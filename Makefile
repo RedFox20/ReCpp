@@ -17,8 +17,15 @@ OBJDIRS   := obj obj\src $(OBJDIRS:%\=%)
 OBJDIRS   := $(call make_unique,$(OBJDIRS))
 LIBOUT  := Debug/recpp.a
 TESTOUT := test.exe
-LFLAGS  := -Wall 
-CFLAGS  := -Wall -Wfatal-errors -Wno-pmf-conversions -std=c++11 -I./src/ -g
+MODE    := -m32
+CC      := g++
+OPTS    := -g
+#MODE    := -m64
+#CC      := g++64
+#OPTS    := -O3
+LFLAGS  := $(MODE) $(OPTS) -Wall
+CFLAGS  := $(MODE) $(OPTS) -Wall -Wfatal-errors -Wno-pmf-conversions -std=c++11 -I./src/
+
 
 .phony: all clean
 all: $(TESTOUT)
@@ -31,10 +38,10 @@ clean:
 
 $(TESTOUT): obj/ Debug/ $(LIBOUT) $(TESTOBJS)
 	@echo Linking $(TESTOUT)...
-	@g++ $(LFLAGS) -o $(TESTOUT) $(TESTOBJS) $(LIBOUT)
+	@$(CC) $(LFLAGS) -o $(TESTOUT) $(TESTOBJS) $(LIBOUT)
 obj/%.o: %.cpp
 	@echo Compile $*.cpp...
-	@g++ $(CFLAGS) -c $*.cpp -o obj/$*.o -MD
+	@$(CC) $(CFLAGS) -c $*.cpp -o obj/$*.o -MD
 
 $(LIBOUT): $(LIBOBJS)
 	@echo Linking $(LIBOUT)

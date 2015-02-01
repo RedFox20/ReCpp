@@ -391,7 +391,7 @@ int path::list_files(std::vector<std::string>& out, const char* directory, const
 	} while (FindNextFileA(hFind, &ffd));
 
 	FindClose(hFind);
-	return out.size();
+	return (int)out.size();
 }
 
 
