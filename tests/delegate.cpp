@@ -58,6 +58,14 @@ TestImpl(delegate_test)
 {
 	Implement(delegate_test)
 	{
+//#if __GNUG__
+//		BaseClass a;
+//		typedef int(*func_type)(BaseClass* a, int i);
+//		int (BaseClass::*membfunc)(int i) = &BaseClass::func3;
+//		func_type fp = (func_type)(&a->*membfunc);
+//		printf("BaseClass::func3 %p\n", fp);
+//#endif
+
 		MyClass inst;
 		int params1 = 11, params2 = 22;
 

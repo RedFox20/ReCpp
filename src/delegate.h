@@ -69,9 +69,15 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	/// for regular and member function calls
 	typedef Ret ret_type;
 	typedef Ret(*func_type)(Args...);
-	typedef Ret(__thiscall *memb_type)(void*, Args...);
-	struct dummy {};
-	typedef Ret(dummy::*dummy_type)(Args...);
+	#ifdef _MSC_VER // VC++
+		typedef Ret(__thiscall *memb_type)(void*, Args...);
+		struct dummy {};
+		typedef Ret(dummy::*dummy_type)(Args...);
+	#elif defined(__GNUG__) // G++
+		typedef Ret(__thiscall *memb_type)(void*, Args...);
+		struct dummy {};
+		typedef Ret(dummy::*dummy_type)(void*, Args...);
+	#endif
 
 
 	/// for functors/lambdas and to ensure delegate copy works
@@ -108,10 +114,11 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 		};
 		void* obj;
 		member() {}
+		member(void* o, memb_type f) : ptr(f), obj(o) {}
 		member(void* o, dummy_type f) : dptr(f), obj(o) {}
 		virtual void copy(void* dst) const override
 		{
-			new (dst) member(obj, dptr);
+			new (dst) member(obj, ptr);
 		}
 		virtual Ret operator()(Args&&... args) override
 		{
@@ -226,10 +233,14 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	* @brief Object member function constructor (from pointer)
 	* @example delegate<void(int)> d(&myClass, &MyClass::func);
 	*/
-	template<class Class> delegate(void* obj,
-		Ret(Class::*membfunc)(Args...))
+	template<class IClass, class FClass> delegate(IClass* obj,
+		Ret(FClass::*membfunc)(Args...))
 	{
-		new (data) member(obj, (dummy_type)membfunc);
+		#ifdef _MSC_BUILD // VC++
+			new (data) member(obj, (dummy_type)membfunc);
+		#elif defined(__GNUG__) // G++
+			new (data) member(obj, (memb_type)(obj->*membfunc));
+		#endif
 	}
 	/**
 	* @brief Object member function constructor (from reference)
@@ -238,7 +249,11 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	template<class IClass, class FClass> delegate(IClass& obj,
 		Ret(FClass::*membfunc)(Args...))
 	{
-		new (data) member(&obj, (dummy_type)membfunc);
+		#ifdef _MSC_BUILD // VC++
+			new (data) member(&obj, (dummy_type)membfunc);
+		#elif defined(__GNUG__) // G++
+			new (data) member(&obj, (memb_type)(&obj->*membfunc));
+		#endif
 	}
 	/**
 	* @brief Functor type constructor for lambdas and old-style functors
@@ -283,17 +298,26 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 		new (data) function(func);
 	}
 	/** @brief Resets the delegate to point to a member function */
-	template<class Class> void reset(void* obj, Ret(Class::*membfunc)(Args...))
+	template<class IClass, class FClass>
+	void reset(IClass* obj, Ret(FClass::*membfunc)(Args...))
 	{
 		~delegate();
-		new (data) member(obj, (dummy_type)membfunc);
+		#ifdef _MSC_BUILD // VC++
+			new (data) member(obj, (dummy_type)membfunc);
+		#elif defined(__GNUG__) // G++
+			new (data) member(obj, (memb_type)(obj->*membfunc));
+		#endif
 	}
 	/** @brief Resets the delegate to point to a member function */
 	template<class IClass, class FClass>
 	void reset(IClass& obj, Ret(FClass::*membfunc)(Args...))
 	{
 		~delegate();
-		new (data) member(&obj, (dummy_type)membfunc);
+		#ifdef _MSC_BUILD // VC++
+			new (data) member(&obj, (dummy_type)membfunc);
+		#elif defined(__GNUG__) // G++
+			new (data) member(&obj, (memb_type)(&obj->*membfunc));
+		#endif
 	}
 	/** @brief Resets the delegate to point to a functor or lambda */
 	template<class Functor> void reset(Functor&& ftor)
@@ -364,8 +388,8 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 		return data[0] == *(void**)&vt && data[1] == func;
 	}
 	/** @brief Class member function comparison is instance sensitive */
-	template<class Class>
-	bool equals(void* obj, Ret(Class::*membfunc)(Args...)) const
+	template<class IClass, class FClass>
+	bool equals(IClass* obj, Ret(FClass::*membfunc)(Args...)) const
 	{
 		member vt; // vtable reference object
 		return data[0] == *(void**)&vt &&
@@ -393,6 +417,8 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 
 
 
+
+
 /**
 * @brief Event class - a delegate container object
 * @note Event class is optimized to have minimal overhead if no events are registered
@@ -412,12 +438,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 template<class Func> struct event;
 template<class Ret, class... Args> struct event<Ret(Args...)>
 {
-	/// for regular and member function calls
-	typedef Ret(*func_type)(Args...);
-	typedef Ret(__thiscall *memb_type)(void*, Args...);
-	struct dummy {};
-	typedef Ret(dummy::*dummy_type)(Args...);
-	typedef delegate<Ret(Args...)> T;
+	typedef delegate<Ret(Args...)> T; // delegate type
 
 
 	/// dynamic data container, actual size is sizeof(container) + sizeof(T)*(capacity-1)

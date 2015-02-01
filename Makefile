@@ -17,8 +17,8 @@ OBJDIRS   := obj obj\src $(OBJDIRS:%\=%)
 OBJDIRS   := $(call make_unique,$(OBJDIRS))
 LIBOUT  := Debug/recpp.a
 TESTOUT := test.exe
-LFLAGS  := 
-CFLAGS  := -Wfatal-errors -std=c++11 -I./src/ -g
+LFLAGS  := -Wall 
+CFLAGS  := -Wall -Wfatal-errors -Wno-pmf-conversions -std=c++11 -I./src/ -g
 
 .phony: all clean
 all: $(TESTOUT)
