@@ -15,10 +15,10 @@ AUTODEPS  := $(LIBSRCS:%.cpp=obj/%.d) $(TESTSRCS:%.cpp=obj/%.d)
 OBJDIRS   := $(subst /,\,$(dir $(AUTODEPS)))
 OBJDIRS   := obj obj\src $(OBJDIRS:%\=%)
 OBJDIRS   := $(call make_unique,$(OBJDIRS))
-LIBOUT  := recpp.a
+LIBOUT  := Debug/recpp.a
 TESTOUT := test.exe
-LFLAGS  := -Wall
-CFLAGS  := -Wall -std=c++11 -I./src/ -g
+LFLAGS  := 
+CFLAGS  := -Wfatal-errors -std=c++11 -I./src/ -g
 
 .phony: all clean
 all: $(TESTOUT)
@@ -27,9 +27,9 @@ clean:
 	@rm -rf obj/ $(LIBOUT) $(TESTOUT)
 	
 # declare all the autodeps
--include obj/*.d
+-include $(AUTODEPS)
 
-$(TESTOUT): obj/ $(LIBOUT) $(TESTOBJS)
+$(TESTOUT): obj/ Debug/ $(LIBOUT) $(TESTOBJS)
 	@echo Linking $(TESTOUT)...
 	@g++ $(LFLAGS) -o $(TESTOUT) $(TESTOBJS) $(LIBOUT)
 obj/%.o: %.cpp
@@ -41,3 +41,5 @@ $(LIBOUT): $(LIBOBJS)
 	@ar rcs $(LIBOUT) $(LIBOBJS)
 obj/:
 	@mkdir $(OBJDIRS)
+Debug/:
+	@mkdir Debug/

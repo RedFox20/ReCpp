@@ -66,7 +66,8 @@ TestImpl(delegate_test)
 		delegate<int(int)> d2(inst, &MyClass::func2);
 		Assert(d2(20) == 2);
 
-		delegate<int(int)> d3((BaseClass)inst, &BaseClass::func3);
+		BaseClass binst = inst;
+		delegate<int(int)> d3(binst, &BaseClass::func3);
 		Assert(d3(30) == 3); // this must result in BaseClass::func3 virtual call
 
 		delegate<int(int)> d4((BaseClass*)&inst, &BaseClass::func3);

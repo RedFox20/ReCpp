@@ -30,7 +30,18 @@
 *     delegate<bool(int,int)> comparer = std::less<int>();
 *     bool result = comparer(37, 42);
 *
+*  -) Events:
+*
+*     event<void(int,int)> on_mouse_move;
+*     on_mouse_move += &scene_mousemove;   // register events
+*     on_mouse_move += &gui_mouse_handler; 
+*     on_mouse_move(deltaX, deltaY);       // invoke multicast delegate (event)
+*     ...
+*     on_mouse_move -= &scene_mousemove;   // unregister existing event
+*     on_mouse_move.clear();               // unregister all
 */
+#include <cstdlib> // malloc/free for event<()>
+#include <cstring> // memmove for event<()>
 
 
 /**
@@ -82,7 +93,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 		}
 		virtual Ret operator()(Args&&... args) override
 		{
-			return (Ret)ptr((Args&&...)args...);
+			return (Ret)ptr((Args&&)args...);
 		}
 		virtual bool equals(const callable* c) const override
 		{
@@ -104,7 +115,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 		}
 		virtual Ret operator()(Args&&... args) override
 		{
-			return (Ret)ptr(obj, (Args&&...)args...);
+			return (Ret)ptr(obj, (Args&&)args...);
 		}
 		virtual bool equals(const callable* c) const override
 		{
@@ -143,7 +154,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 		virtual Ret operator()(Args&&... args) override
 		{
 			FUNC& fn = (sizeof(FUNC) <= SZ) ? *(FUNC*)data : *ftor;
-			return (Ret)fn((Args&&...)args...);
+			return (Ret)fn((Args&&)args...);
 		}
 	};
 
@@ -199,7 +210,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	{
 		if (this != &d)
 		{
-			void* d0 = data[0], d1 = data[1], d2 = data[2], d3 = data[3];
+			void* d0 = data[0], *d1 = data[1], *d2 = data[2], *d3 = data[3];
 			data[0] = d.data[0];
 			data[1] = d.data[1];
 			data[2] = d.data[2];
@@ -215,8 +226,8 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	* @brief Object member function constructor (from pointer)
 	* @example delegate<void(int)> d(&myClass, &MyClass::func);
 	*/
-	template<class FClass> delegate(void* obj,
-		Ret(FClass::*membfunc)(Args...))
+	template<class Class> delegate(void* obj,
+		Ret(Class::*membfunc)(Args...))
 	{
 		new (data) member(obj, (dummy_type)membfunc);
 	}
@@ -246,7 +257,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	*/
 	Ret operator()(Args&&... args)
 	{
-		return (*(callable*)data)((Args&&...)args...);
+		return (Ret)(*(callable*)data)((Args&&)args...);
 	}
 
 
@@ -374,7 +385,7 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	template<class Functor> bool equals() const
 	{
 		delegate::functor<Functor> vt; // vtable reference object
-		return data[0] == *(void**)&fn; // comparing vtables should be enough
+		return data[0] == *(void**)&vt; // comparing vtables should be enough
 	}
 
 };
@@ -529,7 +540,8 @@ template<class Ret, class... Args> struct event<Ret(Args...)>
 		auto data = ptr->data;
 		for (int i = 0; i < count; ++i)
 		{
-			data[i]((Args&&...)args...);
+			data[i]((Args&&)args...);
+			//(Ret)(*(T::callable*)data[i].data)(std::forward<Args>(args)...);
 		}
 	}
 };

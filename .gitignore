@@ -5,3 +5,6 @@
 /ReCpp/Debug
 /MSVC/Debug
 /Tests/Debug
+/obj/tests
+/obj/src/io
+/test.exe

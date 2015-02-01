@@ -1,4 +1,5 @@
 #pragma once
+#include <stdio.h> // some basic printf etc.
 #include <vector>
 
 using namespace std;
