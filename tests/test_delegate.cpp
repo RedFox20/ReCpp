@@ -124,6 +124,8 @@ TestImpl(delegate_test)
 		evt.remove(evc, &EvtClass::evt_func2);
 		evt(00);
 		Assert(evt.size() == 0); // must be empty now
-
 	}
+
+
+
 } Impl;

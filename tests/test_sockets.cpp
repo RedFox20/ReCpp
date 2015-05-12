@@ -62,5 +62,4 @@ TestImpl(sockets_test)
 		printf("remote: server disconnected\n");
 		printf("remote: closing down\n");
 	}
-
 } Impl;
