@@ -1,3 +1,6 @@
+/**
+ * Copyright (c) 2015 ReCpp - Jorma Rebane
+ */
 #include "file_io.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -50,9 +53,21 @@ char* load_buffer::steal_ptr()
 
 
 
-
-
-static void* OpenFile(const char* filename, IOFlags mode)
+static void* OpenFile(const char* file, int desiredAccess, int sharingMode, 
+					  int creationDisposition, int openFlags)
+{
+	SECURITY_ATTRIBUTES secu = { sizeof(secu), NULL, TRUE };
+	void* handle = CreateFileA(file, desiredAccess, sharingMode, &secu, creationDisposition, openFlags, 0);
+	return handle != INVALID_HANDLE_VALUE ? handle : 0;
+}
+static void* OpenFile(const wchar_t* file, int desiredAccess, int sharingMode, 
+					  int creationDisposition, int openFlags)
+{
+	SECURITY_ATTRIBUTES secu = { sizeof(secu), NULL, TRUE };
+	void* handle = CreateFileW(file, desiredAccess, sharingMode, &secu, creationDisposition, openFlags, 0);
+	return handle != INVALID_HANDLE_VALUE ? handle : 0;
+}
+template<class CHAR> static void* OpenFile(const CHAR* filename, IOFlags mode)
 {
 	int desiredAccess;
 	int sharingMode;			// FILE_SHARE_READ, FILE_SHARE_WRITE
@@ -67,7 +82,7 @@ static void* OpenFile(const char* filename, IOFlags mode)
 			creationDisposition = OPEN_EXISTING;
 			openFlags			= FILE_ATTRIBUTE_NORMAL|FILE_FLAG_SEQUENTIAL_SCAN;
 			break;
-		case READONLYEXECUTE:
+		case READONLY_EXECUTE:
 			desiredAccess       = FILE_GENERIC_READ|FILE_GENERIC_EXECUTE;
 			sharingMode			= FILE_SHARE_READ | FILE_SHARE_WRITE;
 			creationDisposition = OPEN_EXISTING;
@@ -79,7 +94,7 @@ static void* OpenFile(const char* filename, IOFlags mode)
 			creationDisposition = OPEN_EXISTING; // if not exists, fail
 			openFlags           = FILE_ATTRIBUTE_NORMAL;
 			break;
-		case READWRITECREATE:
+		case READWRITE_CREATE:
 			desiredAccess       = FILE_GENERIC_READ|FILE_GENERIC_WRITE;
 			sharingMode			= FILE_SHARE_READ;
 			creationDisposition = OPEN_ALWAYS; // if exists, success, else create file
@@ -98,12 +113,23 @@ static void* OpenFile(const char* filename, IOFlags mode)
 			openFlags			= FILE_FLAG_DELETE_ON_CLOSE | FILE_ATTRIBUTE_TEMPORARY;
 			break;
 	}
-	SECURITY_ATTRIBUTES secu = { sizeof(secu), NULL, TRUE };
-	void* handle = CreateFileA(filename, desiredAccess, sharingMode, &secu, creationDisposition, openFlags, 0);
-	return handle != INVALID_HANDLE_VALUE ? handle : 0;
+	return OpenFile(filename, desiredAccess, sharingMode, 
+				    creationDisposition, openFlags);
 }
 
 
+//#define PATH_LEN 512
+//template<class CHAR> static const CHAR* temp_path(const CHAR* str, int length)
+//{
+//	static CHAR buffer[PATH_LEN];
+//	if (length < PATH_LEN)
+//	{
+//		memcpy(buffer, str, length * sizeof(CHAR));
+//	}
+//	// else: @note OS Paths are limited to 260 chars unless \\?\ is prepended to a WSTR
+//	buffer[length] = 0;
+//	return buffer;
+//}
 
 
 
@@ -111,8 +137,8 @@ file::file(const char* filename, IOFlags mode)
 	: Handle(OpenFile(filename, mode)), Mode(mode)
 {
 }
-file::file(const std::string& filename, IOFlags mode)
-	: Handle(OpenFile(filename.c_str(), mode)), Mode(mode)
+file::file(const wchar_t* filename, IOFlags mode)
+	: Handle(OpenFile(filename, mode)), Mode(mode)
 {
 }
 file::file(file&& f)
@@ -135,6 +161,13 @@ file& file::operator=(file&& f)
 	return *this;
 }
 bool file::open(const char* filename, IOFlags mode)
+{
+	if (Handle)
+		CloseHandle(Handle);
+	Mode = mode;
+	return (Handle = OpenFile(filename, mode)) != NULL;
+}
+bool file::open(const wchar_t* filename, IOFlags mode)
 {
 	if (Handle)
 		CloseHandle(Handle);
@@ -187,8 +220,11 @@ load_buffer file::read_all()
 }
 load_buffer file::read_all(const char* filename)
 {
-	file f(filename, READONLY);
-	return f.read_all();
+	return file(filename, READONLY).read_all();
+}
+load_buffer file::read_all(const wchar_t* filename)
+{
+	return file(filename, READONLY).read_all();
 }
 int file::write(const void* buffer, int bytesToWrite)
 {
@@ -197,6 +233,10 @@ int file::write(const void* buffer, int bytesToWrite)
 	return (int)bytesWritten;
 }
 int file::write_new(const char* filename, const void* buffer, int bytesToWrite)
+{
+	return file(filename, IOFlags::CREATENEW).write(buffer, bytesToWrite);
+}
+int file::write_new(const wchar_t* filename, const void* buffer, int bytesToWrite)
 {
 	return file(filename, IOFlags::CREATENEW).write(buffer, bytesToWrite);
 }
@@ -230,29 +270,16 @@ unsigned __int64 file::time_modified() const
 
 
 
-#define PATH_LEN 512
-inline const char* temp_path(const char* str, int length)
-{
-	static char buffer[PATH_LEN];
-	if (length < PATH_LEN)
-		memcpy(buffer, str, length);
-	buffer[length] = 0;
-	return buffer;
-}
-
 
 bool file_exists(const char* filename)
 {
 	int attr = GetFileAttributesA(filename);
 	return attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
-bool file_exists(const std::string& filename)
+bool file_exists(const wchar_t* filename)
 {
-	return file_exists(filename.c_str());
-}
-bool file_exists(const char* filename, int length)
-{
-	return file_exists(temp_path(filename, length));
+	int attr = GetFileAttributesW(filename);
+	return attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
 bool folder_exists(const char* folder)
@@ -260,13 +287,10 @@ bool folder_exists(const char* folder)
 	int attr = GetFileAttributesA(folder);
 	return attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
-bool folder_exists(const std::string& folder)
+bool folder_exists(const wchar_t* folder)
 {
-	return folder_exists(folder.c_str());
-}
-bool folder_exists(const char* filename, int length)
-{
-	return folder_exists(temp_path(filename, length));
+	int attr = GetFileAttributesW(folder);
+	return attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 unsigned int file_size(const char* filename)
@@ -275,13 +299,11 @@ unsigned int file_size(const char* filename)
 	if (!GetFileAttributesExA(filename, GetFileExInfoStandard, &fad)) return -1;
 	return fad.nFileSizeLow;
 }
-unsigned int file_size(const std::string& filename)
+unsigned int file_size(const wchar_t* filename)
 {
-	return file_size(filename.c_str());
-}
-unsigned int file_size(const char* filename, int length)
-{
-	return file_size(temp_path(filename, length));
+	WIN32_FILE_ATTRIBUTE_DATA fad;
+	if (!GetFileAttributesExW(filename, GetFileExInfoStandard, &fad)) return -1;
+	return fad.nFileSizeLow;
 }
 
 unsigned __int64 file_sizel(const char* filename)
@@ -291,57 +313,49 @@ unsigned __int64 file_sizel(const char* filename)
 	LARGE_INTEGER sz = { fad.nFileSizeLow, (LONG)fad.nFileSizeHigh };
 	return sz.QuadPart;
 }
-unsigned __int64 file_sizel(const std::string& filename)
+unsigned __int64 file_sizel(const wchar_t* filename)
 {
-	return file_sizel(filename.c_str());
-}
-unsigned __int64 file_sizel(const char* filename, int length)
-{
-	return file_sizel(temp_path(filename, length));
+	WIN32_FILE_ATTRIBUTE_DATA fad;
+	if (!GetFileAttributesExW(filename, GetFileExInfoStandard, &fad)) return -1;
+	LARGE_INTEGER sz = { fad.nFileSizeLow, (LONG)fad.nFileSizeHigh };
+	return sz.QuadPart;
 }
 
 time_t file_modified(const char* filename)
 {
 	return file(filename).time_modified();
 }
-time_t file_modified(const std::string& filename)
+time_t file_modified(const wchar_t* filename)
 {
 	return file(filename).time_modified();
-}
-time_t file_modified(const char* filename, int length)
-{
-	return file(temp_path(filename, length)).time_modified();
 }
 
 bool create_folder(const char* filename)
 {
 	return !!CreateDirectoryA(filename, NULL);
 }
-bool create_folder(const std::string& filename)
+bool create_folder(const wchar_t* filename)
 {
-	return create_folder(filename.c_str());
-}
-bool create_folder(const char* filename, int length)
-{
-	return create_folder(temp_path(filename, length));
+	return !!CreateDirectoryW(filename, NULL);
 }
 
-bool delete_folder(const char* filename)
+bool delete_folder(const char* foldername)
 {
 	SHFILEOPSTRUCTA file_op = {
-		NULL, FO_DELETE, filename, "",
+		NULL, FO_DELETE, foldername, "",
 		FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
 		false, 0, ""
 	};
 	return SHFileOperationA(&file_op) == 0;
 }
-bool delete_folder(const std::string& file)
+bool delete_folder(const wchar_t* foldername)
 {
-	return delete_folder(file.c_str());
-}
-bool delete_folder(const char* filename, int length)
-{
-	return delete_folder(temp_path(filename, length));
+	SHFILEOPSTRUCTW file_op = {
+		NULL, FO_DELETE, foldername, L"",
+		FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
+		false, 0, L""
+	};
+	return SHFileOperationW(&file_op) == 0;
 }
 
 
@@ -362,6 +376,7 @@ int path::list_dirs(std::vector<std::string>& out, const char* directory, const 
 	{
 		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
+			// @note rely on intrinsics to optimize these strcmp's
 			if (strcmp(ffd.cFileName, ".") != 0 && strcmp(ffd.cFileName, "..") != 0)
 				out.emplace_back(ffd.cFileName);
 		}
@@ -395,61 +410,66 @@ int path::list_files(std::vector<std::string>& out, const char* directory, const
 }
 
 
-std::string path::get_working_dir()
+std::string path::working_dir()
 {
-	char path[PATH_LEN];
+	char path[512];
 	return std::string(path, GetCurrentDirectoryA(sizeof path, path));
 }
-
-void path::set_working_dir(const std::string& new_wd)
+std::wstring path::working_dirw()
 {
-	SetCurrentDirectoryA(new_wd.c_str());
+	wchar_t path[512];
+	return std::wstring(path, GetCurrentDirectoryW(_countof(path), path));
 }
 
-std::string path::fullpath(const std::string& relativePath)
+void path::working_dir(const char* newWorkingDir)
 {
-	char path[PATH_LEN];
-	return std::string(path, GetFullPathNameA(relativePath.c_str(), sizeof path, path, NULL));
+	SetCurrentDirectoryA(newWorkingDir);
+}
+void path::working_dir(const wchar_t* newWorkingDir)
+{
+	SetCurrentDirectoryW(newWorkingDir);
 }
 
-std::string path::fullpath(const char* relativePath)
+std::string path::full_path(const char* relativePath)
 {
-	char path[PATH_LEN];
+	char path[512];
 	return std::string(path, GetFullPathNameA(relativePath, sizeof path, path, NULL));
 }
-
-std::string path::filename(const std::string& someFilePath)
+std::wstring path::full_path(const wchar_t* relativePath)
 {
-	char path[PATH_LEN];
-	char* file;
-	int len = GetFullPathNameA(someFilePath.c_str(), sizeof path, path, &file);
-	return std::string(file, (path + len) - file);
+	wchar_t path[512];
+	return std::wstring(path, GetFullPathNameW(relativePath, _countof(path), path, NULL));
 }
 
-std::string path::filename(const char* someFilePath)
+std::string path::file_name(const char* someFilePath)
 {
-	char path[PATH_LEN];
+	char path[512];
 	char* file;
 	int len = GetFullPathNameA(someFilePath, sizeof path, path, &file);
 	return std::string(file, (path + len) - file);
 }
-
-std::string path::foldername(const std::string& someFolderPath)
+std::wstring path::file_name(const wchar_t* someFilePath)
 {
-	char path[PATH_LEN];
-	char* file;
-	GetFullPathNameA(someFolderPath.c_str(), sizeof path, path, &file);
-	return std::string(path, file - path);
+	wchar_t path[512];
+	wchar_t* file;
+	int len = GetFullPathNameW(someFilePath, _countof(path), path, &file);
+	return std::wstring(file, (path + len) - file);
 }
 
-std::string path::foldername(const char* someFolderPath)
+std::string path::folder_name(const char* someFolderPath)
 {
-	char path[PATH_LEN];
+	char path[512];
 	char* file;
 	GetFullPathNameA(someFolderPath, sizeof path, path, &file);
 	return std::string(path, file - path);
 }
-
+std::wstring path::folder_name(const wchar_t* someFolderPath)
+{
+	wchar_t path[512];
+	wchar_t* file;
+	GetFullPathNameW(someFolderPath, _countof(path), path, &file);
+	return std::wstring(path, file - path);
+}
 
 
 

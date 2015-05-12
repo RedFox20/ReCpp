@@ -10,11 +10,14 @@
     <ClInclude Include="..\tests\tests.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\tests\file_io.cpp">
+    <ClCompile Include="..\tests\tests.cpp" />
+    <ClCompile Include="..\tests\test_delegate.cpp">
       <Filter>tests</Filter>
     </ClCompile>
-    <ClCompile Include="..\tests\tests.cpp" />
-    <ClCompile Include="..\tests\delegate.cpp">
+    <ClCompile Include="..\tests\test_file_io.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tests\test_sockets.cpp">
       <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>

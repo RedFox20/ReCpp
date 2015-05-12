@@ -36,19 +36,27 @@ void test::assert_failed(const char* file, int line, const char* expression)
 
 void test::run_test()
 {
-	printf("running '%s'\n", name);
+	char title[256];
+	int len = sprintf(title, "--------  running '%s'  --------", name);
+	printf("%s\n", title);
 	run();
+	printf("%s\n\n", memset(title, '-', len));
 }
 
-
-TestImpl(test_test)
+void test::sleep(int millis)
 {
-	Implement(test_test)
-	{
-		Assert(1 == 1);
-	}
+	_sleep(millis);
 }
-Instance;
+
+
+//TestImpl(test_test)
+//{
+//	Implement(test_test)
+//	{
+//		Assert(1 == 1);
+//	}
+//}
+//Instance;
 
 
 int main(int argc, char** argv, char** envp)

@@ -13,12 +13,18 @@
     <ClCompile Include="..\src\io\file_io.cpp">
       <Filter>src\io</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\sockets.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\io\file_io.h">
       <Filter>src\io</Filter>
     </ClInclude>
     <ClInclude Include="..\src\delegate.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\sockets.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

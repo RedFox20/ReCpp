@@ -125,10 +125,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\io\file_io.cpp" />
+    <ClCompile Include="..\src\sockets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\delegate.h" />
     <ClInclude Include="..\src\io\file_io.h" />
+    <ClInclude Include="..\src\sockets.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
