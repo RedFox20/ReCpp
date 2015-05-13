@@ -38,16 +38,18 @@ void fileio_read_sample(const char* filename = "./README.md")
 {
 	if (file f = file(filename, READONLY))
 	{
-		load_buffer data = f.read_all(); // reads all data in the most efficient way possible
+		// reads all data in the most efficient way
+		load_buffer data = f.read_all(); 
 		
-		// use the data with binary_reader/text_reader or any other method of your own choosing
-		// alternatively tokenizers can be used to parse text
+		// use the data as a binary blob
 		for (char& ch : data) { }
 	}
 }
 void fileio_writeall_sample(const char* file = "./test.txt")
 {
-	std::string someText = "/**\n * A simple self-expanding buffer\n */\nstruct write_buffer\n{\n";
+	std::string someText = "/**\n * A simple self-expanding buffer\n */\nstruct";
+	
+	// write a new file with the contents of someText
 	file::write_new(file, someText.data(), someText.size());
 }
 void fileio_methods_sample(const char* file = "./README.md")
@@ -61,28 +63,6 @@ void fileio_methods_sample(const char* file = "./README.md")
 		printf("  file_name     : %s\n",   file_name(file).c_str());
 		printf("  folder_name   : %s\n",   folder_name(full_path(file)).c_str());
 	}
-	create_folder("examplefolder");
-	delete_folder("examplefolder");
-}
-void fileio_listfiles_sample(const char* folder = "./src")
-{
-	std::vector<std::string> files;
-	list_files(files, folder, "*.*");
-	
-	printf(" === Files in '%s' === \n", folder);
-	for (auto& file : files)
-	{
-		printf("  %s\n", file.c_str());
-	}
-}
-void fileio_dirwatch_sample(const char* dir = "./src")
-{
-	dirwatch dw(dir, notify_file_modified);
-	
-	while (dw.wait(-1)) // wait forever until a file is modified
-	{
-		printf("A file was modified in '%s'\n", dir);
-	}
 }
 ```
 
@@ -93,47 +73,28 @@ void fileio_dirwatch_sample(const char* dir = "./src")
 | `event<void(a)>`  | Multicast delegate object, acts as an optimized container for registering multiple delegates to a single event. |
 ##### Examples of using delegates for any convenient case
 ```cpp
-void func(int a) { printf("func %d!\n", a); }
-struct myclass { void func(int a) { printf("myclass::func %d!\n", a); } };
-
 void delegate_samples()
 {
-	// regular functions
-	delegate<void(int)> fn1 = &func;
-	fn1(42);
+	// create a new function delegate - in this case using a lambda
+	delegate<void(int)> fn = [](int a) { 
+		printf("lambda %d!\n", a); 
+	};
 	
-	// class member functions
-	myclass mc;
-	delegate<void(int)> fn2(mc, &myclass::func);
-	fn2(42);
-	
-	// lambdas
-	delegate<void(int)> fn3 = [](int a) { printf("lambda %d!\n", a); };
-	fn3(42);
-	
-	// functors
-	delegate<bool(int,int)> comparer = std::less<int>();
-	printf("functor std::less(%d, %d): %d\n", 37, 42, comparer(37, 42));
+	// invoke the delegate like any other function
+	fn(42);
 }
 void event_sample()
 {
-	struct guimanager {
-		void mouse_move_handler(int x, int y) {
-			printf("guimanager::mouse_move_handler(%d, %d)\n", x, y);
-		}
-	} guiManager;
-
+	// create an event container
 	event<void(int,int)> onMouseMove;
 
-	// add some notification targets
-	onMouseMove += [](int x, int y) { printf("mx %d, my %d\n", x, y); };
-	onMouseMove.add(guiManager, &guimanager::mouse_move_handler);
+	// add a single notification target (more can be added if needed)
+	onMouseMove += [](int x, int y) { 
+		printf("mx %d, my %d\n", x, y); 
+	};
 	
-	onMouseMove(22, 34);  // call the event and multicast to all registered callbacks
-	onMouseMove(128, 47);
-	
-	onMouseMove.remove(guiManager, &guimanager::mouse_move_handler); // unregister single callback
-	onMouseMove.clear(); // unregister all callbacks
+	// call the event and multicast to all registered callbacks
+	onMouseMove(22, 34);
 }
 ```
 
