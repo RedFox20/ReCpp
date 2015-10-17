@@ -20,5 +20,8 @@
     <ClCompile Include="..\tests\test_sockets.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\tests\test_cppsockets.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

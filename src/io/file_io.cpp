@@ -67,7 +67,7 @@ namespace io {
 		void* handle = CreateFileW(file, desiredAccess, sharingMode, &secu, creationDisposition, openFlags, 0);
 		return handle != INVALID_HANDLE_VALUE ? handle : 0;
 	}
-	template<class CHAR> static void* OpenFile(const CHAR* filename, IOFlags mode)
+	template<class CHAR> static void* OpenFile(const CHAR* filename, io_flags mode)
 	{
 		int desiredAccess;
 		int sharingMode;			// FILE_SHARE_READ, FILE_SHARE_WRITE
@@ -133,11 +133,11 @@ namespace io {
 
 
 
-	file::file(const char* filename, IOFlags mode)
+	file::file(const char* filename, io_flags mode)
 		: Handle(OpenFile(filename, mode)), Mode(mode)
 	{
 	}
-	file::file(const wchar_t* filename, IOFlags mode)
+	file::file(const wchar_t* filename, io_flags mode)
 		: Handle(OpenFile(filename, mode)), Mode(mode)
 	{
 	}
@@ -160,14 +160,14 @@ namespace io {
 		f.Handle = 0;
 		return *this;
 	}
-	bool file::open(const char* filename, IOFlags mode)
+	bool file::open(const char* filename, io_flags mode)
 	{
 		if (Handle)
 			CloseHandle(Handle);
 		Mode = mode;
 		return (Handle = OpenFile(filename, mode)) != NULL;
 	}
-	bool file::open(const wchar_t* filename, IOFlags mode)
+	bool file::open(const wchar_t* filename, io_flags mode)
 	{
 		if (Handle)
 			CloseHandle(Handle);
@@ -234,11 +234,11 @@ namespace io {
 	}
 	int file::write_new(const char* filename, const void* buffer, int bytesToWrite)
 	{
-		return file(filename, IOFlags::CREATENEW).write(buffer, bytesToWrite);
+		return file(filename, io_flags::CREATENEW).write(buffer, bytesToWrite);
 	}
 	int file::write_new(const wchar_t* filename, const void* buffer, int bytesToWrite)
 	{
-		return file(filename, IOFlags::CREATENEW).write(buffer, bytesToWrite);
+		return file(filename, io_flags::CREATENEW).write(buffer, bytesToWrite);
 	}
 	int file::seek(int filepos, int seekmode)
 	{

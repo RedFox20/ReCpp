@@ -2,70 +2,70 @@
 #include <sockets.h>
 #include <thread>
 
-TestImpl(sockets_test)
+using namespace rpp;
+
+TestImpl(cppsockets_test)
 {
-	Implement(sockets_test)
+	Implement(cppsockets_test)
 	{
 		nonblocking_sockets();
 		transmit_data();
 	}
 
-	int Server_ListenTo(int port)
+	static socket create(const char* msg, socket&& s)
 	{
-		int server = Socket_ListenTo(port);
-		Assert(server != -1);
-		printf("server: listening on sock{%d} @ %d\n", server, port);
-		return server;
+		Assert(s.good() && s.connected());
+		printf("%s %s\n", msg, s.name().c_str());
+		return std::move(s);
+	}
+	static socket listen(int port)
+	{
+		return create("server: listening on", socket::listen_to(port));
+	}
+	static socket accept(const socket& server)
+	{
+		return create("server: accepted client", server.accept(5000/*ms*/));
+	}
+	static socket connect(const char* ip, int port)
+	{
+		return create("remote: connected to", socket::connect_to(ip, port, 5000/*ms*/, AF_IPv4));
 	}
 
-	int Server_AcceptClient(int server)
-	{
-		// wait 5s for a client
-		int client = Socket_Accept(server, 5000);
-		printf("server: accepted client sock{%d}\n", client);
-		Assert(client != -1);
-		return client;
-	}
-
+	/**
+	 * This test simulates a very simple client - server setup
+	 */
 	void nonblocking_sockets()
 	{
-		int server = Server_ListenTo(1337); // this is our server
+		socket server = listen(1337); // this is our server
 		std::thread remote(nonblocking_remote); // spawn remote client
+		socket client = accept(server);
 
-		int client = Server_AcceptClient(server);
 		// wait 1ms for a client that will never come
-		int failClient = Socket_Accept(server, 1);
-		Assert(failClient == -1);
+		socket failClient = server.accept(1);
+		Assert(failClient.bad());
 
-		Socket_SendStr(client, "Server says: Hello!");
+		client.send("Server says: Hello!");
 		sleep(500);
 
-		std::string resp = Socket_RecvStr(client);
+		std::string resp = client.recv_str();
 		Assert(resp != "") else printf("%s\n", resp.c_str());
 		sleep(500);
 
 		printf("server: closing down\n");
-		Socket_Close(client);
-		Socket_Close(server);
-
+		client.close();
+		server.close();
 		remote.join(); // wait for remote thread to finish
 	}
-
-	// simulated remote endpoint
-	static void nonblocking_remote()
+	static void nonblocking_remote() // simulated remote endpoint
 	{
-		int server = Socket_ConnectTo("127.0.0.1", 1337, 5000, AF_IPv4);
-		Assert(server != -1);
-
-		printf("remote: connected to server sock{%d}\n", server);
-
-		while (Socket_IsConnected(server))
+		socket server = connect("127.0.0.1", 1337);
+		while (server.connected())
 		{
-			std::string resp = Socket_RecvStr(server);
+			std::string resp = server.recv_str();
 			if (resp != "")
 			{
 				printf("%s\n", resp.c_str());
-				Assert(Socket_SendStr(server, "Client says: Thanks!") > 0);
+				Assert(server.send("Client says: Thanks!") > 0);
 			}
 			sleep(1);
 		}
@@ -77,13 +77,13 @@ TestImpl(sockets_test)
 	{
 		printf("========= TRANSMIT DATA =========\n");
 
-		int server = Server_ListenTo(1337);
+		socket server = listen(1337);
 		std::thread remote(transmitting_remote);
-		int client = Server_AcceptClient(server);
+		socket client = accept(server);
 
 		for (int i = 0; i < 10; ++i)
 		{
-			std::string data = Socket_RecvStr(client);
+			std::string data = client.recv_str();
 			if (data != "")
 			{
 				printf("server: received %d bytes of data from client ", data.length());
@@ -106,29 +106,24 @@ TestImpl(sockets_test)
 		}
 
 		printf("server: closing down\n");
-		Socket_Close(client);
-		Socket_Close(server);
+		client.close();
+		server.close();
 		remote.join();
 	}
 
 	static void transmitting_remote()
 	{
-		int server = Socket_ConnectTo("127.0.0.1", 1337, 5000, AF_IPv4);
-		Assert(server != -1);
-
-		printf("remote: connected to server sock{%d}\n", server);
-
 		char sendBuffer[80000];
 		memset(sendBuffer, '$', sizeof sendBuffer);
 
-		while (Socket_IsConnected(server))
+		socket server = connect("127.0.0.1", 1337);
+		while (server.connected())
 		{
-			int sentBytes = Socket_Send(server, sendBuffer, sizeof sendBuffer);
+			int sentBytes = server.send(sendBuffer, sizeof sendBuffer);
 			if (sentBytes > 0)
 				printf("remote: sent %d bytes of data\n", sentBytes);
 			else
 				printf("remote: failed to send data: %s\n", Socket_LastErrStr().c_str());
-
 			sleep(1000);
 		}
 		printf("remote: server disconnected\n");

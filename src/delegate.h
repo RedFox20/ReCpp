@@ -365,12 +365,12 @@ template<class Ret, class... Args> struct delegate<Ret(Args...)>
 	}
 	template<class Functor> bool operator==(const Functor& fn) const
 	{
-		delegate::functor<Functor> vt; // vtable reference object
+		//delegate::functor<Functor> vt; // vtable reference object
 		return data[0] == *(void**)&fn; // comparing vtables should be enough
 	}
 	template<class Functor> bool operator!=(const Functor& fn) const
 	{
-		delegate::functor<Functor> vt; // vtable reference object
+		//delegate::functor<Functor> vt; // vtable reference object
 		return data[0] != *(void**)&fn; // comparing vtables should be enough
 	}
 

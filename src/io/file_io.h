@@ -7,7 +7,7 @@
 
 namespace io {
 
-	enum IOFlags {
+	enum io_flags {
 		READONLY,			// opens an existing file for reading
 		READONLY_EXECUTE,	// open an existing file for read & execute
 		READWRITE, OPEN_EXISTING = READWRITE,        // opens an existing file for read/write
@@ -98,7 +98,7 @@ namespace io {
 	struct file
 	{
 		void*	Handle;	// File handle
-		IOFlags	Mode;	// File openmode READWRITE or READONLY
+		io_flags	Mode;	// File openmode READWRITE or READONLY
 
 
 		/**
@@ -114,8 +114,8 @@ namespace io {
 		 * @param filename File name to open or create
 		 * @param mode File open mode
 		 */
-		file(const char* filename, IOFlags mode = READONLY);
-		file(const wchar_t* filename, IOFlags mode = READONLY);
+		file(const char* filename, io_flags mode = READONLY);
+		file(const wchar_t* filename, io_flags mode = READONLY);
 
 		/**
 		 * Opens an existing file for reading with mode = READONLY
@@ -123,7 +123,7 @@ namespace io {
 		 * @param filename File name to open or create
 		 * @param mode File open mode
 		 */
-		template<class C> file(const cstring<C>& filename, IOFlags mode = READONLY)
+		template<class C> file(const cstring<C>& filename, io_flags mode = READONLY)
 			: file(filename.c_str(), mode) {}
 
 		/**
@@ -132,7 +132,7 @@ namespace io {
 		 * @param filename File name to open or create
 		 * @param mode File open mode
 		 */
-		template<class C> file(const cfpaths<C>& filename, IOFlags mode = READONLY)
+		template<class C> file(const cfpaths<C>& filename, io_flags mode = READONLY)
 			: file(filename.c_str(), mode) {}
 
 		file(file&& f);
@@ -151,14 +151,14 @@ namespace io {
 		 * @param mode File open mode
 		 * @return TRUE if file open/create succeeded, FALSE if failed
 		 */
-		bool open(const char* filename, IOFlags mode = READONLY);
-		bool open(const wchar_t* filename, IOFlags mode = READONLY);
+		bool open(const char* filename, io_flags mode = READONLY);
+		bool open(const wchar_t* filename, io_flags mode = READONLY);
 
-		template<class C> bool open(const cstring<C>& filename, IOFlags mode = READONLY)
+		template<class C> bool open(const cstring<C>& filename, io_flags mode = READONLY)
 		{
 			return open(filename.c_str(), mode);
 		}
-		template<class C> bool open(const cfpaths<C>& filename, IOFlags mode = READONLY)
+		template<class C> bool open(const cfpaths<C>& filename, io_flags mode = READONLY)
 		{
 			return open(filename.c_str(), mode);
 		}
