@@ -4,9 +4,9 @@
 
 using namespace rpp;
 
-TestImpl(cppsockets_test)
+TestImpl(test_cppsockets)
 {
-	Implement(cppsockets_test)
+	Implement(test_cppsockets)
 	{
 		nonblocking_sockets();
 		transmit_data();
@@ -94,7 +94,7 @@ TestImpl(cppsockets_test)
 					if (data[j] != '$')
 					{
 						printf("(corrupted at position %d):\n", j);
-						printf("%.s\n", 10, &data[j]);
+						printf("%.*s\n", 10, &data[j]);
 						printf("^\n");
 						break;
 					}

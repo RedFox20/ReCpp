@@ -2,9 +2,9 @@
 #include <sockets.h>
 #include <thread>
 
-TestImpl(sockets_test)
+TestImpl(test_sockets)
 {
-	Implement(sockets_test)
+	Implement(test_sockets)
 	{
 		nonblocking_sockets();
 		transmit_data();
@@ -94,7 +94,7 @@ TestImpl(sockets_test)
 					if (data[j] != '$')
 					{
 						printf("(corrupted at position %d):\n", j);
-						printf("%.s\n", 10, &data[j]);
+						printf("%.*s\n", 10, &data[j]);
 						printf("^\n");
 						break;
 					}

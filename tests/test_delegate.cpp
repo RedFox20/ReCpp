@@ -54,9 +54,9 @@ struct EvtClass
 	}
 };
 
-TestImpl(delegate_test)
+TestImpl(test_delegate)
 {
-	Implement(delegate_test)
+	Implement(test_delegate)
 	{
 //#if __GNUG__
 //		BaseClass a;

@@ -1,6 +1,5 @@
 #include "tests.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <typeinfo>
 #include <algorithm>
 
@@ -40,7 +39,7 @@ void test::run_test()
 	int len = sprintf(title, "--------  running '%s'  --------", name);
 	printf("%s\n", title);
 	run();
-	printf("%s\n\n", memset(title, '-', len));
+	printf("%s\n\n", (char*)memset(title, '-', len));
 }
 
 void test::sleep(int millis)
@@ -61,8 +60,28 @@ void test::sleep(int millis)
 
 int main(int argc, char** argv, char** envp)
 {
-	for (test* t : *g_tests)
-		t->run_test();
+	if (argc > 1)
+	{
+		// if arg is provided, we assume it is either:
+		// test_testname or testname
+		bool exactMatch = memcmp(argv[1], "test_", 5) == 0;
+		for (test* t : *g_tests) 
+		{
+			if ((exactMatch && strcmp(t->name, argv[1]) == 0) ||
+				(!exactMatch && strstr(t->name, argv[1]))) 
+			{
+				t->run_test();
+				break;
+			}
+		}
+	}
+	else
+	{
+		for (test* t : *g_tests)
+			t->run_test();
+	}
+
+
 	
 	if (test::asserts_failed)
 	{

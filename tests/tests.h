@@ -1,7 +1,8 @@
 #pragma once
+// these includes are for convenience in TestImpl's not for tests.cpp
 #include <stdio.h> // some basic printf etc.
-#include <vector>
-
+#include <vector>  // access to std::vector and std::string
+#include <string>
 using namespace std;
 
 struct test
