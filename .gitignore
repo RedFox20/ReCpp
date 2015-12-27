@@ -16,4 +16,9 @@
 /MSVC/Release
 /*.opendb
 /MSVC/obj/Debug
-/bin
+/bin/ReCpp.lib
+/bin/ReCpp.pdb
+/bin/Tests.exe
+/bin/Tests.ilk
+/bin/Tests.pdb
+/bin/recpp.a

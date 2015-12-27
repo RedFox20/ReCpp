@@ -1,7 +1,12 @@
 #include "tests.h"
-#include <stdlib.h>
+#include <cstdlib>
 #include <typeinfo>
 #include <algorithm>
+#include <cstring>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif
 
 int test::asserts_failed = 0;
 static vector<test*>* g_tests = 0;
@@ -44,7 +49,11 @@ void test::run_test()
 
 void test::sleep(int millis)
 {
-	_sleep(millis);
+#ifdef _WIN32
+	Sleep(millis);
+#else
+	usleep(millis * 1000);
+#endif
 }
 
 
@@ -80,15 +89,14 @@ int main(int argc, char** argv, char** envp)
 		for (test* t : *g_tests)
 			t->run_test();
 	}
-
-
 	
 	if (test::asserts_failed)
 	{
-		printf("\nWARNING: %d assertions failed!\n", test::asserts_failed);
+		fprintf(stderr, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
 		system("pause");
 		return -1;
 	}
+	printf("\nSUCCESS: All test runs passed!\n");
 	system("pause");
 	return 0;
 }

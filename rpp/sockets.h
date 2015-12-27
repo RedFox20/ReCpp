@@ -288,9 +288,9 @@ namespace rpp
 		template<class T, class U> T request(const U& request, int millis = 1000) {
 			return send(request) <= 0 ? T() : wait_recv<T>(millis);
 		}
-		template<class U> auto request_str(const U& req, int millis = 1000)  { return request<string>(req, millis); }
-		template<class U> auto request_wstr(const U& req, int millis = 1000) { return request<wstring>(req, millis); }
-		template<class U> auto request_data(const U& req, int millis = 1000) { return request<vector<uint8_t>>(req, millis); }
+		template<class U> string          request_str(const U& req, int millis = 1000)  { return request<string>(req, millis); }
+		template<class U> wstring         request_wstr(const U& req, int millis = 1000) { return request<wstring>(req, millis); }
+		template<class U> vector<uint8_t> request_data(const U& req, int millis = 1000) { return request<vector<uint8_t>>(req, millis); }
 
 
 		/**

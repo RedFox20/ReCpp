@@ -137,16 +137,17 @@
   <ItemGroup>
     <ClCompile Include="..\rpp\allocators.cpp" />
     <ClCompile Include="..\rpp\binary_serializer.cpp" />
-    <ClCompile Include="..\rpp\io\file_io.cpp" />
+    <ClCompile Include="..\rpp\file_io.cpp" />
     <ClCompile Include="..\rpp\sockets.cpp" />
     <ClCompile Include="..\rpp\strview.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\allocators.h" />
+    <ClInclude Include="..\rpp\binary_reader.h" />
     <ClInclude Include="..\rpp\binary_serializer.h" />
     <ClInclude Include="..\rpp\binary_writer.h" />
     <ClInclude Include="..\rpp\delegate.h" />
-    <ClInclude Include="..\rpp\io\file_io.h" />
+    <ClInclude Include="..\rpp\file_io.h" />
     <ClInclude Include="..\rpp\sockets.h" />
     <ClInclude Include="..\rpp\strview.h" />
   </ItemGroup>

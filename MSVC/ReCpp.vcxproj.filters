@@ -5,14 +5,8 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="rpp\io">
-      <UniqueIdentifier>{6bd1a6a7-28d8-4ea5-940b-19be80c4515c}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\rpp\io\file_io.cpp">
-      <Filter>rpp\io</Filter>
-    </ClCompile>
     <ClCompile Include="..\rpp\sockets.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
@@ -25,11 +19,11 @@
     <ClCompile Include="..\rpp\strview.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\file_io.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\rpp\io\file_io.h">
-      <Filter>rpp\io</Filter>
-    </ClInclude>
     <ClInclude Include="..\rpp\delegate.h">
       <Filter>rpp</Filter>
     </ClInclude>
@@ -46,6 +40,12 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\strview.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\binary_reader.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\file_io.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>

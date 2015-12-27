@@ -17,10 +17,10 @@
     <ClCompile Include="..\tests\test_file_io.cpp">
       <Filter>tests</Filter>
     </ClCompile>
-    <ClCompile Include="..\tests\test_cppsockets.cpp">
+    <ClCompile Include="..\tests\test_allocators.cpp">
       <Filter>tests</Filter>
     </ClCompile>
-    <ClCompile Include="..\tests\test_allocators.cpp">
+    <ClCompile Include="..\tests\test_sockets.cpp">
       <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>

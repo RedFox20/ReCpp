@@ -1,5 +1,25 @@
 #pragma once
+#include <cassert>
+#include <cstdlib>
 
+	//// @note Some functions get inlined too aggressively, leading to some serious code bloat
+	////       Need to hint the compiler to take it easy ^_^'
+	#ifndef NOINLINE
+		#ifdef _MSC_VER
+			#define NOINLINE __declspec(noinline)
+		#else
+			#define NOINLINE __attribute__((noinline))
+		#endif
+	#endif
+
+	//// @note Some strong hints that some functions are merely wrappers, so should be forced inline
+	#ifndef FINLINE
+		#ifdef _MSC_VER
+			#define FINLINE __forceinline
+		#else
+			#define FINLINE  __attribute__((always_inline))
+		#endif
+	#endif
 
 /**
  * @brief Provides a fixed size pool that provides no 
@@ -28,19 +48,19 @@ struct fixsize_pool
 template<class PoolType, class ObjType> struct specific_allocator
 {
 	PoolType* pool;
-	inline specific_allocator(int maxCount = 1024)
+	FINLINE specific_allocator(int maxCount = 1024) noexcept
 		: pool(PoolType::create(sizeof(ObjType), maxCount)) {}
-	inline ~specific_allocator() {
+	FINLINE ~specific_allocator() noexcept {
 		PoolType::destroy(pool);
 	}
 };
 
-template<class PoolType, size_t SIZE> struct size_allocator
+template<class PoolType, int SIZE> struct size_allocator
 {
 	PoolType* pool;
-	inline size_allocator(int maxCount = 1024)
+	FINLINE size_allocator(int maxCount = 1024) noexcept
 		: pool(PoolType::create(SIZE, maxCount)) {}
-	inline ~size_allocator() {
+	FINLINE ~size_allocator() noexcept {
 		PoolType::destroy(pool);
 	}
 };
@@ -49,8 +69,9 @@ template<class T, class U>
 inline void* operator new(size_t size, specific_allocator<T,U>& a) noexcept {
 	return a.pool->alloc();
 }
-template<class T, size_t S>
-inline void* operator new(size_t size, size_allocator<T, S>& a) noexcept {
+template<class T, size_t SIZE>
+inline void* operator new(size_t size, size_allocator<T, SIZE>& a) noexcept {
+	assert(size == SIZE);
 	return a.pool->alloc();
 }
 

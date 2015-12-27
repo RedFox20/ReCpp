@@ -143,7 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\tests\test_allocators.cpp" />
-    <ClCompile Include="..\tests\test_cppsockets.cpp" />
+    <ClCompile Include="..\tests\test_sockets.cpp" />
     <ClCompile Include="..\tests\test_delegate.cpp" />
     <ClCompile Include="..\tests\tests.cpp" />
     <ClCompile Include="..\tests\test_file_io.cpp" />

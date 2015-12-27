@@ -3,25 +3,25 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-static HANDLE AHeap; // separate heap for allocators only
-static inline void* system_alloc(size_t size) noexcept
-{
-	if (!AHeap) AHeap = HeapCreate(0, 0, 0);
-	return HeapAlloc(AHeap, 0, size);
-}
-static inline void system_free(void* ptr) noexcept
-{
-	HeapFree(AHeap, 0, ptr);
-}
+	static HANDLE AHeap; // separate heap for allocators only
+	static inline void* system_alloc(size_t size) noexcept
+	{
+		if (!AHeap) AHeap = HeapCreate(0, 0, 0);
+		return HeapAlloc(AHeap, 0, size);
+	}
+	static inline void system_free(void* ptr) noexcept
+	{
+		HeapFree(AHeap, 0, ptr);
+	}
 #else
-static void* system_alloc(size_t size) noexcept
-{
-	return malloc(size);
-}
-static void system_free(void* ptr) noexcept
-{
-	free(ptr);
-}
+	static void* system_alloc(size_t size) noexcept
+	{
+		return malloc(size);
+	}
+	static void system_free(void* ptr) noexcept
+	{
+		free(ptr);
+	}
 #endif
 
 
