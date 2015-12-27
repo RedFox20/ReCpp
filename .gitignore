@@ -14,3 +14,6 @@
 /.vs/ReCpp/v14/.suo
 /MSVC/Tests.vcxproj.user
 /MSVC/Release
+/*.opendb
+/MSVC/obj/Debug
+/bin

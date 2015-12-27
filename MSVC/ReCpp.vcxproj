@@ -21,6 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3EA37B51-D733-479E-9341-D7A5A3868365}</ProjectGuid>
     <RootNamespace>ReCpp</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -66,10 +67,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
+    <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
+    <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)bin\</OutDir>
+    <IntDir>obj\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)bin\</OutDir>
+    <IntDir>obj\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -124,15 +135,23 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\allocators.cpp" />
-    <ClCompile Include="..\src\io\file_io.cpp" />
-    <ClCompile Include="..\src\sockets.cpp" />
+    <ClCompile Include="..\rpp\allocators.cpp" />
+    <ClCompile Include="..\rpp\binary_serializer.cpp" />
+    <ClCompile Include="..\rpp\io\file_io.cpp" />
+    <ClCompile Include="..\rpp\sockets.cpp" />
+    <ClCompile Include="..\rpp\strview.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\allocators.h" />
-    <ClInclude Include="..\src\delegate.h" />
-    <ClInclude Include="..\src\io\file_io.h" />
-    <ClInclude Include="..\src\sockets.h" />
+    <ClInclude Include="..\rpp\allocators.h" />
+    <ClInclude Include="..\rpp\binary_serializer.h" />
+    <ClInclude Include="..\rpp\binary_writer.h" />
+    <ClInclude Include="..\rpp\delegate.h" />
+    <ClInclude Include="..\rpp\io\file_io.h" />
+    <ClInclude Include="..\rpp\sockets.h" />
+    <ClInclude Include="..\rpp\strview.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\rpp\strview.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

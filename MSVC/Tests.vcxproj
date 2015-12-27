@@ -21,6 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F97722E2-5FEE-4253-AF54-E81F9B5FAABB}</ProjectGuid>
     <RootNamespace>Tests</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -66,22 +67,24 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir)\..\src\;$(IncludePath)</IncludePath>
-    <IntDir>$(Configuration)\Tests\</IntDir>
+    <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
+    <IntDir>obj\$(Configuration)\Tests\</IntDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)\..\src\;$(IncludePath)</IncludePath>
-    <IntDir>$(Platform)\$(Configuration)\Tests\</IntDir>
-    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
+    <IntDir>obj\$(Platform)\$(Configuration)\Tests\</IntDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(ProjectDir)\..\src\;$(IncludePath)</IncludePath>
-    <IntDir>$(Configuration)\Tests\</IntDir>
+    <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
+    <IntDir>obj\$(Configuration)\Tests\</IntDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)\..\src\;$(IncludePath)</IncludePath>
-    <IntDir>$(Platform)\$(Configuration)\Tests\</IntDir>
-    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
+    <IntDir>obj\$(Platform)\$(Configuration)\Tests\</IntDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -142,7 +145,6 @@
     <ClCompile Include="..\tests\test_allocators.cpp" />
     <ClCompile Include="..\tests\test_cppsockets.cpp" />
     <ClCompile Include="..\tests\test_delegate.cpp" />
-    <ClCompile Include="..\tests\test_sockets.cpp" />
     <ClCompile Include="..\tests\tests.cpp" />
     <ClCompile Include="..\tests\test_file_io.cpp" />
   </ItemGroup>

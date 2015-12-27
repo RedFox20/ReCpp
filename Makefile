@@ -6,16 +6,16 @@
 #
 # Written for MinGW
 make_unique = $(if $1,$(firstword $1) $(call make_unique,$(filter-out $(firstword $1),$1)))
-LIBSRCS   := $(shell find src/   -iname *.cpp)
+LIBSRCS   := $(shell find rpp/   -iname *.cpp)
 TESTSRCS  := $(shell find tests/ -iname *.cpp)
 LIBOBJS   := $(LIBSRCS:%.cpp=obj/%.o)
 TESTOBJS  := $(TESTSRCS:%.cpp=obj/%.o)
 AUTODEPS  := $(LIBSRCS:%.cpp=obj/%.d) $(TESTSRCS:%.cpp=obj/%.d)
 # /\ hack for windows, %\=% hack for mkdir
 OBJDIRS   := $(subst /,\,$(dir $(AUTODEPS)))
-OBJDIRS   := obj obj\src $(OBJDIRS:%\=%)
+OBJDIRS   := obj obj\rpp $(OBJDIRS:%\=%)
 OBJDIRS   := $(call make_unique,$(OBJDIRS))
-LIBOUT  := Debug/recpp.a
+LIBOUT  := bin/recpp.a
 TESTOUT := test.exe
 MODE    := -m32
 CC      := g++
@@ -24,7 +24,7 @@ OPTS    := -g
 #CC      := g++64
 #OPTS    := -O3
 LFLAGS  := $(MODE) $(OPTS) -Wall
-CFLAGS  := $(MODE) $(OPTS) -Wall -Wfatal-errors -Wno-pmf-conversions -std=c++11 -I./src/
+CFLAGS  := $(MODE) $(OPTS) -Wall -Wfatal-errors -Wno-pmf-conversions -std=c++11 -I./ -I./rpp/
 
 
 .phony: all clean
@@ -36,7 +36,7 @@ clean:
 # declare all the autodeps
 -include $(AUTODEPS)
 
-$(TESTOUT): obj/ Debug/ $(LIBOUT) $(TESTOBJS)
+$(TESTOUT): obj/ bin/ $(LIBOUT) $(TESTOBJS)
 	@echo Linking $(TESTOUT)...
 	@$(CC) $(LFLAGS) -o $(TESTOUT) $(TESTOBJS) $(LIBOUT)
 obj/%.o: %.cpp
@@ -46,7 +46,7 @@ obj/%.o: %.cpp
 $(LIBOUT): $(LIBOBJS)
 	@echo Linking $(LIBOUT)
 	@ar rcs $(LIBOUT) $(LIBOBJS)
-obj/:
+obj:
 	@mkdir $(OBJDIRS)
-Debug/:
-	@mkdir Debug/
+bin:
+	@mkdir bin
