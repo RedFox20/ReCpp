@@ -1,5 +1,5 @@
 #include "tests.h"
-#include <sockets.h>
+#include <rpp/sockets.h>
 #include <thread>
 
 using namespace rpp;
@@ -123,7 +123,7 @@ TestImpl(test_cppsockets)
 			if (sentBytes > 0)
 				printf("remote: sent %d bytes of data\n", sentBytes);
 			else
-				printf("remote: failed to send data: %s\n", Socket_LastErrStr().c_str());
+				printf("remote: failed to send data: %s\n", socket::last_err().c_str());
 			sleep(1000);
 		}
 		printf("remote: server disconnected\n");

@@ -124,15 +124,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\allocators.cpp" />
-    <ClCompile Include="..\src\io\file_io.cpp" />
-    <ClCompile Include="..\src\sockets.cpp" />
+    <ClCompile Include="..\rpp\allocators.cpp" />
+    <ClCompile Include="..\rpp\io\file_io.cpp" />
+    <ClCompile Include="..\rpp\sockets.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\allocators.h" />
-    <ClInclude Include="..\src\delegate.h" />
-    <ClInclude Include="..\src\io\file_io.h" />
-    <ClInclude Include="..\src\sockets.h" />
+    <ClInclude Include="..\rpp\allocators.h" />
+    <ClInclude Include="..\rpp\delegate.h" />
+    <ClInclude Include="..\rpp\io\file_io.h" />
+    <ClInclude Include="..\rpp\sockets.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
