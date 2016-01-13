@@ -6,7 +6,7 @@
 namespace rpp // ReCpp
 {
 	// This is same as memchr, but optimized for very small control strings
-	bool strcontains(const char* str, int len, char ch) {
+	FINLINE bool strcontains(const char* str, int len, char ch) {
 		for (int i = 0; i < len; ++i) if (str[i] == ch) return true; // found it.
 		return false;
 	}
@@ -14,7 +14,7 @@ namespace rpp // ReCpp
 	 * @note Same as strpbrk, except we're not dealing with 0-term strings
 	 * @note This function is optimized for 4-8 char str and 3-4 char control.
 	 */
-	const char* strcontains(const char* str, int nstr, const char* control, int ncontrol) {
+	FINLINE const char* strcontains(const char* str, int nstr, const char* control, int ncontrol) {
 		for (auto s = str; nstr; --nstr, ++s)
 			if (strcontains(control, ncontrol, *s)) return s; // done
 		return 0; // not found
@@ -259,7 +259,7 @@ namespace rpp // ReCpp
 	}
 
 
-	static inline void foreach(char* str, int len, int func(int ch)) 
+	static FINLINE void foreach(char* str, int len, int func(int ch)) 
 	{
 		auto s = str, e = s + len;
 		for (; s < e; ++s)
