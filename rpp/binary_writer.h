@@ -151,11 +151,11 @@ namespace rpp /* ReCpp */
 		void flush() { storage::write(data(), size()); clear(); }
 		void write(const void* data, uint numBytes) {
 			if (available() < numBytes) flush(); // forced flush
-			storage::write(data, numBytes);
+			buffer::write(data, numBytes);
 		}
 		template<class T> void write(const T& data) {
 			if (available() < sizeof(T)) flush(); // forced flush
-			storage::write(data);
+			buffer::write(data);
 		}
 	};
 

@@ -87,12 +87,12 @@ namespace rpp /* ReCpp */
 
 
 	// This is same as memchr, but optimized for very small control strings
-	FINLINE bool strcontains(const char* str, int len, char ch);
+	bool strcontains(const char* str, int len, char ch);
 	/**
 	 * @note Same as strpbrk, except we're not dealing with 0-term strings
 	 * @note This function is optimized for 4-8 char str and 3-4 char control.
 	 */
-	FINLINE const char* strcontains(const char* str, int nstr, const char* control, int ncontrol);
+	const char* strcontains(const char* str, int nstr, const char* control, int ncontrol);
 	NOINLINE bool strequals(const char* s1, const char* s2, int len);
 	NOINLINE bool strequalsi(const char* s1, const char* s2, int len);
 
@@ -609,22 +609,22 @@ namespace rpp /* ReCpp */
 	};
 
 
-	FINLINE strview& operator>>(strview& strview, float& out)
+	inline strview& operator>>(strview& strview, float& out)
 	{
 		out = strview.next_float();
 		return strview;
 	}
-	FINLINE strview& operator>>(strview& strview, int& out)
+	inline strview& operator>>(strview& strview, int& out)
 	{
 		out = strview.next_int();
 		return strview;
 	}
-	FINLINE strview& operator>>(strview& strview, unsigned& out)
+	inline strview& operator>>(strview& strview, unsigned& out)
 	{
 		out = strview.next_int();
 		return strview;
 	}
-	FINLINE std::ostream& operator<<(std::ostream& stream, const strview& strview)
+	inline std::ostream& operator<<(std::ostream& stream, const strview& strview)
 	{
 		return stream.write(strview.str, strview.len);
 	}

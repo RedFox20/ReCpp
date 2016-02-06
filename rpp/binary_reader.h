@@ -19,11 +19,11 @@ namespace rpp /* ReCpp */
 	#endif
 
 	#ifndef RPP_MOVECOPY_MACROS_DEFINED
-	#define RPP_MOVECOPY_MACROS_DEFINED
-	#define MOVE(Class,value) Class(Class&&)=value;       Class&operator=(Class&&)=value;
-	#define NOCOPY(Class)     Class(const Class&)=delete; Class&operator=(const Class&)=delete;
-	#define NOCOPY_MOVE(Class)   MOVE(Class,default) NOCOPY(Class) 
-	#define NOCOPY_NOMOVE(Class) MOVE(Class,delete)  NOCOPY(Class) 
+		#define RPP_MOVECOPY_MACROS_DEFINED
+		#define MOVE(Class,value) Class(Class&&)=value;       Class&operator=(Class&&)=value;
+		#define NOCOPY(Class)     Class(const Class&)=delete; Class&operator=(const Class&)=delete;
+		#define NOCOPY_MOVE(Class)   MOVE(Class,default) NOCOPY(Class) 
+		#define NOCOPY_NOMOVE(Class) MOVE(Class,delete)  NOCOPY(Class) 
 	#endif
 
 	#ifndef RPP_MINMAX_DEFINED
@@ -115,27 +115,27 @@ template<class read_impl> struct binary_reader : public reader_base, public read
 	template<class Char> binary_reader& read(std::basic_string<Char>& str) {
 		uint n = min<uint>(read_ushort(), read_impl::available());
 		str.resize(n);
-		read_impl::read((Char*)str.data(), sizeof(Char) * n);
+		read_impl::read((void*)str.data(), sizeof(Char) * n);
 		return *this;
 	}
 	/** @brief Reads a length specified string to the dst buffer in the form of [uint16 len][data] and returns actual length */
-	template<class Char> uint read(Char* dst, uint maxLen) {
+	template<class Char> uint read_nstr(Char* dst, uint maxLen) {
 		uint n = min3<uint>(read_ushort(), read_impl::available(), maxLen);
-		read_impl::read((Char*)dst, sizeof(Char) * n);
+		read_impl::read((void*)dst, sizeof(Char) * n);
 		return n;
 	}
 	/** @brief Peeks a length specified string to the std::string in the form of [uint16 len][data] */
 	template<class Char> binary_reader& peek(std::basic_string<Char>& str) {
 		uint n = min<uint>(read_ushort(), read_impl::available());
 		str.resize(n);
-		read_impl::peek((Char*)str.data(), sizeof(Char) * n);
+		read_impl::peek((void*)str.data(), sizeof(Char) * n);
 		undo(2); // undo read_ushort
 		return *this;
 	}
 	/** @brief Peeks a length specified string to the dst buffer in the form of [uint16 len][data] and returns actual length */
-	template<class Char> uint peek(Char* dst, uint maxLen) {
+	template<class Char> uint peek_nstr(Char* dst, uint maxLen) {
 		uint n = min3<uint>(read_ushort(), read_impl::available(), maxLen);
-		n = read_impl::peek((Char*)dst, sizeof(Char) * n) / sizeof(Char);
+		n = read_impl::peek((void*)dst, sizeof(Char) * n) / sizeof(Char);
 		undo(2); // undo read_ushort
 		return n;
 	}
@@ -400,9 +400,9 @@ template<class buffer, class storage> struct composite_read
 	uint _read(void* dst, uint cnt, uint bufn) {
 		uint rem = cnt - buffer::read(dst, bufn); // read some from buffer; won't read all(!)
 		if (rem >= buffer::max())
-			return bufn + storage::read(dst, rem); // straight from storage
+			return bufn + storage::read((char*)dst+bufn, rem); // straight from storage
 		buffer::fill((storage&)*this);
-		return bufn + buffer::read(dst, rem); // refill and read from buf
+		return bufn + buffer::read((char*)dst+bufn, rem); // refill and read from buf
 	}
 	uint peek(void* dst, uint cnt) {
 		if (!buffer::available())

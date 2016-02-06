@@ -4,6 +4,16 @@
 #include <ostream>  // ostream& operator<<
 #include <string.h> // strlen
 
+//// @note Some functions get inlined too aggressively, leading to some serious code bloat
+////       Need to hint the compiler to take it easy ^_^'
+#ifndef NOINLINE
+	#ifdef _MSC_VER
+	#  define NOINLINE __declspec(noinline)
+	#else
+	#  define NOINLINE __attribute__((noinline))
+	#endif
+#endif
+
 namespace rpp
 {
 	using namespace std;
@@ -181,7 +191,7 @@ namespace rpp
 		 * Send data to remote socket, return number of bytes sent or -1 if socket closed
 		 * Automatically closes socket during critical failure
 		 */
-		int send(const void* buffer, int numBytes);
+		NOINLINE int send(const void* buffer, int numBytes);
 		/** Send a null delimited C string */
 		int send(const char* str);
 		/** Send a null delimited C string */
@@ -190,34 +200,34 @@ namespace rpp
 		template<class T> int send(const basic_string<T>& str) { return send(str.data(), int(sizeof(T) * str.length())); }
 
 		/** @brief Forces the socket object to flush any data in its buffers */
-		void flush();
+		NOINLINE void flush();
 
 		/**
 		 * Peeks the socket for currently available bytes to read
 		 * Automatically closes socket during critical failure and returns -1
 		 * If there is no data in recv buffer, this function returns 0
 		 */
-		int available();
+		NOINLINE int available();
 
 		/**
 		 * Recv data from remote socket, return number of bytes received
 		 * Automatically closes socket during critical failure and returns -1
 		 * If there is no data to receive, this function returns 0
 		 */
-		int recv(void* buffer, int maxBytes);
+		NOINLINE int recv(void* buffer, int maxBytes);
 
 		/**
 		 * Peek bytes from remote socket, return number of bytes peeked
 		 * Automatically closes socket during critical failure and returns -1
 		 * If there is no data to peek, this function returns 0
 		 */
-		int peek(void* buffer, int numBytes);
+		NOINLINE int peek(void* buffer, int numBytes);
 
 		/**
 		 * Skips a number of bytes from the read stream
 		 * This is a controlled flush of the OS socket read buffer
 		 */
-		void skip(int n);
+		NOINLINE void skip(int n);
 
 	private: 
 		int handle_recv(int ret);
@@ -250,7 +260,7 @@ namespace rpp
 		 *     value_type* data();
 		 *     typedef ... value_type;
 		 */
-		template<class T> T recv_gen(int maxCount = 0x7fffffff) {
+		template<class T> NOINLINE T recv_gen(int maxCount = 0x7fffffff) {
 			int count = available() / sizeof(typename T::value_type);
 			if (count <= 0) return T();
 			int n = count < maxCount ? count : maxCount;
@@ -268,7 +278,7 @@ namespace rpp
 		 * Waits up to timeout millis for data from remote end.
 		 * If no data available or critical failure, an empty vector is returned
 		 */
-		template<class T> T wait_recv(int millis)
+		template<class T> NOINLINE T wait_recv(int millis)
 		{
 			return try_recv(&socket::recv_gen<T>, millis);
 		}
