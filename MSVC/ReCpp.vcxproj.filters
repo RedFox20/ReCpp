@@ -39,13 +39,13 @@
     <ClInclude Include="..\rpp\binary_writer.h">
       <Filter>rpp</Filter>
     </ClInclude>
-    <ClInclude Include="..\rpp\strview.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
     <ClInclude Include="..\rpp\binary_reader.h">
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\file_io.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\strview.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>

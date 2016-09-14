@@ -1,4 +1,6 @@
 #pragma once
+#ifndef RPP_BINARY_WRITER_H
+#define RPP_BINARY_WRITER_H
 #include <string>
 #include <vector>
 #include <type_traits> // std::is_pod<T>
@@ -334,3 +336,5 @@ namespace rpp /* ReCpp */
 
 
 } // namespace rpp
+
+#endif // RPP_BINARY_WRITER_H

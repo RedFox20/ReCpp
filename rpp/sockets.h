@@ -1,4 +1,6 @@
 #pragma once
+#ifndef RPP_SOCKETS_H
+#define RPP_SOCKETS_H
 #include <string>   // std::string, std::wstring
 #include <vector>   // std::vector
 #include <ostream>  // ostream& operator<<
@@ -511,3 +513,5 @@ namespace rpp
 	};
 
 } // namespace rpp
+
+#endif // RPP_SOCKETS_H

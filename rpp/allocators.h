@@ -1,4 +1,6 @@
 #pragma once
+#ifndef RPP_ALLOCATORS_H
+#define RPP_ALLOCATORS_H
 #include <cassert>
 #include <cstdlib>
 
@@ -84,3 +86,6 @@ template<class T, size_t S>
 inline void operator delete(void* ptr, size_allocator<T,S>& a) noexcept
 {
 }
+
+
+#endif // RPP_ALLOCATORS_H

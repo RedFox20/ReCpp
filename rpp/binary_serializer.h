@@ -1,4 +1,6 @@
 #pragma once
+#ifndef RPP_BINARY_SERIALIZER_H
+#define RPP_BINARY_SERIALIZER_H
 #include "binary_readwrite.h"
 
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
@@ -65,3 +67,5 @@ namespace rpp
 	}
 
 } // namespace rpp
+
+#endif // RPP_BINARY_SERIALIZER_H

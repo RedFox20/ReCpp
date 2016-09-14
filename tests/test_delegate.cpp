@@ -1,5 +1,6 @@
 #include "tests.h"
 #include <delegate.h>
+using namespace rpp;
 
 static int func1(int arg0)
 {

@@ -1,4 +1,6 @@
 #pragma once
+#ifndef RPP_BINARY_READER_H
+#define RPP_BINARY_READER_H
 #include <string>
 #include <vector>
 #include <cstdlib>    // malloc/free
@@ -461,3 +463,5 @@ using file_arraystream_reader  = stream_reader<array_read<SIZE>, file_read>;
 using file_bufferstream_reader = stream_reader<buffer_read, file_read>;
 
 } // namespace rpp
+
+#endif // RPP_BINARY_READER_H
