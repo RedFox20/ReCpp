@@ -167,6 +167,14 @@ namespace rpp
         return NULL;
     }
 
+    const char* strview::rfind(char c) const
+    {
+        const char* p = str;
+        const char* e = p + len;
+        for (; p < e; --e) if (*e == c) return e;
+        return nullptr;
+    }
+
     strview strview::split_first(char delim)
     {
         if (auto splitend = (const char*)memchr(str, delim, len))

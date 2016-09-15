@@ -98,7 +98,7 @@ namespace rpp /* ReCpp */
         void*	Handle;	// File handle
         IOFlags	Mode;	// File openmode READWRITE or READONLY
 
-        inline file() : Handle(0), Mode(READONLY)
+        file() : Handle(0), Mode(READONLY)
         {
         }
 
@@ -108,8 +108,9 @@ namespace rpp /* ReCpp */
          * @param filename File name to open or create
          * @param mode File open mode
          */
-        file(const char* filename, IOFlags mode = READONLY);
+        file(const char*   filename, IOFlags mode = READONLY);
         file(const string& filename, IOFlags mode = READONLY);
+        file(const strview filename, IOFlags mode = READONLY);
         file(file&& f);
         ~file();
 
@@ -126,11 +127,9 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
-        bool open(const char* filename, IOFlags mode = READONLY);
-        inline bool open(const string& filename, IOFlags mode = READONLY)
-        {
-            return open(filename.c_str(), mode);
-        }
+        bool open(const char*   filename, IOFlags mode = READONLY);
+        bool open(const string& filename, IOFlags mode = READONLY);
+        bool open(const strview filename, IOFlags mode = READONLY);
         void close();
 
         /**
@@ -174,11 +173,9 @@ namespace rpp /* ReCpp */
          * Reads the entire contents of the file into a load_buffer
          * The file is opened as READONLY, unbuffered_file is used internally
          */
-        static load_buffer read_all(const char* filename);
-        static load_buffer read_all(const string& filename)
-        {
-            return read_all(filename.c_str());
-        }
+        static load_buffer read_all(const char*   filename);
+        static load_buffer read_all(const string& filename);
+        static load_buffer read_all(const strview filename);
 
         /**
          * Writes a block of bytes to the file. Regular Windows IO
@@ -201,11 +198,9 @@ namespace rpp /* ReCpp */
          * @param bytesToWrite Number of bytes to write to the file
          * @return Number of bytes actually written to the file
          */
-        static int write_new(const char* filename, const void* buffer, int bytesToWrite);
-        static int write_new(const string& filename, const void* buffer, int bytesToWrite)
-        {
-            return write_new(filename.c_str(), buffer, bytesToWrite);
-        }
+        static int write_new(const char*   filename, const void* buffer, int bytesToWrite);
+        static int write_new(const string& filename, const void* buffer, int bytesToWrite);
+        static int write_new(const strview filename, const void* buffer, int bytesToWrite);
 
         /**
          * Seeks to the specified position in a file. Seekmode is
@@ -344,6 +339,18 @@ namespace rpp /* ReCpp */
          * @brief Extract the foldername from a path name
          */
         static string foldername(const char* someFolderPath);
+
+        /**
+         * @brief Extracts the full folder path from a filePath
+         *        Ex: "/full/dir/file.ext" ==> "/full/dir/"
+         */
+        static string folder_path(const strview filePath);
+
+        /**
+         * @brief Normalizes the path string to use a specific type of slash
+         * @note This does not perform fullpath expansion.
+         */
+        static string& normalize(string& pathString, char separator = '/');
     };
 
 

@@ -101,6 +101,10 @@ namespace rpp /* ReCpp */
         : Handle(OpenFile(filename.c_str(), mode)), Mode(mode)
     {
     }
+    file::file(const strview filename, IOFlags mode)
+        : Handle(OpenFile(filename.to_cstr(), mode)), Mode(mode)
+    {
+    }
     file::file(file&& f) : Handle(f.Handle), Mode(f.Mode)
     {
         f.Handle = 0;
@@ -122,6 +126,14 @@ namespace rpp /* ReCpp */
         close();
         Mode = mode;
         return (Handle = OpenFile(filename, mode)) != nullptr;
+    }
+    bool file::open(const string& filename, IOFlags mode)
+    {
+        return open(filename.c_str(), mode);
+    }
+    bool file::open(const strview filename, IOFlags mode)
+    {
+        return open(filename.to_cstr(), mode);
     }
     void file::close()
     {
@@ -201,6 +213,14 @@ namespace rpp /* ReCpp */
         file f(filename, READONLY);
         return f.read_all();
     }
+    load_buffer file::read_all(const string& filename)
+    {
+        return read_all(filename.c_str());
+    }
+    load_buffer file::read_all(const strview filename)
+    {
+        return read_all(filename.to_cstr());
+    }
     int file::write(const void* buffer, int bytesToWrite)
     {
         #if USE_WINAPI_IO
@@ -214,6 +234,14 @@ namespace rpp /* ReCpp */
     int file::write_new(const char* filename, const void* buffer, int bytesToWrite)
     {
         return file(filename, IOFlags::CREATENEW).write(buffer, bytesToWrite);
+    }
+    int file::write_new(const string & filename, const void * buffer, int bytesToWrite)
+    {
+        return write_new(filename.c_str(), buffer, bytesToWrite);
+    }
+    int file::write_new(const strview filename, const void* buffer, int bytesToWrite)
+    {
+        return write_new(filename.to_cstr(), buffer, bytesToWrite);
     }
     int file::seek(int filepos, int seekmode)
     {
@@ -389,10 +417,8 @@ namespace rpp /* ReCpp */
             return 0;
         do
         {
-            if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            {
-                if (strcmp(ffd.cFileName, ".") != 0 && strcmp(ffd.cFileName, "..") != 0)
-                    out.emplace_back(ffd.cFileName);
+            if ((ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && ffd.cFileName[0] != '.') {
+                out.emplace_back(ffd.cFileName);
             }
         } while (FindNextFileA(hFind, &ffd));
         FindClose(hFind);
@@ -409,8 +435,9 @@ namespace rpp /* ReCpp */
             return 0;
         do
         {
-            if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
                 out.emplace_back(ffd.cFileName);
+            }
         } while (FindNextFileA(hFind, &ffd));
         FindClose(hFind);
         return (int)out.size();
@@ -514,16 +541,40 @@ namespace rpp /* ReCpp */
 
     string path::foldername(const string& someFolderPath)
     {
-        return foldername(someFolderPath.c_str());
+        const char* str = someFolderPath.c_str();
+        const char* ptr = scanback(str, str + someFolderPath.size() - 1);
+        if (str < ptr) --ptr;
+        return string{ str, ptr };
     }
     string path::foldername(const char* someFolderPath)
     {
         size_t len = strlen(someFolderPath);
         const char* ptr = scanback(someFolderPath, someFolderPath + len - 1);
-        if (someFolderPath < ptr)
-            --ptr;
+        if (someFolderPath < ptr) --ptr;
         return string{ someFolderPath, ptr };
     }
 
+    string path::folder_path(const strview filePath)
+    {
+        if (const char* end = filePath.rfind('/'))
+            return { filePath.str, end+1 };
+        return filePath.to_string();
+    }
 
+    string& path::normalize(string& pathString, char separator)
+    {
+        if (separator == '/')
+        {
+            for (char& ch : pathString) if (ch == '\\') ch = '/';
+        }
+        else if (separator == '//')
+        {
+            for (char& ch : pathString) if (ch == '/') ch = '\\';
+        }
+        // else: ignore any other separators
+        return pathString;
+    }
+
+
+    
 }

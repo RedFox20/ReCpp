@@ -349,6 +349,8 @@ namespace rpp
             return find(substr, SIZE - 1); 
         }
 
+        NOINLINE const char* rfind(char c) const;
+
         /** @return TRUE if the string strview starts with this string */
         FINLINE bool starts_with(const char* s, int length) const {
             return len >= length && strequals(str, s, length);
