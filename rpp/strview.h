@@ -232,7 +232,7 @@ namespace rpp
         FINLINE strview(const char* str, const char* end) : str(str), len(int(end-str))     {}
         FINLINE strview(const void* str, const void* end) : strview((const char*)str, (const char*)end) {}
         FINLINE strview(const string& s)             : str(s.c_str()), len((int)s.length()) {}
-        FINLINE char operator[](int index) const { return str[index]; }
+        FINLINE const char& operator[](int index) const { return str[index]; }
 
 
         strview(strview&& t)                 = default;
@@ -247,6 +247,7 @@ namespace rpp
 
         /** Copies this str[len] string into a C-string array */
         NOINLINE char* to_cstr(char* buf, int max) const;
+        template<int N> FINLINE char* to_cstr(char (&buf)[N]) { return to_cstr(buf, N); }
         /** 
          * Copies this str[len] into a max of 512 byte static C-string array 
          * Result is only valid until next call to this method
@@ -254,20 +255,20 @@ namespace rpp
          */
         NOINLINE const char* to_cstr() const;
 
-        /** Parses this string strview as an integer */
+        /** Parses this strview as an integer */
         FINLINE int to_int() const { return _toint(str, len); }
-        /** Parses this string strview as a HEX integer ('0xff' or '0ff' or 'ff') */
+        /** Parses this strview as a HEX integer ('0xff' or '0ff' or 'ff') */
         FINLINE int to_int(strview_use_hex) const { return _tointhx(str, len); }
-        /** Parses this string strview as a long */
+        /** Parses this strview as a long */
         FINLINE long to_long() const { return (long)_toint(str, len); }
-        /** Parses this string strview as a float */
+        /** Parses this strview as a float */
         FINLINE float to_float() const { return _tofloat(str, len); }
-        /** Parses this string strview as a double */
+        /** Parses this strview as a double */
         FINLINE double to_double() const { return (double) _tofloat(str, len); }
-        /** Parses this string strview as a bool */
+        /** Parses this strview as a bool */
         bool to_bool() const;
 
-        /** Clears the string strview */
+        /** Clears the strview */
         FINLINE void clear() { str = "", len = 0; }
         /** @return Length of the string */
         FINLINE int length() const  { return len; }
@@ -277,8 +278,12 @@ namespace rpp
         FINLINE operator bool() const { return !!len; }
         /** @return Pointer to the start of the string */
         FINLINE const char* c_str() const { return str; }
-        /** @return TRUE if the string strview is only whitespace: " \t\r\n"  */
+        FINLINE const char* begin() const { return str; }
+        FINLINE const char* end()   const { return str + len; }
+        /** @return TRUE if the strview is only whitespace: " \t\r\n"  */
         NOINLINE bool is_whitespace();
+        /** @return TRUE if the strview ends with a null terminator */
+        FINLINE bool is_nullterm() const { return str[len] == '\0'; }
 
         /** Trims the start of the string from any whitespace */
         NOINLINE strview& trim_start();
@@ -328,9 +333,9 @@ namespace rpp
         /** Consumes the last COUNT characters in the strview String if possible. */
         FINLINE strview& chomp_last(int count)  { for (int n = count; n && len; --n) --len; return *this; }
 
-        /** @return TRUE if the string strview contains this char */
+        /** @return TRUE if the strview contains this char */
         FINLINE bool contains(char c) const { return !!memchr(str, c, len); }
-        /** @return TRUE if the string strview contains any of the chars */
+        /** @return TRUE if the strview contains any of the chars */
         NOINLINE bool contains(const char* chars, int nchars) const { 
             return !!strcontains(str, len, chars, nchars); 
         }
@@ -342,93 +347,103 @@ namespace rpp
         FINLINE const char* find(char c) const { return (const char*)memchr(str, c, len); }
         /** @return Pointer to start of substring if found, NULL otherwise */
         NOINLINE const char* find(const char* substr, int len) const;
-        FINLINE const char* find(const strview& str) const { 
-            return find(str.str, str.len); 
+        FINLINE const char* find(const strview& substr) const { 
+            return find(substr.str, substr.len); 
         }
-        template<int SIZE> FINLINE const char* find(const char(&substr)[SIZE]) const { 
-            return find(substr, SIZE - 1); 
+        template<int N> FINLINE const char* find(const char (&substr)[N]) const { 
+            return find(substr, N - 1); 
         }
 
+
+        /** @return Pointer to char if found using reverse search, NULL otherwise */
         NOINLINE const char* rfind(char c) const;
 
-        /** @return TRUE if the string strview starts with this string */
+        /** 
+        * Forward searches for any of the specified chars
+        * @return Pointer to char if found, NULL otherwise.
+        */
+        const char* findany(const char* chars, int n) const;
+        template<int N> FINLINE const char* findany(const char (&chars)[N]) const {
+            return findany(chars, N - 1);
+        }
+
+        /** 
+         * Reverse searches for any of the specified chars
+         * @return Pointer to char if found, NULL otherwise.
+         */
+        const char* rfindany(const char* chars, int n) const;
+        template<int N> FINLINE const char* rfindany(const char (&chars)[N]) const {
+            return rfindany(chars, N - 1);
+        }
+
+
+
+        /** @return TRUE if this strview starts with the specified string */
         FINLINE bool starts_with(const char* s, int length) const {
             return len >= length && strequals(str, s, length);
         }
-        /** @return TRUE if the string strview starts with IGNORECASE this string */
-        FINLINE bool starts_withi(const char* s, int length) const {
-            return len >= length && strequalsi(str, s, length);
-        }
-        /** @return TRUE if the string strview starts with this string */
         template<int N> FINLINE bool starts_with(const char (&s)[N]) const { 
             return len >= (N - 1) && strequals<N>(str, s);
         }
-        /** @return TRUE if the string strview starts with IGNORECASE this string */
+        FINLINE bool starts_with(const string& s)  const { return starts_with(s.c_str(), (int)s.length()); }
+        FINLINE bool starts_with(const strview& s)  const { return starts_with(s.str, s.len); }
+        FINLINE bool starts_with(char ch) const { return len && *str == ch; }
+
+
+        /** @return TRUE if this strview starts with IGNORECASE of the specified string */
+        FINLINE bool starts_withi(const char* s, int length) const {
+            return len >= length && strequalsi(str, s, length);
+        }
         template<int N> FINLINE bool starts_withi(const char (&s)[N]) const { 
             return len >= (N - 1) && strequalsi<N>(str, s);
         }
-        /** @return TRUE if the string strview starts with this string */
-        FINLINE bool starts_with(const string& s)  const { return starts_with(s.c_str(), (int)s.length()); }
-        /** @return TRUE if the string strview starts with IGNORECASE this string */
         FINLINE bool starts_withi(const string& s) const { return starts_withi(s.c_str(), (int)s.length()); }
-        /** @return TRUE if the string strview starts with this string */
-        FINLINE bool starts_with(const strview& s)  const { return starts_with(s.str, s.len); }
-        /** @return TRUE if the string strview starts with IGNORECASE this string */
         FINLINE bool starts_withi(const strview& s) const { return starts_withi(s.str, s.len); }
-        /** @return TRUE if the string strview starts with this char */
-        FINLINE bool starts_with(char ch) const { return len && *str == ch; }
-        /** @return TRUE if the string strview starts with IGNORECASE this char */
         FINLINE bool starts_withi(char ch) const { return len && ::toupper(*str) == ::toupper(ch); }
 
 
-        /** @return TRUE if the string strview ends with this string */
+        /** @return TRUE if the strview ends with the specified string */
         FINLINE bool ends_with(const char* s, int slen) const {
             return len >= slen && strequals(str + len - slen, s, slen);
         }
-        /** @return TRUE if the string strview ends with IGNORECASE this string */
-        FINLINE bool ends_withi(const char* s, int slen) const {
-            return len >= slen && strequalsi(str + len - slen, s, slen);
-        }
-        /** @return TRUE if the string strview ends with this string */
         template<int N> FINLINE bool ends_with(const char (&s)[N]) const { 
             return len >= (N - 1) && strequals<N>(str + len - (N - 1), s);
         }
-        /** @return TRUE if the string strview ends with IGNORECASE this string */
+        FINLINE bool ends_with(const string& s)  const { return ends_with(s.c_str(), (int)s.length()); }
+        FINLINE bool ends_with(const strview s)  const { return ends_with(s.str, s.len); }
+        FINLINE bool ends_with(char ch)          const { return len && str[len-1] == ch; }
+
+
+        /** @return TRUE if this strview ends with IGNORECASE of the specified string */
+        FINLINE bool ends_withi(const char* s, int slen) const {
+            return len >= slen && strequalsi(str + len - slen, s, slen);
+        }
         template<int N> FINLINE bool ends_withi(const char (&s)[N]) const { 
             return len >= (N - 1) && strequalsi<N>(str + len - (N - 1), s);
         }
-        /** @return TRUE if the string strview ends with this string */
-        FINLINE bool ends_with(const string& s)  const { return ends_with(s.c_str(), (int)s.length()); }
-        /** @return TRUE if the string strview ends with IGNORECASE this string */
         FINLINE bool ends_withi(const string& s) const { return ends_withi(s.c_str(), (int)s.length()); }
-        /** @return TRUE if the string strview ends with this char */
-        FINLINE bool ends_with(char ch) const { return len && str[len-1] == ch; }
-        /** @return TRUE if the string strview ends with IGNORECASE this char */
+        FINLINE bool ends_withi(const strview s) const { return ends_withi(s.str, s.len); }
         FINLINE bool ends_withi(char ch) const { return len && ::toupper(str[len-1]) == ::toupper(ch); }
 
 
-        /** @return TRUE if the string strview equals this string */
+        /** @return TRUE if this strview equals the specified string */
         FINLINE bool equals(const char* s, int length) const { return len == length && strequals(str, s, length); }
-        /** @return TRUE if the string strview equals IGNORECASE this string */
-        FINLINE bool equalsi(const char* s, int length) const { return len == length && strequalsi(str, s, length); }
-        /** @return TRUE if the string strview equals this string */
-        template<int N> FINLINE bool equals(const char (&s)[N]) const { return len == (N-1) && strequals<N>(str, s); }
-        /** @return TRUE if the string strview equals IGNORECASE this string */
-        template<int N> FINLINE bool equalsi(const char (&s)[N]) const { return len == (N-1) && strequalsi<N>(str, s); }
-        /** @return TRUE if the string strview equals this string */
-        FINLINE bool equals(const string& s)  const { return equals(s.c_str(), (int)s.length()); }
-        /** @return TRUE if the string strview equals IGNORECASE this string */
-        FINLINE bool equalsi(const string& s) const { return equalsi(s.c_str(), (int)s.length()); }
-        /** @return TRUE if the string strview equals this string */
-        FINLINE bool equals(const strview& s)  const { return equals(s.str, s.len); }
-        /** @return TRUE if the string strview equals IGNORECASE this string */
-        FINLINE bool equalsi(const strview& s) const { return equalsi(s.str, s.len); }
+        template<int N>
+        FINLINE bool equals(const char (&s)[N]) const { return len == (N-1) && strequals<N>(str, s); }
+        FINLINE bool equals(const string& s)    const { return equals(s.c_str(), (int)s.length());   }
+        FINLINE bool equals(const strview& s)   const { return equals(s.str, s.len);                 }
 
+        /** @return TRUE if this strview equals IGNORECASE the specified string */
+        FINLINE bool equalsi(const char* s, int length) const { return len == length && strequalsi(str, s, length); }
+        template<int N>
+        FINLINE bool equalsi(const char (&s)[N]) const { return len == (N-1) && strequalsi<N>(str, s); }
+        FINLINE bool equalsi(const string& s)    const { return equalsi(s.c_str(), (int)s.length());   }
+        FINLINE bool equalsi(const strview& s)   const { return equalsi(s.str, s.len);                 }
 
         template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const { return equals<SIZE>(s); }
         template<int SIZE> FINLINE bool operator!=(const char(&s)[SIZE]) const { return !equals<SIZE>(s); }
-        FINLINE bool operator==(const string& s) const { return equals(s); }
-        FINLINE bool operator!=(const string& s) const { return !equals(s); }
+        FINLINE bool operator==(const string& s)  const { return equals(s); }
+        FINLINE bool operator!=(const string& s)  const { return !equals(s); }
         FINLINE bool operator==(const strview& s) const { return equals(s.str, s.len); }
         FINLINE bool operator!=(const strview& s) const { return !equals(s.str, s.len); }
         FINLINE bool operator==(char ch) const { return len == 1 && *str == ch; }
@@ -437,13 +452,13 @@ namespace rpp
         /** @brief Compares this strview to string data */
         NOINLINE int compare(const char* s, int n) const;
         NOINLINE int compare(const char* s) const;
-        FINLINE int compare(const strview& b)     const { return compare(b.str, b.len); }
-        FINLINE int compare(const string& b) const { return compare(b.c_str(),(int)b.size()); }
+        FINLINE int compare(const strview& b) const { return compare(b.str, b.len); }
+        FINLINE int compare(const string& b)  const { return compare(b.c_str(),(int)b.size()); }
         
-        FINLINE bool operator<(const strview& s)     const { return compare(s.str, s.len) < 0; }
-        FINLINE bool operator>(const strview& s)     const { return compare(s.str, s.len) > 0; }
-        FINLINE bool operator<(const string& s) const { return compare(s.c_str(),(int)s.size()) < 0; }
-        FINLINE bool operator>(const string& s) const { return compare(s.c_str(),(int)s.size()) > 0; }
+        FINLINE bool operator<(const strview& s) const { return compare(s.str, s.len) < 0; }
+        FINLINE bool operator>(const strview& s) const { return compare(s.str, s.len) > 0; }
+        FINLINE bool operator<(const string& s)  const { return compare(s.c_str(),(int)s.size()) < 0; }
+        FINLINE bool operator>(const string& s)  const { return compare(s.c_str(),(int)s.size()) > 0; }
         template<int SIZE> FINLINE bool operator<(const char(&s)[SIZE]) const {return compare(s,SIZE-1)<0;}
         template<int SIZE> FINLINE bool operator>(const char(&s)[SIZE]) const {return compare(s,SIZE-1)>0;}
         
@@ -486,7 +501,7 @@ namespace rpp
         NOINLINE int split(vector<strview>& out, const char* delims, const char* trimChars = 0);
 
         /**
-         * Gets the next string strview; also advances the ptr to next token.
+         * Gets the next strview; also advances the ptr to next token.
          * @param out Resulting string token. Only valid if result is TRUE.
          * @param delim Delimiter char between string tokens
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).

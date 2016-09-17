@@ -13,6 +13,7 @@
 #else
     #include <unistd.h>
     #include <string.h>
+    #include <dirent.h> // opendir()
 #endif
 
 
@@ -384,77 +385,155 @@ namespace rpp /* ReCpp */
     time_t file_modified(const string& filename) { return file_modified(filename.c_str());   }
     time_t file_modified(const strview filename) { return file_modified(filename.to_cstr()); }
 
+    bool delete_file(const char* filename)
+    {
+        return ::remove(filename) == 0;
+    }
+    bool delete_file(const string& filename) { return delete_file(filename.c_str());   }
+    bool delete_file(const strview filename) { return delete_file(filename.to_cstr()); }
 
-    bool create_folder(const char* filename)
+    static bool sys_mkdir(const strview foldername)
     {
     #if _WIN32 || _WIN64
-        return mkdir(filename) == 0;
+        return mkdir(foldername.to_cstr()) == 0;
     #else
-        return mkdir(filename, 0700) == 0;
+        return mkdir(foldername.to_cstr(), 0700) == 0;
     #endif
     }
-    bool create_folder(const string& filename) { return create_folder(filename.c_str());   }
-    bool create_folder(const strview filename) { return create_folder(filename.to_cstr()); }
-
-
-    bool delete_folder(const char* filename)
+    bool create_folder(const char* foldername)   { return create_folder(strview(foldername)); }
+    bool create_folder(const string& foldername) { return create_folder(strview(foldername)); }
+    bool create_folder(const strview foldername)
     {
-        return rmdir(filename) == 0;
+        if (sys_mkdir(foldername))
+            return true; // best case, no recursive mkdir required
+
+        // ugh, need to work our way upward to find a root dir that exists:
+        // @note heavily optimized to minimize folder_exists() and mkdir() syscalls
+        const char* fs = foldername.begin();
+        const char* fe = foldername.end();
+        const char* p = fe;
+        while ((p = strview{fs,p}.rfindany("/\\")))
+        {
+            if (folder_exists(strview{fs,p}))
+                break;
+        }
+
+        // now create all the parent dirs between:
+        ++p;
+        while (const char* e = strview{p,fe}.findany("/\\"))
+        {
+            if (!sys_mkdir(strview{fs,e}))
+                return false; // ugh, something went really wrong here...
+            p = e + 1;
+        }
+        return sys_mkdir(foldername); // and now create the final dir
     }
-    bool delete_folder(const string& filename) { return delete_folder(filename.c_str());   }
-    bool delete_folder(const strview filename) { return delete_folder(filename.to_cstr()); }
+
+    bool delete_folder(const char* foldername, bool recursive)   { return delete_folder(string{ foldername },   recursive); }
+    bool delete_folder(const strview foldername, bool recursive) { return delete_folder(foldername.to_string(), recursive); }
+    bool delete_folder(const string& foldername, bool recursive) 
+    {
+        if (!recursive)
+            return rmdir(foldername.c_str()) == 0; // easy path, just gently try to delete...
+
+        vector<string> folders;
+        vector<string> files;
+        bool deletedChildren = true;
+
+        if (path::list_alldir(folders, files, foldername))
+        {
+            for (const string& folder : folders)
+                deletedChildren |= delete_folder(foldername + '/' + folder, true);
+
+            for (const string& file : files)
+                deletedChildren |= delete_file(foldername + '/' + file);
+        }
+
+        if (deletedChildren)
+            return rmdir(foldername.c_str()) == 0; // should be okay to remove now
+
+        return false; // no way to delete, since some subtree files are protected
+    }
 
 
 #if _WIN32
-    int path::list_dirs(vector<string>& out, const char* directory, const char* matchPattern)
-    {
-        out.clear();
-        char findPattern[512];
-        sprintf(findPattern, "%s\\%s", directory, matchPattern);
+    struct dir_iterator {
+        HANDLE hFind;
         WIN32_FIND_DATAA ffd;
-        HANDLE hFind = FindFirstFileA(findPattern, &ffd);
-        if (hFind == INVALID_HANDLE_VALUE)
-            return 0;
-        do
-        {
-            if ((ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && ffd.cFileName[0] != '.') {
-                out.emplace_back(ffd.cFileName);
-            }
-        } while (FindNextFileA(hFind, &ffd));
-        FindClose(hFind);
-        return (int)out.size();
-    }
-    int path::list_files(vector<string>& out, const char* directory, const char* matchPattern)
-    {
-        out.clear();
-        char findPattern[512];
-        sprintf(findPattern, "%s\\%s", directory, matchPattern);
-        WIN32_FIND_DATAA ffd;
-        HANDLE hFind = FindFirstFileA(findPattern, &ffd);
-        if (hFind == INVALID_HANDLE_VALUE)
-            return 0;
-        do
-        {
-            if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-                out.emplace_back(ffd.cFileName);
-            }
-        } while (FindNextFileA(hFind, &ffd));
-        FindClose(hFind);
-        return (int)out.size();
-    }
+        dir_iterator(const strview& dir) {
+            char path[512]; sprintf(path, "%.*s/*", dir.len, dir.str);
+            if ((hFind = FindFirstFileA(path, &ffd)) == INVALID_HANDLE_VALUE)
+                hFind = 0;
+        }
+        ~dir_iterator() { if (hFind) FindClose(hFind); }
+        operator bool() const { return hFind != 0; }
+        bool is_dir() const { return (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+        const char* name() const { return ffd.cFileName; }
+        bool next() { return FindNextFileA(hFind, &ffd) != 0; }
+    };
 #else
-    int path::list_dirs(vector<string>& out, const char* directory, const char* matchPattern)
-    {
-        out.clear();
-        return (int)out.size();
-    }
-    int path::list_files(vector<string>& out, const char* directory, const char* matchPattern)
-    {
-        out.clear();
-        return (int)out.size();
-    }
+    struct dir_iterator {
+        DIR* d;
+        dirent* e;
+        dir_iterator(const strview& dir) {
+            if ((d=opendir(dir.to_cstr()))) 
+                e = readdir(d);
+        }
+        ~dir_iterator() { if (d) closedir(d); }
+        operator bool() const { return d && e; }
+        bool is_dir() const { return e->d_type == DT_DIR; }
+        const char* name() const { return e->d_name; }
+        bool next() { return (e = readdir(d)) != 0; }
+    };
 #endif
 
+    int path::list_dirs(vector<string>& out, strview dir)
+    {
+        if (out.size()) 
+            out.clear();
+
+        if (dir_iterator it = { dir })
+        {
+            do {
+                if (it.is_dir() && it.name()[0] != '.') {
+                    out.emplace_back(it.name());
+                }
+            } while (it.next());
+        }
+        return (int)out.size();
+    }
+    int path::list_files(vector<string>& out, strview dir, strview ext)
+    {
+        if (out.size()) 
+            out.clear();
+
+        if (dir_iterator it = { dir })
+        {
+            do {
+                if (!it.is_dir()) {
+                    strview fname = it.name();
+                    if (ext && !fname.ends_withi(ext))
+                        continue;
+                    out.emplace_back(fname.str, fname.len);
+                }
+            } while (it.next());
+        }
+        return (int)out.size();
+    }
+    int path::list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir)
+    {
+        if (outdirs.size())  outdirs.clear();
+        if (outfiles.size()) outfiles.clear();
+
+        if (dir_iterator it = { dir })
+        {
+            do {
+                if (!it.is_dir())             outfiles.emplace_back(it.name());
+                else if (it.name()[0] != '.') outdirs.emplace_back(it.name());
+            } while (it.next());
+        }
+        return int(outdirs.size() + outfiles.size());
+    }
 
     string path::working_dir()
     {

@@ -271,13 +271,22 @@ namespace rpp /* ReCpp */
     time_t file_modified(const string& filename);
     time_t file_modified(const strview filename);
 
-    bool create_folder(const char*   filename);
-    bool create_folder(const string& filename);
-    bool create_folder(const strview filename);
+    bool delete_file(const char*   filename);
+    bool delete_file(const string& filename);
+    bool delete_file(const strview filename);
 
-    bool delete_folder(const char*   filename);
-    bool delete_folder(const string& filename);
-    bool delete_folder(const strview filename);
+    bool create_folder(const char*   foldername);
+    bool create_folder(const string& foldername);
+    bool create_folder(const strview foldername);
+
+    /**
+     * Deletes a folder, by default only if it's empty.
+     * @param recursiveDelete If TRUE, all subdirectories and files will also be deleted (permanently)
+     * @return TRUE if the folder was deleted
+     */
+    bool delete_folder(const char*   foldername, bool recursiveDelete = false);
+    bool delete_folder(const string& foldername, bool recursiveDelete = false);
+    bool delete_folder(const strview foldername, bool recursiveDelete = false);
 
 
     /**
@@ -285,8 +294,27 @@ namespace rpp /* ReCpp */
      */
     struct path
     {
-        static int list_dirs(vector<string>& out, const char* directory, const char* matchPattern = "*");
-        static int list_files(vector<string>& out, const char* directory, const char* matchPattern = "*.*");
+        /**
+         * Lists all folders inside this directory
+         * @param out Destination vector for result folder names (not full folder paths!)
+         * @param dir Relative or full path of this directory
+         * @return Number of folders found
+         */
+        static int list_dirs(vector<string>& out, strview dir);
+
+        /**
+         * Lists all files inside this directory that have the specified extension (default: all files)
+         * @param out Destination vector for result file names (not full file paths!)
+         * @param dir Relative or full path of this directory
+         * @param ext Filter files by extension, ex: "txt", default ("") lists all files
+         * @return Number of files found that match the extension
+         */
+        static int list_files(vector<string>& out, strview dir, strview ext = {});
+
+        /**
+         * Lists all files and folders inside a dir
+         */
+        static int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir);
 
         /**
          * @return The current working directory of the application
