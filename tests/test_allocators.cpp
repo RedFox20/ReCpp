@@ -14,11 +14,11 @@ struct person
 
 TestImpl(test_allocators)
 {
-	Implement(test_allocators)
+	TestInit(test_allocators)
 	{
-		test_fixsize_pool();
 	}
-	void test_fixsize_pool()
+
+	TestCase(fixsize_pool)
 	{
 		//specific_allocator<fixsize_pool, vec2> a1;
 		//size_allocator<fixsize_pool, sizeof(vec2)> a2;

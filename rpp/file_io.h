@@ -6,7 +6,6 @@
 
 namespace rpp /* ReCpp */
 {
-    using namespace std; // we love std; you should too.
 
     enum IOFlags {
         READONLY,			// opens an existing file for reading
@@ -151,7 +150,7 @@ namespace rpp /* ReCpp */
         /**
          * @return 64-bit unsigned size of the file in bytes
          */
-        uint64 sizel() const;
+        int64 sizel() const;
 
         /**
          * Reads a block of bytes from the file. Standard OS level
@@ -221,7 +220,7 @@ namespace rpp /* ReCpp */
         /**
          * Get multiple time info from this file handle
          */
-        void time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const;
+        bool time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const;
 
         /**
          * @return File creation time
@@ -240,146 +239,209 @@ namespace rpp /* ReCpp */
     };
 
 
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    /**
+     * @return TRUE if the file exists, arg ex: "dir/file.ext"
+     */
     bool file_exists(const char*   filename);
-    bool file_exists(const string& filename);
-    bool file_exists(const strview filename);
+    FINLINE bool file_exists(const string& filename) { return file_exists(filename.c_str());   }
+    FINLINE bool file_exists(const strview filename) { return file_exists(filename.to_cstr()); }
 
+    /**
+     * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
+     */
     bool folder_exists(const char*   folder);
-    bool folder_exists(const string& folder);
-    bool folder_exists(const strview folder);
+    FINLINE bool folder_exists(const string& folder) { return folder_exists(folder.c_str());   }
+    FINLINE bool folder_exists(const strview folder) { return folder_exists(folder.to_cstr()); }
 
-    void file_info(const char* filename, uint64_t* filesize, time_t* created, 
-                                         time_t*   accessed, time_t* modified);
+    /**
+     * @brief Gets basic information of a file
+     * @param filename Name of the file, ex: "dir/file.ext"
+     * @param filesize (optional) If not null, writes the long size of the file
+     * @param created  (optional) If not null, writes the file creation date
+     * @param accessed (optional) If not null, writes the last file access date
+     * @param modified (optional) If not null, writes the last file modification date
+     * @return TRUE if the file exists and required data was retrieved from the OS
+     */
+    bool file_info(const char* filename, int64*  filesize, time_t* created, 
+                                         time_t* accessed, time_t* modified);
 
-    uint file_size(const char*   filename);
-    uint file_size(const string& filename);
-    uint file_size(const strview filename);
+    /**
+     * @return Short size of a file
+     */
+    int file_size(const char*   filename);
+    FINLINE int file_size(const string& filename) { return file_size(filename.c_str());   }
+    FINLINE int file_size(const strview filename) { return file_size(filename.to_cstr()); }
 
-    uint64_t file_sizel(const char*   filename);
-    uint64_t file_sizel(const string& filename);
-    uint64_t file_sizel(const strview filename);
+    /**
+     * @return Long size of a file
+     */
+    int64 file_sizel(const char*   filename);
+    FINLINE int64 file_sizel(const string& filename) { return file_sizel(filename.c_str());   }
+    FINLINE int64 file_sizel(const strview filename) { return file_sizel(filename.to_cstr()); }
 
+    /**
+     * @return File creation date
+     */
     time_t file_created(const char*   filename);
-    time_t file_created(const string& filename);
-    time_t file_created(const strview filename);
+    FINLINE time_t file_created(const string& filename) { return file_created(filename.c_str());   }
+    FINLINE time_t file_created(const strview filename) { return file_created(filename.to_cstr()); }
 
+    /**
+     * @return Last file access date
+     */
     time_t file_accessed(const char*   filename);
-    time_t file_accessed(const string& filename);
-    time_t file_accessed(const strview filename);
+    FINLINE time_t file_accessed(const string& filename) { return file_accessed(filename.c_str());   }
+    FINLINE time_t file_accessed(const strview filename) { return file_accessed(filename.to_cstr()); }
 
+    /**
+     * @return Last file modification date
+     */
     time_t file_modified(const char*   filename);
-    time_t file_modified(const string& filename);
-    time_t file_modified(const strview filename);
+    FINLINE time_t file_modified(const string& filename) { return file_modified(filename.c_str());   }
+    FINLINE time_t file_modified(const strview filename) { return file_modified(filename.to_cstr()); }
 
+    /**
+     * @brief Deletes a single file, ex: "root/dir/file.ext"
+     * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
+     */
     bool delete_file(const char*   filename);
-    bool delete_file(const string& filename);
-    bool delete_file(const strview filename);
+    FINLINE bool delete_file(const string& filename) { return delete_file(filename.c_str());   }
+    FINLINE bool delete_file(const strview filename) { return delete_file(filename.to_cstr()); }
 
-    bool create_folder(const char*   foldername);
-    bool create_folder(const string& foldername);
+    /**
+     * Creates a folder, recursively creating folders that do not exist
+     * @return TRUE if the final folder was actually created (can fail due to access rights)
+     */
     bool create_folder(const strview foldername);
+    FINLINE bool create_folder(const char*   foldername) { return create_folder(strview{ foldername }); }
+    FINLINE bool create_folder(const string& foldername) { return create_folder(strview{ foldername }); }
+
 
     /**
      * Deletes a folder, by default only if it's empty.
-     * @param recursiveDelete If TRUE, all subdirectories and files will also be deleted (permanently)
+     * @param recursive If TRUE, all subdirectories and files will also be deleted (permanently)
      * @return TRUE if the folder was deleted
      */
-    bool delete_folder(const char*   foldername, bool recursiveDelete = false);
-    bool delete_folder(const string& foldername, bool recursiveDelete = false);
-    bool delete_folder(const strview foldername, bool recursiveDelete = false);
+    bool delete_folder(const string& foldername, bool recursive = false);
+    FINLINE bool delete_folder(const char*   foldername, bool recursive = false) { return delete_folder(string{ foldername },   recursive); }
+    FINLINE bool delete_folder(const strview foldername, bool recursive = false) { return delete_folder(foldername.to_string(), recursive); }
 
 
     /**
-     * @brief Static container for directory utility functions
+     * @brief Transform a relative path to a full path name
+     *        Ex: "path" ==> "C:\Projects\Test\path" 
      */
-    struct path
-    {
-        /**
-         * Lists all folders inside this directory
-         * @param out Destination vector for result folder names (not full folder paths!)
-         * @param dir Relative or full path of this directory
-         * @return Number of folders found
-         */
-        static int list_dirs(vector<string>& out, strview dir);
+    string full_path(const char*   path);
+    FINLINE string full_path(const string& path) { return full_path(path.c_str());   }
+    FINLINE string full_path(const strview path) { return full_path(path.to_cstr()); }
 
-        /**
-         * Lists all files inside this directory that have the specified extension (default: all files)
-         * @param out Destination vector for result file names (not full file paths!)
-         * @param dir Relative or full path of this directory
-         * @param ext Filter files by extension, ex: "txt", default ("") lists all files
-         * @return Number of files found that match the extension
-         */
-        static int list_files(vector<string>& out, strview dir, strview ext = {});
+    /**
+     * @brief Extract the filename (no extension) from a file path
 
-        /**
-         * Lists all files and folders inside a dir
-         */
-        static int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir);
+     *        Ex: /root/dir/file.ext ==> file
+     *        Ex: /root/dir/file     ==> file
+     *        Ex: /root/dir/         ==> 
+     *        Ex: file.ext           ==> file
+     */
+    strview file_name(const strview path);
+    FINLINE strview file_name(const string& path) { return file_name(strview{ path }); }
+    FINLINE strview file_name(const char*   path) { return file_name(strview{ path }); }
 
-        /**
-         * @return The current working directory of the application
-         */
-        static string working_dir();
+    /**
+     * @brief Extract the file part (with ext) from a file path
+     *        Ex: /root/dir/file.ext ==> file.ext
+     *        Ex: /root/dir/file     ==> file
+     *        Ex: /root/dir/         ==> 
+     *        Ex: file.ext           ==> file.ext
+     */
+    strview file_nameext(const strview path);
+    FINLINE strview file_nameext(const string& path) { return file_nameext(strview{ path }); }
+    FINLINE strview file_nameext(const char*   path) { return file_nameext(strview{ path }); }
 
-        /**
-         * @brief Set the working directory of the application to a new value
-         */
-        static void set_working_dir(const string& new_wd);
+    /**
+     * @brief Extract the foldername from a path name
+     *        Ex: /root/dir/file.ext ==> dir
+     *        Ex: /root/dir/file     ==> dir
+     *        Ex: /root/dir/         ==> dir
+     *        Ex: dir/               ==> dir
+     *        Ex: file.ext           ==> 
+     */
+    strview folder_name(const strview path);
+    FINLINE strview folder_name(const string& path) { return folder_name(strview{ path }); }
+    FINLINE strview folder_name(const char*   path) { return folder_name(strview{ path }); }
 
-        /**
-         *  @brief Transform a relative path to a full path name
-         */
-        static string fullpath(const string& relativePath);
+    /**
+     * @brief Extracts the full folder path from a file path.
+     *        Will preserve / and assume input is always a filePath
+     *        Ex: /root/dir/file.ext ==> /root/dir/
+     *        Ex: /root/dir/file     ==> /root/dir/
+     *        Ex: /root/dir/         ==> /root/dir/
+     *        Ex: dir/               ==> dir/
+     *        Ex: file.ext           ==> 
+     */
+    strview folder_path(const strview path);
+    FINLINE strview folder_path(const string& path) { return folder_path(strview{ path }); }
+    FINLINE strview folder_path(const char*   path) { return folder_path(strview{ path }); }
 
-        /**
-         *  @brief Transform a relative path to a full path name
-         */
-        static string fullpath(const char* relativePath);
+    /**
+     * @brief Normalizes the path string to use a specific type of slash
+     * @note This does not perform full path expansion.
+     * @note The string is modified in-place !careful!
+     *
+     *       Ex:  \root\dir/file.ext ==> /root/dir/file.ext
+     */
+    string& normalize(string& path, char sep = '/');
+    char*   normalize(char*   path, char sep = '/');
 
-        /**
-         * @brief Extract the filename from a path name
-         */
-        static string filename(const string& someFilePath);
+    /**
+     * @brief Normalizes the path string to use a specific type of slash
+     * @note A copy of the string is made
+     */
+    string normalized(const strview path, char sep = '/');
+    FINLINE string normalized(const string& path, char sep = '/') { return normalized(strview{ path }, sep); }
+    FINLINE string normalized(const char*   path, char sep = '/') { return normalized(strview{ path }, sep); }
 
-        /**
-         * @brief Extract the filename from a path name
-         */
-        static string filename(const char* someFilePath);
 
-        /**
-         * @brief Extract the filepart from a filename
-         *        Ex: "/dir/file.ext" ==> "file"
-         */
-        static string filename_namepart(const string& someFilePath);
+    ////////////////////////////////////////////////////////////////////////////////
 
-        /**
-         * @brief Extract the filepart from a filename
-         *        Ex: "/dir/file.ext" ==> "file"
-         */
-        static string filename_namepart(const char* someFilePath);
 
-        /**
-         * @brief Extract the foldername from a path name
-         */
-        static string foldername(const string& someFolderPath);
+    /**
+     * Lists all folders inside this directory
+     * @param out Destination vector for result folder names (not full folder paths!)
+     * @param dir Relative or full path of this directory
+     * @return Number of folders found
+     */
+    int list_dirs(vector<string>& out, strview dir);
 
-        /**
-         * @brief Extract the foldername from a path name
-         */
-        static string foldername(const char* someFolderPath);
+    /**
+     * Lists all files inside this directory that have the specified extension (default: all files)
+     * @param out Destination vector for result file names (not full file paths!)
+     * @param dir Relative or full path of this directory
+     * @param ext Filter files by extension, ex: "txt", default ("") lists all files
+     * @return Number of files found that match the extension
+     */
+    int list_files(vector<string>& out, strview dir, strview ext = {});
 
-        /**
-         * @brief Extracts the full folder path from a filePath
-         *        Ex: "/full/dir/file.ext" ==> "/full/dir/"
-         */
-        static string folder_path(const strview filePath);
+    /**
+     * Lists all files and folders inside a dir
+     */
+    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir);
 
-        /**
-         * @brief Normalizes the path string to use a specific type of slash
-         * @note This does not perform fullpath expansion.
-         */
-        static string& normalize(string& pathString, char separator = '/');
-    };
+    /**
+     * @return The current working directory of the application
+     */
+    string working_dir();
+
+    /**
+     * @brief Set the working directory of the application to a new value
+     */
+    void set_working_dir(const string& new_wd);
+
+
+    ////////////////////////////////////////////////////////////////////////////////
 
 
 } // namespace rpp

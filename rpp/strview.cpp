@@ -34,8 +34,10 @@ namespace rpp
     ///////////// strview
     
     
-    char* strview::to_cstr(char* buf, int max) const
+    const char* strview::to_cstr(char* buf, int max) const
     {
+        if (str[len] == '\0')
+            return str;
         int n = (len < max) ? len : max - 1;
         memcpy(buf, str, n);
         buf[n] = '\0';

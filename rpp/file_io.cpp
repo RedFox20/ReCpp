@@ -6,7 +6,7 @@
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
-    #include <direct.h> // mkdir
+    #include <direct.h> // mkdir, getcwd
     #include <io.h>
     #define USE_WINAPI_IO 1
     #define stat64 _stat64
@@ -170,7 +170,7 @@ namespace rpp /* ReCpp */
             return (int)s.st_size;
         #endif
     }
-    uint64 file::sizel() const
+    int64 file::sizel() const
     {
         if (!Handle) return 0;
         #if USE_WINAPI_IO
@@ -179,14 +179,14 @@ namespace rpp /* ReCpp */
                 //fprintf(stderr, "GetFileSizeEx error: [%d]\n", GetLastError());
                 return 0ull;
             }
-            return size.QuadPart;
+            return (int64)size.QuadPart;
         #else
             struct _stat64 s;
             if (_fstat64(fileno((FILE*)Handle), &s)) {
                 //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));
                 return 0ull;
             }
-            return s.st_size;
+            return (int64)s.st_size;
         #endif
     }
     int file::read(void* buffer, int bytesToRead)
@@ -211,8 +211,7 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all(const char* filename)
     {
         // make sure file f; remains until end of scope, or read_all will bug out
-        file f(filename, READONLY);
-        return f.read_all();
+        return file{filename, READONLY}.read_all();
     }
     load_buffer file::read_all(const string& filename)
     {
@@ -234,7 +233,7 @@ namespace rpp /* ReCpp */
     }
     int file::write_new(const char* filename, const void* buffer, int bytesToWrite)
     {
-        return file(filename, IOFlags::CREATENEW).write(buffer, bytesToWrite);
+        return file{filename, IOFlags::CREATENEW}.write(buffer, bytesToWrite);
     }
     int file::write_new(const string & filename, const void * buffer, int bytesToWrite)
     {
@@ -242,7 +241,8 @@ namespace rpp /* ReCpp */
     }
     int file::write_new(const strview filename, const void* buffer, int bytesToWrite)
     {
-        return write_new(filename.to_cstr(), buffer, bytesToWrite);
+        char buf[512];
+        return write_new(filename.to_cstr(buf,512), buffer, bytesToWrite);
     }
     int file::seek(int filepos, int seekmode)
     {
@@ -274,29 +274,30 @@ namespace rpp /* ReCpp */
             return ftell((FILE*)Handle);
         #endif
     }
-    void file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const
+    bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const
     {
-        #if USE_WINAPI_IO
-            GetFileTime((HANDLE)Handle, (FILETIME*)outCreated, 
-                (FILETIME*)outAccessed, (FILETIME*)outModified);
-        #else
-            struct stat s;
-            if (fstat(fileno((FILE*)Handle), &s)) {
-                //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
-                return 0ull;
-            }
+    #if USE_WINAPI_IO
+        return !!GetFileTime((HANDLE)Handle,         (FILETIME*)outCreated,
+                             (FILETIME*)outAccessed, (FILETIME*)outModified);
+    #else
+        struct stat s;
+        if (fstat(fileno((FILE*)Handle), &s)) {
+            //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
             if (outCreated)  *outCreated  = s.st_ctime;
             if (outAccessed) *outAccessed = s.st_atime;
             if (outModified) *outModified = s.st_mtime;
-            return s.st_ctime;
-        #endif
+            return true;
+        }
+        return false;
+    #endif
     }
-    time_t file::time_created()  const { time_t t; time_info(&t, 0, 0); return t; }
-    time_t file::time_accessed() const { time_t t; time_info(0, &t, 0); return t; }
-    time_t file::time_modified() const { time_t t; time_info(0, 0, &t); return t; }
+    time_t file::time_created()  const { time_t t; return time_info(&t, 0, 0) ? t : 0ull; }
+    time_t file::time_accessed() const { time_t t; return time_info(0, &t, 0) ? t : 0ull; }
+    time_t file::time_modified() const { time_t t; return time_info(0, 0, &t) ? t : 0ull; }
 
 
     ////////////////////////////////////////////////////////////////////////////////
+
 
     bool file_exists(const char* filename)
     {
@@ -308,8 +309,6 @@ namespace rpp /* ReCpp */
             return stat(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
         #endif
     }
-    bool file_exists(const string& filename) { return file_exists(filename.c_str());  }
-    bool file_exists(const strview filename) { return file_exists(filename.to_cstr()); }
 
     bool folder_exists(const char* folder)
     {
@@ -321,76 +320,61 @@ namespace rpp /* ReCpp */
             return stat(filename, &s) ? false : (s.st_mode & S_IFDIR) != 0;
         #endif
     }
-    bool folder_exists(const string& folder) { return folder_exists(folder.c_str());    }
-    bool folder_exists(const strview folder) { return folder_exists(folder.to_cstr()); }
 
-    void file_info(const char* filename, uint64_t* filesize, time_t* created, 
-                                         time_t*   accessed, time_t* modified)
+    bool file_info(const char* filename, int64*  filesize, time_t* created, 
+                                         time_t* accessed, time_t* modified)
     {
-        #if USE_WINAPI_IO
-            WIN32_FILE_ATTRIBUTE_DATA data;
-            GetFileAttributesExA(filename, GetFileExInfoStandard, &data);
+    #if USE_WINAPI_IO
+        WIN32_FILE_ATTRIBUTE_DATA data;
+        if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data)) {
             if (filesize) *filesize = LARGE_INTEGER{data.nFileSizeLow,(LONG)data.nFileSizeHigh}.QuadPart;
             if (created)  *created  = *(time_t*)&data.ftCreationTime;
             if (accessed) *accessed = *(time_t*)&data.ftLastAccessTime;
             if (modified) *modified = *(time_t*)&data.ftLastWriteTime;
-        #else
-            struct _stat64 s;
-            if (stat64(filename, &s) == 0/*OK*/) {
-                if (filesize) *filesize = s.st_size;
-                if (created)  *created  = s.st_ctime;
-                if (accessed) *accessed = s.st_atime;
-                if (modified) *modified = s.st_mtime;
-            }
-        #endif
+            return true;
+        }
+    #else
+        struct _stat64 s;
+        if (stat64(filename, &s) == 0/*OK*/) {
+            if (filesize) *filesize = (int64)s.st_size;
+            if (created)  *created  = s.st_ctime;
+            if (accessed) *accessed = s.st_atime;
+            if (modified) *modified = s.st_mtime;
+            return true;
+        }
+    #endif
+        return false;
     }
 
-
-    uint file_size(const char* filename)
+    int file_size(const char* filename)
     {
-        uint64_t s; file_info(filename, &s, 0, 0, 0); return (uint)s;
+        int64 s; 
+        return file_info(filename, &s, 0, 0, 0) ? (int)s : 0;
     }
-    uint file_size(const string& filename) { return file_size(filename.c_str());   }
-    uint file_size(const strview filename) { return file_size(filename.to_cstr()); }
-
-
-    uint64_t file_sizel(const char* filename)
+    int64 file_sizel(const char* filename)
     {
-        uint64_t s; file_info(filename, &s, 0, 0, 0); return s;
+        int64 s; 
+        return file_info(filename, &s, 0, 0, 0) ? s : 0ll;
     }
-    uint64_t file_sizel(const string& filename) { return file_sizel(filename.c_str());   }
-    uint64_t file_sizel(const strview filename) { return file_sizel(filename.to_cstr()); }
-
-
     time_t file_created(const char* filename)
-    { 
-        time_t t; file_info(filename, 0, &t, 0, 0); return t; 
+    {
+        time_t t; 
+        return file_info(filename, 0, &t, 0, 0) ? t : 0ull; 
     }
-    time_t file_created(const string& filename) { return file_created(filename.c_str());   }
-    time_t file_created(const strview filename) { return file_created(filename.to_cstr()); }
-
-
     time_t file_accessed(const char* filename)
     {
-        time_t t; file_info(filename, 0, 0, &t, 0); return t; 
+        time_t t; 
+        return file_info(filename, 0, 0, &t, 0) ? t : 0ull;
     }
-    time_t file_accessed(const string& filename) { return file_accessed(filename.c_str());   }
-    time_t file_accessed(const strview filename) { return file_accessed(filename.to_cstr()); }
-
-
     time_t file_modified(const char* filename)
     {
-        time_t t; file_info(filename, 0, 0, 0, &t); return t;
+        time_t t; 
+        return file_info(filename, 0, 0, 0, &t) ? t : 0ull;
     }
-    time_t file_modified(const string& filename) { return file_modified(filename.c_str());   }
-    time_t file_modified(const strview filename) { return file_modified(filename.to_cstr()); }
-
     bool delete_file(const char* filename)
     {
         return ::remove(filename) == 0;
     }
-    bool delete_file(const string& filename) { return delete_file(filename.c_str());   }
-    bool delete_file(const strview filename) { return delete_file(filename.to_cstr()); }
 
     static bool sys_mkdir(const strview foldername)
     {
@@ -400,8 +384,7 @@ namespace rpp /* ReCpp */
         return mkdir(foldername.to_cstr(), 0700) == 0;
     #endif
     }
-    bool create_folder(const char* foldername)   { return create_folder(strview(foldername)); }
-    bool create_folder(const string& foldername) { return create_folder(strview(foldername)); }
+
     bool create_folder(const strview foldername)
     {
         if (sys_mkdir(foldername))
@@ -429,8 +412,6 @@ namespace rpp /* ReCpp */
         return sys_mkdir(foldername); // and now create the final dir
     }
 
-    bool delete_folder(const char* foldername, bool recursive)   { return delete_folder(string{ foldername },   recursive); }
-    bool delete_folder(const strview foldername, bool recursive) { return delete_folder(foldername.to_string(), recursive); }
     bool delete_folder(const string& foldername, bool recursive) 
     {
         if (!recursive)
@@ -440,7 +421,7 @@ namespace rpp /* ReCpp */
         vector<string> files;
         bool deletedChildren = true;
 
-        if (path::list_alldir(folders, files, foldername))
+        if (list_alldir(folders, files, foldername))
         {
             for (const string& folder : folders)
                 deletedChildren |= delete_folder(foldername + '/' + folder, true);
@@ -454,6 +435,91 @@ namespace rpp /* ReCpp */
 
         return false; // no way to delete, since some subtree files are protected
     }
+
+
+    string full_path(const char* path)
+    {
+        char buf[512];
+        #if _WIN32 || _WIN64
+            size_t len = GetFullPathNameA(path, 512, buf, NULL);
+            return len ? string{ buf,len } : string{};
+        #else
+            char* res = realpath(path, buf);
+            return res ? string{ res } : string{};
+        #endif
+    }
+
+
+    strview file_name(const strview path)
+    {
+        strview nameext = file_nameext(path);
+
+        if (const char* dot = nameext.rfind('.'))
+            return strview{ nameext.str, dot };
+        return nameext;
+    }
+
+
+    strview file_nameext(const strview path)
+    {
+        if (const char* str = path.rfindany("/\\"))
+            return strview{ str + 1, path.end() };
+        return path; // assume it's just a file name
+    }
+
+
+    strview folder_name(const strview path)
+    {
+        strview folder = folder_path(path);
+        if (folder)
+        {
+            if (const char* str = folder.chomp_last().rfindany("/\\"))
+                return strview{ str + 1, folder.end() };
+        }
+        return folder;
+    }
+
+
+    strview folder_path(const strview path)
+    {
+        if (const char* end = path.rfindany("/\\"))
+            return strview{ path.str, end + 1 };
+        return strview{};
+    }
+
+
+    string& normalize(string& path, char sep)
+    {
+        if (sep == '/') {
+            for (char& ch : path) if (ch == '\\') ch = '/';
+        }
+        else if (sep == '\\') {
+            for (char& ch : path) if (ch == '/')  ch = '\\';
+        }
+        // else: ignore any other separators
+        return path;
+    }
+    char* normalize(char* path, char sep)
+    {
+        if (sep == '/') {
+            for (char* s = path; *s; ++s) if (*s == '\\') *s = '/';
+        }
+        else if (sep == '\\') {
+            for (char* s = path; *s; ++s) if (*s == '/')  *s = '\\';
+        }
+        // else: ignore any other separators
+        return path;
+    }
+
+    string normalized(const strview path, char sep)
+    {
+        string res = path.to_string();
+        normalize(res, sep);
+        return res;
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
 
 
 #if _WIN32
@@ -487,13 +553,11 @@ namespace rpp /* ReCpp */
     };
 #endif
 
-    int path::list_dirs(vector<string>& out, strview dir)
+    int list_dirs(vector<string>& out, strview dir)
     {
-        if (out.size()) 
-            out.clear();
+        if (out.size()) out.clear();
 
-        if (dir_iterator it = { dir })
-        {
+        if (dir_iterator it = { dir }) {
             do {
                 if (it.is_dir() && it.name()[0] != '.') {
                     out.emplace_back(it.name());
@@ -502,13 +566,12 @@ namespace rpp /* ReCpp */
         }
         return (int)out.size();
     }
-    int path::list_files(vector<string>& out, strview dir, strview ext)
-    {
-        if (out.size()) 
-            out.clear();
 
-        if (dir_iterator it = { dir })
-        {
+    int list_files(vector<string>& out, strview dir, strview ext)
+    {
+        if (out.size()) out.clear();
+
+        if (dir_iterator it = { dir }) {
             do {
                 if (!it.is_dir()) {
                     strview fname = it.name();
@@ -520,140 +583,34 @@ namespace rpp /* ReCpp */
         }
         return (int)out.size();
     }
-    int path::list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir)
+
+    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir)
     {
         if (outdirs.size())  outdirs.clear();
         if (outfiles.size()) outfiles.clear();
 
-        if (dir_iterator it = { dir })
-        {
+        if (dir_iterator it = { dir }) {
             do {
                 if (!it.is_dir())             outfiles.emplace_back(it.name());
                 else if (it.name()[0] != '.') outdirs.emplace_back(it.name());
             } while (it.next());
         }
-        return int(outdirs.size() + outfiles.size());
+        return (int)outdirs.size() + (int)outfiles.size();
     }
 
-    string path::working_dir()
+    string working_dir()
     {
         char path[512];
-        return string(getcwd(path, sizeof path) ? path : "");
+        return string(getcwd(path, sizeof(path)) ? path : "");
     }
-    void path::set_working_dir(const string& new_wd)
+
+    void set_working_dir(const string& new_wd)
     {
         chdir(new_wd.c_str());
     }
 
 
-    static size_t getfullpath(const char* filename, char* buffer)
-    {
-    #if _WIN32 || _WIN64
-        if (size_t len = GetFullPathNameA(filename, 512, buffer, NULL))
-            return len;
-    #else
-        if (char* result = realpath(filename, buffer))
-            return strlen(result);
-    #endif
-        buffer[0] = '\0';
-        return 0;
-    }
-    string path::fullpath(const string& relativePath)
-    {
-        return fullpath(relativePath.c_str());
-    }
-    string path::fullpath(const char* relativePath)
-    {
-        char path[512];
-        return string{ path, getfullpath(relativePath, path) };
-    }
+    ////////////////////////////////////////////////////////////////////////////////
 
 
-    static const char* scanback(const char* start, const char* end)
-    {
-        if (end < start) // if end is invalid, default to start
-            return start;
-        for (; start < end; --end)
-            if (*end == '/' || *end == '\\')
-                return ++end; // return part after encounter
-        return end;
-    }
-    static size_t getfilepart(const char* filename, const char** filepart)
-    {
-        int len = (int)strlen(filename);
-        const char* ptr = scanback(filename, filename + len - 1);
-        int filepartlen = int(filename + len - ptr);
-        *filepart = ptr;
-        return filepartlen;
-    }
-
-
-    string path::filename(const string& someFilePath)
-    {
-        return filename(someFilePath.c_str());
-    }
-    string path::filename(const char* someFilePath)
-    {
-        const char* filepart;
-        size_t len = getfilepart(someFilePath, &filepart);
-        return string{ filepart, len };
-    }
-
-
-    string path::filename_namepart(const string& someFilePath)
-    {
-        return filename_namepart(someFilePath.c_str());
-    }
-    string path::filename_namepart(const char * someFilePath)
-    {
-        const char* filepart;
-        size_t len = getfilepart(someFilePath, &filepart);
-        const char* ptr = filepart + len - 1;
-        for (; filepart < ptr; --ptr) // scan back till first .
-            if (*ptr == '.')
-                break;
-        if (ptr == filepart) // no extension
-            ptr = filepart + len;   // use original end
-        return string{ filepart, ptr };
-    }
-
-
-    string path::foldername(const string& someFolderPath)
-    {
-        const char* str = someFolderPath.c_str();
-        const char* ptr = scanback(str, str + someFolderPath.size() - 1);
-        if (str < ptr) --ptr;
-        return string{ str, ptr };
-    }
-    string path::foldername(const char* someFolderPath)
-    {
-        size_t len = strlen(someFolderPath);
-        const char* ptr = scanback(someFolderPath, someFolderPath + len - 1);
-        if (someFolderPath < ptr) --ptr;
-        return string{ someFolderPath, ptr };
-    }
-
-    string path::folder_path(const strview filePath)
-    {
-        if (const char* end = filePath.rfind('/'))
-            return { filePath.str, end+1 };
-        return filePath.to_string();
-    }
-
-    string& path::normalize(string& pathString, char separator)
-    {
-        if (separator == '/')
-        {
-            for (char& ch : pathString) if (ch == '\\') ch = '/';
-        }
-        else if (separator == '//')
-        {
-            for (char& ch : pathString) if (ch == '/') ch = '\\';
-        }
-        // else: ignore any other separators
-        return pathString;
-    }
-
-
-    
-}
+} // namespace rpp

@@ -23,3 +23,5 @@
 /bin/Tests.pdb
 /bin/recpp.a
 ReCpp.VC.db
+packages/
+MSVC/packages.config

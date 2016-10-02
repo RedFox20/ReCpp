@@ -245,9 +245,13 @@ namespace rpp
         FINLINE string& to_string(string& out) const { return out.assign(str, len); }
         FINLINE string to_string() const { return string(str, len); }
 
-        /** Copies this str[len] string into a C-string array */
-        NOINLINE char* to_cstr(char* buf, int max) const;
-        template<int N> FINLINE char* to_cstr(char (&buf)[N]) { return to_cstr(buf, N); }
+        /** 
+         * Copies this str[len] string into a C-string array
+         * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
+         */
+        NOINLINE const char* to_cstr(char* buf, int max) const;
+        template<int N> 
+        FINLINE const char* to_cstr(char (&buf)[N]) const { return to_cstr(buf, N); }
         /** 
          * Copies this str[len] into a max of 512 byte static C-string array 
          * Result is only valid until next call to this method
@@ -260,11 +264,11 @@ namespace rpp
         /** Parses this strview as a HEX integer ('0xff' or '0ff' or 'ff') */
         FINLINE int to_int(strview_use_hex) const { return _tointhx(str, len); }
         /** Parses this strview as a long */
-        FINLINE long to_long() const { return (long)_toint(str, len); }
+        FINLINE long to_long()     const { return (long)_toint(str, len); }
         /** Parses this strview as a float */
-        FINLINE float to_float() const { return _tofloat(str, len); }
+        FINLINE float to_float()   const { return _tofloat(str, len); }
         /** Parses this strview as a double */
-        FINLINE double to_double() const { return (double) _tofloat(str, len); }
+        FINLINE double to_double() const { return (double)_tofloat(str, len); }
         /** Parses this strview as a bool */
         bool to_bool() const;
 
@@ -323,10 +327,15 @@ namespace rpp
             return trim_start(chars).trim_end(chars);
         }
 
-        /** Consumes the first character in the strview String if possible. */
+        /** Consumes the first character in the strview if possible. */
         FINLINE strview& chomp_first() { if (len) ++str,--len; return *this; }
-        /** Consumes the last character in the strview String if possible. */
+        /** Consumes the last character in the strview if possible. */
         FINLINE strview& chomp_last()  { if (len) --len; return *this; }
+
+        /** Pops and returns the first character in the strview if possible. */
+        FINLINE char pop_front() { if (len) { char ch = *str++; --len;       return ch; } return '\0'; }
+        /** Pops and returns the last character in the strview if possible. */
+        FINLINE char pop_back()  { if (len) { char ch = str[len - 1]; --len; return ch; } return '\0'; }
 
         /** Consumes the first COUNT characters in the strview String if possible. */
         FINLINE strview& chomp_first(int count) { for (int n = count; n && len; --n,--len) ++str; return *this; }
@@ -773,15 +782,15 @@ namespace rpp
 
     //////////////// string compare operators /////////////////
 
-    inline bool operator<(const string& a, const strview& b) {return strview(a) < b;}
-    inline bool operator>(const string& a, const strview& b) {return strview(a) > b;}
+    inline bool operator< (const string& a,const strview& b) {return strview(a) <  b;}
+    inline bool operator> (const string& a,const strview& b) {return strview(a) >  b;}
     inline bool operator==(const string& a,const strview& b) {return strview(a) == b;}
     inline bool operator!=(const string& a,const strview& b) {return strview(a) != b;}
     
-    inline bool operator<(const char* a, const strview& b){return strview(a) < b;}
-    inline bool operator>(const char* a, const strview& b){return strview(a) > b;}
-    inline bool operator==(const char* a,const strview& b){return strview(a) == b;}
-    inline bool operator!=(const char* a,const strview& b){return strview(a) != b;}
+    inline bool operator< (const char* a,const strview& b){return strncmp(a, b.str, b.len) <  0;}
+    inline bool operator> (const char* a,const strview& b){return strncmp(a, b.str, b.len) >  0;}
+    inline bool operator==(const char* a,const strview& b){return strncmp(a, b.str, b.len) == 0;}
+    inline bool operator!=(const char* a,const strview& b){return strncmp(a, b.str, b.len) != 0;}
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -853,6 +862,7 @@ namespace rpp
         strview buffer;
     public:
         FINLINE line_parser(const strview& buffer)         : buffer(buffer) {}
+        FINLINE line_parser(const char* data, int size)    : buffer(data, data + size) {}
         FINLINE line_parser(const char* data, size_t size) : buffer(data, data + size) {}
 
         /**
@@ -904,6 +914,7 @@ namespace rpp
         strview buffer;
     public:
         FINLINE keyval_parser(const strview& buffer)         : buffer(buffer) {}
+        FINLINE keyval_parser(const char* data, int size)    : buffer(data, data + size) {}
         FINLINE keyval_parser(const char* data, size_t size) : buffer(data, data + size) {}
 
         /**
