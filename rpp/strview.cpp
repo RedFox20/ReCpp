@@ -193,6 +193,20 @@ namespace rpp
         return nullptr;
     }
 
+    int strview::indexof(char ch) const
+    {
+        for (int i = 0; i < len; ++i)
+            if (str[i] == ch) return i;
+        return -1;
+    }
+
+    int strview::indexof(const char* chars, int n) const
+    {
+        for (int i = 0; i < len; ++i)
+            if (strcontains(chars, n, str[i])) return i;
+        return -1;
+    }
+
     strview strview::split_first(char delim)
     {
         if (auto splitend = (const char*)memchr(str, delim, len))
@@ -223,41 +237,6 @@ namespace rpp
         return strview(str, len);
     }
 
-
-
-    int strview::split(vector<strview>& out, char delim, const char* trimChars)
-    {
-        int ntrims = trimChars ? (int)strlen(trimChars) : 0;
-        int numSplits = 0;
-        strview tok;
-        strview splitter(str, len);
-        while (splitter.next(tok, delim)) // get next strview
-        {
-            if (ntrims) tok.trim(trimChars, ntrims); // trim if needed
-            if (tok.len) { // if we actually have anything after trimming?
-                out.emplace_back(tok.str, tok.len); // push it out
-                ++numSplits;
-            }
-        }
-        return numSplits;
-    }
-    int strview::split(vector<strview>& out, const char* delims, const char* trimChars)
-    {
-        int ntrims = trimChars ? (int)strlen(trimChars) : 0;
-        int ndelims = (int)strlen(delims);
-        int numSplits = 0;
-        strview tok;
-        strview splitter(str, len); // split source strview
-        while (splitter.next(tok, delims, ndelims)) // get next strview
-        {
-            if (ntrims) tok.trim(trimChars, ntrims); // trim if needed
-            if (tok.len) { // if we actually have anything after trimming?
-                out.emplace_back(tok.str, tok.len); // push it out
-                ++numSplits;
-            }
-        }
-        return numSplits;
-    }
 
 
 

@@ -50,9 +50,24 @@ TestImpl(test_file_io)
 
     TestCase(create_delete_folder)
     {
-        Assert(create_folder("./test/folder/path"));
-        Assert(folder_exists("./test/folder/path"));
-        Assert(delete_folder("./test/folder/path", true/*recursive*/));
+        Assert(create_folder("") == false);
+        Assert(create_folder("./") == false);
+
+        // these tests are extremely volatile, don't run without a step-in debugger
+        //Assert(create_folder("dangerous"));
+        //Assert(change_dir("dangerous"));
+        //Assert(delete_folder("", true) == false); // can delete system root dir
+        //Assert(delete_folder("./", true) == false); // may accidentally delete current folder
+        //Assert(change_dir(".."));
+        //Assert(delete_folder("dangerous"));
+
+        Assert(create_folder("./test_tmp/folder/path"));
+        Assert(folder_exists("./test_tmp/folder/path"));
+        Assert(delete_folder("./test_tmp/", true/*recursive*/));
+
+        Assert(create_folder("test_tmp/folder/path"));
+        Assert(folder_exists("test_tmp/folder/path"));
+        Assert(delete_folder("test_tmp", true/*recursive*/));
     }
 
     TestCase(path_utils)

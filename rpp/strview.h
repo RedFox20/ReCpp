@@ -284,6 +284,8 @@ namespace rpp
         FINLINE const char* c_str() const { return str; }
         FINLINE const char* begin() const { return str; }
         FINLINE const char* end()   const { return str + len; }
+        FINLINE char front() const { return *str; }
+        FINLINE char back()  const { return str[len - 1]; }
         /** @return TRUE if the strview is only whitespace: " \t\r\n"  */
         NOINLINE bool is_whitespace();
         /** @return TRUE if the strview ends with a null terminator */
@@ -338,9 +340,16 @@ namespace rpp
         FINLINE char pop_back()  { if (len) { char ch = str[len - 1]; --len; return ch; } return '\0'; }
 
         /** Consumes the first COUNT characters in the strview String if possible. */
-        FINLINE strview& chomp_first(int count) { for (int n = count; n && len; --n,--len) ++str; return *this; }
+        FINLINE strview& chomp_first(int count) { 
+            int n = count < len ? count : len;
+            str += n, len -= n;
+            return *this;
+        }
         /** Consumes the last COUNT characters in the strview String if possible. */
-        FINLINE strview& chomp_last(int count)  { for (int n = count; n && len; --n) --len; return *this; }
+        FINLINE strview& chomp_last(int count) {
+            len -= (count < len ? count : len);
+            return *this; 
+        }
 
         /** @return TRUE if the strview contains this char */
         FINLINE bool contains(char c) const { return !!memchr(str, c, len); }
@@ -386,6 +395,11 @@ namespace rpp
         }
 
 
+        int indexof(char ch) const;
+        int indexof(const char* chars, int n) const;
+        template<int N> FINLINE int indexof(const char (&chars)[N]) const {
+            return indexof(chars, N - 1);
+        }
 
         /** @return TRUE if this strview starts with the specified string */
         FINLINE bool starts_with(const char* s, int length) const {
@@ -492,22 +506,6 @@ namespace rpp
          * @param delim Delimiter char to split on
          */
         NOINLINE strview split_second(char delim);
-        /**
-         * Splits the string at given delimiter values and trims each split with the specified trim chars.
-         * @param out Output split and trimmed strings
-         * @param delim Delimiter char to split on [default ' ']
-         * @param trimChars Chars to trim on the split strings (optional)
-         * @return Number of split strings (at least 1)
-         */
-        NOINLINE int split(vector<strview>& out, char delim = ' ', const char* trimChars = 0);
-        /**
-         * Splits the string at given delimiter values and trims each split with the specified trim chars.
-         * @param out Output split and trimmed strings
-         * @param delims Delimiter chars to split on. ex: " \r\t" splits on 3 chars
-         * @param trimChars Chars to trim on the split strings (optional)
-         * @return Number of split strings (at least 1)
-         */
-        NOINLINE int split(vector<strview>& out, const char* delims, const char* trimChars = 0);
 
         /**
          * Gets the next strview; also advances the ptr to next token.
@@ -779,6 +777,8 @@ namespace rpp
     inline string operator+(const strview&a,const string&b){return a + strview(b);}
     inline string operator+(const char*a,const strview&b){return strview(a,strlen(a)) + b;}
     inline string operator+(const strview&a,const char*b){return a + strview(b,strlen(b));}
+    inline string operator+(const strview&a,char c){return a + strview{&c,1};}
+    inline string&& operator+(string&&a,const strview&b){return move(a.append(b.str,b.len));}
 
     //////////////// string compare operators /////////////////
 

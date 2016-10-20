@@ -21,28 +21,28 @@ namespace rpp /* ReCpp */
 {
     load_buffer::~load_buffer()
     {
-        if (ptr) free(ptr); // MEM_RELEASE
+        if (str) free(str); // MEM_RELEASE
     }
-    load_buffer::load_buffer(load_buffer&& mv) : ptr(mv.ptr), len(mv.len)
+    load_buffer::load_buffer(load_buffer&& mv) noexcept : str(mv.str), len(mv.len)
     {
-        mv.ptr = 0;
+        mv.str = 0;
         mv.len = 0;
     }
-    load_buffer& load_buffer::operator=(load_buffer&& mv)
+    load_buffer& load_buffer::operator=(load_buffer&& mv) noexcept
     {
-        char* p = ptr;
+        char* p = str;
         int   l = len;
-        ptr = mv.ptr;
+        str = mv.str;
         len = mv.len;
-        mv.ptr = p;
+        mv.str = p;
         mv.len = l;
         return *this;
     }
     // acquire the data pointer of this load_buffer, making the caller own the buffer
-    char* load_buffer::steal_ptr()
+    char* load_buffer::steal_ptr() noexcept
     {
-        char* p = ptr;
-        ptr = 0;
+        char* p = str;
+        str = 0;
         return p;
     }
 
@@ -50,7 +50,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    static void* OpenFile(const char* filename, IOFlags mode)
+    static void* OpenFile(const char* filename, IOFlags mode) noexcept
     {
     #if USE_WINAPI_IO
         int access, sharing;        // FILE_SHARE_READ, FILE_SHARE_WRITE
@@ -93,20 +93,33 @@ namespace rpp /* ReCpp */
     #endif
     }
 
+    static void* OpenOrCreate(const char* filename, IOFlags mode) noexcept
+    {
+        void* handle = OpenFile(filename, mode);
+        if (!handle && mode == CREATENEW)
+        {
+            // assume the directory doesn't exist
+            if (create_folder(folder_path(filename))) {
+                return OpenFile(filename, mode); // last chance
+            }
+        }
+        return handle;
+    }
 
-    file::file(const char* filename, IOFlags mode)
-        : Handle(OpenFile(filename, mode)), Mode(mode)
+
+    file::file(const char* filename, IOFlags mode) noexcept
+        : Handle(OpenOrCreate(filename, mode)), Mode(mode)
     {
     }
-    file::file(const string& filename, IOFlags mode)
-        : Handle(OpenFile(filename.c_str(), mode)), Mode(mode)
+    file::file(const string& filename, IOFlags mode) noexcept
+        : Handle(OpenOrCreate(filename.c_str(), mode)), Mode(mode)
     {
     }
-    file::file(const strview filename, IOFlags mode)
-        : Handle(OpenFile(filename.to_cstr(), mode)), Mode(mode)
+    file::file(const strview filename, IOFlags mode) noexcept
+        : Handle(OpenOrCreate(filename.to_cstr(), mode)), Mode(mode)
     {
     }
-    file::file(file&& f) : Handle(f.Handle), Mode(f.Mode)
+    file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
     {
         f.Handle = 0;
     }
@@ -114,7 +127,7 @@ namespace rpp /* ReCpp */
     {
         close();
     }
-    file& file::operator=(file&& f)
+    file& file::operator=(file&& f) noexcept
     {
         close();
         Handle = f.Handle;
@@ -122,21 +135,21 @@ namespace rpp /* ReCpp */
         f.Handle = 0;
         return *this;
     }
-    bool file::open(const char* filename, IOFlags mode)
+    bool file::open(const char* filename, IOFlags mode) noexcept
     {
         close();
         Mode = mode;
-        return (Handle = OpenFile(filename, mode)) != nullptr;
+        return (Handle = OpenOrCreate(filename, mode)) != nullptr;
     }
-    bool file::open(const string& filename, IOFlags mode)
+    bool file::open(const string& filename, IOFlags mode) noexcept
     {
         return open(filename.c_str(), mode);
     }
-    bool file::open(const strview filename, IOFlags mode)
+    bool file::open(const strview filename, IOFlags mode) noexcept
     {
         return open(filename.to_cstr(), mode);
     }
-    void file::close()
+    void file::close() noexcept
     {
         if (Handle)
         {
@@ -148,15 +161,15 @@ namespace rpp /* ReCpp */
             Handle = nullptr;
         }
     }
-    bool file::good() const
+    bool file::good() const noexcept
     {
         return Handle != nullptr;
     }
-    bool file::bad() const
+    bool file::bad() const noexcept
     {
         return Handle == nullptr;
     }
-    int file::size() const
+    int file::size() const noexcept
     {
         if (!Handle) return 0;
         #if USE_WINAPI_IO
@@ -170,7 +183,7 @@ namespace rpp /* ReCpp */
             return (int)s.st_size;
         #endif
     }
-    int64 file::sizel() const
+    int64 file::sizel() const noexcept
     {
         if (!Handle) return 0;
         #if USE_WINAPI_IO
@@ -189,7 +202,7 @@ namespace rpp /* ReCpp */
             return (int64)s.st_size;
         #endif
     }
-    int file::read(void* buffer, int bytesToRead)
+    int file::read(void* buffer, int bytesToRead) noexcept
     {
         #if USE_WINAPI_IO
             DWORD bytesRead;
@@ -199,7 +212,7 @@ namespace rpp /* ReCpp */
             return (int)fread(buffer, bytesToRead, 1, (FILE*)Handle) * bytesToRead;
         #endif
     }
-    load_buffer file::read_all()
+    load_buffer file::read_all() noexcept
     {
         int fileSize = size();
         if (!fileSize) return load_buffer(0, 0);
@@ -208,20 +221,20 @@ namespace rpp /* ReCpp */
         int bytesRead = read(buffer, fileSize);
         return load_buffer(buffer, bytesRead);
     }
-    load_buffer file::read_all(const char* filename)
+    load_buffer file::read_all(const char* filename) noexcept
     {
         // make sure file f; remains until end of scope, or read_all will bug out
         return file{filename, READONLY}.read_all();
     }
-    load_buffer file::read_all(const string& filename)
+    load_buffer file::read_all(const string& filename) noexcept
     {
         return read_all(filename.c_str());
     }
-    load_buffer file::read_all(const strview filename)
+    load_buffer file::read_all(const strview filename) noexcept
     {
         return read_all(filename.to_cstr());
     }
-    int file::write(const void* buffer, int bytesToWrite)
+    int file::write(const void* buffer, int bytesToWrite) noexcept
     {
         #if USE_WINAPI_IO
             DWORD bytesWritten;
@@ -231,20 +244,31 @@ namespace rpp /* ReCpp */
             return (int)fwrite(buffer, bytesToWrite, 1, (FILE*)Handle) * bytesToWrite;
         #endif
     }
-    int file::write_new(const char* filename, const void* buffer, int bytesToWrite)
+    void file::flush() noexcept
     {
-        return file{filename, IOFlags::CREATENEW}.write(buffer, bytesToWrite);
+    #if USE_WINAPI_IO
+        FlushFileBuffers((HANDLE)Handle);
+    #else
+        fflush((FILE*)Handle);
+    #endif
     }
-    int file::write_new(const string & filename, const void * buffer, int bytesToWrite)
+    int file::write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept
+    {
+        file f{ filename, IOFlags::CREATENEW };
+        int n = f.write(buffer, bytesToWrite);
+        //f.flush(); // ensure the data gets flushed
+        return n;
+    }
+    int file::write_new(const string & filename, const void * buffer, int bytesToWrite) noexcept
     {
         return write_new(filename.c_str(), buffer, bytesToWrite);
     }
-    int file::write_new(const strview filename, const void* buffer, int bytesToWrite)
+    int file::write_new(const strview filename, const void* buffer, int bytesToWrite) noexcept
     {
         char buf[512];
         return write_new(filename.to_cstr(buf,512), buffer, bytesToWrite);
     }
-    int file::seek(int filepos, int seekmode)
+    int file::seek(int filepos, int seekmode) noexcept
     {
         #if USE_WINAPI_IO
             return SetFilePointer((HANDLE)Handle, filepos, 0, seekmode);
@@ -253,7 +277,7 @@ namespace rpp /* ReCpp */
             return ftell((FILE*)Handle);
         #endif
     }
-    uint64 file::seekl(uint64 filepos, int seekmode)
+    uint64 file::seekl(uint64 filepos, int seekmode) noexcept
     {
         #if USE_WINAPI_IO
             LARGE_INTEGER newpos, nseek;
@@ -266,7 +290,7 @@ namespace rpp /* ReCpp */
             return ftell((FILE*)Handle);
         #endif
     }
-    int file::tell() const
+    int file::tell() const noexcept
     {
         #if USE_WINAPI_IO
             return SetFilePointer((HANDLE)Handle, 0, 0, FILE_CURRENT);
@@ -274,7 +298,7 @@ namespace rpp /* ReCpp */
             return ftell((FILE*)Handle);
         #endif
     }
-    bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const
+    bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
     #if USE_WINAPI_IO
         return !!GetFileTime((HANDLE)Handle,         (FILETIME*)outCreated,
@@ -291,15 +315,15 @@ namespace rpp /* ReCpp */
         return false;
     #endif
     }
-    time_t file::time_created()  const { time_t t; return time_info(&t, 0, 0) ? t : 0ull; }
-    time_t file::time_accessed() const { time_t t; return time_info(0, &t, 0) ? t : 0ull; }
-    time_t file::time_modified() const { time_t t; return time_info(0, 0, &t) ? t : 0ull; }
+    time_t file::time_created()  const noexcept { time_t t; return time_info(&t, 0, 0) ? t : 0ull; }
+    time_t file::time_accessed() const noexcept { time_t t; return time_info(0, &t, 0) ? t : 0ull; }
+    time_t file::time_modified() const noexcept { time_t t; return time_info(0, 0, &t) ? t : 0ull; }
 
 
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    bool file_exists(const char* filename)
+    bool file_exists(const char* filename) noexcept
     {
         #if USE_WINAPI_IO
             DWORD attr = GetFileAttributesA(filename);
@@ -310,7 +334,7 @@ namespace rpp /* ReCpp */
         #endif
     }
 
-    bool folder_exists(const char* folder)
+    bool folder_exists(const char* folder) noexcept
     {
         #if USE_WINAPI_IO
             DWORD attr = GetFileAttributesA(folder);
@@ -322,7 +346,7 @@ namespace rpp /* ReCpp */
     }
 
     bool file_info(const char* filename, int64*  filesize, time_t* created, 
-                                         time_t* accessed, time_t* modified)
+                                         time_t* accessed, time_t* modified) noexcept
     {
     #if USE_WINAPI_IO
         WIN32_FILE_ATTRIBUTE_DATA data;
@@ -346,37 +370,37 @@ namespace rpp /* ReCpp */
         return false;
     }
 
-    int file_size(const char* filename)
+    int file_size(const char* filename) noexcept
     {
         int64 s; 
         return file_info(filename, &s, 0, 0, 0) ? (int)s : 0;
     }
-    int64 file_sizel(const char* filename)
+    int64 file_sizel(const char* filename) noexcept
     {
         int64 s; 
         return file_info(filename, &s, 0, 0, 0) ? s : 0ll;
     }
-    time_t file_created(const char* filename)
+    time_t file_created(const char* filename) noexcept
     {
         time_t t; 
         return file_info(filename, 0, &t, 0, 0) ? t : 0ull; 
     }
-    time_t file_accessed(const char* filename)
+    time_t file_accessed(const char* filename) noexcept
     {
         time_t t; 
         return file_info(filename, 0, 0, &t, 0) ? t : 0ull;
     }
-    time_t file_modified(const char* filename)
+    time_t file_modified(const char* filename) noexcept
     {
         time_t t; 
         return file_info(filename, 0, 0, 0, &t) ? t : 0ull;
     }
-    bool delete_file(const char* filename)
+    bool delete_file(const char* filename) noexcept
     {
         return ::remove(filename) == 0;
     }
 
-    static bool sys_mkdir(const strview foldername)
+    static bool sys_mkdir(const strview foldername) noexcept
     {
     #if _WIN32 || _WIN64
         return mkdir(foldername.to_cstr()) == 0;
@@ -385,8 +409,10 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    bool create_folder(const strview foldername)
+    bool create_folder(const strview foldername) noexcept
     {
+        if (!foldername.len || foldername == "./")
+            return false;
         if (sys_mkdir(foldername))
             return true; // best case, no recursive mkdir required
 
@@ -401,8 +427,9 @@ namespace rpp /* ReCpp */
                 break;
         }
 
-        // now create all the parent dirs between:
-        ++p;
+        // now create all the parent dir between:
+        p = p ? p + 1 : fs; // handle /dir/ vs dir/ case
+
         while (const char* e = strview{p,fe}.findany("/\\"))
         {
             if (!sys_mkdir(strview{fs,e}))
@@ -412,8 +439,10 @@ namespace rpp /* ReCpp */
         return sys_mkdir(foldername); // and now create the final dir
     }
 
-    bool delete_folder(const string& foldername, bool recursive) 
+    bool delete_folder(const string& foldername, bool recursive) noexcept
     {
+        if (foldername.empty()) // this would delete the root dir. NOPE! This is always a bug.
+            return false;
         if (!recursive)
             return rmdir(foldername.c_str()) == 0; // easy path, just gently try to delete...
 
@@ -437,7 +466,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    string full_path(const char* path)
+    string full_path(const char* path) noexcept
     {
         char buf[512];
         #if _WIN32 || _WIN64
@@ -449,8 +478,38 @@ namespace rpp /* ReCpp */
         #endif
     }
 
+    string merge_dirups(const strview path) noexcept
+    {
+        strview pathstr = path;
+        const bool isDirPath = path.back() == '/' || path.back() == '\\';
+        vector<strview> folders;
+        while (strview folder = pathstr.next("/\\")) {
+            folders.push_back(folder);
+        }
 
-    strview file_name(const strview path)
+        for (int i = 0; i < (int)folders.size(); ++i)
+        {
+            if (i > 0 && folders[i] == ".." && folders[i-1] != "..") 
+            {
+                auto it = folders.begin() + i;
+                folders.erase(it - 1, it + 1);
+                i -= 2;
+            }
+        }
+
+        string result;
+        for (const strview& folder : folders) {
+            result += folder;
+            result += '/';
+        }
+        if (!isDirPath) { // it's a filename? so pop the last /
+            result.pop_back();
+        }
+        return result;
+    }
+
+
+    strview file_name(const strview path) noexcept
     {
         strview nameext = file_nameext(path);
 
@@ -460,7 +519,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    strview file_nameext(const strview path)
+    strview file_nameext(const strview path) noexcept
     {
         if (const char* str = path.rfindany("/\\"))
             return strview{ str + 1, path.end() };
@@ -468,7 +527,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    strview folder_name(const strview path)
+    strview folder_name(const strview path) noexcept
     {
         strview folder = folder_path(path);
         if (folder)
@@ -480,7 +539,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    strview folder_path(const strview path)
+    strview folder_path(const strview path) noexcept
     {
         if (const char* end = path.rfindany("/\\"))
             return strview{ path.str, end + 1 };
@@ -488,7 +547,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    string& normalize(string& path, char sep)
+    string& normalize(string& path, char sep) noexcept
     {
         if (sep == '/') {
             for (char& ch : path) if (ch == '\\') ch = '/';
@@ -499,7 +558,7 @@ namespace rpp /* ReCpp */
         // else: ignore any other separators
         return path;
     }
-    char* normalize(char* path, char sep)
+    char* normalize(char* path, char sep) noexcept
     {
         if (sep == '/') {
             for (char* s = path; *s; ++s) if (*s == '\\') *s = '/';
@@ -511,7 +570,7 @@ namespace rpp /* ReCpp */
         return path;
     }
 
-    string normalized(const strview path, char sep)
+    string normalized(const strview path, char sep) noexcept
     {
         string res = path.to_string();
         normalize(res, sep);
@@ -526,36 +585,38 @@ namespace rpp /* ReCpp */
     struct dir_iterator {
         HANDLE hFind;
         WIN32_FIND_DATAA ffd;
-        dir_iterator(const strview& dir) {
+        dir_iterator(const strview& dir) noexcept {
             char path[512]; sprintf(path, "%.*s/*", dir.len, dir.str);
             if ((hFind = FindFirstFileA(path, &ffd)) == INVALID_HANDLE_VALUE)
                 hFind = 0;
         }
         ~dir_iterator() { if (hFind) FindClose(hFind); }
-        operator bool() const { return hFind != 0; }
-        bool is_dir() const { return (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
-        const char* name() const { return ffd.cFileName; }
-        bool next() { return FindNextFileA(hFind, &ffd) != 0; }
+        operator bool() const noexcept { return hFind != 0; }
+        bool is_dir() const noexcept { return (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+        const char* name() const noexcept { return ffd.cFileName; }
+        bool next() noexcept { return FindNextFileA(hFind, &ffd) != 0; }
     };
 #else
     struct dir_iterator {
         DIR* d;
         dirent* e;
-        dir_iterator(const strview& dir) {
+        dir_iterator(const strview& dir) noexcept {
             if ((d=opendir(dir.to_cstr()))) 
                 e = readdir(d);
         }
         ~dir_iterator() { if (d) closedir(d); }
-        operator bool() const { return d && e; }
-        bool is_dir() const { return e->d_type == DT_DIR; }
-        const char* name() const { return e->d_name; }
-        bool next() { return (e = readdir(d)) != 0; }
+        operator bool() const noexcept { return d && e; }
+        bool is_dir() const noexcept { return e->d_type == DT_DIR; }
+        const char* name() const noexcept { return e->d_name; }
+        bool next() noexcept { return (e = readdir(d)) != 0; }
     };
 #endif
 
-    int list_dirs(vector<string>& out, strview dir)
+    ////////////////////////////////////////////////////////////////////////////////
+
+    int list_dirs(vector<string>& out, strview dir) noexcept
     {
-        if (out.size()) out.clear();
+        if (!out.empty()) out.clear();
 
         if (dir_iterator it = { dir }) {
             do {
@@ -567,27 +628,26 @@ namespace rpp /* ReCpp */
         return (int)out.size();
     }
 
-    int list_files(vector<string>& out, strview dir, strview ext)
+    int list_files(vector<string>& out, strview dir, strview ext) noexcept
     {
-        if (out.size()) out.clear();
+        if (!out.empty()) out.clear();
 
         if (dir_iterator it = { dir }) {
             do {
                 if (!it.is_dir()) {
                     strview fname = it.name();
-                    if (ext && !fname.ends_withi(ext))
-                        continue;
-                    out.emplace_back(fname.str, fname.len);
+                    if (ext.empty() || fname.ends_withi(ext))
+                        out.emplace_back(fname.str, fname.len);
                 }
             } while (it.next());
         }
         return (int)out.size();
     }
 
-    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir)
+    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept
     {
-        if (outdirs.size())  outdirs.clear();
-        if (outfiles.size()) outfiles.clear();
+        if (!outdirs.empty())  outdirs.clear();
+        if (!outfiles.empty()) outfiles.clear();
 
         if (dir_iterator it = { dir }) {
             do {
@@ -598,17 +658,78 @@ namespace rpp /* ReCpp */
         return (int)outdirs.size() + (int)outfiles.size();
     }
 
-    string working_dir()
+    ////////////////////////////////////////////////////////////////////////////////
+
+    static void list_rec(vector<string>& out, strview dir, strview ext) noexcept
+    {
+        if (dir_iterator it = { dir }) {
+            do {
+                strview fname = it.name();
+                if (it.is_dir())
+                {
+                    if (fname[0] != '.')
+                        list_rec(out, dir + '/' + fname, ext);
+                }
+                else
+                {
+                    if (ext.empty() || fname.ends_withi(ext))
+                        out.emplace_back(dir + '/' + fname);
+                }
+            } while (it.next());
+        }
+    }
+    vector<string> list_files_recursive(strview dir, strview ext) noexcept
+    {
+        vector<string> out;
+        list_rec(out, dir, ext);
+        return out;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    static bool ends_withi(const strview& str, const vector<strview>& exts) noexcept
+    {
+        for (const strview& ext : exts)
+            if (str.ends_withi(ext)) return true;
+        return false;
+    }
+    static void list_rec(vector<string>& out, strview dir, const vector<strview>& exts) noexcept
+    {
+        if (dir_iterator it = { dir }) {
+            do {
+                strview fname = it.name();
+                if (it.is_dir())
+                {
+                    if (fname[0] != '.')
+                        list_rec(out, dir + '/' + fname, exts);
+                }
+                else
+                {
+                    if (exts.empty() || ends_withi(fname, exts))
+                        out.emplace_back(dir + '/' + fname);
+                }
+            } while (it.next());
+        }
+    }
+    vector<string> list_files_recursive(strview dir, const vector<strview>& exts) noexcept
+    {
+        vector<string> out;
+        list_rec(out, dir, exts);
+        return out;
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    string working_dir() noexcept
     {
         char path[512];
         return string(getcwd(path, sizeof(path)) ? path : "");
     }
-
-    void set_working_dir(const string& new_wd)
+    bool change_dir(const char* new_wd) noexcept
     {
-        chdir(new_wd.c_str());
+        return chdir(new_wd) == 0;
     }
-
 
     ////////////////////////////////////////////////////////////////////////////////
 
