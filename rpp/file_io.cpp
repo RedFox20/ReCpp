@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h> // stat,fstat
-#if _WIN32 || _WIN64
+#if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
@@ -400,10 +400,11 @@ namespace rpp /* ReCpp */
         return ::remove(filename) == 0;
     }
 
+
     static bool sys_mkdir(const strview foldername) noexcept
     {
-    #if _WIN32 || _WIN64
-        return mkdir(foldername.to_cstr()) == 0;
+    #if _WIN32
+        return _mkdir(foldername.to_cstr()) == 0;
     #else
         return mkdir(foldername.to_cstr(), 0700) == 0;
     #endif
@@ -439,12 +440,22 @@ namespace rpp /* ReCpp */
         return sys_mkdir(foldername); // and now create the final dir
     }
 
+
+    static bool sys_rmdir(const strview foldername) noexcept
+    {
+    #if _WIN32
+        return _rmdir(foldername.to_cstr()) == 0;
+    #else
+        return rmdir(foldername.to_cstr()) == 0;
+    #endif
+    }
+
     bool delete_folder(const string& foldername, bool recursive) noexcept
     {
         if (foldername.empty()) // this would delete the root dir. NOPE! This is always a bug.
             return false;
         if (!recursive)
-            return rmdir(foldername.c_str()) == 0; // easy path, just gently try to delete...
+            return sys_rmdir(foldername); // easy path, just gently try to delete...
 
         vector<string> folders;
         vector<string> files;
@@ -460,7 +471,7 @@ namespace rpp /* ReCpp */
         }
 
         if (deletedChildren)
-            return rmdir(foldername.c_str()) == 0; // should be okay to remove now
+            return sys_rmdir(foldername); // should be okay to remove now
 
         return false; // no way to delete, since some subtree files are protected
     }
@@ -469,7 +480,7 @@ namespace rpp /* ReCpp */
     string full_path(const char* path) noexcept
     {
         char buf[512];
-        #if _WIN32 || _WIN64
+        #if _WIN32
             size_t len = GetFullPathNameA(path, 512, buf, NULL);
             return len ? string{ buf,len } : string{};
         #else
@@ -586,7 +597,7 @@ namespace rpp /* ReCpp */
         HANDLE hFind;
         WIN32_FIND_DATAA ffd;
         dir_iterator(const strview& dir) noexcept {
-            char path[512]; sprintf(path, "%.*s/*", dir.len, dir.str);
+            char path[512]; snprintf(path, 512, "%.*s/*", dir.len, dir.str);
             if ((hFind = FindFirstFileA(path, &ffd)) == INVALID_HANDLE_VALUE)
                 hFind = 0;
         }
@@ -724,11 +735,19 @@ namespace rpp /* ReCpp */
     string working_dir() noexcept
     {
         char path[512];
-        return string(getcwd(path, sizeof(path)) ? path : "");
+        #if _WIN32
+            return string(_getcwd(path, sizeof(path)) ? path : "");
+        #else
+            return string(getcwd(path, sizeof(path)) ? path : "");
+        #endif
     }
     bool change_dir(const char* new_wd) noexcept
     {
-        return chdir(new_wd) == 0;
+        #if _WIN32
+            return _chdir(new_wd) == 0;
+        #else
+            return chdir(new_wd) == 0;
+        #endif
     }
 
     ////////////////////////////////////////////////////////////////////////////////

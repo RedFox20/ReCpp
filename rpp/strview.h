@@ -232,6 +232,8 @@ namespace rpp
         FINLINE strview(const char* str, const char* end) : str(str), len(int(end-str))     {}
         FINLINE strview(const void* str, const void* end) : strview((const char*)str, (const char*)end) {}
         FINLINE strview(const string& s)             : str(s.c_str()), len((int)s.length()) {}
+        template<class StringT>
+        FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const { return str[index]; }
 
 

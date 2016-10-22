@@ -425,6 +425,10 @@ namespace rpp /* ReCpp */
      * @return Number of folders found
      */
     int list_dirs(vector<string>& out, strview dir) noexcept;
+    FINLINE vector<string> list_dirs(strview dir) noexcept
+    {
+        vector<string> out; list_dirs(out, dir); return out;
+    }
 
     /**
      * Lists all files inside this directory that have the specified extension (default: all files)
@@ -434,6 +438,10 @@ namespace rpp /* ReCpp */
      * @return Number of files found that match the extension
      */
     int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
+    FINLINE vector<string> list_files(strview dir, strview ext = {}) noexcept
+    {
+        vector<string> out; list_files(out, dir, ext); return out;
+    }
 
     /**
      * Lists all files and folders inside a dir
