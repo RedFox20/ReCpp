@@ -298,11 +298,24 @@ namespace rpp /* ReCpp */
             return ftell((FILE*)Handle);
         #endif
     }
+
+    static time_t to_time_t(const FILETIME& ft)
+    {
+        ULARGE_INTEGER ull = { ft.dwLowDateTime, ft.dwHighDateTime };
+        return ull.QuadPart / 10000000ULL - 11644473600ULL;
+    }
+
     bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
     #if USE_WINAPI_IO
-        return !!GetFileTime((HANDLE)Handle,         (FILETIME*)outCreated,
-                             (FILETIME*)outAccessed, (FILETIME*)outModified);
+        FILETIME c, a, m;
+        if (GetFileTime((HANDLE)Handle, outCreated?&c:0,outAccessed?&a:0, outModified?&m:0)) {
+            if (outCreated)  *outCreated  = to_time_t(c);
+            if (outAccessed) *outAccessed = to_time_t(a);
+            if (outModified) *outModified = to_time_t(m);
+            return true;
+        }
+        return false;
     #else
         struct stat s;
         if (fstat(fileno((FILE*)Handle), &s)) {
@@ -352,9 +365,9 @@ namespace rpp /* ReCpp */
         WIN32_FILE_ATTRIBUTE_DATA data;
         if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data)) {
             if (filesize) *filesize = LARGE_INTEGER{data.nFileSizeLow,(LONG)data.nFileSizeHigh}.QuadPart;
-            if (created)  *created  = *(time_t*)&data.ftCreationTime;
-            if (accessed) *accessed = *(time_t*)&data.ftLastAccessTime;
-            if (modified) *modified = *(time_t*)&data.ftLastWriteTime;
+            if (created)  *created  = to_time_t(data.ftCreationTime);
+            if (accessed) *accessed = to_time_t(data.ftLastAccessTime);
+            if (modified) *modified = to_time_t(data.ftLastWriteTime);
             return true;
         }
     #else
@@ -399,7 +412,6 @@ namespace rpp /* ReCpp */
     {
         return ::remove(filename) == 0;
     }
-
 
     static bool sys_mkdir(const strview foldername) noexcept
     {
