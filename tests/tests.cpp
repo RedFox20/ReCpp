@@ -27,7 +27,7 @@ test::~test()
             g_tests.erase(it);
     }
 }
-void test::assert_failed(const char* file, int line, const char* expression)
+void test::assert_failed(const char* file, int line, const char* expression, ...)
 {
     static const char path[] = __FILE__;
     static int path_skip = sizeof(path) - 10;
@@ -63,6 +63,14 @@ void test::sleep(int millis)
 #endif
 }
 
+static void pause()
+{
+#ifdef _WIN32
+    system("pause");
+#else
+    // no pause on OSX
+#endif
+}
 
 //TestImpl(test_test)
 //{
@@ -74,7 +82,7 @@ void test::sleep(int millis)
 //Instance;
 
 
-int main(int argc, char** argv, char** envp)
+int main(int argc, char* argv[])
 {
     int numTest = 0;
     if (argc > 1)
@@ -109,12 +117,11 @@ int main(int argc, char** argv, char** envp)
     if (test::asserts_failed)
     {
         fprintf(stderr, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
-        system("pause");
+        pause();
         return -1;
     }
 
     if (numTest > 0)  printf("\nSUCCESS: All test runs passed!\n");
     else              printf("\nNOTE: No tests were run! (out of %d)\n", (int)g_tests.size());
-    system("pause");
     return 0;
 }

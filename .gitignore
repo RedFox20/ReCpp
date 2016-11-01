@@ -25,3 +25,4 @@
 ReCpp.VC.db
 packages/
 MSVC/packages.config
+ipch/
