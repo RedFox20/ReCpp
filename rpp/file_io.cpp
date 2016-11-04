@@ -251,13 +251,33 @@ namespace rpp /* ReCpp */
             return (int)fwrite(buffer, bytesToWrite, 1, (FILE*)Handle) * bytesToWrite;
         #endif
     }
+    int file::writef(const char* format, ...) noexcept
+    {
+        va_list ap; va_start(ap, format);
+        #if USE_WINAPI_IO
+            char buf[4096];
+            int n = vsnprintf(buf, sizeof(buf), format, ap);
+            if (n >= sizeof(buf))
+            {
+                const int n2 = n + 1;
+                const bool heap = (n2 > 64 * 1024);
+                char* b2 = (char*)(heap ? malloc(n2) : _alloca(n2));
+                n = write(b2, vsnprintf(b2, n2, format, ap));
+                if (heap) free(b2);
+                return n;
+            }
+            return write(buf, n);
+        #else
+            return vfprintf((FILE*)Handle, format, ap);
+        #endif
+    }
     void file::flush() noexcept
     {
-    #if USE_WINAPI_IO
-        FlushFileBuffers((HANDLE)Handle);
-    #else
-        fflush((FILE*)Handle);
-    #endif
+        #if USE_WINAPI_IO
+            FlushFileBuffers((HANDLE)Handle);
+        #else
+            fflush((FILE*)Handle);
+        #endif
     }
     int file::write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept
     {

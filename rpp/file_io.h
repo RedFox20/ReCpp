@@ -186,6 +186,13 @@ namespace rpp /* ReCpp */
          * @return Number of bytes actually written to the file
          */
         int write(const void* buffer, int bytesToWrite) noexcept;
+        
+        /**
+         * Writes a formatted string to file
+         * For format string reference, check printf() documentation.
+         * @return Number of bytes written to the file
+         */
+        int writef(const char* format, ...) noexcept;
 
         /**
          * Forcefully flushes any OS file buffers to send all data to the storage device
