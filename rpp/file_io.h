@@ -11,6 +11,7 @@ namespace rpp /* ReCpp */
         READONLY,			// opens an existing file for reading
         READWRITE,			// opens an existing file for read/write
         CREATENEW,			// creates new file for writing
+        APPEND,             // opens an existing file for appending only
     };
 
 

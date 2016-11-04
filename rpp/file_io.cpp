@@ -76,6 +76,12 @@ namespace rpp /* ReCpp */
                 createmode = CREATE_ALWAYS;
                 openFlags  = FILE_ATTRIBUTE_NORMAL;
                 break;
+            case APPEND:
+                access     = FILE_APPEND_DATA;
+                sharing    = FILE_SHARE_READ;
+                createmode = OPEN_ALWAYS;
+                openFlags  = FILE_ATTRIBUTE_NORMAL;
+                break;
         }
         SECURITY_ATTRIBUTES secu = { sizeof(secu), NULL, TRUE };
         void* handle = CreateFileA(filename, access, sharing, &secu, createmode, openFlags, 0);
@@ -88,6 +94,7 @@ namespace rpp /* ReCpp */
             case READONLY:  modeStr = "rb";  break; // open existing for read-binary
             case READWRITE: modeStr = "wbx"; break; // open existing for r/w-binary
             case CREATENEW: modeStr = "wb";  break; // create new file for write-binary
+            case APPEND:    modeStr = "ab";  break; // open existing for append-binary
         }
         return fopen(filename, modeStr);
     #endif
