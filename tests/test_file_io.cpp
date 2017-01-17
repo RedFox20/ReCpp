@@ -19,16 +19,24 @@ TestImpl(test_file_io)
             FileName = "../" + FileName;
             refFile.open(FileName.c_str(), mode);
         }
-        Assert(refFile.good());
+        AssertMsg(refFile.good(), "Test file '%s' is missing", FileName.c_str());
         FileSize = (int)refFile.seekg(0, SEEK_END).tellg();
     }
 
     TestCase(basic_file)
     {
-        file f(FileName);
+        file f = { FileName };
         Assert(f.good());
         Assert(f.size() > 0);
         Assert(f.size() == FileSize);
+    }
+
+    TestCase(if_initializer)
+    {
+        if (file f = file(FileName))
+        {
+            
+        }
     }
 
     TestCase(exists)
@@ -104,6 +112,5 @@ TestImpl(test_file_io)
         Assert(normalized("/root\\dir\\file.ext", '\\') == "\\root\\dir\\file.ext");
         Assert(normalized("\\root/dir/file.ext",  '\\') == "\\root\\dir\\file.ext");
     }
-
 
 } Impl;

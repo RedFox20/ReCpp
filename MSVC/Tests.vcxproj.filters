@@ -23,5 +23,8 @@
     <ClCompile Include="..\tests\test_sockets.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\tests\test_strview.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

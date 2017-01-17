@@ -49,8 +49,28 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
+#if USE_WINAPI_IO
+    static void* OpenF(const char* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
+    { return CreateFileA(f, a, s, sa, c, o, 0); }
+    static void* OpenF(const wchar_t* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
+    { return CreateFileW(f, a, s, sa, c, o, 0); }
+#else
+    static void* OpenF(const char* f, IOFlags mode) {
+        const char* modes[] = { "rb", "wbx", "wb", "ab" };
+        return fopen(f, m);
+    }
+    static void* OpenF(const wchar_t* f, IOFlags mode) {
+    #if _WIN32
+        const wchar_t* modes[] = { L"rb", L"wbx", L"wb", L"ab" };
+        return _wfopen(f, modes[mode]); 
+    #else
+        string s = { f, f + wcslen(f) }; // @todo Add proper UCS2 --> UTF8 conversion
+        return OpenF(s.c_str(), mode);
+    #endif
+    }
+#endif
 
-    static void* OpenFile(const char* filename, IOFlags mode) noexcept
+    template<class TChar> static void* OpenFile(const TChar* filename, IOFlags mode) noexcept
     {
     #if USE_WINAPI_IO
         int access, sharing;        // FILE_SHARE_READ, FILE_SHARE_WRITE
@@ -84,23 +104,14 @@ namespace rpp /* ReCpp */
                 break;
         }
         SECURITY_ATTRIBUTES secu = { sizeof(secu), NULL, TRUE };
-        void* handle = CreateFileA(filename, access, sharing, &secu, createmode, openFlags, 0);
+        void* handle = OpenF(filename, access, sharing, &secu, createmode, openFlags);
         return handle != INVALID_HANDLE_VALUE ? handle : 0;
     #else
-        const char* modeStr;
-        switch (mode)
-        {
-            default: /* default mode */
-            case READONLY:  modeStr = "rb";  break; // open existing for read-binary
-            case READWRITE: modeStr = "wbx"; break; // open existing for r/w-binary
-            case CREATENEW: modeStr = "wb";  break; // create new file for write-binary
-            case APPEND:    modeStr = "ab";  break; // open existing for append-binary
-        }
-        return fopen(filename, modeStr);
+        return OpenF(filename, mode);
     #endif
     }
 
-    static void* OpenOrCreate(const char* filename, IOFlags mode) noexcept
+    template<class TChar> static void* OpenOrCreate(const TChar* filename, IOFlags mode) noexcept
     {
         void* handle = OpenFile(filename, mode);
         if (!handle && mode == CREATENEW)
@@ -114,18 +125,11 @@ namespace rpp /* ReCpp */
     }
 
 
-    file::file(const char* filename, IOFlags mode) noexcept
-        : Handle(OpenOrCreate(filename, mode)), Mode(mode)
-    {
-    }
-    file::file(const string& filename, IOFlags mode) noexcept
-        : Handle(OpenOrCreate(filename.c_str(), mode)), Mode(mode)
-    {
-    }
-    file::file(const strview filename, IOFlags mode) noexcept
-        : Handle(OpenOrCreate(filename.to_cstr(), mode)), Mode(mode)
-    {
-    }
+    file::file(const char*    filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode) {}
+    file::file(const string&  filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename.c_str(), mode)), Mode(mode) {}
+    file::file(const strview  filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename.to_cstr(), mode)), Mode(mode) {}
+    file::file(const wchar_t* filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode) {}
+    file::file(const wstring& filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename.c_str(), mode)), Mode(mode) {}
     file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
     {
         f.Handle = 0;
@@ -155,6 +159,16 @@ namespace rpp /* ReCpp */
     bool file::open(const strview filename, IOFlags mode) noexcept
     {
         return open(filename.to_cstr(), mode);
+    }
+    bool file::open(const wchar_t* filename, IOFlags mode) noexcept
+    {
+        close();
+        Mode = mode;
+        return (Handle = OpenOrCreate(filename, mode)) != nullptr;
+    }
+    bool file::open(const wstring& filename, IOFlags mode) noexcept
+    {
+        return open(filename.c_str(), mode);
     }
     void file::close() noexcept
     {
@@ -224,13 +238,14 @@ namespace rpp /* ReCpp */
         int fileSize = size();
         if (!fileSize) return load_buffer(0, 0);
 
-        char* buffer = (char*)malloc(fileSize);
+        // allocate +1 bytes for null terminator; this is for legacy API-s
+        char* buffer = (char*)malloc(fileSize + 1);
         int bytesRead = read(buffer, fileSize);
+        buffer[bytesRead] = '\0';
         return load_buffer(buffer, bytesRead);
     }
     load_buffer file::read_all(const char* filename) noexcept
     {
-        // make sure file f; remains until end of scope, or read_all will bug out
         return file{filename, READONLY}.read_all();
     }
     load_buffer file::read_all(const string& filename) noexcept
@@ -240,6 +255,14 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all(const strview filename) noexcept
     {
         return read_all(filename.to_cstr());
+    }
+    load_buffer file::read_all(const wchar_t* filename) noexcept
+    {
+        return file{filename, READONLY}.read_all();
+    }
+    load_buffer file::read_all(const wstring& filename) noexcept
+    {
+        return read_all(filename.c_str());
     }
     int file::write(const void* buffer, int bytesToWrite) noexcept
     {
@@ -254,7 +277,7 @@ namespace rpp /* ReCpp */
     int file::writef(const char* format, ...) noexcept
     {
         va_list ap; va_start(ap, format);
-        #if USE_WINAPI_IO
+        #if USE_WINAPI_IO // @note This is heavily optimized
             char buf[4096];
             int n = vsnprintf(buf, sizeof(buf), format, ap);
             if (n >= sizeof(buf))
@@ -448,6 +471,15 @@ namespace rpp /* ReCpp */
         return mkdir(foldername.to_cstr(), 0700) == 0;
     #endif
     }
+    static bool sys_mkdir(const wchar_t* foldername) noexcept
+    {
+    #if _WIN32
+        return _wmkdir(foldername);
+    #else
+        string s = { foldername,foldername + wcslen(foldername) };
+        return sys_mkdir(s);
+    #endif
+    }
 
     bool create_folder(const strview foldername) noexcept
     {
@@ -477,6 +509,18 @@ namespace rpp /* ReCpp */
             p = e + 1;
         }
         return sys_mkdir(foldername); // and now create the final dir
+    }
+    bool create_folder(const wchar_t* foldername) noexcept
+    {
+        if (!foldername || !*foldername || wcscmp(foldername, L"./") == 0)
+            return false;
+        return sys_mkdir(foldername);
+    }
+    bool create_folder(const wstring& foldername) noexcept
+    {
+        if (foldername.empty() || foldername == L"./")
+            return false;
+        return sys_mkdir(foldername.c_str());
     }
 
 
@@ -594,6 +638,23 @@ namespace rpp /* ReCpp */
         if (const char* end = path.rfindany("/\\"))
             return strview{ path.str, end + 1 };
         return strview{};
+    }
+    wstring folder_path(const wchar_t* path) noexcept
+    {
+        auto* end = path + wcslen(path);
+        for (; path < end; --end)
+            if (*end == '/' || *end == '\\')
+                break;
+        return path == end ? wstring{} : wstring{path, end + 1};
+    }
+    wstring folder_path(const wstring& filename) noexcept
+    {
+        auto* path = filename.c_str();
+        auto* end  = path + filename.size();
+        for (; path < end; --end)
+            if (*end == '/' || *end == '\\')
+                break;
+        return path == end ? wstring{} : wstring{path, end + 1};
     }
 
 

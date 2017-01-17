@@ -2,7 +2,7 @@
 #ifndef TESTFRAMEWORK_TESTS_HPP
 #define TESTFRAMEWORK_TESTS_HPP
 // these includes are for convenience in TestImpl's not for tests.cpp
-#include <stdio.h> // some basic printf etc.
+#include <cstdio>  // some basic printf etc.
 #include <vector>  // access to std::vector and std::string
 #include <string>
 #include <functional>

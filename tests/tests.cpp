@@ -1,11 +1,13 @@
 #include "tests.h"
 #include <cstdlib>
-#include <typeinfo>
-#include <algorithm>
-#include <cstring>
+#include <chrono>
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+    #define WIN32_LEAN_AND_MEAN
+    #include <Windows.h>
+    #include <conio.h>
+#else
+    #include <unistd.h>
+    #include <termios.h>
 #endif
 #include <strview.h>
 
@@ -27,25 +29,50 @@ test::~test()
             g_tests.erase(it);
     }
 }
+
+enum ConsoleColor { Default, Green, Yellow, Red, };
+
+static void consolef(ConsoleColor color, const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+#if _WIN32
+    static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+    static const int colormap[] = {
+        FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE, // Default
+        FOREGROUND_GREEN, // dark green
+        FOREGROUND_RED|FOREGROUND_GREEN, // dark yellow
+        FOREGROUND_RED, // dark red
+    };
+    if (color != Default) SetConsoleTextAttribute(console, colormap[color]);
+    if (color == Red) vfprintf(stderr, fmt, ap);
+    else              vfprintf(stdout, fmt, ap);
+    if (color != Default) SetConsoleTextAttribute(console, colormap[Default]);
+#else // @todo Proper Linux & OSX implementations
+    if (color == Red) vfprintf(stderr, fmt, ap);
+    else              vfprintf(stdout, fmt, ap);
+#endif
+}
+
 void test::assert_failed(const char* file, int line, const char* expression, ...)
 {
     static const char path[] = __FILE__;
     static int path_skip = sizeof(path) - 10;
 
     ++asserts_failed;
-    printf("FAILURE %12s:%d    %s\n", file + path_skip, line, expression);
+    consolef(Red, "FAILURE %12s:%d    %s\n", file + path_skip, line, expression);
 }
 
 void test::run_test()
 {
     char title[256];
     int len = sprintf(title, "--------  running '%s'  --------", name);
-    printf("%s\n", title);
+    consolef(Yellow, "%s\n", title);
     run();
     for (auto& testFunc : test_funcs) {
         testFunc();
     }
-    printf("%s\n\n", (char*)memset(title, '-', len));
+    consolef(Yellow, "%s\n\n", (char*)memset(title, '-', len)); // "-------------"
 }
 
 int test::add_test_func(test_func && func) 
@@ -63,13 +90,42 @@ void test::sleep(int millis)
 #endif
 }
 
-static void pause()
+#ifndef _WIN32 // Linux:
+static int kbhit()
 {
-#ifdef _WIN32
-    system("pause");
-#else
-    // no pause on OSX
+    termios oldSettings; tcgetattr(STDIN_FILENO, &oldSettings);
+    termios newSettings = oldSettings;
+    newSettings.c_cc[VTIME] = 0;
+    newSettings.c_cc[VMIN]  = 0;
+    newSettings.c_iflag &= ~(IXOFF);
+    newSettings.c_lflag &= ~(ECHO | ICANON);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newSettings);
+
+    char keycodes[16];
+    int count = read(stdin, (void*)keycodes, 16);
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldSettings);
+
+    return count == 0 ? 0 : keycodes[0];
+}
 #endif
+
+static void pause(int millis = -1/*forever*/)
+{
+    printf("\nPress any key to continue...");
+
+    using namespace chrono;
+    auto start = system_clock::now();
+    while (!kbhit())
+    {
+        if (millis != -1)
+        {
+            auto elapsed = duration_cast<milliseconds>(system_clock::now() - start);
+            if (elapsed.count() >= millis)
+                break;
+        }
+        test::sleep(50);
+    }
 }
 
 //TestImpl(test_test)
@@ -91,8 +147,8 @@ int main(int argc, char* argv[])
         // test_testname or testname
         rpp::strview arg = argv[1];
         const bool exactMatch = arg.starts_with("test_");
-        if (exactMatch) printf("Filtering exact match '%s'\n\n", arg.str);
-        else            printf("Filtering substr match '%s'\n\n", arg.str);
+        if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", arg.str);
+        else            consolef(Yellow, "Filtering substr tests '%s'\n\n", arg.str);
 
         for (test* t : g_tests) 
         {
@@ -107,7 +163,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        printf("Running all tests\n");
+        consolef(Green, "Running all tests\n");
         for (test* t : g_tests) {
             t->run_test();
             ++numTest;
@@ -116,12 +172,20 @@ int main(int argc, char* argv[])
     
     if (test::asserts_failed)
     {
-        fprintf(stderr, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
+        consolef(Red, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
         pause();
         return -1;
     }
 
-    if (numTest > 0)  printf("\nSUCCESS: All test runs passed!\n");
-    else              printf("\nNOTE: No tests were run! (out of %d)\n", (int)g_tests.size());
+    if (numTest > 0)
+    {
+        consolef(Green, "\nSUCCESS: All test runs passed!\n");
+        pause(3000);
+    }
+    else
+    {
+        consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)g_tests.size());
+        pause(5000);
+    }
     return 0;
 }

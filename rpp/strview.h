@@ -226,12 +226,13 @@ namespace rpp
     #endif
 
         FINLINE strview() : str(""), len(0) {}
+        FINLINE strview(char* str)                        : str(str), len((int)strlen(str)) {}
         FINLINE strview(const char* str)                  : str(str), len((int)strlen(str)) {}
         FINLINE strview(const char* str, int len)         : str(str), len(len)              {}
         FINLINE strview(const char* str, size_t len)      : str(str), len((int)len)         {}
         FINLINE strview(const char* str, const char* end) : str(str), len(int(end-str))     {}
         FINLINE strview(const void* str, const void* end) : strview((const char*)str, (const char*)end) {}
-        FINLINE strview(const string& s)             : str(s.c_str()), len((int)s.length()) {}
+        FINLINE strview(const string& s)                  : str(s.c_str()), len((int)s.length()) {}
         template<class StringT>
         FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const { return str[index]; }
@@ -246,6 +247,8 @@ namespace rpp
         /** Creates a new string from this string-strview */
         FINLINE string& to_string(string& out) const { return out.assign(str, len); }
         FINLINE string to_string() const { return string(str, len); }
+        FINLINE operator string() const { return string(str, len); }
+
 
         /** 
          * Copies this str[len] string into a C-string array
@@ -779,7 +782,8 @@ namespace rpp
     inline string operator+(const strview&a,const string&b){return a + strview(b);}
     inline string operator+(const char*a,const strview&b){return strview(a,strlen(a)) + b;}
     inline string operator+(const strview&a,const char*b){return a + strview(b,strlen(b));}
-    inline string operator+(const strview&a,char c){return a + strview{&c,1};}
+    inline string operator+(const strview&a,char b){return a + strview{&b,1};}
+    inline string operator+(char a, const strview& b) { return strview(&a,1) + b; }
     inline string&& operator+(string&&a,const strview&b){return move(a.append(b.str,b.len));}
 
     //////////////// string compare operators /////////////////

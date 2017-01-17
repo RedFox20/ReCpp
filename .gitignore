@@ -26,3 +26,5 @@ ReCpp.VC.db
 packages/
 MSVC/packages.config
 ipch/
+.vs/
+bin/lnk{25D41FEF-B825-459C-8B46-03620AC3C878}.tmp

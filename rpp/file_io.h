@@ -1,11 +1,10 @@
 #pragma once
-#include <string>
-#include <vector>
 #include <time.h> // time_t
 #include "strview.h"
 
 namespace rpp /* ReCpp */
 {
+    using namespace std; // we love std; you should too.
 
     enum IOFlags {
         READONLY,			// opens an existing file for reading
@@ -111,6 +110,8 @@ namespace rpp /* ReCpp */
         file(const char*   filename, IOFlags mode = READONLY) noexcept;
         file(const string& filename, IOFlags mode = READONLY) noexcept;
         file(const strview filename, IOFlags mode = READONLY) noexcept;
+        file(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
+        file(const wstring& filename, IOFlags mode = READONLY) noexcept;
         file(file&& f) noexcept;
         ~file();
 
@@ -130,13 +131,15 @@ namespace rpp /* ReCpp */
         bool open(const char*   filename, IOFlags mode = READONLY) noexcept;
         bool open(const string& filename, IOFlags mode = READONLY) noexcept;
         bool open(const strview filename, IOFlags mode = READONLY) noexcept;
+        bool open(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
+        bool open(const wstring& filename, IOFlags mode = READONLY) noexcept;
         void close() noexcept;
 
         /**
          * @return TRUE if file handle is valid (file exists or has been created)
          */
         bool good() const noexcept;
-        operator bool() const noexcept { return good(); }
+        explicit operator bool() const noexcept { return good(); }
 
         /**
          * @return TRUE if the file handle is INVALID
@@ -176,6 +179,8 @@ namespace rpp /* ReCpp */
         static load_buffer read_all(const char*   filename) noexcept;
         static load_buffer read_all(const string& filename) noexcept;
         static load_buffer read_all(const strview filename) noexcept;
+        static load_buffer read_all(const wchar_t* filename) noexcept;
+        static load_buffer read_all(const wstring& filename) noexcept;
 
         /**
          * Writes a block of bytes to the file. Regular Windows IO
@@ -332,6 +337,8 @@ namespace rpp /* ReCpp */
     bool create_folder(const strview foldername) noexcept;
     FINLINE bool create_folder(const char*   foldername) noexcept { return create_folder(strview{ foldername }); }
     FINLINE bool create_folder(const string& foldername) noexcept { return create_folder(strview{ foldername }); }
+    bool create_folder(const wchar_t* foldername) noexcept;
+    bool create_folder(const wstring& foldername) noexcept;
 
 
     /**
@@ -403,7 +410,8 @@ namespace rpp /* ReCpp */
     strview folder_path(const strview path) noexcept;
     FINLINE strview folder_path(const string& path) noexcept { return folder_path(strview{ path }); }
     FINLINE strview folder_path(const char*   path) noexcept { return folder_path(strview{ path }); }
-
+    wstring folder_path(const wchar_t* path) noexcept;
+    wstring folder_path(const wstring& path) noexcept;
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note This does not perform full path expansion.
