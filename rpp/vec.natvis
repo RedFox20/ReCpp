@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="rpp::Vector2">
+    <DisplayString>x={x,g} y={y,g}</DisplayString>
+    <Expand>
+      <Item Name="[x]">x,g</Item>
+      <Item Name="[y]">y,g</Item>
+      <Item Name="[sqlength]">x*x + y*y,g</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="rpp::Rect">
+    <DisplayString>x={x,g} y={y,g} w={w,g} h={h,g}</DisplayString>
+    <Expand>
+      <Item Name="[pos]">pos</Item>
+      <Item Name="[size]">size,g</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="rpp::Vector3">
+    <DisplayString>x={x,g} y={y,g} z={z,g}</DisplayString>
+    <Expand>
+      <Item Name="[sqlength]">x*x + y*y + z*z</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="rpp::Vector4">
+    <DisplayString>x={x,g} y={y,g} z={z,g} w={w,g}</DisplayString>
+    <Expand>
+      <Item Name="[sqlength]">x*x + y*y + z*z + w*w</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="rpp::Color">
+    <DisplayString>r={x,g} g={y,g} b={z,g} a={w,g}</DisplayString>
+    <Expand>
+      <Item Name="[r]">x</Item>
+      <Item Name="[g]">y</Item>
+      <Item Name="[b]">z</Item>
+      <Item Name="[a]">w</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="rpp::_Matrix4RowVis">
+    <DisplayString>{x,g} {y,g} {z,g} {w,g}</DisplayString>
+  </Type>
+  <Type Name="rpp::Matrix4">
+    <DisplayString>mat4 {vis0} ||| {vis1} ||| {vis2} ||| {vis3}</DisplayString>
+    <Expand>
+      <Item Name="[m00 m01 m02 m03]">vis0</Item>
+      <Item Name="[m10 m11 m12 m13]">vis1</Item>
+      <Item Name="[m20 m21 m22 m23]">vis2</Item>
+      <Item Name="[m30 m31 m32 m33]">vis3</Item>
+      <Item Name="[pos]">r3.xyz</Item>
+      <Item Name="[scalex]">m00</Item>
+      <Item Name="[scaley]">m11</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="rpp::BoundingBox">
+    <DisplayString>min={min} max={max}</DisplayString>
+    <Expand>
+      <Item Name="[min]">min</Item>
+      <Item Name="[max]">max</Item>
+      <Item Name="[width(dx)]">max.x-min.x</Item>
+      <Item Name="[height(dy)]">max.y-min.y</Item>
+      <Item Name="[depth(dz)]">max.z-min.z</Item>
+      <Item Name="[volume]">(max.x-min.x)*(max.y-min.y)*(max.z-min.z)</Item>
+    </Expand>
+  </Type>
+  <!-- ///////////////////////////////////////////////////////////////////// -->
+
+</AutoVisualizer>

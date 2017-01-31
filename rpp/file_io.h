@@ -45,8 +45,11 @@ namespace rpp /* ReCpp */
 
         template<class T> operator T*() noexcept { return (T*)str; }
         int size()      const noexcept { return len; }
+		int length()    const noexcept { return len; }
         char* data()    const noexcept { return str; }
+		char* c_str()   const noexcept { return str; }
         operator bool() const noexcept { return str != nullptr; }
+        operator strview() const noexcept { return { str,len }; }
     };
 
 
@@ -191,6 +194,29 @@ namespace rpp /* ReCpp */
          * @return Number of bytes actually written to the file
          */
         int write(const void* buffer, int bytesToWrite) noexcept;
+
+        /**
+         * Writes a C array with size information to the file.
+         * Relies on OS file buffering
+         */
+        template<class T, int N> int write(const T(&items)[N]) noexcept {
+            return write(items, int(sizeof(T)) * N);
+        }
+        template<int N> int write(const char(&str)[N]) noexcept {
+            return write(str, N - 1);
+        }
+        template<int N> int write(const wchar_t (&str)[N]) noexcept {
+            return write(str, int(sizeof(wchar_t)) * (N - 1));
+        }
+        int write(const string& str) noexcept {
+            return write(str.c_str(), (int)str.length());
+        }
+        int write(const strview& str) noexcept {
+            return write(str.str, str.len);
+        }
+        int write(const wstring& str) noexcept {
+            return write(str.c_str(), int(sizeof(wchar_t) * str.size()));
+        }
         
         /**
          * Writes a formatted string to file
@@ -454,10 +480,7 @@ namespace rpp /* ReCpp */
      * @return Number of files found that match the extension
      */
     int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    FINLINE vector<string> list_files(strview dir, strview ext = {}) noexcept
-    {
-        vector<string> out; list_files(out, dir, ext); return out;
-    }
+	vector<string> list_files(strview dir, strview ext = {}) noexcept;
 
     /**
      * Lists all files and folders inside a dir

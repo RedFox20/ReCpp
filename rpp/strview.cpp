@@ -17,7 +17,7 @@ namespace rpp
     const char* strcontains(const char* str, int nstr, const char* control, int ncontrol) {
         for (auto s = str; nstr; --nstr, ++s)
             if (strcontains(control, ncontrol, *s)) return s; // done
-        return 0; // not found
+        return nullptr; // not found
     }
     NOINLINE bool strequals(const char* s1, const char* s2, int len) {
         for (int i = 0; i < len; ++i) 
@@ -54,8 +54,8 @@ namespace rpp
 
     bool strview::to_bool() const
     {
-        const uint len = this->len;
-        if (len > 4)
+        const uint n = this->len;
+        if (n > 4)
             return false; // can't be any of true literals
         return strequalsi(str, "true") ||
                strequalsi(str, "yes")  ||
@@ -63,10 +63,10 @@ namespace rpp
                strequalsi(str, "1");
     }
 
-    bool strview::is_whitespace()
+    bool strview::is_whitespace() const
     {
         auto* s = str, *e = s+len;
-        for (; s < e && *(byte*)s <= ' '; ++s) ; // loop while is whitespace
+		for (; s < e && *(byte*)s <= ' '; ++s) {} // loop while is whitespace
         return s == e;
     }
     
@@ -98,7 +98,7 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-        for (; n && *(byte*)s <= ' '; ++s, --n) ; // loop while is whitespace
+		for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
         str = s, len = n; // result writeout
         return *this;
     }
@@ -107,7 +107,7 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-        for (; n && *s == ch; ++s, --n) ;
+        for (; n && *s == ch; ++s, --n) {}
         str = s, len = n; // result writeout
         return *this;
     }
@@ -116,7 +116,7 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-        for (; n && strcontains(chars, nchars, *s); ++s, --n);
+        for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
         str = s, len = n; // result writeout
         return *this;
     }
@@ -125,7 +125,7 @@ namespace rpp
     {
         auto n = len;
         auto e = str + n;
-        for (; n && *--e <= ' '; --n) ; // reverse loop while is whitespace
+        for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
         len = n; // result writeout
         return *this;
     }
@@ -134,7 +134,7 @@ namespace rpp
     {
         auto n = len;
         auto e = str + n;
-        for (; n && *--e == ch; --n) ;
+        for (; n && *--e == ch; --n) {}
         len = n; // result writeout
         return *this;
     }
@@ -143,7 +143,7 @@ namespace rpp
     {
         auto n = len;
         auto e = str + n;
-        for (; n && strcontains(chars, nchars, *--e); --n);
+        for (; n && strcontains(chars, nchars, *--e); --n) {}
         len = n; // result writeout
         return *this;
     }
@@ -158,15 +158,16 @@ namespace rpp
             int firstChar = *needle;
             while (haystr < hayend)
             {
-                if (!(haystr = (const char*)memchr(haystr, firstChar, hayend - haystr))) 
-                    return NULL; // definitely not found
+				haystr = (const char*)memchr(haystr, firstChar, hayend - haystr);
+                if (!haystr) 
+                    return nullptr; // definitely not found
 
                 if (memcmp(haystr, needle, n) == 0)
                     return haystr; // it's a match
                 ++haystr; // no match, reset search from next char
             }
         }
-        return NULL;
+        return nullptr;
     }
 
     const char* strview::rfind(char c) const
@@ -193,6 +194,14 @@ namespace rpp
         return nullptr;
     }
 
+    int strview::count(char ch) const noexcept
+    {
+        int count = 0;
+        for (auto* p = str, *e = str+len; p < e; ++p)
+			if (*p == ch) ++count;
+        return count;
+    }
+
     int strview::indexof(char ch) const
     {
         for (int i = 0; i < len; ++i)
@@ -207,20 +216,20 @@ namespace rpp
         return -1;
     }
 
-    strview strview::split_first(char delim)
+    strview strview::split_first(char delim) const
     {
         if (auto splitend = (const char*)memchr(str, delim, len))
             return strview(str, splitend); // if we find a separator, readjust end of strview to that
         return strview(str, len);
     }
 
-    strview strview::split_first(const char* substr, int sublen)
+    strview strview::split_first(const char* substr, int sublen) const
     {
         int l = len;
         const char* s = str;
         const char* e = s + l;
         char ch = *substr;
-        while ((s = (const char*)memchr(s, ch, l))) {
+        while ((s = (const char*)memchr(s, ch, l)) != nullptr) {
             l = int(e - s);
             if (l >= sublen && strequals(s, substr, sublen)) {
                 return strview(str, s);
@@ -230,7 +239,7 @@ namespace rpp
         return strview(str, len);
     }
 
-    strview strview::split_second(char delim)
+    strview strview::split_second(char delim) const
     {
         if (auto splitstart = (const char*)memchr(str, delim, len))
             return strview(splitstart + 1, str+len); // readjust start, also skip the char we split at
@@ -260,15 +269,15 @@ namespace rpp
 
     bool strview::next_notrim(strview& out, char delim)
     {
-        return _next_notrim(out, [delim](const char* str, int len) {
-            return (const char*)memchr(str, delim, len);
+        return _next_notrim(out, [delim](const char* s, int n) {
+            return (const char*)memchr(s, delim, n);
         });
     }
 
     bool strview::next_notrim(strview& out, const char* delims, int ndelims)
     {
-        return _next_notrim(out, [delims, ndelims](const char* str, int len) {
-            return strcontains(str, len, delims, ndelims);
+        return _next_notrim(out, [delims, ndelims](const char* s, int n) {
+            return strcontains(s, n, delims, ndelims);
         });
     }
 
@@ -331,7 +340,7 @@ namespace rpp
     {
         auto s = str;
         auto l = len, n = nchars;
-        for (; l && n > 0; --l, --n, ++s) ;
+        for (; l && n > 0; --l, --n, ++s) {}
         str = s, len = l;
     }
 
@@ -339,7 +348,7 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-        for (; n && *s != ch; --n, ++s) ;
+        for (; n && *s != ch; --n, ++s) {}
         str = s, len = n;
     }
     void strview::skip_until(const char* sstr, int slen)
@@ -376,7 +385,7 @@ namespace rpp
     {
         auto s = str, e = s + len;
         for (; s < e; ++s)
-            *s = func(*s);
+            *s = (char)func(*s);
     }
     strview& strview::tolower() 
     {
@@ -390,7 +399,7 @@ namespace rpp
         auto p = dst;
         auto s = str;
         for (int n = len; n > 0; --n)
-            *p++ = ::tolower(*s++);
+            *p++ = (char)::tolower(*s++);
         *p = 0;
         return dst;
     }
@@ -399,7 +408,7 @@ namespace rpp
         auto p = dst;
         auto s = str;
         for (int n = len; n > 0; --n)
-            *p++ = ::toupper(*s++);
+            *p++ = (char)::toupper(*s++);
         *p = 0;
         return dst;
     }
@@ -409,7 +418,7 @@ namespace rpp
         ret.reserve(len);
         auto s = (char*)str;
         for (int n = len; n > 0; --n)
-            ret.push_back(::tolower(*s++));
+            ret.push_back((char)::tolower(*s++));
         return ret;
     }
     string strview::asupper() const
@@ -418,7 +427,7 @@ namespace rpp
         ret.reserve(len);
         auto s = (char*)str;
         for (int n = len; n > 0; --n)
-            ret.push_back(::toupper(*s++));
+            ret.push_back((char)::toupper(*s++));
         return ret;
     }
 
@@ -478,9 +487,13 @@ namespace rpp
     float _tofloat(const char* str, const char** end)
     {
         const char* s = str;
-        int  power    = 1;
-        int  intPart  = _toint(s, &s);
-        char ch       = *s;
+        int64_t power   = 1;
+        int64_t intPart = abs(_toint(s, &s));
+        char ch         = *s;
+
+        // if input is -0.xxx then intPart will lose the sign info
+        // intpart growth will also break if we use neg ints
+        const bool negfix = *str == '-';
 
         // @note The '.' is actually the sole reason for this function in the first place. Locale independence.
         if (ch == '.') { /* fraction part follows*/
@@ -490,16 +503,21 @@ namespace rpp
             }
         }
         if (end) *end = s; // write end of parsed value
-        return power == 1 ? float(intPart) : float(intPart) / float(power);
+        double result = power == 1 ? double(intPart) : double(intPart) / double(power);
+        return float(negfix ? -result : result);
     }
 
     float _tofloat(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;
-        int  power    = 1;
-        int  intPart  = _toint(s, len, &s);
-        char ch       = *s;
+        int64_t power   = 1;
+        int64_t intPart = abs(_toint(s, len, &s));
+        char ch         = *s;
+
+        // if input is -0.xxx then intPart will lose the sign info
+        // intpart growth will also break if we use neg ints
+        const bool negfix = *str == '-';
 
         // @note The '.' is actually the sole reason for this function in the first place. Locale independence.
         if (ch == '.') { /* fraction part follows*/
@@ -509,7 +527,8 @@ namespace rpp
             }
         }
         if (end) *end = s; // write end of parsed value
-        return power == 1 ? float(intPart) : float(intPart) / float(power);
+        double result = power == 1 ? double(intPart) : double(intPart) / double(power);
+        return float(negfix ? -result : result);
     }
 
     // optimized for simplicity and performance
@@ -777,7 +796,7 @@ namespace rpp
         return -1; // no more lines in Buffer
     }
 
-    char bracket_parser::peek_next()
+    char bracket_parser::peek_next() const
     {
         for (strview buf = buffer; buf.len; ++buf.str, --buf.len)
         {

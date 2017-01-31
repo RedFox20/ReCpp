@@ -25,6 +25,8 @@
  * The structures below contain methods for efficiently manipulating the strview class.
  */
 
+#pragma warning(push)
+#pragma warning(disable:4201) // nameless struct/union warning
 
 namespace rpp
 {
@@ -185,11 +187,6 @@ namespace rpp
     int _tostring(char* buffer, unsigned value);
 
 
-    struct strview_use_hex {};
-    #define HEX strview_use_hex()
-
-
-
 
     struct strview_vishelper // VC++ visualization helper
     {
@@ -246,8 +243,8 @@ namespace rpp
 
         /** Creates a new string from this string-strview */
         FINLINE string& to_string(string& out) const { return out.assign(str, len); }
-        FINLINE string to_string() const { return string(str, len); }
-        FINLINE operator string() const { return string(str, len); }
+        string to_string() const { return string(str, len); }
+        operator string() const { return string(str, len); }
 
 
         /** 
@@ -267,7 +264,7 @@ namespace rpp
         /** Parses this strview as an integer */
         FINLINE int to_int() const { return _toint(str, len); }
         /** Parses this strview as a HEX integer ('0xff' or '0ff' or 'ff') */
-        FINLINE int to_int(strview_use_hex) const { return _tointhx(str, len); }
+        FINLINE int to_int_hex() const { return _tointhx(str, len); }
         /** Parses this strview as a long */
         FINLINE long to_long()     const { return (long)_toint(str, len); }
         /** Parses this strview as a float */
@@ -292,7 +289,7 @@ namespace rpp
         FINLINE char front() const { return *str; }
         FINLINE char back()  const { return str[len - 1]; }
         /** @return TRUE if the strview is only whitespace: " \t\r\n"  */
-        NOINLINE bool is_whitespace();
+        NOINLINE bool is_whitespace() const;
         /** @return TRUE if the strview ends with a null terminator */
         FINLINE bool is_nullterm() const { return str[len] == '\0'; }
 
@@ -328,7 +325,7 @@ namespace rpp
         FINLINE strview& trim() { return trim_start().trim_end(); }
         /** Trims both start and end width this char*/
         FINLINE strview& trim(char ch) { return trim_start(ch).trim_end(ch); }
-        FINLINE strview& trim(const char* chars, int len) { return trim_start(chars, len).trim_end(chars, len); }
+        FINLINE strview& trim(const char* chars, int nchars) { return trim_start(chars, nchars).trim_end(chars, nchars); }
         /** Trims both start and end with any of the given chars */
         template<int N> FINLINE strview& trim(const char (&chars)[N]) { 
             return trim_start(chars).trim_end(chars);
@@ -382,9 +379,9 @@ namespace rpp
         NOINLINE const char* rfind(char c) const;
 
         /** 
-        * Forward searches for any of the specified chars
-        * @return Pointer to char if found, NULL otherwise.
-        */
+         * Forward searches for any of the specified chars
+         * @return Pointer to char if found, NULL otherwise.
+         */
         const char* findany(const char* chars, int n) const;
         template<int N> FINLINE const char* findany(const char (&chars)[N]) const {
             return findany(chars, N - 1);
@@ -398,6 +395,12 @@ namespace rpp
         template<int N> FINLINE const char* rfindany(const char (&chars)[N]) const {
             return rfindany(chars, N - 1);
         }
+
+
+        /**
+         * Count number of occurrances of this character inside the strview bounds
+         */
+        int count(char ch) const noexcept;
 
 
         int indexof(char ch) const;
@@ -494,14 +497,14 @@ namespace rpp
          * Splits the string into TWO and returns strview to the first one
          * @param delim Delimiter char to split on
          */
-        NOINLINE strview split_first(char delim);
+        NOINLINE strview split_first(char delim) const;
 
         /**
          * Splits the string into TWO and returns strview to the first one
          * @param substr Substring to split with
          * @param n Length of the substring
          */
-        NOINLINE strview split_first(const char* substr, int n);
+        NOINLINE strview split_first(const char* substr, int n) const;
         template<int N> FINLINE strview split_first(const char(&substr)[N]) {
             return split_first(substr, N-1);
         }
@@ -510,7 +513,7 @@ namespace rpp
          * Splits the string into TWO and returns strview to the second one
          * @param delim Delimiter char to split on
          */
-        NOINLINE strview split_second(char delim);
+        NOINLINE strview split_second(char delim) const;
 
         /**
          * Gets the next strview; also advances the ptr to next token.
@@ -534,8 +537,8 @@ namespace rpp
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
         template<int N> NOINLINE bool next(strview& out, const char (&delims)[N]) {
-            bool result = _next_notrim(out, [&delims](const char* str, int len) {
-                return strcontains<N>(str, len, delims);
+            bool result = _next_notrim(out, [&delims](const char* s, int n) {
+                return strcontains<N>(s, n, delims);
             });
             if (result && len) ++str, --len; // trim match
             return result;
@@ -575,8 +578,8 @@ namespace rpp
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
         template<int N> NOINLINE bool next_notrim(strview& out, const char (&delims)[N]) {
-            return _next_notrim(out, [&delims](const char* str, int len) {
-                return strcontains<N>(str, len, delims);
+            return _next_notrim(out, [&delims](const char* s, int n) {
+                return strcontains<N>(s, n, delims);
             });
         }
         /**
@@ -987,7 +990,7 @@ namespace rpp
          * @note Whitespace and comments will be skipped
          * @note If buffer is empty, '\0' is returned.
          */
-        NOINLINE char peek_next();
+        NOINLINE char peek_next() const;
     };
 
 
@@ -1026,5 +1029,6 @@ namespace std
     ////////////////////////////////////////////////////////////////////////////////
 }
 
+#pragma warning(pop)
 
 #endif // MFGRAPHICS_STRVIEW_HPP

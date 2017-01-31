@@ -493,7 +493,7 @@ namespace rpp /* ReCpp */
         const char* fs = foldername.begin();
         const char* fe = foldername.end();
         const char* p = fe;
-        while ((p = strview{fs,p}.rfindany("/\\")))
+        while ((p = strview{fs,p}.rfindany("/\\")) != nullptr)
         {
             if (folder_exists(strview{fs,p}))
                 break;
@@ -754,6 +754,13 @@ namespace rpp /* ReCpp */
         }
         return (int)out.size();
     }
+
+	vector<string> list_files(strview dir, strview ext) noexcept
+	{
+		vector<string> out;
+		list_files(out, dir, ext);
+		return out;
+	}
 
     int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept
     {
