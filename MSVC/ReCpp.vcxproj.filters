@@ -22,6 +22,9 @@
     <ClCompile Include="..\rpp\file_io.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\timer.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\delegate.h">
@@ -46,6 +49,9 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\strview.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\timer.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>

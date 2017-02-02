@@ -167,6 +167,7 @@
     <ClCompile Include="..\rpp\file_io.cpp" />
     <ClCompile Include="..\rpp\sockets.cpp" />
     <ClCompile Include="..\rpp\strview.cpp" />
+    <ClCompile Include="..\rpp\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\allocators.h" />
@@ -177,6 +178,7 @@
     <ClInclude Include="..\rpp\file_io.h" />
     <ClInclude Include="..\rpp\sockets.h" />
     <ClInclude Include="..\rpp\strview.h" />
+    <ClInclude Include="..\rpp\timer.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\rpp\strview.natvis" />
