@@ -91,23 +91,23 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    Timer::Timer()
+    Timer::Timer() noexcept
     {
         start();
     }
 
-    void Timer::start()
+    void Timer::start() noexcept
     {
         value = time_now();
     }
 
-    double Timer::elapsed() const
+    double Timer::elapsed() const noexcept
     {
         uint64_t end = time_now();
         return (end - value) * period;
     }
 
-    double Timer::next()
+    double Timer::next() noexcept
     {
         double t = elapsed();
         start();
