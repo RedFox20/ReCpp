@@ -29,6 +29,8 @@ namespace rpp
     const Vector4 Vector4::BLUE    = { 0.0f, 0.0f, 1.0f, 1.0f };
     const Vector4 Vector4::YELLOW  = { 1.0f, 1.0f, 0.0f, 1.0f };
     const Vector4 Vector4::ORANGE  = { 1.0f, 0.5f, 0.0f, 1.0f };
+    const Vector4 Vector4::MAGENTA = { 1.0f, 0.0f, 1.0f, 1.0f };
+    const Vector4 Vector4::CYAN    = { 0.0f, 1.0f, 1.0f, 1.0f };
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -285,30 +287,30 @@ namespace rpp
         return x*b.x + y*b.y + z*b.z;
     }
 
-	void Vector3::print() const
-	{
-		char buffer[256];
-		puts(toString(buffer));
-	}
+    void Vector3::print() const
+    {
+        char buffer[256];
+        puts(toString(buffer));
+    }
 
-	const char* Vector3::toString() const
-	{
-		static char buffer[256];
-		return toString(buffer, sizeof(buffer));
-	}
+    const char* Vector3::toString() const
+    {
+        static char buffer[256];
+        return toString(buffer, sizeof(buffer));
+    }
 
-	char* Vector3::toString(char* buffer) const
-	{
-		return toString(buffer, 256);
-	}
+    char* Vector3::toString(char* buffer) const
+    {
+        return toString(buffer, 256);
+    }
 
-	char* Vector3::toString(char* buffer, int size) const
-	{
-		snprintf(buffer, size, "{%.3g;%.3g;%.3g}", x, y, z);
-		return buffer;
-	}
+    char* Vector3::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g;%.3g}", x, y, z);
+        return buffer;
+    }
 
-	///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
 
     void Vector4::set(float newX, float newY, float newZ, float newW)
     {
@@ -630,30 +632,32 @@ namespace rpp
         return buffer;
     }
 
-	float BoundingBox::volume() const
-	{
-		return width() * height() * depth();
-	}
+    ////////////////////////////////////////////////////////////////////////////////
 
-	Vector3 BoundingBox::compare(const BoundingBox& bb) const
-	{
-		//// local delta based
-		//float dx = width()  / bb.width();
-		//float dy = height() / bb.height();
-		//float dz = depth()  / bb.depth();
-		//return 1.0f / Vector3{ sqrtf(dx), sqrtf(dy), sqrtf(dz) };
+    float BoundingBox::volume() const
+    {
+        return width() * height() * depth();
+    }
 
-		// max distance from origin
-		auto maxdist = [](float a, float b) {
-			return fmax(fabs(a), fabs(b));
-		};
-		float dx = maxdist(min.x, max.x) / maxdist(bb.min.x, bb.max.x);
-		float dy = maxdist(min.y, max.y) / maxdist(bb.min.y, bb.max.y);
-		float dz = maxdist(min.z, max.z) / maxdist(bb.min.z, bb.max.z);
-		return 1.0f / Vector3{ dx*dx*dx, dy*dy*dy, dz*dz*dz };
-	}
+    Vector3 BoundingBox::compare(const BoundingBox& bb) const
+    {
+        //// local delta based
+        //float dx = width()  / bb.width();
+        //float dy = height() / bb.height();
+        //float dz = depth()  / bb.depth();
+        //return 1.0f / Vector3{ sqrtf(dx), sqrtf(dy), sqrtf(dz) };
 
-	////////////////////////////////////////////////////////////////////////////////
+        // max distance from origin
+        auto maxdist = [](float a, float b) {
+            return fmax(fabs(a), fabs(b));
+        };
+        float dx = maxdist(min.x, max.x) / maxdist(bb.min.x, bb.max.x);
+        float dy = maxdist(min.y, max.y) / maxdist(bb.min.y, bb.max.y);
+        float dz = maxdist(min.z, max.z) / maxdist(bb.min.z, bb.max.z);
+        return 1.0f / Vector3{ dx*dx*dx, dy*dy*dy, dz*dz*dz };
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
 

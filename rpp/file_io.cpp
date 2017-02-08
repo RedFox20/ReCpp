@@ -572,6 +572,7 @@ namespace rpp /* ReCpp */
         #endif
     }
 
+
     string merge_dirups(const strview path) noexcept
     {
         strview pathstr = path;
@@ -618,6 +619,14 @@ namespace rpp /* ReCpp */
         if (const char* str = path.rfindany("/\\"))
             return strview{ str + 1, path.end() };
         return path; // assume it's just a file name
+    }
+
+
+    strview file_ext(const strview path) noexcept
+    {
+        if (const char* dot = path.rfind('.'))
+            return { dot+1, path.end() };
+        return strview{};
     }
 
 
@@ -755,12 +764,12 @@ namespace rpp /* ReCpp */
         return (int)out.size();
     }
 
-	vector<string> list_files(strview dir, strview ext) noexcept
-	{
-		vector<string> out;
-		list_files(out, dir, ext);
-		return out;
-	}
+    vector<string> list_files(strview dir, strview ext) noexcept
+    {
+        vector<string> out;
+        list_files(out, dir, ext);
+        return out;
+    }
 
     int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept
     {

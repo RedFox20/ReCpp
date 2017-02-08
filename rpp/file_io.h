@@ -45,9 +45,9 @@ namespace rpp /* ReCpp */
 
         template<class T> operator T*() noexcept { return (T*)str; }
         int size()      const noexcept { return len; }
-		int length()    const noexcept { return len; }
+        int length()    const noexcept { return len; }
         char* data()    const noexcept { return str; }
-		char* c_str()   const noexcept { return str; }
+        char* c_str()   const noexcept { return str; }
         operator bool() const noexcept { return str != nullptr; }
         operator strview() const noexcept { return { str,len }; }
     };
@@ -366,7 +366,6 @@ namespace rpp /* ReCpp */
     bool create_folder(const wchar_t* foldername) noexcept;
     bool create_folder(const wstring& foldername) noexcept;
 
-
     /**
      * Deletes a folder, by default only if it's empty.
      * @param recursive If TRUE, all subdirectories and files will also be deleted (permanently)
@@ -375,7 +374,6 @@ namespace rpp /* ReCpp */
     bool delete_folder(const string& foldername, bool recursive = false) noexcept;
     FINLINE bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
     FINLINE bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
-
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
@@ -388,10 +386,8 @@ namespace rpp /* ReCpp */
     // merges all ../ of a full path
     string merge_dirups(const strview path) noexcept;
 
-
     /**
      * @brief Extract the filename (no extension) from a file path
-
      *        Ex: /root/dir/file.ext ==> file
      *        Ex: /root/dir/file     ==> file
      *        Ex: /root/dir/         ==> 
@@ -411,6 +407,17 @@ namespace rpp /* ReCpp */
     strview file_nameext(const strview path) noexcept;
     FINLINE strview file_nameext(const string& path) noexcept { return file_nameext(strview{ path }); }
     FINLINE strview file_nameext(const char*   path) noexcept { return file_nameext(strview{ path }); }
+
+    /**
+     * @brief Extract the extension from a file path
+     *        Ex: /root/dir/file.ext ==> ext
+     *        Ex: /root/dir/file     ==> 
+     *        Ex: /root/dir/         ==> 
+     *        Ex: file.ext           ==> ext
+     */
+    strview file_ext(const strview path) noexcept;
+    FINLINE strview file_ext(const string& path) noexcept { return file_ext(strview{ path }); }
+    FINLINE strview file_ext(const char*   path) noexcept { return file_ext(strview{ path }); }
 
     /**
      * @brief Extract the foldername from a path name
@@ -480,7 +487,7 @@ namespace rpp /* ReCpp */
      * @return Number of files found that match the extension
      */
     int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
-	vector<string> list_files(strview dir, strview ext = {}) noexcept;
+    vector<string> list_files(strview dir, strview ext = {}) noexcept;
 
     /**
      * Lists all files and folders inside a dir
