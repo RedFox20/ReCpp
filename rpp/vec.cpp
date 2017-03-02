@@ -7,39 +7,12 @@
 
 namespace rpp
 {
-    const Vector2 Vector2::ZERO  = { 0.0f, 0.0f };
-    const Vector2 Vector2::ONE   = { 1.0f, 1.0f };
-    const Vector2 Vector2::RIGHT = { 1.0f, 0.0f };
-    const Vector2 Vector2::UP    = { 0.0f, 1.0f };
+    /////////////////////////////////////////////////////////////////////////////////////
 
-    const Rect Rect::ZERO = { 0.0f, 0.0f, 0.0f, 0.0f };
+    const Point Point::ZERO = { 0, 0 };
+    const Rect  Rect::ZERO  = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    const Vector3 Vector3::ZERO    = { 0.0f, 0.0f, 0.0f };
-    const Vector3 Vector3::ONE     = { 1.0f, 1.0f, 1.0f };
-    const Vector3 Vector3::RIGHT   = { 1.0f, 0.0f, 0.0f };
-    const Vector3 Vector3::FORWARD = { 0.0f, 1.0f, 0.0f };
-    const Vector3 Vector3::UP      = { 0.0f, 0.0f, 1.0f };
-
-    const Vector4 Vector4::ZERO    = { 0.0f, 0.0f, 0.0f, 0.0f };
-    const Vector4 Vector4::WHITE   = { 1.0f, 1.0f, 1.0f, 1.0f };
-    const Vector4 Vector4::BLACK   = { 0.0f, 0.0f, 0.0f, 1.0f };
-    const Vector4 Vector4::RED     = { 1.0f, 0.0f, 0.0f, 1.0f };
-    const Vector4 Vector4::GREEN   = { 0.0f, 1.0f, 0.0f, 1.0f };
-    const Vector4 Vector4::SWEETGREEN = Color::RGB(86, 188, 57);
-    const Vector4 Vector4::BLUE    = { 0.0f, 0.0f, 1.0f, 1.0f };
-    const Vector4 Vector4::YELLOW  = { 1.0f, 1.0f, 0.0f, 1.0f };
-    const Vector4 Vector4::ORANGE  = { 1.0f, 0.5f, 0.0f, 1.0f };
-    const Vector4 Vector4::MAGENTA = { 1.0f, 0.0f, 1.0f, 1.0f };
-    const Vector4 Vector4::CYAN    = { 0.0f, 1.0f, 1.0f, 1.0f };
-
-    ////////////////////////////////////////////////////////////////////////////////
-
-    float radf(float degrees)
-    {
-        return (degrees * (float)M_PI) / 180.0f; // rads=(degs*PI)/180
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
 
     void Vector2::print() const
     {
@@ -129,7 +102,17 @@ namespace rpp
         return Vector2{ -y, x }.normalized(magnitude);
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
+    bool Vector2::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y);
+    }
+
+    bool Vector2::almostEqual(const Vector2& b) const
+    {
+        return nearlyZero(x - b.x) && nearlyZero(y - b.y);
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
 
     const char* Point::toString() const
     {
@@ -137,8 +120,7 @@ namespace rpp
         return buf;
     }
 
-
-    ////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
 
     void Rect::print() const
     {
@@ -237,7 +219,7 @@ namespace rpp
         if (b > fb) h = fb - y;
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
 
     void Vector3::set(float newX, float newY, float newZ)
     {
@@ -252,6 +234,14 @@ namespace rpp
     float Vector3::sqlength() const
     {
         return x*x + y*y + z*z;
+    }
+
+    float Vector3::distanceTo(const Vector3& v) const
+    {
+        float dx = x - v.x;
+        float dy = y - v.y;
+        float dz = z - v.z;
+        return sqrtf(dx*dx + dy*dy + dz*dz);
     }
 
     void Vector3::normalize()
@@ -310,7 +300,36 @@ namespace rpp
         return buffer;
     }
 
-    ///////////////////////////////////////////////////////////////////////////////
+
+    /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
+    bool Vector3::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y) && nearlyZero(z);
+    }
+
+    bool Vector3::almostEqual(const Vector3& b) const
+    {
+        return nearlyZero(x - b.x) && nearlyZero(y - b.y) && nearlyZero(z - b.z);
+    }
+
+    const Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
+    {
+        return { src.x * (1 - ratio) + dst.x * ratio,
+                 src.y * (1 - ratio) + dst.y * ratio,
+                 src.z * (1 - ratio) + dst.z * ratio };
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    bool Vector4::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y) && nearlyZero(z) && nearlyZero(w);
+    }
+
+    bool Vector4::almostEqual(const Vector4& v) const
+    {
+        return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z) && nearlyZero(w - v.w);
+    }
 
     void Vector4::set(float newX, float newY, float newZ, float newW)
     {
@@ -412,7 +431,7 @@ namespace rpp
         return NUMBER(s);
     }
 
-    ///////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
 
     const Matrix4 Matrix4::IDENTITY = {{
         1, 0, 0, 0,
@@ -632,14 +651,19 @@ namespace rpp
         return buffer;
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
 
-    float BoundingBox::volume() const
+    float BoundingBox::volume() const noexcept
     {
         return width() * height() * depth();
     }
 
-    Vector3 BoundingBox::compare(const BoundingBox& bb) const
+    Vector3 BoundingBox::center() const noexcept
+    {
+        return lerp(min, max, 0.5f);
+    }
+
+    Vector3 BoundingBox::compare(const BoundingBox& bb) const noexcept
     {
         //// local delta based
         //float dx = width()  / bb.width();
@@ -657,7 +681,121 @@ namespace rpp
         return 1.0f / Vector3{ dx*dx*dx, dy*dy*dy, dz*dz*dz };
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
+    void BoundingBox::join(const Vector3& v) noexcept
+    {
+        if      (v.x < min.x) min.x = v.x; 
+        else if (v.x > max.x) max.x = v.x;
+        if      (v.y < min.y) min.y = v.y; 
+        else if (v.y > max.y) max.y = v.y;
+        if      (v.z < min.z) min.z = v.z; 
+        else if (v.z > max.z) max.z = v.z;
+    }
+
+    void BoundingBox::join(const BoundingBox& bbox) noexcept
+    {
+        if      (bbox.min.x < min.x) min.x = bbox.min.x;
+        else if (bbox.max.x > max.x) max.x = bbox.max.x;
+        if      (bbox.min.y < min.y) min.y = bbox.min.y;
+        else if (bbox.max.y > max.y) max.y = bbox.max.y;
+        if      (bbox.min.z < min.z) min.z = bbox.min.z;
+        else if (bbox.max.z > max.z) max.z = bbox.max.z;
+    }
+
+    bool BoundingBox::contains(const Vector3& v) const noexcept
+    {
+        return min.x <= v.x && v.x <= max.x
+            && min.y <= v.y && v.y <= max.y
+            && min.z <= v.z && v.z <= max.z;
+    }
+
+    float BoundingBox::distanceTo(const Vector3& v) const noexcept
+    {
+        Vector3 closest = clamp(v, min, max);
+        return v.distanceTo(closest);
+    }
+
+    void BoundingBox::grow(float growth) noexcept
+    {
+        min.x -= growth;
+        min.y -= growth;
+        min.z -= growth;
+        max.x += growth;
+        max.y += growth;
+        max.z += growth;
+    }
+
+    BoundingBox BoundingBox::create(const vector<Vector3>& points) noexcept
+    {
+        if (points.empty())
+            return { Vector3::ZERO, Vector3::ZERO };
+
+        auto* verts = points.data(); // better debug iteration performance
+        size_t size = points.size();
+
+        Vector3 min = verts[0];
+        Vector3 max = min;
+        for (size_t i = 1; i < size; ++i)
+        {
+            const Vector3 pos = verts[i];
+            if      (pos.x < min.x) min.x = pos.x;
+            else if (pos.x > max.x) max.x = pos.x;
+            if      (pos.y < min.y) min.y = pos.y;
+            else if (pos.y > max.y) max.y = pos.y;
+            if      (pos.z < min.z) min.z = pos.z;
+            else if (pos.z > max.z) max.z = pos.z;
+        }
+        return { min, max };
+    }
+
+    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<IdVector3>& ids)
+    {
+        if (points.empty() || ids.empty())
+            return { Vector3::ZERO, Vector3::ZERO };
+
+        auto* verts = points.data(); // better debug iteration performance
+        auto*  data = ids.data();
+        size_t size = ids.size();
+
+        Vector3 min = verts[data[0].ID];
+        Vector3 max = min;
+        for (size_t i = 1; i < size; ++i)
+        {
+            const Vector3 pos = verts[data[i].ID];
+            if      (pos.x < min.x) min.x = pos.x;
+            else if (pos.x > max.x) max.x = pos.x;
+            if      (pos.y < min.y) min.y = pos.y;
+            else if (pos.y > max.y) max.y = pos.y;
+            if      (pos.z < min.z) min.z = pos.z;
+            else if (pos.z > max.z) max.z = pos.z;
+        }
+        return { min, max };
+    }
+
+    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<int>& ids)
+    {
+        if (points.empty() || ids.empty())
+            return { Vector3::ZERO, Vector3::ZERO };
+
+        auto* verts = points.data(); // better debug iteration performance
+        auto*  data = ids.data();
+        size_t size = ids.size();
+
+        Vector3 min = verts[data[0]];
+        Vector3 max = min;
+        for (size_t i = 1; i < size; ++i)
+        {
+            const Vector3 pos = verts[data[i]];
+            if      (pos.x < min.x) min.x = pos.x;
+            else if (pos.x > max.x) max.x = pos.x;
+            if      (pos.y < min.y) min.y = pos.y;
+            else if (pos.y > max.y) max.y = pos.y;
+            if      (pos.z < min.z) min.z = pos.z;
+            else if (pos.z > max.z) max.z = pos.z;
+        }
+        return { min, max };
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
 

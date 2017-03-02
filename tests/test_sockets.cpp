@@ -89,14 +89,14 @@ TestImpl(test_sockets)
             string data = client.recv_str();
             if (data != "")
             {
-                printf("server: received %d bytes of data from client ", data.length());
+                printf("server: received %d bytes of data from client ", (int)data.length());
 
                 size_t j = 0;
                 for (; j < data.length(); ++j)
                 {
                     if (data[j] != '$')
                     {
-                        printf("(corrupted at position %d):\n", j);
+                        printf("(corrupted at position %d):\n", (int)j);
                         printf("%.*s\n", 10, &data[j]);
                         printf("^\n");
                         break;

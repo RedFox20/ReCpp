@@ -68,22 +68,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
-    <IntDir>obj\$(Platform)\$(Configuration)\Tests\</IntDir>
+    <IntDir>$(ProjectDir)..\obj\$(Platform)$(Configuration)\Tests\</IntDir>
     <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
-    <IntDir>obj\$(Platform)\$(Configuration)\Tests\</IntDir>
+    <IntDir>$(ProjectDir)..\obj\$(Platform)$(Configuration)\Tests\</IntDir>
     <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
-    <IntDir>obj\$(Platform)\$(Configuration)\Tests\</IntDir>
+    <IntDir>$(ProjectDir)..\obj\$(Platform)$(Configuration)\Tests\</IntDir>
     <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir)\;$(SolutionDir)\rpp\;$(IncludePath)</IncludePath>
-    <IntDir>obj\$(Platform)\$(Configuration)\Tests\</IntDir>
+    <IntDir>$(ProjectDir)..\obj\$(Platform)$(Configuration)\Tests\</IntDir>
     <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -146,6 +146,7 @@
     <ClInclude Include="..\tests\tests.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\rpp\test_serialization.cpp" />
     <ClCompile Include="..\tests\test_allocators.cpp" />
     <ClCompile Include="..\tests\test_sockets.cpp" />
     <ClCompile Include="..\tests\test_delegate.cpp" />

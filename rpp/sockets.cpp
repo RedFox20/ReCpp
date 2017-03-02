@@ -192,13 +192,13 @@ namespace rpp
 		else memset(Addr6, 0, sizeof Addr6);
 	}
 	ipaddress::ipaddress(address_family af, int port) 
-		: Family(af), Port(port), FlowInfo(0), ScopeId(0)
+		: Family(af), Port(ushort(port)), FlowInfo(0), ScopeId(0)
 	{
 		if (af == AF_IPv4) Addr4 = INADDR_ANY;
 		else memset(Addr6, 0, sizeof Addr6);
 	}
 	ipaddress::ipaddress(address_family af, const char* hostname, int port)
-		: Family(af), Port(port), FlowInfo(0), ScopeId(0)
+		: Family(af), Port(ushort(port)), FlowInfo(0), ScopeId(0)
 	{
 		void* addr = af == AF_IPv4 ? (void*)&Addr4 : (void*)&Addr6;
 		int family = af == AF_IPv4 ? AF_INET : AF_INET6;
@@ -258,7 +258,7 @@ namespace rpp
 	static saddr to_saddr(const ipaddress& ipa)
 	{
 		saddr a;
-		a.sa4.sin_family = addrfamily_int(ipa.Family);
+		a.sa4.sin_family = (ushort)addrfamily_int(ipa.Family);
 		a.sa4.sin_port   = htons(ipa.Port);
 		if (ipa.Family == AF_IPv4) {
 			a.sa4.sin_addr.s_addr = ipa.Addr4;
@@ -294,7 +294,7 @@ namespace rpp
 		connect(Addr);
 	}
 	socket::socket(const char* hostname, int port, int timeoutMillis, address_family af) : Sock(-1), Addr(af, hostname, port) {
-		connect(Addr);
+		connect(Addr, timeoutMillis);
 	}
 	socket::socket(socket&& fwd) : Sock(fwd.Sock), Addr(fwd.Addr) {
 		fwd.Sock = -1;

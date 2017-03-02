@@ -74,7 +74,7 @@ namespace rpp /* ReCpp */
 
 		/** @brief Write a length specified string to the buffer in the form of [uint16 len][data] */
 		template<class Char> socket_writer& write_nstr(const Char* str, int len) {
-			write_ushort(len).write(str, len * sizeof(Char)); 
+			write_ushort(ushort(len)).write(str, len * sizeof(Char)); 
 			return *this;
 		}
 		socket_writer& write(const strview& str)      { return write_nstr(str.str, str.len); }

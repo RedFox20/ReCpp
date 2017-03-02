@@ -26,5 +26,8 @@
     <ClCompile Include="..\tests\test_strview.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\test_serialization.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

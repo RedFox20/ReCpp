@@ -6,19 +6,31 @@
 #include <ostream>  // ostream& operator<<
 #include <string.h> // strlen
 
-//// @note Some functions get inlined too aggressively, leading to some serious code bloat
-////       Need to hint the compiler to take it easy ^_^'
-#ifndef NOINLINE
-	#ifdef _MSC_VER
-	#  define NOINLINE __declspec(noinline)
-	#else
-	#  define NOINLINE __attribute__((noinline))
-	#endif
-#endif
+#pragma warning(push)
+#pragma warning(disable:4201) // nameless struct/union warning
 
 namespace rpp
 {
-	using namespace std;
+	using namespace std; // we love std; you should too.
+
+    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
+    #define RPP_BASIC_INTEGER_TYPEDEFS
+        typedef unsigned char      byte;
+        typedef unsigned short     ushort;
+        typedef unsigned int       uint;
+        typedef long long          int64;
+        typedef unsigned long long uint64;
+    #endif
+        
+    //// @note Some functions get inlined too aggressively, leading to some serious code bloat
+    ////       Need to hint the compiler to take it easy ^_^'
+    #ifndef NOINLINE
+	    #ifdef _MSC_VER
+	    #  define NOINLINE __declspec(noinline)
+	    #else
+	    #  define NOINLINE __attribute__((noinline))
+	    #endif
+    #endif
 
 	enum address_family
 	{
@@ -513,5 +525,7 @@ namespace rpp
 	};
 
 } // namespace rpp
+
+#pragma warning(pop)
 
 #endif // RPP_SOCKETS_H

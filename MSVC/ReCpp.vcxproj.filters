@@ -25,6 +25,9 @@
     <ClCompile Include="..\rpp\timer.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\vec.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\delegate.h">
@@ -54,9 +57,15 @@
     <ClInclude Include="..\rpp\timer.h">
       <Filter>rpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\rpp\vec.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\rpp\strview.natvis">
+      <Filter>rpp</Filter>
+    </Natvis>
+    <Natvis Include="..\rpp\vec.natvis">
       <Filter>rpp</Filter>
     </Natvis>
   </ItemGroup>

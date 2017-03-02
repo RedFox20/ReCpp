@@ -441,8 +441,8 @@ namespace rpp /* ReCpp */
      *        Ex: file.ext           ==> 
      */
     strview folder_path(const strview path) noexcept;
-    FINLINE strview folder_path(const string& path) noexcept { return folder_path(strview{ path }); }
-    FINLINE strview folder_path(const char*   path) noexcept { return folder_path(strview{ path }); }
+    inline strview folder_path(const string& path) noexcept { return folder_path(strview{ path }); }
+    inline strview folder_path(const char*   path) noexcept { return folder_path(strview{ path }); }
     wstring folder_path(const wchar_t* path) noexcept;
     wstring folder_path(const wstring& path) noexcept;
     /**

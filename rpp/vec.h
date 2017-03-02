@@ -21,10 +21,14 @@ namespace rpp
     constexpr double M_SQRT2 = 1.41421356237309504880; // sqrt(2)
 
     /** @return Radians from degrees */
-    float radf(float degrees);
+    static constexpr float radf(float degrees)
+    {
+        return float((degrees * M_PI) / 180.0); // rads=(degs*PI)/180
+    }
 
     /** @brief Clamps a value between:  min <= value <= max */
-    template<class T> static T clamp(T value, T min, T max) {
+    template<class T> static constexpr T clamp(T value, T min, T max) 
+    {
         return value < min ? min : (value < max ? value : max);
     }
 
@@ -34,24 +38,38 @@ namespace rpp
      * @param end Ending bound of the linear range
      * @param position Multiplier value such as 0.5, 1.0 or 1.5
      */
-    inline float lerp(float start, float end, float position) {
+    static constexpr float lerp(float start, float end, float position)
+    {
         return start + (end-start)*position;
     }
 
+    static constexpr bool nearlyZero(const float value, const float epsilon = 0.001f)
+    {
+        return -epsilon < value && value < epsilon;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////
+
+    /** @brief Proxy to allow constexpr initialization inside Vector2 */
+    struct float2
+    {
+        float x, y;
+        constexpr float2(float x, float y) : x(x), y(y) {}
+    };
 
     /** @brief 2D Vector for UI calculations */
     struct Vector2
     {
         float x, y;
-        static const Vector2 ZERO;  // 0 0
-        static const Vector2 ONE;   // 1 1
-        static const Vector2 RIGHT; // X-axis
-        static const Vector2 UP;    // Y-axis
+        static constexpr float2 ZERO  = { 0.0f, 0.0f }; // 0 0
+        static constexpr float2 ONE   = { 1.0f, 1.0f }; // 1 1
+        static constexpr float2 RIGHT = { 1.0f, 0.0f }; // X-axis
+        static constexpr float2 UP    = { 0.0f, 1.0f }; // Y-axis, OpenGL UP
     
-        Vector2() = default;
-        explicit constexpr Vector2(float xy) : x(xy), y(xy) {}
-        constexpr Vector2(float x, float y) : x(x), y(y) {}
+        Vector2() {}
+        explicit constexpr Vector2(float xy) : x(xy),  y(xy)  {}
+        constexpr Vector2(float x, float y)  : x(x),   y(y)   {}
+        constexpr Vector2(const float2& v)   : x(v.x), y(v.y) {}
     
         /** Print the Vector2 */
         void print() const;
@@ -65,8 +83,17 @@ namespace rpp
             return toString(buffer, SIZE);
         }
 
-        bool empty() const { return x == .0f && y == .0f; }
-    
+        /** @return TRUE if all elements are exactly 0.0f, which implies default initialized. 
+         * To avoid FP errors, use almostZero() if you performed calculations */
+        bool isZero()  const { return x == 0.0f && y == 0.0f; }
+        bool notZero() const { return x != 0.0f || y != 0.0f; }
+
+        /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
+        bool almostZero() const;
+
+        /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
+        bool almostEqual(const Vector2& b) const;
+
         /** @brief Set new XY values */
         void set(float x, float y);
     
@@ -140,15 +167,16 @@ namespace rpp
     inline Vector2 operator*(float f, const Vector2& a) { return { f*a.x, f*a.y }; }
     inline Vector2 operator/(float f, const Vector2& a) { return { f/a.x, f/a.y }; }
 
-    inline Vector2 clamp(const Vector2& value, const Vector2& min, const Vector2& max) {
+    inline constexpr Vector2 clamp(const Vector2& value, const Vector2& min, const Vector2& max)
+    {
         return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y) };
     }
 
-    inline Vector2 lerp(const Vector2& start, const Vector2& end, float position)
+    inline constexpr Vector2 lerp(const Vector2& start, const Vector2& end, float position)
     {
-        return{ start.x + (end.x - start.x)*position,
-                start.y + (end.y - start.y)*position };
+        return { start.x + (end.x - start.x)*position,
+                 start.y + (end.y - start.y)*position };
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -160,12 +188,17 @@ namespace rpp
     {
         int x, y;
 
-        Point() = default;
-        Point(int x, int y) : x(x), y(y) {}
-    
+        static const Point ZERO;
+
+        Point() {}
+        constexpr Point(int x, int y) : x(x), y(y) {}
+        
         operator bool()  const { return x || y;   }
         bool operator!() const { return !x && !y; }
         void set(int nx, int ny) { x = nx, y = ny; }
+
+        bool isZero()  const { return !x && !y; }
+        bool notZero() const { return x || y; }
     
         const char* toString() const;
 
@@ -209,9 +242,9 @@ namespace rpp
 
         static const Rect ZERO;
 
-        Rect() = default;
-        Rect(float x, float y, float w, float h)      : x(x), y(y), w(w), h(h) {}
-        Rect(const Vector2& pos, const Vector2& size) : pos(pos),   size(size) {}
+        Rect() {}
+        constexpr Rect(float x, float y, float w, float h)      : x(x), y(y), w(w), h(h) {}
+        constexpr Rect(const Vector2& pos, const Vector2& size) : pos(pos),   size(size) {}
         Rect(float x, float y, const Vector2& size)   : x(x), y(y), w(size.x), h(size.y) {}
         Rect(const Vector2& pos, float w, float h)    : x(pos.x), y(pos.y), w(w), h(h)   {}
 
@@ -286,6 +319,13 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
+    /** @brief Proxy to allow constexpr initialization inside Vector3 */
+    struct float3
+    { 
+        float x, y, z;
+        constexpr float3(float x, float y, float z) : x(x), y(y), z(z) {}
+    };
+
     /** @brief 3D Vector for matrix calculations */
     struct Vector3
     {
@@ -293,17 +333,32 @@ namespace rpp
             struct { float x, y, z; };
             struct { Vector2 xy; };
             struct { float _x; Vector2 yz; };
+            float3 xyz;
         };
 
-        static const Vector3 ZERO;    // 0 0 0
-        static const Vector3 ONE;     // 1 1 1
-        static const Vector3 RIGHT;   // X axis
-        static const Vector3 FORWARD; // Y axis
-        static const Vector3 UP;      // Z axis
+        static constexpr float3 ZERO           = { 0.0f, 0.0f, 0.0f };;     // 0 0 0
+        static constexpr float3 ONE            = { 1.0f, 1.0f, 1.0f };;     // 1 1 1
+        static constexpr float3 RIGHT          = { 1.0f, 0.0f, 0.0f };      // X axis
+        static constexpr float3 FORWARD        = { 0.0f, 1.0f, 0.0f };      // Y axis
+        static constexpr float3 UP             = { 0.0f, 0.0f, 1.0f };      // Z axis
     
-        Vector3() = default;
-        Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
-    
+        static constexpr float3 RED            = { 1.0f, 0.0f, 0.0f };       // RGB 1 0 0
+        static constexpr float3 GREEN          = { 0.0f, 1.0f, 0.0f };       // RGB 0 1 0
+        static constexpr float3 BLUE           = { 0.0f, 0.0f, 1.0f };       // RGB 0 0 1
+
+        static constexpr float3 YELLOW         = { 1.0f, 1.0f, 0.0f };       // 1 1 0
+        static constexpr float3 ORANGE         = { 1.0f, 0.50196f, 0.0f };   // 1 0.502 0; 255 128 0
+        static constexpr float3 MAGENTA        = { 1.0f, 0.0f, 1.0f };       // 1 0 1
+        static constexpr float3 CYAN           = { 0.0f, 1.0f, 1.0f };       // 0 1 1
+        static constexpr float3 SWEETGREEN     = { 0.337f, 0.737f, 0.223f }; // 86, 188, 57
+        static constexpr float3 CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f };     // #55AAFF  85, 170, 255
+
+        Vector3() {}
+        constexpr Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
+        constexpr Vector3(const float3& v) : xyz(v) {}
+        Vector3(const Vector2& xy, float z) : xy(xy), z(z) {}
+        Vector3(float x, const Vector2& yz) : x(x), yz(yz) {}
+
         /** @brief Set new XYZ values */
         void set(float x, float y, float z);
     
@@ -312,6 +367,9 @@ namespace rpp
     
         /** @return Squared length of the vector */
         float sqlength() const;
+
+        /** @return Absolute distance from this vec3 to target vec3 */
+        float distanceTo(const Vector3& v) const;
     
         /** @brief Normalize this vector */
         void normalize();
@@ -335,6 +393,17 @@ namespace rpp
             return toString(buffer, SIZE);
         }
 
+        /** @return TRUE if all elements are exactly 0.0f, which implies default initialized. 
+         * To avoid FP errors, use almostZero() if you performed calculations */
+        bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f; }
+        bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f; }
+
+        /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
+        bool almostZero() const;
+
+        /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
+        bool almostEqual(const Vector3& b) const;
+
         Vector3& operator+=(const Vector3& b) { x+=b.x, y+=b.y, z+=b.z; return *this; }
         Vector3& operator-=(const Vector3& b) { x-=b.x, y-=b.y, z-=b.z; return *this; }
         Vector3& operator*=(const Vector3& b) { x*=b.x, y*=b.y, z*=b.z; return *this; }
@@ -347,6 +416,8 @@ namespace rpp
     
         bool operator==(const Vector3& b) const { return x == b.x && y == b.y && z == b.z; }
         bool operator!=(const Vector3& b) const { return x != b.x || y != b.y || z != b.z; }
+
+        static const Vector3 smoothColor(const Vector3& src, const Vector3& dst, float ratio);
     };
 
     inline Vector3 operator+(const Vector3& a, float f) { return { a.x+f, a.y+f, a.z+f }; }
@@ -358,7 +429,28 @@ namespace rpp
     inline Vector3 operator*(float f, const Vector3& a) { return { f*a.x, f*a.y, f*a.z }; }
     inline Vector3 operator/(float f, const Vector3& a) { return { f/a.x, f/a.y, f/a.z }; }
 
+    inline constexpr Vector3 clamp(const Vector3& value, const Vector3& min, const Vector3& max)
+    {
+        return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
+                 value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y),
+                 value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z) };
+    }
+
+    inline constexpr Vector3 lerp(const Vector3& start, const Vector3& end, float position)
+    {
+        return { start.x + (end.x - start.x)*position,
+                 start.y + (end.y - start.y)*position,
+                 start.z + (end.z - start.z)*position };
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
+
+    /** @brief Proxy to allow constexpr initialization inside Vector4 */
+    struct float4
+    {
+        float x, y, z, w;
+        constexpr float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+    };
 
     /** @brief 4D Vector for matrix calculations and quaternion rotations */
     struct Vector4
@@ -369,31 +461,47 @@ namespace rpp
             struct { Vector2 xy; Vector2 zw; };
             struct { Vector2 rg; Vector2 ba; };
             struct { Vector3 xyz; float _w; };
-            struct { Vector3 rgb; float _a; };
+            struct { float3 rgb; float _a; };
             struct { float _x; Vector3 yzw; };
             struct { float _r; Vector3 gba; };
+            float4 xyzw;
         };
 
-        static const Vector4 ZERO;
-        static const Vector4 WHITE; // RGBA 1 1 1 1
-        static const Vector4 BLACK; // RGBA 0 0 0 1
-        static const Vector4 RED;   //
-        static const Vector4 GREEN; //
-        static const Vector4 SWEETGREEN; // 86, 188, 57
-        static const Vector4 BLUE;  //
-        static const Vector4 YELLOW;
-        static const Vector4 ORANGE;  //
-        static const Vector4 MAGENTA; // 1 0 1 1
-        static const Vector4 CYAN;    // 0 1 1 1
+        static constexpr float4 ZERO           = { 0.0f, 0.0f, 0.0f, 0.0f };   // XYZW 0 0 0 0
+        static constexpr float4 WHITE          = { 1.0f, 1.0f, 1.0f, 1.0f };   // RGBA 1 1 1 1
+        static constexpr float4 BLACK          = { 0.0f, 0.0f, 0.0f, 1.0f };   // RGBA 0 0 0 1
+        static constexpr float4 RED            = { 1.0f, 0.0f, 0.0f, 1.0f };   // RGBA 1 0 0 1
+        static constexpr float4 GREEN          = { 0.0f, 1.0f, 0.0f, 1.0f };   // RGBA 0 1 0 1
+        static constexpr float4 BLUE           = { 0.0f, 0.0f, 1.0f, 1.0f };   // RGBA 0 0 1 1
+
+        static constexpr float4 YELLOW         = { 1.0f, 1.0f, 0.0f, 1.0f };       // 1 1 0 1
+        static constexpr float4 ORANGE         = { 1.0f, 0.50196f, 0.0f, 1.0f };   // 1 0.502 0 1; 255 128 0 255
+        static constexpr float4 MAGENTA        = { 1.0f, 0.0f, 1.0f, 1.0f };       // 1 0 1 1
+        static constexpr float4 CYAN           = { 0.0f, 1.0f, 1.0f, 1.0f };       // 0 1 1 1
+        static constexpr float4 SWEETGREEN     = { 0.337f, 0.737f, 0.223f, 1.0f }; // 86, 188, 57
+        static constexpr float4 CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f, 1.0f };     // #55AAFF  85, 170, 255
     
-        Vector4() = default;
-        Vector4(float x, float y, float z,float w=1.f): x(x), y(y), z(z), w(w) {}
+        Vector4() {}
+        constexpr Vector4(float x, float y, float z,float w=1.f): x(x), y(y), z(z), w(w) {}
+        constexpr Vector4(const float4& v) : xyzw(v) {}
         Vector4(const Vector2& xy, const Vector2& zw) : xy(xy), zw(zw) {}
         Vector4(const Vector2& xy, float z, float w)  : x(xy.x), y(xy.y), z(z), w(w) {}
         Vector4(float x, float y, const Vector2& zw)  : x(x), y(y), z(zw.x), w(zw.y) {}
         Vector4(const Vector3& xyz, float w)          : xyz(xyz), _w(w) {}
         Vector4(float x, const Vector3& yzw)          : _x(x), yzw(yzw) {}
-    
+        
+
+        /** @return TRUE if all elements are exactly 0.0f, which implies default initialized.
+        * To avoid FP errors, use almostZero() if you performed calculations */
+        bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f; }
+        bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f; }
+        
+        /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
+        bool almostZero() const;
+
+        /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
+        bool almostEqual(const Vector4& b) const;
+
         void set(float x, float y, float z, float w);
     
         /** @return Dot product with another vector */
@@ -407,11 +515,18 @@ namespace rpp
     
         /** @brief Creates a quaternion rotation from Euler XYZ (degrees) rotation */
         static Vector4 fromRotation(const Vector3& rotation);
-    
-        /** @return A 4-component float color from integer RGBA color */
-        static Vector4 RGB(int r, int g, int b, int a = 255)
+        
+        // don't use macros plz :)
+        #undef RGB
+        /** @return A 3-component float color from integer RGBA color */
+        static constexpr Vector3 RGB(int r, int g, int b)
         {
-            return Vector4(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
+            return Vector3{ r / 255.0f, g / 255.0f, b / 255.0f};
+        }
+        /** @return A 4-component float color from integer RGBA color */
+        static constexpr Vector4 RGB(int r, int g, int b, int a)
+        {
+            return Vector4{ r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
         }
     
         /**
@@ -480,8 +595,15 @@ namespace rpp
     inline Vector4 operator*(float f, const Vector4& a) { return { f*a.x, f*a.y, f*a.z, f*a.w }; }
     inline Vector4 operator/(float f, const Vector4& a) { return { f/a.x, f/a.y, f/a.z, f/a.w }; }
 
+    inline constexpr Vector4 clamp(const Vector4& value, const Vector4& min, const Vector4& max)
+    {
+        return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
+                 value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y),
+                 value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z),
+                 value.w < min.w ? min.w : (value.w < max.w ? value.w : max.w) };
+    }
 
-    inline Vector4 lerp(const Vector4& start, const Vector4& end, float position)
+    inline constexpr Vector4 lerp(const Vector4& start, const Vector4& end, float position)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
@@ -609,6 +731,20 @@ namespace rpp
     /** @brief Simple 4-component RGBA float color */
     using Color = Vector4;
 
+    /** @brief Simple 3-component RGB float color */
+    using Color3 = Vector3;
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    // Vector3 with an associated Vertex ID
+    struct IdVector3 : Vector3
+    {
+        int ID; // vertex id, -1 means invalid Vertex ID, [0] based indices
+
+        IdVector3(int id, const Vector3& v) : Vector3{ v }, ID{ id } {}
+        IdVector3(int id, float x, float y, float z) : Vector3{ x,y,z }, ID{ id } {}
+    };
+
     ////////////////////////////////////////////////////////////////////////////////
     
     /** 3D bounding box */
@@ -617,18 +753,52 @@ namespace rpp
         Vector3 min;
         Vector3 max;
     
-        BoundingBox() {}
-        BoundingBox(const Vector3& bbMin, const Vector3& bbMax)
-            : min(bbMin), max(bbMax) {}
+        BoundingBox() : min(0.0f,0.0f,0.0f), max(0.0f,0.0f,0.0f) {}
+        BoundingBox(const Vector3& bbMinMax) : min(bbMinMax), max(bbMinMax) {}
+        BoundingBox(const Vector3& bbMin, const Vector3& bbMax) : min(bbMin), max(bbMax) {}
 
-        float width()  const { return max.x - min.x; } // DX
-        float height() const { return max.y - min.y; } // DY
-        float depth()  const { return max.z - min.z; } // DZ
+        operator bool()  const { return min.notZero() && max.notZero(); }
+        bool operator!() const { return min.isZero()  || max.isZero();  }
+
+        bool isZero()  const { return min.isZero()  && max.isZero();  }
+        bool notZero() const { return min.notZero() || max.notZero(); }
+
+        float width()  const noexcept { return max.x - min.x; } // DX
+        float height() const noexcept { return max.y - min.y; } // DY
+        float depth()  const noexcept { return max.z - min.z; } // DZ
 
         // width*height*depth
-        float volume() const;
+        float volume() const noexcept;
 
-        Vector3 compare(const BoundingBox& bb) const;
+        // get center of BoundingBox
+        Vector3 center() const noexcept;
+
+        Vector3 compare(const BoundingBox& bb) const noexcept;
+
+        // joins a vector into this bounding box, possibly increasing the volume
+        void join(const Vector3& v) noexcept;
+
+        // joins with another bounding box, possibly increasing the volume
+        void join(const BoundingBox& bbox) noexcept;
+
+        // @return TRUE if vec3 point is inside this bounding box volume
+        bool contains(const Vector3& v) const noexcept;
+
+        // @return Distance to vec3 point from this boundingbox's corners
+        // @todo Improve this to be more accurate
+        float distanceTo(const Vector3& v) const noexcept;
+
+        // grow the bounding box by the given value across all axes
+        void grow(float growth) noexcept;
+
+        // calculates the bounding box of the given point cloud
+        static BoundingBox create(const vector<Vector3>& points) noexcept;
+
+        // calculates the bounding box using ID-s from IdVector3-s, which index the given point cloud
+        static BoundingBox create(const vector<Vector3>& points, const vector<IdVector3>& ids);
+
+        // calculates the bounding box using vertex ID-s, which index the given point cloud
+        static BoundingBox create(const vector<Vector3>& points, const vector<int>& ids);
     };
 
     ////////////////////////////////////////////////////////////////////////////////
