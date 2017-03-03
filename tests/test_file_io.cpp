@@ -1,7 +1,6 @@
 #include "tests.h"
 #include <file_io.h>
 #include <fstream> // 
-
 using namespace rpp;
 
 TestImpl(test_file_io)

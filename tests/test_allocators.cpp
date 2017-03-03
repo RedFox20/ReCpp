@@ -1,5 +1,6 @@
 #include "tests.h"
 #include <allocators.h>
+using namespace rpp;
 
 struct vec2
 {

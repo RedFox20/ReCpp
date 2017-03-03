@@ -60,8 +60,7 @@ namespace rpp /* ReCpp */
 		}
 		/** @brief Appends data from other binary_writer to this one */
 		socket_writer& write(const socket_writer& w) {
-			write(w.Buf, w.Pos);
-			return *this;
+			return write(w.Buf, w.Pos);
 		}
 
 		socket_writer& write_byte(byte value)     { return write(value); } /** @brief Writes a 8-bit unsigned byte into the buffer */
@@ -74,8 +73,7 @@ namespace rpp /* ReCpp */
 
 		/** @brief Write a length specified string to the buffer in the form of [uint16 len][data] */
 		template<class Char> socket_writer& write_nstr(const Char* str, int len) {
-			write_ushort(ushort(len)).write(str, len * sizeof(Char)); 
-			return *this;
+			return write_ushort(ushort(len)).write((void*)str, len * sizeof(Char)); 
 		}
 		socket_writer& write(const strview& str)      { return write_nstr(str.str, str.len); }
 		socket_writer& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }

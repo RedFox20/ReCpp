@@ -1,6 +1,5 @@
 #include "tests.h"
 #include <file_io.h>
-
 using namespace rpp;
 
 TestImpl(test_strview)

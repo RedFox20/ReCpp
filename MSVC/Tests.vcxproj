@@ -146,8 +146,8 @@
     <ClInclude Include="..\tests\tests.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\rpp\test_serialization.cpp" />
     <ClCompile Include="..\tests\test_allocators.cpp" />
+    <ClCompile Include="..\tests\test_serialization.cpp" />
     <ClCompile Include="..\tests\test_sockets.cpp" />
     <ClCompile Include="..\tests\test_delegate.cpp" />
     <ClCompile Include="..\tests\tests.cpp" />
