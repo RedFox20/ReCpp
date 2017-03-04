@@ -2,10 +2,30 @@
 #include <rpp/binary_serializer.h>
 using namespace rpp;
 
+struct Struct1 : introspection<Struct1, socket_writer, socket_reader>
+{
+    float a;
+
+    static void introspect()
+    {
+        bind<&Struct1::a>();
+    }
+};
+
+struct Struct2
+{
+    float a;
+    float b;
+};
+
 TestImpl(test_serialization)
 {
     TestInit(test_serialization)
     {
+        Struct1 s1;
+        Struct2 s2;
+
+
     }
 
     TestCase(object_size)

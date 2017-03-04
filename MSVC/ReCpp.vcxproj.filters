@@ -28,6 +28,9 @@
     <ClCompile Include="..\rpp\vec.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\binary_readwrite.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\delegate.h">
@@ -58,6 +61,9 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\vec.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\binary_readwrite.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>

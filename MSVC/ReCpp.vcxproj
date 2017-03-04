@@ -96,6 +96,7 @@
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -116,6 +117,7 @@
       <OmitFramePointers>false</OmitFramePointers>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -137,6 +139,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MinimalRebuild>true</MinimalRebuild>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -160,6 +163,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MinimalRebuild>true</MinimalRebuild>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -169,6 +173,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\rpp\allocators.cpp" />
+    <ClCompile Include="..\rpp\binary_readwrite.cpp" />
     <ClCompile Include="..\rpp\binary_serializer.cpp" />
     <ClCompile Include="..\rpp\file_io.cpp" />
     <ClCompile Include="..\rpp\sockets.cpp" />
@@ -179,6 +184,7 @@
   <ItemGroup>
     <ClInclude Include="..\rpp\allocators.h" />
     <ClInclude Include="..\rpp\binary_reader.h" />
+    <ClInclude Include="..\rpp\binary_readwrite.h" />
     <ClInclude Include="..\rpp\binary_serializer.h" />
     <ClInclude Include="..\rpp\binary_writer.h" />
     <ClInclude Include="..\rpp\delegate.h" />

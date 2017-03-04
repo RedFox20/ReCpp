@@ -2,6 +2,8 @@
 #ifndef RPP_BINARY_SERIALIZER_H
 #define RPP_BINARY_SERIALIZER_H
 #include "binary_readwrite.h"
+//#include "binary_reader.h"
+//#include "binary_writer.h"
 
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
@@ -125,12 +127,65 @@ namespace rpp
         };
     }
 
+    template<class T, class Writer, class Reader> struct introspection
+    {
+        using serialize   = function<void (T* inst, Writer& w)>;
+        using deserialize = function<void (T* inst, Reader& r)>;
+
+        struct member
+        {
+            serialize   serialize;
+            deserialize deserialize;
+        };
+
+        static vector<member>& members() noexcept
+        {
+            static vector<member> m;
+            return m;
+        }
+
+        template<class TMember> struct helper;
+        template<class A, class TMember> struct helper<A T::*TMember>
+        {
+            using type = A;
+            using member_ptr = TMember;
+        };
+
+        template<class A>
+        template<class A T::*TMember> 
+        static void bind() noexcept
+        {
+            member m = {
+                [a](T* inst, Writer& w) {
+                    w << ((*inst).*a);
+                },
+                [a](T* inst, Reader& r) {
+                    r >> ((*inst).*a);
+                }
+            };
+            members().emplace_back(move(m));
+        }
+    };
+
+
     /**
      * Runtime size of the objects once serialized
      */
     template<class T> constexpr int size_of(const T& v)
     {
         return detail::size_of<T>::value(v);
+    }
+
+    
+    template<class T, class A> int auto_expand(const T& obj = { A{} })
+    {
+        std::tuple<A> t1;
+        return 1;
+    }
+
+    template<class T, class A, class B> int auto_expand(const T& obj = { A{}, B{} })
+    {
+        return 2;
     }
 
     //////////////////////////////////////////////////////////////////////////////////

@@ -4,7 +4,7 @@
 
 namespace rpp
 {
-	NOINLINE socket_writer & binary_serializer::write(socket_writer & w) const noexcept
+	NOINLINE socket_writer& binary_serializer::write(socket_writer & w) const noexcept
 	{
 		// we write[int32 length][layout data...]
 		const int size = layout_size();
@@ -22,7 +22,7 @@ namespace rpp
 		}
 		return w;
 	}
-	NOINLINE socket_reader & binary_serializer::read(socket_reader & r) noexcept
+	NOINLINE socket_reader& binary_serializer::read(socket_reader & r) noexcept
 	{
 		// we don't read layouts sent by remote end, but we read length for validation
 		length = r.read_int();
