@@ -59,7 +59,7 @@ namespace rpp
         static void sleep(int millis);
 
         // main entry/initialization point for the test class
-        virtual void run() = 0;
+        virtual void run() {}
 
         /**
          * Run tests with a single filter pattern
@@ -82,12 +82,25 @@ namespace rpp
          * Runs all the tests, no filtering is done
          */
         static int run_tests();
+
+        template<class Expected, class Actual>
+        static void expected_failed(const char* file, int line, 
+                    const Expected& expected, const Actual& actual, 
+                    const char* expectedExpr, const char* actualExpr)
+        {
+            assert_failed(file, line, "Expected %s(%s) but got %s(%s) instead.",
+                expectedExpr, to_string(expected).c_str(),
+                actualExpr, to_string(actual).c_str());
+        }
     };
 
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
-#define TestImpl(testclass) static struct testclass : public test
+#define AssertThat(expected, actual) \
+    if ((expected) != (actual)) { \
+        expected_failed(__FILE__, __LINE__, expected, actual, #expected, #actual); }
 
+#define TestImpl(testclass) static struct testclass : public test
 
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \
