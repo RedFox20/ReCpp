@@ -2,6 +2,7 @@
 #ifndef RPP_BINARY_SERIALIZER_H
 #define RPP_BINARY_SERIALIZER_H
 #include "binary_readwrite.h"
+#include "delegate.h"
 //#include "binary_reader.h"
 //#include "binary_writer.h"
 
@@ -127,47 +128,6 @@ namespace rpp
         };
     }
 
-    template<class T, class Writer, class Reader> struct introspection
-    {
-        using serialize   = function<void (T* inst, Writer& w)>;
-        using deserialize = function<void (T* inst, Reader& r)>;
-
-        struct member
-        {
-            serialize   serialize;
-            deserialize deserialize;
-        };
-
-        static vector<member>& members() noexcept
-        {
-            static vector<member> m;
-            return m;
-        }
-
-        template<class TMember> struct helper;
-        template<class A, class TMember> struct helper<A T::*TMember>
-        {
-            using type = A;
-            using member_ptr = TMember;
-        };
-
-        template<class A>
-        template<class A T::*TMember> 
-        static void bind() noexcept
-        {
-            member m = {
-                [a](T* inst, Writer& w) {
-                    w << ((*inst).*a);
-                },
-                [a](T* inst, Reader& r) {
-                    r >> ((*inst).*a);
-                }
-            };
-            members().emplace_back(move(m));
-        }
-    };
-
-
     /**
      * Runtime size of the objects once serialized
      */
@@ -187,6 +147,45 @@ namespace rpp
     {
         return 2;
     }
+
+    template<class T> struct member_serialize
+    {
+        using serialize_func   = delegate<void(T* inst, socket_writer& w)>;
+        using deserialize_func = delegate<void(T* inst, socket_reader& r)>;
+
+        serialize_func   serialize;
+        deserialize_func deserialize;
+    };
+
+    template<class T> struct serializable
+    {
+        static vector<member_serialize<T>> members;
+
+        template<class A> static void bind(A T::*a) noexcept
+        {
+            member_serialize<T> m = {
+                [a](T* inst, socket_writer& w) {
+                    w << ((*inst).*a);
+                },
+                [a](T* inst, socket_reader& r) {
+                    r >> ((*inst).*a);
+                }
+            };
+            members.emplace_back(move(m));
+        }
+
+        void serialize(socket_writer& w)
+        {
+            T* inst = static_cast<T*>(this);
+
+            for (member_serialize<T>& memberInfo : members)
+            {
+                memberInfo.serialize(inst, w);
+            }
+        }
+    };
+
+    template<class T> vector<member_serialize<T>> serializable<T>::members;
 
     //////////////////////////////////////////////////////////////////////////////////
 

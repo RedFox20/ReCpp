@@ -2,20 +2,26 @@
 #include <rpp/binary_serializer.h>
 using namespace rpp;
 
-struct Struct1 : introspection<Struct1, socket_writer, socket_reader>
+struct Struct1 : serializable<Struct1>
 {
-    float a;
+    float a = 42.0f;
 
     static void introspect()
     {
-        bind<&Struct1::a>();
+        bind(&Struct1::a);
     }
 };
 
-struct Struct2
+struct Struct2 : serializable<Struct2>
 {
-    float a;
-    float b;
+    float a = 44.0f;
+    float b = 46.0f;
+
+    static void introspect()
+    {
+        bind(&Struct2::a);
+        bind(&Struct2::b);
+    }
 };
 
 TestImpl(test_serialization)
@@ -25,13 +31,18 @@ TestImpl(test_serialization)
         Struct1 s1;
         Struct2 s2;
 
+        s1.introspect();
+        s2.introspect();
 
+        socket_writer w1;
+        s1.serialize(w1);
+        
     }
 
     TestCase(object_size)
     {
         AssertThat(sizeof(byte), size_of<byte>(123));
-        AssertThat(sizeof(int), size_of<int>(1234));
+        AssertThat(sizeof(int),  size_of<int>(1234));
 
         vector<int> simpleVec = { 1, 2, 3, 4 };
         int simpleVecSize = size_of(simpleVec);
