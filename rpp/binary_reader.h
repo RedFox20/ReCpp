@@ -22,17 +22,17 @@ namespace rpp /* ReCpp */
 
 	#ifndef RPP_MOVECOPY_MACROS_DEFINED
 		#define RPP_MOVECOPY_MACROS_DEFINED
-		#define MOVE(Class,value) Class(Class&&)=value;       Class&operator=(Class&&)=value;
-		#define NOCOPY(Class)     Class(const Class&)=delete; Class&operator=(const Class&)=delete;
+		#define MOVE(Class,value) Class(Class&&)noexcept=value;       Class&operator=(Class&&)noexcept=value;
+		#define NOCOPY(Class)     Class(const Class&)noexcept=delete; Class&operator=(const Class&)noexcept=delete;
 		#define NOCOPY_MOVE(Class)   MOVE(Class,default) NOCOPY(Class) 
 		#define NOCOPY_NOMOVE(Class) MOVE(Class,delete)  NOCOPY(Class) 
 	#endif
 
 	#ifndef RPP_MINMAX_DEFINED
 	#define RPP_MINMAX_DEFINED
-		template<class T> T max(T a, T b) { return a > b ? a : b; }
-		template<class T> T min(T a, T b) { return a < b ? a : b; }
-		template<class T> T min3(T a, T b, T c) { return a < b ? (a<c?a:c) : (b<c?b:c); }
+		template<class T> constexpr T max(T a, T b) noexcept { return a > b ? a : b; }
+		template<class T> constexpr T min(T a, T b) noexcept { return a < b ? a : b; }
+		template<class T> constexpr T min3(T a, T b, T c) noexcept { return a < b ? (a<c?a:c) : (b<c?b:c); }
 	#endif
 
 	/**
@@ -40,10 +40,11 @@ namespace rpp /* ReCpp */
 	 */
 	struct reader_base
 	{
-		virtual uint read(void* dst, uint cnt) = 0;
-		virtual uint peek(void* dst, uint cnt) = 0;
-		virtual void skip(uint n) = 0;
-		virtual void undo(uint n) = 0;
+        virtual ~reader_base() noexcept = default;
+		virtual int read(void* dst, int cnt) noexcept = 0;
+		virtual int peek(void* dst, int cnt) noexcept = 0;
+		virtual void skip(int n) noexcept = 0;
+		virtual void undo(int n) noexcept = 0;
 	};
 
 /**
@@ -65,36 +66,36 @@ namespace rpp /* ReCpp */
  *     void skip(uint n);
  *     void undo(uint n);
  */
-template<class read_impl> struct binary_reader : public reader_base, public read_impl
+template<class read_impl> struct binary_reader final : public reader_base, public read_impl
 {
 	using read_impl::read_impl; // inherit base constructors
 
 	/** @brief Reads numbytes of raw data into dst buffer */
-	uint read(void* dst, uint numBytes) override { return read_impl::read(dst, numBytes); }
+	uint read(void* dst, uint numBytes) noexcept override { return read_impl::read(dst, numBytes); }
 	/** @brief Peeks numbytes of raw data into dst buffer without advancing the streampos */
-	uint peek(void* dst, uint numBytes) override { return read_impl::peek(dst, numBytes); }
+	uint peek(void* dst, uint numBytes) noexcept override { return read_impl::peek(dst, numBytes); }
 
 	/** @brief Reads generic POD type data into dst */
-	template<class T> uint read(T& dst) {
-		uint n = read_impl::read(dst);
+	template<class T> int read(T& dst) noexcept {
+		int n = read_impl::read(dst);
 		if (!n) dst = T(); // read failed, default construct
 		return n;
 	}
 	/** @brief Peeks a generic POD type data without advancing the streampos */
-	template<class T> uint peek(T& dst) {
-		uint n = read_impl::peek(dst);
+	template<class T> int peek(T& dst) noexcept {
+		int n = read_impl::peek(dst);
 		if (!n) dst = T(); // read failed, default construct
 		return n;
 	}
 
 	/** @brief Reads generic POD type data and returns it */
-	template<class T> T read() { T out; read(out); return out; }
+	template<class T> T read() noexcept { T out; read(out); return out; }
 	/** @brief Peeks generic POD type data and returns it without advancing the streampos */
-	template<class T> T peek() { T out; peek(out); return out; }
+	template<class T> T peek() noexcept { T out; peek(out); return out; }
 	/** @brief Advances streampos by discarding bytes */
-	void skip(uint n) override { read_impl::skip(n); }
+	void skip(int n) noexcept override { read_impl::skip(n); }
 	/** @brief Can be used to undo read operations, but won't work with non-undoable readers */
-	void undo(uint n) override { read_impl::undo(n); }
+	void undo(int n) noexcept override { read_impl::undo(n); }
 
 	byte   read_byte()   { return read<byte>();  } /** @brief Reads a 8-bit unsigned byte   */
 	short  read_short()  { return read<short>(); } /** @brief Reads a 16-bit signed short   */
@@ -114,47 +115,46 @@ template<class read_impl> struct binary_reader : public reader_base, public read
 
 
 	/** @brief Reads a length specified string to the std::string in the form of [uint16 len][data] */
-	template<class Char> binary_reader& read(std::basic_string<Char>& str) {
-		uint n = min<uint>(read_ushort(), read_impl::available());
+	template<class Char> binary_reader& read(std::basic_string<Char>& str) noexcept {
+		int n = min<int>(read_int(), read_impl::available());
 		str.resize(n);
 		read_impl::read((void*)str.data(), sizeof(Char) * n);
 		return *this;
 	}
 	/** @brief Reads a length specified string to the dst buffer in the form of [uint16 len][data] and returns actual length */
-	template<class Char> uint read_nstr(Char* dst, uint maxLen) {
-		uint n = min3<uint>(read_ushort(), read_impl::available(), maxLen);
-		read_impl::read((void*)dst, sizeof(Char) * n);
-		return n;
+	template<class Char> int read_nstr(Char* dst, int maxLen) noexcept {
+		int n = min3<int>(read_int(), read_impl::available(), maxLen);
+		return read_impl::read((void*)dst, sizeof(Char) * n);
 	}
 	/** @brief Peeks a length specified string to the std::string in the form of [uint16 len][data] */
-	template<class Char> binary_reader& peek(std::basic_string<Char>& str) {
-		uint n = min<uint>(read_ushort(), read_impl::available());
+	template<class Char> binary_reader& peek(std::basic_string<Char>& str) noexcept {
+		int n = min<int>(read_int(), read_impl::available());
 		str.resize(n);
 		read_impl::peek((void*)str.data(), sizeof(Char) * n);
-		undo(2); // undo read_ushort
+		undo(4); // undo read_int
 		return *this;
 	}
 	/** @brief Peeks a length specified string to the dst buffer in the form of [uint16 len][data] and returns actual length */
-	template<class Char> uint peek_nstr(Char* dst, uint maxLen) {
-		uint n = min3<uint>(read_ushort(), read_impl::available(), maxLen);
+	template<class Char> int peek_nstr(Char* dst, int maxLen) noexcept {
+		int n = min3<int>(read_int(), read_impl::available(), maxLen);
 		n = read_impl::peek((void*)dst, sizeof(Char) * n) / sizeof(Char);
-		undo(2); // undo read_ushort
+		undo(4); // undo read_int
 		return n;
 	}
 
-	std::string  read_string()  { std::string  s; read(s); return s; } /** @brief Reads a length specified [uint16 len][data] string */
-	std::wstring read_wstring() { std::wstring s; read(s); return s; } /** @brief Reads a length specified [uint16 len][data] wstring */
-	std::string  peek_string()  { std::string  s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] string */
-	std::wstring peek_wstring() { std::wstring s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] wstring */
-	strview      peek_strview() { strview s; peek(s); return s; }      /** @brief Peeks a length specified [uint16 len][data] string view */
+	std::string  read_string()  noexcept { std::string  s; read(s); return s; } /** @brief Reads a length specified [uint16 len][data] string */
+	std::wstring read_wstring() noexcept { std::wstring s; read(s); return s; } /** @brief Reads a length specified [uint16 len][data] wstring */
+	std::string  peek_string()  noexcept { std::string  s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] string */
+	std::wstring peek_wstring() noexcept { std::wstring s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] wstring */
+	strview      peek_strview() noexcept { strview s; peek(s); return s; }      /** @brief Peeks a length specified [uint16 len][data] string view */
 
 	/**
 	 * @brief Reads a vector as [uint16 len] [ len * sizeof(T) ]
 	 * @note  May require operator>> if T is not a POD type: 
 	 *            binary_reader& operator>>(binary_reader& rb, T& out);
 	 */
-	template<class T, class U> uint read(std::vector<T, U>& vec) {
-		int count = read_ushort();
+	template<class T, class U> int read(std::vector<T, U>& vec) noexcept {
+		int count = read_int();
 		vec.resize(count);
 		T* data = vec.data();
 		if (std::is_pod<T>::value) 
@@ -165,22 +165,22 @@ template<class read_impl> struct binary_reader : public reader_base, public read
 	}
 };
 // explicit operator>> overloads
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, strview& v)      { r.peek(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, std::string& v)  { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, std::wstring& v) { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, bool& v)   { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, char& v)   { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, byte& v)   { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, short& v)  { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, ushort& v) { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, int& v)    { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, uint& v)   { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, int64& v)  { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, uint64& v) { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, float& v)  { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, double& v) { r.read(v); return r; }
-template<class C, class T, class U> binary_reader<C>& operator>>(binary_reader<C>& r, std::vector<T, U>& v) { r.read(v); return r; }
-template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, binary_reader<C>& m(binary_reader<C>&)) { return m(r); }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, strview& v)      noexcept { r.peek(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, std::string& v)  noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, std::wstring& v) noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, bool& v)   noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, char& v)   noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, byte& v)   noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, short& v)  noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, ushort& v) noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, int& v)    noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, uint& v)   noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, int64& v)  noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, uint64& v) noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, float& v)  noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, double& v) noexcept { r.read(v); return r; }
+template<class C, class T, class U> binary_reader<C>& operator>>(binary_reader<C>& r, std::vector<T, U>& v) noexcept { r.read(v); return r; }
+template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, binary_reader<C>& m(binary_reader<C>&)) noexcept { return m(r); }
 
 
 
@@ -189,47 +189,47 @@ template<class C> binary_reader<C>& operator>>(binary_reader<C>& r, binary_reade
 struct view_read_base // most generic data reading interface
 {
 	typedef byte* ptr_t;
-	uint Pos;   // current streampos
-	uint Rem;   // remaining bytes
+	int  Pos;   // current streampos
+	int  Rem;   // remaining bytes
 	void*Ptr;   // data reference
-	uint Max;   // max buffer capacity
+	int  Max;   // max buffer capacity
 
-	view_read_base(void* ptr, uint max)           : Pos(0),Rem(0),  Ptr(ptr),Max(max) {}
-	view_read_base(void* ptr, uint rem, uint max) : Pos(0),Rem(rem),Ptr(ptr),Max(max) {}
+	view_read_base(void* ptr, int max)          noexcept : Pos(0),Rem(0),  Ptr(ptr),Max(max) {}
+	view_read_base(void* ptr, int rem, int max) noexcept : Pos(0),Rem(rem),Ptr(ptr),Max(max) {}
 
-	uint max()       const { return Max; }
-	uint pos()       const { return Pos; }
-	uint size()      const { return Pos + Rem; }
-	uint available() const { return Rem; }
-	void flush() { Pos = Rem = 0; } /* flush clears base buffer state */
+	int max()       const noexcept { return Max; }
+	int pos()       const noexcept { return Pos; }
+	int size()      const noexcept { return Pos + Rem; }
+	int available() const noexcept { return Rem; }
+	void flush() noexcept { Pos = Rem = 0; } /* flush clears base buffer state */
 
-	uint read(void* dst, uint cnt) {
-		uint n = peek(dst,cnt); 
+	int read(void* dst, int cnt) noexcept {
+		int n = peek(dst,cnt); 
 		Pos += n, Rem -= n; 
 		return n; 
 	}
-	template<class T> uint read(T& dst)  {
-		uint n = peek(dst);     
+	template<class T> int read(T& dst) noexcept {
+		int n = peek(dst);     
 		Pos += n, Rem -= n; 
 		return n; 
 	}
-	uint peek(void* dst, uint cnt) {
-		uint n = min<uint>(cnt, Rem);
+	int peek(void* dst, int cnt) noexcept {
+		int n = min<int>(cnt, Rem);
 		memcpy(dst, ptr_t(Ptr) + Pos, n);
 		return n;
 	}
-	template<class T> uint peek(T& dst) {
-		uint n = min<uint>(sizeof(T), Rem);
+	template<class T> int peek(T& dst) noexcept {
+		int n = min<int>(sizeof(T), Rem);
 		if (n < sizeof(T)) return 0; // can't peek
 		dst = *(T*)(ptr_t(Ptr) + Pos);
 		return n;
 	}
-	void skip(uint n) {
-		uint nskip = min<uint>(n, Rem); // max skippable: Rem
+	void skip(int n) noexcept {
+		int nskip = min<int>(n, Rem); // max skippable: Rem
 		Pos += nskip, Rem -= nskip;
 	}
-	void undo(uint n) {
-		uint nundo = min<uint>(n, Pos); // max undoable:  Pos
+	void undo(int n) noexcept {
+		int nundo = min<int>(n, Pos); // max undoable:  Pos
 		Pos -= nundo, Rem += nundo;
 	}
 };
@@ -238,14 +238,14 @@ struct view_read_base // most generic data reading interface
  * A static array read buffer. Useless without a backing read source - use composite_read (!)
  * A small default array size is provided as 512 bytes.
  */
-template<uint MAX = 512> struct array_read : public view_read_base
+template<uint MAX = 512> struct array_read final : public view_read_base
 {
 	byte Buf[MAX];
 
-	array_read() : view_read_base(Buf, MAX) {}
+	array_read() noexcept : view_read_base(Buf, MAX) {}
 	NOCOPY_NOMOVE(array_read)
 	
-	template<class storage> void fill(storage& st) {
+	template<class storage> void fill(storage& st) noexcept {
 		Pos = 0, Rem = st.read(Ptr, MAX);
 	}
 };
@@ -262,15 +262,15 @@ template<uint MAX = 512> struct array_read : public view_read_base
  *       vr >> x >> y;
  *       int z = vr.read_int();
  */
-struct view_read : public view_read_base
+struct view_read final : public view_read_base
 {
 	/** Initializes view_read for reading data from the given buffer */
-	explicit view_read(const void* buf, uint len)  : view_read_base((void*)buf, len, len) {}
+	explicit view_read(const void* buf, int len) noexcept  : view_read_base((void*)buf, len, len) {}
 	/** Initializes view_read for reading data from the specified vector */
-	explicit view_read(const std::vector<byte>& v) : view_read(v.data(), (uint)v.size()) {}
+	explicit view_read(const std::vector<byte>& v) noexcept : view_read(v.data(), (int)v.size()) {}
 	NOCOPY_MOVE(view_read)
 	
-	template<class storage> void fill(storage& st) {
+	template<class storage> void fill(storage& st) noexcept {
 		Pos = 0, Rem = st.read(Ptr, Max);
 	}
 };
@@ -281,15 +281,15 @@ struct view_read : public view_read_base
  * This buffer will dynamically set its size to match backing storage, allowing 
  * large dynamic buffering. Default Max size of dynamic buffer is INT_MAX (2GB), but can be overridden.
  */
-struct buffer_read : public view_read_base
+struct buffer_read final : public view_read_base
 {
-	buffer_read()         : view_read_base(nullptr, 0x7fffffff) {}
-	buffer_read(uint max) : view_read_base(nullptr, max) {}
-	~buffer_read() { if (Ptr) free(Ptr); }
+	buffer_read()        noexcept : view_read_base(nullptr, 0x7fffffff) {}
+	buffer_read(int max) noexcept : view_read_base(nullptr, max) {}
+	~buffer_read() noexcept { if (Ptr) free(Ptr); }
 	NOCOPY_MOVE(buffer_read)
 	
-	template<class storage> void fill(storage& st) {
-		Pos = 0, Rem = min<uint>(st.size(), Max);
+	template<class storage> void fill(storage& st) noexcept {
+		Pos = 0, Rem = min<int>(st.size(), Max);
 		Ptr = realloc(Ptr, Rem);  // allocate 
 		Rem = st.read(Ptr, Rem);
 	}
@@ -299,35 +299,35 @@ struct buffer_read : public view_read_base
 /**
  * A file reader. Uses FILE* C API.
  */
-struct file_read : public view_read_base
+struct file_read final : public view_read_base
 {
-	typedef FILE* ptr_t;
+    using ptr_t = FILE*;
 
-	file_read(FILE* file) : view_read_base(file,0) {Rem=Max=filesize();}
-	file_read(const char* path,        const char* mode = "wb") : file_read(fopen(path, mode)) {}
-	file_read(const std::string& path, const char* mode = "wb") : file_read(fopen(path.c_str(), mode)) {}
-	uint filesize() { struct stat s; fstat(fileno(ptr_t(Ptr)), &s); return s.st_size; }
-	~file_read() { if (Ptr) fclose(ptr_t(Ptr)); }
+	file_read(FILE* file) noexcept : view_read_base(file,0) {Rem=Max=filesize();}
+	file_read(const char* path,        const char* mode = "wb") noexcept : file_read(fopen(path, mode)) {}
+	file_read(const std::string& path, const char* mode = "wb") noexcept : file_read(fopen(path.c_str(), mode)) {}
+	int filesize() noexcept { struct stat s; fstat(fileno(ptr_t(Ptr)), &s); return s.st_size; }
+	~file_read() noexcept { if (Ptr) fclose(ptr_t(Ptr)); }
 	NOCOPY_MOVE(file_read)
 	
-	void flush() { fflush(ptr_t(Ptr)); } /* flush clears any FILE* input buffering */
+	void flush() noexcept { fflush(ptr_t(Ptr)); } /* flush clears any FILE* input buffering */
 
-	template<class T> uint read(T& dst) { return read(&dst, sizeof(T)); }
-	template<class T> uint peek(T& dst) { return peek(&dst, sizeof(T)); }
-	uint read(void* dst, uint cnt) {
-		uint n = min<uint>(cnt, Rem);
+	template<class T> int read(T& dst) noexcept { return read(&dst, sizeof(T)); }
+	template<class T> int peek(T& dst) noexcept { return peek(&dst, sizeof(T)); }
+	int read(void* dst, int cnt) noexcept {
+		int n = min<int>(cnt, Rem);
 		if (!n) return 0;
 		fread(dst, n, 1, ptr_t(Ptr));
 		return n;
 	}
-	uint peek(void* dst, uint cnt) {
-		uint n = read(dst, cnt); undo(n); return n;
+	int peek(void* dst, int cnt) noexcept {
+		int n = read(dst, cnt); undo(n); return n;
 	}
-	void skip(uint n) {
+	void skip(int n) noexcept {
 		view_read_base::skip(n);          // all magic in superclass
 		fseek(ptr_t(Ptr), Pos, SEEK_SET); // we just set the new streampos
 	}
-	void undo(uint n) {
+	void undo(int n) noexcept {
 		view_read_base::undo(n);          // all magic in superclass
 		fseek(ptr_t(Ptr), Pos, SEEK_SET); // we just set the new streampos
 	}
@@ -339,34 +339,34 @@ struct file_read : public view_read_base
  */
 struct socket_read
 {
-	uint Pos;            // total bytes read from socket
+	int Pos;            // total bytes read from socket
 	rpp::socket* Socket; // as pointer to allow Move
 
-	explicit socket_read(rpp::socket& s) : Pos(0), Socket(&s) {}
+	explicit socket_read(rpp::socket& s) noexcept : Pos(0), Socket(&s) {}
 	NOCOPY_MOVE(socket_read)
 	
-	uint max()       const { return 0xffffffff; /* network is unlimited */ }
-	uint pos()       const { return Pos; } /* network stream total bytes read */
-	uint size()      const { return Pos; } /* network stream total bytes read */
-	uint available() const { return Socket->available(); }
-	void flush()           { if (available()) Socket->flush(); }
+	int max()       const noexcept { return 2147483647; /* network is unlimited */ }
+	int pos()       const noexcept { return Pos; } /* network stream total bytes read */
+	int size()      const noexcept { return Pos; } /* network stream total bytes read */
+	int available() const noexcept { return Socket->available(); }
+	void flush()           noexcept { if (available()) Socket->flush(); }
 
-	template<class T> uint read(T& dst) { return available() >= sizeof(T) ? read(&dst, sizeof(T)) : 0; }
-	template<class T> uint peek(T& dst) { return peek(&dst, sizeof(T)); }
-	uint read(void* dst, uint cnt) {
+	template<class T> int read(T& dst) noexcept { return available() >= sizeof(T) ? read(&dst, sizeof(T)) : 0; }
+	template<class T> int peek(T& dst) noexcept { return peek(&dst, sizeof(T)); }
+	int read(void* dst, int cnt) noexcept {
 		int n = Socket->recv(dst, cnt);
 		if (n <= 0) return 0;
 		Pos += n;
 		return n;
 	}
-	uint peek(void* dst, uint cnt) {
+	int peek(void* dst, int cnt) noexcept {
 		return rpp::max(0, Socket->peek(dst, cnt));
 	}
-	void skip(uint n) {
+	void skip(int n) noexcept {
 		Socket->skip(n);
 		Pos += n;
 	}
-	void undo(uint n) { } /* socket can't undo! */
+	void undo(int n) noexcept { } /* socket can't undo! */
 };
 
 
@@ -374,55 +374,55 @@ struct socket_read
  * A composite read utilizes first type as a read buffer to reduce the number of I/O calls
  * and secondary type as data source for reads (file/socket/etc)
  */
-template<class buffer, class storage> struct composite_read
+template<class buffer, class storage> struct composite_read final
 	: private storage, private buffer
 {
 	using storage::storage; // inherit Storage class constructors
 
-	uint max() const { return storage::max(); }
-	uint pos() const { 
-		uint i = storage::pos(); // some storage classes may report 0 pos
+	int max() const noexcept { return storage::max(); }
+	int pos() const noexcept {
+		int i = storage::pos(); // some storage classes may report 0 pos
 		return i ? i - buffer::available() : 0;
 	}
-	uint size()      const { return storage::size(); }
-	uint available() const { return buffer::available() + storage::available();  }
-	void flush()           { buffer::flush(), storage::flush(); } /* flushes both buffered data and any storage buffering */
+	int size()      const noexcept { return storage::size(); }
+	int available() const noexcept { return buffer::available() + storage::available();  }
+	void flush()          noexcept { buffer::flush(), storage::flush(); } /* flushes both buffered data and any storage buffering */
 
-	uint read(void* dst, uint cnt) {
-		uint n = buffer::available();
+	int read(void* dst, int cnt) noexcept {
+		int n = buffer::available();
 		if (n >= cnt) return buffer::read(dst, cnt); // best case, all from buffer
 		return _read(&dst, cnt, n);                  // fallback partial read
 	}
-	template<class T> uint read(T& dst) {
-		uint n = buffer::available();
+	template<class T> int read(T& dst) noexcept {
+		int n = buffer::available();
 		if (n >= sizeof(T)) return buffer::read(dst);  // best case, all from buffer
 		if (n+storage::available() < sizeof(T)) return 0; // can't read whole T
 		return _read(&dst, sizeof(T), n);                 // fallback partial read
 	}
-	uint _read(void* dst, uint cnt, uint bufn) {
-		uint rem = cnt - buffer::read(dst, bufn); // read some from buffer; won't read all(!)
+	int _read(void* dst, int cnt, int bufn) noexcept {
+		int rem = cnt - buffer::read(dst, bufn); // read some from buffer; won't read all(!)
 		if (rem >= buffer::max())
 			return bufn + storage::read((char*)dst+bufn, rem); // straight from storage
 		buffer::fill((storage&)*this);
 		return bufn + buffer::read((char*)dst+bufn, rem); // refill and read from buf
 	}
-	uint peek(void* dst, uint cnt) {
+	int peek(void* dst, int cnt) noexcept {
 		if (!buffer::available())
 			buffer::fill((storage&)*this); // fill before peek if possible
 		return buffer::peek(dst, cnt);     // peek what we can, might not be enough
 	}
-	template<class T> uint peek(T& dst) {
+	template<class T> int peek(T& dst) noexcept {
 		if (!buffer::available())
 			buffer::fill((storage&)*this); // fill before peek if possible
 		return buffer::peek(dst);          // peek what we can, might not be enough
 	}
-	void skip(uint n) {
-		uint bufskip = min<uint>(n, buffer::available());
+	void skip(int n) noexcept {
+		int bufskip = min<int>(n, buffer::available());
 		buffer::skip(bufskip);
 		if (bufskip < n) storage::skip(n - bufskip); // skip remaining from storage
 	}
-	void undo(uint n) {
-		uint bufundo = min<uint>(n, buffer::pos());
+	void undo(int n) noexcept {
+		int bufundo = min<int>(n, buffer::pos());
 		buffer::undo(bufundo);
 		if (bufundo < n) storage::undo(n - bufundo); // undo remaining from storage
 	}
@@ -435,13 +435,13 @@ template<class buffer, class storage> struct composite_read
 /** @brief Reads data from a fixed sized array. Default size 512 bytes.  */
 template<uint SIZE = 512> using array_reader = binary_reader<array_read<SIZE>>;
 /** @brief Reads data from an array view. Array size depends on its initialized view size. */
-typedef binary_reader<view_read>   view_reader;
+using view_reader = binary_reader<view_read>;
 /** @brief Reads data from a dynamic buffer, possibly after a FILE read has been buffered. */
-typedef binary_reader<buffer_read> buffer_reader;
+using buffer_reader = binary_reader<buffer_read>;
 /** @brief Reads data from file using C FILE* API. */
-typedef binary_reader<file_read>   file_reader;
+using file_reader = binary_reader<file_read>;
 /** @brief Reads data directly from an rpp::socket */
-typedef binary_reader<socket_read> socket_reader;
+using socket_reader = binary_reader<socket_read>;
 /**
  * @brief A stream reader combines a primary read buffer and a source storage reader
  *        All data is buffered by the buffer class, some options for buffer:
@@ -452,7 +452,8 @@ typedef binary_reader<socket_read> socket_reader;
  *		      file_read        - reads from a C FILE
  *		      socket_read      - reads from an rpp::socket
  */
-template<class buffer, class storage> using stream_reader = binary_reader<composite_read<buffer, storage>>;
+template<class buffer, class storage> 
+    using stream_reader = binary_reader<composite_read<buffer, storage>>;
 
 
 template<uint SIZE = 512>

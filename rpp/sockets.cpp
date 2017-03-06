@@ -104,23 +104,18 @@ namespace rpp
 
 	/////////////////////////// SOCKETS API ////////////////////////////
 
-#if _WIN32
-	static inline void Socket_Initialize()
+	static inline int Socket_NewSocket(address_family af, socket_type st, ip_protocol ipp)
 	{
+    #if _WIN32
 		static struct wsa { // static var init on first entry to func
 			wsa()  { WSADATA w; WSAStartup(MAKEWORD(2, 2), &w); }
 			~wsa() { WSACleanup(); }
 		} wsa_raii_handle; // this RAII handle will be automatically unloaded
-	}
-#endif
-
-	static inline int Socket_NewSocket(address_family af, socket_type st, ip_protocol ipp)
-	{
-		inwin32(Socket_Initialize());
+    #endif
 
 		int family = addrfamily_int(af);
-		int type = socktype_int(st);
-		int proto = ipproto_int(ipp);
+		int type   = socktype_int(st);
+		int proto  = ipproto_int(ipp);
 		return (int)::socket(family, type, proto);
 	}
 
@@ -169,6 +164,9 @@ namespace rpp
 		return protos[ipProtocol];
 	}
 
+
+
+    //////////////////// IP address handling /////////////////////
 
 	union saddr {
 		sockaddr     sa;
@@ -279,8 +277,8 @@ namespace rpp
 	/////////        socket
 	///////////////////////////////////////////////////////////////////////////
 
-	socket::socket(int handle, const ipaddress& addr) : Sock(handle), Addr(addr) {}
 	socket::socket() : Sock(-1), Addr(AF_IPv4) {}
+    socket::socket(int handle, const ipaddress& addr) : Sock(handle), Addr(addr) {}
 	socket::socket(int port, address_family af) : Sock(-1), Addr(af, port) {
 		listen(Addr);
 	}
@@ -296,11 +294,17 @@ namespace rpp
 	socket::socket(const char* hostname, int port, int timeoutMillis, address_family af) : Sock(-1), Addr(af, hostname, port) {
 		connect(Addr, timeoutMillis);
 	}
-	socket::socket(socket&& fwd) : Sock(fwd.Sock), Addr(fwd.Addr) {
+    socket::~socket() {
+        if (Sock != -1) closesocket(Sock);
+    }
+
+    socket::socket(socket&& fwd) : Sock(fwd.Sock), Addr(fwd.Addr) 
+    {
 		fwd.Sock = -1;
 		fwd.Addr.clear();
 	}
-	socket& socket::operator=(socket&& fwd) {
+	socket& socket::operator=(socket&& fwd) 
+    {
 		if (this != &fwd) {
 			if (Sock != -1) closesocket(Sock);
 			Sock = fwd.Sock;
@@ -310,10 +314,6 @@ namespace rpp
 		}
 		return *this;
 	}
-	socket::~socket() {
-		if (Sock != -1) closesocket(Sock);
-	}
-
 
 	void socket::close() 
 	{
@@ -321,6 +321,12 @@ namespace rpp
 		Addr.clear();
 	}
 
+    int socket::steal_oshandle()
+    {
+        int handle = Sock;
+        Sock = INVALID;
+        return handle;
+    }
 
 	string socket::last_err()
 	{
@@ -491,9 +497,9 @@ namespace rpp
 		return !!get_opt(IPPROTO_TCP, TCP_NODELAY);
 	}
 
+
 	void socket::listen(const ipaddress& addr)
 	{
-		inwin32(Socket_Initialize());
 		if (Sock != -1) closesocket(Sock);
 
 		// create TCP stream socket
@@ -509,13 +515,16 @@ namespace rpp
 		
 		Addr = addr;
 	}
-	void socket::listen(int port, address_family af /*= AF_IPv4*/) {
+	void socket::listen(int port, address_family af /*= AF_IPv4*/)
+    {
 		listen(ipaddress(af, port));
 	}
-	socket socket::listen_to(const ipaddress& addr) {
+	socket socket::listen_to(const ipaddress& addr) 
+    {
 		socket s; s.listen(addr); return s;
 	}
-	socket socket::listen_to(int port, address_family af /*= AF_IPv4*/) {
+	socket socket::listen_to(int port, address_family af /*= AF_IPv4*/) 
+    {
 		return listen_to(ipaddress(af, port));
 	}
 
@@ -543,7 +552,6 @@ namespace rpp
 
 	bool socket::connect(const ipaddress& addr)
 	{
-		inwin32(Socket_Initialize());
 		if (Sock != -1) closesocket(Sock);
 
 		Sock = Socket_NewSocket(addr.Family, ST_Stream, IPP_TCP);
@@ -567,20 +575,20 @@ namespace rpp
 		});
 		return Sock != -1;
 	}
-	bool socket::connect(const char* hostname, int port, address_family af /*= AF_IPv4*/) {
+	bool socket::connect(const char* hostname, int port, address_family af) {
 		return connect(ipaddress(af, hostname, port));
 	}
-	bool socket::connect(const char* hostname, int port, int millis, address_family af /*= AF_IPv4*/) {
+	bool socket::connect(const char* hostname, int port, int millis, address_family af) {
 		return connect(ipaddress(af, hostname, port), millis);
 	}
 
 
 	socket socket::connect_to(const ipaddress& addr) { return socket(addr); }
-	socket socket::connect_to(const char* hostname, int port, address_family af /*= AF_IPv4*/) {
+	socket socket::connect_to(const char* hostname, int port, address_family af) {
 		return connect_to(ipaddress(af, hostname, port));
 	}
 	socket socket::connect_to(const ipaddress& addr, int millis) { return socket(addr, millis); }
-	socket socket::connect_to(const char* hostname, int port, int millis, address_family af /*= AF_IPv4*/) {
+	socket socket::connect_to(const char* hostname, int port, int millis, address_family af) {
 		return connect_to(ipaddress(af, hostname, port), millis);
 	}
 

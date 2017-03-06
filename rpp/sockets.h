@@ -153,16 +153,15 @@ namespace rpp
 	class socket
 	{
 	protected:
-		static const int INVALID = -1;
+		static constexpr int INVALID = -1;
 		int       Sock; // Socket handle
 		ipaddress Addr; // remote addr
 
+    public:
+        /** @brief Creates a default (empty) socket object */
+        socket();
 		/** @brief Create a socket with an initialized handle */
 		socket(int handle, const ipaddress& addr);
-
-	public:
-		/** @brief Creates a default socket object */
-		socket();
 		/** @brief Creates a listener socket */
 		explicit socket(int port, address_family af = AF_IPv4);
 		/** @brief Creates a connection to the specified remote address */
@@ -175,6 +174,11 @@ namespace rpp
 		socket(const char* hostname, int port, int millis, address_family af = AF_IPv4);
 		~socket();
 
+		socket(const socket&)            = delete; // no copy construct
+		socket& operator=(const socket&) = delete; // no copy assign
+		socket(socket&& fwd);                      // move construct allowed
+		socket& operator=(socket&& fwd);           // move assign allowed
+
 		/** @brief Closes the connection (if any) and returns this socket to a default state */
 		void close();
 
@@ -185,11 +189,9 @@ namespace rpp
 		bool bad()  const { return Sock == INVALID; }
 		/** @return OS socket handle. We are generous. */
 		int oshandle() const { return Sock; }
-
-		socket(const socket&)            = delete; // no copy construct
-		socket& operator=(const socket&) = delete; // no copy assign
-		socket(socket&& fwd);                      // move construct allowed
-		socket& operator=(socket&& fwd);           // move assign allowed
+        /** @brief Gets the OS socket handle and sets this internal handle to INVALID. 
+                   You will be in charge of the handle from then on. */
+        int steal_oshandle();
 
 		/** @return Current ipaddress */
 		const ipaddress& address() const { return Addr; }
