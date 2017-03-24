@@ -14,6 +14,11 @@
     #include <unistd.h>
     #include <string.h>
     #include <dirent.h> // opendir()
+    #if __APPLE__
+        #define _stat64 stat
+        #define _fstat64 fstat
+        #define stat64 stat
+    #endif
 #endif
 
 
@@ -57,7 +62,7 @@ namespace rpp /* ReCpp */
 #else
     static void* OpenF(const char* f, IOFlags mode) {
         const char* modes[] = { "rb", "wbx", "wb", "ab" };
-        return fopen(f, m);
+        return fopen(f, modes[mode]);
     }
     static void* OpenF(const wchar_t* f, IOFlags mode) {
     #if _WIN32
@@ -324,7 +329,7 @@ namespace rpp /* ReCpp */
             return SetFilePointer((HANDLE)Handle, filepos, 0, seekmode);
         #else
             fseek((FILE*)Handle, filepos, seekmode);
-            return ftell((FILE*)Handle);
+            return (int)ftell((FILE*)Handle);
         #endif
     }
     uint64 file::seekl(uint64 filepos, int seekmode) noexcept
@@ -345,15 +350,17 @@ namespace rpp /* ReCpp */
         #if USE_WINAPI_IO
             return SetFilePointer((HANDLE)Handle, 0, 0, FILE_CURRENT);
         #else
-            return ftell((FILE*)Handle);
+            return (int)ftell((FILE*)Handle);
         #endif
     }
 
+#if USE_WINAPI_IO
     static time_t to_time_t(const FILETIME& ft)
     {
         ULARGE_INTEGER ull = { ft.dwLowDateTime, ft.dwHighDateTime };
         return ull.QuadPart / 10000000ULL - 11644473600ULL;
     }
+#endif
 
     bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
@@ -404,7 +411,7 @@ namespace rpp /* ReCpp */
             return attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY);
         #else
             struct stat s;
-            return stat(filename, &s) ? false : (s.st_mode & S_IFDIR) != 0;
+            return ::stat(folder, &s) ? false : (s.st_mode & S_IFDIR) != 0;
         #endif
     }
 
@@ -747,6 +754,22 @@ namespace rpp /* ReCpp */
         }
         return (int)out.size();
     }
+    
+    int list_dirs_fullpath(vector<string>& out, strview dir) noexcept
+    {
+        if (!out.empty()) out.clear();
+        
+        string fullpath = full_path(dir) + "/";
+
+        if (dir_iterator it = { dir }) {
+            do {
+                if (it.is_dir() && it.name()[0] != '.') {
+                    out.emplace_back(fullpath + it.name());
+                }
+            } while (it.next());
+        }
+        return (int)out.size();
+    }
 
     int list_files(vector<string>& out, strview dir, strview ext) noexcept
     {
@@ -763,12 +786,23 @@ namespace rpp /* ReCpp */
         }
         return (int)out.size();
     }
-
-    vector<string> list_files(strview dir, strview ext) noexcept
+    
+    int list_files_fullpath(vector<string>& out, strview dir, strview ext) noexcept
     {
-        vector<string> out;
-        list_files(out, dir, ext);
-        return out;
+        if (!out.empty()) out.clear();
+        
+        string fullpath = full_path(dir) + "/";
+        
+        if (dir_iterator it = { dir }) {
+            do {
+                if (!it.is_dir()) {
+                    strview fname = it.name();
+                    if (ext.empty() || fname.ends_withi(ext))
+                        out.emplace_back(fullpath + fname);
+                }
+            } while (it.next());
+        }
+        return (int)out.size();
     }
 
     int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept

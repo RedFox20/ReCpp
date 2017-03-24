@@ -55,8 +55,10 @@ namespace rpp
     #ifndef FINLINE
         #ifdef _MSC_VER
             #define FINLINE __forceinline
+        #elif __APPLE__
+            #define FINLINE inline __attribute__((always_inline))
         #else
-            #define FINLINE  __attribute__((always_inline))
+            #define FINLINE __attribute__((always_inline))
         #endif
     #endif
 
@@ -112,7 +114,7 @@ namespace rpp
     /**
      * C-locale specific, simplified atof that also outputs the end of parsed string
      * @param str Input string, e.g. "-0.25" / ".25", etc.. '+' is not accepted as part of the number
-     * @param end[NULL] (optional) Destination pointer for end of parsed string. Can be NULL.
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed float
      */
     float _tofloat(const char* str, const char** end = nullptr);
@@ -128,7 +130,7 @@ namespace rpp
     /**
      * Fast locale agnostic atoi
      * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
-     * @param end[NULL] (optional) Destination pointer for end of parsed string. Can be NULL.
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
     int _toint(const char* str, const char** end = nullptr);
@@ -137,7 +139,7 @@ namespace rpp
      * Fast locale agnostic atoi
      * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
      * @param len Length of the string to parse
-     * @param end[NULL] (optional) Destination pointer for end of parsed string. Can be NULL.
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
     int _toint(const char* str, int len, const char** end = nullptr);
@@ -146,7 +148,7 @@ namespace rpp
      * Fast locale agnostic atoi
      * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
      *            HEX syntax is supported: 0xBA or 0BA will parse hex values instead of regular integers
-     * @param end[NULL] (optional) Destination pointer for end of parsed string. Can be NULL.
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
     int _tointhx(const char* str, const char** end = nullptr);
@@ -156,7 +158,7 @@ namespace rpp
      * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
      *            HEX syntax is supported: 0xBA or 0BA will parse hex values instead of regular integers
      * @param len Length of the string to parse
-     * @param end[NULL] (optional) Destination pointer for end of parsed string. Can be NULL.
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
     int _tointhx(const char* str, int len, const char** end = nullptr);
@@ -669,7 +671,6 @@ namespace rpp
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * @param substr Substring to skip until
-         * @param len Length of the substring
          */
         template<int SIZE> FINLINE void skip_until(const char (&substr)[SIZE])
         {
@@ -696,7 +697,6 @@ namespace rpp
          * Skips start of the string until the specified substring is found or end of string is reached.
          * The specified substring itself is consumed.
          * @param substr Substring to skip after
-         * @param len Length of the substring
          */
         template<int SIZE> FINLINE void skip_after(const char (&substr)[SIZE])
         {
