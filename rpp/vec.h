@@ -444,6 +444,52 @@ namespace rpp
         bool operator!=(const Vector3& b) const { return x != b.x || y != b.y || z != b.z; }
 
         static const Vector3 smoothColor(const Vector3& src, const Vector3& dst, float ratio);
+
+        /**
+         * Some common 3D vector conversions
+         * Some conversions are two way <->, but we still provide duplicate overloads for consistency
+         *
+         * This Vector library is based on OpenGL coordsys -- important when dealing with Matrix/Vector4(quat).
+         * 
+         * OpenGL coordsys: +X is Right on the screen, +Y is Up on the screen, +Z is Forward INTO the screen
+         *
+         */
+
+        // OpenGL to OpenCV coordinate conversion. Works both ways: GL <-> CV
+        // OpenCV coordsys: +X is Right on the screen, +Y is Down on the screen, +Z is INTO the screen
+        Vector3 convertGL2CV() const noexcept { return { x, -y, z }; }
+        Vector3 convertCV2GL() const noexcept { return { x, -y, z }; }
+
+        // 3ds Max to OpenCV coordinate conversion
+        // 3ds Max coordsys: +X is Right on the screen, +Y is INTO the screen, +Z is Up
+        Vector3 convertMax2CV() const noexcept { return { x, -z, y }; }
+        Vector3 convertCV2Max() const noexcept { return { x, z, -y }; }
+
+        // OpenGL to 3ds Max coordinate conversion
+        Vector3 convertMax2GL() const noexcept { return { x, z, y }; }
+        Vector3 convertGL2Max() const noexcept { return { x, z, y }; }
+
+        // OpenGL to iPhone coordinate conversion
+        // iPhone coordsys: +X is Right on the screen, +Y is Up on the screen, +Z is OUT of the screen
+        Vector3 convertGL2IOS() const noexcept { return { x, y, -z }; }
+        Vector3 convertIOS2GL() const noexcept { return { x, y, -z }; }
+
+        // Blender to OpenGL coordinate conversion
+        // Blender coordsys: +X is OUT of the screen, +Y is Right on the screen, +Z is Up
+        Vector3 convertBlender2GL() const noexcept { return { y, z, -x }; }
+        Vector3 convertGL2Blender() const noexcept { return { -z, x, y }; }
+
+        // DirectX to OpenGL coordinate conversion
+        // DirectX default coordsys: +X is Right on the screen, +Y is Up, +Z is INTO the screen
+        // -- D3D is identical to modern OpenGL coordsys --
+        Vector3 convertDX2GL() const noexcept { return *this; }
+        Vector3 convertGL2DX() const noexcept { return *this; }
+
+        // Unreal Engine 4 to openGL coordinate conversion
+        // UE4 coordsys: +X is INTO the screen, +Y is Right on the screen, +Z is Up
+        Vector3 convertUE2GL() const noexcept { return { y, z, x }; }
+        Vector3 convertGL2UE() const noexcept { return { z, x, y }; }
+
     };
 
     inline Vector3 operator+(const Vector3& a, float f) { return { a.x+f, a.y+f, a.z+f }; }
