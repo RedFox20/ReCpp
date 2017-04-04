@@ -89,17 +89,25 @@ namespace rpp
     /**
      * A generic thread pool that can be used to group and control pool lifetimes
      * By default a global thread_pool is also available
+     *
+     * By design, nesting parallel for loops is detected as a fatal error, because
+     * creating nested threads will not bring any performance benefits
+     *
+     * Accidentally running nested parallel_for can end up in 8*8=64 threads on an 8-core CPU,
+     * which is why it's considered an error.
      */
     class thread_pool
     {
         mutex poolmutex;
         vector<unique_ptr<pool_task>> tasks;
-
+        bool loop_running;
+        
     public:
 
         // the default global thread pool
         static thread_pool global;
 
+        thread_pool();
         ~thread_pool() noexcept;
 
         // number of thread pool tasks that are currently running

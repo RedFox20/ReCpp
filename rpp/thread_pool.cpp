@@ -45,9 +45,11 @@ namespace rpp
         }
     }
 
+    static void segfault(int signal) { throw exception("SIGSEGV"); }
+
     void pool_task::run() noexcept
     {
-        signal(SIGSEGV, [](int signal) { throw signal; }); // throw any segfaults from this thread
+        signal(SIGSEGV, segfault); // set SIGSEGV handler, so we can catch it
 
         while (!killed)
         {
@@ -58,19 +60,14 @@ namespace rpp
                     taskRunning = true;
                     task(loopStart, loopEnd);
                 }
-                catch (int signal) 
-                {
-                    fprintf(stderr, "pool_task::run SIGSEGV!\n");
-                }
                 catch (const exception& e)
                 {
                     fprintf(stderr, "pool_task::run unhandled exception: %s\n", e.what());
                 }
-                catch (...) // don't fail in any case
+                catch (...) // prevent failure that would terminate the thread
                 {
                     fprintf(stderr, "pool_task::run unhandled exception!\n");
                 }
-
                 if (killed)
                     return;
             }
@@ -90,6 +87,13 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     thread_pool thread_pool::global;
+    static int core_count;
+
+    thread_pool::thread_pool()
+    {
+        if (!core_count)
+            core_count = (int)thread::hardware_concurrency();
+    }
 
     thread_pool::~thread_pool() noexcept
     {
@@ -152,19 +156,21 @@ namespace rpp
     void thread_pool::parallel_for(int rangeStart, int rangeEnd, 
                                    const action<int, int>& rangeTask) noexcept
     {
-        const int physicalCores = (int)thread::hardware_concurrency();
-        assert(physicalCores != 0);
+        assert(loop_running == false && "Fatal error: nested parallel loops are forbidden!");
+        assert(core_count != 0);
 
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
             return;
 
-        const int cores = range < physicalCores ? range : physicalCores;
+        const int cores = range < core_count ? range : core_count;
         const int len = range / cores;
 
         pool_task** active = (pool_task**)_alloca(sizeof(pool_task*) * cores);
         {
             lock_guard<mutex> lock(poolmutex);
+            loop_running = true;
+
             size_t poolIndex = 0;
             for (int i = 0; i < cores; ++i)
             {
@@ -179,5 +185,7 @@ namespace rpp
 
         for (int i = 0; i < cores; ++i)
             active[i]->wait();
+
+        loop_running = false;
     }
 }
