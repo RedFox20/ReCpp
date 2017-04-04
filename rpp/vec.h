@@ -181,6 +181,13 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    /** @brief Proxy to allow constexpr initialization inside Point */
+    struct int2
+    {
+        int x, y;
+        constexpr int2(int x, int y) : x(x), y(y) {}
+    };
+
     /**
      * @brief Utility for dealing with integer-only points. Pretty rare, but useful.
      */
@@ -193,12 +200,12 @@ namespace rpp
         Point() {}
         constexpr Point(int x, int y) : x(x), y(y) {}
         
-        operator bool()  const { return x || y;   }
+        operator bool()  const { return  x || y;  }
         bool operator!() const { return !x && !y; }
         void set(int nx, int ny) { x = nx, y = ny; }
 
         bool isZero()  const { return !x && !y; }
-        bool notZero() const { return x || y; }
+        bool notZero() const { return  x || y;  }
     
         const char* toString() const;
 
@@ -232,19 +239,28 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    /** @brief Proxy to allow constexpr initialization inside Vector4 and Rect */
+    struct float4
+    {
+        float x, y, z, w;
+        constexpr float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+    };
+
     /** @brief Utility for dealing with 2D Rects */
     struct Rect
     {
         union {
             struct { float x, y, w, h; };
             struct { Vector2 pos; Vector2 size; };
+            float4 xywh;
         };
 
-        static const Rect ZERO;
+        static constexpr float4 ZERO = { 0.0f, 0.0f, 0.0f, 0.0f };
 
         Rect() {}
         constexpr Rect(float x, float y, float w, float h)      : x(x), y(y), w(w), h(h) {}
         constexpr Rect(const Vector2& pos, const Vector2& size) : pos(pos),   size(size) {}
+        constexpr Rect(const float4& xywh) : xywh(xywh) {}
         Rect(float x, float y, const Vector2& size)   : x(x), y(y), w(size.x), h(size.y) {}
         Rect(const Vector2& pos, float w, float h)    : x(pos.x), y(pos.y), w(w), h(h)   {}
 
@@ -339,6 +355,7 @@ namespace rpp
             struct { float x, y, z; };
             struct { Vector2 xy; };
             struct { float _x; Vector2 yz; };
+            float3 xyz;
         };
 
         static constexpr float3 ZERO           = { 0.0f, 0.0f, 0.0f };      // 0 0 0
@@ -453,13 +470,6 @@ namespace rpp
     }
 
     ////////////////////////////////////////////////////////////////////////////////
-
-    /** @brief Proxy to allow constexpr initialization inside Vector4 */
-    struct float4
-    {
-        float x, y, z, w;
-        constexpr float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
-    };
 
     /** @brief 4D Vector for matrix calculations and quaternion rotations */
     struct Vector4

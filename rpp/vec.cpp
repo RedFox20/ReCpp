@@ -7,8 +7,6 @@
 
 namespace rpp
 {
-    const Rect Rect::ZERO = { 0.0f, 0.0f, 0.0f, 0.0f };
-
     /////////////////////////////////////////////////////////////////////////////////////
 
     void Vector2::print() const
@@ -323,9 +321,9 @@ namespace rpp
         return nearlyZero(x) && nearlyZero(y) && nearlyZero(z) && nearlyZero(w);
     }
 
-    bool Vector4::almostEqual(const Vector4 & b) const
+    bool Vector4::almostEqual(const Vector4& v) const
     {
-        return nearlyZero(x - b.x) && nearlyZero(y - b.y) && nearlyZero(z - b.z) && nearlyZero(w - b.w);
+        return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z) && nearlyZero(w - v.w);
     }
 
     void Vector4::set(float newX, float newY, float newZ, float newW)

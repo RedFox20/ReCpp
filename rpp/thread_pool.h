@@ -81,8 +81,8 @@ namespace rpp
         void wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
-        void run();
-        bool wait_for_task();
+        void run() noexcept;
+        bool wait_for_task() noexcept;
     };
 
 

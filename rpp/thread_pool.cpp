@@ -45,7 +45,7 @@ namespace rpp
         }
     }
 
-    static void segfault(int signal) { throw exception("SIGSEGV"); }
+    static void segfault(int) { throw exception("SIGSEGV"); }
 
     void pool_task::run() noexcept
     {
