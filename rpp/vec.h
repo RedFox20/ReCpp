@@ -712,8 +712,8 @@ namespace rpp
         /** @brief Multiplies this matrix: this = this * mb */
         Matrix4& multiply(const Matrix4& mb);
     
-        /** @brief Transforms 3D vector v with this matrix and return the resulting vec4 */
-        Vector4 operator*(const Vector3& v) const;
+        /** @brief Transforms 3D vector v with this matrix and return the resulting vec3 */
+        Vector3 operator*(const Vector3& v) const;
     
         /** @brief Transforms 4D vector v with this matrix and returns the resulting vec4 */
         Vector4 operator*(const Vector4& v) const;

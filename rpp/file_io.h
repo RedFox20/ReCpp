@@ -383,7 +383,7 @@ namespace rpp /* ReCpp */
      */
     string full_path(const char* path) noexcept;
     FINLINE string full_path(const string& path) noexcept { return full_path(path.c_str());   }
-    FINLINE string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
+    inline  string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
 
     // merges all ../ of a full path
     string merge_dirups(const strview path) noexcept;

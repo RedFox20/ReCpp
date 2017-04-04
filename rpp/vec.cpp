@@ -457,13 +457,12 @@ namespace rpp
         return *this;
     }
 
-    Vector4 Matrix4::operator*(const Vector3& v) const
+    Vector3 Matrix4::operator*(const Vector3& v) const
     {
         return {
                 (m00*v.x) + (m10*v.y) + (m20*v.z) + m30,
                 (m01*v.x) + (m11*v.y) + (m21*v.z) + m31,
-                (m02*v.x) + (m12*v.y) + (m22*v.z) + m32,
-                (m03*v.x) + (m13*v.y) + (m23*v.z) + m33
+                (m02*v.x) + (m12*v.y) + (m22*v.z) + m32
         };
     }
     Vector4 Matrix4::operator*(const Vector4& v) const
@@ -478,7 +477,7 @@ namespace rpp
 
     Matrix4& Matrix4::translate(const Vector3& offset)
     {
-        r3 = this->operator*(offset);
+        r3.xyz = this->operator*(offset);
         return *this;
     }
 
