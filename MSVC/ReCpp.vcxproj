@@ -173,6 +173,7 @@
     <ClCompile Include="..\rpp\file_io.cpp" />
     <ClCompile Include="..\rpp\sockets.cpp" />
     <ClCompile Include="..\rpp\strview.cpp" />
+    <ClCompile Include="..\rpp\thread_pool.cpp" />
     <ClCompile Include="..\rpp\timer.cpp" />
     <ClCompile Include="..\rpp\vec.cpp" />
   </ItemGroup>
@@ -185,6 +186,7 @@
     <ClInclude Include="..\rpp\file_io.h" />
     <ClInclude Include="..\rpp\sockets.h" />
     <ClInclude Include="..\rpp\strview.h" />
+    <ClInclude Include="..\rpp\thread_pool.h" />
     <ClInclude Include="..\rpp\timer.h" />
     <ClInclude Include="..\rpp\vec.h" />
   </ItemGroup>

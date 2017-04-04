@@ -153,6 +153,7 @@
     <ClCompile Include="..\tests\tests.cpp" />
     <ClCompile Include="..\tests\test_file_io.cpp" />
     <ClCompile Include="..\tests\test_strview.cpp" />
+    <ClCompile Include="..\tests\test_thread_pool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="ReCpp.vcxproj">
