@@ -326,21 +326,30 @@ namespace rpp
         constexpr float3(float x, float y, float z) : x(x), y(y), z(z) {}
     };
 
-    /** @brief 3D Vector for matrix calculations */
+    /** 
+     * 3D Vector for matrix calculations
+     * The coordinate system assumed in UP, FORWARD, RIGHT is OpenGL coordinate system:
+     * +X is Right on the screen
+     * +Y is Up on the screen
+     * +Z is Forward INTO the screen
+     */
     struct Vector3
     {
         union {
             struct { float x, y, z; };
             struct { Vector2 xy; };
             struct { float _x; Vector2 yz; };
-            float3 xyz;
         };
 
-        static constexpr float3 ZERO           = { 0.0f, 0.0f, 0.0f };;     // 0 0 0
-        static constexpr float3 ONE            = { 1.0f, 1.0f, 1.0f };;     // 1 1 1
-        static constexpr float3 RIGHT          = { 1.0f, 0.0f, 0.0f };      // X axis
-        static constexpr float3 FORWARD        = { 0.0f, 1.0f, 0.0f };      // Y axis
-        static constexpr float3 UP             = { 0.0f, 0.0f, 1.0f };      // Z axis
+        static constexpr float3 ZERO           = { 0.0f, 0.0f, 0.0f };      // 0 0 0
+        static constexpr float3 ONE            = { 1.0f, 1.0f, 1.0f };      // 1 1 1
+
+        static constexpr float3 LEFT           = { -1.0f, 0.0f, 0.0f };     // -X axis
+        static constexpr float3 RIGHT          = { +1.0f, 0.0f, 0.0f };     // +X axis
+        static constexpr float3 UP             = { 0.0f, +1.0f, 0.0f };     // +Y axis
+        static constexpr float3 DOWN           = { 0.0f, -1.0f, 1.0f };     // -Y axis
+        static constexpr float3 FORWARD        = { 0.0f, 0.0f, +1.0f };     // +Z axis
+        static constexpr float3 BACKWARD       = { 0.0f, 0.0f, -1.0f };     // -Z axis
     
         static constexpr float3 RED            = { 1.0f, 0.0f, 0.0f };       // RGB 1 0 0
         static constexpr float3 GREEN          = { 0.0f, 1.0f, 0.0f };       // RGB 0 1 0
