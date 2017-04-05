@@ -257,12 +257,17 @@ namespace rpp /* ReCpp */
          * @return Current position in the file
          */
         int seek(int filepos, int seekmode = SEEK_SET) noexcept;
-        uint64 seekl(uint64 filepos, int seekmode = SEEK_SET) noexcept;
+        uint64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept;
 
         /**
          * @return Current position in the file
          */
         int tell() const noexcept;
+
+        /**
+         * @return 64-bit position in the file
+         */
+        int64 tell64() const noexcept;
 
         /**
          * Get multiple time info from this file handle

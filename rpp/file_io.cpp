@@ -10,14 +10,19 @@
     #include <io.h>
     #define USE_WINAPI_IO 1
     #define stat64 _stat64
+    #define fseeki64 _fseeki64
+    #define ftelli64 _ftelli64
 #else
     #include <unistd.h>
     #include <string.h>
     #include <dirent.h> // opendir()
+
+    #define fseeki64 fseeko
+    #define ftelli64 ftello
+
     #if __APPLE__
-        #define _stat64 stat
         #define _fstat64 fstat
-        #define stat64 stat
+        #define stat64   stat
     #endif
 #endif
 
@@ -220,7 +225,7 @@ namespace rpp /* ReCpp */
             }
             return (int64)size.QuadPart;
         #else
-            struct _stat64 s;
+            struct stat64 s;
             if (_fstat64(fileno((FILE*)Handle), &s)) {
                 //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));
                 return 0ull;
@@ -332,7 +337,7 @@ namespace rpp /* ReCpp */
             return (int)ftell((FILE*)Handle);
         #endif
     }
-    uint64 file::seekl(uint64 filepos, int seekmode) noexcept
+    uint64 file::seekl(int64 filepos, int seekmode) noexcept
     {
         #if USE_WINAPI_IO
             LARGE_INTEGER newpos, nseek;
@@ -340,9 +345,8 @@ namespace rpp /* ReCpp */
             SetFilePointerEx((HANDLE)Handle, nseek, &newpos, seekmode);
             return newpos.QuadPart;
         #else
-            // @todo implement 64-bit seek
-            fseek((FILE*)Handle, filepos, seekmode);
-            return ftell((FILE*)Handle);
+            fseeki64((FILE*)Handle, filepos, seekmode);
+            return ftelli64((FILE*)Handle);
         #endif
     }
     int file::tell() const noexcept
@@ -351,6 +355,17 @@ namespace rpp /* ReCpp */
             return SetFilePointer((HANDLE)Handle, 0, 0, FILE_CURRENT);
         #else
             return (int)ftell((FILE*)Handle);
+        #endif
+    }
+
+    int64 file::tell64() const noexcept
+    {
+        #if USE_WINAPI_IO
+            LARGE_INTEGER current;
+            SetFilePointerEx((HANDLE)Handle, { 0 }, &current, FILE_CURRENT);
+            return current.QuadPart;
+        #else
+            return ftelli64((FILE*)Handle);
         #endif
     }
 
@@ -428,7 +443,7 @@ namespace rpp /* ReCpp */
             return true;
         }
     #else
-        struct _stat64 s;
+        struct stat64 s;
         if (stat64(filename, &s) == 0/*OK*/) {
             if (filesize) *filesize = (int64)s.st_size;
             if (created)  *created  = s.st_ctime;
