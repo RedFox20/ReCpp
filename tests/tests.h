@@ -38,7 +38,7 @@ namespace rpp
 
         test(const char* name);
         virtual ~test();
-        static void assert_failed(const char* file, int line, const char* expression, ...);
+        static void assert_failed(const char* file, int line, const char* fmt, ...);
 
         enum ConsoleColor { Default, Green, Yellow, Red, };
 
@@ -83,14 +83,18 @@ namespace rpp
          */
         static int run_tests();
 
+        static const string& as_string(const string& v) { return v; }
+        template<int N>   static string as_string(const char(&v)[N]) { return { v, v + (N - 1) }; }
+        template<class T> static string as_string(const T& v)        { return to_string(v); }
+
         template<class Expected, class Actual>
         static void expected_failed(const char* file, int line, 
                     const Expected& expected, const Actual& actual, 
                     const char* expectedExpr, const char* actualExpr)
         {
             assert_failed(file, line, "Expected %s(%s) but got %s(%s) instead.",
-                expectedExpr, to_string(expected).c_str(),
-                actualExpr, to_string(actual).c_str());
+                expectedExpr, as_string(expected).c_str(),
+                actualExpr,   as_string(actual).c_str());
         }
     };
 
@@ -105,6 +109,8 @@ namespace rpp
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \
     void run() override
+
+#define TestCleanup(testclass) ~testclass()
 
 #define TestCase(testname) \
     const int _test_##testname = add_test_func({strview{#testname}, [this](){ this->test_##testname(); }}); \

@@ -8,7 +8,7 @@
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
     #include <io.h>
-    #define USE_WINAPI_IO 1
+    #define USE_WINAPI_IO 0
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64

@@ -22,10 +22,17 @@ TestImpl(test_file_io)
         FileSize = (int)refFile.seekg(0, SEEK_END).tellg();
     }
 
+    TestCleanup(test_file_io)
+    {
+        if (folder_exists("./test_tmp"))
+            Assert(delete_folder("test_tmp", true/*recursive*/));
+    }
+
     TestCase(basic_file)
     {
         file f = { FileName };
         Assert(f.good());
+        Assert(!f.bad());
         Assert(f.size() > 0);
         Assert(f.size() == FileSize);
     }
@@ -34,8 +41,9 @@ TestImpl(test_file_io)
     {
         if (file f = file(FileName))
         {
-            
+            Assert(f.good() && !f.bad());
         }
+        else Assert(f.good() && !f.bad());
     }
 
     TestCase(exists)
@@ -51,8 +59,29 @@ TestImpl(test_file_io)
 
     TestCase(size)
     {
-        Assert(file_size(FileName) == FileSize);
-        Assert(file_size(FileName) == (int)file_sizel(FileName));
+        AssertThat(file_size(FileName),  FileSize);
+        AssertThat(file_sizel(FileName), (int64)FileSize);
+    }
+
+    TestCase(write_size_sanity)
+    {
+        Assert(create_folder("./test_tmp"));
+        file f = file("./test_tmp/_size_sanity_test.txt", CREATENEW);
+        Assert(f.good());
+        int expectedSize = 0;
+        srand((uint)time(0));
+        for (int i = 0; i < 10; ++i)
+        {
+            int randCount = rand() % 8192;
+            auto data = vector<char>(randCount, 'A');
+            int written = f.write(data.data(), (int)data.size());
+            AssertThat(written, randCount);
+            expectedSize += randCount;
+        }
+        
+        int fileSize = f.size();
+        AssertThat(fileSize, expectedSize);
+        f.close();
     }
 
     TestCase(create_delete_folder)
@@ -79,37 +108,37 @@ TestImpl(test_file_io)
 
     TestCase(path_utils)
     {
-        Assert(file_name("/root/dir/file.ext") == "file");
-        Assert(file_name("/root/dir/file")     == "file");
-        Assert(file_name("/root/dir/")         == "");
-        Assert(file_name("file.ext")           == "file");
-        Assert(file_name("")                   == "");
+        AssertThat(file_name("/root/dir/file.ext"   ), "file");
+        AssertThat(file_name("/root/dir/file"       ), "file");
+        AssertThat(file_name("/root/dir/"           ), "");
+        AssertThat(file_name("file.ext"             ), "file");
+        AssertThat(file_name(""                     ), "");
 
-        Assert(file_nameext("/root/dir/file.ext") == "file.ext");
-        Assert(file_nameext("/root/dir/file")     == "file");
-        Assert(file_nameext("/root/dir/")         == "");
-        Assert(file_nameext("file.ext")           == "file.ext");
-        Assert(file_nameext("")                   == "");
+        AssertThat(file_nameext("/root/dir/file.ext"), "file.ext");
+        AssertThat(file_nameext("/root/dir/file"    ), "file");
+        AssertThat(file_nameext("/root/dir/"        ), "");
+        AssertThat(file_nameext("file.ext"          ), "file.ext");
+        AssertThat(file_nameext(""                  ), "");
 
-        Assert(folder_name("/root/dir/file.ext") == "dir");
-        Assert(folder_name("/root/dir/file")     == "dir");
-        Assert(folder_name("/root/dir/")         == "dir");
-        Assert(folder_name("dir/")               == "dir");
-        Assert(folder_name("file.ext")           == "");
-        Assert(folder_name("")                   == "");
+        AssertThat(folder_name("/root/dir/file.ext" ), "dir");
+        AssertThat(folder_name("/root/dir/file"     ), "dir");
+        AssertThat(folder_name("/root/dir/"         ), "dir");
+        AssertThat(folder_name("dir/"               ), "dir");
+        AssertThat(folder_name("file.ext"           ), "");
+        AssertThat(folder_name(""                   ), "");
 
-        Assert(folder_path("/root/dir/file.ext") == "/root/dir/");
-        Assert(folder_path("/root/dir/file")     == "/root/dir/");
-        Assert(folder_path("/root/dir/")         == "/root/dir/");
-        Assert(folder_path("dir/")               == "dir/");
-        Assert(folder_path("file.ext")           == "");
-        Assert(folder_path("")                   == "");
+        AssertThat(folder_path("/root/dir/file.ext" ), "/root/dir/");
+        AssertThat(folder_path("/root/dir/file"     ), "/root/dir/");
+        AssertThat(folder_path("/root/dir/"         ), "/root/dir/");
+        AssertThat(folder_path("dir/"               ), "dir/");
+        AssertThat(folder_path("file.ext"           ), "");
+        AssertThat(folder_path(""                   ), "");
 
-        Assert(normalized("/root\\dir\\file.ext", '/') == "/root/dir/file.ext");
-        Assert(normalized("\\root/dir/file.ext",  '/') == "/root/dir/file.ext");
+        AssertThat(normalized("/root\\dir\\file.ext", '/'), "/root/dir/file.ext");
+        AssertThat(normalized("\\root/dir/file.ext",  '/'), "/root/dir/file.ext");
 
-        Assert(normalized("/root\\dir\\file.ext", '\\') == "\\root\\dir\\file.ext");
-        Assert(normalized("\\root/dir/file.ext",  '\\') == "\\root\\dir\\file.ext");
+        AssertThat(normalized("/root\\dir\\file.ext", '\\'), "\\root\\dir\\file.ext");
+        AssertThat(normalized("\\root/dir/file.ext",  '\\'), "\\root\\dir\\file.ext");
     }
 
 } Impl;
