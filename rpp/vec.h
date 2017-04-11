@@ -6,6 +6,17 @@
 #define RPP_VECTORMATH_H
 #include "strview.h"
 
+// You can disable RPP SSE intrinsics by declaring #define RPP_SSE_INTRINSICS 0 before including <rpp/vec.h>
+#ifndef RPP_SSE_INTRINSICS
+    #if _M_IX86_FP || _M_AMD64 || _M_X64
+    #define RPP_SSE_INTRINSICS 1
+    #endif
+#endif
+
+#if RPP_SSE_INTRINSICS
+#include <emmintrin.h>
+#endif
+
 #undef M_PI
 #undef M_SQRT2
 
@@ -27,7 +38,7 @@ namespace rpp
     }
 
     /** @brief Clamps a value between:  min <= value <= max */
-    template<class T> static constexpr T clamp(T value, T min, T max) 
+    template<class T> static constexpr T clamp(const T value, const T min, const T max) 
     {
         return value < min ? min : (value < max ? value : max);
     }
@@ -47,6 +58,40 @@ namespace rpp
     {
         return -epsilon < value && value < epsilon;
     }
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+#if RPP_SSE_INTRINSICS
+    static FINLINE double sqrt(const double d) noexcept
+    { auto m = _mm_set_sd(d); return _mm_cvtsd_f64(_mm_sqrt_sd(m, m)); }
+    static FINLINE float sqrt(const float f) noexcept
+    { return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(f))); }
+
+    static FINLINE float min(const float a, const float b) noexcept
+    { return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(a), _mm_set_ss(b))); }
+    static FINLINE double min(const double a, const double b) noexcept
+    { return _mm_cvtsd_f64(_mm_min_sd(_mm_set_sd(a), _mm_set_sd(b))); }
+
+    static FINLINE float max(const float a, const float b) noexcept
+    { return _mm_cvtss_f32(_mm_max_ss(_mm_set_ss(a), _mm_set_ss(b))); }
+    static FINLINE double max(const double a, const double b) noexcept
+    { return _mm_cvtsd_f64(_mm_max_sd(_mm_set_sd(a), _mm_set_sd(b))); }
+
+    static FINLINE float abs(const float a) noexcept
+    { return _mm_cvtss_f32(_mm_andnot_ps(_mm_castsi128_ps(_mm_set1_epi32(0x80000000)), _mm_set_ss(a))); }
+    static FINLINE double abs(const double a) noexcept
+    { return _mm_cvtsd_f64(_mm_andnot_pd(_mm_castsi128_pd(_mm_set1_epi64x(0x8000000000000000UL)), _mm_set_sd(a))); }
+#endif
+
+#ifndef RPP_MINMAX_DEFINED
+#define RPP_MINMAX_DEFINED
+    template<class T> static constexpr const T& min(const T& a, const T& b) { return a < b ? a : b; }
+    template<class T> static constexpr const T& max(const T& a, const T& b) { return a > b ? a : b; }
+    template<class T> static constexpr const T& min3(const T& a, const T& b, const T& c)
+    { return a < b ? (a<c?a:c) : (b<c?b:c); }
+    template<class T> static constexpr const T& max3(const T& a, const T& b, const T& c)
+    { return a > b ? (a>c?a:c) : (b>c?b:c); }
+#endif
 
     ///////////////////////////////////////////////////////////////////////////////
 

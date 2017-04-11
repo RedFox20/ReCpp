@@ -3,7 +3,6 @@
  */
 #include "vec.h"
 #include <stdio.h>
-#include <algorithm> // min,max
 
 namespace rpp
 {
