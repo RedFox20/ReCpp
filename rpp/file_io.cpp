@@ -8,7 +8,7 @@
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
     #include <io.h>
-    #define USE_WINAPI_IO 0
+    #define USE_WINAPI_IO 1
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64
@@ -280,8 +280,12 @@ namespace rpp /* ReCpp */
             DWORD bytesWritten;
             WriteFile((HANDLE)Handle, buffer, bytesToWrite, &bytesWritten, 0);
             return bytesWritten;
+        #elif WIN32
+            // MSVC writes to buffer byte by byte, so to get decent performance, flip the count
+            int result = (int)fwrite(buffer, bytesToWrite, 1, (FILE*)Handle);
+            return result > 0 ? result * bytesToWrite : result;
         #else
-            return (int)fwrite(buffer, bytesToWrite, 1, (FILE*)Handle) * bytesToWrite;
+            return (int)fwrite(buffer, 1, bytesToWrite, (FILE*)Handle);
         #endif
     }
     int file::writef(const char* format, ...) noexcept
@@ -315,9 +319,7 @@ namespace rpp /* ReCpp */
     int file::write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept
     {
         file f{ filename, IOFlags::CREATENEW };
-        int n = f.write(buffer, bytesToWrite);
-        //f.flush(); // ensure the data gets flushed
-        return n;
+        return f.write(buffer, bytesToWrite);
     }
     int file::write_new(const string & filename, const void * buffer, int bytesToWrite) noexcept
     {
@@ -484,19 +486,21 @@ namespace rpp /* ReCpp */
     {
         return ::remove(filename) == 0;
     }
-
+    
+    // on failure, check errno for details, if folder (or file) exists, we consider it a success
+    // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
     static bool sys_mkdir(const strview foldername) noexcept
     {
     #if _WIN32
-        return _mkdir(foldername.to_cstr()) == 0;
+        return _mkdir(foldername.to_cstr()) == 0 || errno == EEXIST;
     #else
-        return mkdir(foldername.to_cstr(), 0700) == 0;
+        return mkdir(foldername.to_cstr(), 0755) == 0 || errno == EEXIST;
     #endif
     }
     static bool sys_mkdir(const wchar_t* foldername) noexcept
     {
     #if _WIN32
-        return _wmkdir(foldername);
+        return _wmkdir(foldername) == 0 || errno == EEXIST;
     #else
         string s = { foldername,foldername + wcslen(foldername) };
         return sys_mkdir(s);
@@ -719,7 +723,20 @@ namespace rpp /* ReCpp */
         return res;
     }
 
-
+    string path_combine(strview path1, strview path2) noexcept
+    {
+        path1.trim_end("/\\");
+        path2.trim_start("/\\");
+        path2.trim_end("/\\");
+        
+        string combined;
+        combined.reserve(path1.len + 1 + path2.len);
+        combined.append(path1.str, path1.len);
+        combined.append(1, '/');
+        combined.append(path2.str, path2.len);
+        return combined;
+    }
+    
     ////////////////////////////////////////////////////////////////////////////////
 
 

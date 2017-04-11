@@ -368,8 +368,6 @@ namespace rpp /* ReCpp */
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */
     bool create_folder(const strview foldername) noexcept;
-    FINLINE bool create_folder(const char*   foldername) noexcept { return create_folder(strview{ foldername }); }
-    FINLINE bool create_folder(const string& foldername) noexcept { return create_folder(strview{ foldername }); }
     bool create_folder(const wchar_t* foldername) noexcept;
     bool create_folder(const wstring& foldername) noexcept;
 
@@ -401,8 +399,6 @@ namespace rpp /* ReCpp */
      *        Ex: file.ext           ==> file
      */
     strview file_name(const strview path) noexcept;
-    FINLINE strview file_name(const string& path) noexcept { return file_name(strview{ path }); }
-    FINLINE strview file_name(const char*   path) noexcept { return file_name(strview{ path }); }
 
     /**
      * @brief Extract the file part (with ext) from a file path
@@ -412,8 +408,6 @@ namespace rpp /* ReCpp */
      *        Ex: file.ext           ==> file.ext
      */
     strview file_nameext(const strview path) noexcept;
-    FINLINE strview file_nameext(const string& path) noexcept { return file_nameext(strview{ path }); }
-    FINLINE strview file_nameext(const char*   path) noexcept { return file_nameext(strview{ path }); }
 
     /**
      * @brief Extract the extension from a file path
@@ -423,8 +417,6 @@ namespace rpp /* ReCpp */
      *        Ex: file.ext           ==> ext
      */
     strview file_ext(const strview path) noexcept;
-    FINLINE strview file_ext(const string& path) noexcept { return file_ext(strview{ path }); }
-    FINLINE strview file_ext(const char*   path) noexcept { return file_ext(strview{ path }); }
 
     /**
      * @brief Extract the foldername from a path name
@@ -435,8 +427,6 @@ namespace rpp /* ReCpp */
      *        Ex: file.ext           ==> 
      */
     strview folder_name(const strview path) noexcept;
-    FINLINE strview folder_name(const string& path) noexcept { return folder_name(strview{ path }); }
-    FINLINE strview folder_name(const char*   path) noexcept { return folder_name(strview{ path }); }
 
     /**
      * @brief Extracts the full folder path from a file path.
@@ -448,8 +438,6 @@ namespace rpp /* ReCpp */
      *        Ex: file.ext           ==> 
      */
     strview folder_path(const strview path) noexcept;
-    inline strview folder_path(const string& path) noexcept { return folder_path(strview{ path }); }
-    inline strview folder_path(const char*   path) noexcept { return folder_path(strview{ path }); }
     wstring folder_path(const wchar_t* path) noexcept;
     wstring folder_path(const wstring& path) noexcept;
     /**
@@ -467,9 +455,15 @@ namespace rpp /* ReCpp */
      * @note A copy of the string is made
      */
     string normalized(const strview path, char sep = '/') noexcept;
-    FINLINE string normalized(const string& path, char sep = '/') noexcept { return normalized(strview{ path }, sep); }
-    FINLINE string normalized(const char*   path, char sep = '/') noexcept { return normalized(strview{ path }, sep); }
-
+    
+    /**
+     * @brief Efficiently combines two path strings, removing any repeated / or \
+     *          Ex: path_combine("tmp", "file.txt")   ==> "tmp/file.txt"
+     *          Ex: path_combine("tmp/", "file.txt")  ==> "tmp/file.txt"
+     *          Ex: path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
+     *          Ex: path_combine("tmp/", "/folder//") ==> "tmp/folder"
+     */
+    string path_combine(strview path1, strview path2) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -481,12 +475,14 @@ namespace rpp /* ReCpp */
      * @return Number of folders found
      */
     int list_dirs(vector<string>& out, strview dir) noexcept;
-    FINLINE vector<string> list_dirs(strview dir) noexcept {
+    FINLINE vector<string> list_dirs(strview dir) noexcept
+    {
         vector<string> out; list_dirs(out, dir); return out;
     }
 
     int list_dirs_fullpath(vector<string>& out, strview dir) noexcept;
-    FINLINE vector<string> list_dirs_fullpath(strview dir) noexcept {
+    FINLINE vector<string> list_dirs_fullpath(strview dir) noexcept
+    {
         vector<string> out; list_dirs_fullpath(out, dir); return out;
     }
 
@@ -498,12 +494,14 @@ namespace rpp /* ReCpp */
      * @return Number of files found that match the extension
      */
     int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    FINLINE vector<string> list_files(strview dir, strview ext = {}) noexcept {
+    FINLINE vector<string> list_files(strview dir, strview ext = {}) noexcept
+    {
         vector<string> out; list_files(out, dir, ext); return out;
     }
     
     int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    FINLINE vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept {
+    FINLINE vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept
+    {
         vector<string> out; list_files_fullpath(out, dir, ext); return out;
     }
     
