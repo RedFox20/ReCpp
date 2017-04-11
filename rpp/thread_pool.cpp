@@ -45,7 +45,7 @@ namespace rpp
         }
     }
 
-    static void segfault(int) { throw exception("SIGSEGV"); }
+    static void segfault(int) { throw runtime_error("SIGSEGV"); }
 
     void pool_task::run() noexcept
     {
@@ -166,7 +166,7 @@ namespace rpp
         const int cores = range < core_count ? range : core_count;
         const int len = range / cores;
 
-        pool_task** active = (pool_task**)_alloca(sizeof(pool_task*) * cores);
+        pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
         {
             lock_guard<mutex> lock(poolmutex);
             loop_running = true;

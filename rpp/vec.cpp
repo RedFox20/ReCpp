@@ -3,9 +3,60 @@
  */
 #include "vec.h"
 #include <stdio.h>
+#include <cmath>
 
 namespace rpp
 {
+    // Clang doesn't support C++17 ODR-used constexpr simplifications
+    // so we still require an out-of-class definition for them:
+    #if __clang__
+        const float2 Vector2::ZERO;
+        const float2 Vector2::ONE;
+        const float2 Vector2::RIGHT;
+        const float2 Vector2::UP;
+        // ----
+        const int2 Point::ZERO; // Outer declaration required
+        // ----
+        const float4 Rect::ZERO; // Outer declaration required
+        // ----
+        const float3 Vector3::ZERO;
+        const float3 Vector3::ONE;
+        
+        const float3 Vector3::LEFT;
+        const float3 Vector3::RIGHT;
+        const float3 Vector3::UP;
+        const float3 Vector3::DOWN;
+        const float3 Vector3::FORWARD;
+        const float3 Vector3::BACKWARD;
+        
+        const float3 Vector3::WHITE;
+        const float3 Vector3::BLACK;
+        const float3 Vector3::RED;
+        const float3 Vector3::GREEN;
+        const float3 Vector3::BLUE;
+        const float3 Vector3::YELLOW;
+        const float3 Vector3::ORANGE;
+        const float3 Vector3::MAGENTA;
+        const float3 Vector3::CYAN;
+        const float3 Vector3::SWEETGREEN;
+        const float3 Vector3::CORNFLOWERBLUE;
+        // ----
+        const float4 Vector4::ZERO;
+        const float4 Vector4::ONE;
+        
+        const float4 Vector4::WHITE;
+        const float4 Vector4::BLACK;
+        const float4 Vector4::RED;
+        const float4 Vector4::GREEN;
+        const float4 Vector4::BLUE;
+        const float4 Vector4::YELLOW;
+        const float4 Vector4::ORANGE;
+        const float4 Vector4::MAGENTA;
+        const float4 Vector4::CYAN;
+        const float4 Vector4::SWEETGREEN;
+        const float4 Vector4::CORNFLOWERBLUE;
+    #endif
+
     /////////////////////////////////////////////////////////////////////////////////////
 
     void Vector2::print() const

@@ -166,21 +166,25 @@ namespace rpp
 
         /**
          * Treating this as point A, gives the RIGHT direction for vec AB
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
          */
         Vector2 right(const Vector2& b, float magnitude = 1.0f) const;
 
         /**
          * Treating this as point A, gives the LEFT direction for vec AB
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
          */
         Vector2 left(const Vector2& b, float magnitude = 1.0f) const;
 
         /**
          * Assuming this is already a direction vector, gives the perpendicular RIGHT direction vector
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
          */
         Vector2 right(float magnitude = 1.0f) const;
 
         /**
          * Assuming this is already a direction vector, gives the perpendicular LEFT direction vector
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
          */
         Vector2 left(float magnitude = 1.0f) const;
     
@@ -223,7 +227,7 @@ namespace rpp
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position };
     }
-
+    
     ////////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Point */
@@ -240,7 +244,7 @@ namespace rpp
     {
         int x, y;
 
-        static const Point ZERO;
+        static constexpr int2 ZERO = { 0, 0 };
 
         Point() {}
         constexpr Point(int x, int y) : x(x), y(y) {}
@@ -377,7 +381,7 @@ namespace rpp
     inline Rect operator-(float f, const Rect& a) { return{ f-a.x, f-a.y, a.w, a.h }; }
     inline Rect operator*(float f, const Rect& a) { return{ a.x, a.y, f*a.w, f*a.h }; }
     inline Rect operator/(float f, const Rect& a) { return{ a.x, a.y, f/a.w, f/a.h }; }
-
+    
     ///////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Vector3 */
@@ -412,11 +416,12 @@ namespace rpp
         static constexpr float3 DOWN           = { 0.0f, -1.0f, 1.0f };     // -Y axis
         static constexpr float3 FORWARD        = { 0.0f, 0.0f, +1.0f };     // +Z axis
         static constexpr float3 BACKWARD       = { 0.0f, 0.0f, -1.0f };     // -Z axis
-    
+        
+        static constexpr float3 WHITE          = { 1.0f, 1.0f, 1.0f };       // RGB 1 1 1
+        static constexpr float3 BLACK          = { 0.0f, 0.0f, 0.0f };       // RGB 0 0 0
         static constexpr float3 RED            = { 1.0f, 0.0f, 0.0f };       // RGB 1 0 0
         static constexpr float3 GREEN          = { 0.0f, 1.0f, 0.0f };       // RGB 0 1 0
         static constexpr float3 BLUE           = { 0.0f, 0.0f, 1.0f };       // RGB 0 0 1
-
         static constexpr float3 YELLOW         = { 1.0f, 1.0f, 0.0f };       // 1 1 0
         static constexpr float3 ORANGE         = { 1.0f, 0.50196f, 0.0f };   // 1 0.502 0; 255 128 0
         static constexpr float3 MAGENTA        = { 1.0f, 0.0f, 1.0f };       // 1 0 1
@@ -427,8 +432,8 @@ namespace rpp
         Vector3() {}
         constexpr Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
         constexpr Vector3(const float3& v) : xyz(v) {}
-        Vector3(const Vector2& xy, float z) : xy(xy), z(z) {}
-        Vector3(float x, const Vector2& yz) : x(x), yz(yz) {}
+        Vector3(const Vector2& xy, float z) : x(xy.x), y(xy.y), z(z) {}
+        Vector3(float x, const Vector2& yz) : x(x), y(yz.x), z(yz.y) {}
 
         /** @brief Set new XYZ values */
         void set(float x, float y, float z);
@@ -578,12 +583,13 @@ namespace rpp
         };
 
         static constexpr float4 ZERO           = { 0.0f, 0.0f, 0.0f, 0.0f };   // XYZW 0 0 0 0
+        static constexpr float4 ONE            = { 1.0f, 1.0f, 1.0f, 1.0f };   // XYZW 1 1 1 1
+        
         static constexpr float4 WHITE          = { 1.0f, 1.0f, 1.0f, 1.0f };   // RGBA 1 1 1 1
         static constexpr float4 BLACK          = { 0.0f, 0.0f, 0.0f, 1.0f };   // RGBA 0 0 0 1
         static constexpr float4 RED            = { 1.0f, 0.0f, 0.0f, 1.0f };   // RGBA 1 0 0 1
         static constexpr float4 GREEN          = { 0.0f, 1.0f, 0.0f, 1.0f };   // RGBA 0 1 0 1
         static constexpr float4 BLUE           = { 0.0f, 0.0f, 1.0f, 1.0f };   // RGBA 0 0 1 1
-
         static constexpr float4 YELLOW         = { 1.0f, 1.0f, 0.0f, 1.0f };       // 1 1 0 1
         static constexpr float4 ORANGE         = { 1.0f, 0.50196f, 0.0f, 1.0f };   // 1 0.502 0 1; 255 128 0 255
         static constexpr float4 MAGENTA        = { 1.0f, 0.0f, 1.0f, 1.0f };       // 1 0 1 1
