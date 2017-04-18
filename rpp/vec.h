@@ -19,6 +19,8 @@
 
 #undef M_PI
 #undef M_SQRT2
+#undef min
+#undef max
 
 #pragma warning(push)
 #pragma warning(disable:4201) // nameless struct/union warning
