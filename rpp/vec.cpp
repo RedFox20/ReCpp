@@ -41,6 +41,8 @@ namespace rpp
         const float3 Vector3::SWEETGREEN;
         const float3 Vector3::CORNFLOWERBLUE;
         // ----
+        const double3 Vector3d::ZERO;
+        // ----
         const float4 Vector4::ZERO;
         const float4 Vector4::ONE;
         
@@ -363,7 +365,98 @@ namespace rpp
                  src.y * (1 - ratio) + dst.y * ratio,
                  src.z * (1 - ratio) + dst.z * ratio };
     }
+    
+    /////////////////////////////////////////////////////////////////////////////////////
+    
+    void Vector3d::set(double newX, double newY, double newZ)
+    {
+        x=newX, y=newY, z=newZ;
+    }
 
+    double Vector3d::length() const
+    {
+        return sqrt(x*x + y*y + z*z);
+    }
+
+    double Vector3d::sqlength() const
+    {
+        return x*x + y*y + z*z;
+    }
+
+    double Vector3d::distanceTo(const Vector3d& v) const
+    {
+        float dx = x - v.x;
+        float dy = y - v.y;
+        float dz = z - v.z;
+        return sqrt(dx*dx + dy*dy + dz*dz);
+    }
+
+    void Vector3d::normalize()
+    {
+        double inv = 1.0f / sqrt(x*x + y*y + z*z);
+        x *= inv, y *= inv, z *= inv;
+    }
+
+    void Vector3d::normalize(const double magnitude)
+    {
+        double inv = magnitude / sqrt(x*x + y*y + z*z);
+        x *= inv, y *= inv, z *= inv;
+    }
+
+    Vector3d Vector3d::normalized() const
+    {
+        double inv = 1.0f / sqrt(x*x + y*y + z*z);
+        return{ x*inv, y*inv, z*inv };
+    }
+    Vector3d Vector3d::normalized(const double magnitude) const
+    {
+        double inv = magnitude / sqrt(x*x + y*y + z*z);
+        return { x*inv, y*inv, z*inv };
+    }
+
+    Vector3d Vector3d::cross(const Vector3d& b) const
+    {
+        return { y*b.z - b.y*z, z*b.x - b.z*x, x*b.y - b.x*y };
+    }
+
+    double Vector3d::dot(const Vector3d& b) const
+    {
+        return x*b.x + y*b.y + z*b.z;
+    }
+    
+    void Vector3d::print() const
+    {
+        char buffer[256];
+        puts(toString(buffer));
+    }
+    
+    const char* Vector3d::toString() const
+    {
+        static char buffer[256];
+        return toString(buffer, sizeof(buffer));
+    }
+    
+    char* Vector3d::toString(char* buffer) const
+    {
+        return toString(buffer, 256);
+    }
+    
+    char* Vector3d::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g;%.3g}", x, y, z);
+        return buffer;
+    }
+
+    bool Vector3d::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y) && nearlyZero(z);
+    }
+
+    bool Vector3d::almostEqual(const Vector3d& v) const
+    {
+        return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
+    }
+    
     /////////////////////////////////////////////////////////////////////////////////////
 
     bool Vector4::almostZero() const

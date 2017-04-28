@@ -436,6 +436,8 @@ namespace rpp
         constexpr Vector3(const float3& v) : xyz(v) {}
         Vector3(const Vector2& xy, float z) : x(xy.x), y(xy.y), z(z) {}
         Vector3(float x, const Vector2& yz) : x(x), y(yz.x), z(yz.y) {}
+        
+        explicit operator struct Vector3d() const;
 
         /** @brief Set new XYZ values */
         void set(float x, float y, float z);
@@ -565,6 +567,135 @@ namespace rpp
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
                  start.z + (end.z - start.z)*position };
+    }
+    
+    inline ostream& operator<<(ostream& os, const Vector3& v) noexcept {
+        return os << v.x << ';' << v.y << ';' << v.z << ';';
+    }
+    
+    ////////////////////////////////////////////////////////////////////////////////
+
+    struct double3
+    {
+        double x, y, z;
+    };
+
+    struct Vector3d
+    {
+        union {
+            struct { double x, y, z; };
+            struct { double3 xyz; };
+        };
+        static constexpr double3 ZERO = { 0.0, 0.0, 0.0 };
+        
+        Vector3d() {}
+        constexpr Vector3d(double x, double y, double z) : x(x),   y(y),   z(z)   {}
+        constexpr Vector3d(const double3& v) : x(v.x) {}
+        
+        explicit operator Vector3() const { return {float(x), float(y), float(z)}; }
+        
+        /** @brief Set new XYZ values */
+        void set(double x, double y, double z);
+    
+        /** @return Length of the vector */
+        double length() const;
+    
+        /** @return Squared length of the vector */
+        double sqlength() const;
+
+        /** @return Absolute distance from this vec3 to target vec3 */
+        double distanceTo(const Vector3d& v) const;
+    
+        /** @brief Normalize this vector */
+        void normalize();
+        void normalize(const double magnitude);
+    
+        /** @return A normalized copy of this vector */
+        Vector3d normalized() const;
+        Vector3d normalized(const double magnitude) const;
+    
+        /** @return Cross product with another vector */
+        Vector3d cross(const Vector3d& b) const;
+    
+        /** @return Dot product with another vector */
+        double dot(const Vector3d& b) const;
+        
+        void print() const;
+        const char* toString() const;
+        char* toString(char* buffer) const;
+        char* toString(char* buffer, int size) const;
+        template<int SIZE> char* toString(char(&buffer)[SIZE]) const {
+            return toString(buffer, SIZE);
+        }
+
+        /** @return TRUE if all elements are exactly 0.0f, which implies default initialized. 
+         * To avoid FP errors, use almostZero() if you performed calculations */
+        bool isZero()  const { return x == 0.0 && y == 0.0 && z == 0.0; }
+        bool notZero() const { return x != 0.0 || y != 0.0 || z != 0.0; }
+
+        /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
+        bool almostZero() const;
+
+        /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
+        bool almostEqual(const Vector3d& b) const;
+        
+        Vector3d& operator+=(const Vector3d& b) { x+=b.x, y+=b.y, z+=b.z; return *this; }
+        Vector3d& operator-=(const Vector3d& b) { x-=b.x, y-=b.y, z-=b.z; return *this; }
+        Vector3d& operator*=(const Vector3d& b) { x*=b.x, y*=b.y, z*=b.z; return *this; }
+        Vector3d& operator/=(const Vector3d& b) { x/=b.x, y/=b.y, z/=b.z; return *this; }
+        Vector3d  operator+ (const Vector3d& b) const { return { x+b.x, y+b.y, z+b.z }; }
+        Vector3d  operator- (const Vector3d& b) const { return { x-b.x, y-b.y, z-b.z }; }
+        Vector3d  operator* (const Vector3d& b) const { return { x*b.x, y*b.y, z*b.z }; }
+        Vector3d  operator/ (const Vector3d& b) const { return { x/b.x, y/b.y, z/b.z }; }
+        Vector3d  operator- () const { return {-x, -y, -z}; }
+        
+        bool operator==(const Vector3d& v) const { return x == v.x && y == v.y && z == v.z; }
+        bool operator!=(const Vector3d& v) const { return x != v.x || y != v.y || z != v.z; }
+        
+        /**
+         * Some common 3D vector conversions
+         * Some conversions are two way <->, but we still provide duplicate overloads for consistency
+         *
+         * This Vector library is based on OpenGL coordsys -- important when dealing with Matrix/Vector4(quat).
+         * 
+         * OpenGL coordsys: +X is Right on the screen, +Y is Up on the screen, +Z is Forward INTO the screen
+         *
+         */
+
+        // OpenGL to OpenCV coordinate conversion. Works both ways: GL <-> CV
+        // OpenCV coordsys: +X is Right on the screen, +Y is Down on the screen, +Z is INTO the screen
+        Vector3d convertGL2CV() const noexcept { return { x, -y, z }; }
+        Vector3d convertCV2GL() const noexcept { return { x, -y, z }; }
+
+    };
+    
+    inline Vector3d operator+(const Vector3d& a, double f) { return { a.x+f, a.y+f, a.z+f }; }
+    inline Vector3d operator-(const Vector3d& a, double f) { return { a.x-f, a.y-f, a.z-f }; }
+    inline Vector3d operator*(const Vector3d& a, double f) { return { a.x*f, a.y*f, a.z*f }; }
+    inline Vector3d operator/(const Vector3d& a, double f) { return { a.x/f, a.y/f, a.z/f }; }
+    inline Vector3d operator+(double f, const Vector3d& a) { return { f+a.x, f+a.y, f+a.z }; }
+    inline Vector3d operator-(double f, const Vector3d& a) { return { f-a.x, f-a.y, f-a.z }; }
+    inline Vector3d operator*(double f, const Vector3d& a) { return { f*a.x, f*a.y, f*a.z }; }
+    inline Vector3d operator/(double f, const Vector3d& a) { return { f/a.x, f/a.y, f/a.z }; }
+
+    inline constexpr Vector3d clamp(const Vector3d& value, const Vector3d& min, const Vector3d& max)
+    {
+        return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
+                 value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y),
+                 value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z) };
+    }
+
+    inline constexpr Vector3d lerp(const Vector3d& start, const Vector3d& end, double position)
+    {
+        return { start.x + (end.x - start.x)*position,
+                 start.y + (end.y - start.y)*position,
+                 start.z + (end.z - start.z)*position };
+    }
+    
+    inline Vector3::operator Vector3d() const { return { double(x), double(y), double(z) }; }
+
+    inline ostream& operator<<(ostream& os, const Vector3d& v) noexcept {
+        return os << v.x << ';' << v.y << ';' << v.z << ';';
     }
 
     ////////////////////////////////////////////////////////////////////////////////
