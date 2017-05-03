@@ -298,15 +298,15 @@ namespace rpp /* ReCpp */
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
     bool file_exists(const char* filename) noexcept;
-    FINLINE bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
-    FINLINE bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
+    inline bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
+    inline bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
     bool folder_exists(const char* folder) noexcept;
-    FINLINE bool folder_exists(const string& folder) noexcept { return folder_exists(folder.c_str());   }
-    FINLINE bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
+    inline bool folder_exists(const string& folder) noexcept { return folder_exists(folder.c_str());   }
+    inline bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
 
     /**
      * @brief Gets basic information of a file
@@ -324,44 +324,44 @@ namespace rpp /* ReCpp */
      * @return Short size of a file
      */
     int file_size(const char* filename) noexcept;
-    FINLINE int file_size(const string& filename) noexcept { return file_size(filename.c_str());   }
-    FINLINE int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
+    inline int file_size(const string& filename) noexcept { return file_size(filename.c_str());   }
+    inline int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
 
     /**
      * @return Long size of a file
      */
     int64 file_sizel(const char* filename) noexcept;
-    FINLINE int64 file_sizel(const string& filename) noexcept { return file_sizel(filename.c_str());   }
-    FINLINE int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
+    inline int64 file_sizel(const string& filename) noexcept { return file_sizel(filename.c_str());   }
+    inline int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
 
     /**
      * @return File creation date
      */
     time_t file_created(const char* filename) noexcept;
-    FINLINE time_t file_created(const string& filename) noexcept { return file_created(filename.c_str());   }
-    FINLINE time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
+    inline time_t file_created(const string& filename) noexcept { return file_created(filename.c_str());   }
+    inline time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
 
     /**
      * @return Last file access date
      */
     time_t file_accessed(const char* filename) noexcept;
-    FINLINE time_t file_accessed(const string& filename) noexcept { return file_accessed(filename.c_str());   }
-    FINLINE time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
+    inline time_t file_accessed(const string& filename) noexcept { return file_accessed(filename.c_str());   }
+    inline time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
 
     /**
      * @return Last file modification date
      */
     time_t file_modified(const char* filename) noexcept;
-    FINLINE time_t file_modified(const string& filename) noexcept { return file_modified(filename.c_str());   }
-    FINLINE time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
+    inline time_t file_modified(const string& filename) noexcept { return file_modified(filename.c_str());   }
+    inline time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
 
     /**
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
     bool delete_file(const char* filename) noexcept;
-    FINLINE bool delete_file(const string& filename) noexcept { return delete_file(filename.c_str());   }
-    FINLINE bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
+    inline bool delete_file(const string& filename) noexcept { return delete_file(filename.c_str());   }
+    inline bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
 
     /**
      * Creates a folder, recursively creating folders that do not exist
@@ -377,16 +377,16 @@ namespace rpp /* ReCpp */
      * @return TRUE if the folder was deleted
      */
     bool delete_folder(const string& foldername, bool recursive = false) noexcept;
-    FINLINE bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
-    FINLINE bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
+    inline bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
+    inline bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
      *        Ex: "path" ==> "C:\Projects\Test\path" 
      */
     string full_path(const char* path) noexcept;
-    FINLINE string full_path(const string& path) noexcept { return full_path(path.c_str());   }
-    inline  string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
+    inline string full_path(const string& path) noexcept { return full_path(path.c_str());   }
+    inline string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
 
     // merges all ../ of a full path
     string merge_dirups(const strview path) noexcept;
@@ -475,13 +475,13 @@ namespace rpp /* ReCpp */
      * @return Number of folders found
      */
     int list_dirs(vector<string>& out, strview dir) noexcept;
-    FINLINE vector<string> list_dirs(strview dir) noexcept
+    inline vector<string> list_dirs(strview dir) noexcept
     {
         vector<string> out; list_dirs(out, dir); return out;
     }
 
     int list_dirs_fullpath(vector<string>& out, strview dir) noexcept;
-    FINLINE vector<string> list_dirs_fullpath(strview dir) noexcept
+    inline vector<string> list_dirs_fullpath(strview dir) noexcept
     {
         vector<string> out; list_dirs_fullpath(out, dir); return out;
     }
@@ -494,13 +494,13 @@ namespace rpp /* ReCpp */
      * @return Number of files found that match the extension
      */
     int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    FINLINE vector<string> list_files(strview dir, strview ext = {}) noexcept
+    inline vector<string> list_files(strview dir, strview ext = {}) noexcept
     {
         vector<string> out; list_files(out, dir, ext); return out;
     }
     
     int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    FINLINE vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept
+    inline vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept
     {
         vector<string> out; list_files_fullpath(out, dir, ext); return out;
     }
@@ -538,8 +538,8 @@ namespace rpp /* ReCpp */
      * @return TRUE if chdir() is successful
      */
     bool change_dir(const char* new_wd) noexcept;
-    FINLINE bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
-    FINLINE bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
+    inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
+    inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
 
 
     ////////////////////////////////////////////////////////////////////////////////
