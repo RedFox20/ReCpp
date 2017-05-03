@@ -20,10 +20,8 @@
     #define fseeki64 fseeko
     #define ftelli64 ftello
 
-    #if __APPLE__
-        #define _fstat64 fstat
-        #define stat64   stat
-    #endif
+    #define _fstat64 fstat
+    #define stat64   stat
 #endif
 
 
