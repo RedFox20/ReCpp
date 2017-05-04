@@ -15,6 +15,11 @@ namespace rpp
         const float2 Vector2::RIGHT;
         const float2 Vector2::UP;
         // ----
+        const double2 Vector2d::ZERO;
+        const double2 Vector2d::ONE;
+        const double2 Vector2d::RIGHT;
+        const double2 Vector2d::UP;
+        // ----
         const int2 Point::ZERO; // Outer declaration required
         // ----
         const float4 Rect::ZERO; // Outer declaration required
@@ -61,6 +66,20 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
+    template<class T> static constexpr const T inverse_length(const T magnitude, const T& x, const T& y)
+    {
+        const T len = sqrt(x*x + y*y);
+        return nearlyZero(len) ? T{} : magnitude / len;
+    }
+
+    template<class T> static constexpr const T inverse_length(const T magnitude, const T& x, const T& y, const T& z)
+    {
+        const T len = sqrt(x*x + y*y + z*z);
+        return nearlyZero(len) ? T{} : magnitude / len;
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
     void Vector2::print() const
     {
         char buffer[256];
@@ -101,25 +120,25 @@ namespace rpp
 
     void Vector2::normalize()
     {
-        float inv = 1.0f / sqrtf(x*x + y*y);
+        auto inv = inverse_length(1.0f, x, y);
         x *= inv, y *= inv;
     }
 
     void Vector2::normalize(const float magnitude)
     {
-        float inv = magnitude / sqrtf(x*x + y*y);
+        auto inv = inverse_length(magnitude, x, y);
         x *= inv, y *= inv;
     }
 
     Vector2 Vector2::normalized() const
     {
-        float inv = 1.0f / sqrtf(x*x + y*y);
-        return{ x*inv, y*inv };
+        auto inv = inverse_length(1.0f, x, y);
+        return { x*inv, y*inv };
     }
 
     Vector2 Vector2::normalized(const float magnitude) const
     {
-        float inv = magnitude / sqrtf(x*x + y*y);
+        auto inv = inverse_length(magnitude, x, y);
         return { x*inv, y*inv };
     }
 
@@ -159,6 +178,106 @@ namespace rpp
         return nearlyZero(x - b.x) && nearlyZero(y - b.y);
     }
 
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    void Vector2d::print() const
+    {
+        char buffer[256];
+        puts(toString(buffer));
+    }
+    
+    const char* Vector2d::toString() const
+    {
+        static char buffer[256];
+        return toString(buffer, sizeof(buffer));
+    }
+    
+    char* Vector2d::toString(char* buffer) const
+    {
+        return toString(buffer, 256);
+    }
+    
+    char* Vector2d::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g}", x, y);
+        return buffer;
+    }
+    
+    void Vector2d::set(double newX, double newY)
+    {
+        x=newX, y=newY;
+    }
+
+    double Vector2d::length() const
+    {
+        return sqrt(x*x + y*y);
+    }
+
+    double Vector2d::sqlength() const
+    {
+        return x*x + y*y;
+    }
+
+    void Vector2d::normalize()
+    {
+        auto inv = inverse_length(1.0, x, y);
+        x *= inv, y *= inv;
+    }
+
+    void Vector2d::normalize(const double magnitude)
+    {
+        auto inv = inverse_length(magnitude, x, y);
+        x *= inv, y *= inv;
+    }
+
+    Vector2d Vector2d::normalized() const
+    {
+        auto inv = inverse_length(1.0, x, y);
+        return{ x*inv, y*inv };
+    }
+
+    Vector2d Vector2d::normalized(const double magnitude) const
+    {
+        auto inv = inverse_length(magnitude, x, y);
+        return { x*inv, y*inv };
+    }
+
+    double Vector2d::dot(const Vector2d& v) const
+    {
+        return x*v.x + y*v.y;
+    }
+
+    Vector2d Vector2d::right(const Vector2d& b, double magnitude) const
+    {
+        return Vector2d{ y - b.y, b.x - x }.normalized(magnitude);
+
+    }
+
+    Vector2d Vector2d::left(const Vector2d& b, double magnitude) const
+    {
+        return Vector2d{ b.y - y, x - b.x }.normalized(magnitude);
+    }
+
+    Vector2d Vector2d::right(double magnitude) const
+    {
+        return Vector2d{ y, -x }.normalized(magnitude);
+    }
+
+    Vector2d Vector2d::left(double magnitude) const
+    {
+        return Vector2d{ -y, x }.normalized(magnitude);
+    }
+
+    bool Vector2d::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y);
+    }
+
+    bool Vector2d::almostEqual(const Vector2d& b) const
+    {
+        return nearlyZero(x - b.x) && nearlyZero(y - b.y);
+    }
+    
     /////////////////////////////////////////////////////////////////////////////////////
 
     const char* Point::toString() const
@@ -293,24 +412,24 @@ namespace rpp
 
     void Vector3::normalize()
     {
-        float inv = 1.0f / sqrtf(x*x + y*y + z*z);
+        auto inv = inverse_length(1.0f, x, y, z);
         x *= inv, y *= inv, z *= inv;
     }
 
     void Vector3::normalize(const float magnitude)
     {
-        float inv = magnitude / sqrtf(x*x + y*y + z*z);
+        auto inv = inverse_length(magnitude, x, y, z);
         x *= inv, y *= inv, z *= inv;
     }
 
     Vector3 Vector3::normalized() const
     {
-        float inv = 1.0f / sqrtf(x*x + y*y + z*z);
-        return{ x*inv, y*inv, z*inv };
+        auto inv = inverse_length(1.0f, x, y, z);
+        return { x*inv, y*inv, z*inv };
     }
     Vector3 Vector3::normalized(const float magnitude) const
     {
-        float inv = magnitude / sqrtf(x*x + y*y + z*z);
+        auto inv = inverse_length(magnitude, x, y, z);
         return { x*inv, y*inv, z*inv };
     }
 
@@ -393,24 +512,24 @@ namespace rpp
 
     void Vector3d::normalize()
     {
-        double inv = 1.0f / sqrt(x*x + y*y + z*z);
+        auto inv = inverse_length(1.0, x, y, z);
         x *= inv, y *= inv, z *= inv;
     }
 
     void Vector3d::normalize(const double magnitude)
     {
-        double inv = magnitude / sqrt(x*x + y*y + z*z);
+        auto inv = inverse_length(magnitude, x, y, z);
         x *= inv, y *= inv, z *= inv;
     }
 
     Vector3d Vector3d::normalized() const
     {
-        double inv = 1.0f / sqrt(x*x + y*y + z*z);
+        auto inv = inverse_length(1.0, x, y, z);
         return{ x*inv, y*inv, z*inv };
     }
     Vector3d Vector3d::normalized(const double magnitude) const
     {
-        double inv = magnitude / sqrt(x*x + y*y + z*z);
+        auto inv = inverse_length(magnitude, x, y, z);
         return { x*inv, y*inv, z*inv };
     }
 
@@ -797,7 +916,7 @@ namespace rpp
 
     Vector3 BoundingBox::center() const noexcept
     {
-        return lerp(min, max, 0.5f);
+        return lerp(0.5f, min, max);
     }
 
     Vector3 BoundingBox::compare(const BoundingBox& bb) const noexcept

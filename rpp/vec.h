@@ -47,16 +47,31 @@ namespace rpp
 
     /**
      * @brief Math utility, Linear Interpolation
+     * @param position Multiplier value such as 0.5, 1.0 or 1.5
      * @param start Starting bound of the linear range
      * @param end Ending bound of the linear range
-     * @param position Multiplier value such as 0.5, 1.0 or 1.5
      */
-    static constexpr float lerp(float start, float end, float position)
+    template<class T> static constexpr T lerp(const T position, const T start, const T end)
     {
         return start + (end-start)*position;
     }
 
-    static constexpr bool nearlyZero(const float value, const float epsilon = 0.001f)
+    /**
+     * @brief Math utility, inverse operation of Linear Interpolation
+     *        ex:  lerpInverse(30.0, 60.0, 45.0); ==> 0.5 , because 45 is halfway between [30, 60]
+     * @param value Value somewhere between [start, end].
+     *              !!Out of bounds values are not checked!! Use clamp(lerpInverse(min, max, value), 0, 1); instead
+     * @param start Starting bound of the linear range
+     * @param end Ending bound of the linear range
+     * @return Ratio between [0..1] or < 0 / > 1 if value is out of bounds
+     */
+    template<class T> static constexpr T lerpInverse(const T value, const T start, const T end)
+    {
+        return (value - start) / (end - start);
+    }
+    
+    /** @return TRUE if abs(value) is very close to 0.0 */
+    template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = 0.001)
     {
         return -epsilon < value && value < epsilon;
     }
@@ -224,7 +239,142 @@ namespace rpp
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y) };
     }
 
-    inline constexpr Vector2 lerp(const Vector2& start, const Vector2& end, float position)
+    inline constexpr Vector2 lerp(float position, const Vector2& start, const Vector2& end)
+    {
+        return { start.x + (end.x - start.x)*position,
+                 start.y + (end.y - start.y)*position };
+    }
+    
+    ///////////////////////////////////////////////////////////////////////////////
+
+    /** @brief Proxy to allow constexpr initialization inside Vector2d */
+    struct double2
+    {
+        double x, y;
+        constexpr double2(double x, double y) : x(x), y(y) {}
+    };
+
+    /** @brief 2D Vector for UI calculations */
+    struct Vector2d
+    {
+        double x, y;
+        static constexpr double2 ZERO  = { 0.0, 0.0 }; // 0 0
+        static constexpr double2 ONE   = { 1.0, 1.0 }; // 1 1
+        static constexpr double2 RIGHT = { 1.0, 0.0 }; // X-axis
+        static constexpr double2 UP    = { 0.0, 1.0 }; // Y-axis, OpenGL UP
+    
+        Vector2d() {}
+        explicit constexpr Vector2d(double xy) : x(xy),  y(xy)  {}
+        constexpr Vector2d(double x, double y) : x(x),   y(y)   {}
+        constexpr Vector2d(const double2& v)   : x(v.x), y(v.y) {}
+    
+        /** Print the Vector2 */
+        void print() const;
+    
+        /** @return Temporary static string from this Vector */
+        const char* toString() const;
+    
+        char* toString(char* buffer) const;
+        char* toString(char* buffer, int size) const;
+        template<int SIZE> char* toString(char(&buffer)[SIZE]) {
+            return toString(buffer, SIZE);
+        }
+
+        /** @return TRUE if all elements are exactly 0.0f, which implies default initialized. 
+         * To avoid FP errors, use almostZero() if you performed calculations */
+        bool isZero()  const { return x == 0.0 && y == 0.0; }
+        bool notZero() const { return x != 0.0 || y != 0.0; }
+
+        /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
+        bool almostZero() const;
+
+        /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
+        bool almostEqual(const Vector2d& b) const;
+
+        /** @brief Set new XY values */
+        void set(double x, double y);
+    
+        /** @return Length of the vector */
+        double length() const;
+    
+        /** @return Squared length of the vector */
+        double sqlength() const;
+    
+        /** @brief Normalize this vector */
+        void normalize();
+
+        /** @brief Normalize this vector to the given magnitude */
+        void normalize(const double magnitude);
+    
+        /** @return A normalized copy of this vector */
+        Vector2d normalized() const;
+        Vector2d normalized(const double magnitude) const;
+
+        /** @return Dot product of two vectors */
+        double dot(const Vector2d& v) const;
+
+        /** @return Normalized direction of this vector */
+        Vector2d direction() const { return normalized(); }
+
+        /**
+         * Treating this as point A, gives the RIGHT direction for vec AB
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
+         */
+        Vector2d right(const Vector2d& b, double magnitude = 1.0) const;
+
+        /**
+         * Treating this as point A, gives the LEFT direction for vec AB
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
+         */
+        Vector2d left(const Vector2d& b, double magnitude = 1.0) const;
+
+        /**
+         * Assuming this is already a direction vector, gives the perpendicular RIGHT direction vector
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
+         */
+        Vector2d right(double magnitude = 1.0) const;
+
+        /**
+         * Assuming this is already a direction vector, gives the perpendicular LEFT direction vector
+         * @note THIS ASSUMES OPENGL COORDINATE SYSTEM
+         */
+        Vector2d left(double magnitude = 1.0) const;
+        
+        Vector2d& operator+=(const Vector2d& b) { x+=b.x, y+=b.y; return *this; }
+        Vector2d& operator-=(const Vector2d& b) { x-=b.x, y-=b.y; return *this; }
+        Vector2d& operator*=(const Vector2d& b) { x*=b.x, y*=b.y; return *this; }
+        Vector2d& operator/=(const Vector2d& b) { x/=b.x, y/=b.y; return *this; }
+        Vector2d  operator+ (const Vector2d& b) const { return { x+b.x, y+b.y }; }
+        Vector2d  operator- (const Vector2d& b) const { return { x-b.x, y-b.y }; }
+        Vector2d  operator* (const Vector2d& b) const { return { x*b.x, y*b.y }; }
+        Vector2d  operator/ (const Vector2d& b) const { return { x/b.x, y/b.y }; }
+        Vector2d  operator- () const { return {-x, -y}; }
+    
+        bool operator==(const Vector2d& b) const { return x == b.x && y == b.y; }
+        bool operator!=(const Vector2d& b) const { return x != b.x || y != b.y; }
+
+        Vector2d& operator+=(double f) { x += f, y += f; return *this; }
+        Vector2d& operator-=(double f) { x -= f, y -= f; return *this; }
+        Vector2d& operator*=(double f) { x *= f, y *= f; return *this; }
+        Vector2d& operator/=(double f) { x /= f, y /= f; return *this; }
+    };
+
+    inline Vector2d operator+(const Vector2d& a, double f) { return { a.x+f, a.y+f }; }
+    inline Vector2d operator-(const Vector2d& a, double f) { return { a.x-f, a.y-f }; }
+    inline Vector2d operator*(const Vector2d& a, double f) { return { a.x*f, a.y*f }; }
+    inline Vector2d operator/(const Vector2d& a, double f) { return { a.x/f, a.y/f }; }
+    inline Vector2d operator+(double f, const Vector2d& a) { return { f+a.x, f+a.y }; }
+    inline Vector2d operator-(double f, const Vector2d& a) { return { f-a.x, f-a.y }; }
+    inline Vector2d operator*(double f, const Vector2d& a) { return { f*a.x, f*a.y }; }
+    inline Vector2d operator/(double f, const Vector2d& a) { return { f/a.x, f/a.y }; }
+
+    inline constexpr Vector2d clamp(const Vector2d& value, const Vector2d& min, const Vector2d& max)
+    {
+        return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
+                 value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y) };
+    }
+
+    inline constexpr Vector2d lerp(double position, const Vector2d& start, const Vector2d& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position };
@@ -562,7 +712,7 @@ namespace rpp
                  value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z) };
     }
 
-    inline constexpr Vector3 lerp(const Vector3& start, const Vector3& end, float position)
+    inline constexpr Vector3 lerp(float position, const Vector3& start, const Vector3& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
@@ -685,7 +835,7 @@ namespace rpp
                  value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z) };
     }
 
-    inline constexpr Vector3d lerp(const Vector3d& start, const Vector3d& end, double position)
+    inline constexpr Vector3d lerp(double position, const Vector3d& start, const Vector3d& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
@@ -852,7 +1002,7 @@ namespace rpp
                  value.w < min.w ? min.w : (value.w < max.w ? value.w : max.w) };
     }
 
-    inline constexpr Vector4 lerp(const Vector4& start, const Vector4& end, float position)
+    inline constexpr Vector4 lerp(float position, const Vector4& start, const Vector4& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
