@@ -71,7 +71,7 @@ namespace rpp
     }
     
     /** @return TRUE if abs(value) is very close to 0.0 */
-    template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = 0.001)
+    template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = (T)0.001)
     {
         return -epsilon < value && value < epsilon;
     }

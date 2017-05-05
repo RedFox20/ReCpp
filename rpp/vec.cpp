@@ -69,13 +69,13 @@ namespace rpp
     template<class T> static constexpr const T inverse_length(const T magnitude, const T& x, const T& y)
     {
         const T len = sqrt(x*x + y*y);
-        return nearlyZero(len) ? T{} : magnitude / len;
+        return nearlyZero(len) ? 0 : magnitude / len;
     }
 
     template<class T> static constexpr const T inverse_length(const T magnitude, const T& x, const T& y, const T& z)
     {
         const T len = sqrt(x*x + y*y + z*z);
-        return nearlyZero(len) ? T{} : magnitude / len;
+        return nearlyZero(len) ? 0 : magnitude / len;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
@@ -525,7 +525,7 @@ namespace rpp
     Vector3d Vector3d::normalized() const
     {
         auto inv = inverse_length(1.0, x, y, z);
-        return{ x*inv, y*inv, z*inv };
+        return { x*inv, y*inv, z*inv };
     }
     Vector3d Vector3d::normalized(const double magnitude) const
     {
