@@ -543,6 +543,8 @@ namespace rpp
         constexpr float3(float x, float y, float z) : x(x), y(y), z(z) {}
     };
 
+	struct Vector3d;
+
     /** 
      * 3D Vector for matrix calculations
      * The coordinate system assumed in UP, FORWARD, RIGHT is OpenGL coordinate system:
@@ -587,7 +589,7 @@ namespace rpp
         Vector3(const Vector2& xy, float z) : x(xy.x), y(xy.y), z(z) {}
         Vector3(float x, const Vector2& yz) : x(x), y(yz.x), z(yz.y) {}
         
-        explicit operator struct Vector3d() const;
+        explicit operator Vector3d() const;
 
         /** @brief Set new XYZ values */
         void set(float x, float y, float z);
