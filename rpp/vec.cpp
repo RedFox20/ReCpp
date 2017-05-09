@@ -504,9 +504,9 @@ namespace rpp
 
     double Vector3d::distanceTo(const Vector3d& v) const
     {
-        float dx = x - v.x;
-        float dy = y - v.y;
-        float dz = z - v.z;
+        double dx = x - v.x;
+        double dy = y - v.y;
+        double dz = z - v.z;
         return sqrt(dx*dx + dy*dy + dz*dz);
     }
 
