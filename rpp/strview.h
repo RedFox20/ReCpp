@@ -280,12 +280,14 @@ namespace rpp
         FINLINE void clear() { str = "", len = 0; }
         /** @return Length of the string */
         FINLINE int length() const  { return len; }
+        FINLINE int size()   const  { return len; }
         /** @return TRUE if length of the string is 0 - thus the string is empty */
         FINLINE bool empty() const { return !len; }
         /** @return TRUE if string is non-empty */
         FINLINE operator bool() const { return !!len; }
         /** @return Pointer to the start of the string */
         FINLINE const char* c_str() const { return str; }
+        FINLINE const char* data()  const { return str; }
         FINLINE const char* begin() const { return str; }
         FINLINE const char* end()   const { return str + len; }
         FINLINE char front() const { return *str; }
