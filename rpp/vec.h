@@ -556,6 +556,7 @@ namespace rpp
     {
         union {
             struct { float x, y, z; };
+            struct { float r, g, b; };
             struct { Vector2 xy; };
             struct { float _x; Vector2 yz; };
             float3 xyz;
