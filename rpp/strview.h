@@ -747,6 +747,12 @@ namespace rpp
         NOINLINE strview& replace(char chOld, char chNew);
     };
 
+    //////////////// strview literal operator ///////////////
+
+    strview operator "" _sv(const char* str, std::size_t len)
+    {
+        return { str, (int)len };
+    }
 
     //////////////// handy stream operators /////////////////
 
@@ -762,7 +768,7 @@ namespace rpp
     }
     inline strview& operator>>(strview& s, unsigned& out)
     {
-        out = s.next_int();
+        out = (unsigned)s.next_int();
         return s;
     }
     inline ostream& operator<<(ostream& stream, const strview& s)
