@@ -224,14 +224,14 @@ namespace rpp
         int len;         // length of string
     #endif
 
-        FINLINE strview() : str(""), len(0) {}
-        FINLINE strview(char* str)                        : str(str), len((int)strlen(str)) {}
-        FINLINE strview(const char* str)                  : str(str), len((int)strlen(str)) {}
-        FINLINE strview(const char* str, int len)         : str(str), len(len)              {}
-        FINLINE strview(const char* str, size_t len)      : str(str), len((int)len)         {}
-        FINLINE strview(const char* str, const char* end) : str(str), len(int(end-str))     {}
-        FINLINE strview(const void* str, const void* end) : strview((const char*)str, (const char*)end) {}
-        FINLINE strview(const string& s)                  : str(s.c_str()), len((int)s.length()) {}
+        FINLINE constexpr strview() : str(""), len(0) {}
+        FINLINE strview(char* str)                             : str(str), len((int)strlen(str)) {}
+        FINLINE strview(const char* str)                       : str(str), len((int)strlen(str)) {}
+        FINLINE constexpr strview(const char* str, int len)    : str(str), len(len)              {}
+        FINLINE constexpr strview(const char* str, size_t len) : str(str), len((int)len)         {}
+        FINLINE strview(const char* str, const char* end)      : str(str), len(int(end-str))     {}
+        FINLINE strview(const void* str, const void* end)      : strview((const char*)str, (const char*)end) {}
+        FINLINE strview(const string& s)                       : str(s.c_str()), len((int)s.length()) {}
         template<class StringT>
         FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const { return str[index]; }
@@ -749,7 +749,7 @@ namespace rpp
 
     //////////////// strview literal operator ///////////////
 
-    strview operator "" _sv(const char* str, std::size_t len)
+    constexpr strview operator "" _sv(const char* str, std::size_t len)
     {
         return { str, (int)len };
     }
