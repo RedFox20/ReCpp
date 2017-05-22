@@ -404,13 +404,13 @@ namespace rpp
         /**
          * Count number of occurrances of this character inside the strview bounds
          */
-        int count(char ch) const noexcept;
+        int count(char ch) const;
 
 
         int indexof(char ch) const;
-        int indexof(const char* chars, int n) const;
-        template<int N> FINLINE int indexof(const char (&chars)[N]) const {
-            return indexof(chars, N - 1);
+        int indexofany(const char* chars, int n) const;
+        template<int N> FINLINE int indexofany(const char (&chars)[N]) const {
+            return indexofany(chars, N - 1);
         }
 
         /** @return TRUE if this strview starts with the specified string */

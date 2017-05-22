@@ -172,9 +172,10 @@ namespace rpp
 
     const char* strview::rfind(char c) const
     {
+        if (len <= 0) return nullptr;
         const char* p = str;
         const char* e = p + len - 1;
-        for (; p < e; --e) if (*e == c) return e;
+        for (; e >= p; --e) if (*e == c) return e;
         return nullptr;
     }
 
@@ -188,13 +189,14 @@ namespace rpp
 
     const char* strview::rfindany(const char* chars, int n) const
     {
+        if (len <= 0) return nullptr;
         const char* p = str;
         const char* e = p + len - 1;
-        for (; p < e; --e) if (strcontains(chars, n, *e)) return e;
+        for (; e >= p; --e) if (strcontains(chars, n, *e)) return e;
         return nullptr;
     }
 
-    int strview::count(char ch) const noexcept
+    int strview::count(char ch) const
     {
         int count = 0;
         for (auto* p = str, *e = str+len; p < e; ++p)
@@ -209,7 +211,7 @@ namespace rpp
         return -1;
     }
 
-    int strview::indexof(const char* chars, int n) const
+    int strview::indexofany(const char* chars, int n) const
     {
         for (int i = 0; i < len; ++i)
             if (strcontains(chars, n, str[i])) return i;
