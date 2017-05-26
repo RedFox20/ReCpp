@@ -719,6 +719,24 @@ namespace rpp
         return *this;
     }
 
+    Matrix4 Matrix4::operator*(const Matrix4& mb) const
+    {
+        const Vector4 a0 = r0;
+        const Vector4 a1 = r1;
+        const Vector4 a2 = r2;
+        const Vector4 a3 = r3;
+        const Vector4 b0 = mb.r0;
+        const Vector4 b1 = mb.r1;
+        const Vector4 b2 = mb.r2;
+        const Vector4 b3 = mb.r3;
+        Matrix4 m = {};
+        m.r0 = (a0*b0.x + a1*b0.y) + (a2*b0.z + a3*b0.w);
+        m.r1 = (a0*b1.x + a1*b1.y) + (a2*b1.z + a3*b1.w);
+        m.r2 = (a0*b2.x + a1*b2.y) + (a2*b2.z + a3*b2.w);
+        m.r3 = (a0*b3.x + a1*b3.y) + (a2*b3.z + a3*b3.w);
+        return m;
+    }
+
     Vector3 Matrix4::operator*(const Vector3& v) const
     {
         return {
@@ -788,11 +806,18 @@ namespace rpp
         const float rl = right - left;
         const float tb = top - bottom;
         const float dt = far - near;
-        m00 = 2.0f / rl, m01 = 0.0f, m02 = 0.0f,  m03 = 0.0f;
-        m10 = 0.0f, m11 = 2.0f / tb, m12 = 0.0f,  m13 = 0.0f;
-        m20 = 0.0f, m21 = 0.0f,      m22 = -2.0f/dt, m23 = 0.0f;
+        m00 = 2.0f/rl, m01 = 0.0f,    m02 = 0.0f,     m03 = 0.0f;
+        m10 = 0.0f,    m11 = 2.0f/tb, m12 = 0.0f,     m13 = 0.0f;
+        m20 = 0.0f,    m21 = 0.0f,    m22 = -2.0f/dt, m23 = 0.0f;
         m30 = -(right+left)/rl, m31 = -(top+bottom)/tb, m32 = -(far+near)/dt, m33 = 1.0f;
         return *this;
+    }
+
+    Matrix4 Matrix4::createOrtho(float left, float right, float bottom, float top)
+    {
+        Matrix4 view = {};
+        view.setOrtho(left, right, bottom, top);
+        return view;
     }
 
     Matrix4& Matrix4::setPerspective(float fov, float width, float height, float zNear, float zFar)
@@ -824,6 +849,14 @@ namespace rpp
     {
         *this = IDENTITY;
         return translate(position);
+    }
+
+
+    Matrix4 Matrix4::createPosition(const Vector3& position)
+    {
+        Matrix4 mat = IDENTITY;
+        mat.translate(position);
+        return mat;
     }
 
     Matrix4& Matrix4::fromRotation(const Vector3& rotation)
@@ -899,11 +932,11 @@ namespace rpp
     }
     char* Matrix4::toString(char* buffer, int size) const
     {
-        int len = snprintf(buffer, size, "{\n");
+        int len = snprintf(buffer, size_t(size), "{\n");
         for (int i = 0; i < 4; ++i)
-            len += snprintf(buffer+len, size-len, " %8.3f,%8.3f,%8.3f,%8.3f\n",
+            len += snprintf(buffer+len, size_t(size-len), " %8.3f,%8.3f,%8.3f,%8.3f\n",
                                                   r[i].x,r[i].y,r[i].z,r[i].w);
-        len += snprintf(buffer+len, size-len, "}");
+        snprintf(buffer+len, size_t(size-len), "}");
         return buffer;
     }
 

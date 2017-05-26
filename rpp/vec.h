@@ -1042,13 +1042,16 @@ namespace rpp
     
         /** @brief Global identity matrix for easy initialization */
         static const Matrix4 IDENTITY;
-    
+
         /** @brief Loads identity matrix */
         Matrix4& loadIdentity();
     
         /** @brief Multiplies this matrix: this = this * mb */
         Matrix4& multiply(const Matrix4& mb);
-    
+
+        /** @brief Multiplies this matrix ma with matrix mb and returns the result as mc */
+        Matrix4 operator*(const Matrix4& mb) const;
+
         /** @brief Transforms 3D vector v with this matrix and return the resulting vec3 */
         Vector3 operator*(const Vector3& v) const;
     
@@ -1069,6 +1072,7 @@ namespace rpp
     
         /** @brief Loads an Ortographic projection matrix */
         Matrix4& setOrtho(float left, float right, float bottom, float top);
+        static Matrix4 createOrtho(float left, float right, float bottom, float top);
     
         /** @brief Loads a perspective projection matrix */
         Matrix4& setPerspective(float fov, float width, float height, float zNear, float zFar);
@@ -1078,6 +1082,7 @@ namespace rpp
     
         /** @brief Creates a translated matrix from XYZ position */
         Matrix4& fromPosition(const Vector3& position);
+        static Matrix4 createPosition(const Vector3& position);
     
         /** @brief Creates a rotated matrix from euler XYZ rotation */
         Matrix4& fromRotation(const Vector3& rotation);

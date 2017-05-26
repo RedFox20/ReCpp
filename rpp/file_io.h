@@ -1,6 +1,9 @@
 #pragma once
 #ifndef RPP_FILE_IO_H
 #define RPP_FILE_IO_H
+/**
+ * Cross platform file utilities, Copyright (c) 2014 - Jorma Rebane
+ */
 #include <time.h> // time_t
 #include "strview.h"
 
@@ -288,6 +291,13 @@ namespace rpp /* ReCpp */
          * @return File write time - when was this file last modified
          */
         time_t time_modified() const noexcept;
+
+        /**
+         * Gets the size of the file along with last modified time.
+         * This has less syscalls than calling f.size() and f.time_modified() separately
+         * @return Size of the file
+         */
+        int size_and_time_modified(time_t* outModified) const noexcept;
     };
 
 

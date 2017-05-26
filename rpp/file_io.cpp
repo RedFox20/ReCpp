@@ -346,7 +346,7 @@ namespace rpp /* ReCpp */
             return newpos.QuadPart;
         #else
             fseeki64((FILE*)Handle, filepos, seekmode);
-            return ftelli64((FILE*)Handle);
+            return (uint64)ftelli64((FILE*)Handle);
         #endif
     }
     int file::tell() const noexcept
@@ -365,7 +365,7 @@ namespace rpp /* ReCpp */
             SetFilePointerEx((HANDLE)Handle, { 0 }, &current, FILE_CURRENT);
             return current.QuadPart;
         #else
-            return ftelli64((FILE*)Handle);
+            return (int64)ftelli64((FILE*)Handle);
         #endif
     }
 
@@ -400,10 +400,24 @@ namespace rpp /* ReCpp */
         return false;
     #endif
     }
-    time_t file::time_created()  const noexcept { time_t t; return time_info(&t, 0, 0) ? t : 0ull; }
-    time_t file::time_accessed() const noexcept { time_t t; return time_info(0, &t, 0) ? t : 0ull; }
-    time_t file::time_modified() const noexcept { time_t t; return time_info(0, 0, &t) ? t : 0ull; }
+    time_t file::time_created()  const noexcept { time_t t; return time_info(&t, 0, 0) ? t : time_t(0); }
+    time_t file::time_accessed() const noexcept { time_t t; return time_info(0, &t, 0) ? t : time_t(0); }
+    time_t file::time_modified() const noexcept { time_t t; return time_info(0, 0, &t) ? t : time_t(0); }
 
+    int file::size_and_time_modified(time_t* outModified) const noexcept
+    {
+        if (!Handle) return 0;
+        #if USE_WINAPI_IO
+            *outModified = time_modified();
+            return size();
+        #else
+            struct stat s;
+            if (fstat(fileno((FILE*)Handle), &s))
+                return 0;
+            *outModified = s.st_mtime;
+            return (int)s.st_size;
+        #endif
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -468,17 +482,17 @@ namespace rpp /* ReCpp */
     time_t file_created(const char* filename) noexcept
     {
         time_t t; 
-        return file_info(filename, 0, &t, 0, 0) ? t : 0ull; 
+        return file_info(filename, 0, &t, 0, 0) ? t : time_t(0);
     }
     time_t file_accessed(const char* filename) noexcept
     {
         time_t t; 
-        return file_info(filename, 0, 0, &t, 0) ? t : 0ull;
+        return file_info(filename, 0, 0, &t, 0) ? t : time_t(0);
     }
     time_t file_modified(const char* filename) noexcept
     {
         time_t t; 
-        return file_info(filename, 0, 0, 0, &t) ? t : 0ull;
+        return file_info(filename, 0, 0, 0, &t) ? t : time_t(0);
     }
     bool delete_file(const char* filename) noexcept
     {
@@ -728,10 +742,10 @@ namespace rpp /* ReCpp */
         path2.trim_end("/\\");
         
         string combined;
-        combined.reserve(path1.len + 1 + path2.len);
-        combined.append(path1.str, path1.len);
+        combined.reserve(size_t(path1.len + 1 + path2.len));
+        combined.append(path1.str, size_t(path1.len));
         combined.append(1, '/');
-        combined.append(path2.str, path2.len);
+        combined.append(path2.str, size_t(path2.len));
         return combined;
     }
     
