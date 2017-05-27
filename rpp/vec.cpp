@@ -815,7 +815,7 @@ namespace rpp
 
     Matrix4 Matrix4::createOrtho(float left, float right, float bottom, float top)
     {
-        Matrix4 view = {};
+        Matrix4 view = Matrix4::IDENTITY;
         view.setOrtho(left, right, bottom, top);
         return view;
     }
@@ -833,7 +833,14 @@ namespace rpp
         return *this;
     }
 
-    Matrix4& Matrix4::setLookAt(const Vector3 &eye, const Vector3 &center, const Vector3 &up)
+    Matrix4 Matrix4::createPerspective(float fov, float width, float height, float zNear, float zFar)
+    {
+        Matrix4 view = Matrix4::IDENTITY;
+        view.setPerspective(fov, width, height, zNear, zFar);
+        return view;
+    }
+
+    Matrix4& Matrix4::setLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
     {
         const Vector3 f = (center - eye).normalized();
         const Vector3 s = f.cross(up.normalized()).normalized();
@@ -843,6 +850,13 @@ namespace rpp
         m20 = s.z, m21 = u.z, m22 = -f.z, m23 = 0.0f;
         m30 = -s.dot(eye), m31 = -u.dot(eye), m32 = f.dot(eye), m33 = 1.0f;
         return *this;
+    }
+
+    Matrix4 Matrix4::createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
+    {
+        Matrix4 view = Matrix4::IDENTITY;
+        view.setLookAt(eye, center, up);
+        return view;
     }
 
     Matrix4& Matrix4::fromPosition(const Vector3& position)

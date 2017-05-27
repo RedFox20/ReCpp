@@ -1076,9 +1076,11 @@ namespace rpp
     
         /** @brief Loads a perspective projection matrix */
         Matrix4& setPerspective(float fov, float width, float height, float zNear, float zFar);
+        static Matrix4 createPerspective(float fov, float width, float height, float zNear, float zFar);
     
         /** @brief Loads a lookAt view/camera matrix */
         Matrix4& setLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
+        static Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
     
         /** @brief Creates a translated matrix from XYZ position */
         Matrix4& fromPosition(const Vector3& position);
