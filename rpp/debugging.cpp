@@ -9,7 +9,6 @@ static LogSeverity Filter = LogSeverityWarn;
 static LogSeverity Filter = LogSeverityInfo;
 #endif
 static LogErrorCallback ErrorHandler;
-static char ErrBuf[8192];
 
 EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc)
 {
@@ -20,56 +19,58 @@ EXTERNC void SetLogSeverityFilter(LogSeverity filter)
     Filter = filter;
 }
 
-EXTERNC const char* LogFormatv(LogSeverity severity, const char* format, va_list ap)
+EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
 {
-    // always format, because return string is used in asserts
-    int len = vsnprintf(ErrBuf, sizeof(ErrBuf)-1, format, ap);
-    if (len < 0) { // err: didn't fit
-        len = sizeof(ErrBuf)-2; // try to recover gracefully
-        ErrBuf[len] = '\0';
-    }
-    ErrBuf[len++] = '\n'; // force append a newline
-    
-    if (severity >= Filter)
+    if (severity < Filter)
     {
-        // some default logging behavior:
-        fwrite(ErrBuf, len, 1, (severity == LogSeverityError) ? stderr : stdout);
-
-        // optional error handler for iOS Crashlytics logging
-        if (ErrorHandler)
-        {
-            ErrorHandler(severity, ErrBuf, len);
-        }
+        return;
     }
-    return ErrBuf;
+    
+    char errBuf[4096];
+    // always format, because return string is used in asserts
+    int len = vsnprintf(errBuf, sizeof(errBuf)-1, format, ap);
+    if (len < 0) { // err: didn't fit
+        len = sizeof(errBuf)-2; // try to recover gracefully
+        errBuf[len] = '\0';
+    }
+    errBuf[len++] = '\n'; // force append a newline
+    
+    // some default logging behavior:
+    fwrite(errBuf, len, 1, (severity == LogSeverityError) ? stderr : stdout);
+
+    // optional error handler for iOS Crashlytics logging
+    if (ErrorHandler)
+    {
+        ErrorHandler(severity, errBuf, len);
+    }
+
 }
 
 #define WrappedLogFormatv(severity, format) \
     va_list ap; va_start(ap, format); \
-    const char* err = LogFormatv(severity, format, ap); \
-    va_end(ap); return err;
-
-EXTERNC const char* LogFormat(LogSeverity severity, const char* format, ...) {
-    WrappedLogFormatv(severity, format);
-}
-EXTERNC const char* LogString(LogSeverity severity, const char* string) {
-    return LogFormat(severity, "%s", string);
-}
-EXTERNC const char* _LogInfo(const char* format, ...) {
+    LogFormatv(severity, format, ap); \
+    va_end(ap);
+EXTERNC void _LogInfo(const char* format, ...) {
     WrappedLogFormatv(LogSeverityInfo, format);
 }
-EXTERNC const char* _LogWarning(const char* format, ...) {
+EXTERNC void _LogWarning(const char* format, ...) {
     WrappedLogFormatv(LogSeverityWarn, format);
 }
-EXTERNC const char* _LogError(const char* format, ...) {
+EXTERNC void _LogError(const char* format, ...) {
     WrappedLogFormatv(LogSeverityError, format);
 }
 
 EXTERNC const char* _FmtString(const char* format, ...) {
+    static char errBuf[4096];
+
     va_list ap; va_start(ap, format);
-    vsprintf(ErrBuf, format, ap);
-    va_end(ap);
-    return ErrBuf;
+    int len = vsnprintf(errBuf, sizeof(errBuf)-1, format, ap);
+    
+    if (len < 0) { // err: didn't fit
+        len = sizeof(errBuf)-2; // try to recover gracefully
+        errBuf[len] = '\0';
+    }
+    return errBuf;
 }
 
 EXTERNC const char* _LogFilename(const char* longFilePath)

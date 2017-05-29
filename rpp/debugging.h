@@ -41,12 +41,10 @@ EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc);
 EXTERNC void SetLogSeverityFilter(LogSeverity filter);
 
 /** Logs an error to the backing error mechanism (Crashlytics on iOS) */
-EXTERNC const char* LogFormatv(LogSeverity severity, const char* format, va_list ap);
-EXTERNC const char* LogFormat (LogSeverity severity, const char* format, ...);
-EXTERNC const char* LogString (LogSeverity severity, const char* string);
-EXTERNC const char* _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC const char* _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC const char* _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap);
+EXTERNC void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+EXTERNC void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+EXTERNC void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 EXTERNC const char* _LogFuncname(const char* longFuncName); // shortens the func name
