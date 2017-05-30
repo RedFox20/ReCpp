@@ -30,3 +30,9 @@ ipch/
 bin/lnk{25D41FEF-B825-459C-8B46-03620AC3C878}.tmp
 MSVC/obj/
 test_tmp/
+
+\.idea/
+
+bin/libReCpp\.a
+
+cmake-build-debug/
