@@ -690,12 +690,19 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
+#if __clang__
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wmissing-braces"
+#endif
     const Matrix4 Matrix4::IDENTITY = {{
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1,
     }};
+#if __clang__
+    #pragma clang diagnostic pop
+#endif
 
     Matrix4& Matrix4::loadIdentity()
     {

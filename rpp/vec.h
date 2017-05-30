@@ -22,8 +22,10 @@
 #undef min
 #undef max
 
+#if _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4201) // nameless struct/union warning
+#endif
 
 namespace rpp
 {
@@ -1214,6 +1216,8 @@ namespace rpp
 
 } // namespace rpp
 
-#pragma warning(pop)
+#if _MSC_VER
+#pragma warning(pop) // nameless struct/union warning
+#endif
 
 #endif /* RPP_VECTORMATH_H */

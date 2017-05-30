@@ -25,8 +25,10 @@
  * The structures below contain methods for efficiently manipulating the strview class.
  */
 
+#if _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4201) // nameless struct/union warning
+#endif
 
 namespace rpp
 {
@@ -37,6 +39,7 @@ namespace rpp
         typedef unsigned char      byte;
         typedef unsigned short     ushort;
         typedef unsigned int       uint;
+        typedef unsigned long      ulong;
         typedef long long          int64;
         typedef unsigned long long uint64;
     #endif
@@ -1037,6 +1040,8 @@ namespace std
     ////////////////////////////////////////////////////////////////////////////////
 }
 
-#pragma warning(pop)
+#if _MSC_VER
+#pragma warning(pop) // pop nameless struct/union warning
+#endif
 
 #endif // MFGRAPHICS_STRVIEW_HPP
