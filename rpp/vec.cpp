@@ -910,6 +910,27 @@ namespace rpp
         return *this;
     }
 
+    Matrix4& Matrix4::transpose()
+    {
+        swap(m01, m10);
+        swap(m02, m20);
+        swap(m03, m30);
+        swap(m12, m21);
+        swap(m13, m31);
+        swap(m23, m32);
+        return *this;
+    }
+
+    Matrix4 Matrix4::transposed() const
+    {
+        return {
+            m00, m10, m20, m30,
+            m01, m11, m21, m31,
+            m02, m12, m22, m32,
+            m03, m13, m23, m33,
+        };
+    }
+
     Matrix4 Matrix4::inverse() const
     {
         float coef00 = m22 * m33 - m23 * m32;

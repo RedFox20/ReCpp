@@ -1025,6 +1025,10 @@ namespace rpp
         float x, y, z, w;
     };
 
+    /**
+     * 4x4 Affine Matrix for OpenGL
+     * The matrices are in row-major order, which is best suitable for MODERN OPENGL development
+     */
     struct Matrix4
     {
         union {
@@ -1200,6 +1204,11 @@ namespace rpp
             return affine;
         }
 
+        // Transposes THIS Matrix4
+        Matrix4& transpose();
+
+        // Returns a transposed copy of this matrix
+        Matrix4 transposed() const;
 
         // Matrix x InverseMatrix = Identity, useful for unprojecting
         Matrix4 inverse() const;
