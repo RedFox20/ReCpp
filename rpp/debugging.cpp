@@ -91,11 +91,12 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
     static const int max = 36;
 
     // always skip the first ::
-    const char* ptr = (ptr = strchr(longFuncName, ':')) ? ptr+2 : longFuncName;
+    const char* ptr = strchr(longFuncName, ':');
+    ptr = ptr ? ptr+2 : longFuncName;
 
     char ch;
     int len = 0;
-    for (; len < max && (ch = *ptr); ++ptr) {
+    for (; len < max && (ch = *ptr) != '\0'; ++ptr) {
         if (ch == '<' && memcmp(ptr, "<lambda", 7) == 0) {
             memcpy(&buf[len], "lambda", 6);
             len += 6;
