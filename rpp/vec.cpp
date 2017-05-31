@@ -910,6 +910,61 @@ namespace rpp
         return *this;
     }
 
+    Matrix4 Matrix4::inverse() const
+    {
+        float coef00 = m22 * m33 - m23 * m32;
+        float coef02 = m21 * m33 - m23 * m31;
+        float coef03 = m21 * m32 - m22 * m31;
+
+        float coef04 = m12 * m33 - m13 * m32;
+        float coef06 = m11 * m33 - m13 * m31;
+        float coef07 = m11 * m32 - m12 * m31;
+
+        float coef08 = m12 * m23 - m13 * m22;
+        float coef10 = m11 * m23 - m13 * m21;
+        float coef11 = m11 * m22 - m12 * m21;
+
+        float coef12 = m02 * m33 - m03 * m32;
+        float coef14 = m01 * m33 - m03 * m31;
+        float coef15 = m01 * m32 - m02 * m31;
+
+        float coef16 = m02 * m23 - m03 * m22;
+        float coef18 = m01 * m23 - m03 * m21;
+        float coef19 = m01 * m22 - m02 * m21;
+
+        float coef20 = m02 * m13 - m03 * m12;
+        float coef22 = m01 * m13 - m03 * m11;
+        float coef23 = m01 * m12 - m02 * m11;
+
+        static const Vector4 signA{ +1.0f, -1.0f, +1.0f, -1.0f };
+        static const Vector4 signB{ -1.0f, +1.0f, -1.0f, +1.0f };
+
+        Vector4 fac0(coef00, coef00, coef02, coef03);
+        Vector4 fac1(coef04, coef04, coef06, coef07);
+        Vector4 fac2(coef08, coef08, coef10, coef11);
+        Vector4 fac3(coef12, coef12, coef14, coef15);
+        Vector4 fac4(coef16, coef16, coef18, coef19);
+        Vector4 fac5(coef20, coef20, coef22, coef23);
+
+        Vector4 v0(m01, m00, m00, m00);
+        Vector4 v1(m11, m10, m10, m10);
+        Vector4 v2(m21, m20, m20, m20);
+        Vector4 v3(m31, m30, m30, m30);
+
+        Vector4 inv0 = signA * (v1 * fac0 - v2 * fac1 + v3 * fac2);
+        Vector4 inv1 = signB * (v0 * fac0 - v2 * fac3 + v3 * fac4);
+        Vector4 inv2 = signA * (v0 * fac1 - v1 * fac3 + v3 * fac5);
+        Vector4 inv3 = signB * (v0 * fac2 - v1 * fac4 + v2 * fac5);
+
+        Matrix4 inv { inv0, inv1, inv2, inv3 };
+        float determinant = r0.dot(inv.r0);
+        inv.r0 /= determinant;
+        inv.r1 /= determinant;
+        inv.r2 /= determinant;
+        inv.r3 /= determinant;
+        return inv;
+    }
+
     void Matrix4::print() const
     {
         char buffer[256];
@@ -1081,6 +1136,61 @@ namespace rpp
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
+
+    // Thank you!
+    // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
+    float rayIntersect(Vector3 rayStart, Vector3 rayDirection, 
+                       Vector3 sphereCenter, float sphereRadius) noexcept
+    {
+        float t0, t1; // solutions for t if the ray intersects 
+
+        Vector3 L = sphereCenter - rayStart;
+        float tca = L.dot(rayDirection);
+        if (tca < 0) return 0.0f; // L and rayDir point in opposite directions, so intersect is behind rayStart
+
+        float sqRadius = sphereRadius*sphereRadius;
+        float d2 = L.dot(L) - tca*tca;
+        if (d2 > sqRadius) return 0.0f;
+        float thc = sqrt(sqRadius - d2);
+        t0 = tca - thc;
+        t1 = tca + thc;
+
+        if (t0 > t1) swap(t0, t1);
+        if (t0 < 0) {
+            t0 = t1; // if t0 is negative, let's use t1 instead 
+            if (t0 < 0) return 0.0f; // both t0 and t1 are negative 
+        }
+        return t0;
+    }
+
+    // Möller–Trumbore ray-triangle intersection algorithm
+    // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+    float rayIntersect(Vector3 rayStart, Vector3 rayDirection, 
+                       Vector3 v0, Vector3 v1, Vector3 v2) noexcept
+    {
+        Vector3 e1 = v1 - v0;
+        Vector3 e2 = v2 - v0;
+        // Calculate planes normal vector
+        Vector3 pvec = rayDirection.cross(e2);
+        float det = e1.dot(pvec);
+
+        // Ray is parallel to plane
+        if (det < 1e-8 && det > -1e-8)
+            return 0.0f;
+
+        float inv_det = 1 / det;
+        Vector3 tvec = rayStart - v0;
+        float u = tvec.dot(pvec) * inv_det;
+        if (u < 0 || u > 1)
+            return 0;
+
+        Vector3 qvec = tvec.cross(e1);
+        float v = rayDirection.dot(qvec) * inv_det;
+        if (v < 0 || u + v > 1)
+            return 0;
+
+        return e2.dot(qvec) * inv_det;
+    }
 
 } // namespace rpp
 

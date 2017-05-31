@@ -985,6 +985,9 @@ namespace rpp
         Vector4  operator+ (const Vector4& v) const { return { x+v.x, y+v.y, z+v.z, w+v.w }; }
         Vector4  operator- (const Vector4& v) const { return { x-v.x, y-v.y, z-v.z, w-v.w }; }
         Vector4  operator- () const { return {-x, -y, -z, -w }; }
+
+        Vector4& operator*=(float f) { x *= f, y *= f, z *= f, w *= f; return *this; }
+        Vector4& operator/=(float f) { x /= f, y /= f, z /= f, w /= f; return *this; }
     
         bool operator==(const Vector4& v) const { return x == v.x && y == v.y && z == v.z && w == v.w; }
         bool operator!=(const Vector4& v) const { return x != v.x || y != v.y || z != v.z || w != v.w; }
@@ -1198,6 +1201,9 @@ namespace rpp
         }
 
 
+        // Matrix x InverseMatrix = Identity, useful for unprojecting
+        Matrix4 inverse() const;
+
         /** Print the matrix */
         void print() const;
     
@@ -1285,6 +1291,18 @@ namespace rpp
         // calculates the bounding box using vertex ID-s, which index the given point cloud
         static BoundingBox create(const vector<Vector3>& points, const vector<int>& ids);
     };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    // Ray-Sphere intersection 
+    // @return Distance from rayStart to intersection OR 0.0f if no solutions
+    float rayIntersect(Vector3 rayStart, Vector3 rayDirection,
+                       Vector3 sphereCenter, float sphereRadius) noexcept;
+
+    // Ray-Triangle intersection
+    // @return Distance from rayStart to intersection OR 0.0f if no solutions 
+    float rayIntersect(Vector3 rayStart, Vector3 rayDirection,
+                       Vector3 v0, Vector3 v1, Vector3 v2) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
