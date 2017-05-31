@@ -433,14 +433,14 @@ namespace rpp
         return { x*inv, y*inv, z*inv };
     }
 
-    Vector3 Vector3::cross(const Vector3& b) const
+    Vector3 Vector3::cross(const Vector3& v) const
     {
-        return { y*b.z - b.y*z, z*b.x - b.z*x, x*b.y - b.x*y };
+        return { y*v.z - v.y*z, z*v.x - v.z*x, x*v.y - v.x*y };
     }
 
-    float Vector3::dot(const Vector3& b) const
+    float Vector3::dot(const Vector3& v) const
     {
-        return x*b.x + y*b.y + z*b.z;
+        return x*v.x + y*v.y + z*v.z;
     }
 
     void Vector3::print() const
@@ -473,9 +473,9 @@ namespace rpp
         return nearlyZero(x) && nearlyZero(y) && nearlyZero(z);
     }
 
-    bool Vector3::almostEqual(const Vector3& b) const
+    bool Vector3::almostEqual(const Vector3& v) const
     {
-        return nearlyZero(x - b.x) && nearlyZero(y - b.y) && nearlyZero(z - b.z);
+        return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
     }
 
     const Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
@@ -736,12 +736,12 @@ namespace rpp
         const Vector4 b1 = mb.r1;
         const Vector4 b2 = mb.r2;
         const Vector4 b3 = mb.r3;
-        Matrix4 m = {};
-        m.r0 = (a0*b0.x + a1*b0.y) + (a2*b0.z + a3*b0.w);
-        m.r1 = (a0*b1.x + a1*b1.y) + (a2*b1.z + a3*b1.w);
-        m.r2 = (a0*b2.x + a1*b2.y) + (a2*b2.z + a3*b2.w);
-        m.r3 = (a0*b3.x + a1*b3.y) + (a2*b3.z + a3*b3.w);
-        return m;
+        Matrix4 mc = {};
+        mc.r0 = (a0*b0.x + a1*b0.y) + (a2*b0.z + a3*b0.w);
+        mc.r1 = (a0*b1.x + a1*b1.y) + (a2*b1.z + a3*b1.w);
+        mc.r2 = (a0*b2.x + a1*b2.y) + (a2*b2.z + a3*b2.w);
+        mc.r3 = (a0*b3.x + a1*b3.y) + (a2*b3.z + a3*b3.w);
+        return mc;
     }
 
     Vector3 Matrix4::operator*(const Vector3& v) const

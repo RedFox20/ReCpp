@@ -639,18 +639,18 @@ namespace rpp
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
         bool almostEqual(const Vector3& b) const;
 
-        Vector3& operator+=(const Vector3& b) { x+=b.x, y+=b.y, z+=b.z; return *this; }
-        Vector3& operator-=(const Vector3& b) { x-=b.x, y-=b.y, z-=b.z; return *this; }
-        Vector3& operator*=(const Vector3& b) { x*=b.x, y*=b.y, z*=b.z; return *this; }
-        Vector3& operator/=(const Vector3& b) { x/=b.x, y/=b.y, z/=b.z; return *this; }
-        Vector3  operator+ (const Vector3& b) const { return { x+b.x, y+b.y, z+b.z }; }
-        Vector3  operator- (const Vector3& b) const { return { x-b.x, y-b.y, z-b.z }; }
-        Vector3  operator* (const Vector3& b) const { return { x*b.x, y*b.y, z*b.z }; }
-        Vector3  operator/ (const Vector3& b) const { return { x/b.x, y/b.y, z/b.z }; }
+        Vector3& operator+=(const Vector3& v) { x+=v.x, y+=v.y, z+=v.z; return *this; }
+        Vector3& operator-=(const Vector3& v) { x-=v.x, y-=v.y, z-=v.z; return *this; }
+        Vector3& operator*=(const Vector3& v) { x*=v.x, y*=v.y, z*=v.z; return *this; }
+        Vector3& operator/=(const Vector3& v) { x/=v.x, y/=v.y, z/=v.z; return *this; }
+        Vector3  operator+ (const Vector3& v) const { return { x+v.x, y+v.y, z+v.z }; }
+        Vector3  operator- (const Vector3& v) const { return { x-v.x, y-v.y, z-v.z }; }
+        Vector3  operator* (const Vector3& v) const { return { x*v.x, y*v.y, z*v.z }; }
+        Vector3  operator/ (const Vector3& v) const { return { x/v.x, y/v.y, z/v.z }; }
         Vector3  operator- () const { return {-x, -y, -z}; }
     
-        bool operator==(const Vector3& b) const { return x == b.x && y == b.y && z == b.z; }
-        bool operator!=(const Vector3& b) const { return x != b.x || y != b.y || z != b.z; }
+        bool operator==(const Vector3& v) const { return x == v.x && y == v.y && z == v.z; }
+        bool operator!=(const Vector3& v) const { return x != v.x || y != v.y || z != v.z; }
 
         static const Vector3 smoothColor(const Vector3& src, const Vector3& dst, float ratio);
 
