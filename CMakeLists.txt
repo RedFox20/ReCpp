@@ -19,7 +19,7 @@ target_include_directories(ReCpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set(TARGET ReCpp CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 set(LINK_DIRECTORIES ${LINK_DIRECTORIES} ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
-target_compile_options(ReCpp PRIVATE -std=c++1z -Wall -march=native -fPIC)
+target_compile_options(ReCpp PRIVATE -std=c++1z -Wall -march=native -Werror=unused-variable -fPIC)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(ReCpp PRIVATE -DDEBUG)
 endif()

@@ -1,6 +1,6 @@
 #include "file_io.h"
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
 #include <sys/stat.h> // stat,fstat
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -14,7 +14,6 @@
     #define ftelli64 _ftelli64
 #else
     #include <unistd.h>
-    #include <string.h>
     #include <dirent.h> // opendir()
 
     #define fseeki64 fseeko
@@ -131,13 +130,21 @@ namespace rpp /* ReCpp */
         }
         return handle;
     }
+    static void* OpenOrCreate(const strview& filename, IOFlags mode) noexcept
+    {
+        char buf[512];
+        return OpenOrCreate(filename.to_cstr(buf), mode);
+    }
 
-
-    file::file(const char*    filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode) {}
-    file::file(const string&  filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename.c_str(), mode)), Mode(mode) {}
-    file::file(const strview  filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename.to_cstr(), mode)), Mode(mode) {}
-    file::file(const wchar_t* filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode) {}
-    file::file(const wstring& filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename.c_str(), mode)), Mode(mode) {}
+    file::file(const char* filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode)
+    {
+    }
+    file::file(const strview& filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode)
+    {
+    }
+    file::file(const wchar_t* filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode)
+    {
+    }
     file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
     {
         f.Handle = 0;
@@ -160,23 +167,16 @@ namespace rpp /* ReCpp */
         Mode = mode;
         return (Handle = OpenOrCreate(filename, mode)) != nullptr;
     }
-    bool file::open(const string& filename, IOFlags mode) noexcept
-    {
-        return open(filename.c_str(), mode);
-    }
     bool file::open(const strview filename, IOFlags mode) noexcept
     {
-        return open(filename.to_cstr(), mode);
+        char buf[512];
+        return open(filename.to_cstr(buf), mode);
     }
     bool file::open(const wchar_t* filename, IOFlags mode) noexcept
     {
         close();
         Mode = mode;
         return (Handle = OpenOrCreate(filename, mode)) != nullptr;
-    }
-    bool file::open(const wstring& filename, IOFlags mode) noexcept
-    {
-        return open(filename.c_str(), mode);
     }
     void file::close() noexcept
     {
@@ -238,7 +238,7 @@ namespace rpp /* ReCpp */
             ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, 0);
             return bytesRead;
         #else
-            return (int)fread(buffer, bytesToRead, 1, (FILE*)Handle) * bytesToRead;
+            return (int)fread(buffer, (size_t)bytesToRead, 1, (FILE*)Handle) * bytesToRead;
         #endif
     }
     load_buffer file::read_all() noexcept
@@ -247,7 +247,7 @@ namespace rpp /* ReCpp */
         if (!fileSize) return load_buffer(0, 0);
 
         // allocate +1 bytes for null terminator; this is for legacy API-s
-        char* buffer = (char*)malloc(fileSize + 1);
+        char* buffer = (char*)malloc(size_t(fileSize + 1));
         int bytesRead = read(buffer, fileSize);
         buffer[bytesRead] = '\0';
         return load_buffer(buffer, bytesRead);
@@ -256,21 +256,14 @@ namespace rpp /* ReCpp */
     {
         return file{filename, READONLY}.read_all();
     }
-    load_buffer file::read_all(const string& filename) noexcept
+    load_buffer file::read_all(const strview& filename) noexcept
     {
-        return read_all(filename.c_str());
-    }
-    load_buffer file::read_all(const strview filename) noexcept
-    {
-        return read_all(filename.to_cstr());
+        char buf[512];
+        return read_all(filename.to_cstr(buf));
     }
     load_buffer file::read_all(const wchar_t* filename) noexcept
     {
         return file{filename, READONLY}.read_all();
-    }
-    load_buffer file::read_all(const wstring& filename) noexcept
-    {
-        return read_all(filename.c_str());
     }
     int file::write(const void* buffer, int bytesToWrite) noexcept
     {
@@ -319,14 +312,10 @@ namespace rpp /* ReCpp */
         file f{ filename, IOFlags::CREATENEW };
         return f.write(buffer, bytesToWrite);
     }
-    int file::write_new(const string & filename, const void * buffer, int bytesToWrite) noexcept
-    {
-        return write_new(filename.c_str(), buffer, bytesToWrite);
-    }
-    int file::write_new(const strview filename, const void* buffer, int bytesToWrite) noexcept
+    int file::write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept
     {
         char buf[512];
-        return write_new(filename.to_cstr(buf,512), buffer, bytesToWrite);
+        return write_new(filename.to_cstr(buf), buffer, bytesToWrite);
     }
     int file::seek(int filepos, int seekmode) noexcept
     {
