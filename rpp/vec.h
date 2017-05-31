@@ -1138,7 +1138,7 @@ namespace rpp
     
         /** @brief Creates a translated matrix from XYZ position */
         Matrix4& fromPosition(const Vector3& position);
-        static inline Matrix4 Matrix4::createPosition(const Vector3& position)
+        static inline Matrix4 createPosition(const Vector3& position)
         {
             Matrix4 mat = IDENTITY;
             mat.translate(position);
@@ -1147,7 +1147,7 @@ namespace rpp
     
         /** @brief Creates a rotated matrix from euler XYZ rotation */
         Matrix4& fromRotation(const Vector3& rotationDegrees);
-        static inline Matrix4 Matrix4::createRotation(const Vector3& rotationDegrees)
+        static inline Matrix4 createRotation(const Vector3& rotationDegrees)
         {
             Matrix4 mat = {};
             mat.fromRotation(rotationDegrees);
@@ -1156,7 +1156,7 @@ namespace rpp
     
         /** @brief Creates a scaled matrix from XYZ scale */
         Matrix4& fromScale(const Vector3& scale);
-        static inline Matrix4 Matrix4::createScale(const Vector3& scale)
+        static inline Matrix4 createScale(const Vector3& scale)
         {
             Matrix4 mat = {};
             mat.fromScale(scale);
