@@ -931,59 +931,247 @@ namespace rpp
         };
     }
 
+#if !RPP_SSE_INTRINSICS
+    // from MESA implementation of the GLU library gluInvertMatrix source
+    static inline void invert4x4(const float* m, float* inv)
+    {
+        inv[0] = m[5]  * m[10] * m[15] - 
+                 m[5]  * m[11] * m[14] - 
+                 m[9]  * m[6]  * m[15] + 
+                 m[9]  * m[7]  * m[14] +
+                 m[13] * m[6]  * m[11] - 
+                 m[13] * m[7]  * m[10];
+
+        inv[4] = -m[4]  * m[10] * m[15] + 
+                  m[4]  * m[11] * m[14] + 
+                  m[8]  * m[6]  * m[15] - 
+                  m[8]  * m[7]  * m[14] - 
+                  m[12] * m[6]  * m[11] + 
+                  m[12] * m[7]  * m[10];
+
+        inv[8] = m[4]  * m[9] * m[15] - 
+                 m[4]  * m[11] * m[13] - 
+                 m[8]  * m[5] * m[15] + 
+                 m[8]  * m[7] * m[13] + 
+                 m[12] * m[5] * m[11] - 
+                 m[12] * m[7] * m[9];
+
+        inv[12] = -m[4]  * m[9] * m[14] + 
+                   m[4]  * m[10] * m[13] +
+                   m[8]  * m[5] * m[14] - 
+                   m[8]  * m[6] * m[13] - 
+                   m[12] * m[5] * m[10] + 
+                   m[12] * m[6] * m[9];
+
+        inv[1] = -m[1]  * m[10] * m[15] + 
+                  m[1]  * m[11] * m[14] + 
+                  m[9]  * m[2] * m[15] - 
+                  m[9]  * m[3] * m[14] - 
+                  m[13] * m[2] * m[11] + 
+                  m[13] * m[3] * m[10];
+
+        inv[5] = m[0]  * m[10] * m[15] - 
+                 m[0]  * m[11] * m[14] - 
+                 m[8]  * m[2] * m[15] + 
+                 m[8]  * m[3] * m[14] + 
+                 m[12] * m[2] * m[11] - 
+                 m[12] * m[3] * m[10];
+
+        inv[9] = -m[0]  * m[9] * m[15] + 
+                  m[0]  * m[11] * m[13] + 
+                  m[8]  * m[1] * m[15] - 
+                  m[8]  * m[3] * m[13] - 
+                  m[12] * m[1] * m[11] + 
+                  m[12] * m[3] * m[9];
+
+        inv[13] = m[0]  * m[9] * m[14] - 
+                  m[0]  * m[10] * m[13] - 
+                  m[8]  * m[1] * m[14] + 
+                  m[8]  * m[2] * m[13] + 
+                  m[12] * m[1] * m[10] - 
+                  m[12] * m[2] * m[9];
+
+        inv[2] = m[1]  * m[6] * m[15] - 
+                 m[1]  * m[7] * m[14] - 
+                 m[5]  * m[2] * m[15] + 
+                 m[5]  * m[3] * m[14] + 
+                 m[13] * m[2] * m[7] - 
+                 m[13] * m[3] * m[6];
+
+        inv[6] = -m[0]  * m[6] * m[15] + 
+                  m[0]  * m[7] * m[14] + 
+                  m[4]  * m[2] * m[15] - 
+                  m[4]  * m[3] * m[14] - 
+                  m[12] * m[2] * m[7] + 
+                  m[12] * m[3] * m[6];
+
+        inv[10] = m[0]  * m[5] * m[15] - 
+                  m[0]  * m[7] * m[13] - 
+                  m[4]  * m[1] * m[15] + 
+                  m[4]  * m[3] * m[13] + 
+                  m[12] * m[1] * m[7] - 
+                  m[12] * m[3] * m[5];
+
+        inv[14] = -m[0]  * m[5] * m[14] + 
+                   m[0]  * m[6] * m[13] + 
+                   m[4]  * m[1] * m[14] - 
+                   m[4]  * m[2] * m[13] - 
+                   m[12] * m[1] * m[6] + 
+                   m[12] * m[2] * m[5];
+
+        inv[3] = -m[1] * m[6] * m[11] + 
+                  m[1] * m[7] * m[10] + 
+                  m[5] * m[2] * m[11] - 
+                  m[5] * m[3] * m[10] - 
+                  m[9] * m[2] * m[7] + 
+                  m[9] * m[3] * m[6];
+
+        inv[7] = m[0] * m[6] * m[11] - 
+                 m[0] * m[7] * m[10] - 
+                 m[4] * m[2] * m[11] + 
+                 m[4] * m[3] * m[10] + 
+                 m[8] * m[2] * m[7] - 
+                 m[8] * m[3] * m[6];
+
+        inv[11] = -m[0] * m[5] * m[11] + 
+                   m[0] * m[7] * m[9] + 
+                   m[4] * m[1] * m[11] - 
+                   m[4] * m[3] * m[9] - 
+                   m[8] * m[1] * m[7] + 
+                   m[8] * m[3] * m[5];
+
+        inv[15] = m[0] * m[5] * m[10] - 
+                  m[0] * m[6] * m[9] - 
+                  m[4] * m[1] * m[10] + 
+                  m[4] * m[2] * m[9] + 
+                  m[8] * m[1] * m[6] - 
+                  m[8] * m[2] * m[5];
+
+        float det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+
+        det = 1.0f / det;
+        inv[0] *= det;
+        inv[1] *= det;
+        inv[2] *= det;
+        inv[3] *= det;
+        inv[4] *= det;
+        inv[5] *= det;
+        inv[6] *= det;
+        inv[7] *= det;
+        inv[8] *= det;
+        inv[9] *= det;
+        inv[10] *= det;
+        inv[11] *= det;
+        inv[12] *= det;
+        inv[13] *= det;
+        inv[14] *= det;
+        inv[15] *= det;
+    }
+#else
+    // The original code as provided by Intel in
+    // "Streaming SIMD Extensions - Inverse of 4x4 Matrix"
+    // (ftp://download.intel.com/design/pentiumiii/sml/24504301.pdf)
+    static inline void invert4x4(const float* src, float* dst)
+    {
+        __m128 minor0, minor1, minor2, minor3;
+        __m128 row0, row1 = {}, row2, row3 = {};
+        __m128 det, tmp1 = {};
+
+        tmp1 = _mm_loadh_pi(_mm_loadl_pi(tmp1, (__m64*)(src)), (__m64*)(src + 4));
+        row1 = _mm_loadh_pi(_mm_loadl_pi(row1, (__m64*)(src + 8)), (__m64*)(src + 12));
+        row0 = _mm_shuffle_ps(tmp1, row1, 0x88);
+        row1 = _mm_shuffle_ps(row1, tmp1, 0xDD);
+        tmp1 = _mm_loadh_pi(_mm_loadl_pi(tmp1, (__m64*)(src + 2)), (__m64*)(src + 6));
+        row3 = _mm_loadh_pi(_mm_loadl_pi(row3, (__m64*)(src + 10)), (__m64*)(src + 14));
+        row2 = _mm_shuffle_ps(tmp1, row3, 0x88);
+        row3 = _mm_shuffle_ps(row3, tmp1, 0xDD);
+
+        tmp1 = _mm_mul_ps(row2, row3);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor0 = _mm_mul_ps(row1, tmp1);
+        minor1 = _mm_mul_ps(row0, tmp1);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor0 = _mm_sub_ps(_mm_mul_ps(row1, tmp1), minor0);
+        minor1 = _mm_sub_ps(_mm_mul_ps(row0, tmp1), minor1);
+        minor1 = _mm_shuffle_ps(minor1, minor1, 0x4E);
+
+        tmp1 = _mm_mul_ps(row1, row2);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor0 = _mm_add_ps(_mm_mul_ps(row3, tmp1), minor0);
+        minor3 = _mm_mul_ps(row0, tmp1);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor0 = _mm_sub_ps(minor0, _mm_mul_ps(row3, tmp1));
+        minor3 = _mm_sub_ps(_mm_mul_ps(row0, tmp1), minor3);
+        minor3 = _mm_shuffle_ps(minor3, minor3, 0x4E);
+
+        tmp1 = _mm_mul_ps(_mm_shuffle_ps(row1, row1, 0x4E), row3);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        row2 = _mm_shuffle_ps(row2, row2, 0x4E);
+        minor0 = _mm_add_ps(_mm_mul_ps(row2, tmp1), minor0);
+        minor2 = _mm_mul_ps(row0, tmp1);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor0 = _mm_sub_ps(minor0, _mm_mul_ps(row2, tmp1));
+        minor2 = _mm_sub_ps(_mm_mul_ps(row0, tmp1), minor2);
+        minor2 = _mm_shuffle_ps(minor2, minor2, 0x4E);
+
+        tmp1 = _mm_mul_ps(row0, row1);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor2 = _mm_add_ps(_mm_mul_ps(row3, tmp1), minor2);
+        minor3 = _mm_sub_ps(_mm_mul_ps(row2, tmp1), minor3);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor2 = _mm_sub_ps(_mm_mul_ps(row3, tmp1), minor2);
+        minor3 = _mm_sub_ps(minor3, _mm_mul_ps(row2, tmp1));
+
+        tmp1 = _mm_mul_ps(row0, row3);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor1 = _mm_sub_ps(minor1, _mm_mul_ps(row2, tmp1));
+        minor2 = _mm_add_ps(_mm_mul_ps(row1, tmp1), minor2);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor1 = _mm_add_ps(_mm_mul_ps(row2, tmp1), minor1);
+        minor2 = _mm_sub_ps(minor2, _mm_mul_ps(row1, tmp1));
+
+        tmp1 = _mm_mul_ps(row0, row2);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor1 = _mm_add_ps(_mm_mul_ps(row3, tmp1), minor1);
+        minor3 = _mm_sub_ps(minor3, _mm_mul_ps(row1, tmp1));
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor1 = _mm_sub_ps(minor1, _mm_mul_ps(row3, tmp1));
+        minor3 = _mm_add_ps(_mm_mul_ps(row1, tmp1), minor3);
+
+        det = _mm_mul_ps(row0, minor0);
+        det = _mm_add_ps(_mm_shuffle_ps(det, det, 0x4E), det);
+        det = _mm_add_ss(_mm_shuffle_ps(det, det, 0xB1), det);
+
+        tmp1 = _mm_rcp_ss(det);
+        det = _mm_sub_ss(_mm_add_ss(tmp1, tmp1), _mm_mul_ss(det, _mm_mul_ss(tmp1, tmp1)));
+        det = _mm_shuffle_ps(det, det, 0x00);
+
+        minor0 = _mm_mul_ps(det, minor0);
+        _mm_storel_pi((__m64*)(dst), minor0);
+        _mm_storeh_pi((__m64*)(dst + 2), minor0);
+        minor1 = _mm_mul_ps(det, minor1);
+        _mm_storel_pi((__m64*)(dst + 4), minor1);
+        _mm_storeh_pi((__m64*)(dst + 6), minor1);
+        minor2 = _mm_mul_ps(det, minor2);
+        _mm_storel_pi((__m64*)(dst + 8), minor2);
+        _mm_storeh_pi((__m64*)(dst + 10), minor2);
+        minor3 = _mm_mul_ps(det, minor3);
+        _mm_storel_pi((__m64*)(dst + 12), minor3);
+        _mm_storeh_pi((__m64*)(dst + 14), minor3);
+    }
+#endif
+
     Matrix4 Matrix4::inverse() const
     {
-        float coef00 = m22 * m33 - m23 * m32;
-        float coef02 = m21 * m33 - m23 * m31;
-        float coef03 = m21 * m32 - m22 * m31;
-
-        float coef04 = m12 * m33 - m13 * m32;
-        float coef06 = m11 * m33 - m13 * m31;
-        float coef07 = m11 * m32 - m12 * m31;
-
-        float coef08 = m12 * m23 - m13 * m22;
-        float coef10 = m11 * m23 - m13 * m21;
-        float coef11 = m11 * m22 - m12 * m21;
-
-        float coef12 = m02 * m33 - m03 * m32;
-        float coef14 = m01 * m33 - m03 * m31;
-        float coef15 = m01 * m32 - m02 * m31;
-
-        float coef16 = m02 * m23 - m03 * m22;
-        float coef18 = m01 * m23 - m03 * m21;
-        float coef19 = m01 * m22 - m02 * m21;
-
-        float coef20 = m02 * m13 - m03 * m12;
-        float coef22 = m01 * m13 - m03 * m11;
-        float coef23 = m01 * m12 - m02 * m11;
-
-        static const Vector4 signA{ +1.0f, -1.0f, +1.0f, -1.0f };
-        static const Vector4 signB{ -1.0f, +1.0f, -1.0f, +1.0f };
-
-        Vector4 fac0(coef00, coef00, coef02, coef03);
-        Vector4 fac1(coef04, coef04, coef06, coef07);
-        Vector4 fac2(coef08, coef08, coef10, coef11);
-        Vector4 fac3(coef12, coef12, coef14, coef15);
-        Vector4 fac4(coef16, coef16, coef18, coef19);
-        Vector4 fac5(coef20, coef20, coef22, coef23);
-
-        Vector4 v0(m01, m00, m00, m00);
-        Vector4 v1(m11, m10, m10, m10);
-        Vector4 v2(m21, m20, m20, m20);
-        Vector4 v3(m31, m30, m30, m30);
-
-        Vector4 inv0 = signA * (v1 * fac0 - v2 * fac1 + v3 * fac2);
-        Vector4 inv1 = signB * (v0 * fac0 - v2 * fac3 + v3 * fac4);
-        Vector4 inv2 = signA * (v0 * fac1 - v1 * fac3 + v3 * fac5);
-        Vector4 inv3 = signB * (v0 * fac2 - v1 * fac4 + v2 * fac5);
-
-        Matrix4 inv { inv0, inv1, inv2, inv3 };
-        float determinant = r0.dot(inv.r0);
-        inv.r0 /= determinant;
-        inv.r1 /= determinant;
-        inv.r2 /= determinant;
-        inv.r3 /= determinant;
-        return inv;
+        Matrix4 inverse = {};
+        invert4x4(this->m, inverse.m);
+        return inverse;
     }
 
     void Matrix4::print() const
