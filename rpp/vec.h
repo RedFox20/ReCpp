@@ -1045,6 +1045,23 @@ namespace rpp
         /** @brief Global identity matrix for easy initialization */
         static const Matrix4 IDENTITY;
 
+        inline Matrix4() {}
+
+        inline constexpr Matrix4(
+            float m00, float m01, float m02, float m03,
+            float m10, float m11, float m12, float m13,
+            float m20, float m21, float m22, float m23,
+            float m30, float m31, float m32, float m33) :
+            m00(m00), m01(m01), m02(m02), m03(m03),
+            m10(m10), m11(m11), m12(m12), m13(m13),
+            m20(m20), m21(m21), m22(m22), m23(m23),
+            m30(m30), m31(m31), m32(m32), m33(m33) { }
+
+        inline constexpr Matrix4(Vector4 r0, Vector4 r1, Vector4 r2, Vector4 r3)
+            : r0(r0), r1(r1), r2(r2), r3(r3)
+        {
+        }
+
         /** @brief Loads identity matrix */
         Matrix4& loadIdentity();
     
@@ -1074,25 +1091,70 @@ namespace rpp
     
         /** @brief Loads an Ortographic projection matrix */
         Matrix4& setOrtho(float left, float right, float bottom, float top);
-        static Matrix4 createOrtho(float left, float right, float bottom, float top);
+        static inline Matrix4 createOrtho(float left, float right, float bottom, float top)
+        {
+            Matrix4 view = {};
+            view.setOrtho(left, right, bottom, top);
+            return view;
+        }
+        // create a classical GUI friendly ortho: 0,0 is topleft
+        // left [0, width]  right
+        // top  [0, height] bottom
+        static inline Matrix4 createOrtho(int width, int height)
+        {
+            return createOrtho(0.0f, float(width), float(height), 0.0f);
+        }
     
         /** @brief Loads a perspective projection matrix */
         Matrix4& setPerspective(float fov, float width, float height, float zNear, float zFar);
-        static Matrix4 createPerspective(float fov, float width, float height, float zNear, float zFar);
-    
+        static inline Matrix4 createPerspective(float fov, float width, float height, float zNear, float zFar)
+        {
+            Matrix4 view = {};
+            view.setPerspective(fov, width, height, zNear, zFar);
+            return view;
+        }
+        static inline Matrix4 createPerspective(float fov, int width, int height, float zNear, float zFar)
+        {
+            Matrix4 view = {};
+            view.setPerspective(fov, float(width), float(height), zNear, zFar);
+            return view;
+        }
+
         /** @brief Loads a lookAt view/camera matrix */
         Matrix4& setLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
-        static Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
+        static inline Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
+        {
+            Matrix4 view = {};
+            view.setLookAt(eye, center, up);
+            return view;
+        }
     
         /** @brief Creates a translated matrix from XYZ position */
         Matrix4& fromPosition(const Vector3& position);
-        static Matrix4 createPosition(const Vector3& position);
+        static inline Matrix4 Matrix4::createPosition(const Vector3& position)
+        {
+            Matrix4 mat = IDENTITY;
+            mat.translate(position);
+            return mat;
+        }
     
         /** @brief Creates a rotated matrix from euler XYZ rotation */
-        Matrix4& fromRotation(const Vector3& rotation);
+        Matrix4& fromRotation(const Vector3& rotationDegrees);
+        static inline Matrix4 Matrix4::createRotation(const Vector3& rotationDegrees)
+        {
+            Matrix4 mat = {};
+            mat.fromRotation(rotationDegrees);
+            return mat;
+        }
     
         /** @brief Creates a scaled matrix from XYZ scale */
         Matrix4& fromScale(const Vector3& scale);
+        static inline Matrix4 Matrix4::createScale(const Vector3& scale)
+        {
+            Matrix4 mat = {};
+            mat.fromScale(scale);
+            return mat;
+        }
 
         /** @return Extracts position data from this affine matrix */
         Vector3 getPositionColumn() const;
@@ -1123,6 +1185,18 @@ namespace rpp
          */
         Matrix4& setAffine2D(const Vector2& pos, float zOrder, float rotDegrees, 
                              const Vector2& rotAxis, const Vector2& scale);
+
+        /**
+         * @brief Creates an affine 3D transformation matrix. Rotation is in Euler XYZ degrees.
+         */
+        Matrix4& setAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees);
+        static inline Matrix4 createAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees)
+        {
+            Matrix4 affine = Matrix4::IDENTITY;
+            affine.setAffine3D(pos, scale, rotationDegrees);
+            return affine;
+        }
+
 
         /** Print the matrix */
         void print() const;

@@ -690,19 +690,12 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-#if __clang__
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wmissing-braces"
-#endif
-    const Matrix4 Matrix4::IDENTITY = {{
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
-    }};
-#if __clang__
-    #pragma clang diagnostic pop
-#endif
+    const Matrix4 Matrix4::IDENTITY = {
+        { 1, 0, 0, 0 },
+        { 0, 1, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 },
+    };
 
     Matrix4& Matrix4::loadIdentity()
     {
@@ -820,13 +813,6 @@ namespace rpp
         return *this;
     }
 
-    Matrix4 Matrix4::createOrtho(float left, float right, float bottom, float top)
-    {
-        Matrix4 view = Matrix4::IDENTITY;
-        view.setOrtho(left, right, bottom, top);
-        return view;
-    }
-
     Matrix4& Matrix4::setPerspective(float fov, float width, float height, float zNear, float zFar)
     {
         const float rad2 = radf(fov) * 0.5f;
@@ -838,13 +824,6 @@ namespace rpp
         m20 = 0, m21 = 0, m22 = -(zFar + zNear) / range, m23 = -1;
         m30 = 0, m31 = 0, m32 = (-2.0f * zFar * zNear) / range, m33 = 1;
         return *this;
-    }
-
-    Matrix4 Matrix4::createPerspective(float fov, float width, float height, float zNear, float zFar)
-    {
-        Matrix4 view = Matrix4::IDENTITY;
-        view.setPerspective(fov, width, height, zNear, zFar);
-        return view;
     }
 
     Matrix4& Matrix4::setLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
@@ -859,30 +838,15 @@ namespace rpp
         return *this;
     }
 
-    Matrix4 Matrix4::createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
-    {
-        Matrix4 view = Matrix4::IDENTITY;
-        view.setLookAt(eye, center, up);
-        return view;
-    }
-
     Matrix4& Matrix4::fromPosition(const Vector3& position)
     {
         *this = IDENTITY;
         return translate(position);
     }
 
-
-    Matrix4 Matrix4::createPosition(const Vector3& position)
+    Matrix4& Matrix4::fromRotation(const Vector3& rotationDegrees)
     {
-        Matrix4 mat = IDENTITY;
-        mat.translate(position);
-        return mat;
-    }
-
-    Matrix4& Matrix4::fromRotation(const Vector3& rotation)
-    {
-        Vector4 q = Vector4::fromRotation(rotation);
+        Vector4 q = Vector4::fromRotation(rotationDegrees);
         m00 = 1 - 2 * q.y * q.y - 2 * q.z * q.z;
         m01 = 2 * q.x * q.y + 2 * q.w * q.z;
         m02 = 2 * q.x * q.z - 2 * q.w * q.y;
@@ -935,6 +899,17 @@ namespace rpp
         return *this;
     }
     
+    Matrix4& Matrix4::setAffine3D(const Vector3 & pos, const Vector3 & scale, const Vector3 & rotationDegrees)
+    {
+        // affine 3d: move, scale to size and then rotate
+        fromPosition(pos);
+        this->scale(scale);
+        Matrix4 rotation = {};
+        rotation.fromRotation(rotationDegrees);
+        this->multiply(rotation);
+        return *this;
+    }
+
     void Matrix4::print() const
     {
         char buffer[256];
