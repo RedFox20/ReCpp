@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(ReCpp)
 
-add_library(${PROJECT_NAME} STATIC
+add_library(ReCpp
         rpp/strview.cpp
         rpp/strview.h
         rpp/file_io.cpp
@@ -15,11 +15,11 @@ add_library(${PROJECT_NAME} STATIC
         rpp/timer.cpp
         rpp/timer.h)
 
-target_include_directories(ReCpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-set(TARGET ReCpp CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
-set(LINK_DIRECTORIES ${LINK_DIRECTORIES} ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+target_include_directories(ReCpp PUBLIC ".")
+set(TARGET ReCpp CMAKE_ARCHIVE_OUTPUT_DIRECTORY ./bin)
+set(LINK_DIRECTORIES ${LINK_DIRECTORIES} ./bin)
 
-target_compile_options(ReCpp PRIVATE -std=c++1z -Wall -march=native -Werror=unused-variable -fPIC)
+target_compile_options(ReCpp PRIVATE -std=c++1z -Wall -march=native)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(ReCpp PRIVATE -DDEBUG)
 endif()
@@ -27,4 +27,4 @@ endif()
 get_target_property(options ReCpp COMPILE_OPTIONS)
 message("ReCpp ${CMAKE_BUILD_TYPE}: ${options} ")
 
-target_link_libraries(ReCpp PUBLIC pthread)
+target_link_libraries(ReCpp pthread)
