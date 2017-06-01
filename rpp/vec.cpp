@@ -1348,13 +1348,12 @@ namespace rpp
 
     // Thank you!
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-    float rayIntersect(Vector3 rayStart, Vector3 rayDirection, 
-                       Vector3 sphereCenter, float sphereRadius) noexcept
+    float Ray::intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept
     {
         float t0, t1; // solutions for t if the ray intersects 
 
-        Vector3 L = sphereCenter - rayStart;
-        float tca = L.dot(rayDirection);
+        Vector3 L = sphereCenter - origin;
+        float tca = L.dot(direction);
         if (tca < 0) return 0.0f; // L and rayDir point in opposite directions, so intersect is behind rayStart
 
         float sqRadius = sphereRadius*sphereRadius;
@@ -1367,20 +1366,19 @@ namespace rpp
         if (t0 > t1) swap(t0, t1);
         if (t0 < 0) {
             t0 = t1; // if t0 is negative, let's use t1 instead 
-            if (t0 < 0) return 0.0f; // both t0 and t1 are negative 
+            if (t0 < 0) t0 = 0.0f; // both t0 and t1 are negative 
         }
         return t0;
     }
 
     // Möller–Trumbore ray-triangle intersection algorithm
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
-    float rayIntersect(Vector3 rayStart, Vector3 rayDirection, 
-                       Vector3 v0, Vector3 v1, Vector3 v2) noexcept
+    float Ray::intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept
     {
         Vector3 e1 = v1 - v0;
         Vector3 e2 = v2 - v0;
         // Calculate planes normal vector
-        Vector3 pvec = rayDirection.cross(e2);
+        Vector3 pvec = direction.cross(e2);
         float det = e1.dot(pvec);
 
         // Ray is parallel to plane
@@ -1388,13 +1386,13 @@ namespace rpp
             return 0.0f;
 
         float inv_det = 1 / det;
-        Vector3 tvec = rayStart - v0;
+        Vector3 tvec = origin - v0;
         float u = tvec.dot(pvec) * inv_det;
         if (u < 0 || u > 1)
             return 0;
 
         Vector3 qvec = tvec.cross(e1);
-        float v = rayDirection.dot(qvec) * inv_det;
+        float v = direction.dot(qvec) * inv_det;
         if (v < 0 || u + v > 1)
             return 0;
 

@@ -1303,15 +1303,19 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    // Ray-Sphere intersection 
-    // @return Distance from rayStart to intersection OR 0.0f if no solutions
-    float rayIntersect(Vector3 rayStart, Vector3 rayDirection,
-                       Vector3 sphereCenter, float sphereRadius) noexcept;
+    struct Ray
+    {
+        Vector3 origin;
+        Vector3 direction;
 
-    // Ray-Triangle intersection
-    // @return Distance from rayStart to intersection OR 0.0f if no solutions 
-    float rayIntersect(Vector3 rayStart, Vector3 rayDirection,
-                       Vector3 v0, Vector3 v1, Vector3 v2) noexcept;
+        // Ray-Sphere intersection 
+        // @return Distance from rayStart to intersection OR 0.0f if no solutions
+        float intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept;
+
+        // Ray-Triangle intersection
+        // @return Distance from rayStart to intersection OR 0.0f if no solutions 
+        float intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept;
+    };
 
     ////////////////////////////////////////////////////////////////////////////////
 
