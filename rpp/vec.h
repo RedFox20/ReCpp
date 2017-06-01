@@ -589,8 +589,9 @@ namespace rpp
         Vector3() {}
         constexpr Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
         constexpr Vector3(const float3& v) : xyz(v) {}
-        Vector3(const Vector2& xy, float z) : x(xy.x), y(xy.y), z(z) {}
-        Vector3(float x, const Vector2& yz) : x(x), y(yz.x), z(yz.y) {}
+        constexpr Vector3(const Vector2& xy, float z) : x(xy.x), y(xy.y), z(z) {}
+        constexpr Vector3(float x, const Vector2& yz) : x(x), y(yz.x), z(yz.y) {}
+        explicit constexpr Vector3(float xyz) : x(xyz), y(xyz), z(xyz) {}
         
         explicit operator Vector3d() const;
 
@@ -1138,7 +1139,7 @@ namespace rpp
     
         /** @brief Creates a translated matrix from XYZ position */
         Matrix4& fromPosition(const Vector3& position);
-        static inline Matrix4 createPosition(const Vector3& position)
+        static inline Matrix4 createTranslation(const Vector3& position)
         {
             Matrix4 mat = IDENTITY;
             mat.translate(position);
