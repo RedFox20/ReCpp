@@ -478,7 +478,7 @@ namespace rpp
         return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
     }
 
-    const Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
+    Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
     {
         return { src.x * (1 - ratio) + dst.x * ratio,
                  src.y * (1 - ratio) + dst.y * ratio,

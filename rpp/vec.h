@@ -653,7 +653,15 @@ namespace rpp
         bool operator==(const Vector3& v) const { return x == v.x && y == v.y && z == v.z; }
         bool operator!=(const Vector3& v) const { return x != v.x || y != v.y || z != v.z; }
 
-        static const Vector3 smoothColor(const Vector3& src, const Vector3& dst, float ratio);
+        static Vector3 smoothColor(const Vector3& src, const Vector3& dst, float ratio);
+
+        // don't use macros plz :)
+        #undef RGB
+        /** @return A 3-component float color from integer RGBA color */
+        static constexpr Vector3 RGB(int r, int g, int b)
+        {
+            return { r / 255.0f, g / 255.0f, b / 255.0f };
+        }
 
         /**
          * Some common 3D vector conversions
@@ -794,7 +802,7 @@ namespace rpp
 
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
         bool almostEqual(const Vector3d& b) const;
-        
+
         Vector3d& operator+=(const Vector3d& b) { x+=b.x, y+=b.y, z+=b.z; return *this; }
         Vector3d& operator-=(const Vector3d& b) { x-=b.x, y-=b.y, z-=b.z; return *this; }
         Vector3d& operator*=(const Vector3d& b) { x*=b.x, y*=b.y, z*=b.z; return *this; }
@@ -920,18 +928,16 @@ namespace rpp
     
         /** @brief Creates a quaternion rotation from Euler XYZ (degrees) rotation */
         static Vector4 fromRotation(const Vector3& rotation);
-        
-        // don't use macros plz :)
-        #undef RGB
+
         /** @return A 3-component float color from integer RGBA color */
         static constexpr Vector3 RGB(int r, int g, int b)
         {
-            return Vector3{ r / 255.0f, g / 255.0f, b / 255.0f};
+            return { r / 255.0f, g / 255.0f, b / 255.0f};
         }
         /** @return A 4-component float color from integer RGBA color */
         static constexpr Vector4 RGB(int r, int g, int b, int a)
         {
-            return Vector4{ r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
+            return { r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
         }
     
         /**
