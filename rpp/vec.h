@@ -72,18 +72,6 @@ namespace rpp
     {
         return (value - start) / (end - start);
     }
-    
-    /** @return TRUE if abs(value) is very close to 0.0, epsilon controls the threshold */
-    template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = (T)0.001)
-    {
-        return abs(value) <= epsilon;
-    }
-
-    /** @return TRUE if a and b are very close to being equal, epsilon controls the threshold */
-    template<class T> static constexpr bool almostEqual(const T a, const T b, const T epsilon = (T)0.001)
-    {
-        return abs(a - b) <= epsilon;
-    }
 
     ///////////////////////////////////////////////////////////////////////////////
 
@@ -107,6 +95,9 @@ namespace rpp
     { return _mm_cvtss_f32(_mm_andnot_ps(_mm_castsi128_ps(_mm_set1_epi32(0x80000000)), _mm_set_ss(a))); }
     static FINLINE double abs(const double a) noexcept
     { return _mm_cvtsd_f64(_mm_andnot_pd(_mm_castsi128_pd(_mm_set1_epi64x(0x8000000000000000UL)), _mm_set_sd(a))); }
+#else
+    static FINLINE float  abs(const float a)  noexcept { return fabsf(a); }
+    static FINLINE double abs(const double a) noexcept { return fabs(a);  }
 #endif
 
 #ifndef RPP_MINMAX_DEFINED
@@ -118,6 +109,20 @@ namespace rpp
     template<class T> static constexpr const T& max3(const T& a, const T& b, const T& c)
     { return a > b ? (a>c?a:c) : (b>c?b:c); }
 #endif
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+    /** @return TRUE if abs(value) is very close to 0.0, epsilon controls the threshold */
+    template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = (T)0.001)
+    {
+        return rpp::abs(value) <= epsilon;
+    }
+
+    /** @return TRUE if a and b are very close to being equal, epsilon controls the threshold */
+    template<class T> static constexpr bool almostEqual(const T a, const T b, const T epsilon = (T)0.001)
+    {
+        return rpp::abs(a - b) <= epsilon;
+    }
 
     ///////////////////////////////////////////////////////////////////////////////
 
