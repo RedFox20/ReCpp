@@ -1200,6 +1200,44 @@ namespace rpp
         return buffer;
     }
 
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
+
+    Vector2 PerspectiveViewport::ViewProjectToScreen(Vector3 worldPos, const Matrix4& viewProjection) const
+    {
+        Vector3 clipSpacePoint = viewProjection * worldPos;
+        float len = worldPos.x * viewProjection.m03 
+                  + worldPos.y * viewProjection.m13
+                  + worldPos.z * viewProjection.m23
+                  + viewProjection.m33;
+
+        if (!almostEqual(len, 1.0f))
+            clipSpacePoint /= len;
+        return { ( clipSpacePoint.x + 1.0f) * 0.5f * width,
+                 (-clipSpacePoint.y + 1.0f) * 0.5f * height };
+    }
+
+    Vector3 PerspectiveViewport::InverseViewProjectToWorld(Vector2 screenPos, float depth, const Matrix4& inverseViewProjection) const
+    {
+        Vector3 source = {
+            screenPos.x / (width  * 2.0f) - 1.0f,
+            screenPos.y / (height * 2.0f) - 1.0f,
+            (depth - zNear) / (zFar - zNear)
+        };
+
+        Vector3 worldPos = inverseViewProjection * source;
+        float len = source.x * inverseViewProjection.m03
+                  + source.y * inverseViewProjection.m13
+                  + source.z * inverseViewProjection.m23
+                  + inverseViewProjection.m33;
+
+        if (!almostEqual(len, 1.0f))
+            worldPos /= len;
+        return worldPos;
+    }
+
+
     /////////////////////////////////////////////////////////////////////////////////////
 
     float BoundingBox::volume() const noexcept

@@ -49,6 +49,7 @@ namespace rpp
 
     /**
      * @brief Math utility, Linear Interpolation
+     *        ex: lerp(0.5, 30.0, 60.0); ==> 45.0, because 0.5 is halfway between [30, 60]
      * @param position Multiplier value such as 0.5, 1.0 or 1.5
      * @param start Starting bound of the linear range
      * @param end Ending bound of the linear range
@@ -60,7 +61,7 @@ namespace rpp
 
     /**
      * @brief Math utility, inverse operation of Linear Interpolation
-     *        ex:  lerpInverse(30.0, 60.0, 45.0); ==> 0.5 , because 45 is halfway between [30, 60]
+     *        ex:  lerpInverse(45.0, 30.0, 60.0); ==> 0.5, because 45 is halfway between [30, 60]
      * @param value Value somewhere between [start, end].
      *              !!Out of bounds values are not checked!! Use clamp(lerpInverse(min, max, value), 0, 1); instead
      * @param start Starting bound of the linear range
@@ -72,10 +73,16 @@ namespace rpp
         return (value - start) / (end - start);
     }
     
-    /** @return TRUE if abs(value) is very close to 0.0 */
+    /** @return TRUE if abs(value) is very close to 0.0, epsilon controls the threshold */
     template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = (T)0.001)
     {
-        return -epsilon < value && value < epsilon;
+        return abs(value) <= epsilon;
+    }
+
+    /** @return TRUE if a and b are very close to being equal, epsilon controls the threshold */
+    template<class T> static constexpr bool almostEqual(const T a, const T b, const T epsilon = (T)0.001)
+    {
+        return abs(a - b) <= epsilon;
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -207,6 +214,10 @@ namespace rpp
          */
         Vector2 left(float magnitude = 1.0f) const;
     
+        Vector2& operator+=(float f) { x+=f, y+=f; return *this; }
+        Vector2& operator-=(float f) { x-=f, y-=f; return *this; }
+        Vector2& operator*=(float f) { x*=f, y*=f; return *this; }
+        Vector2& operator/=(float f) { x/=f, y/=f; return *this; }
         Vector2& operator+=(const Vector2& b) { x+=b.x, y+=b.y; return *this; }
         Vector2& operator-=(const Vector2& b) { x-=b.x, y-=b.y; return *this; }
         Vector2& operator*=(const Vector2& b) { x*=b.x, y*=b.y; return *this; }
@@ -220,10 +231,10 @@ namespace rpp
         bool operator==(const Vector2& b) const { return x == b.x && y == b.y; }
         bool operator!=(const Vector2& b) const { return x != b.x || y != b.y; }
 
-        Vector2& operator+=(float f) { x += f, y += f; return *this; }
-        Vector2& operator-=(float f) { x -= f, y -= f; return *this; }
-        Vector2& operator*=(float f) { x *= f, y *= f; return *this; }
-        Vector2& operator/=(float f) { x /= f, y /= f; return *this; }
+        Vector2& operator+=(float f) { x+=f, y+=f; return *this; }
+        Vector2& operator-=(float f) { x-=f, y-=f; return *this; }
+        Vector2& operator*=(float f) { x*=f, y*=f; return *this; }
+        Vector2& operator/=(float f) { x/=f, y/=f; return *this; }
     };
 
     inline Vector2 operator+(const Vector2& a, float f) { return { a.x+f, a.y+f }; }
@@ -342,6 +353,10 @@ namespace rpp
          */
         Vector2d left(double magnitude = 1.0) const;
         
+        Vector2d& operator+=(double f) { x+=f, y+=f; return *this; }
+        Vector2d& operator-=(double f) { x-=f, y-=f; return *this; }
+        Vector2d& operator*=(double f) { x*=f, y*=f; return *this; }
+        Vector2d& operator/=(double f) { x/=f, y/=f; return *this; }
         Vector2d& operator+=(const Vector2d& b) { x+=b.x, y+=b.y; return *this; }
         Vector2d& operator-=(const Vector2d& b) { x-=b.x, y-=b.y; return *this; }
         Vector2d& operator*=(const Vector2d& b) { x*=b.x, y*=b.y; return *this; }
@@ -355,10 +370,10 @@ namespace rpp
         bool operator==(const Vector2d& b) const { return x == b.x && y == b.y; }
         bool operator!=(const Vector2d& b) const { return x != b.x || y != b.y; }
 
-        Vector2d& operator+=(double f) { x += f, y += f; return *this; }
-        Vector2d& operator-=(double f) { x -= f, y -= f; return *this; }
-        Vector2d& operator*=(double f) { x *= f, y *= f; return *this; }
-        Vector2d& operator/=(double f) { x /= f, y /= f; return *this; }
+        Vector2d& operator+=(double f) { x+=f, y+=f; return *this; }
+        Vector2d& operator-=(double f) { x-=f, y-=f; return *this; }
+        Vector2d& operator*=(double f) { x*=f, y*=f; return *this; }
+        Vector2d& operator/=(double f) { x/=f, y/=f; return *this; }
     };
 
     inline Vector2d operator+(const Vector2d& a, double f) { return { a.x+f, a.y+f }; }
@@ -412,6 +427,12 @@ namespace rpp
     
         const char* toString() const;
 
+        Point& operator+=(int i) { x+=i, y+=i; return *this; }
+        Point& operator-=(int i) { x-=i, y-=i; return *this; }
+        Point& operator*=(int i) { x*=i, y*=i; return *this; }
+        Point& operator/=(int i) { x/=i, y/=i; return *this; }
+        Point& operator*=(float f) { x = int(x*f), y = int(y*f); return *this; }
+        Point& operator/=(float f) { x = int(x/f), y = int(y/f); return *this; }
         Point& operator+=(const Point& b) { x+=b.x, y+=b.y; return *this; }
         Point& operator-=(const Point& b) { x-=b.x, y-=b.y; return *this; }
         Point& operator*=(const Point& b) { x*=b.x, y*=b.y; return *this; }
@@ -425,10 +446,10 @@ namespace rpp
         bool operator==(const Point& b) const { return x == b.x && y == b.y; }
         bool operator!=(const Point& b) const { return x != b.x || y != b.y; }
 
-        Point& operator+=(int i) { x += i, y += i; return *this; }
-        Point& operator-=(int i) { x -= i, y -= i; return *this; }
-        Point& operator*=(int i) { x *= i, y *= i; return *this; }
-        Point& operator/=(int i) { x /= i, y /= i; return *this; }
+        Point& operator+=(int i) { x+=i, y+=i; return *this; }
+        Point& operator-=(int i) { x-=i, y-=i; return *this; }
+        Point& operator*=(int i) { x*=i, y*=i; return *this; }
+        Point& operator/=(int i) { x/=i, y/=i; return *this; }
     };
 
     inline Point operator+(const Point& a, int i) { return { a.x+i, a.y+i }; }
@@ -640,6 +661,10 @@ namespace rpp
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
         bool almostEqual(const Vector3& b) const;
 
+        Vector3& operator+=(float f) { x+=f, y+=f, z+=f; return *this; }
+        Vector3& operator-=(float f) { x-=f, y-=f, z-=f; return *this; }
+        Vector3& operator*=(float f) { x*=f, y*=f, z*=f; return *this; }
+        Vector3& operator/=(float f) { x/=f, y/=f, z/=f; return *this; }
         Vector3& operator+=(const Vector3& v) { x+=v.x, y+=v.y, z+=v.z; return *this; }
         Vector3& operator-=(const Vector3& v) { x-=v.x, y-=v.y, z-=v.z; return *this; }
         Vector3& operator*=(const Vector3& v) { x*=v.x, y*=v.y, z*=v.z; return *this; }
@@ -803,6 +828,10 @@ namespace rpp
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
         bool almostEqual(const Vector3d& b) const;
 
+        Vector3d& operator+=(double f) { x+=f, y+=f, z+=f; return *this; }
+        Vector3d& operator-=(double f) { x-=f, y-=f, z-=f; return *this; }
+        Vector3d& operator*=(double f) { x*=f, y*=f, z*=f; return *this; }
+        Vector3d& operator/=(double f) { x/=f, y/=f, z/=f; return *this; }
         Vector3d& operator+=(const Vector3d& b) { x+=b.x, y+=b.y, z+=b.z; return *this; }
         Vector3d& operator-=(const Vector3d& b) { x-=b.x, y-=b.y, z-=b.z; return *this; }
         Vector3d& operator*=(const Vector3d& b) { x*=b.x, y*=b.y, z*=b.z; return *this; }
@@ -987,14 +1016,21 @@ namespace rpp
         Vector4& operator*=(const Vector4& q) { return (*this = rotate(q)); }
         Vector4  operator* (const Vector4& q) const { return rotate(q); }
     
+        Vector4& operator+=(float f) { x+=f, y+=f, z+=f, w+=f; return *this; }
+        Vector4& operator-=(float f) { x-=f, y-=f, z-=f, w-=f; return *this; }
+        Vector4& operator*=(float f) { x*=f, y*=f, z*=f, w*=f; return *this; }
+        Vector4& operator/=(float f) { x/=f, y/=f, z/=f, w/=f; return *this; }
         Vector4& operator+=(const Vector4& v) { x+=v.x, y+=v.y, z+=v.z, w+=v.w; return *this; }
         Vector4& operator-=(const Vector4& v) { x-=v.x, y-=v.y, z-=v.z, w-=v.w; return *this; }
+        Vector4& operator*=(const Vector4& v) { x*=v.x, y*=v.y, z*=v.z, w*=v.w; return *this; }
+        Vector4& operator/=(const Vector4& v) { x/=v.x, y/=v.y, z/=v.z, w/=v.w; return *this; }
+
         Vector4  operator+ (const Vector4& v) const { return { x+v.x, y+v.y, z+v.z, w+v.w }; }
         Vector4  operator- (const Vector4& v) const { return { x-v.x, y-v.y, z-v.z, w-v.w }; }
         Vector4  operator- () const { return {-x, -y, -z, -w }; }
 
-        Vector4& operator*=(float f) { x *= f, y *= f, z *= f, w *= f; return *this; }
-        Vector4& operator/=(float f) { x /= f, y /= f, z /= f, w /= f; return *this; }
+        Vector4& operator*=(float f) { x*=f, y*=f, z*=f, w*=f; return *this; }
+        Vector4& operator/=(float f) { x/=f, y/=f, z/=f, w/=f; return *this; }
     
         bool operator==(const Vector4& v) const { return x == v.x && y == v.y && z == v.z && w == v.w; }
         bool operator!=(const Vector4& v) const { return x != v.x || y != v.y || z != v.z || w != v.w; }
@@ -1231,6 +1267,68 @@ namespace rpp
         template<int SIZE> char* toString(char (&buffer)[SIZE]) const {
             return toString(buffer, SIZE);
         }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Viewport utility for creating a projection matrix and managing projection from
+     * 2D to 3D space and vice-versa
+     */
+    struct PerspectiveViewport
+    {
+        float fov, width, height, zNear, zFar;
+        Matrix4 projection;
+
+        /**
+         * Creates a new perspective viewport with a specific field of view.
+         * The screen width and height parameters are used for setting the aspect ratio
+         * and later for projections between screen space and world space
+         */
+        PerspectiveViewport(float fov, float width, float height, float zNear = 0.001f, float zFar = 10000.0f)
+            : fov(fov), width(width), height(height), zNear(zNear), zFar(zFar)
+        {
+            projection.setPerspective(fov, width, height, zNear, zFar);
+        }
+
+        /**
+         * Project from world space to screen space. Screen space is defined by PerspectiveViewport params
+         * @param worldPos 3D position in the world
+         * @param cameraView View matrix such as Matrix4::createLookAt
+         * @return Position on screen. The resulting point can also be outside of the viewport,
+         *         which naturally means worldPos is not visible on screen
+         */
+        Vector2 ProjectToScreen(Vector3 worldPos, const Matrix4& cameraView) const
+        {
+            Matrix4 viewProjection = cameraView; viewProjection.multiply(projection);
+            return ViewProjectToScreen(worldPos, viewProjection);
+            
+        }
+        // Same as ProjectToScreen, but using a premultiplied View-Projection matrix
+        Vector2 ViewProjectToScreen(Vector3 worldPos, const Matrix4& viewProjection) const;
+
+        /**
+         * Project from screen space to world space. Screen space is defined by PerspectiveViewport params
+         * @param screenPos 2D position on the screen
+         * @param depth The Z depth from camera position, usually either 0.0 or 1.0
+         * @param cameraView View matrix such as Matrix4::createLookAt
+         * @return Position in the world. The resulting point depends greatly on depth value
+         */
+        Vector3 ProjectToWorld(Vector2 screenPos, float depth, const Matrix4& cameraView) const
+        {
+            Matrix4 viewProjection = cameraView; viewProjection.multiply(projection);
+            return InverseViewProjectToWorld(screenPos, depth, viewProjection.inverse());
+        }
+
+        // Same as ProjectToWorld, but using a premultiplied View-Projection matrix
+        Vector3 ViewProjectToWorld(Vector2 screenPos, float depth, const Matrix4& viewProjection) const
+        {
+            return InverseViewProjectToWorld(screenPos, depth, viewProjection.inverse());
+        }
+
+        // Same as ProjectToWorld, but using an inverse of a premultiplied View-Projection matrix
+        // This is the fastest ProjectToWorld
+        Vector3 InverseViewProjectToWorld(Vector2 screenPos, float depth, const Matrix4& inverseViewProjection) const;
     };
 
     ////////////////////////////////////////////////////////////////////////////////
