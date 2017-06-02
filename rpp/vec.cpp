@@ -3,7 +3,6 @@
  */
 #include "vec.h"
 #include <stdio.h>
-#include <cmath>
 
 namespace rpp
 {
@@ -1409,7 +1408,7 @@ namespace rpp
         return t0;
     }
 
-    // Möller–Trumbore ray-triangle intersection algorithm
+    // Mï¿½llerï¿½Trumbore ray-triangle intersection algorithm
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     float Ray::intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept
     {

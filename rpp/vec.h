@@ -5,10 +5,11 @@
 #ifndef RPP_VECTORMATH_H
 #define RPP_VECTORMATH_H
 #include "strview.h"
+#include <cmath> // fabsf, fabs
 
 // You can disable RPP SSE intrinsics by declaring #define RPP_SSE_INTRINSICS 0 before including <rpp/vec.h>
 #ifndef RPP_SSE_INTRINSICS
-    #if _M_IX86_FP || _M_AMD64 || _M_X64
+    #if _M_IX86_FP || _M_AMD64 || _M_X64 || __SSE2__
     #define RPP_SSE_INTRINSICS 1
     #endif
 #endif
@@ -75,29 +76,26 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
-#if RPP_SSE_INTRINSICS
-    static FINLINE double sqrt(const double d) noexcept
+#if RPP_SSE_INTRINSICS && false // disabled for now due to __clang__ always picking std::sqrt etc.
+    static FINLINE double sqrt(const double& d) noexcept
     { auto m = _mm_set_sd(d); return _mm_cvtsd_f64(_mm_sqrt_sd(m, m)); }
-    static FINLINE float sqrt(const float f) noexcept
+    static FINLINE float sqrt(const float& f) noexcept
     { return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(f))); }
 
-    static FINLINE float min(const float a, const float b) noexcept
+    static FINLINE float min(const float& a, const float& b) noexcept
     { return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(a), _mm_set_ss(b))); }
-    static FINLINE double min(const double a, const double b) noexcept
+    static FINLINE double min(const double& a, const double& b) noexcept
     { return _mm_cvtsd_f64(_mm_min_sd(_mm_set_sd(a), _mm_set_sd(b))); }
 
-    static FINLINE float max(const float a, const float b) noexcept
+    static FINLINE float max(const float& a, const float& b) noexcept
     { return _mm_cvtss_f32(_mm_max_ss(_mm_set_ss(a), _mm_set_ss(b))); }
-    static FINLINE double max(const double a, const double b) noexcept
+    static FINLINE double max(const double& a, const double& b) noexcept
     { return _mm_cvtsd_f64(_mm_max_sd(_mm_set_sd(a), _mm_set_sd(b))); }
 
-    static FINLINE float abs(const float a) noexcept
+    static FINLINE float abs(const float& a) noexcept
     { return _mm_cvtss_f32(_mm_andnot_ps(_mm_castsi128_ps(_mm_set1_epi32(0x80000000)), _mm_set_ss(a))); }
-    static FINLINE double abs(const double a) noexcept
+    static FINLINE double abs(const double& a) noexcept
     { return _mm_cvtsd_f64(_mm_andnot_pd(_mm_castsi128_pd(_mm_set1_epi64x(0x8000000000000000UL)), _mm_set_sd(a))); }
-#else
-    static FINLINE float  abs(const float a)  noexcept { return fabsf(a); }
-    static FINLINE double abs(const double a) noexcept { return fabs(a);  }
 #endif
 
 #ifndef RPP_MINMAX_DEFINED
@@ -113,15 +111,15 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     /** @return TRUE if abs(value) is very close to 0.0, epsilon controls the threshold */
-    template<class T> static constexpr bool nearlyZero(const T value, const T epsilon = (T)0.001)
+    template<class T> static constexpr bool nearlyZero(const T& value, const T epsilon = (T)0.001)
     {
-        return rpp::abs(value) <= epsilon;
+        return abs(value) <= epsilon;
     }
 
     /** @return TRUE if a and b are very close to being equal, epsilon controls the threshold */
-    template<class T> static constexpr bool almostEqual(const T a, const T b, const T epsilon = (T)0.001)
+    template<class T> static constexpr bool almostEqual(const T& a, const T& b, const T epsilon = (T)0.001)
     {
-        return rpp::abs(a - b) <= epsilon;
+        return abs(a - b) <= epsilon;
     }
 
     ///////////////////////////////////////////////////////////////////////////////
