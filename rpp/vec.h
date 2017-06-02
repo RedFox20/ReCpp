@@ -230,11 +230,6 @@ namespace rpp
     
         bool operator==(const Vector2& b) const { return x == b.x && y == b.y; }
         bool operator!=(const Vector2& b) const { return x != b.x || y != b.y; }
-
-        Vector2& operator+=(float f) { x+=f, y+=f; return *this; }
-        Vector2& operator-=(float f) { x-=f, y-=f; return *this; }
-        Vector2& operator*=(float f) { x*=f, y*=f; return *this; }
-        Vector2& operator/=(float f) { x/=f, y/=f; return *this; }
     };
 
     inline Vector2 operator+(const Vector2& a, float f) { return { a.x+f, a.y+f }; }
@@ -369,11 +364,6 @@ namespace rpp
     
         bool operator==(const Vector2d& b) const { return x == b.x && y == b.y; }
         bool operator!=(const Vector2d& b) const { return x != b.x || y != b.y; }
-
-        Vector2d& operator+=(double f) { x+=f, y+=f; return *this; }
-        Vector2d& operator-=(double f) { x-=f, y-=f; return *this; }
-        Vector2d& operator*=(double f) { x*=f, y*=f; return *this; }
-        Vector2d& operator/=(double f) { x/=f, y/=f; return *this; }
     };
 
     inline Vector2d operator+(const Vector2d& a, double f) { return { a.x+f, a.y+f }; }
@@ -445,11 +435,6 @@ namespace rpp
 
         bool operator==(const Point& b) const { return x == b.x && y == b.y; }
         bool operator!=(const Point& b) const { return x != b.x || y != b.y; }
-
-        Point& operator+=(int i) { x+=i, y+=i; return *this; }
-        Point& operator-=(int i) { x-=i, y-=i; return *this; }
-        Point& operator*=(int i) { x*=i, y*=i; return *this; }
-        Point& operator/=(int i) { x/=i, y/=i; return *this; }
     };
 
     inline Point operator+(const Point& a, int i) { return { a.x+i, a.y+i }; }
@@ -1022,15 +1007,10 @@ namespace rpp
         Vector4& operator/=(float f) { x/=f, y/=f, z/=f, w/=f; return *this; }
         Vector4& operator+=(const Vector4& v) { x+=v.x, y+=v.y, z+=v.z, w+=v.w; return *this; }
         Vector4& operator-=(const Vector4& v) { x-=v.x, y-=v.y, z-=v.z, w-=v.w; return *this; }
-        Vector4& operator*=(const Vector4& v) { x*=v.x, y*=v.y, z*=v.z, w*=v.w; return *this; }
-        Vector4& operator/=(const Vector4& v) { x/=v.x, y/=v.y, z/=v.z, w/=v.w; return *this; }
 
         Vector4  operator+ (const Vector4& v) const { return { x+v.x, y+v.y, z+v.z, w+v.w }; }
         Vector4  operator- (const Vector4& v) const { return { x-v.x, y-v.y, z-v.z, w-v.w }; }
         Vector4  operator- () const { return {-x, -y, -z, -w }; }
-
-        Vector4& operator*=(float f) { x*=f, y*=f, z*=f, w*=f; return *this; }
-        Vector4& operator/=(float f) { x/=f, y/=f, z/=f, w/=f; return *this; }
     
         bool operator==(const Vector4& v) const { return x == v.x && y == v.y && z == v.z && w == v.w; }
         bool operator!=(const Vector4& v) const { return x != v.x || y != v.y || z != v.z || w != v.w; }
