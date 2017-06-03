@@ -554,7 +554,7 @@ namespace rpp
         constexpr float3(float x, float y, float z) : x(x), y(y), z(z) {}
     };
 
-	struct Vector3d;
+    struct Vector3d;
 
     /** 
      * 3D Vector for matrix calculations
@@ -1052,8 +1052,7 @@ namespace rpp
     };
 
     /**
-     * 4x4 Affine Matrix for OpenGL
-     * The matrices are in row-major order, which is best suitable for MODERN OPENGL development
+     * 4x4 Affine Matrix for OpenGL in row-major order, which is best suitable for MODERN OPENGL development
      */
     struct Matrix4
     {
