@@ -139,7 +139,7 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
-        bool open(const char*   filename, IOFlags mode = READONLY) noexcept;
+        bool open(const char* filename, IOFlags mode = READONLY) noexcept;
         inline bool open(const string& filename, IOFlags mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
@@ -547,7 +547,7 @@ namespace rpp /* ReCpp */
      */
     vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept;
 
-     /**
+    /**
      * Recursively lists all files under this directory and its subdirectories 
      * that match the list of extensions
      * @param dir Relative or full path of root directory
