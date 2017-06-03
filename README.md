@@ -5,7 +5,7 @@ The goal of this project is to provide C++14 programmers with a small set of reu
 
 Currently supported and tested platforms are VC++2017 on Windows and Clang 3.8 on Ubuntu,iOS 
 
-### rpp/strview.h Lightweight and powerful string view class with several years of proved production ready capability.
+### [rpp/strview.h](rpp/strview.h) - A lightweight and powerful string view class
 This is definitely one of the core classes of ReCpp. It's the only overarching dependency because of its simplicity
 and usefulness. Currently only char* strview is supported because all the games and applications where strview has
 been used rely on UTF-8.
@@ -26,7 +26,7 @@ struct strview
 
 TODO: Add code examples on how to use strview for parsing
 
-### `rpp/file_io.h` Simple and fast File IO
+### [rpp/file_io.h](rpp/file_io.h) - Simple and fast File IO
 This is an extremely useful cross-platform file and filesystem module. It provides all the basic
 functionality for most common file operations and path manipulations.
 
@@ -219,7 +219,7 @@ void fileio_listing_dirs(strview path = "../"_sv)
 }
 ```
 
-### `rpp/delegate.h` Fast function delegates and multicast delegates (events)
+### [rpp/delegate.h](rpp/delegate.h) - Fast function delegates and multicast delegates (events)
 | Class               | Description                                              |
 | ------------------- | -------------------------------------------------------- |
 | `delegate<f(a)>`  | Function delegate that can contain static functions, instance member functions, lambdas and functors. |
@@ -251,7 +251,7 @@ void event_sample()
 }
 ```
 
-### `rpp/vec.h` Everything you need to write a 3D and 2D game in Modern OpenGL
+### [rpp/vec.h](rpp/vec.h) Everything you need to write a 3D and 2D game in Modern OpenGL
 Contains basic Vector2, Vector3, Vector4 and Matrix4 types with a plethora of extremely useful utility functions.
 Main features are convenient operators, SSE2 intrinsics and GLSL style vector swizzling.
 
