@@ -255,20 +255,18 @@ void event_sample()
 Contains basic Vector2, Vector3, Vector4 and Matrix4 types with a plethora of extremely useful utility functions.
 Main features are convenient operators, SSE2 intrinsics and GLSL style vector swizzling.
 
-```rpp
+```cpp
 struct Vector2
 {
-	float x, y;
+    float x, y;
    
-	char* toString(char* buffer) const;
-	bool almostZero() const;
-	bool almostEqual(const Vector2& b) const;
-	void set(float x, float y);
-	float length() const;
-	float sqlength() const;
-	void normalize(const float magnitude);
-	Vector2 normalized(const float magnitude) const;
-	float dot(const Vector2& v) const;
+    float length() const;
+    float sqlength() const;
+    Vector2 normalized(const float magnitude) const;
+    float dot(const Vector2& v) const;
+    
+    char* toString(char* buffer) const;
+
 };
 
 struct Vector2d
@@ -292,66 +290,66 @@ struct Rect
 
 struct Vector3
 {
-	union {
-		struct { float x, y, z; };
-		struct { float r, g, b; };
-		struct { Vector2 xy; };
-		struct { float _x; Vector2 yz; };
-		float3 xyz;
-	};
+    union {
+        struct { float x, y, z; };
+        struct { float r, g, b; };
+        struct { Vector2 xy; };
+        struct { float _x; Vector2 yz; };
+        float3 xyz;
+    };
 };
 
 struct Vector3d
 {
-	union {
-		struct { double x, y, z; };
-		struct { double3 xyz; };
-	};
+    union {
+        struct { double x, y, z; };
+        struct { double3 xyz; };
+    };
 };
 
 struct Vector4
 {
-	union {
-		struct { float x, y, z, w; };
-		struct { float r, g, b, a; };
-		struct { Vector2 xy; Vector2 zw; };
-		struct { Vector2 rg; Vector2 ba; };
-		struct { Vector3 xyz; float _w; };
-		struct { float3 rgb; float _a; };
-		struct { float _x; Vector3 yzw; };
-		struct { float _r; Vector3 gba; };
-		float4 xyzw;
-	};
+    union {
+        struct { float x, y, z, w; };
+        struct { float r, g, b, a; };
+        struct { Vector2 xy; Vector2 zw; };
+        struct { Vector2 rg; Vector2 ba; };
+        struct { Vector3 xyz; float _w; };
+        struct { float3 rgb; float _a; };
+        struct { float _x; Vector3 yzw; };
+        struct { float _r; Vector3 gba; };
+        float4 xyzw;
+    };
 };
 
 // Affine 4x4 matrix in row-major order
 struct Matrix4
 {
-	Vector4 r0, r1, r2, r3; // rows 0-3
+    Vector4 r0, r1, r2, r3; // rows 0-3
 
-	Matrix4 operator*(const Matrix4& mb) const;
-	Vector3 operator*(const Vector3& v) const;
-	Vector4 operator*(const Vector4& v) const;
+    Matrix4 operator*(const Matrix4& mb) const;
+    Vector3 operator*(const Vector3& v) const;
+    Vector4 operator*(const Vector4& v) const;
 
-	Matrix4& translate(const Vector3& offset);
-	Matrix4& rotate(float angleDegs, const Vector3& axis);
-	Matrix4& rotate(float angleDegs, float x, float y, float z);
-	Matrix4& scale(const Vector3& scale);
+    Matrix4& translate(const Vector3& offset);
+    Matrix4& rotate(float angleDegs, const Vector3& axis);
+    Matrix4& rotate(float angleDegs, float x, float y, float z);
+    Matrix4& scale(const Vector3& scale);
 
-	static Matrix4 createOrtho(int width, int height);
-	static Matrix4 createPerspective(float fov, int width, int height, float zNear, float zFar);
-	static Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
-	static Matrix4 createTranslation(const Vector3& position);
-	static Matrix4 createRotation(const Vector3& rotationDegrees);
-	static Matrix4 createScale(const Vector3& scale);
+    static Matrix4 createOrtho(int width, int height);
+    static Matrix4 createPerspective(float fov, int width, int height, float zNear, float zFar);
+    static Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
+    static Matrix4 createTranslation(const Vector3& position);
+    static Matrix4 createRotation(const Vector3& rotationDegrees);
+    static Matrix4 createScale(const Vector3& scale);
 
-	Matrix4& setAffine2D(const Vector2& pos, float zOrder, float rotDegrees, const Vector2& scale);
-	Matrix4& setAffine2D(const Vector2& pos, float zOrder, float rotDegrees, 
-						 const Vector2& rotAxis, const Vector2& scale);
-	static Matrix4 createAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees);
+    Matrix4& setAffine2D(const Vector2& pos, float zOrder, float rotDegrees, const Vector2& scale);
+    Matrix4& setAffine2D(const Vector2& pos, float zOrder, float rotDegrees, 
+                         const Vector2& rotAxis, const Vector2& scale);
+    static Matrix4 createAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees);
 
-	Matrix4 transposed() const;
-	Matrix4 inverse() const;
+    Matrix4 transposed() const;
+    Matrix4 inverse() const;
 };
 
 
@@ -359,11 +357,11 @@ struct Matrix4
 // 2D to 3D space and vice-versa
 struct PerspectiveViewport
 {
-	float fov, width, height, zNear, zFar;
-	Matrix4 projection;
-	
-	Vector2 ProjectToScreen(Vector3 worldPos, const Matrix4& cameraView) const;
-	Vector3 ProjectToWorld(Vector2 screenPos, float depth, const Matrix4& cameraView) const
+    float fov, width, height, zNear, zFar;
+    Matrix4 projection;
+    
+    Vector2 ProjectToScreen(Vector3 worldPos, const Matrix4& cameraView) const;
+    Vector3 ProjectToWorld(Vector2 screenPos, float depth, const Matrix4& cameraView) const
 };
 
 
@@ -376,39 +374,39 @@ using Color3 = Vector3;
 // Vector3 with an associated Vertex ID
 struct IdVector3 : Vector3
 {
-	int ID;
+    int ID;
 };
 
 
 // 3D bounding box
 struct BoundingBox
 {
-	Vector3 min;
-	Vector3 max;
+    Vector3 min;
+    Vector3 max;
 
-	float volume() const;
-	Vector3 center() const;
-	void join(const Vector3& v);
-	bool contains(const Vector3& v) const;
-	void grow(float growth);
+    float volume() const;
+    Vector3 center() const;
+    void join(const Vector3& v);
+    bool contains(const Vector3& v) const;
+    void grow(float growth);
 
-	// calculates the bounding box of the given point cloud
-	static BoundingBox create(const vector<Vector3>& points);
+    // calculates the bounding box of the given point cloud
+    static BoundingBox create(const vector<Vector3>& points);
 };
 
 
 struct Ray
 {
-	Vector3 origin;
-	Vector3 direction;
+    Vector3 origin;
+    Vector3 direction;
 
-	// Ray-Sphere intersection 
-	// @return Distance from rayStart to intersection OR 0.0f if no solutions
-	float intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept;
+    // Ray-Sphere intersection 
+    // @return Distance from rayStart to intersection OR 0.0f if no solutions
+    float intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept;
 
-	// Ray-Triangle intersection
-	// @return Distance from rayStart to intersection OR 0.0f if no solutions 
-	float intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept;
+    // Ray-Triangle intersection
+    // @return Distance from rayStart to intersection OR 0.0f if no solutions 
+    float intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept;
 };
 ```
 
