@@ -21,22 +21,20 @@ namespace rpp
 {
     using namespace std;
 
-    struct test_func
-    {
-        strview name;
-        function<void()> func;
-    };
-
     struct test
     {
+        struct test_func
+        {
+            strview name;
+            void (test::*func)();
+        };
+
         static int asserts_failed;
 
-        const char* name;
+        strview name;
+        vector<test_func> test_funcs; // all the automatic tests to run
 
-        // all the automatic tests to run
-        vector<test_func> test_funcs;
-
-        test(const char* name);
+        test(strview name);
         virtual ~test();
         static void assert_failed(const char* file, int line, const char* fmt, ...);
 
@@ -51,9 +49,6 @@ namespace rpp
          * the methodFilter substring are run
          */
         void run_test(strview methodFilter = {});
-
-        // adds a test to the automatic run list
-        int add_test_func(test_func&& func);
 
         // generic sleep for testing purposes
         static void sleep(int millis);
@@ -96,6 +91,13 @@ namespace rpp
                 expectedExpr, as_string(expected).c_str(),
                 actualExpr,   as_string(actual).c_str());
         }
+
+        // adds a test to the automatic test run list
+        template<class T> int add_test_func(strview name, void (T::*testMethod)())
+        {
+            test_funcs.emplace_back(test_func{ name, (void (test::*)())testMethod });
+            return (int)test_funcs.size() - 1;
+        }
     };
 
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
@@ -108,12 +110,13 @@ namespace rpp
 
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \
+    using ClassType = testclass;           \
     void run() override
 
 #define TestCleanup(testclass) ~testclass()
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func({strview{#testname}, [this](){ this->test_##testname(); }}); \
+    const int _test_##testname = add_test_func(#testname, &ClassType::test_##testname); \
     void test_##testname()
 }
 

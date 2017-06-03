@@ -25,13 +25,6 @@ namespace rpp /* ReCpp */
     #define SEEK_END 2
     #endif
 
-    #if __clang__
-    #define RPPUSAGE __attribute__((used))
-    #else
-    #define RPPUSAGE
-    #endif
-
-
     /**
      * Automatic whole file loading buffer
      */
@@ -52,7 +45,7 @@ namespace rpp /* ReCpp */
         load_buffer& operator=(load_buffer&& mv) noexcept;
 
         // acquire the data pointer of this load_buffer, making the caller own the buffer
-        char* steal_ptr() noexcept RPPUSAGE;
+        char* steal_ptr() noexcept;
 
         template<class T> operator T*() noexcept { return (T*)str; }
         int size()      const noexcept { return len; }
@@ -121,12 +114,12 @@ namespace rpp /* ReCpp */
          * @param filename File name to open or create
          * @param mode File open mode
          */
-        file(const char* filename, IOFlags mode = READONLY) noexcept RPPUSAGE;
+        file(const char* filename, IOFlags mode = READONLY) noexcept;
         inline file(const string&  filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
         {
         }
-        file(const strview& filename, IOFlags mode = READONLY) noexcept RPPUSAGE;
-        file(const wchar_t* filename, IOFlags mode = READONLY) noexcept RPPUSAGE;
+        file(const strview& filename, IOFlags mode = READONLY) noexcept;
+        file(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
         inline file(const wstring& filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
         {
         }
@@ -146,13 +139,13 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
-        bool open(const char*   filename, IOFlags mode = READONLY) noexcept RPPUSAGE;
+        bool open(const char*   filename, IOFlags mode = READONLY) noexcept;
         inline bool open(const string& filename, IOFlags mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
         }
-        bool open(const strview filename, IOFlags mode = READONLY) noexcept RPPUSAGE;
-        bool open(const wchar_t* filename, IOFlags mode = READONLY) noexcept RPPUSAGE;
+        bool open(const strview filename, IOFlags mode = READONLY) noexcept;
+        bool open(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
         inline bool open(const wstring& filename, IOFlags mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
@@ -168,7 +161,7 @@ namespace rpp /* ReCpp */
         /**
          * @return TRUE if the file handle is INVALID
          */
-        bool bad() const noexcept RPPUSAGE;
+        bool bad() const noexcept;
 
         /**
          * @return Size of the file in bytes
@@ -178,7 +171,7 @@ namespace rpp /* ReCpp */
         /**
          * @return 64-bit unsigned size of the file in bytes
          */
-        int64 sizel() const noexcept RPPUSAGE;
+        int64 sizel() const noexcept;
 
         /**
          * Reads a block of bytes from the file. Standard OS level
@@ -205,8 +198,8 @@ namespace rpp /* ReCpp */
         {
             return read_all(filename.c_str());
         }
-        static load_buffer read_all(const strview& filename) noexcept RPPUSAGE;
-        static load_buffer read_all(const wchar_t* filename) noexcept RPPUSAGE;
+        static load_buffer read_all(const strview& filename) noexcept;
+        static load_buffer read_all(const wchar_t* filename) noexcept;
         static inline load_buffer read_all(const wstring& filename) noexcept
         {
             return read_all(filename.c_str());
@@ -256,7 +249,7 @@ namespace rpp /* ReCpp */
          * Forcefully flushes any OS file buffers to send all data to the storage device
          * @warning Don't call this too haphazardly, or you will ruin your IO performance!
          */
-        void flush() noexcept RPPUSAGE;
+        void flush() noexcept;
 
         /**
          * Creates a new file and fills it with the provided data.
@@ -269,12 +262,12 @@ namespace rpp /* ReCpp */
          * @param bytesToWrite Number of bytes to write to the file
          * @return Number of bytes actually written to the file
          */
-        static int write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept RPPUSAGE;
+        static int write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept;
         static inline int write_new(const string& filename, const void* buffer, int bytesToWrite) noexcept
         {
             return write_new(filename.c_str(), buffer, bytesToWrite);
         }
-        static int write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept RPPUSAGE;
+        static int write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept;
 
         /**
          * Seeks to the specified position in a file. Seekmode is
@@ -284,45 +277,45 @@ namespace rpp /* ReCpp */
          * @param seekmode Seekmode to use: SEEK_SET, SEEK_CUR or SEEK_END
          * @return Current position in the file
          */
-        int seek(int filepos, int seekmode = SEEK_SET) noexcept RPPUSAGE;
-        uint64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept RPPUSAGE;
+        int seek(int filepos, int seekmode = SEEK_SET) noexcept;
+        uint64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept;
 
         /**
          * @return Current position in the file
          */
-        int tell() const noexcept RPPUSAGE;
+        int tell() const noexcept;
 
         /**
          * @return 64-bit position in the file
          */
-        int64 tell64() const noexcept RPPUSAGE;
+        int64 tell64() const noexcept;
 
         /**
          * Get multiple time info from this file handle
          */
-        bool time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept RPPUSAGE;
+        bool time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept;
 
         /**
          * @return File creation time
          */
-        time_t time_created() const noexcept RPPUSAGE;
+        time_t time_created() const noexcept;
 
         /**
          * @return File access time - when was this file last accessed?
          */
-        time_t time_accessed() const noexcept RPPUSAGE;
+        time_t time_accessed() const noexcept;
 
         /**
          * @return File write time - when was this file last modified
          */
-        time_t time_modified() const noexcept RPPUSAGE;
+        time_t time_modified() const noexcept;
 
         /**
          * Gets the size of the file along with last modified time.
          * This has less syscalls than calling f.size() and f.time_modified() separately
          * @return Size of the file
          */
-        int size_and_time_modified(time_t* outModified) const noexcept RPPUSAGE;
+        int size_and_time_modified(time_t* outModified) const noexcept;
     };
 
 
@@ -332,14 +325,14 @@ namespace rpp /* ReCpp */
     /**
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
-    bool file_exists(const char* filename) noexcept RPPUSAGE;
+    bool file_exists(const char* filename) noexcept;
     inline bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
     inline bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
-    bool folder_exists(const char* folder) noexcept RPPUSAGE;
+    bool folder_exists(const char* folder) noexcept;
     inline bool folder_exists(const string& folder) noexcept { return folder_exists(folder.c_str());   }
     inline bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
 
@@ -353,40 +346,40 @@ namespace rpp /* ReCpp */
      * @return TRUE if the file exists and required data was retrieved from the OS
      */
     bool file_info(const char* filename, int64*  filesize, time_t* created, 
-                                         time_t* accessed, time_t* modified) noexcept RPPUSAGE;
+                                         time_t* accessed, time_t* modified) noexcept;
 
     /**
      * @return Short size of a file
      */
-    int file_size(const char* filename) noexcept RPPUSAGE;
+    int file_size(const char* filename) noexcept;
     inline int file_size(const string& filename) noexcept { return file_size(filename.c_str());   }
     inline int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
 
     /**
      * @return Long size of a file
      */
-    int64 file_sizel(const char* filename) noexcept RPPUSAGE;
+    int64 file_sizel(const char* filename) noexcept;
     inline int64 file_sizel(const string& filename) noexcept { return file_sizel(filename.c_str());   }
     inline int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
 
     /**
      * @return File creation date
      */
-    time_t file_created(const char* filename) noexcept RPPUSAGE;
+    time_t file_created(const char* filename) noexcept;
     inline time_t file_created(const string& filename) noexcept { return file_created(filename.c_str());   }
     inline time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
 
     /**
      * @return Last file access date
      */
-    time_t file_accessed(const char* filename) noexcept RPPUSAGE;
+    time_t file_accessed(const char* filename) noexcept;
     inline time_t file_accessed(const string& filename) noexcept { return file_accessed(filename.c_str());   }
     inline time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
 
     /**
      * @return Last file modification date
      */
-    time_t file_modified(const char* filename) noexcept RPPUSAGE;
+    time_t file_modified(const char* filename) noexcept;
     inline time_t file_modified(const string& filename) noexcept { return file_modified(filename.c_str());   }
     inline time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
 
@@ -394,7 +387,7 @@ namespace rpp /* ReCpp */
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
-    bool delete_file(const char* filename) noexcept RPPUSAGE;
+    bool delete_file(const char* filename) noexcept;
     inline bool delete_file(const string& filename) noexcept { return delete_file(filename.c_str());   }
     inline bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
 
@@ -402,16 +395,16 @@ namespace rpp /* ReCpp */
      * Creates a folder, recursively creating folders that do not exist
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */
-    bool create_folder(const strview foldername) noexcept RPPUSAGE;
-    bool create_folder(const wchar_t* foldername) noexcept RPPUSAGE;
-    bool create_folder(const wstring& foldername) noexcept RPPUSAGE;
+    bool create_folder(const strview foldername) noexcept;
+    bool create_folder(const wchar_t* foldername) noexcept;
+    bool create_folder(const wstring& foldername) noexcept;
 
     /**
      * Deletes a folder, by default only if it's empty.
      * @param recursive If TRUE, all subdirectories and files will also be deleted (permanently)
      * @return TRUE if the folder was deleted
      */
-    bool delete_folder(const string& foldername, bool recursive = false) noexcept RPPUSAGE;
+    bool delete_folder(const string& foldername, bool recursive = false) noexcept;
     inline bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
     inline bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
 
@@ -419,12 +412,12 @@ namespace rpp /* ReCpp */
      * @brief Resolves a relative path to a full path name using filesystem path resolution
      *        Ex: "path" ==> "C:\Projects\Test\path" 
      */
-    string full_path(const char* path) noexcept RPPUSAGE;
+    string full_path(const char* path) noexcept;
     inline string full_path(const string& path) noexcept { return full_path(path.c_str());   }
     inline string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
 
     // merges all ../ of a full path
-    string merge_dirups(const strview path) noexcept RPPUSAGE;
+    string merge_dirups(const strview path) noexcept;
 
     /**
      * @brief Extract the filename (no extension) from a file path
@@ -433,7 +426,7 @@ namespace rpp /* ReCpp */
      *        Ex: /root/dir/         ==> 
      *        Ex: file.ext           ==> file
      */
-    strview file_name(const strview path) noexcept RPPUSAGE;
+    strview file_name(const strview path) noexcept;
 
     /**
      * @brief Extract the file part (with ext) from a file path
@@ -442,7 +435,7 @@ namespace rpp /* ReCpp */
      *        Ex: /root/dir/         ==> 
      *        Ex: file.ext           ==> file.ext
      */
-    strview file_nameext(const strview path) noexcept RPPUSAGE;
+    strview file_nameext(const strview path) noexcept;
 
     /**
      * @brief Extract the extension from a file path
@@ -451,7 +444,7 @@ namespace rpp /* ReCpp */
      *        Ex: /root/dir/         ==> 
      *        Ex: file.ext           ==> ext
      */
-    strview file_ext(const strview path) noexcept RPPUSAGE;
+    strview file_ext(const strview path) noexcept;
 
     /**
      * @brief Extract the foldername from a path name
@@ -461,7 +454,7 @@ namespace rpp /* ReCpp */
      *        Ex: dir/               ==> dir
      *        Ex: file.ext           ==> 
      */
-    strview folder_name(const strview path) noexcept RPPUSAGE;
+    strview folder_name(const strview path) noexcept;
 
     /**
      * @brief Extracts the full folder path from a file path.
@@ -472,9 +465,9 @@ namespace rpp /* ReCpp */
      *        Ex: dir/               ==> dir/
      *        Ex: file.ext           ==> 
      */
-    strview folder_path(const strview path) noexcept RPPUSAGE;
-    wstring folder_path(const wchar_t* path) noexcept RPPUSAGE;
-    wstring folder_path(const wstring& path) noexcept RPPUSAGE;
+    strview folder_path(const strview path) noexcept;
+    wstring folder_path(const wchar_t* path) noexcept;
+    wstring folder_path(const wstring& path) noexcept;
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note This does not perform full path expansion.
@@ -482,14 +475,14 @@ namespace rpp /* ReCpp */
      *
      *       Ex:  \root\dir/file.ext ==> /root/dir/file.ext
      */
-    string& normalize(string& path, char sep = '/') noexcept RPPUSAGE;
-    char*   normalize(char*   path, char sep = '/') noexcept RPPUSAGE;
+    string& normalize(string& path, char sep = '/') noexcept;
+    char*   normalize(char*   path, char sep = '/') noexcept;
 
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note A copy of the string is made
      */
-    string normalized(const strview path, char sep = '/') noexcept RPPUSAGE;
+    string normalized(const strview path, char sep = '/') noexcept;
     
     /**
      * @brief Efficiently combines two path strings, removing any repeated / or \
@@ -498,7 +491,7 @@ namespace rpp /* ReCpp */
      *          Ex: path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
      *          Ex: path_combine("tmp/", "/folder//") ==> "tmp/folder"
      */
-    string path_combine(strview path1, strview path2) noexcept RPPUSAGE;
+    string path_combine(strview path1, strview path2) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -509,13 +502,13 @@ namespace rpp /* ReCpp */
      * @param dir Relative or full path of this directory
      * @return Number of folders found
      */
-    int list_dirs(vector<string>& out, strview dir) noexcept RPPUSAGE;
+    int list_dirs(vector<string>& out, strview dir) noexcept;
     inline vector<string> list_dirs(strview dir) noexcept
     {
         vector<string> out; list_dirs(out, dir); return out;
     }
 
-    int list_dirs_fullpath(vector<string>& out, strview dir) noexcept RPPUSAGE;
+    int list_dirs_fullpath(vector<string>& out, strview dir) noexcept;
     inline vector<string> list_dirs_fullpath(strview dir) noexcept
     {
         vector<string> out; list_dirs_fullpath(out, dir); return out;
@@ -528,13 +521,13 @@ namespace rpp /* ReCpp */
      * @param ext Filter files by extension, ex: "txt", default ("") lists all files
      * @return Number of files found that match the extension
      */
-    int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept RPPUSAGE;
+    int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
     inline vector<string> list_files(strview dir, strview ext = {}) noexcept
     {
         vector<string> out; list_files(out, dir, ext); return out;
     }
     
-    int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}) noexcept RPPUSAGE;
+    int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}) noexcept;
     inline vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept
     {
         vector<string> out; list_files_fullpath(out, dir, ext); return out;
@@ -543,7 +536,7 @@ namespace rpp /* ReCpp */
     /**
      * Lists all files and folders inside a dir
      */
-    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept RPPUSAGE;
+    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept;
 
     /**
      * Recursively lists all files under this directory and its subdirectories 
@@ -552,7 +545,7 @@ namespace rpp /* ReCpp */
      * @param ext Filter files by extension, ex: "txt", default ("") lists all files
      * @return vector of resulting relative file paths
      */
-    vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept RPPUSAGE;
+    vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept;
 
      /**
      * Recursively lists all files under this directory and its subdirectories 
@@ -561,18 +554,18 @@ namespace rpp /* ReCpp */
      * @param exts Filter files by extensions, ex: {"txt","cfg"}
      * @return vector of resulting relative file paths
      */
-    vector<string> list_files_recursive(strview dir, const vector<strview>& exts) noexcept RPPUSAGE;
+    vector<string> list_files_recursive(strview dir, const vector<strview>& exts) noexcept;
 
     /**
      * @return The current working directory of the application
      */
-    string working_dir() noexcept RPPUSAGE;
+    string working_dir() noexcept;
 
     /**
      * Calls chdir() to set the working directory of the application to a new value
      * @return TRUE if chdir() is successful
      */
-    bool change_dir(const char* new_wd) noexcept RPPUSAGE;
+    bool change_dir(const char* new_wd) noexcept;
     inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
     inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
 

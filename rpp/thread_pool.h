@@ -17,7 +17,7 @@ namespace rpp
         void* Callee;
         Func Function;
 
-        template <class T, void (T::*TMethod)(TArgs...)>
+        template<class T, void (T::*TMethod)(TArgs...)>
         static void methodCaller(void* callee, TArgs... args)
         {
             T* p = static_cast<T*>(callee);
@@ -38,13 +38,13 @@ namespace rpp
         template<class T, void (T::*TMethod)(TArgs...)>
         static action from_function(T* callee)
         {
-            return action((void*)callee, &methodCaller<T, TMethod>);
+            return { (void*)callee, &methodCaller<T, TMethod> };
         }
 
         template<class T, void (T::*TMethod)(TArgs...)const>
         static action from_function(const T* callee)
         {
-            return action((void*)callee, &methodCaller<T, TMethod>);
+            return { (void*)callee, &methodCaller<T, TMethod> };
         }
 
         inline void operator()(TArgs... args) const

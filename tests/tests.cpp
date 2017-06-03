@@ -22,7 +22,7 @@ namespace rpp
         return tests;
     }
 
-    test::test(const char* name) : name(name)
+    test::test(strview name) : name(name)
     {
         all_tests().push_back(this);
     }
@@ -76,8 +76,8 @@ namespace rpp
     {
         char title[256];
         int len = methodFilter
-            ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name, methodFilter.len, methodFilter.str)
-            : snprintf(title, sizeof(title), "--------  running '%s'  --------", name);
+            ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
+            : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
 
         consolef(Yellow, "%s\n", title);
         run();
@@ -86,23 +86,17 @@ namespace rpp
         {
             for (auto& testFunc : test_funcs) {
                 if (testFunc.name.find(methodFilter)) {
-                    testFunc.func();
+                    (this->*testFunc.func)();
                 }
             }
         }
         else
         {
             for (auto& testFunc : test_funcs) {
-                testFunc.func();
+                (this->*testFunc.func)();
             }
         }
         consolef(Yellow, "%s\n\n", (char*)memset(title, '-', len)); // "-------------"
-    }
-
-    int test::add_test_func(test_func&& func)
-    {
-        test_funcs.emplace_back(move(func));
-        return (int)test_funcs.size() - 1;
     }
 
     void test::sleep(int millis)
@@ -225,7 +219,7 @@ namespace rpp
                 for (test* t : all_tests())
                 {
                     if ((exactMatch && t->name == testName) ||
-                        (!exactMatch && strview{t->name}.find(testName)))
+                        (!exactMatch && t->name.find(testName)))
                     {
                         t->run_test(specific);
                         ++numTest;

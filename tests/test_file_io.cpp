@@ -14,7 +14,7 @@ TestImpl(test_file_io)
 
         int mode = ios::in | ios::binary;
         ifstream refFile { FileName, mode };
-        if (refFile.bad()) {
+        if (!refFile.good()) {
             FileName = "../" + FileName;
             refFile.open(FileName.c_str(), mode);
         }
@@ -39,7 +39,7 @@ TestImpl(test_file_io)
 
     TestCase(if_initializer)
     {
-        if (file f = file(FileName))
+        if (file f = { FileName, READONLY })
         {
             Assert(f.good() && !f.bad());
         }
