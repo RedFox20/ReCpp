@@ -19,80 +19,78 @@ TODO: Brief overview of rpp::strview methods
 ```cpp
 struct strview
 {
-	const char* str;
-	int len;
+    const char* str;
+    int len;
 }
 ```
 
 TODO: Add code examples on how to use strview for parsing
 
 ### `rpp/file_io.h` Simple and fast File IO
-| Class                | Description                                                 |
-| -------------------- | ----------------------------------------------------------  |
-| `rpp::file`          | Core class for reading/writing files                        |
-| `rpp::load_buffer`   | Used with io::file::read_all() to read all data from a file |
+This is an extremely useful cross-platform file and filesystem module. It provides all the basic
+functionality for most common file operations and path manipulations.
 
 Brief overview of core types and prototypes
 ```cpp
-	enum IOFlags
-	{
-		READONLY,			// opens an existing file for reading
-		READWRITE,			// opens an existing file for read/write
-		CREATENEW,			// creates new file for writing
-		APPEND,             // opens an existing file for appending only
-	};
+    enum IOFlags
+    {
+        READONLY,           // opens an existing file for reading
+        READWRITE,          // opens an existing file for read/write
+        CREATENEW,          // creates new file for writing
+        APPEND,             // opens an existing file for appending only
+    };
 
-	struct load_buffer // Used with io::file::read_all() to get all data from a file
-	{
-		load_buffer(char* buffer, int size);
-		~load_buffer();
-		int   size() const;
-		char* data() const;
-	};
+    struct load_buffer // Used with io::file::read_all() to get all data from a file
+    {
+        load_buffer(char* buffer, int size);
+        ~load_buffer();
+        int   size() const;
+        char* data() const;
+    };
 
-	class file
-	{
-		file(const strview& filename, IOFlags mode = READONLY);
-		file(const wstring& filename, IOFlags mode = READONLY);
-		bool open(const strview filename, IOFlags mode = READONLY);
-		void close();
-		void flush();
-		
-		bool good() const;
-		bool bad() const;
-		int size() const;
-		int64 sizel() const;
-		int read(void* buffer, int bytesToRead);
-		load_buffer read_all();
+    class file
+    {
+        file(const strview& filename, IOFlags mode = READONLY);
+        file(const wstring& filename, IOFlags mode = READONLY);
+        bool open(const strview filename, IOFlags mode = READONLY);
+        void close();
+        void flush();
+        
+        bool good() const;
+        bool bad() const;
+        int size() const;
+        int64 sizel() const;
+        int read(void* buffer, int bytesToRead);
+        load_buffer read_all();
 
-		static load_buffer read_all(const strview& filename);
-		static load_buffer read_all(const wchar_t* filename);
+        static load_buffer read_all(const strview& filename);
+        static load_buffer read_all(const wchar_t* filename);
 
-		int write(const void* buffer, int bytesToWrite);
-		int write(const strview& str);
-		int writef(const char* format, ...); // Writes a formatted string to file
-		static int write_new(const strview& filename, const void* buffer, int bytesToWrite);
+        int write(const void* buffer, int bytesToWrite);
+        int write(const strview& str);
+        int writef(const char* format, ...); // Writes a formatted string to file
+        static int write_new(const strview& filename, const void* buffer, int bytesToWrite);
 
-		int seek(int filepos, int seekmode = SEEK_SET);
-		uint64 seekl(int64 filepos, int seekmode = SEEK_SET);
-		int tell() const;
-		int64 tell64() const;
+        int seek(int filepos, int seekmode = SEEK_SET);
+        uint64 seekl(int64 filepos, int seekmode = SEEK_SET);
+        int tell() const;
+        int64 tell64() const;
 
-		bool time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const;
-		time_t time_created() const;
-		time_t time_accessed() const;
-		time_t time_modified() const;
-		int size_and_time_modified(time_t* outModified) const;
-	};
+        bool time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const;
+        time_t time_created() const;
+        time_t time_accessed() const;
+        time_t time_modified() const;
+        int size_and_time_modified(time_t* outModified) const;
+    };
 
 
     bool file_exists(const strview filename);
     bool folder_exists(const strview folder);
 
     int   file_size(const strview filename);
-	int64 file_sizel(const strview filename);
+    int64 file_sizel(const strview filename);
     time_t file_created(const strview filename);
-	time_t file_accessed(const strview filename);
+    time_t file_accessed(const strview filename);
     time_t file_modified(const strview filename);
 
     // Deletes a single file, ex: "root/dir/file.ext"
@@ -160,63 +158,63 @@ using namespace rpp;
 
 void fileio_read_sample(strview filename = "README.md"_sv)
 {
-	if (file f = { filename, READONLY })
-	{
-		// reads all data in the most efficient way
-		load_buffer data = f.read_all(); 
-		
-		// use the data as a binary blob
-		for (char& ch : data) { }
-	}
+    if (file f = { filename, READONLY })
+    {
+        // reads all data in the most efficient way
+        load_buffer data = f.read_all(); 
+        
+        // use the data as a binary blob
+        for (char& ch : data) { }
+    }
 }
 void fileio_writeall_sample(strview filename = "test.txt"_sv)
 {
-	string someText = "/**\n * A simple self-expanding buffer\n */\nstruct";
-	
-	// write a new file with the contents of someText
-	file::write_new(filename, someText.data(), someText.size());
-	
-	// or just write it as a string 
-	file::write_new(filename, someText);
+    string someText = "/**\n * A simple self-expanding buffer\n */\nstruct";
+    
+    // write a new file with the contents of someText
+    file::write_new(filename, someText.data(), someText.size());
+    
+    // or just write it as a string 
+    file::write_new(filename, someText);
 }
 void fileio_info_sample(strview file = "README.md"_sv)
 {
-	if (file_exists(file))
-	{
-		printf(" === %s === \n", file.str);
-		printf("  file_size     : %d\n",   file_size(file));
-		printf("  file_modified : %llu\n", file_modified(file));
-		printf("  full_path     : %s\n",   full_path(file).data());
-		printf("  file_name     : %s\n",   file_name(file).data());
-		printf("  folder_name   : %s\n",   folder_name(full_path(file)).data());
-	}
+    if (file_exists(file))
+    {
+        printf(" === %s === \n", file.str);
+        printf("  file_size     : %d\n",   file_size(file));
+        printf("  file_modified : %llu\n", file_modified(file));
+        printf("  full_path     : %s\n",   full_path(file).data());
+        printf("  file_name     : %s\n",   file_name(file).data());
+        printf("  folder_name   : %s\n",   folder_name(full_path(file)).data());
+    }
 }
 void fileio_path_manipulation(strview file = "/root/../path\\example.txt"_sv)
 {
-	printf(" === %s === \n", file.str);
-	printf("  full_path     : %s\n", full_path(file).data());
-	printf("  merge_dirups  : %s\n", merge_dirups(file).data());
-	printf("  file_name     : %s\n", file_name(file).str);
-	printf("  file_nameext  : %s\n", file_nameext(file).str);
-	printf("  file_ext      : %s\n", file_ext(file).str);
-	printf("  folder_name   : %s\n", file_ext(file).str);
-	printf("  folder_path   : %s\n", file_ext(file).str);
-	printf("  normalized    : %s\n", normalized(file).data());
-	printf("  path_combine  : %s\n", path_combine(folder_name(file), "another.txt").data());
+    printf(" === %s === \n", file.str);
+    printf("  full_path     : %s\n", full_path(file).data());
+    printf("  merge_dirups  : %s\n", merge_dirups(file).data());
+    printf("  file_name     : %s\n", file_name(file).str);
+    printf("  file_nameext  : %s\n", file_nameext(file).str);
+    printf("  file_ext      : %s\n", file_ext(file).str);
+    printf("  folder_name   : %s\n", file_ext(file).str);
+    printf("  folder_path   : %s\n", file_ext(file).str);
+    printf("  normalized    : %s\n", normalized(file).data());
+    printf("  path_combine  : %s\n", path_combine(folder_name(file), "another.txt").data());
 }
 void fileio_listing_dirs(strview path = "../"_sv)
 {
-	printf(" working dir   : %s\n", working_dir().data());
-	printf(" relative path : %s\n", path.str);
-	printf(" full path     : %s\n", full_path(path).data());
-	
-	vector<string> cppFiles = list_files_recursive(path, "cpp");
-	for (auto& relativePath : cppFiles)
-		printf("  source  : %s\n", relativePath.data());
-	
-	vector<string> headerFiles = list_files_fullpath("./rpp", "h");
-	for (auto& fullPath : headerFiles)
-		printf("  header  : %s\n", fullPath.data());
+    printf(" working dir   : %s\n", working_dir().data());
+    printf(" relative path : %s\n", path.str);
+    printf(" full path     : %s\n", full_path(path).data());
+    
+    vector<string> cppFiles = list_files_recursive(path, "cpp");
+    for (auto& relativePath : cppFiles)
+        printf("  source  : %s\n", relativePath.data());
+    
+    vector<string> headerFiles = list_files_fullpath("./rpp", "h");
+    for (auto& fullPath : headerFiles)
+        printf("  header  : %s\n", fullPath.data());
 }
 ```
 
@@ -229,26 +227,26 @@ void fileio_listing_dirs(strview path = "../"_sv)
 ```cpp
 void delegate_samples()
 {
-	// create a new function delegate - in this case using a lambda
-	delegate<void(int)> fn = [](int a) { 
-		printf("lambda %d!\n", a); 
-	};
-	
-	// invoke the delegate like any other function
-	fn(42);
+    // create a new function delegate - in this case using a lambda
+    delegate<void(int)> fn = [](int a) { 
+        printf("lambda %d!\n", a); 
+    };
+    
+    // invoke the delegate like any other function
+    fn(42);
 }
 void event_sample()
 {
-	// create an event container
-	event<void(int,int)> onMouseMove;
+    // create an event container
+    event<void(int,int)> onMouseMove;
 
-	// add a single notification target (more can be added if needed)
-	onMouseMove += [](int x, int y) { 
-		printf("mx %d, my %d\n", x, y); 
-	};
-	
-	// call the event and multicast to all registered callbacks
-	onMouseMove(22, 34);
+    // add a single notification target (more can be added if needed)
+    onMouseMove += [](int x, int y) { 
+        printf("mx %d, my %d\n", x, y); 
+    };
+    
+    // call the event and multicast to all registered callbacks
+    onMouseMove(22, 34);
 }
 ```
 
