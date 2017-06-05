@@ -104,6 +104,10 @@ TestImpl(test_file_io)
         Assert(create_folder("test_tmp/folder/path"));
         Assert(folder_exists("test_tmp/folder/path"));
         Assert(delete_folder("test_tmp", true/*recursive*/));
+
+        Assert(create_folder("test_tmp/folder/path/"));
+        Assert(folder_exists("test_tmp/folder/path/"));
+        Assert(delete_folder("test_tmp", true/*recursive*/));
     }
 
     TestCase(path_utils)

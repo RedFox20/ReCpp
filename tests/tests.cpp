@@ -82,18 +82,20 @@ namespace rpp
         consolef(Yellow, "%s\n", title);
         run();
 
+        auto funcs = test_funcs.data();
+        auto count = test_funcs.size();
         if (methodFilter)
         {
-            for (auto& testFunc : test_funcs) {
-                if (testFunc.name.find(methodFilter)) {
-                    (this->*testFunc.func)();
+            for (auto i = 0u; i < count; ++i) {
+                if (funcs[i].name.find(methodFilter)) {
+                    (funcs[i].lambda.*funcs[i].func)();
                 }
             }
         }
         else
         {
-            for (auto& testFunc : test_funcs) {
-                (this->*testFunc.func)();
+            for (auto i = 0u; i < count; ++i) {
+                (funcs[i].lambda.*funcs[i].func)();
             }
         }
         consolef(Yellow, "%s\n\n", (char*)memset(title, '-', len)); // "-------------"

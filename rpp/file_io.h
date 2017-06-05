@@ -6,6 +6,7 @@
  */
 #include <time.h> // time_t
 #include "strview.h"
+#include <unordered_map> // keyvalue saving
 
 namespace rpp /* ReCpp */
 {
@@ -60,7 +61,7 @@ namespace rpp /* ReCpp */
     /**
      * Stores a load buffer for line parsing
      */
-    struct buffer_line_parser : public line_parser
+    struct buffer_line_parser : line_parser
     {
         load_buffer buf;
         buffer_line_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), buf(move(buf))
@@ -75,7 +76,7 @@ namespace rpp /* ReCpp */
     /**
      * Stores a load buffer for bracket parsing
      */
-    struct buffer_bracket_parser : public bracket_parser
+    struct buffer_bracket_parser : bracket_parser
     {
         load_buffer buf;
         buffer_bracket_parser(load_buffer&& buf) noexcept : bracket_parser(buf.str, buf.len), buf(move(buf))
@@ -115,12 +116,12 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          */
         file(const char* filename, IOFlags mode = READONLY) noexcept;
-        inline file(const string&  filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
+        file(const string&  filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
         {
         }
         file(const strview& filename, IOFlags mode = READONLY) noexcept;
         file(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
-        inline file(const wstring& filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
+        file(const wstring& filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
         {
         }
         file(file&& f) noexcept;
@@ -130,7 +131,6 @@ namespace rpp /* ReCpp */
 
         file(const file& f) = delete;
         file& operator=(const file& f) = delete;
-    public:
 
         /**
          * Opens an existing file for reading with mode = READONLY
@@ -140,13 +140,13 @@ namespace rpp /* ReCpp */
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
         bool open(const char* filename, IOFlags mode = READONLY) noexcept;
-        inline bool open(const string& filename, IOFlags mode = READONLY) noexcept
+        bool open(const string& filename, IOFlags mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
         }
         bool open(const strview filename, IOFlags mode = READONLY) noexcept;
         bool open(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
-        inline bool open(const wstring& filename, IOFlags mode = READONLY) noexcept
+        bool open(const wstring& filename, IOFlags mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
         }
@@ -194,16 +194,34 @@ namespace rpp /* ReCpp */
          * The file is opened as READONLY, unbuffered_file is used internally
          */
         static load_buffer read_all(const char* filename) noexcept;
-        static inline load_buffer read_all(const string& filename) noexcept
+        static load_buffer read_all(const string& filename) noexcept
         {
             return read_all(filename.c_str());
         }
         static load_buffer read_all(const strview& filename) noexcept;
         static load_buffer read_all(const wchar_t* filename) noexcept;
-        static inline load_buffer read_all(const wstring& filename) noexcept
+        static load_buffer read_all(const wstring& filename) noexcept
         {
             return read_all(filename.c_str());
         }
+
+        /**
+         * Reads a simple key-value map from file in the form of:
+         * #comment
+         * key1=value1\n
+         * key2 = value2 \n
+         * @return Hash map of key string and value string
+         */
+        static unordered_map<string, string> read_map(const strview& filename) noexcept;
+
+        /**
+         * Parses a simple key-value map from a load_buffer file.
+         * Intended usage:
+         *     load_buffer buf = file::read_all("values.txt");
+         *     auto map = file::parse_map(buf);
+         * @return Map of string views, referencing into buf
+         */
+        static unordered_map<strview, strview> parse_map(const load_buffer& buf) noexcept;
 
         /**
          * Writes a block of bytes to the file. Regular Windows IO
@@ -246,6 +264,11 @@ namespace rpp /* ReCpp */
         int writef(const char* format, ...) noexcept;
 
         /**
+         * Writes a string to file and also appends a newline
+         */
+        int writeln(const strview& str) noexcept;
+
+        /**
          * Forcefully flushes any OS file buffers to send all data to the storage device
          * @warning Don't call this too haphazardly, or you will ruin your IO performance!
          */
@@ -263,11 +286,46 @@ namespace rpp /* ReCpp */
          * @return Number of bytes actually written to the file
          */
         static int write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept;
-        static inline int write_new(const string& filename, const void* buffer, int bytesToWrite) noexcept
+        static int write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(const string& filename, const void* buffer, int bytesToWrite) noexcept
         {
             return write_new(filename.c_str(), buffer, bytesToWrite);
         }
-        static int write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(const strview& filename, const strview& data) noexcept
+        {
+            return write_new(filename, data.str, data.len);
+        }
+        template<class T, class U>
+        static int write_new(const strview& filename, const vector<T,U>& plainOldData) noexcept
+        {
+            return write_new(filename, plainOldData.data(), int(plainOldData.size()*sizeof(T)));
+        }
+
+        /**
+         * Writes a simple key-value map to file in the form of:
+         * key1=value1\n
+         * key2=value2\n
+         * Please avoid using \n in the keys or values
+         * Key and Value types require .size() and .c_str()
+         * @return Number of bytes written
+         */
+        template<class K, class V, class H, class C, class A>
+        static int write_new(const strview& filename, const unordered_map<K, V, H, C, A>& map) noexcept
+        {
+            size_t required = 0;
+            for (auto& kv : map)
+                required += kv.first.size() + kv.second.size() + 2ul;
+
+            string buffer; buffer.reserve(required);
+            for (auto& kv : map)
+            {
+                buffer.append(kv.first.c_str(), kv.first.size());
+                buffer += '=';
+                buffer.append(kv.second.c_str(), kv.second.size());
+                buffer += '\n';
+            }
+            return write_new(filename, buffer);
+        }
 
         /**
          * Seeks to the specified position in a file. Seekmode is

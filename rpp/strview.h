@@ -287,7 +287,7 @@ namespace rpp
         /** @return TRUE if length of the string is 0 - thus the string is empty */
         FINLINE bool empty() const { return !len; }
         /** @return TRUE if string is non-empty */
-        FINLINE operator bool() const { return !!len; }
+        explicit FINLINE operator bool() const { return !!len; }
         /** @return Pointer to the start of the string */
         FINLINE const char* c_str() const { return str; }
         FINLINE const char* data()  const { return str; }
@@ -926,6 +926,12 @@ namespace rpp
     /**
      * Parses an input string buffer for 'Key=Value' pairs.
      * The pairs are returned one by one with 'read_next'.
+     * 
+     * Ex file:
+     * # comment line
+     * key1 = value1\n
+     * key2=value2\r\n
+     *  key3 = \t value3 \n
      *
      * This is also an example on how to implement your own custom parsers using strview
      */

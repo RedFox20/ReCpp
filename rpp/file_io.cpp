@@ -265,8 +265,32 @@ namespace rpp /* ReCpp */
     {
         return file{filename, READONLY}.read_all();
     }
+
+    unordered_map<string, string> file::read_map(const strview& filename) noexcept
+    {
+        load_buffer buf = read_all(filename);
+        strview key, value;
+        keyval_parser parser = { buf };
+        unordered_map<string, string> map;
+        while (parser.read_next(key, value))
+            map[key] = value.to_string();
+        return map;
+    }
+
+    unordered_map<strview, strview> file::parse_map(const load_buffer& buf) noexcept
+    {
+        strview key, value;
+        keyval_parser parser = { buf };
+        unordered_map<strview, strview> map;
+        while (parser.read_next(key, value))
+            map[key] = value;
+        return map;
+    }
+
     int file::write(const void* buffer, int bytesToWrite) noexcept
     {
+        if (bytesToWrite <= 0)
+            return 0;
         #if USE_WINAPI_IO
             DWORD bytesWritten;
             WriteFile((HANDLE)Handle, buffer, bytesToWrite, &bytesWritten, 0);
@@ -299,6 +323,12 @@ namespace rpp /* ReCpp */
             return vfprintf((FILE*)Handle, format, ap);
         #endif
     }
+
+    int file::writeln(const strview& str) noexcept
+    {
+        return write(str.str, str.len) + write("\n", 1);
+    }
+
     void file::flush() noexcept
     {
         #if USE_WINAPI_IO
@@ -317,6 +347,7 @@ namespace rpp /* ReCpp */
         char buf[512];
         return write_new(filename.to_cstr(buf), buffer, bytesToWrite);
     }
+
     int file::seek(int filepos, int seekmode) noexcept
     {
         #if USE_WINAPI_IO
@@ -492,10 +523,11 @@ namespace rpp /* ReCpp */
     // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
     static bool sys_mkdir(const strview foldername) noexcept
     {
+        char buf[512];
     #if _WIN32
-        return _mkdir(foldername.to_cstr()) == 0 || errno == EEXIST;
+        return _mkdir(foldername.to_cstr(buf)) == 0 || errno == EEXIST;
     #else
-        return mkdir(foldername.to_cstr(), 0755) == 0 || errno == EEXIST;
+        return mkdir(foldername.to_cstr(buf), 0755) == 0 || errno == EEXIST;
     #endif
     }
     static bool sys_mkdir(const wchar_t* foldername) noexcept
@@ -553,10 +585,11 @@ namespace rpp /* ReCpp */
 
     static bool sys_rmdir(const strview foldername) noexcept
     {
+        char buf[512];
     #if _WIN32
-        return _rmdir(foldername.to_cstr()) == 0;
+        return _rmdir(foldername.to_cstr(buf)) == 0;
     #else
-        return rmdir(foldername.to_cstr()) == 0;
+        return rmdir(foldername.to_cstr(buf)) == 0;
     #endif
     }
 

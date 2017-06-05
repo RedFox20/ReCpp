@@ -23,10 +23,12 @@ namespace rpp
 
     struct test
     {
+        struct lambda_base { test* self; };
         struct test_func
         {
             strview name;
-            void (test::*func)();
+            lambda_base lambda;
+            void (lambda_base::*func)();
         };
 
         static int asserts_failed;
@@ -79,6 +81,7 @@ namespace rpp
         static int run_tests();
 
         static const string& as_string(const string& v) { return v; }
+        static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
         template<int N>   static string as_string(const char(&v)[N]) { return { v, v + (N - 1) }; }
         template<class T> static string as_string(const T& v)        { return to_string(v); }
 
@@ -93,9 +96,9 @@ namespace rpp
         }
 
         // adds a test to the automatic test run list
-        template<class T> int add_test_func(strview name, void (T::*testMethod)())
+        template<class T, class Lambda> int add_test_func(strview name, T* self, Lambda)
         {
-            test_funcs.emplace_back(test_func{ name, (void (test::*)())testMethod });
+            test_funcs.emplace_back(test_func{ name, self, (void (lambda_base::*)())&Lambda::operator() });
             return (int)test_funcs.size() - 1;
         }
     };
@@ -116,8 +119,9 @@ namespace rpp
 #define TestCleanup(testclass) ~testclass()
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(#testname, &ClassType::test_##testname); \
+    const int _test_##testname = add_test_func(#testname, this, [this]{ this->test_##testname();}); \
     void test_##testname()
+
 }
 
 #endif // RPP_TESTSFRAMEWORK_HPP

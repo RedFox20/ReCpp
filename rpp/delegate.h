@@ -93,48 +93,46 @@ namespace rpp
 			virtual Ret operator()(Args&&... args) = 0;
 			virtual bool equals(const callable* c) const { return true; }
 		};
-		struct function : public callable
+		struct function : callable
 		{
 			func_type ptr;
-			function() {}
 			function(func_type f) : ptr(f) {}
-			virtual void copy(void* dst) const override
+			void copy(void* dst) const override
 			{
 				new (dst) function(ptr);
 			}
-			virtual Ret operator()(Args&&... args) override
+			Ret operator()(Args&&... args) override
 			{
 				return (Ret)ptr((Args&&)args...);
 			}
-			virtual bool equals(const callable* c) const override
+			bool equals(const callable* c) const override
 			{
 				return ptr == ((function*)c)->ptr;
 			}
 		};
-		struct member : public callable
+		struct member : callable
 		{
 			union {
 				memb_type ptr;
 				dummy_type dptr; // cast helper
 			};
 			void* obj;
-			member() {}
-			member(void* o, memb_type f) : ptr(f), obj(o) {}
+			member(void* o, memb_type  f) : ptr(f),  obj(o) {}
 			member(void* o, dummy_type f) : dptr(f), obj(o) {}
-			virtual void copy(void* dst) const override
+			void copy(void* dst) const override
 			{
 				new (dst) member(obj, ptr);
 			}
-			virtual Ret operator()(Args&&... args) override
+			Ret operator()(Args&&... args) override
 			{
 				return (Ret)ptr(obj, (Args&&)args...);
 			}
-			virtual bool equals(const callable* c) const override
+			bool equals(const callable* c) const override
 			{
 				return ptr == ((member*)c)->ptr && obj == ((member*)c)->obj;
 			}
 		};
-		template<class FUNC> struct functor : public callable
+		template<class FUNC> struct functor : callable
 		{
 			// some very basic small Functor optimization applied here:
 			// @note The data / ftor fields are never compared for functor
@@ -143,7 +141,7 @@ namespace rpp
 				FUNC* ftor;
 			};
 			static const int SZ = 3 * sizeof(void*);
-			functor() {}
+            functor(){}
 			functor(FUNC&& fn)
 			{
 				if (sizeof(FUNC) <= SZ) new (data) FUNC((FUNC&&)fn);
@@ -154,16 +152,16 @@ namespace rpp
 				if (sizeof(FUNC) <= SZ) new (data) FUNC(fn);
 				else                    ftor = new FUNC(fn);
 			}
-			virtual ~functor() override
+			~functor() override
 			{
 				if (sizeof(FUNC) <= SZ) ((FUNC*)data)->~FUNC();
 				else                    delete ftor;
 			}
-			virtual void copy(void* dst) const override
+			void copy(void* dst) const override
 			{
 				new (dst) functor(*ftor);
 			}
-			virtual Ret operator()(Args&&... args) override
+			Ret operator()(Args&&... args) override
 			{
 				FUNC& fn = (sizeof(FUNC) <= SZ) ? *(FUNC*)data : *ftor;
 				return (Ret)fn((Args&&)args...);
@@ -210,7 +208,7 @@ namespace rpp
 			return *this;
 		}
 		/** @brief Forward reference initialization */
-		delegate(delegate&& d) // move
+		delegate(delegate&& d) noexcept // move
 		{
 			data[0] = d.data[0];
 			data[1] = d.data[1];
@@ -219,7 +217,7 @@ namespace rpp
 			d.data[0] = nullptr;
 		}
 		/** @brief Forward reference assignment (swap) */
-		delegate& operator=(delegate&& d)
+		delegate& operator=(delegate&& d) noexcept
 		{
 			void* d0 = data[0], *d1 = data[1], *d2 = data[2], *d3 = data[3];
 			data[0] = d.data[0];
@@ -265,7 +263,7 @@ namespace rpp
 		*/
 		template<class Functor> delegate(Functor&& ftor)
 		{
-			new (data) delegate::functor<Functor>(ftor);
+			new (data) functor<Functor>(forward<Functor>(ftor));
 		}
 
 
@@ -292,7 +290,7 @@ namespace rpp
 		void reset()
 		{
 			this->~delegate();
-			data = nullptr; // only set what we need to
+			*data = nullptr; // only set what we need to
 		}
 		/** @brief Resets the delegate to point to a function */
 		void reset(func_type func)
@@ -326,18 +324,18 @@ namespace rpp
 		template<class Functor> void reset(Functor&& ftor)
 		{
 			this->~delegate();
-			new (data) delegate::functor<Functor>(forward<Functor>(ftor));
+			new (data) functor<Functor>(forward<Functor>(ftor));
 		}
 
 
 
 		/** @brief Basic operator= shortcuts for reset() */
-		inline delegate& operator=(func_type func)
+		delegate& operator=(func_type func)
 		{
 			reset(func);
 			return *this;
 		}
-		template<class Functor> inline delegate& operator=(Functor&& functor)
+		template<class Functor> delegate& operator=(Functor&& functor)
 		{
 			reset(forward<Functor>(functor));
 			return *this;
@@ -411,7 +409,7 @@ namespace rpp
 		*/
 		template<class Functor> bool equals() const
 		{
-			delegate::functor<Functor> vt; // vtable reference object
+			functor<Functor> vt; // vtable reference object
 			return *data == *(void**)&vt; // comparing vtables should be enough
 		}
 
