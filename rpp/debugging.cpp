@@ -9,41 +9,51 @@ static LogSeverity Filter = LogSeverityWarn;
 static LogSeverity Filter = LogSeverityInfo;
 #endif
 static LogErrorCallback ErrorHandler;
+static LogEventCallback EventHandler;
 
-EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc)
+EXTERNC void SetLogErrorHandler(LogErrorCallback errorHandler)
 {
-    ErrorHandler = errfunc;
+    ErrorHandler = errorHandler;
+}
+EXTERNC void SetLogEventHandler(LogEventCallback eventHandler)
+{
+    EventHandler = eventHandler;
 }
 EXTERNC void SetLogSeverityFilter(LogSeverity filter)
 {
     Filter = filter;
 }
 
-EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
+template<int N> static int SafeFormat(char (&errBuf)[N], const char* format, va_list ap)
 {
-    if (severity < Filter)
-    {
-        return;
-    }
-    
-    char errBuf[4096];
-    // always format, because return string is used in asserts
-    int len = vsnprintf(errBuf, sizeof(errBuf)-1, format, ap);
+    int len = vsnprintf(errBuf, N-1/*spare room for \n*/, format, ap);
     if (len < 0) { // err: didn't fit
         len = sizeof(errBuf)-2; // try to recover gracefully
         errBuf[len] = '\0';
     }
+    return len;
+}
+
+EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
+{
+    if (severity < Filter)
+        return;
+    
+    char errBuf[4096];
+    int len = SafeFormat(errBuf, format, ap);
     errBuf[len++] = '\n'; // force append a newline
+    errBuf[len]   = '\0';
+
     
     // some default logging behavior:
     fwrite(errBuf, len, 1, (severity == LogSeverityError) ? stderr : stdout);
-
+    
     // optional error handler for iOS Crashlytics logging
     if (ErrorHandler)
     {
+        errBuf[--len] = '\0'; // remove the newline we added
         ErrorHandler(severity, errBuf, len);
     }
-
 }
 
 #define WrappedLogFormatv(severity, format) \
@@ -58,6 +68,20 @@ EXTERNC void _LogWarning(const char* format, ...) {
 }
 EXTERNC void _LogError(const char* format, ...) {
     WrappedLogFormatv(LogSeverityError, format);
+}
+
+EXTERNC void LogEvent(const char* eventName, const char* format, ...)
+{
+    char messageBuf[4096];
+    va_list ap; va_start(ap, format);
+    int len = SafeFormat(messageBuf, format, ap);
+    
+    printf("EVT %s: %s\n", eventName, messageBuf);
+    
+    if (EventHandler)
+    {
+        EventHandler(eventName, messageBuf, len);
+    }
 }
 
 EXTERNC const char* _FmtString(const char* format, ...) {

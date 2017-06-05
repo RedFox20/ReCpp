@@ -9,9 +9,11 @@
 
 #ifdef _MSC_VER
 #  define PRINTF_CHECKFMT
+#  define PRINTF_CHECKFMT2
 #  define PRINTF_FMTSTR _In_z_ _Printf_format_string_
 #else
 #  define PRINTF_CHECKFMT __attribute__((__format__ (__printf__, 1, 2)))
+#  define PRINTF_CHECKFMT2 __attribute__((__format__ (__printf__, 2, 3)))
 #  define PRINTF_FMTSTR
 #endif
 
@@ -29,10 +31,14 @@ typedef enum {
 
 /** Error message callback */
 typedef void (*LogErrorCallback)(LogSeverity severity, const char* err, int len);
+typedef void (*LogEventCallback)(const char* eventName, const char* message, int len);
 
 
 /** Sets the callback handler for any error messages */
 EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc);
+
+/** Sets the callback handler for event messages  */
+EXTERNC void SetLogEventHandler(LogEventCallback eventFunc);
 
 /** Sets the default log severity filter: if (severity >= filter) log(..)
  *  This defaults to LogSeverityInfo, which is the most verbose
@@ -45,6 +51,7 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap);
 EXTERNC void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+EXTERNC void LogEvent    (const char* eventName, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 EXTERNC const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 EXTERNC const char* _LogFuncname(const char* longFuncName); // shortens the func name
