@@ -34,6 +34,22 @@ template<int N> static int SafeFormat(char (&errBuf)[N], const char* format, va_
     return len;
 }
 
+// split at $ and remove /long/path/ leaving just "filename.cpp:123 func() $ message"
+static void ShortFilePathMessage(char*& ptr, int& len)
+{
+    if (char* middle = strchr(ptr, '$')) {
+        for (; middle > ptr; --middle) {
+            if (*middle == '/' || *middle == '\\') {
+                ++middle;
+                break;
+            }
+        }
+        len = int((ptr + len) - middle);
+        ptr = middle;
+        ptr[len] = '\0';
+    }
+}
+
 EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
 {
     if (severity < Filter)
@@ -43,16 +59,22 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
     int len = SafeFormat(errBuf, format, ap);
     errBuf[len++] = '\n'; // force append a newline
     errBuf[len]   = '\0';
-
     
     // some default logging behavior:
-    fwrite(errBuf, len, 1, (severity == LogSeverityError) ? stderr : stdout);
+    char* ptr = errBuf;
+    #ifndef __linux__
+     ShortFilePathMessage(ptr, len);
+    #endif
+    fwrite(ptr, len, 1, (severity == LogSeverityError) ? stderr : stdout);
     
     // optional error handler for iOS Crashlytics logging
     if (ErrorHandler)
     {
-        errBuf[--len] = '\0'; // remove the newline we added
-        ErrorHandler(severity, errBuf, len);
+        ptr[--len] = '\0'; // remove the newline we added
+        #ifdef __linux__
+         ShortFilePathMessage(ptr, len);
+        #endif
+        ErrorHandler(severity, ptr, len);
     }
 }
 
@@ -116,8 +138,11 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
 
     // always skip the first ::
     const char* ptr = strchr(longFuncName, ':');
-    ptr = ptr ? ptr+2 : longFuncName;
-
+    if (ptr) {
+        if (*++ptr == ':') ++ptr;
+    }
+    else ptr = longFuncName;
+    
     char ch;
     int len = 0;
     for (; len < max && (ch = *ptr) != '\0'; ++ptr) {
@@ -128,6 +153,8 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
         }
         buf[len++] = ch;
     }
+    if (buf[len-1] == ']')
+        --len; // remove Objective-C method ending bracket
     buf[len] = '\0';
     return buf;
 }

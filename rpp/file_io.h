@@ -310,7 +310,7 @@ namespace rpp /* ReCpp */
          * @return Number of bytes written
          */
         template<class K, class V, class H, class C, class A>
-        static int write_new(const strview& filename, const unordered_map<K, V, H, C, A>& map) noexcept
+        static int write_map(const strview& filename, const unordered_map<K, V, H, C, A>& map) noexcept
         {
             size_t required = 0;
             for (auto& kv : map)

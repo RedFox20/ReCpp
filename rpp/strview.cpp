@@ -211,6 +211,13 @@ namespace rpp
         return -1;
     }
 
+    int strview::rindexof(char ch) const
+    {
+        for (int i = len-1; i >= 0; --i)
+            if (str[i] == ch) return i;
+        return -1;
+    }
+
     int strview::indexofany(const char* chars, int n) const
     {
         for (int i = 0; i < len; ++i)
@@ -338,22 +345,24 @@ namespace rpp
         return 0;
     }
 
-    NOINLINE void strview::skip(int nchars)
+    NOINLINE strview& strview::skip(int nchars)
     {
         auto s = str;
         auto l = len, n = nchars;
         for (; l && n > 0; --l, --n, ++s) {}
         str = s, len = l;
+        return *this;
     }
 
-    void strview::skip_until(char ch)
+    strview& strview::skip_until(char ch)
     {
         auto s = str;
         auto n = len;
         for (; n && *s != ch; --n, ++s) {}
         str = s, len = n;
+        return *this;
     }
-    void strview::skip_until(const char* sstr, int slen)
+    strview& strview::skip_until(const char* sstr, int slen)
     {
         auto s = str, e = s + len;
         char ch = *sstr; // starting char of the sequence
@@ -361,7 +370,7 @@ namespace rpp
             if (auto p = (const char*)memchr(s, ch, e - s)) {
                 if (memcmp(p, sstr, slen) == 0) { // match found
                     str = p, len = int(e - p);
-                    return;
+                    return *this;
                 }
                 s = p + 1;
                 continue;
@@ -369,17 +378,20 @@ namespace rpp
             break;
         }
         str = e, len = 0;
+        return *this;
     }
 
-    void strview::skip_after(char ch)
+    strview& strview::skip_after(char ch)
     {
         skip_until(ch);
         if (len) ++str, --len; // skip after
+        return *this;
     }
-    void strview::skip_after(const char* sstr, int slen)
+    strview& strview::skip_after(const char* sstr, int slen)
     {
         skip_until(sstr, slen);
         if (len) str += slen, len -= slen; // skip after
+        return *this;
     }
 
 

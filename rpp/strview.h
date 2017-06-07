@@ -409,8 +409,12 @@ namespace rpp
          */
         int count(char ch) const;
 
-
+        
         int indexof(char ch) const;
+        
+        // reverse iterating indexof
+        int rindexof(char ch) const;
+        
         int indexofany(const char* chars, int n) const;
         template<int N> FINLINE int indexofany(const char (&chars)[N]) const {
             return indexofany(chars, N - 1);
@@ -658,28 +662,28 @@ namespace rpp
         /**
          * Safely chomps N chars while there is something to chomp
          */
-        NOINLINE void skip(int nchars);
+        NOINLINE strview& skip(int nchars);
 
         /**
          * Skips start of the string until the specified character is found or end of string is reached.
          * @param ch Character to skip until
          */
-        NOINLINE void skip_until(char ch);
+        NOINLINE strview& skip_until(char ch);
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * @param substr Substring to skip until
          * @param len Length of the substring
          */
-        NOINLINE void skip_until(const char* substr, int len);
+        NOINLINE strview& skip_until(const char* substr, int len);
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * @param substr Substring to skip until
          */
-        template<int SIZE> FINLINE void skip_until(const char (&substr)[SIZE])
+        template<int SIZE> FINLINE strview& skip_until(const char (&substr)[SIZE])
         {
-            skip_until(substr, SIZE-1);
+            return skip_until(substr, SIZE-1);
         }
 
 
@@ -688,7 +692,7 @@ namespace rpp
          * The specified character itself is consumed.
          * @param ch Character to skip after
          */
-        NOINLINE void skip_after(char ch);
+        NOINLINE strview& skip_after(char ch);
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
@@ -696,16 +700,16 @@ namespace rpp
          * @param substr Substring to skip after
          * @param len Length of the substring
          */
-        NOINLINE void skip_after(const char* substr, int len);
+        NOINLINE strview& skip_after(const char* substr, int len);
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * The specified substring itself is consumed.
          * @param substr Substring to skip after
          */
-        template<int SIZE> FINLINE void skip_after(const char (&substr)[SIZE])
+        template<int SIZE> FINLINE strview& skip_after(const char (&substr)[SIZE])
         {
-            skip_after(substr, SIZE-1);
+            return skip_after(substr, SIZE-1);
         }
 
         /**
