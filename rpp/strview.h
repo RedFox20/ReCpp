@@ -34,42 +34,42 @@ namespace rpp
 {
     using namespace std; // we love std; you should too.
 
-    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
-    #define RPP_BASIC_INTEGER_TYPEDEFS
-        typedef unsigned char      byte;
-        typedef unsigned short     ushort;
-        typedef unsigned int       uint;
-        typedef unsigned long      ulong;
-        typedef long long          int64;
-        typedef unsigned long long uint64;
-    #endif
+#ifndef RPP_BASIC_INTEGER_TYPEDEFS
+#define RPP_BASIC_INTEGER_TYPEDEFS
+    typedef unsigned char      byte;
+    typedef unsigned short     ushort;
+    typedef unsigned int       uint;
+    typedef unsigned long      ulong;
+    typedef long long          int64;
+    typedef unsigned long long uint64;
+#endif
 
     //// @note Some functions get inlined too aggressively, leading to some serious code bloat
     ////       Need to hint the compiler to take it easy ^_^'
-    #ifndef NOINLINE
-        #ifdef _MSC_VER
-            #define NOINLINE __declspec(noinline)
-        #else
-            #define NOINLINE __attribute__((noinline))
-        #endif
-    #endif
+#ifndef NOINLINE
+#ifdef _MSC_VER
+#define NOINLINE __declspec(noinline)
+#else
+#define NOINLINE __attribute__((noinline))
+#endif
+#endif
 
-    //// @note Some strong hints that some functions are merely wrappers, so should be forced inline
-    #ifndef FINLINE
-        #ifdef _MSC_VER
-            #define FINLINE __forceinline
-        #elif __APPLE__
-            #define FINLINE inline __attribute__((always_inline))
-        #else
-            #define FINLINE __attribute__((always_inline))
-        #endif
-    #endif
+//// @note Some strong hints that some functions are merely wrappers, so should be forced inline
+#ifndef FINLINE
+#ifdef _MSC_VER
+#define FINLINE __forceinline
+#elif __APPLE__
+#define FINLINE inline __attribute__((always_inline))
+#else
+#define FINLINE __attribute__((always_inline))
+#endif
+#endif
 
-    /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
+/////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
-    // This is same as memchr, but optimized for very small control strings
-    // Retains string literal array length information
-    template<int N> FINLINE bool strcontains(const char (&str)[N], char ch) {
+// This is same as memchr, but optimized for very small control strings
+// Retains string literal array length information
+    template<int N> FINLINE bool strcontains(const char(&str)[N], char ch) {
         for (int i = 0; i < N; ++i)
             if (str[i] == ch) return true;
         return false;
@@ -79,19 +79,19 @@ namespace rpp
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      * @note Retains string literal array length information
      */
-    template<int N> FINLINE const char* strcontains(const char* str, int nstr, const char (&control)[N]) {
+    template<int N> FINLINE const char* strcontains(const char* str, int nstr, const char(&control)[N]) {
         for (; nstr; --nstr, ++str)
             if (strcontains<N>(control, *str))
                 return str; // done
         return 0; // not found
     }
-    template<int N> NOINLINE bool strequals(const char* s1, const char (&s2)[N]) {
-        for (int i = 0; i < (N-1); ++i) 
+    template<int N> NOINLINE bool strequals(const char* s1, const char(&s2)[N]) {
+        for (int i = 0; i < (N - 1); ++i)
             if (s1[i] != s2[i]) return false; // not equal.
         return true;
     }
-    template<int N> NOINLINE bool strequalsi(const char* s1, const char (&s2)[N]) {
-        for (int i = 0; i < (N-1); ++i) 
+    template<int N> NOINLINE bool strequalsi(const char* s1, const char(&s2)[N]) {
+        for (int i = 0; i < (N - 1); ++i)
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;
     }
@@ -112,16 +112,6 @@ namespace rpp
 
 
 
-
-
-    /**
-     * C-locale specific, simplified atof that also outputs the end of parsed string
-     * @param str Input string, e.g. "-0.25" / ".25", etc.. '+' is not accepted as part of the number
-     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
-     * @return Parsed float
-     */
-    float _tofloat(const char* str, const char** end = nullptr);
-
     /**
      * C-locale specific, simplified atof that also outputs the end of parsed string
      * @param str Input string, e.g. "-0.25" / ".25", etc.. '+' is not accepted as part of the number
@@ -129,14 +119,10 @@ namespace rpp
      * @return Parsed float
      */
     float _tofloat(const char* str, int len, const char** end = nullptr);
-
-    /**
-     * Fast locale agnostic atoi
-     * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
-     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
-     * @return Parsed int
-     */
-    int _toint(const char* str, const char** end = nullptr);
+    FINLINE float _tofloat(const char* str, const char** end = nullptr)
+    {
+        return _tofloat(str, 64, end);
+    }
 
     /**
      * Fast locale agnostic atoi
@@ -146,15 +132,10 @@ namespace rpp
      * @return Parsed int
      */
     int _toint(const char* str, int len, const char** end = nullptr);
-
-    /**
-     * Fast locale agnostic atoi
-     * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
-     *            HEX syntax is supported: 0xBA or 0BA will parse hex values instead of regular integers
-     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
-     * @return Parsed int
-     */
-    int _tointhx(const char* str, const char** end = nullptr);
+    FINLINE int _toint(const char* str, const char** end = nullptr)
+    {
+        return _toint(str, 32, end);
+    }
 
     /**
      * Fast locale agnostic atoi
@@ -165,6 +146,10 @@ namespace rpp
      * @return Parsed int
      */
     int _tointhx(const char* str, int len, const char** end = nullptr);
+    FINLINE int _tointhx(const char* str, const char** end = nullptr)
+    {
+        return _tointhx(str, 32, end);
+    }
 
 
     /**
@@ -173,7 +158,12 @@ namespace rpp
      * @param value Float value to convert to string
      * @return Length of the string
      */
-    int _tostring(char* buffer, float value);
+    int _tostring(char* buffer, double value);
+    FINLINE int _tostring(char* buffer, float value)
+    {
+        return _tostring(buffer, (double)value);
+    }
+
 
     /**
      * Fast locale agnostic itoa
@@ -181,15 +171,8 @@ namespace rpp
      * @param value Integer value to convert to string
      * @return Length of the string
      */
-    int _tostring(char* buffer, int value);
+    template<class T> int _tostring(char* buffer, T value);
 
-    /**
-     * Fast locale agnostic itoa
-     * @param buffer Destination buffer assumed to be big enough. 16 bytes is more than enough.
-     * @param value Integer value to convert to string
-     * @return Length of the string
-     */
-    int _tostring(char* buffer, unsigned value);
 
 
 
@@ -1017,6 +1000,47 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Always null terminated version of stringstream, which is compatible with strview
+     * Not intended for moving or copying
+     */
+    struct string_buffer
+    {
+        static constexpr int SIZE = 256;
+        char* ptr;
+        int   len = 0;
+        int   cap = SIZE;
+        char  buf[SIZE];
+
+        FINLINE string_buffer() noexcept : ptr(buf) {}
+        ~string_buffer() noexcept;
+
+        string_buffer(string_buffer&&)                 = delete;
+        string_buffer(const string_buffer&)            = delete;
+        string_buffer& operator=(string_buffer&&)      = delete;
+        string_buffer& operator=(const string_buffer&) = delete;
+
+        int size() const { return len; }
+        const char* c_str() const { return ptr; }
+        const char* data()  const { return ptr; }
+
+        explicit operator bool()    const { return len > 0; }
+        explicit operator strview() const { return { ptr, len }; }
+
+        void reserve(int count) noexcept;
+
+        string_buffer& push_back(char value);
+        string_buffer& push_back(short value);
+        string_buffer& push_back(int value);
+        string_buffer& push_back(int64 value);
+
+        string_buffer& push_back(byte value);
+        string_buffer& push_back(ushort value);
+        string_buffer& push_back(uint value);
+        string_buffer& push_back(uint64 value);
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
 

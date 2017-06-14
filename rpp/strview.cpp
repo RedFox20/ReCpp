@@ -498,29 +498,6 @@ namespace rpp
      *       Or the worst case:
      *           214748.0001f
      */
-    float _tofloat(const char* str, const char** end)
-    {
-        const char* s = str;
-        int64_t power   = 1;
-        int64_t intPart = abs(_toint(s, &s));
-        char ch         = *s;
-
-        // if input is -0.xxx then intPart will lose the sign info
-        // intpart growth will also break if we use neg ints
-        const bool negfix = *str == '-';
-
-        // @note The '.' is actually the sole reason for this function in the first place. Locale independence.
-        if (ch == '.') { /* fraction part follows*/
-            for (; '0' <= (ch = *++s) && ch <= '9'; ) {
-                intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-                power   = (power << 3) + (power << 1); // power *= 10
-            }
-        }
-        if (end) *end = s; // write end of parsed value
-        double result = power == 1 ? double(intPart) : double(intPart) / double(power);
-        return float(negfix ? -result : result);
-    }
-
     float _tofloat(const char* str, int len, const char** end)
     {
         const char* s = str;
@@ -546,26 +523,6 @@ namespace rpp
     }
 
     // optimized for simplicity and performance
-    int _toint(const char* str, const char** end)
-    {
-        const char* s = str;
-        int  intPart  = 0;
-        bool negative = false;
-        char ch       = *s;
-
-        if (ch == '-')
-            negative = true, ++s; // change sign and skip '-'
-        else if (ch == '+')  ++s; // ignore '+'
-
-        for (; '0' <= (ch = *s) && ch <= '9'; ++s) {
-            intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-        } 
-        if (negative) intPart = -intPart; // twiddle sign
-
-        if (end) *end = s; // write end of parsed value
-        return intPart;
-    }
-
     int _toint(const char* str, int len, const char** end)
     {
         const char* s = str;
@@ -589,23 +546,6 @@ namespace rpp
 
     // optimized for simplicity and performance
     // detects HEX integer strings as 0xBA or 0BA. Regular integers also parsed
-    int _tointhx(const char* str, const char** end)
-    {
-        const char* s = str;
-        unsigned intPart = 0;
-        if (s[0] == '0' && s[1] == 'x') s += 2;
-        for (char ch; ; ++s) {
-            unsigned digit;
-            if ('0' <= (ch=*s) && ch <= '9') digit = ch - '0';
-            else if ('A' <= ch && ch <= 'F') digit = ch - '7'; // hack 'A'-10 == '7'
-            else if ('a' <= ch && ch <= 'f') digit = ch - 'W'; // hack 'a'-10 == 'W'
-            else break; // invalid ch
-            intPart = (intPart << 4) + digit; // intPart = intPart*16 + digit
-        }
-        if (end) *end = s; // write end of parsed value
-        return intPart;
-    }
-
     int _tointhx(const char* str, int len, const char** end)
     {
         const char* s = str;
@@ -624,20 +564,20 @@ namespace rpp
         return intPart;
     }
 
-    int _tostring(char* buffer, float f)
+    int _tostring(char* buffer, double f)
     {
-        int value = (int)f;
+        int64 value = (int64)f;
         f -= value; // -1.2 -= -1 --> -0.2
         if (value < 0) f = -f;
         char* end = buffer + _tostring(buffer, value);
 
-        if (f != 0.0f) { // do we have a fraction ?
+        if (f != 0.0) { // do we have a fraction ?
             double cmp = 0.00001; // 6 decimal places max
             *end++ = '.'; // place the fraction mark
             double x = f; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
             for (;;) {
                 x *= 10;
-                value = (int)x;
+                value = (int64)x;
                 *end++ = '0' + (value % 10);
                 x -= value;
                 if (x < cmp) // break from 0.750000011 cases
@@ -646,10 +586,10 @@ namespace rpp
             }
         }
         *end = '\0'; // null-terminate
-        return (int) (end - buffer); // length of the string
+        return (int)(end - buffer); // length of the string
     }
 
-    int _tostring(char* buffer, int value)
+    template<class T> int _tostring(char* buffer, T value)
     {
         char* end = buffer;
         if (value < 0) { // if neg, abs and writeout '-'
@@ -675,27 +615,10 @@ namespace rpp
         return (int)(end - buffer); // length of the string
     }
 
-    int _tostring(char* buffer, unsigned value)
-    {
-        char* end = buffer;
-        char* start = end; // mark start for strrev after:
-
-        do { // writeout remainder of 10 + '0' while we still have value
-            *end++ = '0' + (value % 10);
-            value /= 10;
-        } while (value != 0);
-        *end = '\0'; // always null-terminate
-
-        // reverse the string:
-        char* rev = end; // for strrev, we'll need a helper pointer
-        while (start < rev) {
-            char tmp = *start;
-            *start++ = *--rev;
-            *rev = tmp;
-        }
-
-        return (int)(end - buffer); // length of the string
-    }
+    template int _tostring<int>(char* buffer, int value);
+    template int _tostring<uint>(char* buffer, uint value);
+    template int _tostring<int64>(char* buffer, int64 value);
+    template int _tostring<uint64>(char* buffer, uint64 value);
 
 
 
@@ -759,6 +682,7 @@ namespace rpp
 
 
     ///////////// bracket_parser
+
 
     bracket_parser::bracket_parser(const void* data, int len) 
         : buffer((const char*)data, len), depth(0), line(1)
@@ -826,5 +750,87 @@ namespace rpp
         }
         return '\0'; // end of buffer
     }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    string_buffer::~string_buffer() noexcept
+    {
+        if (cap > SIZE) free(ptr);
+    }
+
+    void string_buffer::reserve(int count) noexcept
+    {
+        int newlen = len + count;
+        if (newlen >= cap)
+        {
+            if (cap == SIZE)
+            {
+                ptr = (char*)malloc(cap *= 2);
+                memcpy(ptr, buf, len + 1);
+            }
+            else
+            {
+                ptr = (char*)realloc(ptr, cap *= 2);
+            }
+        }
+    }
+
+    string_buffer& string_buffer::push_back(char value)
+    {
+        reserve(1);
+        ptr[len++] = value;
+        ptr[len]   = '\0';
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(short value)
+    {
+        reserve(8);
+        int n = _tostring(&ptr[len], (int)value);
+        len += n;
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(int value)
+    {
+        reserve(16);
+        int n = _tostring(&ptr[len], value);
+        len += n;
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(int64 value)
+    {
+
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(byte value)
+    {
+
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(ushort value)
+    {
+
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(uint value)
+    {
+
+        return *this;
+    }
+
+    string_buffer& string_buffer::push_back(uint64 value)
+    {
+
+        return *this;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp

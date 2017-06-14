@@ -53,8 +53,8 @@ namespace rpp /* ReCpp */
         int length()    const noexcept { return len; }
         char* data()    const noexcept { return str; }
         char* c_str()   const noexcept { return str; }
-        operator bool() const noexcept { return str != nullptr; }
-        operator strview() const noexcept { return { str,len }; }
+        explicit operator bool() const noexcept { return str != nullptr; }
+        explicit operator strview() const noexcept { return { str,len }; }
     };
 
 
@@ -69,7 +69,7 @@ namespace rpp /* ReCpp */
         }
         buffer_line_parser(const buffer_line_parser&) = delete; // NOCOPY
         buffer_line_parser& operator=(const buffer_line_parser&) = delete;
-        operator bool() const noexcept { return (bool)buf; }
+        explicit operator bool() const noexcept { return (bool)buf; }
     };
 
 
@@ -86,7 +86,6 @@ namespace rpp /* ReCpp */
         buffer_bracket_parser& operator=(const buffer_bracket_parser&) = delete;
         operator bool() const noexcept { return (bool)buf; }
     };
-
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -267,6 +266,18 @@ namespace rpp /* ReCpp */
          * Writes a string to file and also appends a newline
          */
         int writeln(const strview& str) noexcept;
+
+        /**
+         * Stringifies and appends the input arguments one by one,
+         * similar to Python print()
+         * Ex: writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n"
+         * @warning Uses a large local buffer to optimize writing
+         */
+        template<class T, class... Args> 
+        int writeln(const T& first, const Args&... args) noexcept
+        {
+            return write(first) + writeln(to_string(args)...);
+        }
 
         /**
          * Forcefully flushes any OS file buffers to send all data to the storage device
