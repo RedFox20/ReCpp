@@ -589,36 +589,52 @@ namespace rpp
         return (int)(end - buffer); // length of the string
     }
 
-    template<class T> int _tostring(char* buffer, T value)
+    template<class T> static int _tostring(char* buffer, char* end, T value)
     {
-        char* end = buffer;
-        if (value < 0) { // if neg, abs and writeout '-'
-            value = -value;	// flip sign
-            *end++ = '-';	// neg
-        }
         char* start = end; // mark start for strrev after:
-    
+
         do { // writeout remainder of 10 + '0' while we still have value
             *end++ = '0' + (value % 10);
             value /= 10;
         } while (value != 0);
         *end = '\0'; // always null-terminate
 
-        // reverse the string:
         char* rev = end; // for strrev, we'll need a helper pointer
-        while (start < rev) {
+        while (start < rev) { // reverse the string:
             char tmp = *start;
             *start++ = *--rev;
             *rev = tmp;
         }
-
         return (int)(end - buffer); // length of the string
     }
 
-    template int _tostring<int>(char* buffer, int value);
-    template int _tostring<uint>(char* buffer, uint value);
-    template int _tostring<int64>(char* buffer, int64 value);
-    template int _tostring<uint64>(char* buffer, uint64 value);
+    template<class T> static char* _write_sign(char* buffer, T& value)
+    {
+        char* end = buffer;
+        if (value < 0) { // if neg, abs and writeout '-'
+            value = -value;	// flip sign
+            *end++ = '-';	// neg
+        }
+        return end;
+    }
+
+    int _tostring(char* buffer, int value)
+    {
+        return _tostring(buffer, _write_sign(buffer, value), value);
+    }
+    int _tostring(char* buffer, int64 value)
+    {
+        return _tostring(buffer, _write_sign(buffer, value), value);
+    }
+
+    int _tostring(char* buffer, uint value)
+    {
+        return _tostring(buffer, buffer, value);
+    }
+    int _tostring(char* buffer, uint64 value)
+    {
+        return _tostring(buffer, buffer, value);
+    }
 
 
 
@@ -757,7 +773,12 @@ namespace rpp
 
     string_buffer::~string_buffer() noexcept
     {
-        if (cap > SIZE) free(ptr);
+        if (cap > SIZE) free(str);
+    }
+
+    void string_buffer::clear()
+    {
+        str[len = 0] = '\0';
     }
 
     void string_buffer::reserve(int count) noexcept
@@ -767,69 +788,40 @@ namespace rpp
         {
             if (cap == SIZE)
             {
-                ptr = (char*)malloc(cap *= 2);
-                memcpy(ptr, buf, len + 1);
+                str = (char*)malloc(cap *= 2);
+                memcpy(str, buf, len + 1);
             }
             else
             {
-                ptr = (char*)realloc(ptr, cap *= 2);
+                str = (char*)realloc(str, cap *= 2);
             }
         }
     }
 
-    string_buffer& string_buffer::push_back(char value)
-    {
-        reserve(1);
-        ptr[len++] = value;
-        ptr[len]   = '\0';
-        return *this;
-    }
+    ////////////////////////////////////////////////////////////////////////////////
 
-    string_buffer& string_buffer::push_back(short value)
-    {
-        reserve(8);
-        int n = _tostring(&ptr[len], (int)value);
-        len += n;
-        return *this;
-    }
+    int print(FILE* file, strview value) { return (int)fwrite(value.str, value.len, 1, file); }
+    int print(FILE* file, char value)    { return (int)fwrite(&value, 1, 1, file);            }
+    int print(FILE* file, byte value)    { char buf[4];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, short value)   { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, ushort value)  { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, int value)     { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, uint value)    { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, int64 value)   { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, uint64 value)  { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
 
-    string_buffer& string_buffer::push_back(int value)
-    {
-        reserve(16);
-        int n = _tostring(&ptr[len], value);
-        len += n;
-        return *this;
-    }
+    int print(strview value) { return print(stdout, value); }
+    int print(char value)    { return print(stdout, value); }
+    int print(byte value)    { return print(stdout, value); }
+    int print(short value)   { return print(stdout, value); }
+    int print(ushort value)  { return print(stdout, value); }
+    int print(int value)     { return print(stdout, value); }
+    int print(uint value)    { return print(stdout, value); }
+    int print(int64 value)   { return print(stdout, value); }
+    int print(uint64 value)  { return print(stdout, value); }
 
-    string_buffer& string_buffer::push_back(int64 value)
-    {
-
-        return *this;
-    }
-
-    string_buffer& string_buffer::push_back(byte value)
-    {
-
-        return *this;
-    }
-
-    string_buffer& string_buffer::push_back(ushort value)
-    {
-
-        return *this;
-    }
-
-    string_buffer& string_buffer::push_back(uint value)
-    {
-
-        return *this;
-    }
-
-    string_buffer& string_buffer::push_back(uint64 value)
-    {
-
-        return *this;
-    }
+    int println(FILE* file) { return print(file, '\n');   }
+    int println()           { return print(stdout, '\n'); }
 
     ////////////////////////////////////////////////////////////////////////////////
 

@@ -104,7 +104,7 @@ namespace rpp /* ReCpp */
         void*	Handle;	// File handle
         IOFlags	Mode;	// File openmode READWRITE or READONLY
 
-        file() noexcept : Handle(0), Mode(READONLY)
+        file() noexcept : Handle(nullptr), Mode(READONLY)
         {
         }
 
@@ -268,15 +268,14 @@ namespace rpp /* ReCpp */
         int writeln(const strview& str) noexcept;
 
         /**
-         * Stringifies and appends the input arguments one by one,
-         * similar to Python print()
+         * Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
          * Ex: writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n"
-         * @warning Uses a large local buffer to optimize writing
          */
-        template<class T, class... Args> 
-        int writeln(const T& first, const Args&... args) noexcept
+        template<class T, class... Args> int writeln(const T& first, const Args&... args) noexcept
         {
-            return write(first) + writeln(to_string(args)...);
+            string_buffer buf;
+            buf.writeln(first, args...);
+            return write(buf.str, buf.len);
         }
 
         /**

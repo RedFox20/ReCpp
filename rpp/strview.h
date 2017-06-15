@@ -167,11 +167,18 @@ namespace rpp
 
     /**
      * Fast locale agnostic itoa
-     * @param buffer Destination buffer assumed to be big enough. 16 bytes is more than enough.
+     * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough.
      * @param value Integer value to convert to string
      * @return Length of the string
      */
-    template<class T> int _tostring(char* buffer, T value);
+    int _tostring(char* buffer, int    value);
+    int _tostring(char* buffer, int64  value);
+    int _tostring(char* buffer, uint   value);
+    int _tostring(char* buffer, uint64 value);
+
+    inline int _tostring(char* buffer, byte value)   { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, short value)  { return _tostring(buffer, (int)value);  }
+    inline int _tostring(char* buffer, ushort value) { return _tostring(buffer, (uint)value); }
 
 
 
@@ -292,7 +299,8 @@ namespace rpp
         template<int N> NOINLINE strview& trim_start(const char (&chars)[N]) { 
             auto s = str;
             auto n = len;
-            for (; n && strcontains<N>(chars, *s); ++s, --n);
+            for (; n && strcontains<N>(chars, *s); ++s, --n)
+                ;
             str = s, len = n; // write result
             return *this;
         }
@@ -306,7 +314,8 @@ namespace rpp
         template<int N> NOINLINE strview& trim_end(const char (&chars)[N]) {
             auto n = len;
             auto e = str + n;
-            for (; n && strcontains<N>(chars, *--e); --n);
+            for (; n && strcontains<N>(chars, *--e); --n)
+                ;
             len = n; // write result
             return *this;
         }
@@ -1007,12 +1016,12 @@ namespace rpp
     struct string_buffer
     {
         static constexpr int SIZE = 256;
-        char* ptr;
+        char* str;
         int   len = 0;
         int   cap = SIZE;
         char  buf[SIZE];
 
-        FINLINE string_buffer() noexcept : ptr(buf) {}
+        FINLINE string_buffer() noexcept : str(buf) { buf[0] = '\0'; }
         ~string_buffer() noexcept;
 
         string_buffer(string_buffer&&)                 = delete;
@@ -1021,24 +1030,142 @@ namespace rpp
         string_buffer& operator=(const string_buffer&) = delete;
 
         int size() const { return len; }
-        const char* c_str() const { return ptr; }
-        const char* data()  const { return ptr; }
+        const char* c_str() const { return str; }
+        const char* data()  const { return str; }
+        strview     view()  const { return { str, len }; }
 
         explicit operator bool()    const { return len > 0; }
-        explicit operator strview() const { return { ptr, len }; }
+        explicit operator strview() const { return { str, len }; }
 
+        void clear();
         void reserve(int count) noexcept;
 
-        string_buffer& push_back(char value);
-        string_buffer& push_back(short value);
-        string_buffer& push_back(int value);
-        string_buffer& push_back(int64 value);
+        template<class T> void write(const T& value)
+        {
+            write(to_string(value));
+        }
 
-        string_buffer& push_back(byte value);
-        string_buffer& push_back(ushort value);
-        string_buffer& push_back(uint value);
-        string_buffer& push_back(uint64 value);
+        template<int N> void write(const char (&value)[N])
+        {
+            write(strview{ value });
+        }
+
+        void write(const char* value)
+        {
+            write(strview{ value });
+        }
+
+        void write(const strview& s)
+        {
+            reserve(s.len);
+            memcpy(&str[len], s.str, s.len);
+            len += s.len;
+            str[len] = '\0';
+        }
+
+        void write(const char& value)
+        {
+            reserve(1);
+            str[len++] = value;
+            str[len] = '\0';
+        }
+
+        void write(byte value)   { reserve(4);  len += _tostring(&str[len], value); }
+        void write(short value)  { reserve(8);  len += _tostring(&str[len], value); }
+        void write(ushort value) { reserve(8);  len += _tostring(&str[len], value); }
+        void write(int value)    { reserve(16); len += _tostring(&str[len], value); }
+        void write(uint value)   { reserve(16); len += _tostring(&str[len], value); }
+        void write(int64 value)  { reserve(32); len += _tostring(&str[len], value); }
+        void write(uint64 value) { reserve(32); len += _tostring(&str[len], value); }
+
+        /**
+         * Stringifies and appends the input arguments one by one, filling gaps with spaces
+         * Ex: write("test:", 10, 20.1f);  --> "test: 10 20.1"
+         */
+        template<class T, class... Args> void write(const T& first, const Args&... args)
+        {
+            write(first);
+            if (sizeof...(Args)) {
+                write(' ');
+                write(args...);
+            }
+        }
+
+        void writeln() { write('\n'); }
+
+        template<class T> void writeln(const T& value)
+        {
+            write(value), writeln();
+        }
+        template<class T, class... Args> void writeln(const T& first, const Args&... args)
+        {
+            write(first, args...), writeln();
+        }
     };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    int print(FILE* file, strview value);
+    int print(FILE* file, char value);
+    int print(FILE* file, byte value);
+    int print(FILE* file, short value);
+    int print(FILE* file, ushort value);
+    int print(FILE* file, int value);
+    int print(FILE* file, uint value);
+    int print(FILE* file, int64 value);
+    int print(FILE* file, uint64 value);
+
+    int print(strview value);
+    int print(char value);
+    int print(byte value);
+    int print(short value);
+    int print(ushort value);
+    int print(int value);
+    int print(uint value);
+    int print(int64 value);
+    int print(uint64 value);
+
+    int println(FILE* file);
+    int println();
+
+    template<class T> int println(FILE* file, const T& value)
+    {
+        return print(value) + println(file);
+    }
+    template<class T> FINLINE int println(const T& value)
+    {
+        return println(stdout, value);
+    }
+
+    /**
+     * Stringifies and appends the input arguments one by one, filling gaps with spaces, similar to Python print()
+     * Ex: print("test:", 10, 20.1f);  --> "test: 10 20.1"
+     */
+    template<class T, class... Args> int print(FILE* file, const T& first, const Args&... args)
+    {
+        string_buffer buf;
+        buf.write(first, args...);
+        return (int)fwrite(buf.str, buf.len, 1, file);
+    }
+    template<class T, class... Args> int print(const T& first, const Args&... args)
+    {
+        return print(stdout, first, args...);
+    }
+
+    /**
+     * Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
+     * Ex: print("test:", 10, 20.1f);  --> "test: 10 20.1\n"
+     */
+    template<class T, class... Args> int println(FILE* file, const T& first, const Args&... args)
+    {
+        string_buffer buf;
+        buf.writeln(first, args...);
+        return (int)fwrite(buf.str, buf.len, 1, file);
+    }
+    template<class T, class... Args> int println(const T& first, const Args&... args)
+    {
+        return println(stdout, first, args...);
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 

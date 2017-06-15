@@ -34,4 +34,17 @@ TestImpl(test_strview)
         Assert(str2 == stdstr3);
     }
 
+    TestCase(string_buf)
+    {
+        string_buffer buf;
+        buf.writeln("s", 10, 20);
+
+        Assert(buf.view() == "s 10 20\n");
+    }
+
+    TestCase(println)
+    {
+        println("hello", 10, "println", 20);
+    }
+
 } Impl;
