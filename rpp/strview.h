@@ -1045,15 +1045,10 @@ namespace rpp
             write(to_string(value));
         }
 
-        template<int N> void write(const char (&value)[N])
-        {
-            write(strview{ value });
-        }
-
-        void write(const char* value)
-        {
-            write(strview{ value });
-        }
+        template<int N> 
+        void write(const char (&value)[N]) { write(strview{ value }); }
+        void write(const string& value)    { write(strview{ value }); }
+        void write(const char* value)      { write(strview{ value }); }
 
         void write(const strview& s)
         {
