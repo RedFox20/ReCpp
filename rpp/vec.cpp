@@ -483,7 +483,21 @@ namespace rpp
                  src.y * (1 - ratio) + dst.y * ratio,
                  src.z * (1 - ratio) + dst.z * ratio };
     }
-    
+
+    Vector3 Vector3::parseColor(const strview& s) noexcept
+    {
+        if (!s)
+            return WHITE;
+
+        if (s[0] == '#')
+            return Vector4::HEX(s).rgb;
+
+        if (isalpha(s[0]))
+            return Vector4::NAME(s).rgb;
+
+        return Vector4::NUMBER(s).rgb;
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////
     
     void Vector3d::set(double newX, double newY, double newZ)
@@ -626,9 +640,9 @@ namespace rpp
         );
     }
     
-    const Vector4 Vector4::HEX(const strview& s) noexcept
+    Vector4 Vector4::HEX(const strview& s) noexcept
     {
-        Color c = Color::WHITE;
+        Color c = WHITE;
         if (s[0] == '#')
         {
             strview r = s.substr(1, 2);
@@ -643,7 +657,7 @@ namespace rpp
         return c;
     }
 
-    const Vector4 Vector4::NAME(const strview& s) noexcept
+    Vector4 Vector4::NAME(const strview& s) noexcept
     {
         if (s.equalsi("white"))  return WHITE;
         if (s.equalsi("black"))  return BLACK;
@@ -655,17 +669,19 @@ namespace rpp
         return WHITE;
     }
 
-    const Vector4 Vector4::NUMBER(strview s) noexcept
+    Vector4 Vector4::NUMBER(strview s) noexcept
     {
-        Color c;
         strview r = s.next(' ');
         strview g = s.next(' ');
         strview b = s.next(' ');
         strview a = s.next(' ');
-        c.r = r.to_float();
-        c.g = g.to_float();
-        c.b = b.to_float();
-        c.a = a ? a.to_float() : 1.0f;
+
+        Color c = {
+            r.to_float(),
+            g.to_float(),
+            b.to_float(),
+            a ? a.to_float() : 1.0f
+        };
         if (c.r > 1.0f) c.r /= 255.0f;
         if (c.g > 1.0f) c.g /= 255.0f;
         if (c.b > 1.0f) c.b /= 255.0f;
@@ -673,7 +689,7 @@ namespace rpp
         return c;
     }
 
-    const Vector4 Vector4::parseColor(const strview& s) noexcept
+    Vector4 Vector4::parseColor(const strview& s) noexcept
     {
         if (!s)
             return WHITE;

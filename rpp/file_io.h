@@ -57,36 +57,6 @@ namespace rpp /* ReCpp */
         explicit operator strview() const noexcept { return { str,len }; }
     };
 
-
-    /**
-     * Stores a load buffer for line parsing
-     */
-    struct buffer_line_parser : line_parser
-    {
-        load_buffer buf;
-        buffer_line_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), buf(move(buf))
-        {
-        }
-        buffer_line_parser(const buffer_line_parser&) = delete; // NOCOPY
-        buffer_line_parser& operator=(const buffer_line_parser&) = delete;
-        explicit operator bool() const noexcept { return (bool)buf; }
-    };
-
-
-    /**
-     * Stores a load buffer for bracket parsing
-     */
-    struct buffer_bracket_parser : bracket_parser
-    {
-        load_buffer buf;
-        buffer_bracket_parser(load_buffer&& buf) noexcept : bracket_parser(buf.str, buf.len), buf(move(buf))
-        {
-        }
-        buffer_bracket_parser(const buffer_bracket_parser&) = delete; // NOCOPY
-        buffer_bracket_parser& operator=(const buffer_bracket_parser&) = delete;
-        operator bool() const noexcept { return (bool)buf; }
-    };
-
     ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -268,6 +238,11 @@ namespace rpp /* ReCpp */
         int writeln(const strview& str) noexcept;
 
         /**
+         * Just append a newline
+         */
+        int writeln() noexcept;
+
+        /**
          * Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
          * Ex: writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n"
          */
@@ -384,6 +359,45 @@ namespace rpp /* ReCpp */
          * @return Size of the file
          */
         int size_and_time_modified(time_t* outModified) const noexcept;
+    };
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    /**
+     * Stores a load buffer for line parsing
+     */
+    struct buffer_line_parser : line_parser
+    {
+        load_buffer buf;
+        buffer_line_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), buf(move(buf)) {}
+        buffer_line_parser(const buffer_line_parser&) = delete; // NOCOPY
+        buffer_line_parser& operator=(const buffer_line_parser&) = delete;
+        buffer_line_parser(buffer_line_parser&&) = default;
+        buffer_line_parser& operator=(buffer_line_parser&&) = default;
+        explicit operator bool() const noexcept { return (bool)buf; }
+        static buffer_line_parser from_file(strview filename) {
+            return { file::read_all(filename) };
+        }
+    };
+
+
+    /**
+     * Stores a load buffer for bracket parsing
+     */
+    struct buffer_bracket_parser : bracket_parser
+    {
+        load_buffer buf;
+        buffer_bracket_parser(load_buffer&& buf) noexcept : bracket_parser(buf.str, buf.len), buf(move(buf)) {}
+        buffer_bracket_parser(const buffer_bracket_parser&) = delete; // NOCOPY
+        buffer_bracket_parser& operator=(const buffer_bracket_parser&) = delete;
+        buffer_bracket_parser(buffer_bracket_parser&&) = default;
+        buffer_bracket_parser& operator=(buffer_bracket_parser&&) = default;
+        operator bool() const noexcept { return (bool)buf; }
+        static buffer_bracket_parser from_file(strview filename) {
+            return { file::read_all(filename) };
+        }
     };
 
 

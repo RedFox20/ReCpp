@@ -677,6 +677,19 @@ namespace rpp
         }
 
         /**
+         * Parses any type of color string. Supported:
+         * -) RGB HEX color strings: #rrggbb
+         * -) Named color strings: 'orange'
+         * -) RGB integer values: 255 0 128
+         * -) RGB float values:   0.1 0.2 0.5
+         * @note All HEX and NUMBER color fields are optional. 
+         *       Color channel default is 0
+         *       Example '#aa' would give 170 0 0  and '0.1' would give 25 0 0
+         * @return Default color WHITE or parsed color in normalized float value range [0.0 ... 1.0]
+         */
+        static Vector3 parseColor(const strview& s) noexcept;
+
+        /**
          * Some common 3D vector conversions
          * Some conversions are two way <->, but we still provide duplicate overloads for consistency
          *
@@ -962,13 +975,13 @@ namespace rpp
          * @warning The string must start with '#', otherwise WHITE is returned
          * @return Parsed color value
          */
-        static const Vector4 HEX(const strview& s) noexcept;
+        static Vector4 HEX(const strview& s) noexcept;
 
         /**
          * Parses a color by name. Supported colors:
          * white, black, red, green, blue, yellow, orange
          */
-        static const Vector4 NAME(const strview& s) noexcept;
+        static Vector4 NAME(const strview& s) noexcept;
 
         /**
          * Parses a color by number values:
@@ -979,7 +992,7 @@ namespace rpp
          *       Example '#aa' would give 170 0 0 255  and '0.1' would give 25 0 0 255
          * @return Parsed color in normalized float value range [0.0 ... 1.0]
          */
-        static const Vector4 NUMBER(strview s) noexcept;
+        static Vector4 NUMBER(strview s) noexcept;
 
         /**
          * Parses any type of color string. Supported:
@@ -992,7 +1005,7 @@ namespace rpp
          *       Example '#aa' would give 170 0 0 255  and '0.1' would give 25 0 0 255
          * @return Default color WHITE or parsed color in normalized float value range [0.0 ... 1.0]
          */
-        static const Vector4 parseColor(const strview& s) noexcept;
+        static Vector4 parseColor(const strview& s) noexcept;
 
         /** 
          * @brief Rotates quaternion p with extra rotation q

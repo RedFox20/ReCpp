@@ -329,6 +329,11 @@ namespace rpp /* ReCpp */
         return write(str.str, str.len) + write("\n", 1);
     }
 
+    int file::writeln() noexcept
+    {
+        return write("\n", 1);
+    }
+
     void file::flush() noexcept
     {
         #if USE_WINAPI_IO
