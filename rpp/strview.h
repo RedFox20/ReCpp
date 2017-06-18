@@ -875,6 +875,7 @@ namespace rpp
      */
     class line_parser
     {
+    protected:
         strview buffer;
     public:
         FINLINE line_parser(const strview& buffer)         : buffer(buffer) {}
@@ -933,6 +934,7 @@ namespace rpp
      */
     class keyval_parser
     {
+    protected:
         strview buffer;
     public:
         FINLINE keyval_parser(const strview& buffer)         : buffer(buffer) {}
@@ -981,6 +983,7 @@ namespace rpp
      */
     class bracket_parser
     {
+    protected:
         strview buffer;
     public:
         int depth;

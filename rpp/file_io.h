@@ -364,42 +364,34 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-
     /**
-     * Stores a load buffer for line parsing
+     * Generic parser that stores a file load buffer, with easy construction and usability
+     * Example usage:
+     *   using buffer_line_parser = buffer_parser<line_parser>;
+     *   if (auto parser = buffer_line_parser::from_file("datalines.txt");
+     *   {
+     *       while (strview line = parser.next_line())
+     *           println(line);
+     *   }
      */
-    struct buffer_line_parser : line_parser
+    template<class parser> struct buffer_parser : parser
     {
-        load_buffer buf;
-        buffer_line_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), buf(move(buf)) {}
-        buffer_line_parser(const buffer_line_parser&) = delete; // NOCOPY
-        buffer_line_parser& operator=(const buffer_line_parser&) = delete;
-        buffer_line_parser(buffer_line_parser&&) = default;
-        buffer_line_parser& operator=(buffer_line_parser&&) = default;
-        explicit operator bool() const noexcept { return (bool)buf; }
-        static buffer_line_parser from_file(strview filename) {
+        load_buffer dataOwner;
+
+        buffer_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), dataOwner(move(buf)) {}
+
+        // resets the parser state
+        void reset() noexcept { parser::buffer = dataOwner; }
+
+        explicit operator bool() const noexcept { return (bool)dataOwner; }
+        static buffer_parser from_file(strview filename) noexcept {
             return { file::read_all(filename) };
         }
     };
 
-
-    /**
-     * Stores a load buffer for bracket parsing
-     */
-    struct buffer_bracket_parser : bracket_parser
-    {
-        load_buffer buf;
-        buffer_bracket_parser(load_buffer&& buf) noexcept : bracket_parser(buf.str, buf.len), buf(move(buf)) {}
-        buffer_bracket_parser(const buffer_bracket_parser&) = delete; // NOCOPY
-        buffer_bracket_parser& operator=(const buffer_bracket_parser&) = delete;
-        buffer_bracket_parser(buffer_bracket_parser&&) = default;
-        buffer_bracket_parser& operator=(buffer_bracket_parser&&) = default;
-        operator bool() const noexcept { return (bool)buf; }
-        static buffer_bracket_parser from_file(strview filename) {
-            return { file::read_all(filename) };
-        }
-    };
-
+    using buffer_line_parser    = buffer_parser<line_parser>;
+    using buffer_bracket_parser = buffer_parser<bracket_parser>;
+    using buffer_keyval_parser  = buffer_parser<keyval_parser>;
 
     ////////////////////////////////////////////////////////////////////////////////
 
