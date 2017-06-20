@@ -31,7 +31,7 @@ namespace rpp
     }
 
 
-    ///////////// strview
+    ///////////// string view
     
     
     const char* strview::to_cstr(char* buf, int max) const
@@ -54,7 +54,7 @@ namespace rpp
 
     bool strview::to_bool() const
     {
-        const uint n = this->len;
+        const uint n = (uint)len;
         if (n > 4)
             return false; // can't be any of true literals
         return strequalsi(str, "true") ||
@@ -74,7 +74,7 @@ namespace rpp
     {
         int len1 = len;
         int len2 = n;
-        if (int res = memcmp(str, s, len1 < len2 ? len1 : len2))
+        if (int res = memcmp(str, s, size_t(len1 < len2 ? len1 : len2)))
             return res;
         if (len1 < len2) return -1;
         if (len1 > len2) return +1;
@@ -117,7 +117,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
-        str = s, len = n; // result writeout
+        str = s, len = n;
         return *this;
     }
 
@@ -126,7 +126,7 @@ namespace rpp
         auto n = len;
         auto e = str + n;
         for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
-        len = n; // result writeout
+        len = n;
         return *this;
     }
 
@@ -135,7 +135,7 @@ namespace rpp
         auto n = len;
         auto e = str + n;
         for (; n && *--e == ch; --n) {}
-        len = n; // result writeout
+        len = n;
         return *this;
     }
 
@@ -144,7 +144,7 @@ namespace rpp
         auto n = len;
         auto e = str + n;
         for (; n && strcontains(chars, nchars, *--e); --n) {}
-        len = n; // result writeout
+        len = n;
         return *this;
     }
 
@@ -227,8 +227,8 @@ namespace rpp
 
     strview strview::split_first(char delim) const
     {
-        if (auto splitend = (const char*)memchr(str, delim, len))
-            return strview(str, splitend); // if we find a separator, readjust end of strview to that
+        if (auto splitEnd = (const char*)memchr(str, delim, size_t(len)))
+            return strview(str, splitEnd); // if we find a separator, readjust end of strview to that
         return strview(str, len);
     }
 
@@ -238,7 +238,7 @@ namespace rpp
         const char* s = str;
         const char* e = s + l;
         char ch = *substr;
-        while ((s = (const char*)memchr(s, ch, l)) != nullptr) {
+        while ((s = (const char*)memchr(s, ch, size_t(l))) != nullptr) {
             l = int(e - s);
             if (l >= sublen && strequals(s, substr, sublen)) {
                 return strview(str, s);
@@ -250,7 +250,7 @@ namespace rpp
 
     strview strview::split_second(char delim) const
     {
-        if (auto splitstart = (const char*)memchr(str, delim, len))
+        if (auto splitstart = (const char*)memchr(str, delim, size_t(len)))
             return strview(splitstart + 1, str+len); // readjust start, also skip the char we split at
         return strview(str, len);
     }
@@ -279,7 +279,7 @@ namespace rpp
     bool strview::next_notrim(strview& out, char delim)
     {
         return _next_notrim(out, [delim](const char* s, int n) {
-            return (const char*)memchr(s, delim, n);
+            return (const char*)memchr(s, delim, size_t(n));
         });
     }
 
@@ -362,13 +362,13 @@ namespace rpp
         str = s, len = n;
         return *this;
     }
-    strview& strview::skip_until(const char* sstr, int slen)
+    strview& strview::skip_until(const char* substr, int sublen)
     {
         auto s = str, e = s + len;
-        char ch = *sstr; // starting char of the sequence
+        char ch = *substr; // starting char of the sequence
         while (s < e) {
             if (auto p = (const char*)memchr(s, ch, e - s)) {
-                if (memcmp(p, sstr, slen) == 0) { // match found
+                if (memcmp(p, substr, size_t(sublen)) == 0) { // match found
                     str = p, len = int(e - p);
                     return *this;
                 }
@@ -395,21 +395,21 @@ namespace rpp
     }
 
 
-    static inline void foreach(char* str, int len, int func(int ch)) 
+    static inline void foreach(char* str, int len, int func(int))
     {
         auto s = str, e = s + len;
         for (; s < e; ++s)
             *s = (char)func(*s);
     }
-    strview& strview::tolower() 
+    strview& strview::to_lower()
     {
         foreach((char*)str, len, ::tolower); return *this;
     }
-    strview& strview::toupper()
+    strview& strview::to_upper()
     {
         foreach((char*)str, len, ::toupper); return *this;
     }
-    char* strview::aslower(char* dst) const {
+    char* strview::as_lower(char* dst) const {
         auto p = dst;
         auto s = str;
         for (int n = len; n > 0; --n)
@@ -417,7 +417,7 @@ namespace rpp
         *p = 0;
         return dst;
     }
-    char* strview::asupper(char* dst) const
+    char* strview::as_upper(char* dst) const
     {
         auto p = dst;
         auto s = str;
@@ -426,19 +426,19 @@ namespace rpp
         *p = 0;
         return dst;
     }
-    string strview::aslower() const
+    string strview::as_lower() const
     {
         string ret;
-        ret.reserve(len);
+        ret.reserve(size_t(len));
         auto s = (char*)str;
         for (int n = len; n > 0; --n)
             ret.push_back((char)::tolower(*s++));
         return ret;
     }
-    string strview::asupper() const
+    string strview::as_upper() const
     {
         string ret;
-        ret.reserve(len);
+        ret.reserve(size_t(len));
         auto s = (char*)str;
         for (int n = len; n > 0; --n)
             ret.push_back((char)::toupper(*s++));
@@ -448,26 +448,26 @@ namespace rpp
 
 
 
-    char* tolower(char* str, int len) 
+    char* to_lower(char* str, int len)
     {
         foreach(str, len, ::tolower); return str;
     }
-    char* toupper(char* str, int len) 
+    char* to_upper(char* str, int len)
     {
         foreach(str, len, ::toupper); return str;
     }
-    string& tolower(string& str) 
+    string& to_lower(string& str)
     {
         foreach((char*)str.data(), (int)str.size(), ::tolower); return str;
     }
-    string& toupper(string& str) 
+    string& to_upper(string& str)
     {
         foreach((char*)str.data(), (int)str.size(), ::toupper); return str;
     }
 
     char* replace(char* str, int len, char chOld, char chNew)
     {
-        char* s = (char*)str, *e = s + len;
+        char* s = str, *e = s + len;
         for (; s < e; ++s) if (*s == chOld) *s = chNew;
         return str;
     }
@@ -553,7 +553,7 @@ namespace rpp
         unsigned intPart = 0;
         if (s[0] == '0' && s[1] == 'x') s += 2;
         for (char ch; s < e; ++s) {
-            unsigned digit;
+            int digit;
             if ('0' <= (ch = *s) && ch <= '9') digit = ch - '0';
             else if ('A' <= ch && ch <= 'F')   digit = ch - '7'; // hack 'A'-10 == '7'
             else if ('a' <= ch && ch <= 'f')   digit = ch - 'W'; // hack 'a'-10 == 'W'
@@ -593,7 +593,7 @@ namespace rpp
     {
         char* start = end; // mark start for strrev after:
 
-        do { // writeout remainder of 10 + '0' while we still have value
+        do { // write out remainder of 10 + '0' while we still have value
             *end++ = '0' + (value % 10);
             value /= 10;
         } while (value != 0);

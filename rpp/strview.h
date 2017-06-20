@@ -119,7 +119,7 @@ namespace rpp
      * @return Parsed float
      */
     float _tofloat(const char* str, int len, const char** end = nullptr);
-    FINLINE float _tofloat(const char* str, const char** end = nullptr)
+    inline float _tofloat(const char* str, const char** end = nullptr)
     {
         return _tofloat(str, 64, end);
     }
@@ -132,7 +132,7 @@ namespace rpp
      * @return Parsed int
      */
     int _toint(const char* str, int len, const char** end = nullptr);
-    FINLINE int _toint(const char* str, const char** end = nullptr)
+    inline int _toint(const char* str, const char** end = nullptr)
     {
         return _toint(str, 32, end);
     }
@@ -146,7 +146,7 @@ namespace rpp
      * @return Parsed int
      */
     int _tointhx(const char* str, int len, const char** end = nullptr);
-    FINLINE int _tointhx(const char* str, const char** end = nullptr)
+    inline int _tointhx(const char* str, const char** end = nullptr)
     {
         return _tointhx(str, 32, end);
     }
@@ -159,7 +159,7 @@ namespace rpp
      * @return Length of the string
      */
     int _tostring(char* buffer, double value);
-    FINLINE int _tostring(char* buffer, float value)
+    inline int _tostring(char* buffer, float value)
     {
         return _tostring(buffer, (double)value);
     }
@@ -237,9 +237,9 @@ namespace rpp
 
 
         /** Creates a new string from this string-strview */
-        FINLINE string& to_string(string& out) const { return out.assign(str, len); }
-        string to_string() const { return string(str, len); }
-        operator string() const { return string(str, len); }
+        FINLINE string& to_string(string& out) const { return out.assign(str, (size_t)len); }
+        string to_string() const { return string{str, (size_t)len}; }
+        operator string() const { return string{str, (size_t)len}; }
 
 
         /** 
@@ -277,7 +277,7 @@ namespace rpp
         /** @return TRUE if length of the string is 0 - thus the string is empty */
         FINLINE bool empty() const { return !len; }
         /** @return TRUE if string is non-empty */
-        explicit FINLINE operator bool() const { return !!len; }
+        explicit FINLINE operator bool() const { return len != 0; }
         /** @return Pointer to the start of the string */
         FINLINE const char* c_str() const { return str; }
         FINLINE const char* data()  const { return str; }
@@ -327,7 +327,7 @@ namespace rpp
         FINLINE strview& trim(const char* chars, int nchars) { return trim_start(chars, nchars).trim_end(chars, nchars); }
         /** Trims both start and end with any of the given chars */
         template<int N> FINLINE strview& trim(const char (&chars)[N]) { 
-            return trim_start(chars).trim_end(chars);
+            return trim_start(chars, N-1).trim_end(chars, N-1);
         }
 
         /** Consumes the first character in the strview if possible. */
@@ -353,17 +353,17 @@ namespace rpp
         }
 
         /** @return TRUE if the strview contains this char */
-        FINLINE bool contains(char c) const { return !!memchr(str, c, len); }
+        FINLINE bool contains(char c) const { return memchr(str, c, (size_t)len) != nullptr; }
         /** @return TRUE if the strview contains any of the chars */
         NOINLINE bool contains(const char* chars, int nchars) const { 
-            return !!strcontains(str, len, chars, nchars); 
+            return strcontains(str, len, chars, nchars) != nullptr;
         }
         template<int N> FINLINE bool contains(const char (&chars)[N]) const { 
-            return strcontains<N>(str, len, chars); 
+            return strcontains<N>(str, len, chars) != nullptr;
         }
 
         /** @return Pointer to char if found, NULL otherwise */
-        FINLINE const char* find(char c) const { return (const char*)memchr(str, c, len); }
+        FINLINE const char* find(char c) const { return (const char*)memchr(str, c, (size_t)len); }
         /** @return Pointer to start of substring if found, NULL otherwise */
         NOINLINE const char* find(const char* substr, int len) const;
         FINLINE const char* find(const strview& substr) const { 
@@ -595,7 +595,11 @@ namespace rpp
             strview out; next_notrim(out, delim, ndelims); return out;
         }
         template<int N> FINLINE strview next_notrim(const char (&delims)[N]) {
-            strview out; next_notrim<N>(out, delims); return out;
+            strview out;
+            _next_notrim(out, [&delims](const char* s, int n) {
+                return strcontains<N>(s, n, delims);
+            });
+            return out;
         }
 
 
@@ -665,9 +669,9 @@ namespace rpp
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * @param substr Substring to skip until
-         * @param len Length of the substring
+         * @param sublen Length of the substring
          */
-        NOINLINE strview& skip_until(const char* substr, int len);
+        NOINLINE strview& skip_until(const char* substr, int sublen);
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
@@ -708,33 +712,33 @@ namespace rpp
          * Modifies the target string to lowercase
          * @warning The const char* will be recasted and modified!
          */
-        NOINLINE strview& tolower();
+        NOINLINE strview& to_lower();
 
         /**
          * Creates a copy of this strview that is in lowercase
          */
-        NOINLINE string aslower() const;
+        NOINLINE string as_lower() const;
 
         /**
          * Creates a copy of this strview that is in lowercase
          */
-        NOINLINE char* aslower(char* dst) const;
+        NOINLINE char* as_lower(char* dst) const;
 
         /**
          * Modifies the target string to be UPPERCASE
          * @warning The const char* will be recasted and modified!
          */
-        NOINLINE strview& toupper();
+        NOINLINE strview& to_upper();
 
         /**
          * Creates a copy of this strview that is in UPPERCASE
          */
-        NOINLINE string asupper() const;
+        NOINLINE string as_upper() const;
 
         /**
          * Creates a copy of this strview that is in UPPERCASE
          */
-        NOINLINE char* asupper(char* dst) const;
+        NOINLINE char* as_upper(char* dst) const;
 
         /**
          * Modifies the target string by replacing all chOld
@@ -779,22 +783,23 @@ namespace rpp
 
     inline string& operator+=(string& a, const strview& b)
     {
-        return a.append(b.str, b.len);
+        return a.append(b.str, size_t(b.len));
     }
     inline string operator+(const strview& a, const strview& b)
     {
         string str;
-        str.reserve(a.len + b.len);
-        str.append(a.str, a.len).append(b.str, b.len);
+        size_t al = size_t(a.len), bl = size_t(b.len);
+        str.reserve(al + bl);
+        str.append(a.str, al).append(b.str, bl);
         return str;
     }
-    inline string operator+(const string&a,const strview&b){return strview(a) + b;}
-    inline string operator+(const strview&a,const string&b){return a + strview(b);}
-    inline string operator+(const char*a,const strview&b){return strview(a,strlen(a)) + b;}
-    inline string operator+(const strview&a,const char*b){return a + strview(b,strlen(b));}
-    inline string operator+(const strview&a,char b){return a + strview{&b,1};}
-    inline string operator+(char a, const strview& b) { return strview(&a,1) + b; }
-    inline string&& operator+(string&&a,const strview&b){return move(a.append(b.str,b.len));}
+    inline string operator+(const string& a, const strview& b){ return strview{a} + b;}
+    inline string operator+(const strview& a, const string& b){ return a + strview{b};}
+    inline string operator+(const char* a, const strview& b)  { return strview{a, strlen(a)} + b; }
+    inline string operator+(const strview& a, const char* b)  { return a + strview{b, strlen(b)}; }
+    inline string operator+(const strview& a, char b)      { return a + strview{&b, 1}; }
+    inline string operator+(char a, const strview& b)      { return strview{&a, 1} + b; }
+    inline string&& operator+(string&& a,const strview& b) { return move(a.append(b.str, (size_t)b.len)); }
 
     //////////////// string compare operators /////////////////
 
@@ -803,10 +808,10 @@ namespace rpp
     inline bool operator==(const string& a,const strview& b) {return strview(a) == b;}
     inline bool operator!=(const string& a,const strview& b) {return strview(a) != b;}
     
-    inline bool operator< (const char* a,const strview& b){return strncmp(a, b.str, b.len) <  0;}
-    inline bool operator> (const char* a,const strview& b){return strncmp(a, b.str, b.len) >  0;}
-    inline bool operator==(const char* a,const strview& b){return strncmp(a, b.str, b.len) == 0;}
-    inline bool operator!=(const char* a,const strview& b){return strncmp(a, b.str, b.len) != 0;}
+    inline bool operator< (const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) <  0;}
+    inline bool operator> (const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) >  0;}
+    inline bool operator==(const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) == 0;}
+    inline bool operator!=(const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) != 0;}
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -823,10 +828,10 @@ namespace rpp
             };
             strview_vishelper v;	// VC++ visualization helper
         };
-        FINLINE operator strview()              { return strview(str, len); }
-        FINLINE operator strview&()             { return *(strview*)this;   }
-        FINLINE operator const strview&() const { return *(strview*)this;   }
-        FINLINE strview* operator->()     const { return  (strview*)this;   }
+        FINLINE operator strview()              { return strview{str, len}; }
+        FINLINE operator strview&()             { return *(rpp::strview*)this; }
+        FINLINE operator const strview&() const { return *(rpp::strview*)this; }
+        FINLINE strview* operator->()     const { return  (rpp::strview*)this; }
     };
 
 
@@ -836,22 +841,22 @@ namespace rpp
     /**
      * Converts a string into its lowercase form
      */
-    char* tolower(char* str, int len);
+    char* to_lower(char* str, int len);
 
     /**
      * Converts a string into its uppercase form
      */
-    char* toupper(char* str, int len);
+    char* to_upper(char* str, int len);
 
     /**
      * Converts an std::string into its lowercase form
      */
-    string& tolower(string& str);
+    string& to_lower(string& str);
 
     /**
      * Converts an std::string into its uppercase form
      */
-    string& toupper(string& str);
+    string& to_upper(string& str);
 
     /**
      * Replaces characters of 'chOld' with 'chNew' inside the specified string
@@ -1056,7 +1061,7 @@ namespace rpp
         void write(const strview& s)
         {
             reserve(s.len);
-            memcpy(&str[len], s.str, s.len);
+            memcpy(&str[len], s.str, (size_t)s.len);
             len += s.len;
             str[len] = '\0';
         }
@@ -1143,7 +1148,7 @@ namespace rpp
     {
         string_buffer buf;
         buf.write(first, args...);
-        return (int)fwrite(buf.str, buf.len, 1, file);
+        return (int)fwrite(buf.str, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int print(const T& first, const Args&... args)
     {
@@ -1158,7 +1163,7 @@ namespace rpp
     {
         string_buffer buf;
         buf.writeln(first, args...);
-        return (int)fwrite(buf.str, buf.len, 1, file);
+        return (int)fwrite(buf.str, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int println(const T& first, const Args&... args)
     {
