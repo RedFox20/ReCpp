@@ -600,7 +600,8 @@ namespace rpp /* ReCpp */
 
     bool delete_folder(const string& foldername, bool recursive) noexcept
     {
-        if (foldername.empty()) // this would delete the root dir. NOPE! This is always a bug.
+        // these would delete the root dir. NOPE! This is always a bug.
+        if (foldername.empty() || foldername == "/"_sv)
             return false;
         if (!recursive)
             return sys_rmdir(foldername); // easy path, just gently try to delete...
