@@ -499,6 +499,8 @@ namespace rpp /* ReCpp */
      *        Ex: /root/dir/file     ==> file
      *        Ex: /root/dir/         ==> 
      *        Ex: file.ext           ==> file
+     *        Ex: /.git/f.reallylong ==> f.reallylong
+     *        Ex: /.git/filewnoext   ==> filewnoext
      */
     strview file_name(const strview path) noexcept;
 
@@ -517,8 +519,20 @@ namespace rpp /* ReCpp */
      *        Ex: /root/dir/file     ==> 
      *        Ex: /root/dir/         ==> 
      *        Ex: file.ext           ==> ext
+     *        Ex: /.git/f.reallylong ==> 
+     *        Ex: /.git/filewnoext   ==> 
      */
     strview file_ext(const strview path) noexcept;
+
+    /**
+     * @brief Replaces the current file path extension
+     *        Usage: file_replace_ext("dir/file.old", "new");
+     *        Ex: /dir/file.old ==> /dir/file.new
+     *        Ex: /dir/file     ==> /dir/file.new
+     *        Ex: /dir/         ==> /dir/
+     *        Ex: file.old      ==> file.new
+     */
+    string file_replace_ext(const strview path, const strview ext);
 
     /**
      * @brief Extract the foldername from a path name

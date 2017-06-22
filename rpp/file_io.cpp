@@ -673,15 +673,15 @@ namespace rpp /* ReCpp */
     {
         strview nameext = file_nameext(path);
 
-        if (const char* dot = nameext.rfind('.'))
-            return strview{ nameext.str, dot };
+        if (auto* ptr = nameext.substr(path.len - 8).rfind('.'))
+            return strview{ nameext.str, ptr };
         return nameext;
     }
 
 
     strview file_nameext(const strview path) noexcept
     {
-        if (const char* str = path.rfindany("/\\"))
+        if (auto* str = path.rfindany("/\\"))
             return strview{ str + 1, path.end() };
         return path; // assume it's just a file name
     }
@@ -689,9 +689,25 @@ namespace rpp /* ReCpp */
 
     strview file_ext(const strview path) noexcept
     {
-        if (const char* dot = path.rfind('.'))
-            return { dot+1, path.end() };
+        if (auto* ptr = path.substr(path.len - 8).rfindany("./\\")) {
+            if (*ptr == '.') return { ptr + 1, path.end() };
+        }
         return strview{};
+    }
+
+
+    string file_replace_ext(const strview path, const strview ext)
+    {
+        if (strview oldext = file_ext(path))
+        {
+            int len = int(oldext.str - path.str);
+            return strview{ path.str, len } + ext;
+        }
+        if (path && path.back() != '/' && path.back() != '\\')
+        {
+            return path + "." + ext;
+        }
+        return path;
     }
 
 
