@@ -315,19 +315,19 @@ namespace rpp
     }
 
 
-    float strview::next_float()
+    double strview::next_double()
     {
         auto s = str, e = s + len;
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-0.25" || ".25" || "25":
             if (ch == '-' || ch == '.' || ('0' <= ch && ch <= '9')) {
-                float f = _tofloat(s, &s);
+                double f = rpp::to_double(s, &s);
                 str = s, len = int(e - s);
                 return f;
             }
         }
         str = s, len = int(e - s);
-        return 0.0f;
+        return 0.0;
     }
 
     int strview::next_int()
@@ -336,7 +336,7 @@ namespace rpp
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-25" || "25":
             if (ch == '-' || ('0' <= ch && ch <= '9')) {
-                int i = _toint(s, &s);
+                int i = rpp::to_int(s, &s);
                 str = s, len = int(e - s);
                 return i;
             }
@@ -491,39 +491,54 @@ namespace rpp
     ////////////////////// loose utility functions
 
     /**
-     * @note Doesn't account for any special cases like +- NAN, E-9 etc. Just a very simple atof.
+     * @note Doesn't account for special cases like +- NAN. Does support scientific notation, ex: '1.0e+003' 
      *       Some optimizations applied to avoid too many multiplications
      *       This doesn't handle very big floats, max range is:
      *           -2147483648.0f to 2147483647.0f, or -0.0000000001f to 0.0000000001f
      *       Or the worst case:
      *           214748.0001f
      */
-    float _tofloat(const char* str, int len, const char** end)
+    double to_double(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;
         int64_t power   = 1;
-        int64_t intPart = abs(_toint(s, len, &s));
+        int64_t intPart = abs(to_int(s, len, &s));
         char ch         = *s;
+        int exponent    = 0;
 
         // if input is -0.xxx then intPart will lose the sign info
         // intpart growth will also break if we use neg ints
-        const bool negfix = *str == '-';
+        double sign = (*str == '-') ? -1.0 : +1.0;
 
         // @note The '.' is actually the sole reason for this function in the first place. Locale independence.
         if (ch == '.') { /* fraction part follows*/
-            for (; s < e && '0' <= (ch = *++s) && ch <= '9'; ) {
+            while (++s < e) {
+                ch = *s;
+                if (ch == 'e') { // parse e-016 e+3 etc.
+                    ++s;
+                    int esign = (*s++ == '+') ? +1 : -1;
+                    exponent = (*s++ - '0');
+                    exponent = (exponent << 3) + (exponent << 1) + (*s++ - '0');
+                    exponent = (exponent << 3) + (exponent << 1) + (*s++ - '0');
+                    exponent *= esign;
+                    break;
+                }
+                if (ch < '0' || '9' < ch)
+                    break;
                 intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-                power = (power << 3) + (power << 1); // power *= 10
+                power   = (power   << 3) + (power   << 1);              // power *= 10
             }
         }
         if (end) *end = s; // write end of parsed value
         double result = power == 1 ? double(intPart) : double(intPart) / double(power);
-        return float(negfix ? -result : result);
+        if (exponent)
+            result *= pow(10.0, (double)exponent);
+        return result * sign;
     }
 
     // optimized for simplicity and performance
-    int _toint(const char* str, int len, const char** end)
+    int to_int(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;
@@ -546,7 +561,7 @@ namespace rpp
 
     // optimized for simplicity and performance
     // detects HEX integer strings as 0xBA or 0BA. Regular integers also parsed
-    int _tointhx(const char* str, int len, const char** end)
+    int to_inthx(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;

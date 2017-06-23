@@ -118,10 +118,10 @@ namespace rpp
      * @param len Length of the string to parse
      * @return Parsed float
      */
-    float _tofloat(const char* str, int len, const char** end = nullptr);
-    inline float _tofloat(const char* str, const char** end = nullptr)
+    double to_double(const char* str, int len, const char** end = nullptr);
+    inline double to_double(const char* str, const char** end = nullptr)
     {
-        return _tofloat(str, 64, end);
+        return to_double(str, 64, end);
     }
 
     /**
@@ -131,10 +131,10 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
-    int _toint(const char* str, int len, const char** end = nullptr);
-    inline int _toint(const char* str, const char** end = nullptr)
+    int to_int(const char* str, int len, const char** end = nullptr);
+    inline int to_int(const char* str, const char** end = nullptr)
     {
-        return _toint(str, 32, end);
+        return to_int(str, 32, end);
     }
 
     /**
@@ -145,10 +145,10 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
-    int _tointhx(const char* str, int len, const char** end = nullptr);
-    inline int _tointhx(const char* str, const char** end = nullptr)
+    int to_inthx(const char* str, int len, const char** end = nullptr);
+    inline int to_inthx(const char* str, const char** end = nullptr)
     {
-        return _tointhx(str, 32, end);
+        return to_inthx(str, 32, end);
     }
 
 
@@ -257,15 +257,15 @@ namespace rpp
         NOINLINE const char* to_cstr() const;
 
         /** Parses this strview as an integer */
-        FINLINE int to_int() const { return _toint(str, len); }
+        FINLINE int to_int() const { return rpp::to_int(str, len); }
         /** Parses this strview as a HEX integer ('0xff' or '0ff' or 'ff') */
-        FINLINE int to_int_hex() const { return _tointhx(str, len); }
+        FINLINE int to_int_hex() const { return to_inthx(str, len); }
         /** Parses this strview as a long */
-        FINLINE long to_long()     const { return (long)_toint(str, len); }
+        FINLINE long to_long()     const { return (long)rpp::to_int(str, len); }
         /** Parses this strview as a float */
-        FINLINE float to_float()   const { return _tofloat(str, len); }
+        FINLINE float to_float()   const { return (float)rpp::to_double(str, len); }
         /** Parses this strview as a double */
-        FINLINE double to_double() const { return (double)_tofloat(str, len); }
+        FINLINE double to_double() const { return rpp::to_double(str, len); }
         /** Parses this strview as a bool */
         bool to_bool() const;
 
@@ -647,7 +647,11 @@ namespace rpp
          * Parses next float from current strview, example: "1.0;sad0.0,'as;2.0" will parse [1.0] [0.0] [2.0]
          * @return 0.0f if there's nothing to parse or a parsed float
          */
-        NOINLINE float next_float();
+        NOINLINE double next_double();
+        inline float next_float()
+        {
+            return (float)next_double();
+        }
 
         /** 
          * Parses next int from current Token, example: "1,asvc2,x*3" will parse [1] [2] [3]
@@ -762,6 +766,11 @@ namespace rpp
     inline strview& operator>>(strview& s, float& out)
     {
         out = s.next_float();
+        return s;
+    }
+    inline strview& operator>>(strview& s, double& out)
+    {
+        out = s.next_double();
         return s;
     }
     inline strview& operator>>(strview& s, int& out)
