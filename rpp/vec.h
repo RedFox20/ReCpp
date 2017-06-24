@@ -34,12 +34,19 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     constexpr double M_PI    = 3.14159265358979323846264338327950288;
-    constexpr double M_SQRT2 = 1.41421356237309504880; // sqrt(2)
+    constexpr double M_PIf   = 3.14159265358979323846264338327950288f;
+    constexpr double M_SQRT2  = 1.41421356237309504880;  // sqrt(2)
+    constexpr double M_SQRT2f = 1.41421356237309504880f; // sqrt(2)
 
     /** @return Radians from degrees */
     static constexpr float radf(float degrees)
     {
-        return float((degrees * M_PI) / 180.0); // rads=(degs*PI)/180
+        return (degrees * M_PIf) / 180.0f; // rads=(degs*PI)/180
+    }
+    /** @return Radians from degrees */
+    static constexpr double radf(double degrees)
+    {
+        return (degrees * M_PI) / 180.0; // rads=(degs*PI)/180
     }
 
     /** @brief Clamps a value between:  min <= value <= max */
@@ -76,7 +83,7 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
-#if RPP_SSE_INTRINSICS && false // disabled for now due to __clang__ always picking std::sqrt etc.
+#if RPP_SSE_INTRINSICS && !__clang__ // disabled for now due to __clang__ always picking std::sqrt etc.
     static FINLINE double sqrt(const double& d) noexcept
     { auto m = _mm_set_sd(d); return _mm_cvtsd_f64(_mm_sqrt_sd(m, m)); }
     static FINLINE float sqrt(const float& f) noexcept
@@ -410,8 +417,9 @@ namespace rpp
 
         Point() {}
         constexpr Point(int x, int y) : x(x), y(y) {}
-        
-        operator bool()  const { return  x || y;  }
+        explicit constexpr Point(int xy) : x(xy), y(xy) {}
+
+        explicit operator bool()  const { return  x || y;  }
         bool operator!() const { return !x && !y; }
         void set(int nx, int ny) { x = nx, y = ny; }
 
@@ -419,6 +427,11 @@ namespace rpp
         bool notZero() const { return  x || y;  }
     
         const char* toString() const;
+        char* toString(char* buffer) const;
+        char* toString(char* buffer, int size) const;
+        template<int SIZE> char* toString(char(&buffer)[SIZE]) {
+            return toString(buffer, SIZE);
+        }
 
         Point& operator+=(int i) { x+=i, y+=i; return *this; }
         Point& operator-=(int i) { x-=i, y-=i; return *this; }
@@ -472,7 +485,7 @@ namespace rpp
         Rect() {}
         constexpr Rect(float x, float y, float w, float h)      : x(x), y(y), w(w), h(h) {}
         constexpr Rect(const Vector2& pos, const Vector2& size) : pos(pos),   size(size) {}
-        constexpr Rect(const float4& xywh) : xywh(xywh) {}
+        constexpr Rect(const float4& xywh)            : xywh(xywh) {}
         Rect(float x, float y, const Vector2& size)   : x(x), y(y), w(size.x), h(size.y) {}
         Rect(const Vector2& pos, float w, float h)    : x(pos.x), y(pos.y), w(w), h(h)   {}
 
@@ -568,8 +581,8 @@ namespace rpp
         union {
             struct { float x, y, z; };
             struct { float r, g, b; };
-            struct { Vector2 xy; };
-            struct { float _x; Vector2 yz; };
+            //struct { Vector2 xy; };
+            //struct { float _x; Vector2 yz; };
             float3 xyz;
         };
 
@@ -780,7 +793,7 @@ namespace rpp
         
         Vector3d() {}
         constexpr Vector3d(double x, double y, double z) : x(x),   y(y),   z(z)   {}
-        constexpr Vector3d(const double3& v) : x(v.x) {}
+        explicit constexpr Vector3d(const double3& v) : x(v.x) {}
         
         explicit operator Vector3() const { return {float(x), float(y), float(z)}; }
         
@@ -903,7 +916,7 @@ namespace rpp
             struct { Vector2 xy; Vector2 zw; };
             struct { Vector2 rg; Vector2 ba; };
             struct { Vector3 xyz; float _w; };
-            struct { float3 rgb; float _a; };
+            struct { float3  rgb; float _a; };
             struct { float _x; Vector3 yzw; };
             struct { float _r; Vector3 gba; };
             float4 xyzw;
@@ -926,10 +939,10 @@ namespace rpp
     
         Vector4() {}
         constexpr Vector4(float x, float y, float z,float w=1.f): x(x), y(y), z(z), w(w) {}
-        constexpr Vector4(const float4& v) : xyzw(v) {}
+        constexpr Vector4(const float4& v)            : xyzw(v) {}
         Vector4(const Vector2& xy, const Vector2& zw) : xy(xy), zw(zw) {}
-        Vector4(const Vector2& xy, float z, float w)  : x(xy.x), y(xy.y), z(z), w(w) {}
-        Vector4(float x, float y, const Vector2& zw)  : x(x), y(y), z(zw.x), w(zw.y) {}
+        Vector4(const Vector2& xy, float z, float w)  : x(xy.x), y(xy.y), z(z),    w(w)    {}
+        Vector4(float x, float y, const Vector2& zw)  : x(x),    y(y),    z(zw.x), w(zw.y) {}
         Vector4(const Vector3& xyz, float w)          : xyz(xyz), _w(w) {}
         Vector4(float x, const Vector3& yzw)          : _x(x), yzw(yzw) {}
         
@@ -949,6 +962,18 @@ namespace rpp
     
         /** @return Dot product with another vector */
         float dot(const Vector4& b) const;
+
+        /** Print the matrix */
+        void print() const;
+
+        /** @return Temporary static string from this Matrix4 */
+        const char* toString() const;
+
+        char* toString(char* buffer) const;
+        char* toString(char* buffer, int size) const;
+        template<int SIZE> char* toString(char (&buffer)[SIZE]) const {
+            return toString(buffer, SIZE);
+        }
 
         /** @brief Creates a quaternion rotation from an Euler angle (degrees), rotation axis must be specified */
         static Vector4 fromAngleAxis(float angle, const Vector3& axis);
@@ -1357,7 +1382,7 @@ namespace rpp
         BoundingBox(const Vector3& bbMinMax) : min(bbMinMax), max(bbMinMax) {}
         BoundingBox(const Vector3& bbMin, const Vector3& bbMax) : min(bbMin), max(bbMax) {}
 
-        operator bool()  const { return min.notZero() && max.notZero(); }
+        explicit operator bool()  const { return min.notZero() && max.notZero(); }
         bool operator!() const { return min.isZero()  || max.isZero();  }
 
         bool isZero()  const { return min.isZero()  && max.isZero();  }
@@ -1372,6 +1397,9 @@ namespace rpp
 
         // get center of BoundingBox
         Vector3 center() const noexcept;
+
+        // get the bounding radius: (max-min).length() / 2
+        float radius() const noexcept;
 
         Vector3 compare(const BoundingBox& bb) const noexcept;
 
@@ -1395,10 +1423,49 @@ namespace rpp
         static BoundingBox create(const vector<Vector3>& points) noexcept;
 
         // calculates the bounding box using ID-s from IdVector3-s, which index the given point cloud
-        static BoundingBox create(const vector<Vector3>& points, const vector<IdVector3>& ids);
+        static BoundingBox create(const vector<Vector3>& points, const vector<IdVector3>& ids) noexcept;
 
         // calculates the bounding box using vertex ID-s, which index the given point cloud
-        static BoundingBox create(const vector<Vector3>& points, const vector<int>& ids);
+        static BoundingBox create(const vector<Vector3>& points, const vector<int>& ids) noexcept;
+
+        // Calculates the bounding box from an arbitrary vertex array
+        // @note Position data must be the first Vector3 element!
+        // @param stride The step in bytes(!!) to the next element
+        //        Ex:
+        //           vector<Vertex3UVNorm> vertices;
+        //           auto bb = BoundingBox::create((Vector3*)vertices.data(), vertices.size(), sizeof(Vertex3UVNorm));
+        static BoundingBox create(const Vector3* vertexData, int vertexCount, int stride) noexcept;
+
+        // Calculates the bounding box from an arbitrary vertex array
+        // @note Position data must be the first Vector3 element!
+        //       Ex:
+        //          vector<Vertex3UVNorm> vertices;
+        //          auto bb = BoundingBox::create(vertices);
+        template<class Vertex> static BoundingBox create(const vector<Vertex>& vertices)
+        {
+            return create((Vector3*)vertices.data(), (int)vertices.size(), sizeof(Vertex));
+        }
+        template<class Vertex> static BoundingBox create(const Vertex* vertices, int vertexCount)
+        {
+            return create((Vector3*)vertices, vertexCount, sizeof(Vertex));
+        }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    struct BoundingSphere
+    {
+        Vector3 center;
+        float radius;
+        BoundingSphere() : center(0.0f, 0.0f, 0.0f), radius(0.0f) {}
+        BoundingSphere(const Vector3& center, float radius) : center(center), radius(radius) {}
+        BoundingSphere(const BoundingBox& bbox) : center(bbox.center()), radius(bbox.radius()) {}
+
+        // calculates the bounding sphere from basic bounding box of the point cloud
+        static BoundingSphere create(const vector<Vector3>& points) noexcept
+        {
+            return { BoundingBox::create(points) };
+        }
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1418,8 +1485,21 @@ namespace rpp
     };
 
     ////////////////////////////////////////////////////////////////////////////////
-
 } // namespace rpp
+
+namespace std
+{
+    ////////////////////////////////////////////////////////////////////////////////
+
+    inline string to_string(const rpp::Vector2& v)  { char buf[32];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const rpp::Point& v)    { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const rpp::Vector3& v)  { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const rpp::Vector3d& v) { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const rpp::Vector4& v)  { char buf[64];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const rpp::Matrix4& v)  { char buf[256]; return { v.toString(buf, sizeof(buf)) }; }
+
+    ////////////////////////////////////////////////////////////////////////////////
+} // namespace std
 
 #if _MSC_VER
 #pragma warning(pop) // nameless struct/union warning

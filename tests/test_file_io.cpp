@@ -169,6 +169,9 @@ TestImpl(test_file_io)
         AssertThat(path_combine("tmp/", "/folder//"), "tmp/folder");
         AssertThat(path_combine("tmp/", ""         ), "tmp/");
         AssertThat(path_combine("tmp",  ""         ), "tmp/");
+        AssertThat(path_combine("",     "tmp"      ), "tmp/");
+        AssertThat(path_combine("",     "/tmp"     ), "tmp/");
+        AssertThat(path_combine("",     "/tmp/"    ), "tmp/");
         AssertThat(path_combine("",     ""         ), "");
     }
 

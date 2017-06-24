@@ -85,14 +85,20 @@ namespace rpp
         template<int N>   static string as_string(const char(&v)[N]) { return { v, v + (N - 1) }; }
         template<class T> static string as_string(const T& v)        { return to_string(v); }
 
-        template<class Expected, class Actual>
+        template<class Actual, class Expected>
         static void expected_failed(const char* file, int line, 
-                    const Expected& expected, const Actual& actual, 
-                    const char* expectedExpr, const char* actualExpr)
+                    const char* expression, const Actual& actual, const Expected& expected)
         {
-            assert_failed(file, line, "Expected %s(%s) but got %s(%s) instead.",
-                expectedExpr, as_string(expected).c_str(),
-                actualExpr,   as_string(actual).c_str());
+            assert_failed(file, line, "%s => '%s' but expected '%s'",
+                expression, as_string(actual).c_str(), as_string(expected).c_str());
+        }
+
+        template<class Actual, class MustNotEqual>
+        static void must_not_equal_failed(const char* file, int line, 
+            const char* expression, const Actual& actual, const MustNotEqual& mustNotEqual)
+        {
+            assert_failed(file, line, "%s => '%s' must not equal '%s'",
+                expression, as_string(actual).c_str(), as_string(mustNotEqual).c_str());
         }
 
         // adds a test to the automatic test run list
@@ -105,9 +111,12 @@ namespace rpp
 
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
-#define AssertThat(expected, actual) \
-    if ((expected) != (actual)) { \
-        expected_failed(__FILE__, __LINE__, expected, actual, #expected, #actual); }
+#define AssertThat(expr, expected) \
+    if ((expr) != (expected)) { expected_failed(__FILE__, __LINE__, #expr, expr, expected); }
+
+#define AssertEqual AssertThat
+#define AssertNotEqual(expr, mustNotEqual) \
+    if ((expr) == (mustNotEqual)) { must_not_equal_failed(__FILE__, __LINE__, #expr, expr, mustNotEqual); }
 
 #define TestImpl(testclass) static struct testclass : public test
 

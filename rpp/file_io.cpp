@@ -674,7 +674,7 @@ namespace rpp /* ReCpp */
     {
         strview nameext = file_nameext(path);
 
-        if (auto* ptr = nameext.substr(path.len - 8).rfind('.'))
+        if (auto* ptr = nameext.substr(nameext.len - 8).rfind('.'))
             return strview{ nameext.str, ptr };
         return nameext;
     }
@@ -784,7 +784,18 @@ namespace rpp /* ReCpp */
         path1.trim_end("/\\");
         path2.trim_start("/\\");
         path2.trim_end("/\\");
-        
+
+        if (path1.empty())
+        {
+            if (path2.empty())   // path_combine("", "") ==> ""
+                return {};
+            return path2 + '/';  // path_combine("", "/tmp/") ==> "tmp/"
+        }
+        else if (path2.empty())
+        {
+            return path1 + '/';  // path_combine("tmp/", "") ==> "tmp/"
+        }
+
         string combined;
         combined.reserve(size_t(path1.len + 1 + path2.len));
         combined.append(path1.str, size_t(path1.len));

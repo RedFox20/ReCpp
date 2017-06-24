@@ -61,13 +61,47 @@ namespace rpp /* ReCpp */
 
 
     /**
-     * Buffered FILE structure for performing random access read/write
+     * @brief Buffered FILE structure for performing random access read/write
      *
-     *  Example usage:
-     *         file f("test.obj");
-     *         char* buffer = malloc(f.size());
-     *         f.read(buffer, f.size());
-     *
+     * Example: opening a file and reading some info
+     * @code 
+     *     if (file f {"example.txt"}) {
+     *         MyStruct s;
+     *         f.read(&s); // read simple binary data blocks
+     *     }
+     * @endcode
+     * 
+     * Example: reading all bytes from a file
+     * @code
+     *     if (load_buffer buf = file::read_all("example.txt")) {
+     *         printf("%.*s", buf.len, buf.str);
+     *     }
+     * @endcode
+     * 
+     * Example: parsing lines from a file and writing data to a file
+     * @code
+     *     if (auto parser = buffer_line_parser::from_file("datalines.txt")) {
+     *         while (strview line = parser.next_line())
+     *             println(line);
+     *     }
+     *     
+     *     if (file f {"datalines.txt", CREATENEW}) {
+     *         f.writeln("line1", 10, 20.1f);   // writes 'line1 10 20.1\n'
+     *         f.writef("a more %.2f complicated %.*s\n", 3.14159, 4, "line");
+     *     }
+     * @endcode
+     * 
+     * Example: parsing or writing a key-value map
+     * @code
+     *     keyvals.txt : "key1=value1\nkey2=value2\n"
+     *     
+     *     unordered_map<string,string> keyvals = file::read_map("keyvals.txt");
+     *     
+     *     file::write_map("keyvals.txt", {
+     *         { "key1", "value1" },
+     *         { "key2", "value2" },
+     *     });
+     * @endcode
      */
     struct file
     {
@@ -152,6 +186,11 @@ namespace rpp /* ReCpp */
          */
         int read(void* buffer, int bytesToRead) noexcept;
 
+        template<class T> int read(T* object) noexcept
+        {
+            return read(object, sizeof(T));
+        }
+
         /**
          * Reads the entire contents of the file into a load_buffer
          * unbuffered_file is used internally
@@ -176,7 +215,7 @@ namespace rpp /* ReCpp */
 
         /**
          * Reads a simple key-value map from file in the form of:
-         * #comment
+         * @code
          * key1=value1\n
          * key2 = value2 \n
          * @return Hash map of key string and value string
@@ -243,8 +282,10 @@ namespace rpp /* ReCpp */
         int writeln() noexcept;
 
         /**
-         * Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
-         * Ex: writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n"
+         * @brief Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
+         * 
+         * Example:
+         * @code writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n"
          */
         template<class T, class... Args> int writeln(const T& first, const Args&... args) noexcept
         {
@@ -288,10 +329,11 @@ namespace rpp /* ReCpp */
 
         /**
          * Writes a simple key-value map to file in the form of:
+         * @code
          * key1=value1\n
          * key2=value2\n
-         * Please avoid using \n in the keys or values
-         * Key and Value types require .size() and .c_str()
+         * @note Please avoid using \n in the keys or values
+         * @note Key and Value types require .size() and .c_str()
          * @return Number of bytes written
          */
         template<class K, class V, class H, class C, class A>
@@ -366,13 +408,15 @@ namespace rpp /* ReCpp */
 
     /**
      * Generic parser that stores a file load buffer, with easy construction and usability
-     * Example usage:
+     * Example:
+     * @code
      *   using buffer_line_parser = buffer_parser<line_parser>;
      *   if (auto parser = buffer_line_parser::from_file("datalines.txt");
      *   {
      *       while (strview line = parser.next_line())
      *           println(line);
      *   }
+     * @endcode
      */
     template<class parser> struct buffer_parser : parser
     {
@@ -484,7 +528,7 @@ namespace rpp /* ReCpp */
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
-     *        Ex: "path" ==> "C:\Projects\Test\path" 
+     * @result "path" ==> "C:\Projects\Test\path" 
      */
     string full_path(const char* path) noexcept;
     inline string full_path(const string& path) noexcept { return full_path(path.c_str());   }
@@ -492,69 +536,70 @@ namespace rpp /* ReCpp */
 
     /**
      * @brief Merges all ../ inside of a path
-     *        Ex:  ../lib/../bin/file.txt ==> ../bin/file.txt
+     * @result  ../lib/../bin/file.txt ==> ../bin/file.txt
      */
     string merge_dirups(const strview path) noexcept;
 
     /**
      * @brief Extract the filename (no extension) from a file path
-     *        Ex: /root/dir/file.ext ==> file
-     *        Ex: /root/dir/file     ==> file
-     *        Ex: /root/dir/         ==> 
-     *        Ex: file.ext           ==> file
-     *        Ex: /.git/f.reallylong ==> f.reallylong
-     *        Ex: /.git/filewnoext   ==> filewnoext
+     * 
+     * @result /root/dir/file.ext ==> file
+     * @result /root/dir/file     ==> file
+     * @result /root/dir/         ==> 
+     * @result file.ext           ==> file
+     * @result /.git/f.reallylong ==> f.reallylong
+     * @result /.git/filewnoext   ==> filewnoext
      */
     strview file_name(const strview path) noexcept;
 
     /**
      * @brief Extract the file part (with ext) from a file path
-     *        Ex: /root/dir/file.ext ==> file.ext
-     *        Ex: /root/dir/file     ==> file
-     *        Ex: /root/dir/         ==> 
-     *        Ex: file.ext           ==> file.ext
+     * @result /root/dir/file.ext ==> file.ext
+     * @result /root/dir/file     ==> file
+     * @result /root/dir/         ==> 
+     * @result file.ext           ==> file.ext
      */
     strview file_nameext(const strview path) noexcept;
 
     /**
      * @brief Extract the extension from a file path
-     *        Ex: /root/dir/file.ext ==> ext
-     *        Ex: /root/dir/file     ==> 
-     *        Ex: /root/dir/         ==> 
-     *        Ex: file.ext           ==> ext
-     *        Ex: /.git/f.reallylong ==> 
-     *        Ex: /.git/filewnoext   ==> 
+     * @result /root/dir/file.ext ==> ext
+     * @result /root/dir/file     ==> 
+     * @result /root/dir/         ==> 
+     * @result file.ext           ==> ext
+     * @result /.git/f.reallylong ==> 
+     * @result /.git/filewnoext   ==> 
      */
     strview file_ext(const strview path) noexcept;
 
     /**
      * @brief Replaces the current file path extension
      *        Usage: file_replace_ext("dir/file.old", "new");
-     *        Ex: /dir/file.old ==> /dir/file.new
-     *        Ex: /dir/file     ==> /dir/file.new
-     *        Ex: /dir/         ==> /dir/
-     *        Ex: file.old      ==> file.new
+     * @result /dir/file.old ==> /dir/file.new
+     * @result /dir/file     ==> /dir/file.new
+     * @result /dir/         ==> /dir/
+     * @result file.old      ==> file.new
      */
     string file_replace_ext(const strview path, const strview ext);
 
     /**
      * @brief Extract the foldername from a path name
-     *        Ex: /root/dir/file.ext ==> dir
-     *        Ex: /root/dir/file     ==> dir
-     *        Ex: /root/dir/         ==> dir
-     *        Ex: dir/               ==> dir
-     *        Ex: file.ext           ==> 
+     * @result /root/dir/file.ext ==> dir
+     * @result /root/dir/file     ==> dir
+     * @result /root/dir/         ==> dir
+     * @result dir/               ==> dir
+     * @result file.ext           ==> 
      */
     strview folder_name(const strview path) noexcept;
 
     /**
      * @brief Extracts the full folder path from a file path.
      *        Will preserve / and assume input is always a filePath
-     *        Ex: /root/dir/file.ext ==> /root/dir/
-     *        Ex: /root/dir/file     ==> /root/dir/
-     *        Ex: /root/dir/         ==> /root/dir/
-     *        Ex: dir/               ==> dir/
-     *        Ex: file.ext           ==> 
+     * @result /root/dir/file.ext ==> /root/dir/
+     * @result /root/dir/file     ==> /root/dir/
+     * @result /root/dir/         ==> /root/dir/
+     * @result dir/               ==> dir/
+     * @result file.ext           ==> 
      */
     strview folder_path(const strview path) noexcept;
     wstring folder_path(const wchar_t* path) noexcept;
@@ -564,7 +609,7 @@ namespace rpp /* ReCpp */
      * @note This does not perform full path expansion.
      * @note The string is modified in-place !careful!
      *
-     *       Ex:  \root\dir/file.ext ==> /root/dir/file.ext
+     * @result \root/dir\\file.ext ==> /root/dir/file.ext
      */
     string& normalize(string& path, char sep = '/') noexcept;
     char*   normalize(char*   path, char sep = '/') noexcept;
@@ -577,10 +622,10 @@ namespace rpp /* ReCpp */
     
     /**
      * @brief Efficiently combines two path strings, removing any repeated / or \
-     *          Ex: path_combine("tmp", "file.txt")   ==> "tmp/file.txt"
-     *          Ex: path_combine("tmp/", "file.txt")  ==> "tmp/file.txt"
-     *          Ex: path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
-     *          Ex: path_combine("tmp/", "/folder//") ==> "tmp/folder"
+     * @result path_combine("tmp", "file.txt")   ==> "tmp/file.txt"
+     * @result path_combine("tmp/", "file.txt")  ==> "tmp/file.txt"
+     * @result path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
+     * @result path_combine("tmp/", "/folder//") ==> "tmp/folder"
      */
     string path_combine(strview path1, strview path2) noexcept;
 

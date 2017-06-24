@@ -65,13 +65,13 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    template<class T> static constexpr const T inverse_length(const T magnitude, const T& x, const T& y)
+    template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y)
     {
         const T len = sqrt(x*x + y*y);
         return nearlyZero(len) ? 0 : magnitude / len;
     }
 
-    template<class T> static constexpr const T inverse_length(const T magnitude, const T& x, const T& y, const T& z)
+    template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y, const T& z)
     {
         const T len = sqrt(x*x + y*y + z*z);
         return nearlyZero(len) ? 0 : magnitude / len;
@@ -81,19 +81,19 @@ namespace rpp
 
     void Vector2::print() const
     {
-        char buffer[256];
+        char buffer[32];
         puts(toString(buffer));
     }
     
     const char* Vector2::toString() const
     {
-        static char buffer[256];
+        static char buffer[32];
         return toString(buffer, sizeof(buffer));
     }
     
     char* Vector2::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 32);
     }
     
     char* Vector2::toString(char* buffer, int size) const
@@ -104,12 +104,12 @@ namespace rpp
     
     void Vector2::set(float newX, float newY)
     {
-        x=newX, y=newY;
+        x = newX, y = newY;
     }
 
     float Vector2::length() const
     {
-        return sqrtf(x*x + y*y);
+        return sqrt(x*x + y*y);
     }
 
     float Vector2::sqlength() const
@@ -181,19 +181,19 @@ namespace rpp
 
     void Vector2d::print() const
     {
-        char buffer[256];
+        char buffer[32];
         puts(toString(buffer));
     }
     
     const char* Vector2d::toString() const
     {
-        static char buffer[256];
+        static char buffer[32];
         return toString(buffer, sizeof(buffer));
     }
     
     char* Vector2d::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 32);
     }
     
     char* Vector2d::toString(char* buffer, int size) const
@@ -281,27 +281,37 @@ namespace rpp
 
     const char* Point::toString() const
     {
-        static char buf[64]; snprintf(buf, sizeof(buf), "{%d;%d}", x, y);
-        return buf;
+        static char buf[32]; return toString(buf, 32);
+    }
+
+    char* Point::toString(char* buffer) const
+    {
+        return toString(buffer, 32);
+    }
+
+    char* Point::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%d;%d}", x, y);
+        return buffer;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
 
     void Rect::print() const
     {
-        char buffer[256];
+        char buffer[64];
         puts(toString(buffer));
     }
 
     const char* Rect::toString() const
     {
-        static char buffer[256];
+        static char buffer[64];
         return toString(buffer, sizeof(buffer));
     }
 
     char* Rect::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 64);
     }
 
     char* Rect::toString(char* buffer, int bufSize) const
@@ -393,7 +403,7 @@ namespace rpp
 
     float Vector3::length() const
     {
-        return sqrtf(x*x + y*y + z*z);
+        return sqrt(x*x + y*y + z*z);
     }
 
     float Vector3::sqlength() const
@@ -406,7 +416,7 @@ namespace rpp
         float dx = x - v.x;
         float dy = y - v.y;
         float dz = z - v.z;
-        return sqrtf(dx*dx + dy*dy + dz*dz);
+        return sqrt(dx*dx + dy*dy + dz*dz);
     }
 
     void Vector3::normalize()
@@ -444,19 +454,19 @@ namespace rpp
 
     void Vector3::print() const
     {
-        char buffer[256];
+        char buffer[48];
         puts(toString(buffer));
     }
 
     const char* Vector3::toString() const
     {
-        static char buffer[256];
+        static char buffer[48];
         return toString(buffer, sizeof(buffer));
     }
 
     char* Vector3::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 48);
     }
 
     char* Vector3::toString(char* buffer, int size) const
@@ -558,19 +568,19 @@ namespace rpp
     
     void Vector3d::print() const
     {
-        char buffer[256];
+        char buffer[48];
         puts(toString(buffer));
     }
     
     const char* Vector3d::toString() const
     {
-        static char buffer[256];
+        static char buffer[48];
         return toString(buffer, sizeof(buffer));
     }
     
     char* Vector3d::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 48);
     }
     
     char* Vector3d::toString(char* buffer, int size) const
@@ -609,6 +619,29 @@ namespace rpp
     float Vector4::dot(const Vector4& v) const
     {
         return x*v.x + y*v.y + z*v.z + w*v.w;
+    }
+
+    void Vector4::print() const
+    {
+        char buffer[48];
+        puts(toString(buffer));
+    }
+
+    const char* Vector4::toString() const
+    {
+        static char buffer[64];
+        return toString(buffer, sizeof(buffer));
+    }
+
+    char* Vector4::toString(char* buffer) const
+    {
+        return toString(buffer, 64);
+    }
+
+    char* Vector4::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g;%.3g;%.3g}", x, y, z, w);
+        return buffer;
     }
 
     Vector4 Vector4::fromAngleAxis(float angle, const Vector3& axis)
@@ -744,7 +777,7 @@ namespace rpp
         const Vector4 b1 = mb.r1;
         const Vector4 b2 = mb.r2;
         const Vector4 b3 = mb.r3;
-        Matrix4 mc = {};
+        Matrix4 mc;
         mc.r0 = (a0*b0.x + a1*b0.y) + (a2*b0.z + a3*b0.w);
         mc.r1 = (a0*b1.x + a1*b1.y) + (a2*b1.z + a3*b1.w);
         mc.r2 = (a0*b2.x + a1*b2.y) + (a2*b2.z + a3*b2.w);
@@ -1184,7 +1217,7 @@ namespace rpp
 
     Matrix4 Matrix4::inverse() const
     {
-        Matrix4 inverse = {};
+        Matrix4 inverse;
         invert4x4(this->m, inverse.m);
         return inverse;
     }
@@ -1263,6 +1296,11 @@ namespace rpp
     Vector3 BoundingBox::center() const noexcept
     {
         return lerp(0.5f, min, max);
+    }
+
+    float BoundingBox::radius() const noexcept
+    {
+        return (max - min).length() * 0.5f * float(M_SQRT2);
     }
 
     Vector3 BoundingBox::compare(const BoundingBox& bb) const noexcept
@@ -1349,7 +1387,7 @@ namespace rpp
         return { min, max };
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<IdVector3>& ids)
+    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<IdVector3>& ids) noexcept
     {
         if (points.empty() || ids.empty())
             return { Vector3::ZERO, Vector3::ZERO };
@@ -1373,7 +1411,7 @@ namespace rpp
         return { min, max };
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<int>& ids)
+    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<int>& ids) noexcept
     {
         if (points.empty() || ids.empty())
             return { Vector3::ZERO, Vector3::ZERO };
@@ -1397,14 +1435,34 @@ namespace rpp
         return { min, max };
     }
 
+    BoundingBox BoundingBox::create(const Vector3* vertexData, int vertexCount, int stride) noexcept
+    {
+        if (vertexCount == 0)
+            return { Vector3::ZERO, Vector3::ZERO };
+
+        Vector3 min = vertexData[0];
+        Vector3 max = min;
+        for (int i = 1; i < vertexCount; ++i)
+        {
+            const Vector3 pos = vertexData[i];
+            if      (pos.x < min.x) min.x = pos.x;
+            else if (pos.x > max.x) max.x = pos.x;
+            if      (pos.y < min.y) min.y = pos.y;
+            else if (pos.y > max.y) max.y = pos.y;
+            if      (pos.z < min.z) min.z = pos.z;
+            else if (pos.z > max.z) max.z = pos.z;
+
+            vertexData = (Vector3*)((byte*)vertexData + stride);
+        }
+        return { min, max };
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////
 
     // Thank you!
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
     float Ray::intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept
     {
-        float t0, t1; // solutions for t if the ray intersects 
-
         Vector3 L = sphereCenter - origin;
         float tca = L.dot(direction);
         if (tca < 0) return 0.0f; // L and rayDir point in opposite directions, so intersect is behind rayStart
@@ -1413,8 +1471,8 @@ namespace rpp
         float d2 = L.dot(L) - tca*tca;
         if (d2 > sqRadius) return 0.0f;
         float thc = sqrt(sqRadius - d2);
-        t0 = tca - thc;
-        t1 = tca + thc;
+        float t0 = tca - thc; // solutions for t if the ray intersects 
+        float t1 = tca + thc;
 
         if (t0 > t1) swap(t0, t1);
         if (t0 < 0) {

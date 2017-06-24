@@ -304,6 +304,7 @@ namespace rpp
             str = s, len = n; // write result
             return *this;
         }
+        inline strview& trim_start(strview s) { return trim_start(s.str, s.len); }
 
         /** Trims end from this char */
         NOINLINE strview& trim_end(char ch);
@@ -319,6 +320,7 @@ namespace rpp
             len = n; // write result
             return *this;
         }
+        inline strview& trim_end(strview s) { return trim_end(s.str, s.len); }
 
         /** Trims both start and end with whitespace */
         FINLINE strview& trim() { return trim_start().trim_end(); }
@@ -329,6 +331,7 @@ namespace rpp
         template<int N> FINLINE strview& trim(const char (&chars)[N]) { 
             return trim_start(chars, N-1).trim_end(chars, N-1);
         }
+        inline strview& trim(strview s) { return trim_start(s.str, s.len).trim_end(s.str, s.len); }
 
         /** Consumes the first character in the strview if possible. */
         FINLINE strview& chomp_first() { if (len) ++str,--len; return *this; }
