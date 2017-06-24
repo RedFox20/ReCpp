@@ -216,8 +216,9 @@ namespace rpp /* ReCpp */
         /**
          * Reads a simple key-value map from file in the form of:
          * @code
-         * key1=value1\n
-         * key2 = value2 \n
+         *     key1=value1\n
+         *     key2 = value2 \n
+         * @endcode
          * @return Hash map of key string and value string
          */
         static unordered_map<string, string> read_map(const strview& filename) noexcept;
@@ -285,7 +286,7 @@ namespace rpp /* ReCpp */
          * @brief Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
          * 
          * Example:
-         * @code writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n"
+         * @code writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n" @endcode
          */
         template<class T, class... Args> int writeln(const T& first, const Args&... args) noexcept
         {
@@ -330,8 +331,9 @@ namespace rpp /* ReCpp */
         /**
          * Writes a simple key-value map to file in the form of:
          * @code
-         * key1=value1\n
-         * key2=value2\n
+         *     key1=value1\n
+         *     key2=value2\n
+         * @endcode
          * @note Please avoid using \n in the keys or values
          * @note Key and Value types require .size() and .c_str()
          * @return Number of bytes written
