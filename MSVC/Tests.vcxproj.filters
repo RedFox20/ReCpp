@@ -32,5 +32,8 @@
     <ClCompile Include="..\tests\test_thread_pool.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\tests\test_vec.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

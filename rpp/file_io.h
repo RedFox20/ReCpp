@@ -34,7 +34,7 @@ namespace rpp /* ReCpp */
         char* str;  // dynamic or internal buffer
         int   len;  // buffer size in bytes
 
-        load_buffer() noexcept : str(0), len(0) {}
+        load_buffer() noexcept : str(nullptr), len(0) {}
         // takes ownership of a malloc-ed pointer and frees it when out of scope
         load_buffer(char* buffer, int size) noexcept : str(buffer), len(size) {}
         ~load_buffer();
@@ -490,7 +490,10 @@ namespace rpp /* ReCpp */
     inline string full_path(const string& path) noexcept { return full_path(path.c_str());   }
     inline string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
 
-    // merges all ../ of a full path
+    /**
+     * @brief Merges all ../ inside of a path
+     *        Ex:  ../lib/../bin/file.txt ==> ../bin/file.txt
+     */
     string merge_dirups(const strview path) noexcept;
 
     /**
