@@ -1444,15 +1444,15 @@ namespace rpp
         Vector3 max = min;
         for (int i = 1; i < vertexCount; ++i)
         {
-            const Vector3 pos = vertexData[i];
+            vertexData = (Vector3*)((byte*)vertexData + stride);
+
+            const Vector3 pos = *vertexData;
             if      (pos.x < min.x) min.x = pos.x;
             else if (pos.x > max.x) max.x = pos.x;
             if      (pos.y < min.y) min.y = pos.y;
             else if (pos.y > max.y) max.y = pos.y;
             if      (pos.z < min.z) min.z = pos.z;
             else if (pos.z > max.z) max.z = pos.z;
-
-            vertexData = (Vector3*)((byte*)vertexData + stride);
         }
         return { min, max };
     }
