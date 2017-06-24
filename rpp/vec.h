@@ -33,10 +33,10 @@ namespace rpp
     using namespace std;
     ///////////////////////////////////////////////////////////////////////////////
 
-    constexpr double M_PI    = 3.14159265358979323846264338327950288;
-    constexpr double M_PIf   = 3.14159265358979323846264338327950288f;
+    constexpr double M_PI     = 3.14159265358979323846264338327950288;
+    constexpr float  M_PIf    = 3.14159265358979323846264338327950288f;
     constexpr double M_SQRT2  = 1.41421356237309504880;  // sqrt(2)
-    constexpr double M_SQRT2f = 1.41421356237309504880f; // sqrt(2)
+    constexpr float  M_SQRT2f = 1.41421356237309504880f; // sqrt(2)
 
     /** @return Radians from degrees */
     static constexpr float radf(float degrees)
@@ -1428,19 +1428,29 @@ namespace rpp
         // calculates the bounding box using vertex ID-s, which index the given point cloud
         static BoundingBox create(const vector<Vector3>& points, const vector<int>& ids) noexcept;
 
-        // Calculates the bounding box from an arbitrary vertex array
-        // @note Position data must be the first Vector3 element!
-        // @param stride The step in bytes(!!) to the next element
-        //        Ex:
-        //           vector<Vertex3UVNorm> vertices;
-        //           auto bb = BoundingBox::create((Vector3*)vertices.data(), vertices.size(), sizeof(Vertex3UVNorm));
+        /**
+         * Calculates the bounding box from an arbitrary vertex array
+         * @note Position data must be the first Vector3 element!
+         * @param stride The step in bytes(!!) to the next element
+         * 
+         * Example:
+         * @code
+         *     vector<Vertex3UVNorm> vertices;
+         *     auto bb = BoundingBox::create((Vector3*)vertices.data(), vertices.size(), sizeof(Vertex3UVNorm));
+         * @endcode
+         */
         static BoundingBox create(const Vector3* vertexData, int vertexCount, int stride) noexcept;
 
-        // Calculates the bounding box from an arbitrary vertex array
-        // @note Position data must be the first Vector3 element!
-        //       Ex:
-        //          vector<Vertex3UVNorm> vertices;
-        //          auto bb = BoundingBox::create(vertices);
+        /**
+         * Calculates the bounding box from an arbitrary vertex array
+         * @note Position data must be the first Vector3 element!
+         * 
+         * Example:
+         * @code
+         *     vector<Vertex3UVNorm> vertices;
+         *     auto bb = BoundingBox::create(vertices);
+         * @endcode
+         */
         template<class Vertex> static BoundingBox create(const vector<Vertex>& vertices)
         {
             return create((Vector3*)vertices.data(), (int)vertices.size(), sizeof(Vertex));
@@ -1465,6 +1475,14 @@ namespace rpp
         static BoundingSphere create(const vector<Vector3>& points) noexcept
         {
             return { BoundingBox::create(points) };
+        }
+        template<class Vertex> static BoundingSphere create(const vector<Vertex>& vertices)
+        {
+            return { BoundingBox::create(vertices) };
+        }
+        template<class Vertex> static BoundingSphere create(const Vertex* vertices, int vertexCount)
+        {
+            return { BoundingBox::create(vertices, vertexCount) };
         }
     };
 
