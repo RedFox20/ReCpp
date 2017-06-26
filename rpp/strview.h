@@ -4,6 +4,9 @@
 /**
  * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
  */
+#ifndef _HAS_STD_BYTE
+#define _HAS_STD_BYTE 0
+#endif
 #include <cstring>   // C string utilities
 #include <string>     // compatibility with std::string
 #include <vector>     // std::vector for split
@@ -36,7 +39,9 @@ namespace rpp
 
 #ifndef RPP_BASIC_INTEGER_TYPEDEFS
 #define RPP_BASIC_INTEGER_TYPEDEFS
+#if !_HAS_STD_BYTE
     typedef unsigned char      byte;
+#endif
     typedef unsigned short     ushort;
     typedef unsigned int       uint;
     typedef unsigned long      ulong;
