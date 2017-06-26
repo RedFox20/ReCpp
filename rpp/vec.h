@@ -793,7 +793,7 @@ namespace rpp
         
         Vector3d() {}
         constexpr Vector3d(double x, double y, double z) : x(x),   y(y),   z(z)   {}
-        explicit constexpr Vector3d(const double3& v) : x(v.x) {}
+        constexpr Vector3d(const double3& v) : x(v.x) {}
         
         explicit operator Vector3() const { return {float(x), float(y), float(z)}; }
         

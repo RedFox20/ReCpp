@@ -2,6 +2,7 @@
  * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
  */
 #include "strview.h"
+#include <cmath>
 
 namespace rpp
 {
@@ -38,7 +39,7 @@ namespace rpp
     {
         if (str[len] == '\0')
             return str;
-        int n = (len < max) ? len : max - 1;
+        size_t n = size_t((len < max) ? len : max - 1);
         memcpy(buf, str, n);
         buf[n] = '\0';
         return buf;
