@@ -713,29 +713,42 @@ namespace rpp
          */
 
         // OpenGL to OpenCV coordinate conversion. Works both ways: GL <-> CV
-        // OpenCV coordsys: +X is Right on the screen, +Y is Down on the screen, +Z is INTO the screen
+        // OpenGL coordsys:  +X is Right on the screen, +Y is Up on the screen,   +Z is Forward INTO the screen
+        // OpenCV coordsys:  +X is Right on the screen, +Y is Down on the screen, +Z is INTO the screen
         Vector3 convertGL2CV() const noexcept { return { x, -y, z }; }
         Vector3 convertCV2GL() const noexcept { return { x, -y, z }; }
 
         // 3ds Max to OpenCV coordinate conversion
-        // 3ds Max coordsys: +X is Right on the screen, +Y is INTO the screen, +Z is Up
+        // 3ds Max coordsys: +X is Right on the screen, +Y is INTO the screen,    +Z is Up
+        // OpenCV  coordsys: +X is Right on the screen, +Y is Down on the screen, +Z is INTO the screen
         Vector3 convertMax2CV() const noexcept { return { x, -z, y }; }
         Vector3 convertCV2Max() const noexcept { return { x, z, -y }; }
 
         // OpenGL to 3ds Max coordinate conversion
+        // 3ds Max coordsys: +X is Right on the screen, +Y is INTO the screen,  +Z is Up
+        // OpenGL coordsys:  +X is Right on the screen, +Y is Up on the screen, +Z is Forward INTO the screen
         Vector3 convertMax2GL() const noexcept { return { x, z, y }; }
         Vector3 convertGL2Max() const noexcept { return { x, z, y }; }
 
         // OpenGL to iPhone coordinate conversion
-        // iPhone coordsys: +X is Right on the screen, +Y is Up on the screen, +Z is OUT of the screen
+        // OpenGL coordsys:  +X is Right on the screen, +Y is Up on the screen, +Z is Forward INTO the screen
+        // iPhone coordsys:  +X is Right on the screen, +Y is Up on the screen, +Z is OUT of the screen
         Vector3 convertGL2IOS() const noexcept { return { x, y, -z }; }
         Vector3 convertIOS2GL() const noexcept { return { x, y, -z }; }
 
         // Blender to OpenGL coordinate conversion
-        // Blender coordsys: +X is OUT of the screen, +Y is Right on the screen, +Z is Up
-        Vector3 convertBlender2GL() const noexcept { return { y, z, -x }; }
-        Vector3 convertGL2Blender() const noexcept { return { -z, x, y }; }
+        // Blender coordsys: +X is Right on the screen, +Y is INTO the screen,  +Z is Up on the screen
+        // OpenGL  coordsys: +X is Right on the screen, +Y is Up on the screen, +Z is Forward INTO the screen
+        Vector3 convertBlender2GL() const noexcept  { return { x, z, y }; }
+        Vector3 convertGL2Blender() const noexcept  { return { x, z, y }; }
+        
+        // Blender to iPhone coordinate conversion
+        // Blender coordsys: +X is Right on the screen, +Y is INTO the screen,  +Z is Up on the screen
+        // iPhone  coordsys: +X is Right on the screen, +Y is Up on the screen, +Z is OUT of the screen
+        Vector3 convertBlender2IOS() const noexcept { return { x,  z, -y }; }
+        Vector3 convertIOS2Blender() const noexcept { return { x, -z,  y }; }
 
+        
         // DirectX to OpenGL coordinate conversion
         // DirectX default coordsys: +X is Right on the screen, +Y is Up, +Z is INTO the screen
         // -- D3D is identical to modern OpenGL coordsys --

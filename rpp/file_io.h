@@ -438,6 +438,37 @@ namespace rpp /* ReCpp */
     using buffer_line_parser    = buffer_parser<line_parser>;
     using buffer_bracket_parser = buffer_parser<bracket_parser>;
     using buffer_keyval_parser  = buffer_parser<keyval_parser>;
+    
+    /**
+     * Key-Value map parser that stores a file load buffer, with easy construction and usability
+     * Example:
+     * @code
+     *   if (auto map = map_parser::from_file("keyvalues.txt");
+     *   {
+     *       println(map["key"]);
+     *   }
+     * @endcode
+     */
+    struct key_value_map
+    {
+        load_buffer dataOwner;
+        unordered_map<strview, strview> map;
+        
+        key_value_map(load_buffer&& buf) noexcept : dataOwner(move(buf)), map(file::parse_map(dataOwner)) {}
+        
+        explicit operator bool() const noexcept { return (bool)dataOwner && !map.empty(); }
+        int size()   const { return (int)map.size(); }
+        bool empty() const { return map.empty(); }
+        
+        strview operator[](strview key) const noexcept {
+            auto it = map.find(key);
+            return it == map.end() ? strview{} : it->second;
+        }
+        
+        static key_value_map from_file(strview filename) noexcept {
+            return { file::read_all(filename) };
+        }
+    };
 
     ////////////////////////////////////////////////////////////////////////////////
 
