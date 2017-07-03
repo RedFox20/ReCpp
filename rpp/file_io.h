@@ -6,7 +6,6 @@
  */
 #include <time.h> // time_t
 #include "strview.h"
-#include <unordered_map> // keyvalue saving
 
 namespace rpp /* ReCpp */
 {

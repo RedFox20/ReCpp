@@ -840,5 +840,17 @@ namespace rpp
     int println()           { return print(stdout, '\n'); }
 
     ////////////////////////////////////////////////////////////////////////////////
+    
+    string to_string(bool trueOrFalse) noexcept
+    {
+        return trueOrFalse ? "true"s : "false"s;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
 
 } // namespace rpp
+
+
+
+
