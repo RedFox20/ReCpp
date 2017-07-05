@@ -72,6 +72,9 @@
     <ClInclude Include="..\rpp\debugging.h">
       <Filter>rpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\rpp\obfuscated_string.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\rpp\strview.natvis">

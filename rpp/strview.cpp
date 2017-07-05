@@ -67,7 +67,7 @@ namespace rpp
     bool strview::is_whitespace() const
     {
         auto* s = str, *e = s+len;
-		for (; s < e && *(byte*)s <= ' '; ++s) {} // loop while is whitespace
+        for (; s < e && *(byte*)s <= ' '; ++s) {} // loop while is whitespace
         return s == e;
     }
     
@@ -99,7 +99,7 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-		for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
+        for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
         str = s, len = n; // result writeout
         return *this;
     }
@@ -159,7 +159,7 @@ namespace rpp
             int firstChar = *needle;
             while (haystr < hayend)
             {
-				haystr = (const char*)memchr(haystr, firstChar, hayend - haystr);
+                haystr = (const char*)memchr(haystr, firstChar, hayend - haystr);
                 if (!haystr) 
                     return nullptr; // definitely not found
 
@@ -201,7 +201,7 @@ namespace rpp
     {
         int count = 0;
         for (auto* p = str, *e = str+len; p < e; ++p)
-			if (*p == ch) ++count;
+            if (*p == ch) ++count;
         return count;
     }
 
@@ -841,16 +841,16 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
     
+} // namespace rpp
+
+namespace std
+{
+    ////////////////////////////////////////////////////////////////////////////////
+
     string to_string(bool trueOrFalse) noexcept
     {
         return trueOrFalse ? "true"s : "false"s;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
-
-
-} // namespace rpp
-
-
-
-
+}

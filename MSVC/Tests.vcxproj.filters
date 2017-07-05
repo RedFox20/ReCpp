@@ -35,5 +35,8 @@
     <ClCompile Include="..\tests\test_vec.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\tests\test_obfuscated_string.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

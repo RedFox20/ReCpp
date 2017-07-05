@@ -1188,75 +1188,6 @@ namespace rpp
         return println(stdout, first, args...);
     }
 
-
-
-    
-    /////////////////////// useful container tostr extensions //////////////////////
-
-    string to_string(bool trueOrFalse) noexcept;
-
-    /** Outputs a vector like {"hello","world"} as:
-     *  [2]{
-     *    hello,
-     *    world,
-     *  }
-     */
-    template<class T, class A>
-    string to_string(const vector<T,A>& vec, bool newLineSeparator = true) noexcept
-    {
-        string result = "["s;
-        result += to_string(vec.size());
-        result += "]{";
-        if (newLineSeparator) result += '\n';
-        for (const auto& s : vec) {
-            result += "  ";
-            result += s;
-            result += ',';
-            if (newLineSeparator) result += '\n';
-        }
-        result += '}';
-        if (newLineSeparator) result += '\n';
-        return result;
-    }
-    
-    /** Outputs an unordered map like { {"key","value"}, {"name","john"} } as:
-     *  [2]{
-     *    "key": "value",
-     *    "name": "john",
-     *  }
-     */
-    template<class K, class V, class H, class P, class A>
-    string to_string(const unordered_map<K,V,H,P,A>& map, bool newLineSeparator = true) noexcept
-    {
-        string result = "["s;
-        result += to_string(map.size());
-        result += "]{";
-        if (newLineSeparator) result += '\n';
-        for (const auto& kv : map) {
-            result += "  \"";
-            result += kv.first;
-            result += ": \"";
-            result += kv.second;
-            result += ',';
-            if (newLineSeparator) result += '\n';
-        }
-        result += '}';
-        if (newLineSeparator) result += '\n';
-        return result;
-    }
-    
-    template<class T, class A>
-    inline ostream& operator<<(ostream& os, const vector<T,A>& v) noexcept
-    {
-        return os << to_string(v, true);
-    }
-    
-    template<class K, class V, class H, class P, class A>
-    inline ostream& operator<<(ostream& os, const unordered_map<K,V,H,P,A>& map) noexcept
-    {
-        return os << to_string(map, true);
-    }
-
     ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
@@ -1287,6 +1218,73 @@ namespace std
             return value;
         }
     };
+
+    /////////////////////// useful container tostr extensions //////////////////////
+
+    string to_string(bool trueOrFalse) noexcept;
+
+    /** Outputs a vector like {"hello","world"} as:
+    *  [2]{
+    *    hello,
+    *    world,
+    *  }
+    */
+    template<class T, class A>
+    string to_string(const vector<T,A>& vec, bool newLineSeparator = true) noexcept
+    {
+        string result = "["s;
+        result += to_string(vec.size());
+        result += "]{";
+        if (newLineSeparator) result += '\n';
+        for (const auto& s : vec) {
+            result += "  ";
+            result += s;
+            result += ',';
+            if (newLineSeparator) result += '\n';
+        }
+        result += '}';
+        if (newLineSeparator) result += '\n';
+        return result;
+    }
+
+    /** Outputs an unordered map like { {"key","value"}, {"name","john"} } as:
+    *  [2]{
+    *    "key": "value",
+    *    "name": "john",
+    *  }
+    */
+    template<class K, class V, class H, class P, class A>
+    string to_string(const unordered_map<K,V,H,P,A>& map, bool newLineSeparator = true) noexcept
+    {
+        string result = "["s;
+        result += to_string(map.size());
+        result += "]{";
+        if (newLineSeparator) result += '\n';
+        for (const auto& kv : map) {
+            result += "  \"";
+            result += kv.first;
+            result += ": \"";
+            result += kv.second;
+            result += ',';
+            if (newLineSeparator) result += '\n';
+        }
+        result += '}';
+        if (newLineSeparator) result += '\n';
+        return result;
+    }
+
+    template<class T, class A>
+    inline ostream& operator<<(ostream& os, const vector<T,A>& v) noexcept
+    {
+        return os << to_string(v, true);
+    }
+
+    template<class K, class V, class H, class P, class A>
+    inline ostream& operator<<(ostream& os, const unordered_map<K,V,H,P,A>& map) noexcept
+    {
+        return os << to_string(map, true);
+    }
+
     
     ////////////////////////////////////////////////////////////////////////////////
 }
