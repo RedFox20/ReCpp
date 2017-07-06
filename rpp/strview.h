@@ -1064,7 +1064,7 @@ namespace rpp
         const char* c_str() const { return str; }
         const char* data()  const { return str; }
         strview     view()  const { return { str, len }; }
-        string to_string()  const { return { str, str+len }; }
+        string    stdstr()  const { return { str, str+len }; }
 
         explicit operator bool()    const { return len > 0; }
         explicit operator strview() const { return { str, len }; }
@@ -1074,7 +1074,7 @@ namespace rpp
 
         template<class T> void write(const T& value)
         {
-            write(::to_string(value));
+            write(to_string(value));
         }
 
         template<int N> 
@@ -1292,7 +1292,7 @@ namespace std
     template<typename T, template<class,class...> class C, class... Args>
     string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
-        rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.to_string();
+        rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.stdstr();
     }
 
     /**
@@ -1301,7 +1301,7 @@ namespace std
     template<class K, class V, class Hash, class Equal, class Alloc>
     string to_string(const unordered_map<K,V,Hash,Equal,Alloc>& map, bool newLineSeparator = true) noexcept
     {
-        rpp::string_buffer sb; sb.prettyprint(map, newLineSeparator); return sb.to_string();
+        rpp::string_buffer sb; sb.prettyprint(map, newLineSeparator); return sb.stdstr();
     }
 
     template<class T, class Alloc>
