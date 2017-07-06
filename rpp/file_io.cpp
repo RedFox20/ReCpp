@@ -999,6 +999,23 @@ namespace rpp /* ReCpp */
         #endif
     }
 
+    string temp_dir() noexcept
+    {
+        #if _WIN32
+            char path[512];
+            DWORD len = GetTempPathA(sizeof(path), path);
+            normalize(path);
+            return { path, path + len };
+        #else
+            const char* path;
+            (path = getenv("TMP")) ||
+            (path = getenv("TEMP")) ||
+            (path = getenv("TEMPDIR")) ||
+            (path = "/tmp");
+            return path;
+        #endif
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
 
 

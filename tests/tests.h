@@ -109,6 +109,16 @@ namespace rpp
         }
     };
 
+#undef Assert
+#undef AssertMsg
+#undef AssertThat
+#undef AssertEqual
+#undef AssertNotEqual
+#undef TestImpl
+#undef TestInit
+#undef TestCleanup
+#undef TestCase
+
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
 #define AssertThat(expr, expected) \

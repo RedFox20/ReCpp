@@ -737,6 +737,11 @@ namespace rpp /* ReCpp */
     inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
     inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
 
+    /**
+     * @return The system temporary directory for storing misc files
+     * @note For windows this is: %USERPROFILE%/AppData/Local/Temp
+     */
+    string temp_dir() noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 

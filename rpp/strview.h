@@ -245,8 +245,10 @@ namespace rpp
         /** Creates a new string from this string-strview */
         FINLINE string& to_string(string& out) const { return out.assign(str, (size_t)len); }
         string to_string() const { return string{str, (size_t)len}; }
-        operator string() const { return string{str, (size_t)len}; }
 
+        // this is implicit by design; but it may cause some unexpected conversions to std::string
+        // main goal is to provide convenient automatic conversion:  string s = my_string_view;
+        operator string() const { return string{str, (size_t)len}; }
 
         /** 
          * Copies this str[len] string into a C-string array
@@ -1048,6 +1050,9 @@ namespace rpp
         char  buf[SIZE];
 
         FINLINE string_buffer() noexcept : str(buf) { buf[0] = '\0'; }
+        FINLINE explicit string_buffer(strview text) noexcept : string_buffer() {
+            write(text);
+        }
         ~string_buffer() noexcept;
 
         string_buffer(string_buffer&&)                 = delete;
@@ -1059,6 +1064,7 @@ namespace rpp
         const char* c_str() const { return str; }
         const char* data()  const { return str; }
         strview     view()  const { return { str, len }; }
+        string to_string()  const { return { str, str+len }; }
 
         explicit operator bool()    const { return len > 0; }
         explicit operator strview() const { return { str, len }; }
@@ -1068,7 +1074,7 @@ namespace rpp
 
         template<class T> void write(const T& value)
         {
-            write(to_string(value));
+            write(::to_string(value));
         }
 
         template<int N> 
@@ -1089,6 +1095,43 @@ namespace rpp
             reserve(1);
             str[len++] = value;
             str[len] = '\0';
+        }
+
+        template<class T> void prettyprint(const T& value) {
+            write(to_string(value));
+        }
+        void prettyprint(const string& value) {
+            write('"'); write(value); write('"'); 
+        }
+        void prettyprint(const strview& value) {
+            write('"'); write(value); write('"'); 
+        }
+        void prettyprint(const char& value) {
+            write('\''); write(value); write('\'');
+        }
+        template<class K, class V> void prettyprint(const K& key, const V& value) {
+            prettyprint(key); write(": "); prettyprint(value);
+        }
+        template<class K, class V> void prettyprint(const pair<K const, V const>& pair) {
+            prettyprint(pair.first); write(": "); prettyprint(pair.second);
+        }
+
+        template<typename T, template<class,class...> class C, class... Args>
+        void prettyprint(const C<T,Args...>& container, bool newLineSeparator = true)
+        {
+            int i = 0, count = (int)container.size();
+            write('[');
+            write(count);
+            write("] = { ");
+            if (newLineSeparator) write('\n');
+            for (const auto& item : container) {
+                if (newLineSeparator) write("  ");
+                prettyprint(item);
+                if (++i < count) write(", ");
+                if (newLineSeparator) write('\n');
+            }
+            write(" }");
+            if (newLineSeparator) write('\n');
         }
 
         void write(byte value)   { reserve(4);  len += _tostring(&str[len], value); }
@@ -1223,68 +1266,55 @@ namespace std
 
     string to_string(bool trueOrFalse) noexcept;
 
-    /** Outputs a vector like {"hello","world"} as:
-    *  [2]{
-    *    hello,
-    *    world,
-    *  }
-    */
-    template<class T, class A>
-    string to_string(const vector<T,A>& vec, bool newLineSeparator = true) noexcept
+    /** 
+     *  @brief Outputs a linear container like vector<string>{"hello","world"} as:
+     *  @code
+     *  [2] = {
+     *    "hello",
+     *    "world"
+     *  }
+     *  @endcode
+     *  
+     *  Outputs a map like  unordered_map<strview,strview>{ {"key","value"}, {"name","john"} } as:
+     *  @code
+     *  [2] = {
+     *    "key": "value",
+     *    "name": "john"
+     *  }
+     *  @endcode
+     *  
+     *  With newLineSeparator = false the output is:
+     *  @code
+     *  [2] = { "hello", "world" }
+     *  [2] = { "key": "value", "name": "john" }
+     *  @endcode
+     */
+    template<typename T, template<class,class...> class C, class... Args>
+    string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
-        string result = "["s;
-        result += to_string(vec.size());
-        result += "]{";
-        if (newLineSeparator) result += '\n';
-        for (const auto& s : vec) {
-            result += "  ";
-            result += s;
-            result += ',';
-            if (newLineSeparator) result += '\n';
-        }
-        result += '}';
-        if (newLineSeparator) result += '\n';
-        return result;
+        rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.to_string();
     }
 
-    /** Outputs an unordered map like { {"key","value"}, {"name","john"} } as:
-    *  [2]{
-    *    "key": "value",
-    *    "name": "john",
-    *  }
-    */
-    template<class K, class V, class H, class P, class A>
-    string to_string(const unordered_map<K,V,H,P,A>& map, bool newLineSeparator = true) noexcept
+    /**
+
+     */
+    template<class K, class V, class Hash, class Equal, class Alloc>
+    string to_string(const unordered_map<K,V,Hash,Equal,Alloc>& map, bool newLineSeparator = true) noexcept
     {
-        string result = "["s;
-        result += to_string(map.size());
-        result += "]{";
-        if (newLineSeparator) result += '\n';
-        for (const auto& kv : map) {
-            result += "  \"";
-            result += kv.first;
-            result += ": \"";
-            result += kv.second;
-            result += ',';
-            if (newLineSeparator) result += '\n';
-        }
-        result += '}';
-        if (newLineSeparator) result += '\n';
-        return result;
+        rpp::string_buffer sb; sb.prettyprint(map, newLineSeparator); return sb.to_string();
     }
 
-    template<class T, class A>
-    inline ostream& operator<<(ostream& os, const vector<T,A>& v) noexcept
+    template<class T, class Alloc>
+    ostream& operator<<(ostream& os, const vector<T,Alloc>& v) noexcept
     {
         return os << to_string(v, true);
     }
 
-    template<class K, class V, class H, class P, class A>
-    inline ostream& operator<<(ostream& os, const unordered_map<K,V,H,P,A>& map) noexcept
+    template<class K, class V, class Hash, class Equal, class Alloc>
+    ostream& operator<<(ostream& os, const unordered_map<K,V,Hash,Equal,Alloc>& map) noexcept
     {
         return os << to_string(map, true);
     }
-
     
     ////////////////////////////////////////////////////////////////////////////////
 }
