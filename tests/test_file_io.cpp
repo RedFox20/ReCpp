@@ -174,5 +174,10 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     "/tmp/"    ), "tmp/");
         AssertThat(path_combine("",     ""         ), "");
     }
+	
+	TestCase(file_listing)
+	{
+		
+	}
 
 } Impl;

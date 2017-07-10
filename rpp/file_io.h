@@ -665,55 +665,181 @@ namespace rpp /* ReCpp */
 
 
     /**
+     * Basic and minimal directory iterator. Example usage:
+     * @code
+     *     for (dir_entry e : dir_iterator { dir })
+     *         if (e.is_dir) e.add_path_to(out);
+     * @endcode
+     */
+    class dir_iterator
+    {
+        struct impl;
+        struct dummy {
+            #if _WIN32
+                void* hFind;
+                char ffd[320];
+            #else
+                void* d;
+                void* e;
+            #endif
+            impl* operator->();
+            const impl* operator->() const;
+        };
+
+        dummy s; // iterator state
+        const string dir;       // original path used to construct this dir_iterator
+        const string reldir;    // relative directory
+        mutable string fulldir; // full path to directory we're iterating
+
+    public:
+        explicit dir_iterator(const strview& dir) : dir_iterator{ dir.to_string() } {}
+        explicit dir_iterator(string&& dir);
+        ~dir_iterator();
+
+        struct entry
+        {
+            const dir_iterator* it;
+            const strview name;
+            const bool is_dir;
+            entry(const dir_iterator* it) : it{it}, name{ it->name() }, is_dir{ it->is_dir() }
+            {
+            }
+            string path()      const { return path_combine(it->path(),      name); }
+            string full_path() const { return path_combine(it->full_path(), name); }
+            // all files and directories that aren't "." or ".." are valid
+            bool is_valid()    const { return !is_dir || (name != "." && name != ".."); }
+            bool add_path_to(vector<string>& out) const {
+                if (is_valid()) {
+                    out.emplace_back(path());
+                    return true;
+                }
+                return false;
+            }
+            bool add_full_path_to(vector<string>& out) const {
+                if (is_valid()) {
+                    out.emplace_back(full_path());
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        struct iter { // bare minimum for basic looping
+            dir_iterator* it;
+            bool operator==(const iter& other) const { return it == other.it; }
+            bool operator!=(const iter& other) const { return it != other.it; }
+            entry operator*() const { return { it }; }
+            iter& operator++() {
+                if (!it->next()) it = nullptr;
+                return *this;
+            }
+        };
+
+        explicit operator bool() const;
+        bool next(); // find next directory entry
+        bool is_dir()  const; // if current entry is a dir
+        strview name() const; // current entry name
+        entry current() const { return { this }; }
+        iter begin()          { return { this }; }
+        iter end()      const { return { nullptr }; }
+
+        // original path used to construct this dir_iterator
+        const string& path() const { return dir; }
+
+        // full path to directory we're iterating
+        const string& full_path() const {
+            return fulldir.empty() ? (fulldir = rpp::full_path(dir)) : fulldir;
+        }
+    };
+
+    using dir_entry = dir_iterator::entry;
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    /**
      * Lists all folders inside this directory
+     * @note By default: not recursive
      * @param out Destination vector for result folder names (not full folder paths!)
      * @param dir Relative or full path of this directory
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of folders found
      */
-    int list_dirs(vector<string>& out, strview dir) noexcept;
-    inline vector<string> list_dirs(strview dir) noexcept
-    {
-        vector<string> out; list_dirs(out, dir); return out;
-    }
+    int list_dirs(vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
 
-    int list_dirs_fullpath(vector<string>& out, strview dir) noexcept;
-    inline vector<string> list_dirs_fullpath(strview dir) noexcept
-    {
-        vector<string> out; list_dirs_fullpath(out, dir); return out;
+    inline vector<string> list_dirs(strview dir, bool recursive = false, bool fullpath = false) noexcept {
+        vector<string> out; list_dirs(out, dir, recursive, fullpath); return out;
+    }
+    inline int list_dirs_fullpath(vector<string>& out, strview dir, bool recursive = false) noexcept {
+        return list_dirs(out, dir, recursive, true);
+    }
+    inline vector<string> list_dirs_fullpath(strview dir, bool recursive = false) noexcept {
+        return list_dirs(dir, recursive, true);
     }
 
     /**
      * Lists all files inside this directory that have the specified extension (default: all files)
-     * @param out Destination vector for result file names (not full file paths!)
+     * @note By default: not recursive
+     * @param out Destination vector for result file names.
      * @param dir Relative or full path of this directory
      * @param ext Filter files by extension, ex: "txt", default ("") lists all files
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of files found that match the extension
+     * Example:
+     * @code
+     *     vector<string> relativePaths          = list_files(folder);
+     *     vector<string> recursiveRelativePaths = list_files_recursive(folder);
+     *     
+     * @endcode
      */
-    int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    inline vector<string> list_files(strview dir, strview ext = {}) noexcept
-    {
-        vector<string> out; list_files(out, dir, ext); return out;
+    int list_files(vector<string>& out, strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept;
+    inline vector<string> list_files(strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept {
+        vector<string> out; list_files(out, dir, ext, recursive, fullpath); return out;
     }
-    
-    int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    inline vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept
-    {
-        vector<string> out; list_files_fullpath(out, dir, ext); return out;
+
+    inline int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}, bool recursive = false) noexcept {
+        return list_files(out, dir, ext, recursive, true);
     }
-    
-    /**
-     * Lists all files and folders inside a dir
-     */
-    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept;
+    inline int list_files_recursive(vector<string>& out, strview dir, strview ext = {}) noexcept {
+        return list_files(out, dir, ext, true, false);
+    }
+    inline int list_files_fullpath_recursive(vector<string>& out, strview dir, strview ext = {}) noexcept {
+        return list_files(out, dir, ext, true, true);
+    }
+
+    inline vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept {
+        return list_files(dir, ext, false, true);
+    }
+    inline vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept {
+        return list_files(dir, ext, true, false);
+    }
+    inline vector<string> list_files_fullpath_recursive(strview dir, strview ext = {}) noexcept {
+        return list_files(dir, ext, true, true);
+    }
 
     /**
-     * Recursively lists all files under this directory and its subdirectories 
-     * that have the specified extension (default: all files)
-     * @param dir Relative or full path of root directory
-     * @param ext Filter files by extension, ex: "txt", default ("") lists all files
-     * @return vector of resulting relative file paths
+     * Lists all files and folders inside a dir
+     * @note By default: not recursive
+     * @param outDirs All found directories relative to input dir
+     * @param outFiles All found files
+     * @param dir Directory to search in
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
+     * @return Number of files and folders found that match the extension
+     * Example:
+     * @code
+     *     string dir = "C:/Projects/ReCpp";
+     *     vector<string> dirs, files;
+     *     list_alldir(dirs, files, dir, true, false); // recursive, relative paths
+     *     // dirs:  { ".git", ".git/logs", ... }
+     *     // files: { ".git/config", ..., ".gitignore", ... }
+     * @endcode
      */
-    vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept;
+    int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir, 
+                    bool recursive = false, bool fullpath = false) noexcept;
+
 
     /**
      * Recursively lists all files under this directory and its subdirectories 
@@ -722,7 +848,10 @@ namespace rpp /* ReCpp */
      * @param exts Filter files by extensions, ex: {"txt","cfg"}
      * @return vector of resulting relative file paths
      */
-    vector<string> list_files_recursive(strview dir, const vector<strview>& exts) noexcept;
+    vector<string> list_files(strview dir, const vector<strview>& exts, bool recursive = false , bool fullpath = false) noexcept;
+    inline vector<string> list_files_recursive(strview dir, const vector<strview>& exts, bool fullpath = false) noexcept {
+        return list_files(dir, exts, true, fullpath);
+    }
 
     /**
      * @return The current working directory of the application

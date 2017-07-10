@@ -23,7 +23,6 @@
     #define stat64   stat
 #endif
 
-
 namespace rpp /* ReCpp */
 {
     load_buffer::~load_buffer()
@@ -630,7 +629,8 @@ namespace rpp /* ReCpp */
     {
         char buf[512];
         #if _WIN32
-            size_t len = GetFullPathNameA(path, 512, buf, NULL);
+            size_t len = GetFullPathNameA(path, 512, buf, nullptr);
+            if (len) normalize(buf);
             return len ? string{ buf,len } : string{};
         #else
             char* res = realpath(path, buf);
@@ -804,180 +804,126 @@ namespace rpp /* ReCpp */
         return combined;
     }
     
+
+
     ////////////////////////////////////////////////////////////////////////////////
 
+
+
+    struct dir_iterator::impl {
+        #if _WIN32
+            HANDLE hFind;
+            WIN32_FIND_DATAA ffd;
+        #else
+            DIR* d;
+            dirent* e;
+        #endif
+    };
+    dir_iterator::impl* dir_iterator::dummy::operator->()
+    {
+        static_assert(sizeof(ffd) == sizeof(dir_iterator::impl::ffd), "dir_iterator::dummy size mismatch");
+        return reinterpret_cast<dir_iterator::impl*>(this);
+    }
+    const dir_iterator::impl* dir_iterator::dummy::operator->() const
+    {
+        return reinterpret_cast<const dir_iterator::impl*>(this);
+    }
 
 #if _WIN32
-    struct dir_iterator {
-        HANDLE hFind;
-        WIN32_FIND_DATAA ffd;
-        dir_iterator(const strview& dir) noexcept {
-            char path[512]; snprintf(path, 512, "%.*s/*", dir.len, dir.str);
-            if ((hFind = FindFirstFileA(path, &ffd)) == INVALID_HANDLE_VALUE)
-                hFind = 0;
+        dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {
+            char path[512]; snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());
+            if ((s->hFind = FindFirstFileA(path, &s->ffd)) == INVALID_HANDLE_VALUE)
+                s->hFind = nullptr;
         }
-        ~dir_iterator() { if (hFind) FindClose(hFind); }
-        operator bool() const noexcept { return hFind != 0; }
-        bool is_dir() const noexcept { return (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
-        const char* name() const noexcept { return ffd.cFileName; }
-        bool next() noexcept { return FindNextFileA(hFind, &ffd) != 0; }
-    };
+        dir_iterator::~dir_iterator() { if (s->hFind) FindClose(s->hFind); }
+        dir_iterator::operator bool()  const { return s->hFind != nullptr; }
+        bool    dir_iterator::next()         { return FindNextFileA(s->hFind, &s->ffd) != 0; }
+        bool    dir_iterator::is_dir() const { return (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+        strview dir_iterator::name()   const { return s->ffd.cFileName; }
 #else
-    struct dir_iterator {
-        DIR* d;
-        dirent* e;
-        dir_iterator(const strview& dir) noexcept {
-            if ((d=opendir(dir.to_cstr()))) 
-                e = readdir(d);
+        dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {
+            s->e = (s->d=opendir(this->dir.c_str())) != nullptr ? readdir(s->d) : nullptr;
         }
-        ~dir_iterator() { if (d) closedir(d); }
-        operator bool() const noexcept { return d && e; }
-        bool is_dir() const noexcept { return e->d_type == DT_DIR; }
-        const char* name() const noexcept { return e->d_name; }
-        bool next() noexcept { return (e = readdir(d)) != 0; }
-    };
+        dir_iterator::~dir_iterator() { if (s->d) closedir(s->d); }
+        dir_iterator::operator bool()  const { return s->d && s->e; }
+        bool    dir_iterator::next()         { return (s->e = readdir(s->d)) != nullptr; }
+        bool    dir_iterator::is_dir() const { return s->e->d_type == DT_DIR; }
+        strview dir_iterator::name()   const { return s->e->d_name; }
 #endif
 
+
+
     ////////////////////////////////////////////////////////////////////////////////
 
-    int list_dirs(vector<string>& out, strview dir) noexcept
-    {
-        if (!out.empty()) out.clear();
 
-        if (dir_iterator it = { dir }) {
-            do {
-                if (it.is_dir() && it.name()[0] != '.') {
-                    out.emplace_back(it.name());
-                }
-            } while (it.next());
+
+    // @param queryRoot The original path passed to the query.
+    //                  For abs listing, this must be an absolute path value!
+    //                  For rel listing, this is only used for opening the directory
+    // @param relPath Relative path from search root, ex: "src", "src/session/util", etc.
+    template<class Func> 
+    static void traverse_dir2(strview queryRoot, strview relPath, 
+                              bool dirs, bool files, bool rec, bool abs, const Func& func)
+    {
+        string currentDir = path_combine(queryRoot, relPath);
+        for (dir_entry e : dir_iterator{ currentDir })
+        {
+            if (((dirs && e.is_dir) || (files && !e.is_dir)) && e.is_valid()) 
+            {
+                func(path_combine((abs ? currentDir : relPath), e.name), e.is_dir);
+                if (e.is_dir && rec)
+                    traverse_dir2(queryRoot, path_combine(relPath, e.name), files, dirs, rec, abs, func);
+            }
         }
-        return (int)out.size();
     }
-    
-    int list_dirs_fullpath(vector<string>& out, strview dir) noexcept
+    template<class Func> 
+    static void traverse_dir(strview dir, bool dirs, bool files, bool rec, bool abs, const Func& func)
     {
-        if (!out.empty()) out.clear();
-        
-        string fullpath = full_path(dir) + "/";
-
-        if (dir_iterator it = { dir }) {
-            do {
-                if (it.is_dir() && it.name()[0] != '.') {
-                    out.emplace_back(fullpath + it.name());
-                }
-            } while (it.next());
-        }
-        return (int)out.size();
-    }
-
-    int list_files(vector<string>& out, strview dir, strview ext) noexcept
-    {
-        if (!out.empty()) out.clear();
-
-        if (dir_iterator it = { dir }) {
-            do {
-                if (!it.is_dir()) {
-                    strview fname = it.name();
-                    if (ext.empty() || fname.ends_withi(ext))
-                        out.emplace_back(fname.str, fname.len);
-                }
-            } while (it.next());
-        }
-        return (int)out.size();
-    }
-    
-    int list_files_fullpath(vector<string>& out, strview dir, strview ext) noexcept
-    {
-        if (!out.empty()) out.clear();
-        
-        string fullpath = full_path(dir) + "/";
-        
-        if (dir_iterator it = { dir }) {
-            do {
-                if (!it.is_dir()) {
-                    strview fname = it.name();
-                    if (ext.empty() || fname.ends_withi(ext))
-                        out.emplace_back(fullpath + fname);
-                }
-            } while (it.next());
-        }
-        return (int)out.size();
-    }
-
-    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept
-    {
-        if (!outdirs.empty())  outdirs.clear();
-        if (!outfiles.empty()) outfiles.clear();
-
-        if (dir_iterator it = { dir }) {
-            do {
-                if (!it.is_dir())             outfiles.emplace_back(it.name());
-                else if (it.name()[0] != '.') outdirs.emplace_back(it.name());
-            } while (it.next());
-        }
-        return (int)outdirs.size() + (int)outfiles.size();
+        if (abs) traverse_dir2(full_path(dir), strview{}, dirs, files, rec, abs, func);
+        else     traverse_dir2(dir,            strview{}, dirs, files, rec, abs, func);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    static void list_rec(vector<string>& out, strview dir, strview ext) noexcept
+    int list_dirs(vector<string>& out, strview dir, bool recursive, bool fullpath) noexcept
     {
-        if (dir_iterator it = { dir }) {
-            do {
-                strview fname = it.name();
-                if (it.is_dir())
-                {
-                    if (fname[0] != '.')
-                        list_rec(out, dir + '/' + fname, ext);
-                }
-                else
-                {
-                    if (ext.empty() || fname.ends_withi(ext))
-                        out.emplace_back(dir + '/' + fname);
-                }
-            } while (it.next());
-        }
+        traverse_dir(dir, true, false, recursive, fullpath, [&](string&& path, bool) {
+            out.emplace_back(move(path));
+        });
+        return (int)out.size();
     }
-    vector<string> list_files_recursive(strview dir, strview ext) noexcept
+
+    int list_files(vector<string>& out, strview dir, strview ext, bool recursive, bool fullpath) noexcept
+    {
+        traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
+            if (ext.empty() || strview{path}.ends_withi(ext))
+                out.emplace_back(move(path));
+        });
+        return (int)out.size();
+    }
+
+    int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive, bool fullpath) noexcept
+    {
+        traverse_dir(dir, true, true, recursive, fullpath, [&](string&& path, bool isDir) {
+            auto& out = isDir ? outDirs : outFiles;
+            out.emplace_back(move(path));
+        });
+        return (int)outDirs.size() + (int)outFiles.size();
+    }
+
+    vector<string> list_files(strview dir, const vector<strview>& exts, bool recursive, bool fullpath) noexcept
     {
         vector<string> out;
-        list_rec(out, dir, ext);
+        traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
+            for (const strview& ext : exts) {
+                if (strview{ path }.ends_withi(ext)) {
+                    out.emplace_back(move(path));
+                    return;
+                }
+            }
+        });
         return out;
     }
-
-    ////////////////////////////////////////////////////////////////////////////////
-
-    static bool ends_withi(const strview& str, const vector<strview>& exts) noexcept
-    {
-        for (const strview& ext : exts)
-            if (str.ends_withi(ext)) return true;
-        return false;
-    }
-    static void list_rec(vector<string>& out, strview dir, const vector<strview>& exts) noexcept
-    {
-        if (dir_iterator it = { dir }) {
-            do {
-                strview fname = it.name();
-                if (it.is_dir())
-                {
-                    if (fname[0] != '.')
-                        list_rec(out, dir + '/' + fname, exts);
-                }
-                else
-                {
-                    if (exts.empty() || ends_withi(fname, exts))
-                        out.emplace_back(dir + '/' + fname);
-                }
-            } while (it.next());
-        }
-    }
-    vector<string> list_files_recursive(strview dir, const vector<strview>& exts) noexcept
-    {
-        vector<string> out;
-        list_rec(out, dir, exts);
-        return out;
-    }
-
 
     ////////////////////////////////////////////////////////////////////////////////
 
