@@ -174,10 +174,11 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     "/tmp/"    ), "tmp/");
         AssertThat(path_combine("",     ""         ), "");
     }
-	
-	TestCase(file_listing)
-	{
-		
-	}
+    
+    TestCase(file_listing)
+    {
+        Assert(create_folder("./test_tmp/folder/path"));
+        Assert(delete_folder("./test_tmp/", true/*recursive*/));
+    }
 
 } Impl;

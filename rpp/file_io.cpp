@@ -787,13 +787,13 @@ namespace rpp /* ReCpp */
 
         if (path1.empty())
         {
-            if (path2.empty())   // path_combine("", "") ==> ""
+            if (path2.empty()) // path_combine("", "") ==> ""
                 return {};
-            return path2 + '/';  // path_combine("", "/tmp/") ==> "tmp/"
+            return path2;  // path_combine("", "/tmp.txt") ==> "tmp.txt"
         }
-        else if (path2.empty())
+        if (path2.empty())
         {
-            return path1 + '/';  // path_combine("tmp/", "") ==> "tmp/"
+            return path1;  // path_combine("tmp/", "") ==> "tmp"
         }
 
         string combined;
@@ -821,12 +821,12 @@ namespace rpp /* ReCpp */
     };
     dir_iterator::impl* dir_iterator::dummy::operator->()
     {
-        static_assert(sizeof(ffd) == sizeof(dir_iterator::impl::ffd), "dir_iterator::dummy size mismatch");
-        return reinterpret_cast<dir_iterator::impl*>(this);
+        static_assert(sizeof(ffd) == sizeof(impl::ffd), "dir_iterator::dummy size mismatch");
+        return reinterpret_cast<impl*>(this);
     }
     const dir_iterator::impl* dir_iterator::dummy::operator->() const
     {
-        return reinterpret_cast<const dir_iterator::impl*>(this);
+        return reinterpret_cast<const impl*>(this);
     }
 
 #if _WIN32
@@ -868,11 +868,14 @@ namespace rpp /* ReCpp */
         string currentDir = path_combine(queryRoot, relPath);
         for (dir_entry e : dir_iterator{ currentDir })
         {
-            if (((dirs && e.is_dir) || (files && !e.is_dir)) && e.is_valid()) 
+            bool validDir = e.is_dir && e.name != "." && e.name != "..";
+            if ((validDir && dirs) || (!e.is_dir && files)) 
             {
                 func(path_combine((abs ? currentDir : relPath), e.name), e.is_dir);
-                if (e.is_dir && rec)
-                    traverse_dir2(queryRoot, path_combine(relPath, e.name), files, dirs, rec, abs, func);
+            }
+            if (validDir && rec)
+            {
+                traverse_dir2(queryRoot, path_combine(relPath, e.name), dirs, files, rec, abs, func);
             }
         }
     }
