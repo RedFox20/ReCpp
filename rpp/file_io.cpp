@@ -885,8 +885,16 @@ namespace rpp /* ReCpp */
     template<class Func> 
     static void traverse_dir(strview dir, bool dirs, bool files, bool rec, bool abs, const Func& func)
     {
-        if (abs) traverse_dir2(full_path(dir), strview{}, dirs, files, rec, abs, func);
-        else     traverse_dir2(dir,            strview{}, dirs, files, rec, abs, func);
+        if (abs)
+        {
+            string fullpath = full_path(dir);
+            if (fullpath.empty())
+                return; // folder does not exist
+            
+            traverse_dir2(fullpath, strview{}, dirs, files, rec, abs, func);
+            return;
+        }
+        traverse_dir2(dir, strview{}, dirs, files, rec, abs, func);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
