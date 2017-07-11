@@ -783,7 +783,7 @@ namespace rpp /* ReCpp */
      * @note By default: not recursive
      * @param out Destination vector for result file names.
      * @param dir Relative or full path of this directory
-     * @param ext Filter files by extension, ex: "txt", default ("") lists all files
+     * @param ext Filter files by extension, ex: ".txt", default ("") lists all files
      * @param recursive (default: false) If true, will perform a recursive search
      * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of files found that match the extension

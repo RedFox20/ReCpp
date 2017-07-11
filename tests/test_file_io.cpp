@@ -167,17 +167,62 @@ TestImpl(test_file_io)
         AssertThat(path_combine("tmp/", "file.txt" ), "tmp/file.txt");
         AssertThat(path_combine("tmp/", "/file.txt"), "tmp/file.txt");
         AssertThat(path_combine("tmp/", "/folder//"), "tmp/folder");
-        AssertThat(path_combine("tmp/", ""         ), "tmp/");
-        AssertThat(path_combine("tmp",  ""         ), "tmp/");
-        AssertThat(path_combine("",     "tmp"      ), "tmp/");
-        AssertThat(path_combine("",     "/tmp"     ), "tmp/");
-        AssertThat(path_combine("",     "/tmp/"    ), "tmp/");
+        AssertThat(path_combine("tmp/", ""         ), "tmp");
+        AssertThat(path_combine("tmp",  ""         ), "tmp");
+        AssertThat(path_combine("",     "tmp"      ), "tmp");
+        AssertThat(path_combine("",     "/tmp"     ), "tmp");
+        AssertThat(path_combine("",     "/tmp/"    ), "tmp");
         AssertThat(path_combine("",     ""         ), "");
     }
     
-    TestCase(file_listing)
+    static bool contains(const vector<string>& v, const string& s)
+    {
+        for (const string& item : v)
+            if (item == s) return true;
+        return false;
+    }
+
+    TestCase(file_and_folder_listing)
     {
         Assert(create_folder("./test_tmp/folder/path"));
+        file::write_new("./test_tmp/folder/test1.txt",      "text1");
+        file::write_new("./test_tmp/folder/path/test2.txt", "text2");
+        file::write_new("./test_tmp/folder/path/test3.txt", "text3");
+        file::write_new("./test_tmp/folder/path/dummy.obj", "dummy");
+
+        vector<string> relpaths = list_files("./test_tmp/folder/path", ".txt");
+        AssertThat(relpaths.size(), 2);
+        AssertThat(relpaths.front(), "test2.txt");
+        AssertThat(relpaths.back(),  "test3.txt");
+
+        vector<string> relpaths2 = list_files_recursive("./test_tmp", ".txt");
+        AssertThat(relpaths2.size(), 3);
+        AssertThat(relpaths2[0], "folder/path/test2.txt");
+        AssertThat(relpaths2[1], "folder/path/test3.txt");
+        AssertThat(relpaths2[2], "folder/test1.txt");
+
+        string fullpath = full_path("./test_tmp");
+        vector<string> fullpaths = list_files_fullpath("./test_tmp/folder/path", ".txt");
+        AssertThat(fullpaths.size(), 2);
+        AssertThat(fullpaths[0], path_combine(fullpath,"folder/path/test2.txt"));
+        AssertThat(fullpaths[1], path_combine(fullpath,"folder/path/test3.txt"));
+
+        vector<string> fullpaths2 = list_files_fullpath_recursive("./test_tmp", ".txt");
+        AssertThat(fullpaths2.size(), 3);
+        AssertThat(fullpaths2[0], path_combine(fullpath,"folder/path/test2.txt"));
+        AssertThat(fullpaths2[1], path_combine(fullpath,"folder/path/test3.txt"));
+        AssertThat(fullpaths2[2], path_combine(fullpath,"folder/test1.txt"));
+
+        vector<string> dirs, files;
+        list_alldir(dirs, files, "./test_tmp", true);
+        Assert(contains(dirs, "folder"));
+        Assert(contains(dirs, "folder/path"));
+
+        Assert(contains(files, "folder/test1.txt"));
+        Assert(contains(files, "folder/path/test2.txt"));
+        Assert(contains(files, "folder/path/test3.txt"));
+        Assert(contains(files, "folder/path/dummy.obj"));
+
         Assert(delete_folder("./test_tmp/", true/*recursive*/));
     }
 
