@@ -148,4 +148,59 @@ namespace rpp
 
 
 
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    class semaphore
+    {
+    private:
+        mutex m;
+        condition_variable cv;
+        int value = 0;
+
+    public:
+        semaphore(){}
+        explicit semaphore(int initialCount)
+        {
+            reset(initialCount);
+        }
+
+        int count() const { return value; }
+
+        void reset(int newCount = 0)
+        {
+            value = newCount;
+            if (newCount > 0)
+                cv.notify_one();
+        }
+
+        void notify()
+        {
+            unique_lock<mutex> lock{ m };
+            ++value;
+            cv.notify_one();
+        }
+
+        void wait()
+        {
+            unique_lock<mutex> lock{ m };
+            while (value <= 0)
+                cv.wait(lock);
+            --value;
+        }
+
+        bool try_wait()
+        {
+            unique_lock<mutex> lock{ m };
+            if (value > 0) {
+                --value;
+                return true;
+            }
+            return false;
+        }
+    };
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+
 } // namespace rpp
