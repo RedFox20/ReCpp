@@ -821,7 +821,9 @@ namespace rpp /* ReCpp */
     };
     dir_iterator::impl* dir_iterator::dummy::operator->()
     {
+#if _WIN32
         static_assert(sizeof(ffd) == sizeof(impl::ffd), "dir_iterator::dummy size mismatch");
+#endif
         return reinterpret_cast<impl*>(this);
     }
     const dir_iterator::impl* dir_iterator::dummy::operator->() const
@@ -871,7 +873,8 @@ namespace rpp /* ReCpp */
             bool validDir = e.is_dir && e.name != "." && e.name != "..";
             if ((validDir && dirs) || (!e.is_dir && files)) 
             {
-                func(path_combine((abs ? currentDir : relPath), e.name), e.is_dir);
+                strview dir = abs ? (strview)currentDir : relPath;
+                func(path_combine(dir, e.name), e.is_dir);
             }
             if (validDir && rec)
             {

@@ -104,7 +104,7 @@ namespace rpp
         // adds a test to the automatic test run list
         template<class T, class Lambda> int add_test_func(strview name, T* self, Lambda)
         {
-            test_funcs.emplace_back(test_func{ name, self, (void (lambda_base::*)())&Lambda::operator() });
+            test_funcs.emplace_back(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
             return (int)test_funcs.size() - 1;
         }
     };

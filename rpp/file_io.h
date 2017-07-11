@@ -693,6 +693,7 @@ namespace rpp /* ReCpp */
 
     public:
         explicit dir_iterator(const strview& dir) : dir_iterator{ dir.to_string() } {}
+        explicit dir_iterator(const string& dir)  : dir_iterator{ string{dir}     } {}
         explicit dir_iterator(string&& dir);
         ~dir_iterator();
 

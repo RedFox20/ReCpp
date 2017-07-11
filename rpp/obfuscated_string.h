@@ -109,10 +109,12 @@ namespace rpp
 
 #if __clang__ || __GNUC__
 
+#if __GNUC__ && !__clang__
     template<class T, T... chars> constexpr auto operator""_obfuscated()
     {
         return obfuscated_string<integer_sequence<char, chars...>>{};
     }
+#endif
 
     #define make_obfuscated(str) macro_obfuscated_string<int32_sequence<sizeof(str)-1>>{str}
 

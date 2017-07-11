@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <memory>
+#include <algorithm>
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
@@ -122,7 +123,7 @@ namespace rpp
         tcsetattr(STDIN_FILENO, TCSANOW, &newSettings);
 
         char keycodes[16];
-        int count = read(stdin, (void*)keycodes, 16);
+        int count = (int)::read(fileno(stdin), (void*)keycodes, 16);
 
         tcsetattr(STDIN_FILENO, TCSANOW, &oldSettings);
 
