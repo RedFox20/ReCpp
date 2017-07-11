@@ -1,6 +1,6 @@
-#include "tests.h"
-#include <thread_pool.h>
-#include <timer.h> // performance measurement
+#include <rpp/tests.h>
+#include <rpp/thread_pool.h>
+#include <rpp/timer.h> // performance measurement
 #include <atomic>
 using namespace rpp;
 

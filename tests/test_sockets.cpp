@@ -1,4 +1,4 @@
-#include "tests.h"
+#include <rpp/tests.h>
 #include <rpp/sockets.h>
 #include <thread>
 #ifdef __MINGW32__ // std::thread support for MinGW...

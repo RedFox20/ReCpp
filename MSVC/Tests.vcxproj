@@ -156,15 +156,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\tests\tests.h" />
-  </ItemGroup>
-  <ItemGroup>
+    <ClCompile Include="..\rpp\tests.cpp" />
     <ClCompile Include="..\tests\test_allocators.cpp" />
     <ClCompile Include="..\tests\test_obfuscated_string.cpp" />
     <ClCompile Include="..\tests\test_serialization.cpp" />
     <ClCompile Include="..\tests\test_sockets.cpp" />
     <ClCompile Include="..\tests\test_delegate.cpp" />
-    <ClCompile Include="..\tests\tests.cpp" />
     <ClCompile Include="..\tests\test_file_io.cpp" />
     <ClCompile Include="..\tests\test_strview.cpp" />
     <ClCompile Include="..\tests\test_thread_pool.cpp" />
@@ -174,6 +171,9 @@
     <ProjectReference Include="ReCpp.vcxproj">
       <Project>{3ea37b51-d733-479e-9341-d7a5a3868365}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\rpp\tests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

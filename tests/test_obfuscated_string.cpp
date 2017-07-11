@@ -1,5 +1,5 @@
-#include "tests.h"
-#include <obfuscated_string.h>
+#include <rpp/tests.h>
+#include <rpp/obfuscated_string.h>
 using namespace rpp;
 
 TestImpl(test_obfuscated_string)

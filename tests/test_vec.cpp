@@ -1,5 +1,5 @@
-#include "tests.h"
-#include <vec.h>
+#include <rpp/tests.h>
+#include <rpp/vec.h>
 using namespace rpp;
 
 TestImpl(test_vec)

@@ -7,10 +7,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\tests\tests.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\tests\tests.cpp" />
     <ClCompile Include="..\tests\test_delegate.cpp">
       <Filter>tests</Filter>
     </ClCompile>
@@ -38,5 +34,13 @@
     <ClCompile Include="..\tests\test_obfuscated_string.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\tests.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\rpp\tests.h">
+      <Filter>tests</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

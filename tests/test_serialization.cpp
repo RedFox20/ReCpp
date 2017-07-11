@@ -1,4 +1,4 @@
-#include "tests.h"
+#include <rpp/tests.h>
 #include <rpp/binary_serializer.h>
 using namespace rpp;
 

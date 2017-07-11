@@ -852,5 +852,10 @@ namespace std
         return trueOrFalse ? "true"s : "false"s;
     }
 
+    string to_string(const char* cstr) noexcept
+    {
+        return cstr ? string{cstr} : string{};
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
 }

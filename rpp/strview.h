@@ -1264,7 +1264,13 @@ namespace std
 
     /////////////////////// useful container tostr extensions //////////////////////
 
+    /** @return "true" or "false" string */
     string to_string(bool trueOrFalse) noexcept;
+
+    /**
+     * @return std::string from cstring. If cstr == nullptr, returns empty string ""
+     */
+    string to_string(const char* cstr) noexcept;
 
     /** 
      *  @brief Outputs a linear container like vector<string>{"hello","world"} as:
@@ -1293,15 +1299,6 @@ namespace std
     string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.stdstr();
-    }
-
-    /**
-
-     */
-    template<class K, class V, class Hash, class Equal, class Alloc>
-    string to_string(const unordered_map<K,V,Hash,Equal,Alloc>& map, bool newLineSeparator = true) noexcept
-    {
-        rpp::string_buffer sb; sb.prettyprint(map, newLineSeparator); return sb.stdstr();
     }
 
     template<class T, class Alloc>
