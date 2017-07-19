@@ -785,10 +785,6 @@ namespace rpp
                  start.z + (end.z - start.z)*position };
     }
     
-    inline ostream& operator<<(ostream& os, const Vector3& v) noexcept {
-        return os << v.x << ';' << v.y << ';' << v.z << ';';
-    }
-    
     ////////////////////////////////////////////////////////////////////////////////
 
     struct double3
@@ -913,10 +909,6 @@ namespace rpp
     }
     
     inline Vector3::operator Vector3d() const { return { double(x), double(y), double(z) }; }
-
-    inline ostream& operator<<(ostream& os, const Vector3d& v) noexcept {
-        return os << v.x << ';' << v.y << ';' << v.z << ';';
-    }
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -1516,11 +1508,25 @@ namespace rpp
     };
 
     ////////////////////////////////////////////////////////////////////////////////
+
 } // namespace rpp
 
 namespace std
 {
     ////////////////////////////////////////////////////////////////////////////////
+
+    inline ostream& operator<<(ostream& os, const rpp::Vector3& v) {
+        return os << v.x << ';' << v.y << ';' << v.z << ';';
+    }
+    inline ostream& operator<<(ostream& os, const rpp::Vector3d& v) {
+        return os << v.x << ';' << v.y << ';' << v.z << ';';
+    }
+    inline rpp::string_buffer& operator<<(rpp::string_buffer& sb, const rpp::Vector3& v) {
+        return sb << v.x << ';' << v.y << ';' << v.z << ';';
+    }
+    inline rpp::string_buffer& operator<<(rpp::string_buffer& sb, const rpp::Vector3d& v) {
+        return sb << v.x << ';' << v.y << ';' << v.z << ';';
+    }
 
     inline string to_string(const rpp::Vector2& v)  { char buf[32];  return { v.toString(buf, sizeof(buf)) }; }
     inline string to_string(const rpp::Point& v)    { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }

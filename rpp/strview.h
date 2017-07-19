@@ -1167,6 +1167,11 @@ namespace rpp
             write(first, args...), writeln();
         }
     };
+    
+    template<class T> inline string_buffer& operator<<(string_buffer& sb, const T& value) {
+        sb.write(value);
+        return sb;
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 
