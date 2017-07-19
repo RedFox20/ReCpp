@@ -1071,6 +1071,7 @@ namespace rpp
 
         void clear();
         void reserve(int count) noexcept;
+        void writef(const char* format, ...);
 
         template<class T> void write(const T& value)
         {

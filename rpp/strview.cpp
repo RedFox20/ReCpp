@@ -813,6 +813,18 @@ namespace rpp
             }
         }
     }
+    
+    void string_buffer::writef(const char* format, ...)
+    {
+        char buf[4096];
+        va_list ap; va_start(ap, format);
+        int n = vsnprintf(buf, sizeof(buf), format, ap);
+        
+        reserve(n);
+        memcpy(&str[len], buf, (size_t)n);
+        len += n;
+        str[len] = '\0';
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 
