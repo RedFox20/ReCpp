@@ -1236,6 +1236,12 @@ namespace rpp
     {
         return println(stdout, first, args...);
     }
+    
+    #if DEBUG
+        #define debug_println(...) println(__VA_ARGS__)
+    #else
+        #define debug_println(...)
+    #endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
