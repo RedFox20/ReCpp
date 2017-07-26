@@ -15,13 +15,25 @@ namespace rpp
         th.detach();
     }
 
-    void pool_task::run_task(int start, int end, const action<int, int>& newTask) noexcept
+    void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
         unique_lock<mutex> lock(mtx);
-        task        = newTask;
-        loopStart   = start;
-        loopEnd     = end;
-        taskRunning = true;
+        genericTask  = {};
+        rangeTask    = newTask;
+        rangeStart   = start;
+        rangeEnd     = end;
+        taskRunning  = true;
+        cv.notify_one();
+    }
+
+    void pool_task::run_generic(function<void()>&& newTask) noexcept
+    {
+        unique_lock<mutex> lock(mtx);
+        genericTask  = move(newTask);
+        rangeTask    = {};
+        rangeStart   = 0;
+        rangeEnd     = 0;
+        taskRunning  = true;
         cv.notify_one();
     }
 
@@ -58,7 +70,10 @@ namespace rpp
                 try
                 {
                     taskRunning = true;
-                    task(loopStart, loopEnd);
+                    if (rangeTask)
+                        rangeTask(rangeStart, rangeEnd);
+                    else
+                        genericTask();
                 }
                 catch (const exception& e)
                 {
@@ -80,19 +95,19 @@ namespace rpp
     {
         unique_lock<mutex> lock(mtx);
         cv.wait(lock);
-        return (bool)task; // got task?
+        return (bool)rangeTask || (bool)genericTask; // got task?
     }
 
 
     ///////////////////////////////////////////////////////////////////////////////
 
     thread_pool thread_pool::global;
-    static int core_count;
+    static int coreCount;
 
     thread_pool::thread_pool()
     {
-        if (!core_count)
-            core_count = (int)thread::hardware_concurrency();
+        if (!coreCount)
+            coreCount = (int)thread::hardware_concurrency();
     }
 
     thread_pool::~thread_pool() noexcept
@@ -153,23 +168,29 @@ namespace rpp
         return new_task();
     }
 
+    pool_task* thread_pool::get_task() noexcept
+    {
+        size_t i = 0;
+        return next_task(i);
+    }
+
     void thread_pool::parallel_for(int rangeStart, int rangeEnd, 
                                    const action<int, int>& rangeTask) noexcept
     {
-        assert(loop_running == false && "Fatal error: nested parallel loops are forbidden!");
-        assert(core_count != 0);
+        assert(!rangeRunning && "Fatal error: nested parallel loops are forbidden!");
+        assert(coreCount != 0);
 
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
             return;
 
-        const int cores = range < core_count ? range : core_count;
+        const int cores = range < coreCount ? range : coreCount;
         const int len = range / cores;
 
         pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
         {
-            lock_guard<mutex> lock(poolmutex);
-            loop_running = true;
+            lock_guard<mutex> lock(poolMutex);
+            rangeRunning = true;
 
             size_t poolIndex = 0;
             for (int i = 0; i < cores; ++i)
@@ -179,13 +200,20 @@ namespace rpp
 
                 pool_task* task = next_task(poolIndex);
                 active[i] = task;
-                task->run_task(start, end, rangeTask);
+                task->run_range(start, end, rangeTask);
             }
         }
 
         for (int i = 0; i < cores; ++i)
             active[i]->wait();
 
-        loop_running = false;
+        rangeRunning = false;
+    }
+
+    pool_task* thread_pool::parallel_task(function<void()>&& genericTask) noexcept
+    {
+        pool_task* task = get_task();
+        task->run_generic(move(genericTask));
+        return task;
     }
 }

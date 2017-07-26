@@ -442,7 +442,7 @@ namespace rpp /* ReCpp */
      * Key-Value map parser that stores a file load buffer, with easy construction and usability
      * Example:
      * @code
-     *   if (auto map = map_parser::from_file("keyvalues.txt");
+     *   if (auto map = key_value_map::from_file("keyvalues.txt");
      *   {
      *       println(map["key"]);
      *   }

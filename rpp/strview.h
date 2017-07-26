@@ -640,6 +640,40 @@ namespace rpp
             }
         }
 
+        /**
+         * Template friendly conversions
+         */
+        inline void convertTo(bool& outValue)    const { outValue = to_bool();   }
+        inline void convertTo(int& outValue)     const { outValue = to_int();    }
+        inline void convertTo(float& outValue)   const { outValue = to_float();  }
+        inline void convertTo(double& outValue)  const { outValue = to_double(); }
+        inline void convertTo(string& outValue)  const { to_string(outValue);    }
+        inline void convertTo(strview& outValue) const { outValue = *this;       }
+
+        /**
+         * Calls strview::next(char delim) for each argument and calls strview::convertTo to
+         * convert them to appropriate types.
+         *
+         * @code
+         * strview input = "user@email.com;27;3486.37;true"_sv;
+         *
+         * User user;
+         * input.decompose(';', user.email, user.age, user.coins, user.unlocked);
+         *
+         * // or an immutable version:
+         * strview{input}.decompose(...);
+         *
+         * @endcode
+         */
+        template<class Delim, class T, class... Rest>
+        void decompose(const Delim& delim, T& outFirst, Rest&... outRest)
+        {
+            strview token = next(delim);
+            token.convertTo(outFirst);
+            if (sizeof...(Rest)) {
+                decompose(delim, outRest...);
+            }
+        }
 
         /**
          * Tries to create a substring from specified index with given length.
@@ -1049,6 +1083,10 @@ namespace rpp
         int   cap = SIZE;
         char  buf[SIZE];
 
+        // controls the separator for generic template write calls
+        // the default value " " will turn write("brown", "fox"); into "brown fox"
+        strview separator = " "_sv;
+
         FINLINE string_buffer() noexcept : str(buf) { buf[0] = '\0'; }
         FINLINE explicit string_buffer(strview text) noexcept : string_buffer() {
             write(text);
@@ -1135,6 +1173,7 @@ namespace rpp
             if (newLineSeparator) write('\n');
         }
 
+        void write(bool value)   { write(value ? "true"_sv : "false"_sv); }
         void write(byte value)   { reserve(4);  len += _tostring(&str[len], value); }
         void write(short value)  { reserve(8);  len += _tostring(&str[len], value); }
         void write(ushort value) { reserve(8);  len += _tostring(&str[len], value); }
@@ -1144,14 +1183,15 @@ namespace rpp
         void write(uint64 value) { reserve(32); len += _tostring(&str[len], value); }
 
         /**
-         * Stringifies and appends the input arguments one by one, filling gaps with spaces
+         * Stringifies and appends the input arguments one by one, filling gaps with delimiter
+         * @see string_buffer::delimiter (default = ' ')
          * Ex: write("test:", 10, 20.1f);  --> "test: 10 20.1"
          */
         template<class T, class... Args> void write(const T& first, const Args&... args)
         {
             write(first);
             if (sizeof...(Args)) {
-                write(' ');
+                write(separator);
                 write(args...);
             }
         }
