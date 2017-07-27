@@ -674,6 +674,12 @@ namespace rpp
                 decompose(delim, outRest...);
             }
         }
+        template<class Delim, class T>
+        void decompose(const Delim& delim, T& outFirst)
+        {
+            strview token = next(delim);
+            token.convertTo(outFirst);
+        }
 
         /**
          * Tries to create a substring from specified index with given length.
