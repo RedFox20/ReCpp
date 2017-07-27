@@ -1,3 +1,7 @@
+#pragma once
+#ifndef RPP_THREAD_POOL_H
+#define RPP_THREAD_POOL_H
+
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -254,3 +258,5 @@ namespace rpp
 
 
 } // namespace rpp
+
+#endif // RPP_THREAD_POOL_H
