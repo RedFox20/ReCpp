@@ -1509,12 +1509,6 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace rpp
-
-namespace std
-{
-    ////////////////////////////////////////////////////////////////////////////////
-
     inline ostream& operator<<(ostream& os, const rpp::Vector3& v) {
         return os << v.x << ';' << v.y << ';' << v.z << ';';
     }
@@ -1536,7 +1530,7 @@ namespace std
     inline string to_string(const rpp::Matrix4& v)  { char buf[256]; return { v.toString(buf, sizeof(buf)) }; }
 
     ////////////////////////////////////////////////////////////////////////////////
-} // namespace std
+} // namespace rpp
 
 #if _MSC_VER
 #pragma warning(pop) // nameless struct/union warning
