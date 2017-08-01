@@ -1,4 +1,5 @@
 #include "json.h"
+#include "debugging.h"
 
 namespace rpp
 {

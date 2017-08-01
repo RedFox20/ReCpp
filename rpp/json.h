@@ -4,7 +4,6 @@
 #ifndef RPP_JSON_H
 #define RPP_JSON_H
 #include "file_io.h"
-#include "debugging.h"
 
 namespace rpp
 {
@@ -22,8 +21,10 @@ namespace rpp
             number,
             string,
         };
-
-        class string_t // variadic string type; can be a string view or an std::string
+        
+        // variadic string type; can be a non-owning rpp::strview or an owning std::string
+        // @todo Replace with std::variant<> when C++17 is available in XCode?
+        class string_t
         {
             union {
                 std::string str;
