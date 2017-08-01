@@ -24,11 +24,11 @@ EXTERNC void SetLogSeverityFilter(LogSeverity filter)
     Filter = filter;
 }
 
-template<int N> static int SafeFormat(char (&errBuf)[N], const char* format, va_list ap)
+static int SafeFormat(char* errBuf, int N, const char* format, va_list ap)
 {
     int len = vsnprintf(errBuf, N-1/*spare room for \n*/, format, ap);
     if (len < 0) { // err: didn't fit
-        len = sizeof(errBuf)-2; // try to recover gracefully
+        len = N-2; // try to recover gracefully
         errBuf[len] = '\0';
     }
     return len;
@@ -56,7 +56,7 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
         return;
     
     char errBuf[4096];
-    int len = SafeFormat(errBuf, format, ap);
+    int len = SafeFormat(errBuf, sizeof(errBuf), format, ap);
     errBuf[len++] = '\n'; // force append a newline
     errBuf[len]   = '\0';
     
@@ -94,9 +94,10 @@ EXTERNC void _LogError(const char* format, ...) {
 
 EXTERNC void LogEvent(const char* eventName, const char* format, ...)
 {
-    char messageBuf[4096];
     va_list ap; va_start(ap, format);
-    int len = SafeFormat(messageBuf, format, ap);
+    char messageBuf[4096];
+    int len = SafeFormat(messageBuf, sizeof(messageBuf), format, ap);
+    va_end(ap);
     
     printf("EVT %s: %s\n", eventName, messageBuf);
     
@@ -106,11 +107,13 @@ EXTERNC void LogEvent(const char* eventName, const char* format, ...)
     }
 }
 
-EXTERNC const char* _FmtString(const char* format, ...) {
+EXTERNC const char* _FmtString(const char* format, ...)
+{
     static char errBuf[4096];
-
+    
     va_list ap; va_start(ap, format);
     int len = vsnprintf(errBuf, sizeof(errBuf)-1, format, ap);
+    va_end(ap);
     
     if (len < 0) { // err: didn't fit
         len = sizeof(errBuf)-2; // try to recover gracefully
