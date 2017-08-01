@@ -82,8 +82,9 @@ namespace rpp
 
         static const string& as_string(const string& v) { return v; }
         static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
-        template<int N>   static string as_string(const char(&v)[N]) { return { v, v + (N - 1) }; }
-        template<class T> static string as_string(const T& v)        { return to_string(v); }
+        static string as_string(const char* s) { return string{s};}
+        static string as_string(nullptr_t) { return "null"; }
+        template<class T> static string as_string(const T& v) { return to_string(v); }
 
         template<class Actual, class Expected>
         static void expected_failed(const char* file, int line, 
