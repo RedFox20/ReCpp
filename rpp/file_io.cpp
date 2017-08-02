@@ -848,9 +848,9 @@ namespace rpp /* ReCpp */
         }
         dir_iterator::~dir_iterator() { if (s->d) closedir(s->d); }
         dir_iterator::operator bool()  const { return s->d && s->e; }
-        bool    dir_iterator::next()         { return (s->e = readdir(s->d)) != nullptr; }
-        bool    dir_iterator::is_dir() const { return s->e->d_type == DT_DIR; }
-        strview dir_iterator::name()   const { return s->e->d_name; }
+        bool    dir_iterator::next()         { return s->d && (s->e = readdir(s->d)) != nullptr; }
+        bool    dir_iterator::is_dir() const { return s->e && s->e->d_type == DT_DIR; }
+        strview dir_iterator::name()   const { return s->e ? strview{s->e->d_name} : strview{}; }
 #endif
 
 
