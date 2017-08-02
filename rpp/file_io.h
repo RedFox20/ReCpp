@@ -291,7 +291,7 @@ namespace rpp /* ReCpp */
         {
             string_buffer buf;
             buf.writeln(first, args...);
-            return write(buf.str, buf.len);
+            return write(buf.ptr, buf.len);
         }
 
         /**

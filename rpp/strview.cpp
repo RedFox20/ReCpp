@@ -790,12 +790,12 @@ namespace rpp
 
     string_buffer::~string_buffer() noexcept
     {
-        if (cap > SIZE) free(str);
+        if (cap > SIZE) free(ptr);
     }
 
     void string_buffer::clear()
     {
-        str[len = 0] = '\0';
+        ptr[len = 0] = '\0';
     }
 
     void string_buffer::reserve(int count) noexcept
@@ -805,12 +805,12 @@ namespace rpp
         {
             if (cap == SIZE)
             {
-                str = (char*)malloc(cap *= 2);
-                memcpy(str, buf, len + 1);
+                ptr = (char*)malloc(cap *= 2);
+                memcpy(ptr, buf, len + 1);
             }
             else
             {
-                str = (char*)realloc(str, cap *= 2);
+                ptr = (char*)realloc(ptr, cap *= 2);
             }
         }
     }
@@ -822,9 +822,24 @@ namespace rpp
         int n = vsnprintf(buffer, sizeof(buffer), format, ap);
         
         reserve(n);
-        memcpy(&str[len], buffer, (size_t)n);
+        memcpy(&ptr[len], buffer, (size_t)n);
         len += n;
-        str[len] = '\0';
+        ptr[len] = '\0';
+    }
+
+    void string_buffer::write(const strview& s)
+    {
+        reserve(s.len);
+        memcpy(&ptr[len], s.str, (size_t)s.len);
+        len += s.len;
+        ptr[len] = '\0';
+    }
+
+    void string_buffer::write(const char& value)
+    {
+        reserve(1);
+        ptr[len++] = value;
+        ptr[len] = '\0';
     }
 
     ////////////////////////////////////////////////////////////////////////////////

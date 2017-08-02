@@ -1522,12 +1522,12 @@ namespace rpp
         return sb << v.x << ';' << v.y << ';' << v.z << ';';
     }
 
-    inline string to_string(const rpp::Vector2& v)  { char buf[32];  return { v.toString(buf, sizeof(buf)) }; }
-    inline string to_string(const rpp::Point& v)    { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
-    inline string to_string(const rpp::Vector3& v)  { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
-    inline string to_string(const rpp::Vector3d& v) { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
-    inline string to_string(const rpp::Vector4& v)  { char buf[64];  return { v.toString(buf, sizeof(buf)) }; }
-    inline string to_string(const rpp::Matrix4& v)  { char buf[256]; return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const Vector2& v)  { char buf[32];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const Point& v)    { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const Vector3& v)  { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const Vector3d& v) { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const Vector4& v)  { char buf[64];  return { v.toString(buf, sizeof(buf)) }; }
+    inline string to_string(const Matrix4& v)  { char buf[256]; return { v.toString(buf, sizeof(buf)) }; }
 
     ////////////////////////////////////////////////////////////////////////////////
 } // namespace rpp

@@ -1078,13 +1078,21 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * Forward all Misc to_string calls from rpp namespace to std::to_string
+     */
+    template<class T> inline std::string to_string(const T& object)
+    {
+        return std::to_string(object);
+    }
+
+    /**
      * Always null terminated version of stringstream, which is compatible with strview
      * Not intended for moving or copying
      */
     struct string_buffer
     {
         static constexpr int SIZE = 256;
-        char* str;
+        char* ptr;
         int   len = 0;
         int   cap = SIZE;
         char  buf[SIZE];
@@ -1093,7 +1101,7 @@ namespace rpp
         // the default value " " will turn write("brown", "fox"); into "brown fox"
         strview separator = " "_sv;
 
-        FINLINE string_buffer() noexcept : str(buf) { buf[0] = '\0'; }
+        FINLINE string_buffer() noexcept : ptr(buf) { buf[0] = '\0'; }
         FINLINE explicit string_buffer(strview text) noexcept : string_buffer() {
             write(text);
         }
@@ -1105,13 +1113,13 @@ namespace rpp
         string_buffer& operator=(const string_buffer&) = delete;
 
         int size() const { return len; }
-        const char* c_str() const { return str; }
-        const char* data()  const { return str; }
-        strview     view()  const { return { str, len }; }
-        string    stdstr()  const { return { str, str+len }; }
+        const char* c_str() const { return ptr; }
+        const char* data()  const { return ptr; }
+        strview     view()  const { return { ptr, len }; }
+        string       str()  const { return { ptr, ptr+len }; }
 
         explicit operator bool()    const { return len > 0; }
-        explicit operator strview() const { return { str, len }; }
+        explicit operator strview() const { return { ptr, len }; }
 
         void clear();
         void reserve(int count) noexcept;
@@ -1127,20 +1135,8 @@ namespace rpp
         void write(const string& value)    { write(strview{ value }); }
         void write(const char* value)      { write(strview{ value }); }
 
-        void write(const strview& s)
-        {
-            reserve(s.len);
-            memcpy(&str[len], s.str, (size_t)s.len);
-            len += s.len;
-            str[len] = '\0';
-        }
-
-        void write(const char& value)
-        {
-            reserve(1);
-            str[len++] = value;
-            str[len] = '\0';
-        }
+        void write(const strview& s);
+        void write(const char& value);
 
         template<class T> void prettyprint(const T& value) {
             write(to_string(value));
@@ -1180,13 +1176,13 @@ namespace rpp
         }
 
         void write(bool value)   { write(value ? "true"_sv : "false"_sv); }
-        void write(byte value)   { reserve(4);  len += _tostring(&str[len], value); }
-        void write(short value)  { reserve(8);  len += _tostring(&str[len], value); }
-        void write(ushort value) { reserve(8);  len += _tostring(&str[len], value); }
-        void write(int value)    { reserve(16); len += _tostring(&str[len], value); }
-        void write(uint value)   { reserve(16); len += _tostring(&str[len], value); }
-        void write(int64 value)  { reserve(32); len += _tostring(&str[len], value); }
-        void write(uint64 value) { reserve(32); len += _tostring(&str[len], value); }
+        void write(byte value)   { reserve(4);  len += _tostring(&ptr[len], value); }
+        void write(short value)  { reserve(8);  len += _tostring(&ptr[len], value); }
+        void write(ushort value) { reserve(8);  len += _tostring(&ptr[len], value); }
+        void write(int value)    { reserve(16); len += _tostring(&ptr[len], value); }
+        void write(uint value)   { reserve(16); len += _tostring(&ptr[len], value); }
+        void write(int64 value)  { reserve(32); len += _tostring(&ptr[len], value); }
+        void write(uint64 value) { reserve(32); len += _tostring(&ptr[len], value); }
 
         /**
          * Stringifies and appends the input arguments one by one, filling gaps with delimiter
@@ -1196,10 +1192,8 @@ namespace rpp
         template<class T, class... Args> void write(const T& first, const Args&... args)
         {
             write(first);
-            if (sizeof...(Args)) {
-                write(separator);
-                write(args...);
-            }
+            write(separator);
+            write(args...);
         }
 
         void writeln() { write('\n'); }
@@ -1261,7 +1255,7 @@ namespace rpp
     {
         string_buffer buf;
         buf.write(first, args...);
-        return (int)fwrite(buf.str, (size_t)buf.len, 1, file);
+        return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int print(const T& first, const Args&... args)
     {
@@ -1276,7 +1270,7 @@ namespace rpp
     {
         string_buffer buf;
         buf.writeln(first, args...);
-        return (int)fwrite(buf.str, (size_t)buf.len, 1, file);
+        return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int println(const T& first, const Args&... args)
     {
@@ -1356,7 +1350,7 @@ namespace std
     template<typename T, template<class,class...> class C, class... Args>
     string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
-        rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.stdstr();
+        rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
     }
 
     template<class T, class Alloc>
