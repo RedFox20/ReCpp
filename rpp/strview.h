@@ -223,7 +223,7 @@ namespace rpp
         int len;         // length of string
     #endif
 
-        FINLINE constexpr strview() : str(""), len(0) {}
+        FINLINE constexpr strview()                            : str(""),  len(0) {}
         FINLINE strview(char* str)                             : str(str), len((int)strlen(str)) {}
         FINLINE strview(const char* str)                       : str(str), len((int)strlen(str)) {}
         FINLINE constexpr strview(const char* str, int len)    : str(str), len(len)              {}
