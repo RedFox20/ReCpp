@@ -94,6 +94,9 @@ EXTERNC void _LogError(const char* format, ...) {
 
 EXTERNC void LogEvent(const char* eventName, const char* format, ...)
 {
+#if __has_feature(address_sanitizer)
+    return; // ASAN reports a false positive with vsnprintf
+#endif
     va_list ap; va_start(ap, format);
     char messageBuf[4096];
     int len = SafeFormat(messageBuf, sizeof(messageBuf), format, ap);
