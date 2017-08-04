@@ -258,7 +258,7 @@ namespace rpp
         template<int N> 
         FINLINE const char* to_cstr(char (&buf)[N]) const { return to_cstr(buf, N); }
         /** 
-         * Copies this str[len] into a max of 512 byte static C-string array 
+         * Copies this str[len] into a max of 512 byte static thread-local C-string array 
          * Result is only valid until next call to this method
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
          */
@@ -278,7 +278,7 @@ namespace rpp
         bool to_bool() const;
 
         /** Clears the strview */
-        FINLINE void clear() { str = "", len = 0; }
+        FINLINE void clear() { str = ""; len = 0; }
         /** @return Length of the string */
         FINLINE int length() const  { return len; }
         FINLINE int size()   const  { return len; }
@@ -309,7 +309,7 @@ namespace rpp
             auto n = len;
             for (; n && strcontains<N>(chars, *s); ++s, --n)
                 ;
-            str = s, len = n; // write result
+            str = s; len = n; // write result
             return *this;
         }
         inline strview& trim_start(strview s) { return trim_start(s.str, s.len); }
@@ -342,7 +342,7 @@ namespace rpp
         inline strview& trim(strview s) { return trim_start(s.str, s.len).trim_end(s.str, s.len); }
 
         /** Consumes the first character in the strview if possible. */
-        FINLINE strview& chomp_first() { if (len) ++str,--len; return *this; }
+        FINLINE strview& chomp_first() { if (len) ++str;--len; return *this; }
         /** Consumes the last character in the strview if possible. */
         FINLINE strview& chomp_last()  { if (len) --len; return *this; }
 
@@ -354,7 +354,7 @@ namespace rpp
         /** Consumes the first COUNT characters in the strview String if possible. */
         FINLINE strview& chomp_first(int count) { 
             int n = count < len ? count : len;
-            str += n, len -= n;
+            str += n; len -= n;
             return *this;
         }
         /** Consumes the last COUNT characters in the strview String if possible. */
@@ -554,7 +554,7 @@ namespace rpp
             bool result = _next_notrim(out, [&delims](const char* s, int n) {
                 return strcontains<N>(s, n, delims);
             });
-            if (result && len) ++str, --len; // trim match
+            if (result && len) { ++str; --len; } // trim match
             return result;
         }
         /**
@@ -670,9 +670,7 @@ namespace rpp
         {
             strview token = next(delim);
             token.convertTo(outFirst);
-            if (sizeof...(Rest)) {
-                decompose(delim, outRest...);
-            }
+            decompose(delim, outRest...);
         }
         template<class Delim, class T>
         void decompose(const Delim& delim, T& outFirst)

@@ -104,7 +104,7 @@ namespace rpp
     
     void Vector2::set(float newX, float newY)
     {
-        x = newX, y = newY;
+        x = newX; y = newY;
     }
 
     float Vector2::length() const
@@ -120,13 +120,13 @@ namespace rpp
     void Vector2::normalize()
     {
         auto inv = inverse_length(1.0f, x, y);
-        x *= inv, y *= inv;
+        x *= inv; y *= inv;
     }
 
     void Vector2::normalize(const float magnitude)
     {
         auto inv = inverse_length(magnitude, x, y);
-        x *= inv, y *= inv;
+        x *= inv; y *= inv;
     }
 
     Vector2 Vector2::normalized() const
@@ -204,7 +204,7 @@ namespace rpp
     
     void Vector2d::set(double newX, double newY)
     {
-        x=newX, y=newY;
+        x=newX; y=newY;
     }
 
     double Vector2d::length() const
@@ -220,13 +220,13 @@ namespace rpp
     void Vector2d::normalize()
     {
         auto inv = inverse_length(1.0, x, y);
-        x *= inv, y *= inv;
+        x *= inv; y *= inv;
     }
 
     void Vector2d::normalize(const double magnitude)
     {
         auto inv = inverse_length(magnitude, x, y);
-        x *= inv, y *= inv;
+        x *= inv; y *= inv;
     }
 
     Vector2d Vector2d::normalized() const
@@ -398,7 +398,7 @@ namespace rpp
 
     void Vector3::set(float newX, float newY, float newZ)
     {
-        x=newX, y=newY, z=newZ;
+        x=newX; y=newY; z=newZ;
     }
 
     float Vector3::length() const
@@ -422,13 +422,13 @@ namespace rpp
     void Vector3::normalize()
     {
         auto inv = inverse_length(1.0f, x, y, z);
-        x *= inv, y *= inv, z *= inv;
+        x *= inv; y *= inv; z *= inv;
     }
 
     void Vector3::normalize(const float magnitude)
     {
         auto inv = inverse_length(magnitude, x, y, z);
-        x *= inv, y *= inv, z *= inv;
+        x *= inv; y *= inv; z *= inv;
     }
 
     Vector3 Vector3::normalized() const
@@ -512,7 +512,7 @@ namespace rpp
     
     void Vector3d::set(double newX, double newY, double newZ)
     {
-        x=newX, y=newY, z=newZ;
+        x=newX; y=newY; z=newZ;
     }
 
     double Vector3d::length() const
@@ -536,13 +536,13 @@ namespace rpp
     void Vector3d::normalize()
     {
         auto inv = inverse_length(1.0, x, y, z);
-        x *= inv, y *= inv, z *= inv;
+        x *= inv; y *= inv; z *= inv;
     }
 
     void Vector3d::normalize(const double magnitude)
     {
         auto inv = inverse_length(magnitude, x, y, z);
-        x *= inv, y *= inv, z *= inv;
+        x *= inv; y *= inv; z *= inv;
     }
 
     Vector3d Vector3d::normalized() const
@@ -613,7 +613,7 @@ namespace rpp
 
     void Vector4::set(float newX, float newY, float newZ, float newW)
     {
-        x = newX, y = newY, z = newZ, w = newW;
+        x = newX; y = newY; z = newZ; w = newW;
     }
 
     float Vector4::dot(const Vector4& v) const
@@ -854,10 +854,10 @@ namespace rpp
         const float rl = right - left;
         const float tb = top - bottom;
         const float dt = far - near;
-        m00 = 2.0f/rl, m01 = 0.0f,    m02 = 0.0f,     m03 = 0.0f;
-        m10 = 0.0f,    m11 = 2.0f/tb, m12 = 0.0f,     m13 = 0.0f;
-        m20 = 0.0f,    m21 = 0.0f,    m22 = -2.0f/dt, m23 = 0.0f;
-        m30 = -(right+left)/rl, m31 = -(top+bottom)/tb, m32 = -(far+near)/dt, m33 = 1.0f;
+        m00 = 2.0f/rl; m01 = 0.0f;    m02 = 0.0f;     m03 = 0.0f;
+        m10 = 0.0f;    m11 = 2.0f/tb; m12 = 0.0f;     m13 = 0.0f;
+        m20 = 0.0f;    m21 = 0.0f;    m22 = -2.0f/dt; m23 = 0.0f;
+        m30 = -(right+left)/rl; m31 = -(top+bottom)/tb; m32 = -(far+near)/dt; m33 = 1.0f;
         return *this;
     }
 
@@ -867,10 +867,10 @@ namespace rpp
         const float h = cosf(rad2) / sinf(rad2);
         const float w = (h * height) / width;
         const float range = zFar - zNear;
-        m00 = w, m01 = 0, m02 = 0, m03 = 0;
-        m10 = 0, m11 = h, m12 = 0, m13 = 0;
-        m20 = 0, m21 = 0, m22 = -(zFar + zNear) / range, m23 = -1;
-        m30 = 0, m31 = 0, m32 = (-2.0f * zFar * zNear) / range, m33 = 1;
+        m00 = w; m01 = 0; m02 = 0; m03 = 0;
+        m10 = 0; m11 = h; m12 = 0; m13 = 0;
+        m20 = 0; m21 = 0; m22 = -(zFar + zNear) / range; m23 = -1;
+        m30 = 0; m31 = 0; m32 = (-2.0f * zFar * zNear) / range; m33 = 1;
         return *this;
     }
 
@@ -879,10 +879,10 @@ namespace rpp
         const Vector3 f = (center - eye).normalized();
         const Vector3 s = f.cross(up.normalized()).normalized();
         const Vector3 u = s.cross(f);
-        m00 = s.x, m01 = u.x, m02 = -f.x, m03 = 0.0f;
-        m10 = s.y, m11 = u.y, m12 = -f.y, m13 = 0.0f;
-        m20 = s.z, m21 = u.z, m22 = -f.z, m23 = 0.0f;
-        m30 = -s.dot(eye), m31 = -u.dot(eye), m32 = f.dot(eye), m33 = 1.0f;
+        m00 = s.x; m01 = u.x; m02 = -f.x; m03 = 0.0f;
+        m10 = s.y; m11 = u.y; m12 = -f.y; m13 = 0.0f;
+        m20 = s.z; m21 = u.z; m22 = -f.z; m23 = 0.0f;
+        m30 = -s.dot(eye); m31 = -u.dot(eye); m32 = f.dot(eye); m33 = 1.0f;
         return *this;
     }
 
@@ -916,10 +916,10 @@ namespace rpp
 
     Matrix4& Matrix4::fromScale(const Vector3& sc)
     {
-        m00 = sc.x, m01 = 0.0f, m02 = 0.0f, m03 = 0.0f;
-        m10 = 0.0f, m11 = sc.y, m12 = 0.0f, m13 = 0.0f;
-        m20 = 0.0f, m21 = 0.0f, m22 = sc.z, m23 = 0.0f;
-        m30 = 0.0f, m31 = 0.0f, m32 = 0.0f, m33 = 1.0f;
+        m00 = sc.x; m01 = 0.0f; m02 = 0.0f; m03 = 0.0f;
+        m10 = 0.0f; m11 = sc.y; m12 = 0.0f; m13 = 0.0f;
+        m20 = 0.0f; m21 = 0.0f; m22 = sc.z; m23 = 0.0f;
+        m30 = 0.0f; m31 = 0.0f; m32 = 0.0f; m33 = 1.0f;
         return *this;
     }
 

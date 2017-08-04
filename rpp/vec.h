@@ -224,14 +224,14 @@ namespace rpp
          */
         Vector2 left(float magnitude = 1.0f) const;
     
-        Vector2& operator+=(float f) { x+=f, y+=f; return *this; }
-        Vector2& operator-=(float f) { x-=f, y-=f; return *this; }
-        Vector2& operator*=(float f) { x*=f, y*=f; return *this; }
-        Vector2& operator/=(float f) { x/=f, y/=f; return *this; }
-        Vector2& operator+=(const Vector2& b) { x+=b.x, y+=b.y; return *this; }
-        Vector2& operator-=(const Vector2& b) { x-=b.x, y-=b.y; return *this; }
-        Vector2& operator*=(const Vector2& b) { x*=b.x, y*=b.y; return *this; }
-        Vector2& operator/=(const Vector2& b) { x/=b.x, y/=b.y; return *this; }
+        Vector2& operator+=(float f) { x+=f; y+=f; return *this; }
+        Vector2& operator-=(float f) { x-=f; y-=f; return *this; }
+        Vector2& operator*=(float f) { x*=f; y*=f; return *this; }
+        Vector2& operator/=(float f) { x/=f; y/=f; return *this; }
+        Vector2& operator+=(const Vector2& b) { x+=b.x; y+=b.y; return *this; }
+        Vector2& operator-=(const Vector2& b) { x-=b.x; y-=b.y; return *this; }
+        Vector2& operator*=(const Vector2& b) { x*=b.x; y*=b.y; return *this; }
+        Vector2& operator/=(const Vector2& b) { x/=b.x; y/=b.y; return *this; }
         Vector2  operator+ (const Vector2& b) const { return { x+b.x, y+b.y }; }
         Vector2  operator- (const Vector2& b) const { return { x-b.x, y-b.y }; }
         Vector2  operator* (const Vector2& b) const { return { x*b.x, y*b.y }; }
@@ -358,14 +358,14 @@ namespace rpp
          */
         Vector2d left(double magnitude = 1.0) const;
         
-        Vector2d& operator+=(double f) { x+=f, y+=f; return *this; }
-        Vector2d& operator-=(double f) { x-=f, y-=f; return *this; }
-        Vector2d& operator*=(double f) { x*=f, y*=f; return *this; }
-        Vector2d& operator/=(double f) { x/=f, y/=f; return *this; }
-        Vector2d& operator+=(const Vector2d& b) { x+=b.x, y+=b.y; return *this; }
-        Vector2d& operator-=(const Vector2d& b) { x-=b.x, y-=b.y; return *this; }
-        Vector2d& operator*=(const Vector2d& b) { x*=b.x, y*=b.y; return *this; }
-        Vector2d& operator/=(const Vector2d& b) { x/=b.x, y/=b.y; return *this; }
+        Vector2d& operator+=(double f) { x+=f; y+=f; return *this; }
+        Vector2d& operator-=(double f) { x-=f; y-=f; return *this; }
+        Vector2d& operator*=(double f) { x*=f; y*=f; return *this; }
+        Vector2d& operator/=(double f) { x/=f; y/=f; return *this; }
+        Vector2d& operator+=(const Vector2d& b) { x+=b.x; y+=b.y; return *this; }
+        Vector2d& operator-=(const Vector2d& b) { x-=b.x; y-=b.y; return *this; }
+        Vector2d& operator*=(const Vector2d& b) { x*=b.x; y*=b.y; return *this; }
+        Vector2d& operator/=(const Vector2d& b) { x/=b.x; y/=b.y; return *this; }
         Vector2d  operator+ (const Vector2d& b) const { return { x+b.x, y+b.y }; }
         Vector2d  operator- (const Vector2d& b) const { return { x-b.x, y-b.y }; }
         Vector2d  operator* (const Vector2d& b) const { return { x*b.x, y*b.y }; }
@@ -421,7 +421,7 @@ namespace rpp
 
         explicit operator bool()  const { return  x || y;  }
         bool operator!() const { return !x && !y; }
-        void set(int nx, int ny) { x = nx, y = ny; }
+        void set(int nx, int ny) { x = nx; y = ny; }
 
         bool isZero()  const { return !x && !y; }
         bool notZero() const { return  x || y;  }
@@ -433,16 +433,16 @@ namespace rpp
             return toString(buffer, SIZE);
         }
 
-        Point& operator+=(int i) { x+=i, y+=i; return *this; }
-        Point& operator-=(int i) { x-=i, y-=i; return *this; }
-        Point& operator*=(int i) { x*=i, y*=i; return *this; }
-        Point& operator/=(int i) { x/=i, y/=i; return *this; }
-        Point& operator*=(float f) { x = int(x*f), y = int(y*f); return *this; }
-        Point& operator/=(float f) { x = int(x/f), y = int(y/f); return *this; }
-        Point& operator+=(const Point& b) { x+=b.x, y+=b.y; return *this; }
-        Point& operator-=(const Point& b) { x-=b.x, y-=b.y; return *this; }
-        Point& operator*=(const Point& b) { x*=b.x, y*=b.y; return *this; }
-        Point& operator/=(const Point& b) { x/=b.x, y/=b.y; return *this; }
+        Point& operator+=(int i) { x+=i; y+=i; return *this; }
+        Point& operator-=(int i) { x-=i; y-=i; return *this; }
+        Point& operator*=(int i) { x*=i; y*=i; return *this; }
+        Point& operator/=(int i) { x/=i; y/=i; return *this; }
+        Point& operator*=(float f) { x = int(x*f); y = int(y*f); return *this; }
+        Point& operator/=(float f) { x = int(x/f); y = int(y/f); return *this; }
+        Point& operator+=(const Point& b) { x+=b.x; y+=b.y; return *this; }
+        Point& operator-=(const Point& b) { x-=b.x; y-=b.y; return *this; }
+        Point& operator*=(const Point& b) { x*=b.x; y*=b.y; return *this; }
+        Point& operator/=(const Point& b) { x/=b.x; y/=b.y; return *this; }
         Point  operator+ (const Point& b) const { return { x+b.x, y+b.y }; }
         Point  operator- (const Point& b) const { return { x-b.x, y-b.y }; }
         Point  operator* (const Point& b) const { return { x*b.x, y*b.y }; }
@@ -662,14 +662,14 @@ namespace rpp
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
         bool almostEqual(const Vector3& b) const;
 
-        Vector3& operator+=(float f) { x+=f, y+=f, z+=f; return *this; }
-        Vector3& operator-=(float f) { x-=f, y-=f, z-=f; return *this; }
-        Vector3& operator*=(float f) { x*=f, y*=f, z*=f; return *this; }
-        Vector3& operator/=(float f) { x/=f, y/=f, z/=f; return *this; }
-        Vector3& operator+=(const Vector3& v) { x+=v.x, y+=v.y, z+=v.z; return *this; }
-        Vector3& operator-=(const Vector3& v) { x-=v.x, y-=v.y, z-=v.z; return *this; }
-        Vector3& operator*=(const Vector3& v) { x*=v.x, y*=v.y, z*=v.z; return *this; }
-        Vector3& operator/=(const Vector3& v) { x/=v.x, y/=v.y, z/=v.z; return *this; }
+        Vector3& operator+=(float f) { x+=f; y+=f; z+=f; return *this; }
+        Vector3& operator-=(float f) { x-=f; y-=f; z-=f; return *this; }
+        Vector3& operator*=(float f) { x*=f; y*=f; z*=f; return *this; }
+        Vector3& operator/=(float f) { x/=f; y/=f; z/=f; return *this; }
+        Vector3& operator+=(const Vector3& v) { x+=v.x; y+=v.y; z+=v.z; return *this; }
+        Vector3& operator-=(const Vector3& v) { x-=v.x; y-=v.y; z-=v.z; return *this; }
+        Vector3& operator*=(const Vector3& v) { x*=v.x; y*=v.y; z*=v.z; return *this; }
+        Vector3& operator/=(const Vector3& v) { x/=v.x; y/=v.y; z/=v.z; return *this; }
         Vector3  operator+ (const Vector3& v) const { return { x+v.x, y+v.y, z+v.z }; }
         Vector3  operator- (const Vector3& v) const { return { x-v.x, y-v.y, z-v.z }; }
         Vector3  operator* (const Vector3& v) const { return { x*v.x, y*v.y, z*v.z }; }
@@ -851,14 +851,14 @@ namespace rpp
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
         bool almostEqual(const Vector3d& b) const;
 
-        Vector3d& operator+=(double f) { x+=f, y+=f, z+=f; return *this; }
-        Vector3d& operator-=(double f) { x-=f, y-=f, z-=f; return *this; }
-        Vector3d& operator*=(double f) { x*=f, y*=f, z*=f; return *this; }
-        Vector3d& operator/=(double f) { x/=f, y/=f, z/=f; return *this; }
-        Vector3d& operator+=(const Vector3d& b) { x+=b.x, y+=b.y, z+=b.z; return *this; }
-        Vector3d& operator-=(const Vector3d& b) { x-=b.x, y-=b.y, z-=b.z; return *this; }
-        Vector3d& operator*=(const Vector3d& b) { x*=b.x, y*=b.y, z*=b.z; return *this; }
-        Vector3d& operator/=(const Vector3d& b) { x/=b.x, y/=b.y, z/=b.z; return *this; }
+        Vector3d& operator+=(double f) { x+=f; y+=f; z+=f; return *this; }
+        Vector3d& operator-=(double f) { x-=f; y-=f; z-=f; return *this; }
+        Vector3d& operator*=(double f) { x*=f; y*=f; z*=f; return *this; }
+        Vector3d& operator/=(double f) { x/=f; y/=f; z/=f; return *this; }
+        Vector3d& operator+=(const Vector3d& b) { x+=b.x; y+=b.y; z+=b.z; return *this; }
+        Vector3d& operator-=(const Vector3d& b) { x-=b.x; y-=b.y; z-=b.z; return *this; }
+        Vector3d& operator*=(const Vector3d& b) { x*=b.x; y*=b.y; z*=b.z; return *this; }
+        Vector3d& operator/=(const Vector3d& b) { x/=b.x; y/=b.y; z/=b.z; return *this; }
         Vector3d  operator+ (const Vector3d& b) const { return { x+b.x, y+b.y, z+b.z }; }
         Vector3d  operator- (const Vector3d& b) const { return { x-b.x, y-b.y, z-b.z }; }
         Vector3d  operator* (const Vector3d& b) const { return { x*b.x, y*b.y, z*b.z }; }
@@ -1047,12 +1047,12 @@ namespace rpp
         Vector4& operator*=(const Vector4& q) { return (*this = rotate(q)); }
         Vector4  operator* (const Vector4& q) const { return rotate(q); }
     
-        Vector4& operator+=(float f) { x+=f, y+=f, z+=f, w+=f; return *this; }
-        Vector4& operator-=(float f) { x-=f, y-=f, z-=f, w-=f; return *this; }
-        Vector4& operator*=(float f) { x*=f, y*=f, z*=f, w*=f; return *this; }
-        Vector4& operator/=(float f) { x/=f, y/=f, z/=f, w/=f; return *this; }
-        Vector4& operator+=(const Vector4& v) { x+=v.x, y+=v.y, z+=v.z, w+=v.w; return *this; }
-        Vector4& operator-=(const Vector4& v) { x-=v.x, y-=v.y, z-=v.z, w-=v.w; return *this; }
+        Vector4& operator+=(float f) { x+=f; y+=f; z+=f; w+=f; return *this; }
+        Vector4& operator-=(float f) { x-=f; y-=f; z-=f; w-=f; return *this; }
+        Vector4& operator*=(float f) { x*=f; y*=f; z*=f; w*=f; return *this; }
+        Vector4& operator/=(float f) { x/=f; y/=f; z/=f; w/=f; return *this; }
+        Vector4& operator+=(const Vector4& v) { x+=v.x; y+=v.y; z+=v.z; w+=v.w; return *this; }
+        Vector4& operator-=(const Vector4& v) { x-=v.x; y-=v.y; z-=v.z; w-=v.w; return *this; }
 
         Vector4  operator+ (const Vector4& v) const { return { x+v.x, y+v.y, z+v.z, w+v.w }; }
         Vector4  operator- (const Vector4& v) const { return { x-v.x, y-v.y, z-v.z, w-v.w }; }

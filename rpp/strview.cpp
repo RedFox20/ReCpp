@@ -50,7 +50,7 @@ namespace rpp
     {
         if (str[len] == '\0')
             return str;
-        static char buf[512];
+        static thread_local char buf[512];
         return to_cstr(buf, sizeof(buf));
     }
 
@@ -101,7 +101,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
-        str = s, len = n; // result writeout
+        str = s; len = n; // result writeout
         return *this;
     }
 
@@ -110,7 +110,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && *s == ch; ++s, --n) {}
-        str = s, len = n; // result writeout
+        str = s; len = n; // result writeout
         return *this;
     }
 
@@ -119,7 +119,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
-        str = s, len = n;
+        str = s; len = n;
         return *this;
     }
 
@@ -245,7 +245,7 @@ namespace rpp
             if (l >= sublen && strequals(s, substr, sublen)) {
                 return strview(str, s);
             }
-            --l, ++s;
+            --l; ++s;
         }
         return strview(str, len);
     }
@@ -263,14 +263,14 @@ namespace rpp
     bool strview::next(strview& out, char delim)
     {
         bool result = next_notrim(out, delim);
-        if (result && len) ++str, --len; // trim match
+        if (result && len) { ++str; --len; } // trim match
         return result;
     }
 
     bool strview::next(strview& out, const char* delims, int ndelims)
     {
         bool result = next_notrim(out, delims, ndelims);
-        if (result && len) ++str, --len; // trim match
+        if (result && len) { ++str; --len; } // trim match
         return result;
     }
 
@@ -324,11 +324,11 @@ namespace rpp
             char ch = *s; // check if we have the start of a number: "-0.25" || ".25" || "25":
             if (ch == '-' || ch == '.' || ('0' <= ch && ch <= '9')) {
                 double f = rpp::to_double(s, &s);
-                str = s, len = int(e - s);
+                str = s; len = int(e - s);
                 return f;
             }
         }
-        str = s, len = int(e - s);
+        str = s; len = int(e - s);
         return 0.0;
     }
 
@@ -339,11 +339,11 @@ namespace rpp
             char ch = *s; // check if we have the start of a number: "-25" || "25":
             if (ch == '-' || ('0' <= ch && ch <= '9')) {
                 int i = rpp::to_int(s, &s);
-                str = s, len = int(e - s);
+                str = s; len = int(e - s);
                 return i;
             }
         }
-        str = s, len = int(e - s);
+        str = s; len = int(e - s);
         return 0;
     }
 
@@ -352,7 +352,7 @@ namespace rpp
         auto s = str;
         auto l = len, n = nchars;
         for (; l && n > 0; --l, --n, ++s) {}
-        str = s, len = l;
+        str = s; len = l;
         return *this;
     }
 
@@ -361,7 +361,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && *s != ch; --n, ++s) {}
-        str = s, len = n;
+        str = s; len = n;
         return *this;
     }
     strview& strview::skip_until(const char* substr, int sublen)
@@ -371,7 +371,7 @@ namespace rpp
         while (s < e) {
             if (auto p = (const char*)memchr(s, ch, e - s)) {
                 if (memcmp(p, substr, size_t(sublen)) == 0) { // match found
-                    str = p, len = int(e - p);
+                    str = p; len = int(e - p);
                     return *this;
                 }
                 s = p + 1;
@@ -379,20 +379,20 @@ namespace rpp
             }
             break;
         }
-        str = e, len = 0;
+        str = e; len = 0;
         return *this;
     }
 
     strview& strview::skip_after(char ch)
     {
         skip_until(ch);
-        if (len) ++str, --len; // skip after
+        if (len) { ++str; --len; } // skip after
         return *this;
     }
     strview& strview::skip_after(const char* sstr, int slen)
     {
         skip_until(sstr, slen);
-        if (len) str += slen, len -= slen; // skip after
+        if (len) { str += slen; len -= slen; } // skip after
         return *this;
     }
 
@@ -549,7 +549,7 @@ namespace rpp
         char ch       = *s;
 
         if (ch == '-')
-            negative = true, ++s; // change sign and skip '-'
+            { negative = true; ++s; } // change sign and skip '-'
         else if (ch == '+')  ++s; // ignore '+'
 
         for (; s < e && '0' <= (ch = *s) && ch <= '9'; ++s) {

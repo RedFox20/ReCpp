@@ -269,7 +269,7 @@ namespace rpp
 
     string_t::string_t(string_t&& fwd) : owns(fwd.owns)
     {
-        if (owns) str = move(fwd.str), fwd.owns = false;
+        if (owns) { str = move(fwd.str); fwd.owns = false; }
         else sv = fwd.sv;
     }
 
@@ -295,14 +295,14 @@ namespace rpp
     string_t& string_t::operator=(std::string&& s) noexcept
     {
         if (owns) str = move(s);
-        else new (&str) std::string{move(s)}, owns = true;
+        else { new (&str) std::string{move(s)}; owns = true; }
         return *this;
     }
 
     string_t& string_t::operator=(const std::string& s) noexcept
     {
         if (owns) str = s;
-        else new (&str) std::string{move(s)}, owns = true;
+        else { new (&str) std::string{move(s)}; owns = true; }
         return *this;
     }
 
@@ -310,7 +310,7 @@ namespace rpp
 
     string_t& string_t::operator=(const strview& s) noexcept
     {
-        if (owns) destruct(str), owns = false;
+        if (owns) { destruct(str); owns = false; }
         sv = s;
         return *this;
     }
@@ -323,7 +323,7 @@ namespace rpp
 
     void string_t::clear()
     {
-        if (owns) destruct(str), owns = false;
+        if (owns) { destruct(str); owns = false; }
         else sv.clear();
     }
 
