@@ -1198,11 +1198,11 @@ namespace rpp
 
         template<class T> void writeln(const T& value)
         {
-            write(value), writeln();
+            write(value); writeln();
         }
         template<class T, class... Args> void writeln(const T& first, const Args&... args)
         {
-            write(first, args...), writeln();
+            write(first, args...); writeln();
         }
     };
     

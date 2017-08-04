@@ -805,13 +805,22 @@ namespace rpp
         {
             if (cap == SIZE)
             {
-                ptr = (char*)malloc(cap *= 2);
-                memcpy(ptr, buf, len + 1);
+                cap *= 2;
+                ptr = (char*)malloc(cap);
+                memcpy(ptr, buf, len);
             }
             else
             {
-                ptr = (char*)realloc(ptr, cap *= 2);
+                cap *= 2;
+                
+                // a strange bug with realloc on iOS.. 
+                char* newp = (char*)malloc(cap);
+                memcpy(newp, ptr, len);
+                free(ptr);
+                ptr = newp;
+                //ptr = (char*)realloc(ptr, cap);
             }
+            ptr[len] = '\0';
         }
     }
     
