@@ -1181,6 +1181,8 @@ namespace rpp
         void write(uint value)   { reserve(16); len += _tostring(&ptr[len], value); }
         void write(int64 value)  { reserve(32); len += _tostring(&ptr[len], value); }
         void write(uint64 value) { reserve(32); len += _tostring(&ptr[len], value); }
+        void write(float value)  { reserve(32); len += _tostring(&ptr[len], value); }
+        void write(double value) { reserve(48); len += _tostring(&ptr[len], value); }
 
         /**
          * Stringifies and appends the input arguments one by one, filling gaps with delimiter

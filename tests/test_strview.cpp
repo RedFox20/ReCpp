@@ -42,6 +42,17 @@ TestImpl(test_strview)
         AssertThat(buf.view(), "s 10 20\n");
     }
 
+    TestCase(string_buf_loop)
+    {
+        // ensure it won't crash
+        string_buffer buf;
+        for (int i = 0; i < 100; ++i)
+        {
+            buf.writeln("string_buffer", 1170, 20.1236f, "2132"_sv, "adasda"s, "...");
+        }
+        buf.writeln("end");
+    }
+
     TestCase(println)
     {
         println("hello", 10, "println", 20);
