@@ -839,9 +839,9 @@ namespace rpp /* ReCpp */
         }
         dir_iterator::~dir_iterator() { if (s->hFind) FindClose(s->hFind); }
         dir_iterator::operator bool()  const { return s->hFind != nullptr; }
-        bool    dir_iterator::next()         { return FindNextFileA(s->hFind, &s->ffd) != 0; }
-        bool    dir_iterator::is_dir() const { return (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
-        strview dir_iterator::name()   const { return s->ffd.cFileName; }
+        bool    dir_iterator::next()         { return s->hFind && FindNextFileA(s->hFind, &s->ffd) != 0; }
+        bool    dir_iterator::is_dir() const { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+        strview dir_iterator::name()   const { return s->hFind ? s->ffd.cFileName : ""_sv; }
 #else
         dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {
             s->e = (s->d=opendir(this->dir.c_str())) != nullptr ? readdir(s->d) : nullptr;

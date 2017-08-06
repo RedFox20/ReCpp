@@ -1128,6 +1128,18 @@ namespace rpp
             write(to_string(value));
         }
 
+        template<class T> void write(const T* ptr)
+        {
+            if (ptr == nullptr)
+            {
+                write("null");
+                return;
+            }
+            write("*{");
+            write(*ptr);
+            write('}');
+        }
+
         template<int N> 
         void write(const char (&value)[N]) { write(strview{ value }); }
         void write(const string& value)    { write(strview{ value }); }
