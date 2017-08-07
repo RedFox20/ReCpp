@@ -3,6 +3,9 @@
 #define RPP_FILE_IO_H
 /**
  * Cross platform file utilities, Copyright (c) 2014 - Jorma Rebane
+ *
+ * @note This module predates C++17 filesystem and offers a different
+ *       set of convenient API's for dealing with every-day File I/O tasks.
  */
 #include <time.h> // time_t
 #include "strview.h"
