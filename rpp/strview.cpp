@@ -803,17 +803,15 @@ namespace rpp
         int newlen = len + count + 1;
         if (newlen >= cap)
         {
+            int newcap = cap * 2;
+            while (newcap < newlen) // @todo Any fancy ways to improve this?
+                newcap *= 2;
+            
             if (cap == SIZE)
-            {
-                // @todo Remove the loop
-                while (cap < newlen) cap *= 2;
-                ptr = (char*)memcpy(malloc(cap), buf, len);
-            }
+                ptr = (char*)memcpy(malloc(newcap), buf, len);
             else
-            {
-                while (cap < newlen) cap *= 2;
-                ptr = (char*)realloc(ptr, cap);
-            }
+                ptr = (char*)realloc(ptr, newcap);
+            cap = newcap;
         }
     }
     
