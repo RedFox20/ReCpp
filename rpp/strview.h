@@ -13,6 +13,7 @@
 #include <unordered_map> // std::unordered_map for to_string extensions
 #include <iostream>   // std::ostream for << compatibility
 #include <functional> // std::hash
+#include <memory>     // std::shared_ptr
 
 /**
  * This is a simplified string tokenizer class.
@@ -1097,6 +1098,7 @@ namespace rpp
 
         // controls the separator for generic template write calls
         // the default value " " will turn write("brown", "fox"); into "brown fox"
+        // setting it to "..." will turn write("brown", "fox"); into "brown...fox"
         strview separator = " "_sv;
 
         FINLINE string_buffer() noexcept : ptr(buf) { buf[0] = '\0'; }
@@ -1127,18 +1129,17 @@ namespace rpp
         {
             write(to_string(value));
         }
-
         template<class T> void write(const T* ptr)
         {
-            if (ptr == nullptr)
-            {
+            if (ptr == nullptr) {
                 write("null");
                 return;
             }
-            write("*{");
-            write(*ptr);
-            write('}');
+            write("*{"); write(*ptr); write('}');
         }
+        template<class T> void write(T* ptr)                 { write((const T*)ptr); }
+        template<class T> void write(const weak_ptr<T>& p)   { write(p.lock()); }
+        template<class T> void write(const shared_ptr<T>& p) { write(p.get());  }
 
         template<int N> 
         void write(const char (&value)[N]) { write(strview{ value }); }
@@ -1148,9 +1149,54 @@ namespace rpp
         void write(const strview& s);
         void write(const char& value);
 
+        void write(bool value)   { write(value ? "true"_sv : "false"_sv); }
+        void write(byte value)   { reserve(4);  len += _tostring(&ptr[len], value); }
+        void write(short value)  { reserve(8);  len += _tostring(&ptr[len], value); }
+        void write(ushort value) { reserve(8);  len += _tostring(&ptr[len], value); }
+        void write(int value)    { reserve(16); len += _tostring(&ptr[len], value); }
+        void write(uint value)   { reserve(16); len += _tostring(&ptr[len], value); }
+        void write(int64 value)  { reserve(32); len += _tostring(&ptr[len], value); }
+        void write(uint64 value) { reserve(32); len += _tostring(&ptr[len], value); }
+        void write(float value)  { reserve(32); len += _tostring(&ptr[len], value); }
+        void write(double value) { reserve(48); len += _tostring(&ptr[len], value); }
+
+        /**
+         * Stringifies and appends the input arguments one by one, filling gaps with delimiter
+         * @see string_buffer::delimiter (default = ' ')
+         * Ex: write("test:", 10, 20.1f);  --> "test: 10 20.1"
+         */
+        template<class T, class... Args> void write(const T& first, const Args&... args)
+        {
+            write(first); write(separator); write(args...);
+        }
+
+        void writeln() { write('\n'); }
+
+        template<class T> void writeln(const T& value)
+        {
+            write(value); writeln();
+        }
+        template<class T, class... Args> void writeln(const T& first, const Args&... args)
+        {
+            write(first, args...); writeln();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////
+
         template<class T> void prettyprint(const T& value) {
             write(to_string(value));
         }
+        template<class T> void prettyprint(const T* ptr)
+        {
+            if (ptr == nullptr) {
+                write("null");
+                return;
+            }
+            write("*{"); prettyprint(*ptr); write('}');
+        }
+        template<class T> void prettyprint(T* ptr)                 { prettyprint((const T*)ptr); }
+        template<class T> void prettyprint(const weak_ptr<T>& p)   { prettyprint(p.lock());  }
+        template<class T> void prettyprint(const shared_ptr<T>& p) { prettyprint(p.get());   }
         void prettyprint(const string& value) {
             write('"'); write(value); write('"'); 
         }
@@ -1184,39 +1230,17 @@ namespace rpp
             write(" }");
             if (newLineSeparator) write('\n');
         }
-
-        void write(bool value)   { write(value ? "true"_sv : "false"_sv); }
-        void write(byte value)   { reserve(4);  len += _tostring(&ptr[len], value); }
-        void write(short value)  { reserve(8);  len += _tostring(&ptr[len], value); }
-        void write(ushort value) { reserve(8);  len += _tostring(&ptr[len], value); }
-        void write(int value)    { reserve(16); len += _tostring(&ptr[len], value); }
-        void write(uint value)   { reserve(16); len += _tostring(&ptr[len], value); }
-        void write(int64 value)  { reserve(32); len += _tostring(&ptr[len], value); }
-        void write(uint64 value) { reserve(32); len += _tostring(&ptr[len], value); }
-        void write(float value)  { reserve(32); len += _tostring(&ptr[len], value); }
-        void write(double value) { reserve(48); len += _tostring(&ptr[len], value); }
-
+        
         /**
-         * Stringifies and appends the input arguments one by one, filling gaps with delimiter
-         * @see string_buffer::delimiter (default = ' ')
-         * Ex: write("test:", 10, 20.1f);  --> "test: 10 20.1"
+         * Similar to write(...), but performs prettyprint formatting to each argument
          */
-        template<class T, class... Args> void write(const T& first, const Args&... args)
+        template<class T, class... Args> void prettyprint(const T& first, const Args&... args)
         {
-            write(first);
-            write(separator);
-            write(args...);
+            prettyprint(first); write(separator); prettyprint(args...);
         }
-
-        void writeln() { write('\n'); }
-
-        template<class T> void writeln(const T& value)
+        template<class T, class... Args> void prettyprintln(const T& first, const Args&... args)
         {
-            write(value); writeln();
-        }
-        template<class T, class... Args> void writeln(const T& first, const Args&... args)
-        {
-            write(first, args...); writeln();
+            prettyprint(first, args...); writeln();
         }
     };
     
@@ -1359,10 +1383,18 @@ namespace std
      *  [2] = { "key": "value", "name": "john" }
      *  @endcode
      */
-    template<typename T, template<class,class...> class C, class... Args>
+    template<class T, template<class,class...> class C, class... Args>
     string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
+    }
+    template<class T> string to_string(const shared_ptr<T>& p) noexcept
+    {
+        rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
+    }
+    template<class T> string to_string(const weak_ptr<T>& p) noexcept
+    {
+        rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
 
     template<class T, class Alloc>

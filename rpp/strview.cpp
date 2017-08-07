@@ -800,20 +800,20 @@ namespace rpp
 
     void string_buffer::reserve(int count) noexcept
     {
-        int newlen = len + count;
+        int newlen = len + count + 1;
         if (newlen >= cap)
         {
             if (cap == SIZE)
             {
-                cap *= 2;
+                // @todo Remove the loop
+                while (cap < newlen) cap *= 2;
                 ptr = (char*)memcpy(malloc(cap), buf, len);
             }
             else
             {
-                cap *= 2;
+                while (cap < newlen) cap *= 2;
                 ptr = (char*)realloc(ptr, cap);
             }
-            ptr[len] = '\0';
         }
     }
     
@@ -822,7 +822,8 @@ namespace rpp
         char buffer[4096];
         va_list ap; va_start(ap, format);
         int n = vsnprintf(buffer, sizeof(buffer), format, ap);
-        
+        if (n == -1)
+            n = 4095;
         reserve(n);
         memcpy(&ptr[len], buffer, (size_t)n);
         len += n;
@@ -832,7 +833,8 @@ namespace rpp
     void string_buffer::write(const strview& s)
     {
         reserve(s.len);
-        memcpy(&ptr[len], s.str, (size_t)s.len);
+        char* dst = ptr + len;
+        memcpy(dst, s.str, (size_t)s.len);
         len += s.len;
         ptr[len] = '\0';
     }

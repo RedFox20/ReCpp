@@ -290,6 +290,9 @@ namespace rpp /* ReCpp */
     {
         if (bytesToWrite <= 0)
             return 0;
+        if (Handle == nullptr)
+            return 0;
+        
         #if USE_WINAPI_IO
             DWORD bytesWritten;
             WriteFile((HANDLE)Handle, buffer, bytesToWrite, &bytesWritten, 0);
@@ -304,6 +307,8 @@ namespace rpp /* ReCpp */
     }
     int file::writef(const char* format, ...) noexcept
     {
+        if (Handle == nullptr)
+            return 0;
         va_list ap; va_start(ap, format);
         #if USE_WINAPI_IO // @note This is heavily optimized
             char buf[4096];

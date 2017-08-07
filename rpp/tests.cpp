@@ -161,9 +161,9 @@ namespace rpp
     int test::run_tests(const char* testNamePattern)
     {
         char empty[1] = "";
-        char name[256]; strncpy(name, testNamePattern, 256);
+        char name[1024]; strncpy(name, testNamePattern, 1024);
         char* argv[2] = { empty, name };
-        return run_tests(1, argv);
+        return run_tests(2, argv);
     }
 
     int test::run_tests()
