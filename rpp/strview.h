@@ -431,7 +431,6 @@ namespace rpp
         template<int N> FINLINE bool starts_with(const char (&s)[N]) const { 
             return len >= (N - 1) && strequals<N>(str, s);
         }
-        FINLINE bool starts_with(const string& s)  const { return starts_with(s.c_str(), (int)s.length()); }
         FINLINE bool starts_with(const strview& s)  const { return starts_with(s.str, s.len); }
         FINLINE bool starts_with(char ch) const { return len && *str == ch; }
 
@@ -443,7 +442,6 @@ namespace rpp
         template<int N> FINLINE bool starts_withi(const char (&s)[N]) const { 
             return len >= (N - 1) && strequalsi<N>(str, s);
         }
-        FINLINE bool starts_withi(const string& s) const { return starts_withi(s.c_str(), (int)s.length()); }
         FINLINE bool starts_withi(const strview& s) const { return starts_withi(s.str, s.len); }
         FINLINE bool starts_withi(char ch) const { return len && ::toupper(*str) == ::toupper(ch); }
 
@@ -455,7 +453,6 @@ namespace rpp
         template<int N> FINLINE bool ends_with(const char (&s)[N]) const { 
             return len >= (N - 1) && strequals<N>(str + len - (N - 1), s);
         }
-        FINLINE bool ends_with(const string& s)  const { return ends_with(s.c_str(), (int)s.length()); }
         FINLINE bool ends_with(const strview s)  const { return ends_with(s.str, s.len); }
         FINLINE bool ends_with(char ch)          const { return len && str[len-1] == ch; }
 
@@ -467,7 +464,6 @@ namespace rpp
         template<int N> FINLINE bool ends_withi(const char (&s)[N]) const { 
             return len >= (N - 1) && strequalsi<N>(str + len - (N - 1), s);
         }
-        FINLINE bool ends_withi(const string& s) const { return ends_withi(s.c_str(), (int)s.length()); }
         FINLINE bool ends_withi(const strview s) const { return ends_withi(s.str, s.len); }
         FINLINE bool ends_withi(char ch) const { return len && ::toupper(str[len-1]) == ::toupper(ch); }
 
@@ -476,14 +472,12 @@ namespace rpp
         FINLINE bool equals(const char* s, int length) const { return len == length && strequals(str, s, length); }
         template<int N>
         FINLINE bool equals(const char (&s)[N]) const { return len == (N-1) && strequals<N>(str, s); }
-        FINLINE bool equals(const string& s)    const { return equals(s.c_str(), (int)s.length());   }
         FINLINE bool equals(const strview& s)   const { return equals(s.str, s.len);                 }
 
         /** @return TRUE if this strview equals IGNORECASE the specified string */
         FINLINE bool equalsi(const char* s, int length) const { return len == length && strequalsi(str, s, length); }
         template<int N>
         FINLINE bool equalsi(const char (&s)[N]) const { return len == (N-1) && strequalsi<N>(str, s); }
-        FINLINE bool equalsi(const string& s)    const { return equalsi(s.c_str(), (int)s.length());   }
         FINLINE bool equalsi(const strview& s)   const { return equalsi(s.str, s.len);                 }
 
         template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const { return equals<SIZE>(s); }
