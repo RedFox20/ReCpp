@@ -1090,7 +1090,7 @@ namespace rpp
      */
     struct string_buffer
     {
-        static constexpr int SIZE = 256;
+        static constexpr int SIZE = 512;
         char* ptr;
         int   len = 0;
         int   cap = SIZE;

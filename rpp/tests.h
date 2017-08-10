@@ -1,10 +1,9 @@
 #pragma once
-#ifndef RPP_TESTSFRAMEWORK_HPP
-#define RPP_TESTSFRAMEWORK_HPP
+#ifndef RPP_TESTSFRAMEWORK_H
+#define RPP_TESTSFRAMEWORK_H
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
 #include <vector>  // access to std::vector and std::string
-#include <string>
 #include <functional>
 #include <rpp/strview.h> // we love strview, so it's a common dependency :)
 
@@ -82,24 +81,27 @@ namespace rpp
 
         static const string& as_string(const string& v) { return v; }
         static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
-        static string as_string(const char* s) { return string{s};}
-        static string as_string(nullptr_t) { return "null"; }
+        static string as_string(const char* s)    { return string{s};}
+        static string as_string(nullptr_t)        { return "null"; }
         template<class T> static string as_string(const T& v) { return to_string(v); }
 
-        template<class Actual, class Expected>
-        static void expected_failed(const char* file, int line, 
-                    const char* expression, const Actual& actual, const Expected& expected)
+        template<class T> static string as_short_string(const T& obj, size_t maxLen = 512)
         {
-            assert_failed(file, line, "%s => '%s' but expected '%s'",
-                expression, as_string(actual).c_str(), as_string(expected).c_str());
+            string s = as_string(obj);
+            if (s.size() <= maxLen)
+                return s;
+            s.resize(maxLen);
+            s += "...";
+            return s;
         }
 
-        template<class Actual, class MustNotEqual>
-        static void must_not_equal_failed(const char* file, int line, 
-            const char* expression, const Actual& actual, const MustNotEqual& mustNotEqual)
+        template<class Actual, class Expected>
+        static void assumption_failed(const char* file, int line, 
+            const char* expr, const Actual& actual, const char* why, const Expected& expected)
         {
-            assert_failed(file, line, "%s => '%s' must not equal '%s'",
-                expression, as_string(actual).c_str(), as_string(mustNotEqual).c_str());
+            string sActual = as_short_string(actual);
+            string sExpect = as_short_string(expected);
+            assert_failed(file, line, "%s => '%s' %s '%s'", expr, sActual.c_str(), why, sExpect.c_str());
         }
 
         // adds a test to the automatic test run list
@@ -123,11 +125,11 @@ namespace rpp
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
 #define AssertThat(expr, expected) \
-    if ((expr) != (expected)) { expected_failed(__FILE__, __LINE__, #expr, expr, expected); }
+    if ((expr) != (expected)) { assumption_failed(__FILE__, __LINE__, #expr, expr, "but expected", expected); }
 
 #define AssertEqual AssertThat
 #define AssertNotEqual(expr, mustNotEqual) \
-    if ((expr) == (mustNotEqual)) { must_not_equal_failed(__FILE__, __LINE__, #expr, expr, mustNotEqual); }
+    if ((expr) == (mustNotEqual)) { assumption_failed(__FILE__, __LINE__, #expr, expr, "must not equal", mustNotEqual); }
 
 #define TestImpl(testclass) static struct testclass : public test
 
@@ -144,4 +146,4 @@ namespace rpp
 
 }
 
-#endif // RPP_TESTSFRAMEWORK_HPP
+#endif // RPP_TESTSFRAMEWORK_H
