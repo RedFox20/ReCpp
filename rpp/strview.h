@@ -644,7 +644,11 @@ namespace rpp
         inline void convertTo(double& outValue)  const { outValue = to_double(); }
         inline void convertTo(string& outValue)  const { to_string(outValue);    }
         inline void convertTo(strview& outValue) const { outValue = *this;       }
-
+        
+    private:
+        inline void skipByLength(strview text) { skip(text.len); }
+        inline void skipByLength(char ch)      { skip(1); }
+    public:
         /**
          * Calls strview::next(char delim) for each argument and calls strview::convertTo to
          * convert them to appropriate types.
@@ -663,8 +667,15 @@ namespace rpp
         template<class Delim, class T, class... Rest>
         void decompose(const Delim& delim, T& outFirst, Rest&... outRest)
         {
-            strview token = next(delim);
-            token.convertTo(outFirst);
+            if (starts_with(delim)) // this is an empty entry, just skip it;
+            {
+                skipByLength(delim);
+            }
+            else
+            {
+                strview token = next(delim);
+                token.convertTo(outFirst);
+            }
             decompose(delim, outRest...);
         }
         template<class Delim, class T>
