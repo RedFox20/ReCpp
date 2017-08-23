@@ -213,6 +213,11 @@ namespace rpp
         int value = 0;
 
     public:
+        enum wait_result {
+            notified,
+            timeout,
+        };
+    
         semaphore(){}
         explicit semaphore(int initialCount)
         {
@@ -241,6 +246,23 @@ namespace rpp
             while (value <= 0)
                 cv.wait(lock);
             --value;
+        }
+        
+        /**
+         * @param timeoutSeconds Maximum number of seconds to wait for this semaphore to be notified
+         * @return signalled if wait was successful or timeout if timeoutSeconds had elapsed
+         */
+        wait_result wait(double timeoutSeconds)
+        {
+            unique_lock<mutex> lock{ m };
+            while (value <= 0)
+            {
+                std::chrono::duration<double> dur(timeoutSeconds);
+                if (cv.wait_for(lock, dur) == cv_status::timeout)
+                    return wait_result::timeout;
+            }
+            --value;
+            return wait_result::notified;
         }
 
         bool try_wait()
