@@ -116,7 +116,7 @@ namespace rpp
     }
 #endif
 
-    #define make_obfuscated(str) macro_obfuscated_string<int32_indices<sizeof(str)-1>>{str}
+    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>{str}
 
 #elif _MSC_VER
 
@@ -125,7 +125,7 @@ namespace rpp
     //    return obfuscated_string<integer_sequence<char, chars...>>{};
     //}
 
-    #define make_obfuscated(str) macro_obfuscated_string<int32_indices<sizeof(str)-1>>{str}
+    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>{str}
 
 #else
     static_assert(false, "obfuscated_string not yet supported on this compiler");
