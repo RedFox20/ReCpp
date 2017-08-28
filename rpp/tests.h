@@ -131,7 +131,7 @@ namespace rpp
 #define AssertNotEqual(expr, mustNotEqual) \
     if ((expr) == (mustNotEqual)) { assumption_failed(__FILE__, __LINE__, #expr, expr, "must not equal", mustNotEqual); }
 
-#define TestImpl(testclass) static struct testclass : public test
+#define TestImpl(testclass) static struct testclass : public rpp::test
 
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \

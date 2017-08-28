@@ -1214,7 +1214,7 @@ namespace rpp
         template<class K, class V> void prettyprint(const K& key, const V& value) {
             prettyprint(key); write(": "); prettyprint(value);
         }
-        template<class K, class V> void prettyprint(const pair<K const, V const>& pair) {
+        template<class K, class V> void prettyprint(const pair<K, V>& pair) {
             prettyprint(pair.first); write(": "); prettyprint(pair.second);
         }
 

@@ -141,7 +141,7 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
 {
     if (!longFuncName) return "(null)";
 
-    static char buf[64];
+    static thread_local char buf[64];
     static const int max = 36;
 
     // always skip the first ::
