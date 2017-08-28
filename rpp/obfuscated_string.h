@@ -6,6 +6,7 @@
 #ifndef RPP_OBFUSCATED_STRING_H
 #define RPP_OBFUSCATED_STRING_H
 #include <string>
+#include <utility>
 
 namespace rpp
 {
@@ -116,7 +117,7 @@ namespace rpp
     }
 #endif
 
-    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>{str}
+    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>(str)
 
 #elif _MSC_VER
 
