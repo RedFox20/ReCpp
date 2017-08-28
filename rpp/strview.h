@@ -647,7 +647,7 @@ namespace rpp
         
     private:
         inline void skipByLength(strview text) { skip(text.len); }
-        inline void skipByLength(char ch)      { skip(1); }
+        inline void skipByLength(char)         { skip(1); }
     public:
         /**
          * Calls strview::next(char delim) for each argument and calls strview::convertTo to
