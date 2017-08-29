@@ -1132,6 +1132,10 @@ namespace rpp
         void reserve(int count) noexcept;
         void writef(const char* format, ...);
 
+        void write(const string_buffer& sb)
+        {
+            write(sb.view());
+        }
         template<class T> void write(const T& value)
         {
             write(to_string(value));
@@ -1223,11 +1227,15 @@ namespace rpp
         template<typename T, template<class,class...> class C, class... Args>
         void prettyprint(const C<T,Args...>& container, bool newLineSeparator = true)
         {
-            int i = 0, count = (int)container.size();
-            write('[');
-            write(count);
-            write("] = { ");
+            int count = (int)container.size();
+            if (count == 0) return write("{}");
+            if (count > 4) {
+                write('['); write(count); write("] = { ");
+            } else {
+                write("{ ");
+            }
             if (newLineSeparator) write('\n');
+            int i = 0;
             for (const auto& item : container) {
                 if (newLineSeparator) write("  ");
                 prettyprint(item);
