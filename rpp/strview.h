@@ -1319,7 +1319,7 @@ namespace rpp
     }
     
     #if DEBUG
-        #define debug_println(...) println(__VA_ARGS__)
+        #define debug_println(...) rpp::println(__VA_ARGS__)
     #else
         #define debug_println(...)
     #endif
