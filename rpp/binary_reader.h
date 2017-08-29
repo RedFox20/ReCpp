@@ -47,6 +47,7 @@ namespace rpp /* ReCpp */
 		virtual void undo(int n) noexcept = 0;
 	};
 
+
 /**
  * A generic data reader.
  * Implementation is defined by container template parameter.

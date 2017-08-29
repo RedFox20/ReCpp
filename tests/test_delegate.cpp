@@ -1,5 +1,5 @@
-#include "tests.h"
-#include <delegate.h>
+#include <rpp/tests.h>
+#include <rpp/delegate.h>
 using namespace rpp;
 
 static int func1(int arg0)

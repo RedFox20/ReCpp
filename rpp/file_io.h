@@ -1,4 +1,12 @@
 #pragma once
+#ifndef RPP_FILE_IO_H
+#define RPP_FILE_IO_H
+/**
+ * Cross platform file utilities, Copyright (c) 2014 - Jorma Rebane
+ *
+ * @note This module predates C++17 filesystem and offers a different
+ *       set of convenient API's for dealing with every-day File I/O tasks.
+ */
 #include <time.h> // time_t
 #include "strview.h"
 
@@ -20,7 +28,6 @@ namespace rpp /* ReCpp */
     #define SEEK_END 2
     #endif
 
-
     /**
      * Automatic whole file loading buffer
      */
@@ -29,7 +36,7 @@ namespace rpp /* ReCpp */
         char* str;  // dynamic or internal buffer
         int   len;  // buffer size in bytes
 
-        load_buffer() noexcept : str(0), len(0) {}
+        load_buffer() noexcept : str(nullptr), len(0) {}
         // takes ownership of a malloc-ed pointer and frees it when out of scope
         load_buffer(char* buffer, int size) noexcept : str(buffer), len(size) {}
         ~load_buffer();
@@ -48,59 +55,62 @@ namespace rpp /* ReCpp */
         int length()    const noexcept { return len; }
         char* data()    const noexcept { return str; }
         char* c_str()   const noexcept { return str; }
-        operator bool() const noexcept { return str != nullptr; }
-        operator strview() const noexcept { return { str,len }; }
+        explicit operator bool() const noexcept { return str != nullptr; }
+        explicit operator strview() const noexcept { return { str,len }; }
     };
-
-
-    /**
-     * Stores a load buffer for line parsing
-     */
-    struct buffer_line_parser : public line_parser
-    {
-        load_buffer buf;
-        buffer_line_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), buf(move(buf))
-        {
-        }
-        buffer_line_parser(const buffer_line_parser&) = delete; // NOCOPY
-        buffer_line_parser& operator=(const buffer_line_parser&) = delete;
-        operator bool() const noexcept { return (bool)buf; }
-    };
-
-
-    /**
-     * Stores a load buffer for bracket parsing
-     */
-    struct buffer_bracket_parser : public bracket_parser
-    {
-        load_buffer buf;
-        buffer_bracket_parser(load_buffer&& buf) noexcept : bracket_parser(buf.str, buf.len), buf(move(buf))
-        {
-        }
-        buffer_bracket_parser(const buffer_bracket_parser&) = delete; // NOCOPY
-        buffer_bracket_parser& operator=(const buffer_bracket_parser&) = delete;
-        operator bool() const noexcept { return (bool)buf; }
-    };
-
 
     ////////////////////////////////////////////////////////////////////////////////
 
 
     /**
-     * Buffered FILE structure for performing random access read/write
+     * @brief Buffered FILE structure for performing random access read/write
      *
-     *  Example usage:
-     *         file f("test.obj");
-     *         char* buffer = malloc(f.size());
-     *         f.read(buffer, f.size());
-     *
+     * Example: opening a file and reading some info
+     * @code 
+     *     if (file f {"example.txt"}) {
+     *         MyStruct s;
+     *         f.read(&s); // read simple binary data blocks
+     *     }
+     * @endcode
+     * 
+     * Example: reading all bytes from a file
+     * @code
+     *     if (load_buffer buf = file::read_all("example.txt")) {
+     *         printf("%.*s", buf.len, buf.str);
+     *     }
+     * @endcode
+     * 
+     * Example: parsing lines from a file and writing data to a file
+     * @code
+     *     if (auto parser = buffer_line_parser::from_file("datalines.txt")) {
+     *         while (strview line = parser.next_line())
+     *             println(line);
+     *     }
+     *     
+     *     if (file f {"datalines.txt", CREATENEW}) {
+     *         f.writeln("line1", 10, 20.1f);   // writes 'line1 10 20.1\n'
+     *         f.writef("a more %.2f complicated %.*s\n", 3.14159, 4, "line");
+     *     }
+     * @endcode
+     * 
+     * Example: parsing or writing a key-value map
+     * @code
+     *     keyvals.txt : "key1=value1\nkey2=value2\n"
+     *     
+     *     unordered_map<string,string> keyvals = file::read_map("keyvals.txt");
+     *     
+     *     file::write_map("keyvals.txt", {
+     *         { "key1", "value1" },
+     *         { "key2", "value2" },
+     *     });
+     * @endcode
      */
     struct file
     {
         void*	Handle;	// File handle
         IOFlags	Mode;	// File openmode READWRITE or READONLY
 
-        file() noexcept : Handle(0), Mode(READONLY)
+        file() noexcept : Handle(nullptr), Mode(READONLY)
         {
         }
 
@@ -110,11 +120,15 @@ namespace rpp /* ReCpp */
          * @param filename File name to open or create
          * @param mode File open mode
          */
-        file(const char*   filename, IOFlags mode = READONLY) noexcept;
-        file(const string& filename, IOFlags mode = READONLY) noexcept;
-        file(const strview filename, IOFlags mode = READONLY) noexcept;
+        file(const char* filename, IOFlags mode = READONLY) noexcept;
+        file(const string&  filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
+        {
+        }
+        file(const strview& filename, IOFlags mode = READONLY) noexcept;
         file(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
-        file(const wstring& filename, IOFlags mode = READONLY) noexcept;
+        file(const wstring& filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
+        {
+        }
         file(file&& f) noexcept;
         ~file();
 
@@ -122,7 +136,6 @@ namespace rpp /* ReCpp */
 
         file(const file& f) = delete;
         file& operator=(const file& f) = delete;
-    public:
 
         /**
          * Opens an existing file for reading with mode = READONLY
@@ -131,11 +144,17 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
-        bool open(const char*   filename, IOFlags mode = READONLY) noexcept;
-        bool open(const string& filename, IOFlags mode = READONLY) noexcept;
+        bool open(const char* filename, IOFlags mode = READONLY) noexcept;
+        bool open(const string& filename, IOFlags mode = READONLY) noexcept
+        {
+            return open(filename.c_str(), mode);
+        }
         bool open(const strview filename, IOFlags mode = READONLY) noexcept;
         bool open(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
-        bool open(const wstring& filename, IOFlags mode = READONLY) noexcept;
+        bool open(const wstring& filename, IOFlags mode = READONLY) noexcept
+        {
+            return open(filename.c_str(), mode);
+        }
         void close() noexcept;
 
         /**
@@ -169,6 +188,11 @@ namespace rpp /* ReCpp */
          */
         int read(void* buffer, int bytesToRead) noexcept;
 
+        template<class T> int read(T* object) noexcept
+        {
+            return read(object, sizeof(T));
+        }
+
         /**
          * Reads the entire contents of the file into a load_buffer
          * unbuffered_file is used internally
@@ -179,11 +203,36 @@ namespace rpp /* ReCpp */
          * Reads the entire contents of the file into a load_buffer
          * The file is opened as READONLY, unbuffered_file is used internally
          */
-        static load_buffer read_all(const char*   filename) noexcept;
-        static load_buffer read_all(const string& filename) noexcept;
-        static load_buffer read_all(const strview filename) noexcept;
+        static load_buffer read_all(const char* filename) noexcept;
+        static load_buffer read_all(const string& filename) noexcept
+        {
+            return read_all(filename.c_str());
+        }
+        static load_buffer read_all(const strview& filename) noexcept;
         static load_buffer read_all(const wchar_t* filename) noexcept;
-        static load_buffer read_all(const wstring& filename) noexcept;
+        static load_buffer read_all(const wstring& filename) noexcept
+        {
+            return read_all(filename.c_str());
+        }
+
+        /**
+         * Reads a simple key-value map from file in the form of:
+         * @code
+         *     key1=value1\n
+         *     key2 = value2 \n
+         * @endcode
+         * @return Hash map of key string and value string
+         */
+        static unordered_map<string, string> read_map(const strview& filename) noexcept;
+
+        /**
+         * Parses a simple key-value map from a load_buffer file.
+         * Intended usage:
+         *     load_buffer buf = file::read_all("values.txt");
+         *     auto map = file::parse_map(buf);
+         * @return Map of string views, referencing into buf
+         */
+        static unordered_map<strview, strview> parse_map(const load_buffer& buf) noexcept;
 
         /**
          * Writes a block of bytes to the file. Regular Windows IO
@@ -226,6 +275,29 @@ namespace rpp /* ReCpp */
         int writef(const char* format, ...) noexcept;
 
         /**
+         * Writes a string to file and also appends a newline
+         */
+        int writeln(const strview& str) noexcept;
+
+        /**
+         * Just append a newline
+         */
+        int writeln() noexcept;
+
+        /**
+         * @brief Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
+         * 
+         * Example:
+         * @code writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n" @endcode
+         */
+        template<class T, class... Args> int writeln(const T& first, const Args&... args) noexcept
+        {
+            string_buffer buf;
+            buf.writeln(first, args...);
+            return write(buf.ptr, buf.len);
+        }
+
+        /**
          * Forcefully flushes any OS file buffers to send all data to the storage device
          * @warning Don't call this too haphazardly, or you will ruin your IO performance!
          */
@@ -242,9 +314,49 @@ namespace rpp /* ReCpp */
          * @param bytesToWrite Number of bytes to write to the file
          * @return Number of bytes actually written to the file
          */
-        static int write_new(const char*   filename, const void* buffer, int bytesToWrite) noexcept;
-        static int write_new(const string& filename, const void* buffer, int bytesToWrite) noexcept;
-        static int write_new(const strview filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(const string& filename, const void* buffer, int bytesToWrite) noexcept
+        {
+            return write_new(filename.c_str(), buffer, bytesToWrite);
+        }
+        static int write_new(const strview& filename, const strview& data) noexcept
+        {
+            return write_new(filename, data.str, data.len);
+        }
+        template<class T, class U>
+        static int write_new(const strview& filename, const vector<T,U>& plainOldData) noexcept
+        {
+            return write_new(filename, plainOldData.data(), int(plainOldData.size()*sizeof(T)));
+        }
+
+        /**
+         * Writes a simple key-value map to file in the form of:
+         * @code
+         *     key1=value1\n
+         *     key2=value2\n
+         * @endcode
+         * @note Please avoid using \n in the keys or values
+         * @note Key and Value types require .size() and .c_str()
+         * @return Number of bytes written
+         */
+        template<class K, class V, class H, class C, class A>
+        static int write_map(const strview& filename, const unordered_map<K, V, H, C, A>& map) noexcept
+        {
+            size_t required = 0;
+            for (auto& kv : map)
+                required += kv.first.size() + kv.second.size() + 2ul;
+
+            string buffer; buffer.reserve(required);
+            for (auto& kv : map)
+            {
+                buffer.append(kv.first.c_str(), kv.first.size());
+                buffer += '=';
+                buffer.append(kv.second.c_str(), kv.second.size());
+                buffer += '\n';
+            }
+            return write_new(filename, buffer);
+        }
 
         /**
          * Seeks to the specified position in a file. Seekmode is
@@ -255,12 +367,17 @@ namespace rpp /* ReCpp */
          * @return Current position in the file
          */
         int seek(int filepos, int seekmode = SEEK_SET) noexcept;
-        uint64 seekl(uint64 filepos, int seekmode = SEEK_SET) noexcept;
+        uint64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept;
 
         /**
          * @return Current position in the file
          */
         int tell() const noexcept;
+
+        /**
+         * @return 64-bit position in the file
+         */
+        int64 tell64() const noexcept;
 
         /**
          * Get multiple time info from this file handle
@@ -281,8 +398,79 @@ namespace rpp /* ReCpp */
          * @return File write time - when was this file last modified
          */
         time_t time_modified() const noexcept;
+
+        /**
+         * Gets the size of the file along with last modified time.
+         * This has less syscalls than calling f.size() and f.time_modified() separately
+         * @return Size of the file
+         */
+        int size_and_time_modified(time_t* outModified) const noexcept;
     };
 
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Generic parser that stores a file load buffer, with easy construction and usability
+     * Example:
+     * @code
+     *   using buffer_line_parser = buffer_parser<line_parser>;
+     *   if (auto parser = buffer_line_parser::from_file("datalines.txt");
+     *   {
+     *       while (strview line = parser.next_line())
+     *           println(line);
+     *   }
+     * @endcode
+     */
+    template<class parser> struct buffer_parser : parser
+    {
+        load_buffer dataOwner;
+
+        buffer_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), dataOwner(move(buf)) {}
+
+        // resets the parser state
+        void reset() noexcept { parser::buffer = dataOwner; }
+
+        explicit operator bool() const noexcept { return (bool)dataOwner; }
+        static buffer_parser from_file(strview filename) noexcept {
+            return { file::read_all(filename) };
+        }
+    };
+
+    using buffer_line_parser    = buffer_parser<line_parser>;
+    using buffer_bracket_parser = buffer_parser<bracket_parser>;
+    using buffer_keyval_parser  = buffer_parser<keyval_parser>;
+    
+    /**
+     * Key-Value map parser that stores a file load buffer, with easy construction and usability
+     * Example:
+     * @code
+     *   if (auto map = key_value_map::from_file("keyvalues.txt");
+     *   {
+     *       println(map["key"]);
+     *   }
+     * @endcode
+     */
+    struct key_value_map
+    {
+        load_buffer dataOwner;
+        unordered_map<strview, strview> map;
+        
+        key_value_map(load_buffer&& buf) noexcept : dataOwner(move(buf)), map(file::parse_map(dataOwner)) {}
+        
+        explicit operator bool() const noexcept { return (bool)dataOwner && !map.empty(); }
+        int size()   const { return (int)map.size(); }
+        bool empty() const { return map.empty(); }
+        
+        strview operator[](strview key) const noexcept {
+            auto it = map.find(key);
+            return it == map.end() ? strview{} : it->second;
+        }
+        
+        static key_value_map from_file(strview filename) noexcept {
+            return { file::read_all(filename) };
+        }
+    };
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -291,15 +479,15 @@ namespace rpp /* ReCpp */
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
     bool file_exists(const char* filename) noexcept;
-    FINLINE bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
-    FINLINE bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
+    inline bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
+    inline bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
     bool folder_exists(const char* folder) noexcept;
-    FINLINE bool folder_exists(const string& folder) noexcept { return folder_exists(folder.c_str());   }
-    FINLINE bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
+    inline bool folder_exists(const string& folder) noexcept { return folder_exists(folder.c_str());   }
+    inline bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
 
     /**
      * @brief Gets basic information of a file
@@ -317,52 +505,50 @@ namespace rpp /* ReCpp */
      * @return Short size of a file
      */
     int file_size(const char* filename) noexcept;
-    FINLINE int file_size(const string& filename) noexcept { return file_size(filename.c_str());   }
-    FINLINE int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
+    inline int file_size(const string& filename) noexcept { return file_size(filename.c_str());   }
+    inline int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
 
     /**
      * @return Long size of a file
      */
     int64 file_sizel(const char* filename) noexcept;
-    FINLINE int64 file_sizel(const string& filename) noexcept { return file_sizel(filename.c_str());   }
-    FINLINE int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
+    inline int64 file_sizel(const string& filename) noexcept { return file_sizel(filename.c_str());   }
+    inline int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
 
     /**
      * @return File creation date
      */
     time_t file_created(const char* filename) noexcept;
-    FINLINE time_t file_created(const string& filename) noexcept { return file_created(filename.c_str());   }
-    FINLINE time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
+    inline time_t file_created(const string& filename) noexcept { return file_created(filename.c_str());   }
+    inline time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
 
     /**
      * @return Last file access date
      */
     time_t file_accessed(const char* filename) noexcept;
-    FINLINE time_t file_accessed(const string& filename) noexcept { return file_accessed(filename.c_str());   }
-    FINLINE time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
+    inline time_t file_accessed(const string& filename) noexcept { return file_accessed(filename.c_str());   }
+    inline time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
 
     /**
      * @return Last file modification date
      */
     time_t file_modified(const char* filename) noexcept;
-    FINLINE time_t file_modified(const string& filename) noexcept { return file_modified(filename.c_str());   }
-    FINLINE time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
+    inline time_t file_modified(const string& filename) noexcept { return file_modified(filename.c_str());   }
+    inline time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
 
     /**
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
     bool delete_file(const char* filename) noexcept;
-    FINLINE bool delete_file(const string& filename) noexcept { return delete_file(filename.c_str());   }
-    FINLINE bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
+    inline bool delete_file(const string& filename) noexcept { return delete_file(filename.c_str());   }
+    inline bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
 
     /**
      * Creates a folder, recursively creating folders that do not exist
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */
     bool create_folder(const strview foldername) noexcept;
-    FINLINE bool create_folder(const char*   foldername) noexcept { return create_folder(strview{ foldername }); }
-    FINLINE bool create_folder(const string& foldername) noexcept { return create_folder(strview{ foldername }); }
     bool create_folder(const wchar_t* foldername) noexcept;
     bool create_folder(const wstring& foldername) noexcept;
 
@@ -372,77 +558,85 @@ namespace rpp /* ReCpp */
      * @return TRUE if the folder was deleted
      */
     bool delete_folder(const string& foldername, bool recursive = false) noexcept;
-    FINLINE bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
-    FINLINE bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
+    inline bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
+    inline bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
-     *        Ex: "path" ==> "C:\Projects\Test\path" 
+     * @result "path" ==> "C:\Projects\Test\path" 
      */
     string full_path(const char* path) noexcept;
-    FINLINE string full_path(const string& path) noexcept { return full_path(path.c_str());   }
-    FINLINE string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
+    inline string full_path(const string& path) noexcept { return full_path(path.c_str());   }
+    inline string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
 
-    // merges all ../ of a full path
+    /**
+     * @brief Merges all ../ inside of a path
+     * @result  ../lib/../bin/file.txt ==> ../bin/file.txt
+     */
     string merge_dirups(const strview path) noexcept;
 
     /**
      * @brief Extract the filename (no extension) from a file path
-     *        Ex: /root/dir/file.ext ==> file
-     *        Ex: /root/dir/file     ==> file
-     *        Ex: /root/dir/         ==> 
-     *        Ex: file.ext           ==> file
+     * 
+     * @result /root/dir/file.ext ==> file
+     * @result /root/dir/file     ==> file
+     * @result /root/dir/         ==> 
+     * @result file.ext           ==> file
+     * @result /.git/f.reallylong ==> f.reallylong
+     * @result /.git/filewnoext   ==> filewnoext
      */
     strview file_name(const strview path) noexcept;
-    FINLINE strview file_name(const string& path) noexcept { return file_name(strview{ path }); }
-    FINLINE strview file_name(const char*   path) noexcept { return file_name(strview{ path }); }
 
     /**
      * @brief Extract the file part (with ext) from a file path
-     *        Ex: /root/dir/file.ext ==> file.ext
-     *        Ex: /root/dir/file     ==> file
-     *        Ex: /root/dir/         ==> 
-     *        Ex: file.ext           ==> file.ext
+     * @result /root/dir/file.ext ==> file.ext
+     * @result /root/dir/file     ==> file
+     * @result /root/dir/         ==> 
+     * @result file.ext           ==> file.ext
      */
     strview file_nameext(const strview path) noexcept;
-    FINLINE strview file_nameext(const string& path) noexcept { return file_nameext(strview{ path }); }
-    FINLINE strview file_nameext(const char*   path) noexcept { return file_nameext(strview{ path }); }
 
     /**
      * @brief Extract the extension from a file path
-     *        Ex: /root/dir/file.ext ==> ext
-     *        Ex: /root/dir/file     ==> 
-     *        Ex: /root/dir/         ==> 
-     *        Ex: file.ext           ==> ext
+     * @result /root/dir/file.ext ==> ext
+     * @result /root/dir/file     ==> 
+     * @result /root/dir/         ==> 
+     * @result file.ext           ==> ext
+     * @result /.git/f.reallylong ==> 
+     * @result /.git/filewnoext   ==> 
      */
     strview file_ext(const strview path) noexcept;
-    FINLINE strview file_ext(const string& path) noexcept { return file_ext(strview{ path }); }
-    FINLINE strview file_ext(const char*   path) noexcept { return file_ext(strview{ path }); }
+
+    /**
+     * @brief Replaces the current file path extension
+     *        Usage: file_replace_ext("dir/file.old", "new");
+     * @result /dir/file.old ==> /dir/file.new
+     * @result /dir/file     ==> /dir/file.new
+     * @result /dir/         ==> /dir/
+     * @result file.old      ==> file.new
+     */
+    string file_replace_ext(const strview path, const strview ext);
 
     /**
      * @brief Extract the foldername from a path name
-     *        Ex: /root/dir/file.ext ==> dir
-     *        Ex: /root/dir/file     ==> dir
-     *        Ex: /root/dir/         ==> dir
-     *        Ex: dir/               ==> dir
-     *        Ex: file.ext           ==> 
+     * @result /root/dir/file.ext ==> dir
+     * @result /root/dir/file     ==> dir
+     * @result /root/dir/         ==> dir
+     * @result dir/               ==> dir
+     * @result file.ext           ==> 
      */
     strview folder_name(const strview path) noexcept;
-    FINLINE strview folder_name(const string& path) noexcept { return folder_name(strview{ path }); }
-    FINLINE strview folder_name(const char*   path) noexcept { return folder_name(strview{ path }); }
 
     /**
      * @brief Extracts the full folder path from a file path.
      *        Will preserve / and assume input is always a filePath
-     *        Ex: /root/dir/file.ext ==> /root/dir/
-     *        Ex: /root/dir/file     ==> /root/dir/
-     *        Ex: /root/dir/         ==> /root/dir/
-     *        Ex: dir/               ==> dir/
-     *        Ex: file.ext           ==> 
+     * @result /root/dir/file.ext ==> /root/dir/
+     * @result /root/dir/file     ==> /root/dir/
+     * @result /root/dir/         ==> /root/dir/
+     * @result dir/               ==> dir/
+     * @result file.ext           ==> 
      */
     strview folder_path(const strview path) noexcept;
-    inline strview folder_path(const string& path) noexcept { return folder_path(strview{ path }); }
-    inline strview folder_path(const char*   path) noexcept { return folder_path(strview{ path }); }
     wstring folder_path(const wchar_t* path) noexcept;
     wstring folder_path(const wstring& path) noexcept;
     /**
@@ -450,7 +644,7 @@ namespace rpp /* ReCpp */
      * @note This does not perform full path expansion.
      * @note The string is modified in-place !careful!
      *
-     *       Ex:  \root\dir/file.ext ==> /root/dir/file.ext
+     * @result \root/dir\\file.ext ==> /root/dir/file.ext
      */
     string& normalize(string& path, char sep = '/') noexcept;
     char*   normalize(char*   path, char sep = '/') noexcept;
@@ -460,57 +654,208 @@ namespace rpp /* ReCpp */
      * @note A copy of the string is made
      */
     string normalized(const strview path, char sep = '/') noexcept;
-    FINLINE string normalized(const string& path, char sep = '/') noexcept { return normalized(strview{ path }, sep); }
-    FINLINE string normalized(const char*   path, char sep = '/') noexcept { return normalized(strview{ path }, sep); }
+    
+    /**
+     * @brief Efficiently combines two path strings, removing any repeated / or \
+     * @result path_combine("tmp", "file.txt")   ==> "tmp/file.txt"
+     * @result path_combine("tmp/", "file.txt")  ==> "tmp/file.txt"
+     * @result path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
+     * @result path_combine("tmp/", "/folder//") ==> "tmp/folder"
+     */
+    string path_combine(strview path1, strview path2) noexcept;
 
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    /**
+     * Basic and minimal directory iterator. Example usage:
+     * @code
+     *     for (dir_entry e : dir_iterator { dir })
+     *         if (e.is_dir) e.add_path_to(out);
+     * @endcode
+     */
+    class dir_iterator
+    {
+        struct impl;
+        struct dummy {
+            #if _WIN32
+                void* hFind;
+                char ffd[320];
+            #else
+                void* d;
+                void* e;
+            #endif
+            impl* operator->();
+            const impl* operator->() const;
+        };
+
+        dummy s; // iterator state
+        const string dir;       // original path used to construct this dir_iterator
+        const string reldir;    // relative directory
+        mutable string fulldir; // full path to directory we're iterating
+
+    public:
+        explicit dir_iterator(const strview& dir) : dir_iterator{ dir.to_string() } {}
+        explicit dir_iterator(const string& dir)  : dir_iterator{ string{dir}     } {}
+        explicit dir_iterator(string&& dir);
+        ~dir_iterator();
+
+        struct entry
+        {
+            const dir_iterator* it;
+            const strview name;
+            const bool is_dir;
+            entry(const dir_iterator* it) : it{it}, name{ it->name() }, is_dir{ it->is_dir() }
+            {
+            }
+            string path()      const { return path_combine(it->path(),      name); }
+            string full_path() const { return path_combine(it->full_path(), name); }
+            // all files and directories that aren't "." or ".." are valid
+            bool is_valid()    const { return !is_dir || (name != "." && name != ".."); }
+            bool add_path_to(vector<string>& out) const {
+                if (is_valid()) {
+                    out.emplace_back(path());
+                    return true;
+                }
+                return false;
+            }
+            bool add_full_path_to(vector<string>& out) const {
+                if (is_valid()) {
+                    out.emplace_back(full_path());
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        struct iter { // bare minimum for basic looping
+            dir_iterator* it;
+            bool operator==(const iter& other) const { return it == other.it; }
+            bool operator!=(const iter& other) const { return it != other.it; }
+            entry operator*() const { return { it }; }
+            iter& operator++() {
+                if (!it->next()) it = nullptr;
+                return *this;
+            }
+        };
+
+        explicit operator bool() const;
+        bool next(); // find next directory entry
+        bool is_dir()  const; // if current entry is a dir
+        strview name() const; // current entry name
+        entry current() const { return { this }; }
+        iter begin()          { return { this }; }
+        iter end()      const { return { nullptr }; }
+
+        // original path used to construct this dir_iterator
+        const string& path() const { return dir; }
+
+        // full path to directory we're iterating
+        const string& full_path() const {
+            return fulldir.empty() ? (fulldir = rpp::full_path(dir)) : fulldir;
+        }
+    };
+
+    using dir_entry = dir_iterator::entry;
 
     ////////////////////////////////////////////////////////////////////////////////
 
 
     /**
      * Lists all folders inside this directory
+     * @note By default: not recursive
      * @param out Destination vector for result folder names (not full folder paths!)
      * @param dir Relative or full path of this directory
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of folders found
      */
-    int list_dirs(vector<string>& out, strview dir) noexcept;
-    FINLINE vector<string> list_dirs(strview dir) noexcept
-    {
-        vector<string> out; list_dirs(out, dir); return out;
+    int list_dirs(vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
+
+    inline vector<string> list_dirs(strview dir, bool recursive = false, bool fullpath = false) noexcept {
+        vector<string> out; list_dirs(out, dir, recursive, fullpath); return out;
+    }
+    inline int list_dirs_fullpath(vector<string>& out, strview dir, bool recursive = false) noexcept {
+        return list_dirs(out, dir, recursive, true);
+    }
+    inline vector<string> list_dirs_fullpath(strview dir, bool recursive = false) noexcept {
+        return list_dirs(dir, recursive, true);
     }
 
     /**
      * Lists all files inside this directory that have the specified extension (default: all files)
-     * @param out Destination vector for result file names (not full file paths!)
+     * @note By default: not recursive
+     * @param out Destination vector for result file names.
      * @param dir Relative or full path of this directory
-     * @param ext Filter files by extension, ex: "txt", default ("") lists all files
+     * @param ext Filter files by extension, ex: ".txt", default ("") lists all files
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of files found that match the extension
+     * Example:
+     * @code
+     *     vector<string> relativePaths          = list_files(folder);
+     *     vector<string> recursiveRelativePaths = list_files_recursive(folder);
+     *     
+     * @endcode
      */
-    int list_files(vector<string>& out, strview dir, strview ext = {}) noexcept;
-    vector<string> list_files(strview dir, strview ext = {}) noexcept;
+    int list_files(vector<string>& out, strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept;
+    inline vector<string> list_files(strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept {
+        vector<string> out; list_files(out, dir, ext, recursive, fullpath); return out;
+    }
+
+    inline int list_files_fullpath(vector<string>& out, strview dir, strview ext = {}, bool recursive = false) noexcept {
+        return list_files(out, dir, ext, recursive, true);
+    }
+    inline int list_files_recursive(vector<string>& out, strview dir, strview ext = {}) noexcept {
+        return list_files(out, dir, ext, true, false);
+    }
+    inline int list_files_fullpath_recursive(vector<string>& out, strview dir, strview ext = {}) noexcept {
+        return list_files(out, dir, ext, true, true);
+    }
+
+    inline vector<string> list_files_fullpath(strview dir, strview ext = {}) noexcept {
+        return list_files(dir, ext, false, true);
+    }
+    inline vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept {
+        return list_files(dir, ext, true, false);
+    }
+    inline vector<string> list_files_fullpath_recursive(strview dir, strview ext = {}) noexcept {
+        return list_files(dir, ext, true, true);
+    }
 
     /**
      * Lists all files and folders inside a dir
+     * @note By default: not recursive
+     * @param outDirs All found directories relative to input dir
+     * @param outFiles All found files
+     * @param dir Directory to search in
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
+     * @return Number of files and folders found that match the extension
+     * Example:
+     * @code
+     *     string dir = "C:/Projects/ReCpp";
+     *     vector<string> dirs, files;
+     *     list_alldir(dirs, files, dir, true, false); // recursive, relative paths
+     *     // dirs:  { ".git", ".git/logs", ... }
+     *     // files: { ".git/config", ..., ".gitignore", ... }
+     * @endcode
      */
-    int list_alldir(vector<string>& outdirs, vector<string>& outfiles, strview dir) noexcept;
+    int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir, 
+                    bool recursive = false, bool fullpath = false) noexcept;
+
 
     /**
-     * Recursively lists all files under this directory and its subdirectories 
-     * that have the specified extension (default: all files)
-     * @param dir Relative or full path of root directory
-     * @param ext Filter files by extension, ex: "txt", default ("") lists all files
-     * @return vector of resulting relative file paths
-     */
-    vector<string> list_files_recursive(strview dir, strview ext = {}) noexcept;
-
-     /**
      * Recursively lists all files under this directory and its subdirectories 
      * that match the list of extensions
      * @param dir Relative or full path of root directory
      * @param exts Filter files by extensions, ex: {"txt","cfg"}
      * @return vector of resulting relative file paths
      */
-    vector<string> list_files_recursive(strview dir, const vector<strview>& exts) noexcept;
+    vector<string> list_files(strview dir, const vector<strview>& exts, bool recursive = false , bool fullpath = false) noexcept;
+    inline vector<string> list_files_recursive(strview dir, const vector<strview>& exts, bool fullpath = false) noexcept {
+        return list_files(dir, exts, true, fullpath);
+    }
 
     /**
      * @return The current working directory of the application
@@ -522,11 +867,17 @@ namespace rpp /* ReCpp */
      * @return TRUE if chdir() is successful
      */
     bool change_dir(const char* new_wd) noexcept;
-    FINLINE bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
-    FINLINE bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
+    inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
+    inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
 
+    /**
+     * @return The system temporary directory for storing misc files
+     * @note For windows this is: %USERPROFILE%/AppData/Local/Temp
+     */
+    string temp_dir() noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
 
 } // namespace rpp
+#endif // RPP_FILE_IO_H

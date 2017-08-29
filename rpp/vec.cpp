@@ -3,32 +3,97 @@
  */
 #include "vec.h"
 #include <stdio.h>
-#include <algorithm> // min,max
 
 namespace rpp
 {
+    // Clang doesn't support C++17 ODR-used constexpr simplifications
+    // so we still require an out-of-class definition for them:
+    #if __clang__
+        const float2 Vector2::ZERO;
+        const float2 Vector2::ONE;
+        const float2 Vector2::RIGHT;
+        const float2 Vector2::UP;
+        // ----
+        const double2 Vector2d::ZERO;
+        const double2 Vector2d::ONE;
+        const double2 Vector2d::RIGHT;
+        const double2 Vector2d::UP;
+        // ----
+        const int2 Point::ZERO; // Outer declaration required
+        // ----
+        const float4 Rect::ZERO; // Outer declaration required
+        // ----
+        const float3 Vector3::ZERO;
+        const float3 Vector3::ONE;
+        
+        const float3 Vector3::LEFT;
+        const float3 Vector3::RIGHT;
+        const float3 Vector3::UP;
+        const float3 Vector3::DOWN;
+        const float3 Vector3::FORWARD;
+        const float3 Vector3::BACKWARD;
+        
+        const float3 Vector3::WHITE;
+        const float3 Vector3::BLACK;
+        const float3 Vector3::RED;
+        const float3 Vector3::GREEN;
+        const float3 Vector3::BLUE;
+        const float3 Vector3::YELLOW;
+        const float3 Vector3::ORANGE;
+        const float3 Vector3::MAGENTA;
+        const float3 Vector3::CYAN;
+        const float3 Vector3::SWEETGREEN;
+        const float3 Vector3::CORNFLOWERBLUE;
+        // ----
+        const double3 Vector3d::ZERO;
+        // ----
+        const float4 Vector4::ZERO;
+        const float4 Vector4::ONE;
+        
+        const float4 Vector4::WHITE;
+        const float4 Vector4::BLACK;
+        const float4 Vector4::RED;
+        const float4 Vector4::GREEN;
+        const float4 Vector4::BLUE;
+        const float4 Vector4::YELLOW;
+        const float4 Vector4::ORANGE;
+        const float4 Vector4::MAGENTA;
+        const float4 Vector4::CYAN;
+        const float4 Vector4::SWEETGREEN;
+        const float4 Vector4::CORNFLOWERBLUE;
+    #endif
+
     /////////////////////////////////////////////////////////////////////////////////////
 
-    const Point Point::ZERO = { 0, 0 };
-    const Rect  Rect::ZERO  = { 0.0f, 0.0f, 0.0f, 0.0f };
+    template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y)
+    {
+        const T len = sqrt(x*x + y*y);
+        return nearlyZero(len) ? 0 : magnitude / len;
+    }
+
+    template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y, const T& z)
+    {
+        const T len = sqrt(x*x + y*y + z*z);
+        return nearlyZero(len) ? 0 : magnitude / len;
+    }
 
     /////////////////////////////////////////////////////////////////////////////////////
 
     void Vector2::print() const
     {
-        char buffer[256];
+        char buffer[32];
         puts(toString(buffer));
     }
     
     const char* Vector2::toString() const
     {
-        static char buffer[256];
+        static char buffer[32];
         return toString(buffer, sizeof(buffer));
     }
     
     char* Vector2::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 32);
     }
     
     char* Vector2::toString(char* buffer, int size) const
@@ -39,12 +104,12 @@ namespace rpp
     
     void Vector2::set(float newX, float newY)
     {
-        x=newX, y=newY;
+        x = newX; y = newY;
     }
 
     float Vector2::length() const
     {
-        return sqrtf(x*x + y*y);
+        return sqrt(x*x + y*y);
     }
 
     float Vector2::sqlength() const
@@ -54,25 +119,25 @@ namespace rpp
 
     void Vector2::normalize()
     {
-        float inv = 1.0f / sqrtf(x*x + y*y);
-        x *= inv, y *= inv;
+        auto inv = inverse_length(1.0f, x, y);
+        x *= inv; y *= inv;
     }
 
     void Vector2::normalize(const float magnitude)
     {
-        float inv = magnitude / sqrtf(x*x + y*y);
-        x *= inv, y *= inv;
+        auto inv = inverse_length(magnitude, x, y);
+        x *= inv; y *= inv;
     }
 
     Vector2 Vector2::normalized() const
     {
-        float inv = 1.0f / sqrtf(x*x + y*y);
-        return{ x*inv, y*inv };
+        auto inv = inverse_length(1.0f, x, y);
+        return { x*inv, y*inv };
     }
 
     Vector2 Vector2::normalized(const float magnitude) const
     {
-        float inv = magnitude / sqrtf(x*x + y*y);
+        auto inv = inverse_length(magnitude, x, y);
         return { x*inv, y*inv };
     }
 
@@ -114,29 +179,139 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
+    void Vector2d::print() const
+    {
+        char buffer[32];
+        puts(toString(buffer));
+    }
+    
+    const char* Vector2d::toString() const
+    {
+        static char buffer[32];
+        return toString(buffer, sizeof(buffer));
+    }
+    
+    char* Vector2d::toString(char* buffer) const
+    {
+        return toString(buffer, 32);
+    }
+    
+    char* Vector2d::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g}", x, y);
+        return buffer;
+    }
+    
+    void Vector2d::set(double newX, double newY)
+    {
+        x=newX; y=newY;
+    }
+
+    double Vector2d::length() const
+    {
+        return sqrt(x*x + y*y);
+    }
+
+    double Vector2d::sqlength() const
+    {
+        return x*x + y*y;
+    }
+
+    void Vector2d::normalize()
+    {
+        auto inv = inverse_length(1.0, x, y);
+        x *= inv; y *= inv;
+    }
+
+    void Vector2d::normalize(const double magnitude)
+    {
+        auto inv = inverse_length(magnitude, x, y);
+        x *= inv; y *= inv;
+    }
+
+    Vector2d Vector2d::normalized() const
+    {
+        auto inv = inverse_length(1.0, x, y);
+        return{ x*inv, y*inv };
+    }
+
+    Vector2d Vector2d::normalized(const double magnitude) const
+    {
+        auto inv = inverse_length(magnitude, x, y);
+        return { x*inv, y*inv };
+    }
+
+    double Vector2d::dot(const Vector2d& v) const
+    {
+        return x*v.x + y*v.y;
+    }
+
+    Vector2d Vector2d::right(const Vector2d& b, double magnitude) const
+    {
+        return Vector2d{ y - b.y, b.x - x }.normalized(magnitude);
+
+    }
+
+    Vector2d Vector2d::left(const Vector2d& b, double magnitude) const
+    {
+        return Vector2d{ b.y - y, x - b.x }.normalized(magnitude);
+    }
+
+    Vector2d Vector2d::right(double magnitude) const
+    {
+        return Vector2d{ y, -x }.normalized(magnitude);
+    }
+
+    Vector2d Vector2d::left(double magnitude) const
+    {
+        return Vector2d{ -y, x }.normalized(magnitude);
+    }
+
+    bool Vector2d::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y);
+    }
+
+    bool Vector2d::almostEqual(const Vector2d& b) const
+    {
+        return nearlyZero(x - b.x) && nearlyZero(y - b.y);
+    }
+    
+    /////////////////////////////////////////////////////////////////////////////////////
+
     const char* Point::toString() const
     {
-        static char buf[64]; snprintf(buf, sizeof(buf), "{%d;%d}", x, y);
-        return buf;
+        static char buf[32]; return toString(buf, 32);
+    }
+
+    char* Point::toString(char* buffer) const
+    {
+        return toString(buffer, 32);
+    }
+
+    char* Point::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%d;%d}", x, y);
+        return buffer;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
 
     void Rect::print() const
     {
-        char buffer[256];
+        char buffer[64];
         puts(toString(buffer));
     }
 
     const char* Rect::toString() const
     {
-        static char buffer[256];
+        static char buffer[64];
         return toString(buffer, sizeof(buffer));
     }
 
     char* Rect::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 64);
     }
 
     char* Rect::toString(char* buffer, int bufSize) const
@@ -223,12 +398,12 @@ namespace rpp
 
     void Vector3::set(float newX, float newY, float newZ)
     {
-        x=newX, y=newY, z=newZ;
+        x=newX; y=newY; z=newZ;
     }
 
     float Vector3::length() const
     {
-        return sqrtf(x*x + y*y + z*z);
+        return sqrt(x*x + y*y + z*z);
     }
 
     float Vector3::sqlength() const
@@ -241,57 +416,57 @@ namespace rpp
         float dx = x - v.x;
         float dy = y - v.y;
         float dz = z - v.z;
-        return sqrtf(dx*dx + dy*dy + dz*dz);
+        return sqrt(dx*dx + dy*dy + dz*dz);
     }
 
     void Vector3::normalize()
     {
-        float inv = 1.0f / sqrtf(x*x + y*y + z*z);
-        x *= inv, y *= inv, z *= inv;
+        auto inv = inverse_length(1.0f, x, y, z);
+        x *= inv; y *= inv; z *= inv;
     }
 
     void Vector3::normalize(const float magnitude)
     {
-        float inv = magnitude / sqrtf(x*x + y*y + z*z);
-        x *= inv, y *= inv, z *= inv;
+        auto inv = inverse_length(magnitude, x, y, z);
+        x *= inv; y *= inv; z *= inv;
     }
 
     Vector3 Vector3::normalized() const
     {
-        float inv = 1.0f / sqrtf(x*x + y*y + z*z);
-        return{ x*inv, y*inv, z*inv };
+        auto inv = inverse_length(1.0f, x, y, z);
+        return { x*inv, y*inv, z*inv };
     }
     Vector3 Vector3::normalized(const float magnitude) const
     {
-        float inv = magnitude / sqrtf(x*x + y*y + z*z);
+        auto inv = inverse_length(magnitude, x, y, z);
         return { x*inv, y*inv, z*inv };
     }
 
-    Vector3 Vector3::cross(const Vector3& b) const
+    Vector3 Vector3::cross(const Vector3& v) const
     {
-        return { y*b.z - b.y*z, z*b.x - b.z*x, x*b.y - b.x*y };
+        return { y*v.z - v.y*z, z*v.x - v.z*x, x*v.y - v.x*y };
     }
 
-    float Vector3::dot(const Vector3& b) const
+    float Vector3::dot(const Vector3& v) const
     {
-        return x*b.x + y*b.y + z*b.z;
+        return x*v.x + y*v.y + z*v.z;
     }
 
     void Vector3::print() const
     {
-        char buffer[256];
+        char buffer[48];
         puts(toString(buffer));
     }
 
     const char* Vector3::toString() const
     {
-        static char buffer[256];
+        static char buffer[48];
         return toString(buffer, sizeof(buffer));
     }
 
     char* Vector3::toString(char* buffer) const
     {
-        return toString(buffer, 256);
+        return toString(buffer, 48);
     }
 
     char* Vector3::toString(char* buffer, int size) const
@@ -307,18 +482,123 @@ namespace rpp
         return nearlyZero(x) && nearlyZero(y) && nearlyZero(z);
     }
 
-    bool Vector3::almostEqual(const Vector3& b) const
+    bool Vector3::almostEqual(const Vector3& v) const
     {
-        return nearlyZero(x - b.x) && nearlyZero(y - b.y) && nearlyZero(z - b.z);
+        return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
     }
 
-    const Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
+    Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
     {
         return { src.x * (1 - ratio) + dst.x * ratio,
                  src.y * (1 - ratio) + dst.y * ratio,
                  src.z * (1 - ratio) + dst.z * ratio };
     }
 
+    Vector3 Vector3::parseColor(const strview& s) noexcept
+    {
+        if (!s)
+            return WHITE;
+
+        if (s[0] == '#')
+            return Vector4::HEX(s).rgb;
+
+        if (isalpha(s[0]))
+            return Vector4::NAME(s).rgb;
+
+        return Vector4::NUMBER(s).rgb;
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+    
+    void Vector3d::set(double newX, double newY, double newZ)
+    {
+        x=newX; y=newY; z=newZ;
+    }
+
+    double Vector3d::length() const
+    {
+        return sqrt(x*x + y*y + z*z);
+    }
+
+    double Vector3d::sqlength() const
+    {
+        return x*x + y*y + z*z;
+    }
+
+    double Vector3d::distanceTo(const Vector3d& v) const
+    {
+        double dx = x - v.x;
+        double dy = y - v.y;
+        double dz = z - v.z;
+        return sqrt(dx*dx + dy*dy + dz*dz);
+    }
+
+    void Vector3d::normalize()
+    {
+        auto inv = inverse_length(1.0, x, y, z);
+        x *= inv; y *= inv; z *= inv;
+    }
+
+    void Vector3d::normalize(const double magnitude)
+    {
+        auto inv = inverse_length(magnitude, x, y, z);
+        x *= inv; y *= inv; z *= inv;
+    }
+
+    Vector3d Vector3d::normalized() const
+    {
+        auto inv = inverse_length(1.0, x, y, z);
+        return { x*inv, y*inv, z*inv };
+    }
+    Vector3d Vector3d::normalized(const double magnitude) const
+    {
+        auto inv = inverse_length(magnitude, x, y, z);
+        return { x*inv, y*inv, z*inv };
+    }
+
+    Vector3d Vector3d::cross(const Vector3d& b) const
+    {
+        return { y*b.z - b.y*z, z*b.x - b.z*x, x*b.y - b.x*y };
+    }
+
+    double Vector3d::dot(const Vector3d& b) const
+    {
+        return x*b.x + y*b.y + z*b.z;
+    }
+    
+    void Vector3d::print() const
+    {
+        char buffer[48];
+        puts(toString(buffer));
+    }
+    
+    const char* Vector3d::toString() const
+    {
+        static char buffer[48];
+        return toString(buffer, sizeof(buffer));
+    }
+    
+    char* Vector3d::toString(char* buffer) const
+    {
+        return toString(buffer, 48);
+    }
+    
+    char* Vector3d::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g;%.3g}", x, y, z);
+        return buffer;
+    }
+
+    bool Vector3d::almostZero() const
+    {
+        return nearlyZero(x) && nearlyZero(y) && nearlyZero(z);
+    }
+
+    bool Vector3d::almostEqual(const Vector3d& v) const
+    {
+        return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
+    }
+    
     /////////////////////////////////////////////////////////////////////////////////////
 
     bool Vector4::almostZero() const
@@ -333,12 +613,35 @@ namespace rpp
 
     void Vector4::set(float newX, float newY, float newZ, float newW)
     {
-        x = newX, y = newY, z = newZ, w = newW;
+        x = newX; y = newY; z = newZ; w = newW;
     }
 
     float Vector4::dot(const Vector4& v) const
     {
         return x*v.x + y*v.y + z*v.z + w*v.w;
+    }
+
+    void Vector4::print() const
+    {
+        char buffer[48];
+        puts(toString(buffer));
+    }
+
+    const char* Vector4::toString() const
+    {
+        static char buffer[64];
+        return toString(buffer, sizeof(buffer));
+    }
+
+    char* Vector4::toString(char* buffer) const
+    {
+        return toString(buffer, 64);
+    }
+
+    char* Vector4::toString(char* buffer, int size) const
+    {
+        snprintf(buffer, size, "{%.3g;%.3g;%.3g;%.3g}", x, y, z, w);
+        return buffer;
     }
 
     Vector4 Vector4::fromAngleAxis(float angle, const Vector3& axis)
@@ -370,9 +673,9 @@ namespace rpp
         );
     }
     
-    const Vector4 Vector4::HEX(const strview& s) noexcept
+    Vector4 Vector4::HEX(const strview& s) noexcept
     {
-        Color c = Color::WHITE;
+        Color c = WHITE;
         if (s[0] == '#')
         {
             strview r = s.substr(1, 2);
@@ -387,7 +690,7 @@ namespace rpp
         return c;
     }
 
-    const Vector4 Vector4::NAME(const strview& s) noexcept
+    Vector4 Vector4::NAME(const strview& s) noexcept
     {
         if (s.equalsi("white"))  return WHITE;
         if (s.equalsi("black"))  return BLACK;
@@ -399,17 +702,19 @@ namespace rpp
         return WHITE;
     }
 
-    const Vector4 Vector4::NUMBER(strview s) noexcept
+    Vector4 Vector4::NUMBER(strview s) noexcept
     {
-        Color c;
         strview r = s.next(' ');
         strview g = s.next(' ');
         strview b = s.next(' ');
         strview a = s.next(' ');
-        c.r = r.to_float();
-        c.g = g.to_float();
-        c.b = b.to_float();
-        c.a = a ? a.to_float() : 1.0f;
+
+        Color c = {
+            r.to_float(),
+            g.to_float(),
+            b.to_float(),
+            a ? a.to_float() : 1.0f
+        };
         if (c.r > 1.0f) c.r /= 255.0f;
         if (c.g > 1.0f) c.g /= 255.0f;
         if (c.b > 1.0f) c.b /= 255.0f;
@@ -417,7 +722,7 @@ namespace rpp
         return c;
     }
 
-    const Vector4 Vector4::parseColor(const strview& s) noexcept
+    Vector4 Vector4::parseColor(const strview& s) noexcept
     {
         if (!s)
             return WHITE;
@@ -433,12 +738,12 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    const Matrix4 Matrix4::IDENTITY = {{
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
-    }};
+    const Matrix4 Matrix4::IDENTITY = {
+        { 1, 0, 0, 0 },
+        { 0, 1, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 },
+    };
 
     Matrix4& Matrix4::loadIdentity()
     {
@@ -462,13 +767,30 @@ namespace rpp
         return *this;
     }
 
-    Vector4 Matrix4::operator*(const Vector3& v) const
+    Matrix4 Matrix4::operator*(const Matrix4& mb) const
+    {
+        const Vector4 a0 = r0;
+        const Vector4 a1 = r1;
+        const Vector4 a2 = r2;
+        const Vector4 a3 = r3;
+        const Vector4 b0 = mb.r0;
+        const Vector4 b1 = mb.r1;
+        const Vector4 b2 = mb.r2;
+        const Vector4 b3 = mb.r3;
+        Matrix4 mc;
+        mc.r0 = (a0*b0.x + a1*b0.y) + (a2*b0.z + a3*b0.w);
+        mc.r1 = (a0*b1.x + a1*b1.y) + (a2*b1.z + a3*b1.w);
+        mc.r2 = (a0*b2.x + a1*b2.y) + (a2*b2.z + a3*b2.w);
+        mc.r3 = (a0*b3.x + a1*b3.y) + (a2*b3.z + a3*b3.w);
+        return mc;
+    }
+
+    Vector3 Matrix4::operator*(const Vector3& v) const
     {
         return {
                 (m00*v.x) + (m10*v.y) + (m20*v.z) + m30,
                 (m01*v.x) + (m11*v.y) + (m21*v.z) + m31,
-                (m02*v.x) + (m12*v.y) + (m22*v.z) + m32,
-                (m03*v.x) + (m13*v.y) + (m23*v.z) + m33
+                (m02*v.x) + (m12*v.y) + (m22*v.z) + m32
         };
     }
     Vector4 Matrix4::operator*(const Vector4& v) const
@@ -483,7 +805,7 @@ namespace rpp
 
     Matrix4& Matrix4::translate(const Vector3& offset)
     {
-        r3 = this->operator*(offset);
+        r3.xyz = this->operator*(offset);
         return *this;
     }
 
@@ -532,10 +854,10 @@ namespace rpp
         const float rl = right - left;
         const float tb = top - bottom;
         const float dt = far - near;
-        m00 = 2.0f / rl, m01 = 0.0f, m02 = 0.0f,  m03 = 0.0f;
-        m10 = 0.0f, m11 = 2.0f / tb, m12 = 0.0f,  m13 = 0.0f;
-        m20 = 0.0f, m21 = 0.0f,      m22 = -2.0f/dt, m23 = 0.0f;
-        m30 = -(right+left)/rl, m31 = -(top+bottom)/tb, m32 = -(far+near)/dt, m33 = 1.0f;
+        m00 = 2.0f/rl; m01 = 0.0f;    m02 = 0.0f;     m03 = 0.0f;
+        m10 = 0.0f;    m11 = 2.0f/tb; m12 = 0.0f;     m13 = 0.0f;
+        m20 = 0.0f;    m21 = 0.0f;    m22 = -2.0f/dt; m23 = 0.0f;
+        m30 = -(right+left)/rl; m31 = -(top+bottom)/tb; m32 = -(far+near)/dt; m33 = 1.0f;
         return *this;
     }
 
@@ -545,22 +867,22 @@ namespace rpp
         const float h = cosf(rad2) / sinf(rad2);
         const float w = (h * height) / width;
         const float range = zFar - zNear;
-        m00 = w, m01 = 0, m02 = 0, m03 = 0;
-        m10 = 0, m11 = h, m12 = 0, m13 = 0;
-        m20 = 0, m21 = 0, m22 = -(zFar + zNear) / range, m23 = -1;
-        m30 = 0, m31 = 0, m32 = (-2.0f * zFar * zNear) / range, m33 = 1;
+        m00 = w; m01 = 0; m02 = 0; m03 = 0;
+        m10 = 0; m11 = h; m12 = 0; m13 = 0;
+        m20 = 0; m21 = 0; m22 = -(zFar + zNear) / range; m23 = -1;
+        m30 = 0; m31 = 0; m32 = (-2.0f * zFar * zNear) / range; m33 = 1;
         return *this;
     }
 
-    Matrix4& Matrix4::setLookAt(const Vector3 &eye, const Vector3 &center, const Vector3 &up)
+    Matrix4& Matrix4::setLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
     {
         const Vector3 f = (center - eye).normalized();
         const Vector3 s = f.cross(up.normalized()).normalized();
         const Vector3 u = s.cross(f);
-        m00 = s.x, m01 = u.x, m02 = -f.x, m03 = 0.0f;
-        m10 = s.y, m11 = u.y, m12 = -f.y, m13 = 0.0f;
-        m20 = s.z, m21 = u.z, m22 = -f.z, m23 = 0.0f;
-        m30 = -s.dot(eye), m31 = -u.dot(eye), m32 = f.dot(eye), m33 = 1.0f;
+        m00 = s.x; m01 = u.x; m02 = -f.x; m03 = 0.0f;
+        m10 = s.y; m11 = u.y; m12 = -f.y; m13 = 0.0f;
+        m20 = s.z; m21 = u.z; m22 = -f.z; m23 = 0.0f;
+        m30 = -s.dot(eye); m31 = -u.dot(eye); m32 = f.dot(eye); m33 = 1.0f;
         return *this;
     }
 
@@ -570,9 +892,9 @@ namespace rpp
         return translate(position);
     }
 
-    Matrix4& Matrix4::fromRotation(const Vector3& rotation)
+    Matrix4& Matrix4::fromRotation(const Vector3& rotationDegrees)
     {
-        Vector4 q = Vector4::fromRotation(rotation);
+        Vector4 q = Vector4::fromRotation(rotationDegrees);
         m00 = 1 - 2 * q.y * q.y - 2 * q.z * q.z;
         m01 = 2 * q.x * q.y + 2 * q.w * q.z;
         m02 = 2 * q.x * q.z - 2 * q.w * q.y;
@@ -594,10 +916,10 @@ namespace rpp
 
     Matrix4& Matrix4::fromScale(const Vector3& sc)
     {
-        m00 = sc.x, m01 = 0.0f, m02 = 0.0f, m03 = 0.0f;
-        m10 = 0.0f, m11 = sc.y, m12 = 0.0f, m13 = 0.0f;
-        m20 = 0.0f, m21 = 0.0f, m22 = sc.z, m23 = 0.0f;
-        m30 = 0.0f, m31 = 0.0f, m32 = 0.0f, m33 = 1.0f;
+        m00 = sc.x; m01 = 0.0f; m02 = 0.0f; m03 = 0.0f;
+        m10 = 0.0f; m11 = sc.y; m12 = 0.0f; m13 = 0.0f;
+        m20 = 0.0f; m21 = 0.0f; m22 = sc.z; m23 = 0.0f;
+        m30 = 0.0f; m31 = 0.0f; m32 = 0.0f; m33 = 1.0f;
         return *this;
     }
 
@@ -625,6 +947,281 @@ namespace rpp
         return *this;
     }
     
+    Matrix4& Matrix4::setAffine3D(const Vector3 & pos, const Vector3 & scale, const Vector3 & rotationDegrees)
+    {
+        // affine 3d: move, scale to size and then rotate
+        fromPosition(pos);
+        this->scale(scale);
+        Matrix4 rotation = {};
+        rotation.fromRotation(rotationDegrees);
+        this->multiply(rotation);
+        return *this;
+    }
+
+    Matrix4& Matrix4::transpose()
+    {
+        swap(m01, m10);
+        swap(m02, m20);
+        swap(m03, m30);
+        swap(m12, m21);
+        swap(m13, m31);
+        swap(m23, m32);
+        return *this;
+    }
+
+    Matrix4 Matrix4::transposed() const
+    {
+        return {
+            m00, m10, m20, m30,
+            m01, m11, m21, m31,
+            m02, m12, m22, m32,
+            m03, m13, m23, m33,
+        };
+    }
+
+#if !RPP_SSE_INTRINSICS
+    // from MESA implementation of the GLU library gluInvertMatrix source
+    static inline void invert4x4(const float* m, float* inv)
+    {
+        inv[0] = m[5]  * m[10] * m[15] - 
+                 m[5]  * m[11] * m[14] - 
+                 m[9]  * m[6]  * m[15] + 
+                 m[9]  * m[7]  * m[14] +
+                 m[13] * m[6]  * m[11] - 
+                 m[13] * m[7]  * m[10];
+
+        inv[4] = -m[4]  * m[10] * m[15] + 
+                  m[4]  * m[11] * m[14] + 
+                  m[8]  * m[6]  * m[15] - 
+                  m[8]  * m[7]  * m[14] - 
+                  m[12] * m[6]  * m[11] + 
+                  m[12] * m[7]  * m[10];
+
+        inv[8] = m[4]  * m[9] * m[15] - 
+                 m[4]  * m[11] * m[13] - 
+                 m[8]  * m[5] * m[15] + 
+                 m[8]  * m[7] * m[13] + 
+                 m[12] * m[5] * m[11] - 
+                 m[12] * m[7] * m[9];
+
+        inv[12] = -m[4]  * m[9] * m[14] + 
+                   m[4]  * m[10] * m[13] +
+                   m[8]  * m[5] * m[14] - 
+                   m[8]  * m[6] * m[13] - 
+                   m[12] * m[5] * m[10] + 
+                   m[12] * m[6] * m[9];
+
+        inv[1] = -m[1]  * m[10] * m[15] + 
+                  m[1]  * m[11] * m[14] + 
+                  m[9]  * m[2] * m[15] - 
+                  m[9]  * m[3] * m[14] - 
+                  m[13] * m[2] * m[11] + 
+                  m[13] * m[3] * m[10];
+
+        inv[5] = m[0]  * m[10] * m[15] - 
+                 m[0]  * m[11] * m[14] - 
+                 m[8]  * m[2] * m[15] + 
+                 m[8]  * m[3] * m[14] + 
+                 m[12] * m[2] * m[11] - 
+                 m[12] * m[3] * m[10];
+
+        inv[9] = -m[0]  * m[9] * m[15] + 
+                  m[0]  * m[11] * m[13] + 
+                  m[8]  * m[1] * m[15] - 
+                  m[8]  * m[3] * m[13] - 
+                  m[12] * m[1] * m[11] + 
+                  m[12] * m[3] * m[9];
+
+        inv[13] = m[0]  * m[9] * m[14] - 
+                  m[0]  * m[10] * m[13] - 
+                  m[8]  * m[1] * m[14] + 
+                  m[8]  * m[2] * m[13] + 
+                  m[12] * m[1] * m[10] - 
+                  m[12] * m[2] * m[9];
+
+        inv[2] = m[1]  * m[6] * m[15] - 
+                 m[1]  * m[7] * m[14] - 
+                 m[5]  * m[2] * m[15] + 
+                 m[5]  * m[3] * m[14] + 
+                 m[13] * m[2] * m[7] - 
+                 m[13] * m[3] * m[6];
+
+        inv[6] = -m[0]  * m[6] * m[15] + 
+                  m[0]  * m[7] * m[14] + 
+                  m[4]  * m[2] * m[15] - 
+                  m[4]  * m[3] * m[14] - 
+                  m[12] * m[2] * m[7] + 
+                  m[12] * m[3] * m[6];
+
+        inv[10] = m[0]  * m[5] * m[15] - 
+                  m[0]  * m[7] * m[13] - 
+                  m[4]  * m[1] * m[15] + 
+                  m[4]  * m[3] * m[13] + 
+                  m[12] * m[1] * m[7] - 
+                  m[12] * m[3] * m[5];
+
+        inv[14] = -m[0]  * m[5] * m[14] + 
+                   m[0]  * m[6] * m[13] + 
+                   m[4]  * m[1] * m[14] - 
+                   m[4]  * m[2] * m[13] - 
+                   m[12] * m[1] * m[6] + 
+                   m[12] * m[2] * m[5];
+
+        inv[3] = -m[1] * m[6] * m[11] + 
+                  m[1] * m[7] * m[10] + 
+                  m[5] * m[2] * m[11] - 
+                  m[5] * m[3] * m[10] - 
+                  m[9] * m[2] * m[7] + 
+                  m[9] * m[3] * m[6];
+
+        inv[7] = m[0] * m[6] * m[11] - 
+                 m[0] * m[7] * m[10] - 
+                 m[4] * m[2] * m[11] + 
+                 m[4] * m[3] * m[10] + 
+                 m[8] * m[2] * m[7] - 
+                 m[8] * m[3] * m[6];
+
+        inv[11] = -m[0] * m[5] * m[11] + 
+                   m[0] * m[7] * m[9] + 
+                   m[4] * m[1] * m[11] - 
+                   m[4] * m[3] * m[9] - 
+                   m[8] * m[1] * m[7] + 
+                   m[8] * m[3] * m[5];
+
+        inv[15] = m[0] * m[5] * m[10] - 
+                  m[0] * m[6] * m[9] - 
+                  m[4] * m[1] * m[10] + 
+                  m[4] * m[2] * m[9] + 
+                  m[8] * m[1] * m[6] - 
+                  m[8] * m[2] * m[5];
+
+        float det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+
+        det = 1.0f / det;
+        inv[0] *= det;
+        inv[1] *= det;
+        inv[2] *= det;
+        inv[3] *= det;
+        inv[4] *= det;
+        inv[5] *= det;
+        inv[6] *= det;
+        inv[7] *= det;
+        inv[8] *= det;
+        inv[9] *= det;
+        inv[10] *= det;
+        inv[11] *= det;
+        inv[12] *= det;
+        inv[13] *= det;
+        inv[14] *= det;
+        inv[15] *= det;
+    }
+#else
+    // The original code as provided by Intel in
+    // "Streaming SIMD Extensions - Inverse of 4x4 Matrix"
+    // (ftp://download.intel.com/design/pentiumiii/sml/24504301.pdf)
+    static inline void invert4x4(const float* src, float* dst)
+    {
+        __m128 minor0, minor1, minor2, minor3;
+        __m128 row0, row1 = {}, row2, row3 = {};
+        __m128 det, tmp1 = {};
+
+        tmp1 = _mm_loadh_pi(_mm_loadl_pi(tmp1, (__m64*)(src)), (__m64*)(src + 4));
+        row1 = _mm_loadh_pi(_mm_loadl_pi(row1, (__m64*)(src + 8)), (__m64*)(src + 12));
+        row0 = _mm_shuffle_ps(tmp1, row1, 0x88);
+        row1 = _mm_shuffle_ps(row1, tmp1, 0xDD);
+        tmp1 = _mm_loadh_pi(_mm_loadl_pi(tmp1, (__m64*)(src + 2)), (__m64*)(src + 6));
+        row3 = _mm_loadh_pi(_mm_loadl_pi(row3, (__m64*)(src + 10)), (__m64*)(src + 14));
+        row2 = _mm_shuffle_ps(tmp1, row3, 0x88);
+        row3 = _mm_shuffle_ps(row3, tmp1, 0xDD);
+
+        tmp1 = _mm_mul_ps(row2, row3);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor0 = _mm_mul_ps(row1, tmp1);
+        minor1 = _mm_mul_ps(row0, tmp1);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor0 = _mm_sub_ps(_mm_mul_ps(row1, tmp1), minor0);
+        minor1 = _mm_sub_ps(_mm_mul_ps(row0, tmp1), minor1);
+        minor1 = _mm_shuffle_ps(minor1, minor1, 0x4E);
+
+        tmp1 = _mm_mul_ps(row1, row2);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor0 = _mm_add_ps(_mm_mul_ps(row3, tmp1), minor0);
+        minor3 = _mm_mul_ps(row0, tmp1);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor0 = _mm_sub_ps(minor0, _mm_mul_ps(row3, tmp1));
+        minor3 = _mm_sub_ps(_mm_mul_ps(row0, tmp1), minor3);
+        minor3 = _mm_shuffle_ps(minor3, minor3, 0x4E);
+
+        tmp1 = _mm_mul_ps(_mm_shuffle_ps(row1, row1, 0x4E), row3);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        row2 = _mm_shuffle_ps(row2, row2, 0x4E);
+        minor0 = _mm_add_ps(_mm_mul_ps(row2, tmp1), minor0);
+        minor2 = _mm_mul_ps(row0, tmp1);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor0 = _mm_sub_ps(minor0, _mm_mul_ps(row2, tmp1));
+        minor2 = _mm_sub_ps(_mm_mul_ps(row0, tmp1), minor2);
+        minor2 = _mm_shuffle_ps(minor2, minor2, 0x4E);
+
+        tmp1 = _mm_mul_ps(row0, row1);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor2 = _mm_add_ps(_mm_mul_ps(row3, tmp1), minor2);
+        minor3 = _mm_sub_ps(_mm_mul_ps(row2, tmp1), minor3);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor2 = _mm_sub_ps(_mm_mul_ps(row3, tmp1), minor2);
+        minor3 = _mm_sub_ps(minor3, _mm_mul_ps(row2, tmp1));
+
+        tmp1 = _mm_mul_ps(row0, row3);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor1 = _mm_sub_ps(minor1, _mm_mul_ps(row2, tmp1));
+        minor2 = _mm_add_ps(_mm_mul_ps(row1, tmp1), minor2);
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor1 = _mm_add_ps(_mm_mul_ps(row2, tmp1), minor1);
+        minor2 = _mm_sub_ps(minor2, _mm_mul_ps(row1, tmp1));
+
+        tmp1 = _mm_mul_ps(row0, row2);
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0xB1);
+        minor1 = _mm_add_ps(_mm_mul_ps(row3, tmp1), minor1);
+        minor3 = _mm_sub_ps(minor3, _mm_mul_ps(row1, tmp1));
+
+        tmp1 = _mm_shuffle_ps(tmp1, tmp1, 0x4E);
+        minor1 = _mm_sub_ps(minor1, _mm_mul_ps(row3, tmp1));
+        minor3 = _mm_add_ps(_mm_mul_ps(row1, tmp1), minor3);
+
+        det = _mm_mul_ps(row0, minor0);
+        det = _mm_add_ps(_mm_shuffle_ps(det, det, 0x4E), det);
+        det = _mm_add_ss(_mm_shuffle_ps(det, det, 0xB1), det);
+
+        tmp1 = _mm_rcp_ss(det);
+        det = _mm_sub_ss(_mm_add_ss(tmp1, tmp1), _mm_mul_ss(det, _mm_mul_ss(tmp1, tmp1)));
+        det = _mm_shuffle_ps(det, det, 0x00);
+
+        minor0 = _mm_mul_ps(det, minor0);
+        _mm_storel_pi((__m64*)(dst), minor0);
+        _mm_storeh_pi((__m64*)(dst + 2), minor0);
+        minor1 = _mm_mul_ps(det, minor1);
+        _mm_storel_pi((__m64*)(dst + 4), minor1);
+        _mm_storeh_pi((__m64*)(dst + 6), minor1);
+        minor2 = _mm_mul_ps(det, minor2);
+        _mm_storel_pi((__m64*)(dst + 8), minor2);
+        _mm_storeh_pi((__m64*)(dst + 10), minor2);
+        minor3 = _mm_mul_ps(det, minor3);
+        _mm_storel_pi((__m64*)(dst + 12), minor3);
+        _mm_storeh_pi((__m64*)(dst + 14), minor3);
+    }
+#endif
+
+    Matrix4 Matrix4::inverse() const
+    {
+        Matrix4 inverse;
+        invert4x4(this->m, inverse.m);
+        return inverse;
+    }
+
     void Matrix4::print() const
     {
         char buffer[256];
@@ -643,13 +1240,51 @@ namespace rpp
     }
     char* Matrix4::toString(char* buffer, int size) const
     {
-        int len = snprintf(buffer, size, "{\n");
+        int len = snprintf(buffer, size_t(size), "{\n");
         for (int i = 0; i < 4; ++i)
-            len += snprintf(buffer+len, size-len, " %8.3f,%8.3f,%8.3f,%8.3f\n",
+            len += snprintf(buffer+len, size_t(size-len), " %8.3f,%8.3f,%8.3f,%8.3f\n",
                                                   r[i].x,r[i].y,r[i].z,r[i].w);
-        len += snprintf(buffer+len, size-len, "}");
+        snprintf(buffer+len, size_t(size-len), "}");
         return buffer;
     }
+
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
+
+    Vector2 PerspectiveViewport::ViewProjectToScreen(Vector3 worldPos, const Matrix4& viewProjection) const
+    {
+        Vector3 clipSpacePoint = viewProjection * worldPos;
+        float len = worldPos.x * viewProjection.m03 
+                  + worldPos.y * viewProjection.m13
+                  + worldPos.z * viewProjection.m23
+                  + viewProjection.m33;
+
+        if (!almostEqual(len, 1.0f))
+            clipSpacePoint /= len;
+        return { ( clipSpacePoint.x + 1.0f) * 0.5f * width,
+                 (-clipSpacePoint.y + 1.0f) * 0.5f * height };
+    }
+
+    Vector3 PerspectiveViewport::InverseViewProjectToWorld(Vector2 screenPos, float depth, const Matrix4& inverseViewProjection) const
+    {
+        Vector3 source = {
+            screenPos.x / (width  * 2.0f) - 1.0f,
+            screenPos.y / (height * 2.0f) - 1.0f,
+            (depth - zNear) / (zFar - zNear)
+        };
+
+        Vector3 worldPos = inverseViewProjection * source;
+        float len = source.x * inverseViewProjection.m03
+                  + source.y * inverseViewProjection.m13
+                  + source.z * inverseViewProjection.m23
+                  + inverseViewProjection.m33;
+
+        if (!almostEqual(len, 1.0f))
+            worldPos /= len;
+        return worldPos;
+    }
+
 
     /////////////////////////////////////////////////////////////////////////////////////
 
@@ -660,7 +1295,12 @@ namespace rpp
 
     Vector3 BoundingBox::center() const noexcept
     {
-        return lerp(min, max, 0.5f);
+        return lerp(0.5f, min, max);
+    }
+
+    float BoundingBox::radius() const noexcept
+    {
+        return (max - min).length() * 0.5f * float(M_SQRT2);
     }
 
     Vector3 BoundingBox::compare(const BoundingBox& bb) const noexcept
@@ -747,7 +1387,7 @@ namespace rpp
         return { min, max };
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<IdVector3>& ids)
+    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<IdVector3>& ids) noexcept
     {
         if (points.empty() || ids.empty())
             return { Vector3::ZERO, Vector3::ZERO };
@@ -771,7 +1411,7 @@ namespace rpp
         return { min, max };
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<int>& ids)
+    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<int>& ids) noexcept
     {
         if (points.empty() || ids.empty())
             return { Vector3::ZERO, Vector3::ZERO };
@@ -795,7 +1435,80 @@ namespace rpp
         return { min, max };
     }
 
+    BoundingBox BoundingBox::create(const Vector3* vertexData, int vertexCount, int stride) noexcept
+    {
+        if (vertexCount == 0)
+            return { Vector3::ZERO, Vector3::ZERO };
+
+        Vector3 min = vertexData[0];
+        Vector3 max = min;
+        for (int i = 1; i < vertexCount; ++i)
+        {
+            vertexData = (Vector3*)((byte*)vertexData + stride);
+
+            const Vector3 pos = *vertexData;
+            if      (pos.x < min.x) min.x = pos.x;
+            else if (pos.x > max.x) max.x = pos.x;
+            if      (pos.y < min.y) min.y = pos.y;
+            else if (pos.y > max.y) max.y = pos.y;
+            if      (pos.z < min.z) min.z = pos.z;
+            else if (pos.z > max.z) max.z = pos.z;
+        }
+        return { min, max };
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////
+
+    // Thank you!
+    // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
+    float Ray::intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept
+    {
+        Vector3 L = sphereCenter - origin;
+        float tca = L.dot(direction);
+        if (tca < 0) return 0.0f; // L and rayDir point in opposite directions, so intersect is behind rayStart
+
+        float sqRadius = sphereRadius*sphereRadius;
+        float d2 = L.dot(L) - tca*tca;
+        if (d2 > sqRadius) return 0.0f;
+        float thc = sqrt(sqRadius - d2);
+        float t0 = tca - thc; // solutions for t if the ray intersects 
+        float t1 = tca + thc;
+
+        if (t0 > t1) swap(t0, t1);
+        if (t0 < 0) {
+            t0 = t1; // if t0 is negative, let's use t1 instead 
+            if (t0 < 0) t0 = 0.0f; // both t0 and t1 are negative 
+        }
+        return t0;
+    }
+
+    // M�ller�Trumbore ray-triangle intersection algorithm
+    // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+    float Ray::intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept
+    {
+        Vector3 e1 = v1 - v0;
+        Vector3 e2 = v2 - v0;
+        // Calculate planes normal vector
+        Vector3 pvec = direction.cross(e2);
+        float det = e1.dot(pvec);
+
+        // Ray is parallel to plane
+        if (det < 1e-8 && det > -1e-8)
+            return 0.0f;
+
+        float inv_det = 1 / det;
+        Vector3 tvec = origin - v0;
+        float u = tvec.dot(pvec) * inv_det;
+        if (u < 0 || u > 1)
+            return 0;
+
+        Vector3 qvec = tvec.cross(e1);
+        float v = direction.dot(qvec) * inv_det;
+        if (v < 0 || u + v > 1)
+            return 0;
+
+        return e2.dot(qvec) * inv_det;
+    }
 
 } // namespace rpp
 

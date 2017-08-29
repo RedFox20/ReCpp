@@ -1,4 +1,4 @@
-#include "tests.h"
+#include <rpp/tests.h>
 #include <rpp/binary_serializer.h>
 using namespace rpp;
 
@@ -41,9 +41,9 @@ TestImpl(test_serialization)
 
     TestCase(object_size)
     {
-        AssertThat(sizeof(byte), size_of<byte>(123));
-        AssertThat(sizeof(int),  size_of<int>(1234));
-
+        AssertThat(sizeof(char), size_of<char>(123));
+        AssertThat(sizeof(int), size_of<int>(1234));
+		
         vector<int> simpleVec = { 1, 2, 3, 4 };
         int simpleVecSize = size_of(simpleVec);
         int simpleVecExpected = sizeof(int) + sizeof(int) * (int)simpleVec.size();

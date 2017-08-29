@@ -1,6 +1,9 @@
 #include "timer.h"
 
-#if __APPLE__ || __linux__ || __ANDROID_API__
+#if _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <Windows.h>
+#elif __APPLE__ || __linux__ || __ANDROID_API__
     #include <unistd.h> // usleep()
     #if __APPLE__
         #include <mach/mach.h>
@@ -11,22 +14,23 @@
 #elif __EMSCRIPTEN__
     #include <unistd.h> // usleep()
     #include <emscripten.h>
-#elif _WIN32 || _WIN64
-    #define WIN32_LEAN_AND_MEAN
-    #include <Windows.h>
-#else
     #include <thread>
     #include <chrono>
     using namespace std::chrono;
 #endif
-
+#include <chrono>
+    using namespace std::chrono;
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     static const double period = []
     {
-        #if __APPLE__
+        #if _WIN32
+                LARGE_INTEGER freq;
+                QueryPerformanceFrequency(&freq);
+                return 1.0 / double(freq.QuadPart);
+        #elif __APPLE__
             mach_timebase_info_data_t timebase;
             mach_timebase_info(&timebase);
             return double(timebase.numer) / timebase.denom / 1e9;
@@ -34,10 +38,6 @@ namespace rpp
             return 1e-6;
         #elif __EMSCRIPTEN__
             return 1e-6;
-        #elif _WIN32
-            LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
-            return 1.0 / double(freq.QuadPart);
         #else // default to std::chrono
             return double(microseconds::period::num) / microseconds::period::den;
         #endif
@@ -47,7 +47,11 @@ namespace rpp
 
     uint64_t time_now() noexcept
     {
-        #ifdef __APPLE__
+        #if _WIN32
+            LARGE_INTEGER time;
+            QueryPerformanceCounter(&time);
+            return time.QuadPart;
+        #elif __APPLE__
             return mach_absolute_time();
         #elif __linux__
             struct timeval t;
@@ -55,10 +59,6 @@ namespace rpp
             return (t.tv_sec * 1000000ull) + t.tv_usec;
         #elif __EMSCRIPTEN__
             return uint64_t(emscripten_get_now() * 1000);
-        #elif _WIN32
-            LARGE_INTEGER time;
-            QueryPerformanceCounter(&time);
-            return time.QuadPart;
         #else
             return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
         #endif
@@ -66,10 +66,10 @@ namespace rpp
 
     void sleep_ms(unsigned int millis) noexcept
     {
-        #if __APPLE__ || __linux__ || __EMSCRIPTEN__
-            usleep(millis*1000);
-        #elif _WIN32
+        #if _WIN32
             Sleep(millis);
+        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+            usleep(millis*1000);
         #else
             this_thread::sleep_for(milliseconds(millis));
         #endif
@@ -77,15 +77,33 @@ namespace rpp
 
     void sleep_us(unsigned int micros) noexcept
     {
-        #if __APPLE__ || __linux__ || __EMSCRIPTEN__
+        #if _WIN32
+            if (micros >= 1000)
+            {
+                Sleep(micros / 1000); // this is not really accurate either... maybe always use NtDelayExecution?
+            }
+            else
+            {
+                // On Windows it's difficult to get sub-millisecond precision, so no guarantees...
+                static auto NtDll = GetModuleHandleW(L"ntdll.dll");
+                static auto NtDelayExecution     = (long(__stdcall*)(BOOL alertable, PLARGE_INTEGER delayInterval))GetProcAddress(NtDll, "NtDelayExecution");
+                static auto ZwSetTimerResolution = (long(__stdcall*)(ULONG requestedRes, BOOL setNew, ULONG* actualRes))GetProcAddress(NtDll, "ZwSetTimerResolution");
+
+                static bool resolutionSet;
+                if (!resolutionSet) {
+                    ULONG actualResolution;
+                    ZwSetTimerResolution(1, true, &actualResolution);
+                    resolutionSet = true;
+                }
+
+                LARGE_INTEGER interval;
+                interval.QuadPart = micros * -10000000;
+                NtDelayExecution(false, &interval);
+            }
+        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             usleep(micros);
-        #elif _WIN32
-            // On Windows we don't really care much; just do a millisecond sleep
-            int millis = micros / 1000;
-            if (millis == 0) millis = 1;
-            Sleep(millis);
         #else
-            this_thread::sleep_for(microseconds(micros));
+            this_thread::sleep_for(microseconds(micros)); // On Windows, this does Sleep(1) in a loop
         #endif
     }
 

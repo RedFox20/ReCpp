@@ -2,6 +2,8 @@
  * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
  */
 #include "strview.h"
+#include <cmath>
+#include <cstdarg>
 
 namespace rpp
 {
@@ -31,14 +33,14 @@ namespace rpp
     }
 
 
-    ///////////// strview
+    ///////////// string view
     
     
     const char* strview::to_cstr(char* buf, int max) const
     {
         if (str[len] == '\0')
             return str;
-        int n = (len < max) ? len : max - 1;
+        size_t n = size_t((len < max) ? len : max - 1);
         memcpy(buf, str, n);
         buf[n] = '\0';
         return buf;
@@ -48,13 +50,13 @@ namespace rpp
     {
         if (str[len] == '\0')
             return str;
-        static char buf[512];
+        static thread_local char buf[512];
         return to_cstr(buf, sizeof(buf));
     }
 
     bool strview::to_bool() const
     {
-        const uint n = this->len;
+        const uint n = (uint)len;
         if (n > 4)
             return false; // can't be any of true literals
         return strequalsi(str, "true") ||
@@ -66,7 +68,7 @@ namespace rpp
     bool strview::is_whitespace() const
     {
         auto* s = str, *e = s+len;
-		for (; s < e && *(byte*)s <= ' '; ++s) {} // loop while is whitespace
+        for (; s < e && *(byte*)s <= ' '; ++s) {} // loop while is whitespace
         return s == e;
     }
     
@@ -74,7 +76,7 @@ namespace rpp
     {
         int len1 = len;
         int len2 = n;
-        if (int res = memcmp(str, s, len1 < len2 ? len1 : len2))
+        if (int res = memcmp(str, s, size_t(len1 < len2 ? len1 : len2)))
             return res;
         if (len1 < len2) return -1;
         if (len1 > len2) return +1;
@@ -98,8 +100,8 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-		for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
-        str = s, len = n; // result writeout
+        for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
+        str = s; len = n; // result writeout
         return *this;
     }
 
@@ -108,7 +110,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && *s == ch; ++s, --n) {}
-        str = s, len = n; // result writeout
+        str = s; len = n; // result writeout
         return *this;
     }
 
@@ -117,7 +119,7 @@ namespace rpp
         auto s = str;
         auto n = len;
         for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
-        str = s, len = n; // result writeout
+        str = s; len = n;
         return *this;
     }
 
@@ -126,7 +128,7 @@ namespace rpp
         auto n = len;
         auto e = str + n;
         for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
-        len = n; // result writeout
+        len = n;
         return *this;
     }
 
@@ -135,7 +137,7 @@ namespace rpp
         auto n = len;
         auto e = str + n;
         for (; n && *--e == ch; --n) {}
-        len = n; // result writeout
+        len = n;
         return *this;
     }
 
@@ -144,7 +146,7 @@ namespace rpp
         auto n = len;
         auto e = str + n;
         for (; n && strcontains(chars, nchars, *--e); --n) {}
-        len = n; // result writeout
+        len = n;
         return *this;
     }
 
@@ -158,7 +160,7 @@ namespace rpp
             int firstChar = *needle;
             while (haystr < hayend)
             {
-				haystr = (const char*)memchr(haystr, firstChar, hayend - haystr);
+                haystr = (const char*)memchr(haystr, firstChar, hayend - haystr);
                 if (!haystr) 
                     return nullptr; // definitely not found
 
@@ -172,9 +174,10 @@ namespace rpp
 
     const char* strview::rfind(char c) const
     {
+        if (len <= 0) return nullptr;
         const char* p = str;
         const char* e = p + len - 1;
-        for (; p < e; --e) if (*e == c) return e;
+        for (; e >= p; --e) if (*e == c) return e;
         return nullptr;
     }
 
@@ -188,17 +191,18 @@ namespace rpp
 
     const char* strview::rfindany(const char* chars, int n) const
     {
+        if (len <= 0) return nullptr;
         const char* p = str;
         const char* e = p + len - 1;
-        for (; p < e; --e) if (strcontains(chars, n, *e)) return e;
+        for (; e >= p; --e) if (strcontains(chars, n, *e)) return e;
         return nullptr;
     }
 
-    int strview::count(char ch) const noexcept
+    int strview::count(char ch) const
     {
         int count = 0;
         for (auto* p = str, *e = str+len; p < e; ++p)
-			if (*p == ch) ++count;
+            if (*p == ch) ++count;
         return count;
     }
 
@@ -209,7 +213,14 @@ namespace rpp
         return -1;
     }
 
-    int strview::indexof(const char* chars, int n) const
+    int strview::rindexof(char ch) const
+    {
+        for (int i = len-1; i >= 0; --i)
+            if (str[i] == ch) return i;
+        return -1;
+    }
+
+    int strview::indexofany(const char* chars, int n) const
     {
         for (int i = 0; i < len; ++i)
             if (strcontains(chars, n, str[i])) return i;
@@ -218,8 +229,8 @@ namespace rpp
 
     strview strview::split_first(char delim) const
     {
-        if (auto splitend = (const char*)memchr(str, delim, len))
-            return strview(str, splitend); // if we find a separator, readjust end of strview to that
+        if (auto splitEnd = (const char*)memchr(str, delim, size_t(len)))
+            return strview(str, splitEnd); // if we find a separator, readjust end of strview to that
         return strview(str, len);
     }
 
@@ -229,19 +240,19 @@ namespace rpp
         const char* s = str;
         const char* e = s + l;
         char ch = *substr;
-        while ((s = (const char*)memchr(s, ch, l)) != nullptr) {
+        while ((s = (const char*)memchr(s, ch, size_t(l))) != nullptr) {
             l = int(e - s);
             if (l >= sublen && strequals(s, substr, sublen)) {
                 return strview(str, s);
             }
-            --l, ++s;
+            --l; ++s;
         }
         return strview(str, len);
     }
 
     strview strview::split_second(char delim) const
     {
-        if (auto splitstart = (const char*)memchr(str, delim, len))
+        if (auto splitstart = (const char*)memchr(str, delim, size_t(len)))
             return strview(splitstart + 1, str+len); // readjust start, also skip the char we split at
         return strview(str, len);
     }
@@ -252,14 +263,14 @@ namespace rpp
     bool strview::next(strview& out, char delim)
     {
         bool result = next_notrim(out, delim);
-        if (result && len) ++str, --len; // trim match
+        if (result && len) { ++str; --len; } // trim match
         return result;
     }
 
     bool strview::next(strview& out, const char* delims, int ndelims)
     {
         bool result = next_notrim(out, delims, ndelims);
-        if (result && len) ++str, --len; // trim match
+        if (result && len) { ++str; --len; } // trim match
         return result;
     }
 
@@ -270,7 +281,7 @@ namespace rpp
     bool strview::next_notrim(strview& out, char delim)
     {
         return _next_notrim(out, [delim](const char* s, int n) {
-            return (const char*)memchr(s, delim, n);
+            return (const char*)memchr(s, delim, size_t(n));
         });
     }
 
@@ -306,19 +317,19 @@ namespace rpp
     }
 
 
-    float strview::next_float()
+    double strview::next_double()
     {
         auto s = str, e = s + len;
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-0.25" || ".25" || "25":
             if (ch == '-' || ch == '.' || ('0' <= ch && ch <= '9')) {
-                float f = _tofloat(s, &s);
-                str = s, len = int(e - s);
+                double f = rpp::to_double(s, &s);
+                str = s; len = int(e - s);
                 return f;
             }
         }
-        str = s, len = int(e - s);
-        return 0.0f;
+        str = s; len = int(e - s);
+        return 0.0;
     }
 
     int strview::next_int()
@@ -327,75 +338,80 @@ namespace rpp
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-25" || "25":
             if (ch == '-' || ('0' <= ch && ch <= '9')) {
-                int i = _toint(s, &s);
-                str = s, len = int(e - s);
+                int i = rpp::to_int(s, &s);
+                str = s; len = int(e - s);
                 return i;
             }
         }
-        str = s, len = int(e - s);
+        str = s; len = int(e - s);
         return 0;
     }
 
-    NOINLINE void strview::skip(int nchars)
+    NOINLINE strview& strview::skip(int nchars)
     {
         auto s = str;
         auto l = len, n = nchars;
         for (; l && n > 0; --l, --n, ++s) {}
-        str = s, len = l;
+        str = s; len = l;
+        return *this;
     }
 
-    void strview::skip_until(char ch)
+    strview& strview::skip_until(char ch)
     {
         auto s = str;
         auto n = len;
         for (; n && *s != ch; --n, ++s) {}
-        str = s, len = n;
+        str = s; len = n;
+        return *this;
     }
-    void strview::skip_until(const char* sstr, int slen)
+    strview& strview::skip_until(const char* substr, int sublen)
     {
         auto s = str, e = s + len;
-        char ch = *sstr; // starting char of the sequence
+        char ch = *substr; // starting char of the sequence
         while (s < e) {
             if (auto p = (const char*)memchr(s, ch, e - s)) {
-                if (memcmp(p, sstr, slen) == 0) { // match found
-                    str = p, len = int(e - p);
-                    return;
+                if (memcmp(p, substr, size_t(sublen)) == 0) { // match found
+                    str = p; len = int(e - p);
+                    return *this;
                 }
                 s = p + 1;
                 continue;
             }
             break;
         }
-        str = e, len = 0;
+        str = e; len = 0;
+        return *this;
     }
 
-    void strview::skip_after(char ch)
+    strview& strview::skip_after(char ch)
     {
         skip_until(ch);
-        if (len) ++str, --len; // skip after
+        if (len) { ++str; --len; } // skip after
+        return *this;
     }
-    void strview::skip_after(const char* sstr, int slen)
+    strview& strview::skip_after(const char* sstr, int slen)
     {
         skip_until(sstr, slen);
-        if (len) str += slen, len -= slen; // skip after
+        if (len) { str += slen; len -= slen; } // skip after
+        return *this;
     }
 
 
-    static inline void foreach(char* str, int len, int func(int ch)) 
+    static inline void foreach(char* str, int len, int func(int))
     {
         auto s = str, e = s + len;
         for (; s < e; ++s)
             *s = (char)func(*s);
     }
-    strview& strview::tolower() 
+    strview& strview::to_lower()
     {
         foreach((char*)str, len, ::tolower); return *this;
     }
-    strview& strview::toupper()
+    strview& strview::to_upper()
     {
         foreach((char*)str, len, ::toupper); return *this;
     }
-    char* strview::aslower(char* dst) const {
+    char* strview::as_lower(char* dst) const {
         auto p = dst;
         auto s = str;
         for (int n = len; n > 0; --n)
@@ -403,7 +419,7 @@ namespace rpp
         *p = 0;
         return dst;
     }
-    char* strview::asupper(char* dst) const
+    char* strview::as_upper(char* dst) const
     {
         auto p = dst;
         auto s = str;
@@ -412,19 +428,19 @@ namespace rpp
         *p = 0;
         return dst;
     }
-    string strview::aslower() const
+    string strview::as_lower() const
     {
         string ret;
-        ret.reserve(len);
+        ret.reserve(size_t(len));
         auto s = (char*)str;
         for (int n = len; n > 0; --n)
             ret.push_back((char)::tolower(*s++));
         return ret;
     }
-    string strview::asupper() const
+    string strview::as_upper() const
     {
         string ret;
-        ret.reserve(len);
+        ret.reserve(size_t(len));
         auto s = (char*)str;
         for (int n = len; n > 0; --n)
             ret.push_back((char)::toupper(*s++));
@@ -434,26 +450,26 @@ namespace rpp
 
 
 
-    char* tolower(char* str, int len) 
+    char* to_lower(char* str, int len)
     {
         foreach(str, len, ::tolower); return str;
     }
-    char* toupper(char* str, int len) 
+    char* to_upper(char* str, int len)
     {
         foreach(str, len, ::toupper); return str;
     }
-    string& tolower(string& str) 
+    string& to_lower(string& str)
     {
         foreach((char*)str.data(), (int)str.size(), ::tolower); return str;
     }
-    string& toupper(string& str) 
+    string& to_upper(string& str)
     {
         foreach((char*)str.data(), (int)str.size(), ::toupper); return str;
     }
 
     char* replace(char* str, int len, char chOld, char chNew)
     {
-        char* s = (char*)str, *e = s + len;
+        char* s = str, *e = s + len;
         for (; s < e; ++s) if (*s == chOld) *s = chNew;
         return str;
     }
@@ -477,82 +493,54 @@ namespace rpp
     ////////////////////// loose utility functions
 
     /**
-     * @note Doesn't account for any special cases like +- NAN, E-9 etc. Just a very simple atof.
+     * @note Doesn't account for special cases like +- NAN. Does support scientific notation, ex: '1.0e+003' 
      *       Some optimizations applied to avoid too many multiplications
      *       This doesn't handle very big floats, max range is:
      *           -2147483648.0f to 2147483647.0f, or -0.0000000001f to 0.0000000001f
      *       Or the worst case:
      *           214748.0001f
      */
-    float _tofloat(const char* str, const char** end)
-    {
-        const char* s = str;
-        int64_t power   = 1;
-        int64_t intPart = abs(_toint(s, &s));
-        char ch         = *s;
-
-        // if input is -0.xxx then intPart will lose the sign info
-        // intpart growth will also break if we use neg ints
-        const bool negfix = *str == '-';
-
-        // @note The '.' is actually the sole reason for this function in the first place. Locale independence.
-        if (ch == '.') { /* fraction part follows*/
-            for (; '0' <= (ch = *++s) && ch <= '9'; ) {
-                intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-                power   = (power << 3) + (power << 1); // power *= 10
-            }
-        }
-        if (end) *end = s; // write end of parsed value
-        double result = power == 1 ? double(intPart) : double(intPart) / double(power);
-        return float(negfix ? -result : result);
-    }
-
-    float _tofloat(const char* str, int len, const char** end)
+    double to_double(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;
         int64_t power   = 1;
-        int64_t intPart = abs(_toint(s, len, &s));
+        int64_t intPart = abs(to_int(s, len, &s));
         char ch         = *s;
+        int exponent    = 0;
 
         // if input is -0.xxx then intPart will lose the sign info
         // intpart growth will also break if we use neg ints
-        const bool negfix = *str == '-';
+        double sign = (*str == '-') ? -1.0 : +1.0;
 
         // @note The '.' is actually the sole reason for this function in the first place. Locale independence.
         if (ch == '.') { /* fraction part follows*/
-            for (; s < e && '0' <= (ch = *++s) && ch <= '9'; ) {
+            while (++s < e) {
+                ch = *s;
+                if (ch == 'e') { // parse e-016 e+3 etc.
+                    ++s;
+                    int esign = (*s++ == '+') ? +1 : -1;
+                    exponent = (*s++ - '0');
+                    exponent = (exponent << 3) + (exponent << 1) + (*s++ - '0');
+                    exponent = (exponent << 3) + (exponent << 1) + (*s++ - '0');
+                    exponent *= esign;
+                    break;
+                }
+                if (ch < '0' || '9' < ch)
+                    break;
                 intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-                power = (power << 3) + (power << 1); // power *= 10
+                power   = (power   << 3) + (power   << 1);              // power *= 10
             }
         }
         if (end) *end = s; // write end of parsed value
         double result = power == 1 ? double(intPart) : double(intPart) / double(power);
-        return float(negfix ? -result : result);
+        if (exponent)
+            result *= pow(10.0, (double)exponent);
+        return result * sign;
     }
 
     // optimized for simplicity and performance
-    int _toint(const char* str, const char** end)
-    {
-        const char* s = str;
-        int  intPart  = 0;
-        bool negative = false;
-        char ch       = *s;
-
-        if (ch == '-')
-            negative = true, ++s; // change sign and skip '-'
-        else if (ch == '+')  ++s; // ignore '+'
-
-        for (; '0' <= (ch = *s) && ch <= '9'; ++s) {
-            intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-        } 
-        if (negative) intPart = -intPart; // twiddle sign
-
-        if (end) *end = s; // write end of parsed value
-        return intPart;
-    }
-
-    int _toint(const char* str, int len, const char** end)
+    int to_int(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;
@@ -561,7 +549,7 @@ namespace rpp
         char ch       = *s;
 
         if (ch == '-')
-            negative = true, ++s; // change sign and skip '-'
+            { negative = true; ++s; } // change sign and skip '-'
         else if (ch == '+')  ++s; // ignore '+'
 
         for (; s < e && '0' <= (ch = *s) && ch <= '9'; ++s) {
@@ -575,31 +563,14 @@ namespace rpp
 
     // optimized for simplicity and performance
     // detects HEX integer strings as 0xBA or 0BA. Regular integers also parsed
-    int _tointhx(const char* str, const char** end)
-    {
-        const char* s = str;
-        unsigned intPart = 0;
-        if (s[0] == '0' && s[1] == 'x') s += 2;
-        for (char ch; ; ++s) {
-            unsigned digit;
-            if ('0' <= (ch=*s) && ch <= '9') digit = ch - '0';
-            else if ('A' <= ch && ch <= 'F') digit = ch - '7'; // hack 'A'-10 == '7'
-            else if ('a' <= ch && ch <= 'f') digit = ch - 'W'; // hack 'a'-10 == 'W'
-            else break; // invalid ch
-            intPart = (intPart << 4) + digit; // intPart = intPart*16 + digit
-        }
-        if (end) *end = s; // write end of parsed value
-        return intPart;
-    }
-
-    int _tointhx(const char* str, int len, const char** end)
+    int to_inthx(const char* str, int len, const char** end)
     {
         const char* s = str;
         const char* e = str + len;
         unsigned intPart = 0;
         if (s[0] == '0' && s[1] == 'x') s += 2;
         for (char ch; s < e; ++s) {
-            unsigned digit;
+            int digit;
             if ('0' <= (ch = *s) && ch <= '9') digit = ch - '0';
             else if ('A' <= ch && ch <= 'F')   digit = ch - '7'; // hack 'A'-10 == '7'
             else if ('a' <= ch && ch <= 'f')   digit = ch - 'W'; // hack 'a'-10 == 'W'
@@ -610,20 +581,20 @@ namespace rpp
         return intPart;
     }
 
-    int _tostring(char* buffer, float f)
+    int _tostring(char* buffer, double f)
     {
-        int value = (int)f;
+        int64 value = (int64)f;
         f -= value; // -1.2 -= -1 --> -0.2
         if (value < 0) f = -f;
         char* end = buffer + _tostring(buffer, value);
 
-        if (f != 0.0f) { // do we have a fraction ?
+        if (f != 0.0) { // do we have a fraction ?
             double cmp = 0.00001; // 6 decimal places max
             *end++ = '.'; // place the fraction mark
             double x = f; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
             for (;;) {
                 x *= 10;
-                value = (int)x;
+                value = (int64)x;
                 *end++ = '0' + (value % 10);
                 x -= value;
                 if (x < cmp) // break from 0.750000011 cases
@@ -632,55 +603,54 @@ namespace rpp
             }
         }
         *end = '\0'; // null-terminate
-        return (int) (end - buffer); // length of the string
+        return (int)(end - buffer); // length of the string
     }
 
-    int _tostring(char* buffer, int value)
+    template<class T> static int _tostring(char* buffer, char* end, T value)
+    {
+        char* start = end; // mark start for strrev after:
+
+        do { // write out remainder of 10 + '0' while we still have value
+            *end++ = '0' + (value % 10);
+            value /= 10;
+        } while (value != 0);
+        *end = '\0'; // always null-terminate
+
+        char* rev = end; // for strrev, we'll need a helper pointer
+        while (start < rev) { // reverse the string:
+            char tmp = *start;
+            *start++ = *--rev;
+            *rev = tmp;
+        }
+        return (int)(end - buffer); // length of the string
+    }
+
+    template<class T> static char* _write_sign(char* buffer, T& value)
     {
         char* end = buffer;
         if (value < 0) { // if neg, abs and writeout '-'
             value = -value;	// flip sign
             *end++ = '-';	// neg
         }
-        char* start = end; // mark start for strrev after:
-    
-        do { // writeout remainder of 10 + '0' while we still have value
-            *end++ = '0' + (value % 10);
-            value /= 10;
-        } while (value != 0);
-        *end = '\0'; // always null-terminate
-
-        // reverse the string:
-        char* rev = end; // for strrev, we'll need a helper pointer
-        while (start < rev) {
-            char tmp = *start;
-            *start++ = *--rev;
-            *rev = tmp;
-        }
-
-        return (int)(end - buffer); // length of the string
+        return end;
     }
 
-    int _tostring(char* buffer, unsigned value)
+    int _tostring(char* buffer, int value)
     {
-        char* end = buffer;
-        char* start = end; // mark start for strrev after:
+        return _tostring(buffer, _write_sign(buffer, value), value);
+    }
+    int _tostring(char* buffer, int64 value)
+    {
+        return _tostring(buffer, _write_sign(buffer, value), value);
+    }
 
-        do { // writeout remainder of 10 + '0' while we still have value
-            *end++ = '0' + (value % 10);
-            value /= 10;
-        } while (value != 0);
-        *end = '\0'; // always null-terminate
-
-        // reverse the string:
-        char* rev = end; // for strrev, we'll need a helper pointer
-        while (start < rev) {
-            char tmp = *start;
-            *start++ = *--rev;
-            *rev = tmp;
-        }
-
-        return (int)(end - buffer); // length of the string
+    int _tostring(char* buffer, uint value)
+    {
+        return _tostring(buffer, buffer, value);
+    }
+    int _tostring(char* buffer, uint64 value)
+    {
+        return _tostring(buffer, buffer, value);
     }
 
 
@@ -745,6 +715,7 @@ namespace rpp
 
 
     ///////////// bracket_parser
+
 
     bracket_parser::bracket_parser(const void* data, int len) 
         : buffer((const char*)data, len), depth(0), line(1)
@@ -813,4 +784,108 @@ namespace rpp
         return '\0'; // end of buffer
     }
 
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    string_buffer::~string_buffer() noexcept
+    {
+        if (cap > SIZE) free(ptr);
+    }
+
+    void string_buffer::clear()
+    {
+        ptr[len = 0] = '\0';
+    }
+
+    void string_buffer::reserve(int count) noexcept
+    {
+        int newlen = len + count + 1;
+        if (newlen >= cap)
+        {
+            int newcap = cap * 2;
+            while (newcap < newlen) // @todo Any fancy ways to improve this?
+                newcap *= 2;
+            
+            if (cap == SIZE)
+                ptr = (char*)memcpy(malloc(newcap), buf, len);
+            else
+                ptr = (char*)realloc(ptr, newcap);
+            cap = newcap;
+        }
+    }
+    
+    void string_buffer::writef(const char* format, ...)
+    {
+        char buffer[4096];
+        va_list ap; va_start(ap, format);
+        int n = vsnprintf(buffer, sizeof(buffer), format, ap);
+        if (n == -1)
+            n = 4095;
+        reserve(n);
+        memcpy(&ptr[len], buffer, (size_t)n);
+        len += n;
+        ptr[len] = '\0';
+    }
+
+    void string_buffer::write(const strview& s)
+    {
+        reserve(s.len);
+        char* dst = ptr + len;
+        memcpy(dst, s.str, (size_t)s.len);
+        len += s.len;
+        ptr[len] = '\0';
+    }
+
+    void string_buffer::write(const char& value)
+    {
+        reserve(1);
+        ptr[len++] = value;
+        ptr[len] = '\0';
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    int print(FILE* file, strview value) { return (int)fwrite(value.str, value.len, 1, file); }
+    int print(FILE* file, char value)    { return (int)fwrite(&value, 1, 1, file);            }
+    int print(FILE* file, byte value)    { char buf[4];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, short value)   { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, ushort value)  { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, int value)     { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, uint value)    { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, int64 value)   { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, uint64 value)  { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+
+    int print(strview value) { return print(stdout, value); }
+    int print(char value)    { return print(stdout, value); }
+    int print(byte value)    { return print(stdout, value); }
+    int print(short value)   { return print(stdout, value); }
+    int print(ushort value)  { return print(stdout, value); }
+    int print(int value)     { return print(stdout, value); }
+    int print(uint value)    { return print(stdout, value); }
+    int print(int64 value)   { return print(stdout, value); }
+    int print(uint64 value)  { return print(stdout, value); }
+
+    int println(FILE* file) { return print(file, '\n');   }
+    int println()           { return print(stdout, '\n'); }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    
 } // namespace rpp
+
+namespace std
+{
+    ////////////////////////////////////////////////////////////////////////////////
+
+    string to_string(bool trueOrFalse) noexcept
+    {
+        return trueOrFalse ? "true"s : "false"s;
+    }
+
+    string to_string(const char* cstr) noexcept
+    {
+        return cstr ? string{cstr} : string{};
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+}
