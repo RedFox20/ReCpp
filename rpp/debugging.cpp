@@ -23,10 +23,14 @@ EXTERNC void SetLogSeverityFilter(LogSeverity filter)
 {
     Filter = filter;
 }
+EXTERNC LogSeverity GetLogSeverityFilter()
+{
+    return Filter;
+}
 
 static int SafeFormat(char* errBuf, int N, const char* format, va_list ap)
 {
-    int len = vsnprintf(errBuf, N-1/*spare room for \n*/, format, ap);
+    int len = vsnprintf(errBuf, size_t(N-1)/*spare room for \n*/, format, ap);
     if (len < 0) { // err: didn't fit
         len = N-2; // try to recover gracefully
         errBuf[len] = '\0';
@@ -63,16 +67,16 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
     // some default logging behavior:
     char* ptr = errBuf;
     #ifndef __linux__
-     ShortFilePathMessage(ptr, len);
+      ShortFilePathMessage(ptr, len);
     #endif
-    fwrite(ptr, len, 1, (severity == LogSeverityError) ? stderr : stdout);
+    fwrite(ptr, (size_t)len, 1, (severity == LogSeverityError) ? stderr : stdout);
     
     // optional error handler for iOS Crashlytics logging
-    if (ErrorHandler)
+    if (ErrorHandler != nullptr)
     {
         ptr[--len] = '\0'; // remove the newline we added
         #ifdef __linux__
-         ShortFilePathMessage(ptr, len);
+          ShortFilePathMessage(ptr, len);
         #endif
         ErrorHandler(severity, ptr, len);
     }
@@ -106,7 +110,7 @@ EXTERNC void LogEvent(const char* eventName, const char* format, ...)
     
     printf("EVT %s: %s\n", eventName, messageBuf);
     
-    if (EventHandler)
+    if (EventHandler != nullptr)
     {
         EventHandler(eventName, messageBuf, len);
     }
@@ -129,7 +133,7 @@ EXTERNC const char* _FmtString(const char* format, ...)
 
 EXTERNC const char* _LogFilename(const char* longFilePath)
 {
-    if (!longFilePath) return "(null)";
+    if (longFilePath == nullptr) return "(null)";
     const char* eptr = longFilePath + strlen(longFilePath);
     for (int n = 1; longFilePath < eptr; --eptr)
         if (*eptr == '/' || *eptr == '\\')
@@ -139,14 +143,14 @@ EXTERNC const char* _LogFilename(const char* longFilePath)
 
 EXTERNC const char* _LogFuncname(const char* longFuncName)
 {
-    if (!longFuncName) return "(null)";
+    if (longFuncName == nullptr) return "(null)";
 
     static thread_local char buf[64];
     static const int max = 36;
 
     // always skip the first ::
     const char* ptr = strchr(longFuncName, ':');
-    if (ptr) {
+    if (ptr != nullptr) {
         if (*++ptr == ':') ++ptr;
     }
     else ptr = longFuncName;
@@ -167,3 +171,17 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
     return buf;
 }
 
+void Log(LogSeverity severity, rpp::strview message)
+{
+    if (severity < Filter)
+        return;
+
+    auto file = (severity == LogSeverityError) ? stderr : stdout;
+    fwrite(message.str, (size_t)message.len, 1, file);
+    fwrite("\n", 1, 1, file);
+
+    if (ErrorHandler != nullptr)
+    {
+        ErrorHandler(severity, message.str, message.len);
+    }
+}

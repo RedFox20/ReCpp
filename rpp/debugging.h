@@ -45,6 +45,7 @@ EXTERNC void SetLogEventHandler(LogEventCallback eventFunc);
  *  If Debugging.c is compiled with QUIETLOG, then it defaults to LogSeverityWarn
  **/
 EXTERNC void SetLogSeverityFilter(LogSeverity filter);
+EXTERNC LogSeverity GetLogSeverityFilter();
 
 /** Logs an error to the backing error mechanism (Crashlytics on iOS) */
 EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap);
@@ -55,6 +56,32 @@ EXTERNC void LogEvent    (const char* eventName, PRINTF_FMTSTR const char* forma
 EXTERNC const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 EXTERNC const char* _LogFuncname(const char* longFuncName); // shortens the func name
+
+
+/** Provide special string overloads for C++ */
+#ifdef __cplusplus
+#include "strview.h"
+void Log(LogSeverity severity, rpp::strview message);
+template<class T, class... Args> void Log(LogSeverity severity, const T& first, const Args&... args)
+{
+    if (severity < GetLogSeverityFilter())
+        return;
+    rpp::string_buffer sb;
+    sb.prettyprint(first, args...);
+    Log(severity, sb.view());
+}
+template<class T, class... Args> inline void LogInf(const T& first, const Args&... args) {
+    Log(LogSeverityInfo, first, args...);
+}
+template<class T, class... Args> inline void LogWarn(const T& first, const Args&... args) {
+    Log(LogSeverityWarn, first, args...);
+
+}
+template<class T, class... Args> inline void LogErr(const T& first, const Args&... args) {
+    Log(LogSeverityError, first, args...);
+}
+#endif
+
 
 #ifndef QUIETLOG
 #define __log_format(format, file, line, func) ("%s:%d %s $ " format), file, line, _LogFuncname(func)

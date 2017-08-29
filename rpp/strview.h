@@ -1106,7 +1106,7 @@ namespace rpp
         // setting it to "..." will turn write("brown", "fox"); into "brown...fox"
         strview separator = " "_sv;
 
-        FINLINE string_buffer() noexcept : ptr(buf) { buf[0] = '\0'; }
+        FINLINE string_buffer() noexcept { ptr = buf; buf[0] = '\0'; }
         FINLINE explicit string_buffer(strview text) noexcept : string_buffer() {
             write(text);
         }
