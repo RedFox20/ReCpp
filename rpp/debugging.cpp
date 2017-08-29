@@ -10,6 +10,7 @@ static LogSeverity Filter = LogSeverityInfo;
 #endif
 static LogErrorCallback ErrorHandler;
 static LogEventCallback EventHandler;
+static bool DisableFunctionNames = false;
 
 EXTERNC void SetLogErrorHandler(LogErrorCallback errorHandler)
 {
@@ -18,6 +19,10 @@ EXTERNC void SetLogErrorHandler(LogErrorCallback errorHandler)
 EXTERNC void SetLogEventHandler(LogEventCallback eventHandler)
 {
     EventHandler = eventHandler;
+}
+EXTERNC void LogDisableFunctionNames()
+{
+    DisableFunctionNames = true;
 }
 EXTERNC void SetLogSeverityFilter(LogSeverity filter)
 {
@@ -143,6 +148,7 @@ EXTERNC const char* _LogFilename(const char* longFilePath)
 
 EXTERNC const char* _LogFuncname(const char* longFuncName)
 {
+    if (DisableFunctionNames) return "";
     if (longFuncName == nullptr) return "(null)";
 
     static thread_local char buf[64];

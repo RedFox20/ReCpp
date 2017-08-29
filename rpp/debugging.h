@@ -40,6 +40,9 @@ EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc);
 /** Sets the callback handler for event messages  */
 EXTERNC void SetLogEventHandler(LogEventCallback eventFunc);
 
+/** This will remove function and lambda name information from the logs */
+EXTERNC void LogDisableFunctionNames();
+
 /** Sets the default log severity filter: if (severity >= filter) log(..)
  *  This defaults to LogSeverityInfo, which is the most verbose
  *  If Debugging.c is compiled with QUIETLOG, then it defaults to LogSeverityWarn
