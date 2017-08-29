@@ -482,10 +482,12 @@ namespace rpp
 
         template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const { return equals<SIZE>(s); }
         template<int SIZE> FINLINE bool operator!=(const char(&s)[SIZE]) const { return !equals<SIZE>(s); }
-        FINLINE bool operator==(const string& s)  const { return equals(s); }
+        FINLINE bool operator==(const string& s)  const { return  equals(s); }
         FINLINE bool operator!=(const string& s)  const { return !equals(s); }
-        FINLINE bool operator==(const strview& s) const { return equals(s.str, s.len); }
+        FINLINE bool operator==(const strview& s) const { return  equals(s.str, s.len); }
         FINLINE bool operator!=(const strview& s) const { return !equals(s.str, s.len); }
+        FINLINE bool operator==(char* s) const { return  strequals(s, str, len); }
+        FINLINE bool operator!=(char* s) const { return !strequals(s, str, len); }
         FINLINE bool operator==(char ch) const { return len == 1 && *str == ch; }
         FINLINE bool operator!=(char ch) const { return len != 1 || *str != ch; }
 
