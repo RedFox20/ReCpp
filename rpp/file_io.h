@@ -668,7 +668,9 @@ namespace rpp /* ReCpp */
 
 
     /**
-     * Basic and minimal directory iterator. Example usage:
+     * Basic and minimal directory iterator.
+     * @note This is not recursive!
+     * Example usage:
      * @code
      *     for (dir_entry e : dir_iterator { dir })
      *         if (e.is_dir) e.add_path_to(out);
