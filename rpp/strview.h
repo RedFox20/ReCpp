@@ -1341,6 +1341,12 @@ namespace rpp
     template<class T, class... Args> inline string sprint(const T& first, const Args&... args)
     {
         string_buffer buf;
+        buf.write(first, args...);
+        return buf.str();
+    }
+    template<class T, class... Args> inline string sprintln(const T& first, const Args&... args)
+    {
+        string_buffer buf;
         buf.writeln(first, args...);
         return buf.str();
     }
