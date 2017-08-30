@@ -1,5 +1,6 @@
 #include "json.h"
 #include "debugging.h"
+#include <cstdarg>
 
 namespace rpp
 {
@@ -267,7 +268,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    string_t::string_t(string_t&& fwd) : owns(fwd.owns)
+    string_t::string_t(string_t&& fwd) noexcept : owns(fwd.owns)
     {
         if (owns) { str = move(fwd.str); fwd.owns = false; }
         else sv = fwd.sv;
@@ -325,6 +326,83 @@ namespace rpp
     {
         if (owns) { destruct(str); owns = false; }
         else sv.clear();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    bool json_parser::set_error(strview error)
+    {
+        err.assign(error.str, error.len);
+        if (errors == throw_on_error)
+            throw runtime_error(err);
+        return false;
+    }
+
+    bool json_parser::set_error(const char* format, ...)
+    {
+        char buf[1024];
+        va_list ap; va_start(ap, format);
+        int len = vsnprintf(buf, sizeof(buf), format, ap);
+
+        err.assign(buf, len);
+        if (errors == throw_on_error)
+            throw runtime_error(err);
+        return false;
+    }
+
+    bool json_parser::parse_file(strview filePath, error_handling errhandling)
+    {
+        errors = errhandling;
+        if (load_buffer buf = file::read_all(filePath))
+            return parse_data(buf.view(), errhandling);
+
+        return set_error("json_parser::parse_file() $ Failed to open file '%s'", filePath.to_cstr());
+    }
+
+    struct istream_adapter : json_parser::stream
+    {
+        istream& stream;
+        explicit istream_adapter(istream& stream) noexcept : stream(stream) {}
+        int read(char* buf, int max) override
+        {
+            if (!stream.good())
+                return 0;
+            return (int)stream.readsome(buf, (streamsize)max);
+        }
+    };
+
+    bool json_parser::parse_stream(istream& stream, error_handling errhandling)
+    {
+        errors = errhandling;
+        if (!stream.good())
+            return set_error("json_parser::parse_stream()  $ bad istream; is the stream open?");
+
+        istream_adapter streamAdapter { stream };
+        return parse_stream(streamAdapter, errhandling);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    bool json_parser::parse_data(strview buf, error_handling errhandling)
+    {
+        errors = errhandling;
+
+        // @todo Parser implementation
+        (void)buf;
+
+        return true;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    bool json_parser::parse_stream(stream& stream, error_handling errhandling)
+    {
+        errors = errhandling;
+
+        // @todo Stream Parser implementation
+        (void)stream;
+
+        return set_error("json_parser::parse_stream() $ stream parsing is not implemented!");
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////

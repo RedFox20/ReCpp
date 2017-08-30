@@ -57,6 +57,7 @@ namespace rpp /* ReCpp */
         char* c_str()   const noexcept { return str; }
         explicit operator bool() const noexcept { return str != nullptr; }
         explicit operator strview() const noexcept { return { str,len }; }
+        strview view() const { return { str, len }; }
     };
 
     ////////////////////////////////////////////////////////////////////////////////

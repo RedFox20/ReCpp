@@ -29,10 +29,15 @@
       <Filter>rpp</Filter>
     </ClCompile>
     <ClCompile Include="..\rpp\binary_readwrite.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\rpp\thread_pool.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
     <ClCompile Include="..\rpp\debugging.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\rpp\json.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
   </ItemGroup>
@@ -68,6 +73,8 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\binary_readwrite.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
     <ClInclude Include="..\rpp\thread_pool.h">
       <Filter>rpp</Filter>
     </ClInclude>
@@ -75,6 +82,9 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\obfuscated_string.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\json.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>

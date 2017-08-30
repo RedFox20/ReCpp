@@ -160,6 +160,7 @@
   <ItemGroup>
     <ClCompile Include="..\rpp\tests.cpp" />
     <ClCompile Include="..\tests\test_allocators.cpp" />
+    <ClCompile Include="..\tests\test_json.cpp" />
     <ClCompile Include="..\tests\test_obfuscated_string.cpp" />
     <ClCompile Include="..\tests\test_serialization.cpp" />
     <ClCompile Include="..\tests\test_sockets.cpp" />
