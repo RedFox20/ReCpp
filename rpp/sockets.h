@@ -29,13 +29,13 @@ namespace rpp
     using namespace std; // we love std, you should too.
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
-	#define RPP_BASIC_INTEGER_TYPEDEFS
-		typedef unsigned char    byte;
-		typedef unsigned short   ushort;
-		typedef unsigned int     uint;
-		typedef __int64          int64;
-		typedef unsigned __int64 uint64;
-	#endif
+    #define RPP_BASIC_INTEGER_TYPEDEFS
+        typedef unsigned char    byte;
+        typedef unsigned short   ushort;
+        typedef unsigned int     uint;
+        typedef __int64          int64;
+        typedef unsigned __int64 uint64;
+    #endif
 
     enum address_family
     {
@@ -210,7 +210,7 @@ namespace rpp
         static constexpr int INVALID = -1;
         int       Sock;   // Socket handle
         ipaddress Addr;   // remote addr
-        bool       Shared; // if 1, Socket is shared and dtor won't call closesocket()
+        bool       Shared; // if true, Socket is shared and dtor won't call closesocket()
         category  Category;
 
     public:

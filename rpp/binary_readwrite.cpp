@@ -6,7 +6,7 @@ namespace rpp
 
 	socket_writer::socket_writer() : Pos(0), Sock(nullptr){}
 	socket_writer::socket_writer(rpp::socket & s) : Pos(0), Sock(&s) {}
-	socket_writer::~socket_writer() { if (Pos) Sock->send(Buf, Pos); }
+	socket_writer::~socket_writer() { if (Sock && Pos) Sock->send(Buf, Pos); }
 
 	void socket_writer::flush() {
 		Sock->send(Buf, Pos), Pos = 0;

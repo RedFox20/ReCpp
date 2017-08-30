@@ -43,7 +43,7 @@ TestImpl(test_serialization)
     {
         AssertThat(sizeof(char), size_of<char>(123));
         AssertThat(sizeof(int), size_of<int>(1234));
-		
+        
         vector<int> simpleVec = { 1, 2, 3, 4 };
         int simpleVecSize = size_of(simpleVec);
         int simpleVecExpected = sizeof(int) + sizeof(int) * (int)simpleVec.size();

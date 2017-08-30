@@ -490,38 +490,38 @@ namespace rpp
         : Sock(handle), Addr(addr), Shared(shared), Category(SC_Unknown)
     {
     }
-    socket::socket() noexcept : Sock(-1), Shared(0), Category(SC_Unknown)
+    socket::socket() noexcept : Sock(-1), Shared(false), Category(SC_Unknown)
     {
     }
     socket::socket(int port, address_family af, ip_protocol ipp, socket_option opt) noexcept
-        : Sock(-1), Addr(af, port), Shared(0), Category(SC_Unknown)
+        : Sock(-1), Addr(af, port), Shared(false), Category(SC_Unknown)
     {
         listen(Addr, ipp, opt);
     }
     socket::socket(const ipaddress& address, socket_option opt) noexcept
-        : Sock(-1), Addr(address), Shared(0), Category(SC_Unknown)
+        : Sock(-1), Addr(address), Shared(false), Category(SC_Unknown)
     {
         connect(Addr, opt);
     }
     socket::socket(const ipaddress& address, int timeoutMillis, socket_option opt) noexcept
-        : Sock(-1), Addr(address), Shared(0), Category(SC_Unknown)
+        : Sock(-1), Addr(address), Shared(false), Category(SC_Unknown)
     {
         connect(Addr, timeoutMillis, opt);
     }
     socket::socket(const char* hostname, int port, address_family af, socket_option opt) noexcept
-        : Sock(-1), Addr(af, hostname, port), Shared(0), Category(SC_Unknown)
+        : Sock(-1), Addr(af, hostname, port), Shared(false), Category(SC_Unknown)
     {
         connect(Addr, opt);
     }
     socket::socket(const char* hostname, int port, int timeoutMillis, address_family af, socket_option opt) noexcept
-        : Sock(-1), Addr(af, hostname, port), Shared(0), Category(SC_Unknown)
+        : Sock(-1), Addr(af, hostname, port), Shared(false), Category(SC_Unknown)
     {
         connect(Addr, timeoutMillis, opt);
     }
     socket::socket(socket&& s) noexcept : Sock(s.Sock), Addr(s.Addr), Shared(s.Shared), Category(s.Category) {
         s.Sock = -1;
         s.Addr.clear();
-        s.Shared = 0;
+        s.Shared = false;
         s.Category = SC_Unknown;
     }
     socket& socket::operator=(socket&& s) noexcept {
@@ -532,7 +532,7 @@ namespace rpp
         Category = s.Category;
         s.Sock = -1;
         s.Addr.clear();
-        s.Shared   = 0;
+        s.Shared   = false;
         s.Category = SC_Unknown;
         return *this;
     }
@@ -998,7 +998,9 @@ namespace rpp
                 if (err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
                 {
                     if (select(millis, SF_Write)) {
-                        if (opt & SO_Blocking) set_blocking(true);
+                        if (opt & SO_Blocking)
+                            set_blocking(true);
+                        Category = SC_Client;
                         return true;
                     }
                     // timeout

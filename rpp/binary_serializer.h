@@ -84,7 +84,7 @@ namespace rpp
 
         template<class T> struct size_of<vector<T>>
         {
-            static const int value(const vector<T>& v) noexcept
+            static int value(const vector<T>& v) noexcept
             {
                 int size = sizeof(int);
                 for (const T& item : v) size += rpp::size_of(item);
@@ -94,7 +94,7 @@ namespace rpp
 
         template<class Char> struct size_of<basic_string<Char>>
         {
-            static const int value(const basic_string<Char>& s) noexcept
+            static int value(const basic_string<Char>& s) noexcept
             {
                 return sizeof(int) + sizeof(Char) * (int)s.size();
             }
@@ -102,7 +102,7 @@ namespace rpp
 
         template<> struct size_of<strview>
         {
-            static const int value(const strview& s) noexcept
+            static int value(const strview& s) noexcept
             {
                 return sizeof(int) + s.len * sizeof(char);
             }
@@ -120,7 +120,7 @@ namespace rpp
             //    return rpp::size_of(get<N - 1>(t)) + size<N-1>(t);
             //}
 
-            static const int value(const tuple<T...>& t) noexcept
+            static int value(const tuple<T...>& t) noexcept
             {
                 return 0;
                 //return size<sizeof...(T)>(t);
