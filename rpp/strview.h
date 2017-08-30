@@ -367,10 +367,10 @@ namespace rpp
         /** @return TRUE if the strview contains this char */
         FINLINE bool contains(char c) const { return memchr(str, c, (size_t)len) != nullptr; }
         /** @return TRUE if the strview contains any of the chars */
-        NOINLINE bool contains(const char* chars, int nchars) const { 
+        NOINLINE bool contains_any(const char* chars, int nchars) const {
             return strcontains(str, len, chars, nchars) != nullptr;
         }
-        template<int N> FINLINE bool contains(const char (&chars)[N]) const { 
+        template<int N> FINLINE bool contains_any(const char (&chars)[N]) const {
             return strcontains<N>(str, len, chars) != nullptr;
         }
 
@@ -1333,6 +1333,23 @@ namespace rpp
     #else
         #define debug_println(...)
     #endif
+
+    /**
+     * Stringifies and appends the input arguments one by one, filling gaps with spaces, similar to Python print()
+     * Ex: sprint("test:", 10, 20.1f);  --> "test: 10 20.1"
+     */
+    template<class T, class... Args> inline string sprint(const T& first, const Args&... args)
+    {
+        string_buffer buf;
+        buf.write(first, args...);
+        return buf.str();
+    }
+    template<class T, class... Args> inline string sprintln(const T& first, const Args&... args)
+    {
+        string_buffer buf;
+        buf.writeln(first, args...);
+        return buf.str();
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 

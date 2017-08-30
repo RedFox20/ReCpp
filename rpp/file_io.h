@@ -491,6 +491,13 @@ namespace rpp /* ReCpp */
     inline bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
 
     /**
+     * @return TRUE if either a file or a folder exists at the given path
+     */
+    bool file_or_folder_exists(const char* fileOrFolder) noexcept;
+    inline bool file_or_folder_exists(const string& folder) noexcept { return file_or_folder_exists(folder.c_str());   }
+    inline bool file_or_folder_exists(const strview folder) noexcept { return file_or_folder_exists(folder.to_cstr()); }
+
+    /**
      * @brief Gets basic information of a file
      * @param filename Name of the file, ex: "dir/file.ext"
      * @param filesize (optional) If not null, writes the long size of the file
@@ -669,7 +676,9 @@ namespace rpp /* ReCpp */
 
 
     /**
-     * Basic and minimal directory iterator. Example usage:
+     * Basic and minimal directory iterator.
+     * @note This is not recursive!
+     * Example usage:
      * @code
      *     for (dir_entry e : dir_iterator { dir })
      *         if (e.is_dir) e.add_path_to(out);
@@ -781,6 +790,9 @@ namespace rpp /* ReCpp */
     }
     inline vector<string> list_dirs_fullpath(strview dir, bool recursive = false) noexcept {
         return list_dirs(dir, recursive, true);
+    }
+    inline vector<string> list_dirs_fullpath_recursive(strview dir) noexcept {
+        return list_dirs(dir, true, true);
     }
 
     /**

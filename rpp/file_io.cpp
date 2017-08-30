@@ -473,6 +473,17 @@ namespace rpp /* ReCpp */
         #endif
     }
 
+    bool file_or_folder_exists(const char* fileOrFolder) noexcept
+    {
+        #if USE_WINAPI_IO
+            DWORD attr = GetFileAttributesA(filename);
+            return attr != -1;
+        #else
+            struct stat s;
+            return stat(fileOrFolder, &s) == 0;
+        #endif
+    }
+
     bool file_info(const char* filename, int64*  filesize, time_t* created, 
                                          time_t* accessed, time_t* modified) noexcept
     {
