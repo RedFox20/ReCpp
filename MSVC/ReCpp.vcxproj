@@ -194,10 +194,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\allocators.h" />
-    <ClInclude Include="..\rpp\binary_reader.h" />
+    <ClInclude Include="..\rpp\binary_reader_old.h" />
     <ClInclude Include="..\rpp\binary_readwrite.h" />
     <ClInclude Include="..\rpp\binary_serializer.h" />
-    <ClInclude Include="..\rpp\binary_writer.h" />
+    <ClInclude Include="..\rpp\binary_writer_old.h" />
     <ClInclude Include="..\rpp\debugging.h" />
     <ClInclude Include="..\rpp\delegate.h" />
     <ClInclude Include="..\rpp\file_io.h" />

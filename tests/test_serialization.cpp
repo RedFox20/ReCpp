@@ -4,11 +4,14 @@ using namespace rpp;
 
 struct Struct1 : serializable<Struct1>
 {
-    float a = 42.0f;
+    float a = 0.0f;
 
-    static void introspect()
+    Struct1() {}
+    Struct1(float a) : a(a) {}
+
+    void introspect()
     {
-        bind(&Struct1::a);
+        bind(a);
     }
 };
 
@@ -17,10 +20,9 @@ struct Struct2 : serializable<Struct2>
     float a = 44.0f;
     float b = 46.0f;
 
-    static void introspect()
+    void introspect()
     {
-        bind(&Struct2::a);
-        bind(&Struct2::b);
+        bind(a, b);
     }
 };
 
@@ -31,12 +33,13 @@ TestImpl(test_serialization)
         Struct1 s1;
         Struct2 s2;
 
-        s1.introspect();
-        s2.introspect();
-
-        socket_writer w1;
+        binary_writer w1;
         s1.serialize(w1);
-        
+
+        binary_reader r1;
+        Struct1 s1d;
+        s1d.deserialize(r1);
+
     }
 
     TestCase(object_size)

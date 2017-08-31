@@ -55,18 +55,18 @@ namespace rpp
         binary_serializer() {}
         binary_serializer(uint layout) : layout(layout), length(0) {}
 
-        NOINLINE socket_writer& write(socket_writer& w) const noexcept;
-        NOINLINE socket_reader& read(socket_reader& r) noexcept;
+        NOINLINE binary_writer& write(binary_writer& w) const noexcept;
+        NOINLINE binary_reader& read(binary_reader& r) noexcept;
 
         /** @brief Returns the serialization layout size */
         NOINLINE int layout_size() const noexcept;
     };
 
-    inline socket_writer& operator<<(socket_writer& w, const binary_serializer& s) 
+    inline binary_writer& operator<<(binary_writer& w, const binary_serializer& s) 
     {
         return s.write(w); 
     }
-    inline socket_reader& operator>>(socket_reader& r, binary_serializer& s) 
+    inline binary_reader& operator>>(binary_reader& r, binary_serializer& s) 
     {
         return s.read(r); 
     }
@@ -150,9 +150,9 @@ namespace rpp
 
     template<class T> struct member_serialize
     {
-        using serialize_func   = delegate<void(T* inst, socket_writer& w)>;
-        using deserialize_func = delegate<void(T* inst, socket_reader& r)>;
-
+        using serialize_func   = void(*)(T* inst, int offset, binary_writer& w);
+        using deserialize_func = void(*)(T* inst, int offset, binary_reader& r);
+        int offset;
         serialize_func   serialize;
         deserialize_func deserialize;
     };
@@ -160,32 +160,58 @@ namespace rpp
     template<class T> struct serializable
     {
         static vector<member_serialize<T>> members;
+        static bool introspection_complete;
 
-        template<class A> static void bind(A T::*a) noexcept
+        serializable()
         {
-            member_serialize<T> m = {
-                [a](T* inst, socket_writer& w) {
-                    w << ((*inst).*a);
-                },
-                [a](T* inst, socket_reader& r) {
-                    r >> ((*inst).*a);
-                }
+            if (!introspection_complete)
+                static_cast<T*>(this)->introspect();
+        }
+
+        template<class U> void bind(U& elem) noexcept
+        {
+            member_serialize<T> m;
+            m.offset    = int((char*)&elem - (char*)this);
+            m.serialize = [](T* inst, int offset, binary_writer& w)
+            {
+                U& var = *(U*)((byte*)inst + offset);
+                w << var;
+            };
+            m.deserialize = [](T* inst, int offset, binary_reader& r)
+            {
+                U& var = *(U*)((byte*)inst + offset);
+                r >> var;
             };
             members.emplace_back(move(m));
         }
 
-        void serialize(socket_writer& w)
+        template<class U, class... Args> void bind(U& first, Args&... args)
+        {
+            bind(first);
+            bind(args...);
+        }
+
+        void serialize(binary_writer& w)
         {
             T* inst = static_cast<T*>(this);
-
             for (member_serialize<T>& memberInfo : members)
             {
-                memberInfo.serialize(inst, w);
+                memberInfo.serialize(inst, memberInfo.offset, w);
+            }
+        }
+
+        void deserialize(binary_reader& r)
+        {
+            T* inst = static_cast<T*>(this);
+            for (member_serialize<T>& memberInfo : members)
+            {
+                memberInfo.deserialize(inst, memberInfo.offset, r);
             }
         }
     };
 
     template<class T> vector<member_serialize<T>> serializable<T>::members;
+    template<class T> bool serializable<T>::introspection_complete;
 
     //////////////////////////////////////////////////////////////////////////////////
 

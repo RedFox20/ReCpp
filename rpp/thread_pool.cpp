@@ -102,12 +102,41 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     thread_pool thread_pool::global;
-    static int coreCount;
+    static int core_count;
+
+#if _WIN32
+    #include <Windows.h>
+    static int num_physical_cores()
+    {
+        DWORD bytes = 0;
+        GetLogicalProcessorInformation(nullptr, &bytes);
+        vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> coreInfo(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+        GetLogicalProcessorInformation(coreInfo.data(), &bytes);
+
+        int cores = 0;
+        for (auto& info : coreInfo)
+        {
+            if (info.Relationship == RelationProcessorCore)
+                ++cores;
+        }
+        return cores;
+    }
+#else
+    static int num_physical_cores()
+    {
+        return (int)thread::hardware_concurrency();
+    }
+#endif
+
+    int thread_pool::physical_cores()
+    {
+        if (!core_count) core_count = num_physical_cores();
+        return core_count;
+    }
 
     thread_pool::thread_pool()
     {
-        if (!coreCount)
-            coreCount = (int)thread::hardware_concurrency();
+        if (!core_count) core_count = num_physical_cores();
     }
 
     thread_pool::~thread_pool() noexcept
@@ -178,14 +207,21 @@ namespace rpp
                                    const action<int, int>& rangeTask) noexcept
     {
         assert(!rangeRunning && "Fatal error: nested parallel loops are forbidden!");
-        assert(coreCount != 0);
+        assert(core_count != 0);
 
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
             return;
 
-        const int cores = range < coreCount ? range : coreCount;
+        const int cores = range < core_count ? range : core_count;
         const int len = range / cores;
+
+        // only one physical core or only one task to run. don't run in a thread
+        if (cores == 1)
+        {
+            rangeTask(0, len);
+            return;
+        }
 
         pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
         {

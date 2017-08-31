@@ -54,12 +54,6 @@
     <ClInclude Include="..\rpp\binary_serializer.h">
       <Filter>rpp</Filter>
     </ClInclude>
-    <ClInclude Include="..\rpp\binary_writer.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rpp\binary_reader.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
     <ClInclude Include="..\rpp\file_io.h">
       <Filter>rpp</Filter>
     </ClInclude>
@@ -85,6 +79,12 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\json.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\binary_reader_old.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\binary_writer_old.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>

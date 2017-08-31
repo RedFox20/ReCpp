@@ -25,7 +25,7 @@ TestImpl(test_vec)
 
         AssertThat(unitbox.center(), Vector3(0.5f));
         AssertThat(unitbox.volume(), 1.0f);
-        AssertThat(unitbox.radius(), 0.5f*sqrt(2));
+        AssertThat(unitbox.radius(), Vector3(0.5f).length());
         AssertThat(unitbox.distanceTo({ 2.0f,1.0f,1.0f }), 1.0f);
         AssertThat(unitbox.contains({ 0.5f,0.5f,0.5f }), true);
 

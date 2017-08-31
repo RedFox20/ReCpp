@@ -34,8 +34,10 @@ namespace rpp
 
         strview name;
         vector<test_func> test_funcs; // all the automatic tests to run
+        strview test_specific;
+        bool test_enabled = true;
 
-        test(strview name);
+        explicit test(strview name);
         virtual ~test();
         static void assert_failed(const char* file, int line, const char* fmt, ...);
 
@@ -60,10 +62,11 @@ namespace rpp
         /**
          * Run tests with a single filter pattern
          * Example:
-         *   run_tests("test_strview");        -- Specifically runs "test_strview" test module
-         *   run_tests("strview");             -- All test modules that contain "strview"
-         *   run_tests("test_strview.compare") -- Only runs specific 'compare' test under "test_strview"
-         *   run_tests("strview.compare")      -- All test modules that contain "strview" and have "compare" subtest
+         *   run_tests("test_strview");          -- Specifically runs "test_strview" test module
+         *   run_tests("strview");               -- All test modules that contain "strview"
+         *   run_tests("test_strview.compare")   -- Only runs specific 'compare' test under "test_strview"
+         *   run_tests("strview.compare")        -- All test modules that contain "strview" and have "compare" subtest
+         *   run_tests("-test_strview -strview") -- All tests except these;
          * @return 0 on success, -1 on failure
          */
         static int run_tests(const char* testNamePattern);

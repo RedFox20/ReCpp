@@ -281,12 +281,12 @@ namespace rpp
         /** Clears the strview */
         FINLINE void clear() { str = ""; len = 0; }
         /** @return Length of the string */
-        FINLINE int length() const  { return len; }
-        FINLINE int size()   const  { return len; }
+        FINLINE constexpr int length() const  { return len; }
+        FINLINE constexpr int size()   const  { return len; }
         /** @return TRUE if length of the string is 0 - thus the string is empty */
-        FINLINE bool empty() const { return !len; }
+        FINLINE constexpr bool empty() const { return !len; }
         /** @return TRUE if string is non-empty */
-        explicit FINLINE operator bool() const { return len != 0; }
+        explicit FINLINE constexpr operator bool() const { return len != 0; }
         /** @return Pointer to the start of the string */
         FINLINE const char* c_str() const { return str; }
         FINLINE const char* data()  const { return str; }
