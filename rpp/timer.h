@@ -6,6 +6,7 @@
  */
 #include <stdint.h>
 
+#if __cplusplus
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,5 +55,20 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 }
+#endif
+
+#if __cplusplus
+extern "C" {
+#endif
+    
+    /**
+     * @return Current time in seconds:  rpp::time_now() * rpp::time_period();
+     */
+    double time_now_seconds();
+
+#if __cplusplus
+}
+#endif
+
 
 #endif // RPP_TIMER_H

@@ -5,7 +5,10 @@
  * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
  */
 #ifndef _HAS_STD_BYTE
-#define _HAS_STD_BYTE 0
+  #define _HAS_STD_BYTE 0
+#endif
+#ifndef __cplusplus
+  #error <rpp/strview.h> requires C++14 or higher
 #endif
 #include <cstring>   // C string utilities
 #include <string>     // compatibility with std::string

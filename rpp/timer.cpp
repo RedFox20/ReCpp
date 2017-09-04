@@ -133,5 +133,9 @@ namespace rpp
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
-}
+} // rpp
 
+extern "C" double time_now_seconds()
+{
+    return rpp::time_now() * rpp::period;
+}
