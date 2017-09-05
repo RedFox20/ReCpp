@@ -37,4 +37,17 @@ TestImpl(test_debugging)
         LogWarning("Warn(8): '%s', '%s', %d, %.1f, `%c`, '%s', '%s', %d", a, b, c, d, e, a, b, c);
     }
 
+    TestCase(log_except)
+    {
+        try
+        {
+            throw std::runtime_error("aaarghh!! something happened!");
+        }
+        catch (std::exception& e)
+        {
+            std::string param = "test@user.com";
+            LogExcept(e, "Testing log except with params: %s", param);
+        }
+    }
+
 } Impl;

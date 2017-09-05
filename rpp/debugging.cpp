@@ -10,6 +10,7 @@ static LogSeverity Filter = LogSeverityInfo;
 #endif
 static LogErrorCallback ErrorHandler;
 static LogEventCallback EventHandler;
+static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
 
 EXTERNC void SetLogErrorHandler(LogErrorCallback errorHandler)
@@ -19,6 +20,10 @@ EXTERNC void SetLogErrorHandler(LogErrorCallback errorHandler)
 EXTERNC void SetLogEventHandler(LogEventCallback eventHandler)
 {
     EventHandler = eventHandler;
+}
+EXTERNC void SetLogExceptHandler(LogExceptCallback exceptFunc)
+{
+    ExceptHandler = exceptFunc;
 }
 EXTERNC void LogDisableFunctionNames()
 {
@@ -121,18 +126,35 @@ EXTERNC void LogEvent(const char* eventName, const char* format, ...)
     }
 }
 
+void _LogExcept(const char* exceptionWhat, const char* format, ...)
+{
+#if __clang__
+  #if __has_feature(address_sanitizer)
+    return; // ASAN reports a false positive with vsnprintf
+  #endif
+#endif
+    va_list ap; va_start(ap, format);
+    char messageBuf[4096];
+    int len = SafeFormat(messageBuf, sizeof(messageBuf), format, ap);
+    va_end(ap);
+
+    // only MSVC requires stderr write; other platforms do it in assert
+    #if _MSC_VER
+      fprintf(stderr, "%.*s: %s\n", len, messageBuf, exceptionWhat);
+    #endif
+    
+    if (ExceptHandler != nullptr)
+    {
+        ExceptHandler(messageBuf, exceptionWhat);
+    }
+}
+
 EXTERNC const char* _FmtString(const char* format, ...)
 {
-    static char errBuf[4096];
-    
+    static thread_local char errBuf[4096];
     va_list ap; va_start(ap, format);
-    int len = vsnprintf(errBuf, sizeof(errBuf)-1, format, ap);
+    SafeFormat(errBuf, sizeof(errBuf), format, ap);
     va_end(ap);
-    
-    if (len < 0) { // err: didn't fit
-        len = sizeof(errBuf)-2; // try to recover gracefully
-        errBuf[len] = '\0';
-    }
     return errBuf;
 }
 

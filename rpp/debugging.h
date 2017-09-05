@@ -32,6 +32,7 @@ typedef enum {
 /** Error message callback */
 typedef void (*LogErrorCallback)(LogSeverity severity, const char* err, int len);
 typedef void (*LogEventCallback)(const char* eventName, const char* message, int len);
+typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 
 /** Sets the callback handler for any error messages */
@@ -39,6 +40,9 @@ EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc);
 
 /** Sets the callback handler for event messages  */
 EXTERNC void SetLogEventHandler(LogEventCallback eventFunc);
+
+/** Sets the callback handler for C++ messages. You can even intercept these in C. */
+EXTERNC void SetLogExceptHandler(LogExceptCallback exceptFunc);
 
 /** This will remove function and lambda name information from the logs */
 EXTERNC void LogDisableFunctionNames();
@@ -55,7 +59,8 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap);
 EXTERNC void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC void LogEvent    (const char* eventName, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
+EXTERNC void LogEvent    (const char* eventName,     PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
+EXTERNC void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 EXTERNC const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 EXTERNC const char* _LogFuncname(const char* longFuncName); // shortens the func name
@@ -87,7 +92,7 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
 
 
 #ifndef QUIETLOG
-#define __log_format(format, file, line, func) ("%s:%d %s $ " format), file, line, _LogFuncname(func)
+#define __log_format(format, file, line, func) ("%s:%d %s $ " format), _LogFilename(file), line, _LogFuncname(func)
 #else
 #define __log_format(format, file, line, func) ("$ " format)
 #endif
@@ -186,6 +191,13 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 
 #ifdef __cplusplus
 #include <stdexcept>
+
+// logs an std::exception; this is piped into the special exception handler @see SetLogExceptHandler()
+// triggers an assertion in debug builds
+#define LogExcept(std_except, format, ...) do { \
+    _LogExcept(std_except.what(), __log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
+    __assertion_failure(_FmtString((format ": %s") __wrap_args(__VA_ARGS__), std_except.what() )); \
+} while(0)
 
 // logs error message, triggers an assertion and throws an std::runtime_error
 #define ThrowErr(format, ...) do { \
