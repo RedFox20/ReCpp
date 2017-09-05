@@ -843,6 +843,12 @@ namespace rpp
         out = (unsigned)s.next_int();
         return s;
     }
+    // converts strview to std::string
+    inline strview& operator>>(strview& s, std::string& out)
+    {
+        s.to_string(out);
+        return s;
+    }
     inline ostream& operator<<(ostream& stream, const strview& s)
     {
         return stream.write(s.str, s.len);
