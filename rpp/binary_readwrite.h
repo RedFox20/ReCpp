@@ -35,158 +35,32 @@ namespace rpp /* ReCpp */
         template<class T> T min3(T a, T b, T c) { return a < b ? (a<c?a:c) : (b<c?b:c); }
     #endif
     
-    ////////////////////////////////////////////////////////////////////////////
-
-    struct stream_buffer
-    {
-        static constexpr int MAX = 1024;
-
-    protected:
-        int Pos = 0;   // position in the buffer
-        int Rem = 0;   // remaining bytes that can be read or written
-        int Cap = MAX; // current buffer capacity
-        char* Ptr;     // pointer to current buffer, either this->Buf or a dynamically allocated one
-        char  Buf[MAX];
-
-        stream_buffer() noexcept;
-        explicit stream_buffer(int capacity) noexcept;
-        ~stream_buffer() noexcept;
-
-        void reserve_buffer(int capacity) noexcept;
-    };
 
     ////////////////////////////////////////////////////////////////////////////
-    
+
+
     /**
-     * @brief binary_writer interface
+     * @brief A generic stream source.
      */
-    struct writer_base
+    struct stream_source
     {
-        virtual ~writer_base() noexcept = default;
+        virtual ~stream_source() noexcept = default;
 
-       /**
-        * @return TRUE if stream can be written to, FALSE if the stream is closed
-        */
-        virtual bool good() const noexcept = 0;
+        /**
+         * @return TRUE if stream is open, FALSE if the stream is closed
+         */
+        virtual bool stream_good() const noexcept = 0;
 
         /**
          * Writes a block of data to the underlying storage target or network device
          * @return Number of bytes actually written. Must be [numBytes] or <= 0 on failure
          */
-        virtual int unbuffered_write(const void* data, uint numBytes) = 0;
-    };
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * @brief A buffered socket writer class.
-     */
-    struct binary_writer : writer_base, stream_buffer
-    {
-        /**
-         * Creates a binary writer with a default write buffer of size [binary_writer::MAX]
-         */
-        binary_writer() noexcept;
+        virtual int stream_write(const void* data, uint numBytes) = 0;
 
         /**
-         * Create binary writer with buffer capacity. If capacity == 0, then no buffering is used.
+         * Flush all read/write buffers on the stream
          */
-        explicit binary_writer(int capacity) noexcept;
-        virtual ~binary_writer() noexcept;
-
-        // binary_writer is pure virtual and shouldn't be copied or moved
-        NOCOPY_NOMOVE(binary_writer)
-
-        char*data() const { return (char*)Buf; }
-        uint size() const { return Pos; }
-        uint capacity()  const { return Cap; }
-        uint available() const { return MAX - Pos; }
-        void clear() { Pos = 0; }
-        strview view() const { return { data(), (int)size() }; }
-
-        /** 
-         * Flushes the buffer and changes the size of write buffer
-         * Setting this to 0 will disable buffering. Setting it to <= MAX has no effect
-         */
-        void reserve(int capacity);
-
-        /** @brief Flush write buffer on this writer */
-        void flush();
-
-        /** @brief Writes raw data into the buffer */
-        binary_writer& write(const void* data, uint numBytes);
-
-    private:
-        bool check_unbuffered(const void* data, uint numBytes);
-
-    public:
-        /** @brief Writes object of type T into the buffer */
-        template<class T> binary_writer& write(const T& data)
-        {
-            if (check_unbuffered(&data, sizeof(T)))
-            {
-                *(T*)&Buf[Pos] = data;
-                Pos += sizeof(T);
-            }
-            return *this;
-        }
-
-        /** @brief Appends data from other binary_writer to this one */
-        binary_writer& write(const binary_writer& w) { return write(w.Buf, w.Pos); }
-
-        binary_writer& write_byte(byte value)     { return write(value); } /** @brief Writes a 8-bit unsigned byte into the buffer */
-        binary_writer& write_short(short value)   { return write(value); } /** @brief Writes a 16-bit signed short into the buffer */
-        binary_writer& write_ushort(ushort value) { return write(value); } /** @brief Writes a 16-bit unsigned short into the buffer */
-        binary_writer& write_int(int value)       { return write(value); } /** @brief Writes a 32-bit signed integer into the buffer */
-        binary_writer& write_uint(uint value)     { return write(value); } /** @brief Writes a 32-bit unsigned integer into the buffer */
-        binary_writer& write_int64(int64 value)   { return write(value); } /** @brief Writes a 64-bit signed integer into the buffer */
-        binary_writer& write_uint64(uint64 value) { return write(value); } /** @brief Writes a 64-bit unsigned integer into the buffer */
-
-        /** @brief Write a length specified string to the buffer in the form of [uint16 len][data] */
-        template<class Char> binary_writer& write_nstr(const Char* str, int len) {
-            return write_ushort(ushort(len)).write((void*)str, len * sizeof(Char)); 
-        }
-        binary_writer& write(const strview& str)      { return write_nstr(str.str, str.len); }
-        binary_writer& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }
-        binary_writer& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
-    };
-    // explicit operator<< overloads
-    inline binary_writer& operator<<(binary_writer& w, const strview& v)      { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, const std::string& v)  { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, const std::wstring& v) { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, bool v)   { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, char v)   { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, byte v)   { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, short v)  { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, ushort v) { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, int v)    { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, uint v)   { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, int64 v)  { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, uint64 v) { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, float v)  { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, double v) { return w.write(v); }
-    inline binary_writer& operator<<(binary_writer& w, binary_writer& m(binary_writer&)) { return m(w); }
-    inline binary_writer& endl(binary_writer& w) { w.flush(); return w; }
-
-    
-    ////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * @brief binary_reader interface
-     */
-    struct reader_base
-    {
-        virtual ~reader_base() noexcept = default;
-
-        /**
-         * @return TRUE if stream is open for reading, FALSE if it's closed
-         */
-        virtual bool good() const noexcept = 0;
-
-        /**
-         * @return Number of bytes available for reading; 0 if no bytes available; -1 if stream failed/closed
-         */
-        virtual int stream_available() const noexcept = 0;
+        virtual void stream_flush() = 0;
 
         /**
          * @brief Reads bytes directly from the underlying stream
@@ -202,45 +76,103 @@ namespace rpp /* ReCpp */
          * @param max Maximum number of characters to peek
          * @return Number of bytes actually peeked. Not all streams can be peeked, in which case result is 0;
          */
-        virtual int stream_peek(void* dst, int max) noexcept { (void)dst; (void)max; return 0; }
+        virtual int stream_peek(void* dst, int max) noexcept
+        {
+            (void)dst;
+            (void)max;
+            return 0;
+        }
 
         /**
-         * Tries to flush the underlying read stream. Not all read streams can be flushed, so this is optional.
+         * @param numBytesToSkip Number of bytes to skip from the read stream
          */
-        virtual void stream_flush() noexcept {}
-
-        /**
-         * Skips a specific number of bytes
-         */
-        virtual void stream_skip(int n) noexcept = 0;
+        virtual void stream_skip(int numBytesToSkip) noexcept = 0;
     };
+
 
     ////////////////////////////////////////////////////////////////////////////
 
+
     /**
-     * @brief A buffered socket reader class.
+     * @brief A generalized buffered binary stream.
+     *        Instance of stream_source defines the implementation: file, socket, ...
+     *        
+     *        For streams, buffering can be disabled by passing in capacity: 0,
+     *        which means all data is piped into stream source.
+     *        
+     * @warning There is no automatic flushing during normal write operations, for
+     *          large binary streams, you will need to manually flush the stream with .flush() or << endl
+     *          The stream buffer is flushed in the destructor.
+     * @code
+     *     if (rpp::file f { filename })
+     *     {
+     *         file_stream fs { f };
+     *         fs << "binary string";
+     *     
+     *         fs << std::endl; // example: manual flush
+     *         fs.flush();      // example: another manual flush
+     *     
+     *     } // f is autoflushed
+     * 
+     * @endcode
      */
-    struct binary_reader : reader_base, stream_buffer
+    class binary_stream
     {
-        /**
-         * Creates a new binary_reader with default buffer capacity of [binary_reader::MAX]
-         */
-        binary_reader() noexcept;
-        /**
-         * Creates a new binary_reader with given capacity buffer. If set to 0, then buffering is disabled
-         */
-        explicit binary_reader(int capacity) noexcept;
-        virtual ~binary_reader() noexcept;
+        // Small Buffer Optimization size:
+        static constexpr int SBSize = 512;
 
-        // binary_reader is pure virtual and shouldn't be copied or moved
-        NOCOPY_NOMOVE(binary_reader)
+        int Pos  = 0;      // position in the buffer
+        int Size = 0;      // remaining bytes that can be read
+        int Cap  = SBSize; // current buffer capacity
+        char* Ptr;        // pointer to current buffer, either this->Buf or a dynamically allocated one
+        
+        stream_source* Src = nullptr;
+        char  Buf[SBSize];
 
-        const char* data() const { return &Ptr[Pos]; }
-        uint pos()       const { return Pos; }
-        /* total bytes read from the underlying buffer */
-        uint size()      const { return Pos + Rem; }
-        uint available() const { return Rem + stream_available(); }
-        strview view()   const { return { data(), (int)size() }; }
+    public:
+
+        /**
+         * Creates a binary writer with a default write buffer of size [binary_writer::MAX]
+         */
+        explicit binary_stream(stream_source* src = nullptr) noexcept;
+
+        /**
+         * Create binary writer with buffer capacity. If capacity == 0, then no buffering is used.
+         */
+        explicit binary_stream(int capacity, stream_source* src = nullptr) noexcept;
+
+        virtual ~binary_stream() noexcept;
+
+        // binary_writer is pure virtual and shouldn't be copied or moved
+        NOCOPY_NOMOVE(binary_stream)
+
+        void disable_buffering();
+
+        char* data() const { return &Ptr[Pos]; }
+        uint pos()   const { return Pos; }
+        uint end()   const { return Pos + Size; }
+        uint size()  const { return Size; }
+        uint available() const { return Size; }
+        uint capacity() const { return Cap; }
+        strview view()  const { return { data(), (int)size() }; }
+        
+        /**
+         * Sets the buffer position and size to 0; no data is flushed
+         */
+        void clear();
+
+        /**
+         * Rewinds to a specific position in the read/write BUFFER.
+         * All subsequent read/write operations will begin from the given position.
+         * @note New pos is range checked and clamped
+         */
+        void rewind(int pos = 0);
+
+        /**
+         * @return TRUE if this stream open. 
+         */
+        bool good() const;
+        explicit operator bool() const { return good(); }
 
         /** 
          * Flushes the buffer and changes the size of write buffer
@@ -248,35 +180,87 @@ namespace rpp /* ReCpp */
          */
         void reserve(int capacity);
 
-        /* flushes both buffered data and any storage buffering */
+        /** 
+         * @brief Flush write buffer on this writer.
+         */
         void flush();
 
-    protected:
-        void buf_fill();
-        uint buf_read(void* dst, uint cnt);
-        uint _read(void* dst, uint cnt, uint bufn);
-        template<class T> uint buf_read(T& dst)
+    private:
+        NOINLINE void ensure_space(uint numBytes);
+
+
+    public:
+        ////////////////////// ----- Writer Fields ----- //////////////////////////
+
+        /** @brief Writes raw data into the buffer */
+        binary_stream& write(const void* data, uint numBytes);
+
+        /** @brief Writes object of type T into the buffer */
+        template<class T> binary_stream& write(const T& data)
         {
-            dst = *(T*)&Buf[Pos];
-            Pos += sizeof(T);
-            Rem -= sizeof(T);
+            ensure_space(sizeof(T));
+            *(T*)&Buf[Pos] = data;
+            Pos  += sizeof(T);
+            Size += sizeof(T);
+            return *this;
+        }
+
+        /** @brief Appends data from other binary_writer to this one */
+        binary_stream& write(const binary_stream& w) { return write(w.Buf, w.Pos); }
+        binary_stream& write_byte(byte value)     { return write(value); } /** @brief Writes a 8-bit unsigned byte into the buffer */
+        binary_stream& write_short(short value)   { return write(value); } /** @brief Writes a 16-bit signed short into the buffer */
+        binary_stream& write_ushort(ushort value) { return write(value); } /** @brief Writes a 16-bit unsigned short into the buffer */
+        binary_stream& write_int(int value)       { return write(value); } /** @brief Writes a 32-bit signed integer into the buffer */
+        binary_stream& write_uint(uint value)     { return write(value); } /** @brief Writes a 32-bit unsigned integer into the buffer */
+        binary_stream& write_int64(int64 value)   { return write(value); } /** @brief Writes a 64-bit signed integer into the buffer */
+        binary_stream& write_uint64(uint64 value) { return write(value); } /** @brief Writes a 64-bit unsigned integer into the buffer */
+
+        /** @brief Write a length specified string to the buffer in the form of [uint16 len][data] */
+        template<class Char> binary_stream& write_nstr(const Char* str, int len) {
+            return write_ushort(ushort(len)).write((void*)str, len * sizeof(Char)); 
+        }
+        binary_stream& write(const strview& str)      { return write_nstr(str.str, str.len); }
+        binary_stream& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }
+        binary_stream& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
+
+
+        ////////////////////// ----- Reader Fields ----- //////////////////////////
+    private:
+        void unsafe_buffer_fill();
+        uint unsafe_buffer_read(void* dst, uint cnt);
+        uint fragmented_read(void* dst, uint cnt, uint bufn);
+
+
+        template<class T> uint unsafe_buffer_read(T& dst)
+        {
+            dst = *(T*)&Ptr[Pos];
+            Pos  += sizeof(T);
+            Size -= sizeof(T);
             return sizeof(T);
         }
 
     public:
+
         uint read(void* dst, uint cnt);
         template<class T> uint read(T& dst)
         {
-            uint n = Rem;
-            if (n >= sizeof(T)) return buf_read(dst);  // best case, all from buffer
-            return _read(&dst, sizeof(T), n);          // fallback partial read
+            uint available = Size;
+            if (available >= sizeof(T))
+                return unsafe_buffer_read<T>(dst); // best case, all from buffer
+            return fragmented_read(&dst, sizeof(T), available); // fallback partial read
         }
 
         uint peek(void* dst, uint cnt);
         template<class T> uint peek(T& dst)
         {
-            if (Rem <= 0) buf_fill(); // fill before peek if possible
-            dst = *(T*)&Buf[Pos];
+            if (Size <= 0)
+            {
+                if (!Src) return 0;
+                unsafe_buffer_fill(); // fill before peek if possible
+            }
+            if ((uint)Size <= sizeof(T))
+                return 0;
+            dst = *(T*)&Ptr[Pos];
             return sizeof(T);
         }
         void skip(uint n);
@@ -303,23 +287,22 @@ namespace rpp /* ReCpp */
         int64  peek_int64()  { return peek<int64>(); } /** @brief Peeks a 64-bit signed integer without advancing the streampos   */
         uint64 peek_uint64() { return peek<uint64>();} /** @brief Peeks a 64-bit unsigned integer without advancing the streampos */
 
-
         /** @brief Reads a length specified string to the std::string in the form of [uint16 len][data] */
-        template<class Char> binary_reader& read(std::basic_string<Char>& str) {
-            uint n = min<uint>(read_ushort(), available());
+        template<class Char> binary_stream& read(std::basic_string<Char>& str) {
+            uint n = min<uint>(read_ushort(), size());
             str.resize(n);
             read((void*)str.data(), sizeof(Char) * n);
             return *this;
         }
         /** @brief Reads a length specified string to the dst buffer in the form of [uint16 len][data] and returns actual length */
         template<class Char> uint read_nstr(Char* dst, uint maxLen) {
-            uint n = min3<uint>(read_ushort(), available(), maxLen);
+            uint n = min3<uint>(read_ushort(), size(), maxLen);
             read((void*)dst, sizeof(Char) * n);
             return n;
         }
         /** @brief Peeks a length specified string to the std::string in the form of [uint16 len][data] */
-        template<class Char> binary_reader& peek(std::basic_string<Char>& str) {
-            uint n = min<uint>(read_ushort(), available());
+        template<class Char> binary_stream& peek(std::basic_string<Char>& str) {
+            uint n = min<uint>(read_ushort(), size());
             str.resize(n);
             peek((void*)str.data(), sizeof(Char) * n);
             undo(2); // undo read_ushort
@@ -327,7 +310,7 @@ namespace rpp /* ReCpp */
         }
         /** @brief Peeks a length specified string to the dst buffer in the form of [uint16 len][data] and returns actual length */
         template<class Char> uint peek_nstr(Char* dst, uint maxLen) {
-            uint n = min3<uint>(read_ushort(), available(), maxLen);
+            uint n = min3<uint>(read_ushort(), size(), maxLen);
             n = peek((void*)dst, sizeof(Char) * n) / sizeof(Char);
             undo(2); // undo read_ushort
             return n;
@@ -339,22 +322,53 @@ namespace rpp /* ReCpp */
         std::wstring peek_wstring() { std::wstring s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] wstring */
         strview      peek_strview() { strview s; peek(s); return s; }      /** @brief Peeks a length specified [uint16 len][data] string view */
     };
-    // explicit operator>> overloads
-    inline binary_reader& operator>>(binary_reader& r, strview& v)      { r.peek(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, std::string& v)  { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, std::wstring& v) { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, bool& v)   { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, char& v)   { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, byte& v)   { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, short& v)  { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, ushort& v) { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, int& v)    { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, uint& v)   { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, int64& v)  { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, uint64& v) { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, float& v)  { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, double& v) { r.read(v); return r; }
-    inline binary_reader& operator>>(binary_reader& r, binary_reader& m(binary_reader&)) { return m(r); }
+
+    // explicit operator<< overloads
+    inline binary_stream& operator<<(binary_stream& w, const strview& v)      { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, const std::string& v)  { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, const std::wstring& v) { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, bool v)   { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, char v)   { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, byte v)   { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, short v)  { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, ushort v) { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, int v)    { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, uint v)   { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, int64 v)  { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, uint64 v) { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, float v)  { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, double v) { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, binary_stream& m(binary_stream&)) { return m(w); }
+    inline binary_stream& endl(binary_stream& w) { w.flush(); return w; }
+
+    inline binary_stream& operator>>(binary_stream& r, strview& v)      { r.peek(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, std::string& v)  { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, std::wstring& v) { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, bool& v)   { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, char& v)   { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, byte& v)   { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, short& v)  { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, ushort& v) { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, int& v)    { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, uint& v)   { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, int64& v)  { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, uint64& v) { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, float& v)  { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, double& v) { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, binary_stream& m(binary_stream&)) { return m(r); }
+
+
+
+    ////////////////////////////////////////////////////////////////////////////
+
+
+    /**
+     * Special case of a binary stream, which doesn't flush any of the data
+     */
+    class binary_buffer : public binary_stream
+    {
+        using binary_stream::binary_stream;
+    };
 
 
     ////////////////////////////////////////////////////////////////////////////
@@ -362,34 +376,24 @@ namespace rpp /* ReCpp */
 
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 
-    template<class binary_base> struct binary_socket_stream : binary_base
+    /**
+     * A generic binary socket I/O stream. For UDP sockets, use socket::bind to set the destination ipaddress.
+     */
+    class socket_stream : public binary_stream, protected stream_source
     {
         rpp::socket* Sock = nullptr;
 
-        binary_socket_stream() noexcept {}
-        explicit binary_socket_stream(rpp::socket& sock) noexcept : Sock(&sock) {}
-        binary_socket_stream(rpp::socket& sock, int capacity) noexcept : binary_base(capacity), Sock(&sock) {}
+    public:
+        socket_stream() noexcept : binary_stream(this) {}
+        explicit socket_stream(rpp::socket& sock)      noexcept : binary_stream(this),           Sock(&sock) {}
+        socket_stream(rpp::socket& sock, int capacity) noexcept : binary_stream(capacity, this), Sock(&sock) {}
 
-        bool good() const noexcept override { return Sock && Sock->good(); }
-    };
+        bool stream_good() const noexcept override { return Sock && Sock->good(); }
 
-    /**
-     * A generic binary socket writer. For UDP sockets, use socket::bind to set the destination ipaddress.
-     */
-    struct socket_writer : binary_socket_stream<binary_writer>
-    {
-        int unbuffered_write(const void* data, uint numBytes) override;
-    };
-
-    /**
-     * A generic binary socket reader. For UDP sockets, use socket::bind to set the destination ipaddress.
-     */
-    struct socket_reader : binary_socket_stream<binary_reader>
-    {
-        int stream_available() const noexcept override;
+        int stream_write(const void* data, uint numBytes) noexcept override;
+        void stream_flush() noexcept override;
         int stream_read(void* dst, int max) noexcept override;
         int stream_peek(void* dst, int max) noexcept override;
-        void stream_flush() noexcept override;
         void stream_skip(int n) noexcept override;
     };
 
@@ -399,45 +403,28 @@ namespace rpp /* ReCpp */
 
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
 
-    template<class binary_base> struct binary_file_stream : binary_base
+    /**
+     * A generic binary file stream. This is not the best for small inputs, but excels with huge contiguous streams
+     */
+    class file_stream : public binary_stream, protected stream_source
     {
         rpp::file* File = nullptr;
 
-        binary_file_stream() noexcept {}
-        explicit binary_file_stream(rpp::file& file) noexcept : File(&file) {}
-        binary_file_stream(rpp::file& file, int capacity) noexcept : binary_base(capacity), File(&file) {}
+    public:
+        file_stream() noexcept {}
+        explicit file_stream(rpp::file& file)      noexcept : File(&file) {}
+        file_stream(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
 
-        bool good() const noexcept override { return File && File->good(); }
-    };
+        bool stream_good() const noexcept override { return File && File->good(); }
 
-    /**
-     * A generic binary file writer.
-     */
-    struct file_writer : binary_file_stream<binary_writer>
-    {
-        int unbuffered_write(const void* data, uint numBytes) override;
-    };
-
-    /**
-     * A generic binary file reader.
-     */
-    struct file_reader : binary_file_stream<binary_reader>
-    {
-        int stream_available() const noexcept override;
+        int stream_write(const void* data, uint numBytes) noexcept override;
+        void stream_flush() noexcept override;
         int stream_read(void* dst, int max) noexcept override;
         int stream_peek(void* dst, int max) noexcept override;
-        void stream_flush() noexcept override;
         void stream_skip(int n) noexcept override;
     };
 
 #endif
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    struct binary_buffer_writer : binary_writer
-    {
-        int unbuffered_write(const void* data, uint numBytes) override;
-    };
 
     ////////////////////////////////////////////////////////////////////////////
 } // namespace ReCpp

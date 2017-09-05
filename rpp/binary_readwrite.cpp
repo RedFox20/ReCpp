@@ -4,74 +4,84 @@ namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////
 
-    stream_buffer::stream_buffer() noexcept : Ptr(Buf)
+    binary_stream::binary_stream(stream_source* src) noexcept : Ptr(Buf), Src(src)
     {
     }
 
-    stream_buffer::stream_buffer(int capacity) noexcept : Ptr(Buf)
+    binary_stream::binary_stream(int capacity, stream_source* src) noexcept : Ptr(Buf), Src(src)
     {
-        if (capacity > MAX)
-        {
+        if (capacity > SBSize)
             Ptr = (char*)malloc(capacity);
-        }
         Cap = capacity;
     }
 
-    stream_buffer::~stream_buffer() noexcept
+    binary_stream::~binary_stream() noexcept
     {
-        if (Cap > MAX) free(Ptr);
+        try { flush(); } catch (...) {}
+        if (Cap > SBSize)
+            free(Ptr);
     }
 
-    void stream_buffer::reserve_buffer(int capacity) noexcept
+    void binary_stream::disable_buffering()
+    {
+        flush();
+        if (Cap > SBSize)
+            free(Ptr);
+        Cap = 0;
+    }
+
+    void binary_stream::clear()
+    {
+        Pos  = 0;
+        Size = 0;
+    }
+
+    void binary_stream::rewind(int pos)
+    {
+        int streamEnd = end();
+        Pos  = pos < 0 ? 0 : pos <= streamEnd ? pos : streamEnd;
+        Size = streamEnd - Pos;
+    }
+
+    bool binary_stream::good() const
+    {
+        return !Src || Src->stream_good();
+    }
+
+    void binary_stream::reserve(int capacity)
     {
         if (capacity == 0)
         {
-            if (Cap > MAX)
+            if (Cap > SBSize)
             {
-                free(Ptr); Ptr = Buf;
+                free(Ptr);
+                Ptr = Buf;
             }
+            Pos  = 0;
+            Size = 0;
         }
-        else if (capacity > MAX)
+        else if (capacity > SBSize)
         {
-            if (Cap > MAX) // realloc dynamic buffer
+            if (Cap > SBSize) // realloc dynamic buffer
             {
                 Ptr = (char*)realloc(Ptr, capacity);
             }
-            else // change from local buffer to 
+            else // change from local buffer to dynamic
             {
                 Ptr = (char*)malloc(capacity);
-                if (Pos) memcpy(Ptr, Buf, Pos);
+                if (Size) {
+                    memcpy(Ptr, Buf, Size);
+                }
             }
         }
         Cap = capacity;
     }
 
-    ////////////////////////////////////////////////////////////////////////////
-
-    binary_writer::binary_writer() noexcept : stream_buffer()
+    void binary_stream::flush() 
     {
-    }
-
-    binary_writer::binary_writer(int capacity) noexcept : stream_buffer(capacity)
-    {
-    }
-
-    binary_writer::~binary_writer() noexcept
-    {
-        flush();
-    }
-
-    void binary_writer::reserve(int capacity)
-    {
-        flush();
-        reserve_buffer(capacity);
-    }
-
-    void binary_writer::flush() 
-    {
-        if (int numBytes = Pos)
+        if (int numBytes = Pos && Src)
         {
-            int written = unbuffered_write(Ptr, numBytes);
+            int written = Src->stream_write(Ptr, numBytes);
             if (written != numBytes)
             {
                 // @todo Write failed. How do we recover?
@@ -80,147 +90,132 @@ namespace rpp
         }
     }
 
-    bool binary_writer::check_unbuffered(const void* data, uint numBytes)
+    void binary_stream::ensure_space(uint numBytes)
     {
-        if (uint(Cap - Pos) < numBytes)
+        int newlen = Pos + Size + numBytes;
+        if (newlen > Cap)
         {
-            flush(); // forced flush
+            int align = Cap;
+            int newcap = newlen + align;
+            if (int rem = newcap % align)
+                newcap += align - rem;
+            reserve(newcap);
         }
-        if (numBytes >= (uint)Cap)
-        {
-            unbuffered_write(data, numBytes);
-            return false;
-        }
-        return true;
     }
 
-    binary_writer& binary_writer::write(const void* data, uint numBytes)
+    binary_stream& binary_stream::write(const void* data, uint numBytes)
     {
-        if (check_unbuffered(data, numBytes))
-        {
-            memcpy(&Buf[Pos], data, (size_t)numBytes);
-            Pos += numBytes;
-        }
+        ensure_space(numBytes);
+        memcpy(&Ptr[Pos], data, (size_t)numBytes);
+        Pos  += numBytes;
+        Size += numBytes;
         return *this;
     }
 
     ////////////////////////////////////////////////////////////////////////////
 
-    binary_reader::binary_reader() noexcept : stream_buffer()
+    void binary_stream::unsafe_buffer_fill()
     {
+        int n = Src->stream_read(Ptr, Cap);
+        Pos  = 0;
+        Size = (n > 0) ? n : 0;
     }
 
-    binary_reader::binary_reader(int capacity) noexcept : stream_buffer(capacity)
+
+    uint binary_stream::unsafe_buffer_read(void* dst, uint bytesToRead)
     {
+        memcpy(dst, &Ptr[Pos], (size_t)bytesToRead);
+        Pos  += bytesToRead;
+        Size -= bytesToRead;
+        return bytesToRead;
     }
 
-    binary_reader::~binary_reader() noexcept
+    uint binary_stream::fragmented_read(void* dst, uint bytesToRead, uint bufferBytes)
     {
-        flush();
+        uint remainingBytes = bytesToRead;
+        if (bufferBytes) // available < bytesToRead,  buffer has less data, so it's a fragmented/partial fill
+        {
+            memcpy(dst, &Ptr[Pos], (size_t)bufferBytes);
+            Pos  = 0;
+            Size = 0;
+            remainingBytes -= bufferBytes; // and this will never be 0
+        }
+
+        // if there's no underlying source, we're done reading
+        if (!Src)
+            return bufferBytes;
+
+        unsafe_buffer_fill();
+        return bufferBytes + Src->stream_read((char*)dst + bufferBytes, remainingBytes);
     }
 
-    void binary_reader::reserve(int capacity)
+    uint binary_stream::read(void* dst, uint bytesToRead)
     {
-        flush();
-        reserve_buffer(capacity);
+        uint available = Size;
+        if (available >= bytesToRead)
+            return unsafe_buffer_read(dst, bytesToRead); // best case, all from buffer
+        return fragmented_read(dst, bytesToRead, available);
     }
 
-    void binary_reader::flush()
+    uint binary_stream::peek(void* dst, uint cnt)
     {
-        Pos = 0;
-        Rem = 0;
-        if (stream_available()) stream_flush();
-    }
-
-    void binary_reader::buf_fill()
-    {
-        int n = stream_read(Buf, Cap);
-        Pos = 0;
-        Rem = (n > 0) ? n : 0;
-    }
-
-    uint binary_reader::buf_read(void* dst, uint cnt)
-    {
-        uint n = min<uint>(cnt, Rem);
-        memcpy(dst, &Buf[Pos], cnt);
-        Pos += n;
-        Rem -= n;
-        return n;
-    }
-
-    uint binary_reader::read(void* dst, uint cnt)
-    {
-        uint n = Rem;
-        if (n >= cnt) return buf_read(dst, cnt); // best case, all from buffer
-        return _read(&dst, cnt, n);              // fallback partial read
-    }
-
-    uint binary_reader::_read(void* dst, uint cnt, uint bufn)
-    {
-        uint rem = cnt - buf_read(dst, bufn); // read some from buffer; won't read all(!)
-        buf_fill();
-        return bufn + buf_read((char*)dst + bufn, rem); // refill and read from buf
-    }
-
-    uint binary_reader::peek(void* dst, uint cnt)
-    {
-        if (Rem <= 0) buf_fill();  // fill before peek if possible
-        memcpy(dst, &Buf[Pos], cnt);
+        if (Size <= 0)
+        {
+            if (!Src) return 0;
+            unsafe_buffer_fill(); // fill before peek if possible
+        }
+        if ((uint)Size <= cnt)
+            return 0;
+        memcpy(dst, &Ptr[Pos], cnt);
         return cnt;
     }
 
-    void binary_reader::skip(uint n)
+    void binary_stream::skip(uint n)
     {
-        uint nskip = min<uint>(n, Rem); // max skippable: Rem
-        Pos += nskip;
-        Rem -= nskip;
-        if (nskip < n)
-            stream_skip(n - nskip); // skip remaining from storage
+        uint nskip = min<uint>(n, Size); // max skippable: Size
+        Pos  += nskip;
+        Size -= nskip;
+        if (Src && nskip < n)
+            Src->stream_skip(n - nskip); // skip remaining from storage
     }
 
-    void binary_reader::undo(uint n)
+    void binary_stream::undo(uint n)
     {
         uint nundo = min<uint>(n, Pos); // max undoable:  Pos
-        Pos -= nundo;
-        Rem += nundo;
+        Pos  -= nundo;
+        Size += nundo;
     }
 
     ////////////////////////////////////////////////////////////////////////////
 
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 
-    int socket_writer::unbuffered_write(const void* data, uint numBytes)
+    int socket_stream::stream_write(const void* data, uint numBytes) noexcept
     {
-        if (good())
+        if (stream_good())
             return Sock->send(data, numBytes);
         return -1;
     }
-    int socket_reader::stream_available() const noexcept
+    void socket_stream::stream_flush() noexcept
     {
-        if (good())
-            return Sock->available();
-        return -1;
+        if (stream_good())
+            Sock->flush();
     }
-    int socket_reader::stream_read(void* dst, int max) noexcept
+    int socket_stream::stream_read(void* dst, int max) noexcept
     {
-        if (good())
+        if (stream_good())
             return Sock->recv(dst, max);
         return -1;
     }
-    int socket_reader::stream_peek(void* dst, int max) noexcept
+    int socket_stream::stream_peek(void* dst, int max) noexcept
     {
-        if (good())
+        if (stream_good())
             return Sock->peek(dst, max);
         return -1;
     }
-    void socket_reader::stream_flush() noexcept
+    void socket_stream::stream_skip(int n) noexcept
     {
-        if (good())
-            Sock->flush();
-    }
-    void socket_reader::stream_skip(int n) noexcept
-    {
-        if (good())
+        if (stream_good())
             Sock->skip(n);
     }
 
@@ -230,31 +225,26 @@ namespace rpp
 
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
 
-    int file_writer::unbuffered_write(const void* data, uint numBytes)
+    int file_stream::stream_write(const void* data, uint numBytes) noexcept
     {
-        if (good())
+        if (stream_good())
             return File->write(data, numBytes);
         return -1;
     }
-    int file_reader::stream_available() const noexcept
+    void file_stream::stream_flush() noexcept
     {
-        if (good())
-        {
-            int pos  = File->tell();
-            int size = File->size();
-            return size - pos;
-        }
-        return -1;
+        if (stream_good())
+            File->flush();
     }
-    int file_reader::stream_read(void* dst, int max) noexcept
+    int file_stream::stream_read(void* dst, int max) noexcept
     {
-        if (good())
+        if (stream_good())
             return File->read(dst, max);
         return -1;
     }
-    int file_reader::stream_peek(void* dst, int max) noexcept
+    int file_stream::stream_peek(void* dst, int max) noexcept
     {
-        if (good())
+        if (stream_good())
         {
             int pos = File->tell();
             int ret = File->read(dst, max);
@@ -263,14 +253,9 @@ namespace rpp
         }
         return -1;
     }
-    void file_reader::stream_flush() noexcept
+    void file_stream::stream_skip(int n) noexcept
     {
-        if (good())
-            File->flush();
-    }
-    void file_reader::stream_skip(int n) noexcept
-    {
-        if (good())
+        if (stream_good())
             File->seek(n, SEEK_CUR);
     }
 

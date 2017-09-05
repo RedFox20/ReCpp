@@ -801,11 +801,12 @@ namespace rpp
     void string_buffer::reserve(int count) noexcept
     {
         int newlen = len + count + 1;
-        if (newlen >= cap)
+        if (newlen > cap)
         {
-            int newcap = cap * 2;
-            while (newcap < newlen) // @todo Any fancy ways to improve this?
-                newcap *= 2;
+            int align = cap;
+            int newcap = newlen + align;
+            if (int rem = newcap % align)
+                newcap += align - rem;
             
             if (cap == SIZE)
                 ptr = (char*)memcpy(malloc(newcap), buf, len);

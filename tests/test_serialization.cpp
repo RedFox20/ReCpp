@@ -33,12 +33,12 @@ TestImpl(test_serialization)
         Struct1 s1;
         Struct2 s2;
 
-        file_writer w1;
-        s1.serialize(w1);
+        binary_buffer buf;
+        s1.serialize(buf);
 
-        file_reader r1;
+        buf.rewind();
         Struct1 s1d;
-        s1d.deserialize(r1);
+        s1d.deserialize(buf);
 
     }
 

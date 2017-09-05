@@ -55,18 +55,18 @@ namespace rpp
         binary_serializer() {}
         binary_serializer(uint layout) : layout(layout), length(0) {}
 
-        NOINLINE binary_writer& write(binary_writer& w) const noexcept;
-        NOINLINE binary_reader& read(binary_reader& r) noexcept;
+        NOINLINE binary_stream& write(binary_stream& w) const noexcept;
+        NOINLINE binary_stream& read(binary_stream& r) noexcept;
 
         /** @brief Returns the serialization layout size */
         NOINLINE int layout_size() const noexcept;
     };
 
-    inline binary_writer& operator<<(binary_writer& w, const binary_serializer& s) 
+    inline binary_stream& operator<<(binary_stream& w, const binary_serializer& s) 
     {
         return s.write(w); 
     }
-    inline binary_reader& operator>>(binary_reader& r, binary_serializer& s) 
+    inline binary_stream& operator>>(binary_stream& r, binary_serializer& s) 
     {
         return s.read(r); 
     }
@@ -150,8 +150,8 @@ namespace rpp
 
     template<class T> struct member_serialize
     {
-        using serialize_func   = void(*)(T* inst, int offset, binary_writer& w);
-        using deserialize_func = void(*)(T* inst, int offset, binary_reader& r);
+        using serialize_func   = void(*)(T* inst, int offset, binary_stream& w);
+        using deserialize_func = void(*)(T* inst, int offset, binary_stream& r);
         int offset;
         serialize_func   serialize;
         deserialize_func deserialize;
@@ -172,12 +172,12 @@ namespace rpp
         {
             member_serialize<T> m;
             m.offset    = int((char*)&elem - (char*)this);
-            m.serialize = [](T* inst, int offset, binary_writer& w)
+            m.serialize = [](T* inst, int offset, binary_stream& w)
             {
                 U& var = *(U*)((byte*)inst + offset);
                 w << var;
             };
-            m.deserialize = [](T* inst, int offset, binary_reader& r)
+            m.deserialize = [](T* inst, int offset, binary_stream& r)
             {
                 U& var = *(U*)((byte*)inst + offset);
                 r >> var;
@@ -191,7 +191,7 @@ namespace rpp
             bind(args...);
         }
 
-        void serialize(binary_writer& w)
+        void serialize(binary_stream& w)
         {
             T* inst = static_cast<T*>(this);
             for (member_serialize<T>& memberInfo : members)
@@ -200,7 +200,7 @@ namespace rpp
             }
         }
 
-        void deserialize(binary_reader& r)
+        void deserialize(binary_stream& r)
         {
             T* inst = static_cast<T*>(this);
             for (member_serialize<T>& memberInfo : members)
