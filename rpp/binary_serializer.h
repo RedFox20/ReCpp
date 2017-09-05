@@ -78,6 +78,7 @@ namespace rpp
         using serialize_func   = void(*)(const T* inst, int offset, binary_stream& w);
         using deserialize_func = void(*)(T* inst,       int offset, binary_stream& r);
         int offset;
+        strview name; // for named serialization such as json
         serialize_func   serialize;
         deserialize_func deserialize;
     };
@@ -103,6 +104,24 @@ namespace rpp
                 w << var;
             };
             m.deserialize = [](T* inst, int offset, binary_stream& r)
+            {
+                U& var = *(U*)((byte*)inst + offset);
+                r >> var;
+            };
+            members.emplace_back(move(m));
+        }
+
+        template<class U> void bind(strview name, U& elem) noexcept
+        {
+            member_serialize<T> m;
+            m.offset    = int((char*)&elem - (char*)this);
+            m.name      = name;
+            m.serialize = [](T* inst, int offset, binary_writer& w)
+            {
+                U& var = *(U*)((byte*)inst + offset);
+                w << var;
+            };
+            m.deserialize = [](T* inst, int offset, binary_reader& r)
             {
                 U& var = *(U*)((byte*)inst + offset);
                 r >> var;
