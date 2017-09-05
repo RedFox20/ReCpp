@@ -121,11 +121,11 @@ namespace rpp /* ReCpp */
         // Small Buffer Optimization size:
         static constexpr int SBSize = 512;
 
-        int Pos  = 0;      // position in the buffer
-        int Size = 0;      // remaining bytes that can be read
-        int Cap  = SBSize; // current buffer capacity
-        char* Ptr;        // pointer to current buffer, either this->Buf or a dynamically allocated one
-        
+        int ReadPos  = 0;  // read head position in the buffer
+        int WritePos = 0;  // write head position in the buffer
+        int End = 0;      // end of data
+        int Cap = SBSize; // current buffer capacity
+        char* Ptr;         // pointer to current buffer, either this->Buf or a dynamically allocated one
         stream_source* Src = nullptr;
         char  Buf[SBSize];
 
@@ -148,21 +148,24 @@ namespace rpp /* ReCpp */
 
         void disable_buffering();
 
-        char* data() const { return &Ptr[Pos]; }
-        uint pos()   const { return Pos; }
-        uint end()   const { return Pos + Size; }
-        uint size()  const { return Size; }
-        uint available() const { return Size; }
-        uint capacity() const { return Cap; }
-        strview view()  const { return { data(), (int)size() }; }
-        
+        const char* data() const { return &Ptr[ReadPos]; }
+        char*       data()       { return &Ptr[ReadPos]; }
+        const char* begin() const { return &Ptr[ReadPos]; }
+        const char* end()   const { return &Ptr[End]; }
+        uint readpos()      const { return ReadPos; }
+        uint writepos()     const { return WritePos; }
+        uint size()      const { return End - ReadPos; }
+        uint available() const { return End - ReadPos; }
+        uint capacity()  const { return Cap; }
+        strview view()   const { return { data(), (int)size() }; }
+
         /**
          * Sets the buffer position and size to 0; no data is flushed
          */
         void clear();
 
         /**
-         * Rewinds to a specific position in the read/write BUFFER.
+         * Rewinds the Read/Write head to a specific position in the BUFFER.
          * All subsequent read/write operations will begin from the given position.
          * @note New pos is range checked and clamped
          */
@@ -188,7 +191,6 @@ namespace rpp /* ReCpp */
     private:
         NOINLINE void ensure_space(uint numBytes);
 
-
     public:
         ////////////////////// ----- Writer Fields ----- //////////////////////////
 
@@ -199,14 +201,14 @@ namespace rpp /* ReCpp */
         template<class T> binary_stream& write(const T& data)
         {
             ensure_space(sizeof(T));
-            *(T*)&Buf[Pos] = data;
-            Pos  += sizeof(T);
-            Size += sizeof(T);
+            *(T*)&Ptr[WritePos] = data;
+            WritePos += sizeof(T);
+            End      += sizeof(T);
             return *this;
         }
 
         /** @brief Appends data from other binary_writer to this one */
-        binary_stream& write(const binary_stream& w) { return write(w.Buf, w.Pos); }
+        binary_stream& write(const binary_stream& w) { return write(w.data(), w.size()); }
         binary_stream& write_byte(byte value)     { return write(value); } /** @brief Writes a 8-bit unsigned byte into the buffer */
         binary_stream& write_short(short value)   { return write(value); } /** @brief Writes a 16-bit signed short into the buffer */
         binary_stream& write_ushort(ushort value) { return write(value); } /** @brief Writes a 16-bit unsigned short into the buffer */
@@ -225,26 +227,24 @@ namespace rpp /* ReCpp */
 
 
         ////////////////////// ----- Reader Fields ----- //////////////////////////
+
     private:
         void unsafe_buffer_fill();
         uint unsafe_buffer_read(void* dst, uint cnt);
         uint fragmented_read(void* dst, uint cnt, uint bufn);
 
-
         template<class T> uint unsafe_buffer_read(T& dst)
         {
-            dst = *(T*)&Ptr[Pos];
-            Pos  += sizeof(T);
-            Size -= sizeof(T);
+            dst = *(T*)&Ptr[ReadPos];
+            ReadPos += sizeof(T);
             return sizeof(T);
         }
 
     public:
-
         uint read(void* dst, uint cnt);
         template<class T> uint read(T& dst)
         {
-            uint available = Size;
+            uint available = size();
             if (available >= sizeof(T))
                 return unsafe_buffer_read<T>(dst); // best case, all from buffer
             return fragmented_read(&dst, sizeof(T), available); // fallback partial read
@@ -253,14 +253,14 @@ namespace rpp /* ReCpp */
         uint peek(void* dst, uint cnt);
         template<class T> uint peek(T& dst)
         {
-            if (Size <= 0)
+            if (size() <= 0)
             {
                 if (!Src) return 0;
                 unsafe_buffer_fill(); // fill before peek if possible
             }
-            if ((uint)Size <= sizeof(T))
+            if (size() <= sizeof(T))
                 return 0;
-            dst = *(T*)&Ptr[Pos];
+            dst = *(T*)&Ptr[ReadPos];
             return sizeof(T);
         }
         void skip(uint n);

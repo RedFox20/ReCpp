@@ -28,9 +28,6 @@
     <ClCompile Include="..\rpp\vec.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\rpp\binary_readwrite.cpp">
-      <Filter>rpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\rpp\thread_pool.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
@@ -38,6 +35,9 @@
       <Filter>rpp</Filter>
     </ClCompile>
     <ClCompile Include="..\rpp\json.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\rpp\binary_stream.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
   </ItemGroup>
@@ -66,9 +66,6 @@
     <ClInclude Include="..\rpp\vec.h">
       <Filter>rpp</Filter>
     </ClInclude>
-    <ClInclude Include="..\rpp\binary_readwrite.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
     <ClInclude Include="..\rpp\thread_pool.h">
       <Filter>rpp</Filter>
     </ClInclude>
@@ -81,10 +78,7 @@
     <ClInclude Include="..\rpp\json.h">
       <Filter>rpp</Filter>
     </ClInclude>
-    <ClInclude Include="..\rpp\binary_reader_old.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rpp\binary_writer_old.h">
+    <ClInclude Include="..\rpp\binary_stream.h">
       <Filter>rpp</Filter>
     </ClInclude>
   </ItemGroup>
@@ -93,6 +87,9 @@
       <Filter>rpp</Filter>
     </Natvis>
     <Natvis Include="..\rpp\vec.natvis">
+      <Filter>rpp</Filter>
+    </Natvis>
+    <Natvis Include="..\rpp\binary_reader.natvis">
       <Filter>rpp</Filter>
     </Natvis>
   </ItemGroup>

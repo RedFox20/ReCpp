@@ -1,4 +1,4 @@
-#include "binary_readwrite.h"
+#include "binary_stream.h"
 
 namespace rpp
 {
@@ -32,15 +32,14 @@ namespace rpp
 
     void binary_stream::clear()
     {
-        Pos  = 0;
-        Size = 0;
+        ReadPos  = 0;
+        WritePos = 0;
+        End      = 0;
     }
 
     void binary_stream::rewind(int pos)
     {
-        int streamEnd = end();
-        Pos  = pos < 0 ? 0 : pos <= streamEnd ? pos : streamEnd;
-        Size = streamEnd - Pos;
+        ReadPos = WritePos = pos < 0 ? 0 : pos <= End ? pos : End;
     }
 
     bool binary_stream::good() const
@@ -52,13 +51,12 @@ namespace rpp
     {
         if (capacity == 0)
         {
-            if (Cap > SBSize)
+            if (Cap > SBSize) // revert back to local buffer
             {
                 free(Ptr);
                 Ptr = Buf;
             }
-            Pos  = 0;
-            Size = 0;
+            clear();
         }
         else if (capacity > SBSize)
         {
@@ -69,8 +67,8 @@ namespace rpp
             else // change from local buffer to dynamic
             {
                 Ptr = (char*)malloc(capacity);
-                if (Size) {
-                    memcpy(Ptr, Buf, Size);
+                if (uint bytes = size()) {
+                    memcpy(Ptr, Buf, (size_t)bytes);
                 }
             }
         }
@@ -79,20 +77,23 @@ namespace rpp
 
     void binary_stream::flush() 
     {
-        if (int numBytes = Pos && Src)
+        if (!Src) return;
+        if (uint numBytes = size())
         {
-            int written = Src->stream_write(Ptr, numBytes);
-            if (written != numBytes)
+            int written = Src->stream_write(data(), numBytes);
+            if (written != (int)numBytes)
             {
                 // @todo Write failed. How do we recover?
             }
-            Pos = 0;
+            clear();
         }
+        // now ask the source itself to flush the stuff
+
     }
 
     void binary_stream::ensure_space(uint numBytes)
     {
-        int newlen = Pos + Size + numBytes;
+        int newlen = size() + numBytes;
         if (newlen > Cap)
         {
             int align = Cap;
@@ -106,9 +107,9 @@ namespace rpp
     binary_stream& binary_stream::write(const void* data, uint numBytes)
     {
         ensure_space(numBytes);
-        memcpy(&Ptr[Pos], data, (size_t)numBytes);
-        Pos  += numBytes;
-        Size += numBytes;
+        memcpy(&Ptr[WritePos], data, (size_t)numBytes);
+        WritePos += numBytes;
+        End      += numBytes;
         return *this;
     }
 
@@ -117,16 +118,15 @@ namespace rpp
     void binary_stream::unsafe_buffer_fill()
     {
         int n = Src->stream_read(Ptr, Cap);
-        Pos  = 0;
-        Size = (n > 0) ? n : 0;
+        ReadPos = 0;
+        End = WritePos = (n > 0) ? n : 0;
     }
 
 
     uint binary_stream::unsafe_buffer_read(void* dst, uint bytesToRead)
     {
-        memcpy(dst, &Ptr[Pos], (size_t)bytesToRead);
-        Pos  += bytesToRead;
-        Size -= bytesToRead;
+        memcpy(dst, &Ptr[ReadPos], (size_t)bytesToRead);
+        ReadPos += bytesToRead;
         return bytesToRead;
     }
 
@@ -135,9 +135,8 @@ namespace rpp
         uint remainingBytes = bytesToRead;
         if (bufferBytes) // available < bytesToRead,  buffer has less data, so it's a fragmented/partial fill
         {
-            memcpy(dst, &Ptr[Pos], (size_t)bufferBytes);
-            Pos  = 0;
-            Size = 0;
+            memcpy(dst, &Ptr[ReadPos], (size_t)bufferBytes);
+            clear();
             remainingBytes -= bufferBytes; // and this will never be 0
         }
 
@@ -151,7 +150,7 @@ namespace rpp
 
     uint binary_stream::read(void* dst, uint bytesToRead)
     {
-        uint available = Size;
+        uint available = size();
         if (available >= bytesToRead)
             return unsafe_buffer_read(dst, bytesToRead); // best case, all from buffer
         return fragmented_read(dst, bytesToRead, available);
@@ -159,34 +158,34 @@ namespace rpp
 
     uint binary_stream::peek(void* dst, uint cnt)
     {
-        if (Size <= 0)
+        if (size() <= 0)
         {
             if (!Src) return 0;
             unsafe_buffer_fill(); // fill before peek if possible
         }
-        if ((uint)Size <= cnt)
+        if (size() <= cnt)
             return 0;
-        memcpy(dst, &Ptr[Pos], cnt);
+        memcpy(dst, &Ptr[ReadPos], cnt);
         return cnt;
     }
 
     void binary_stream::skip(uint n)
     {
-        uint nskip = min<uint>(n, Size); // max skippable: Size
-        Pos  += nskip;
-        Size -= nskip;
+        uint nskip = min<uint>(n, size()); // max skippable: Size
+        ReadPos += nskip;
         if (Src && nskip < n)
             Src->stream_skip(n - nskip); // skip remaining from storage
     }
 
     void binary_stream::undo(uint n)
     {
-        uint nundo = min<uint>(n, Pos); // max undoable:  Pos
-        Pos  -= nundo;
-        Size += nundo;
+        uint nundo = min<uint>(n, ReadPos); // max undoable:  Pos
+        ReadPos -= nundo;
     }
 
+
     ////////////////////////////////////////////////////////////////////////////
+
 
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 
@@ -221,7 +220,9 @@ namespace rpp
 
 #endif
 
+
     ////////////////////////////////////////////////////////////////////////////
+
 
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
 

@@ -181,7 +181,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\rpp\allocators.cpp" />
-    <ClCompile Include="..\rpp\binary_readwrite.cpp" />
+    <ClCompile Include="..\rpp\binary_stream.cpp" />
     <ClCompile Include="..\rpp\binary_serializer.cpp" />
     <ClCompile Include="..\rpp\debugging.cpp" />
     <ClCompile Include="..\rpp\file_io.cpp" />
@@ -194,10 +194,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\allocators.h" />
-    <ClInclude Include="..\rpp\binary_reader_old.h" />
-    <ClInclude Include="..\rpp\binary_readwrite.h" />
+    <ClInclude Include="..\rpp\binary_stream.h" />
     <ClInclude Include="..\rpp\binary_serializer.h" />
-    <ClInclude Include="..\rpp\binary_writer_old.h" />
     <ClInclude Include="..\rpp\debugging.h" />
     <ClInclude Include="..\rpp\delegate.h" />
     <ClInclude Include="..\rpp\file_io.h" />
@@ -210,6 +208,7 @@
     <ClInclude Include="..\rpp\vec.h" />
   </ItemGroup>
   <ItemGroup>
+    <Natvis Include="..\rpp\binary_reader.natvis" />
     <Natvis Include="..\rpp\strview.natvis" />
     <Natvis Include="..\rpp\vec.natvis" />
   </ItemGroup>
