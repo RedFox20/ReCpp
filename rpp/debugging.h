@@ -119,7 +119,7 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 // MSVC needs a proxy macro to properly expand __VA_ARGS__
 #if _MSC_VER
 #define __wrap_exp(x) x
-#define __wrap_args1(x)      , __wrap_arg(x)
+#define __wrap_args1(...)    , __wrap_arg(__VA_ARGS__)
 #define __wrap_args2(x, ...) , __wrap_arg(x) __wrap_exp(__wrap_args1(__VA_ARGS__))
 #define __wrap_args3(x, ...) , __wrap_arg(x) __wrap_exp(__wrap_args2(__VA_ARGS__))
 #define __wrap_args4(x, ...) , __wrap_arg(x) __wrap_exp(__wrap_args3(__VA_ARGS__))
