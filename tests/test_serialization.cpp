@@ -30,6 +30,21 @@ struct Struct2 : serializable<Struct2>
     }
 };
 
+struct Struct3 : serializable<Struct3>
+{
+    int a = 0;
+    string b = "";
+
+    Struct3(){}
+    Struct3(int a, string b) : a(a), b(b) {}
+
+    void introspect()
+    {
+        bind_name("a", a);
+        bind_name("b", b);
+    }
+};
+
 TestImpl(test_serialization)
 {
     TestInit(test_serialization)
@@ -37,7 +52,7 @@ TestImpl(test_serialization)
 
     }
 
-    TestCase(serialize_simple)
+    TestCase(binary_serialize_simple)
     {
         binary_buffer buf;
         buf << Struct1{ 34.0f };
@@ -52,19 +67,29 @@ TestImpl(test_serialization)
         AssertThat(s2.c, "42");
     }
 
-    TestCase(serialize_nested)
+    TestCase(binary_serialize_nested)
     {
 
     }
 
-    TestCase(deserialize_nested)
+    TestCase(binary_deserialize_nested)
     {
 
     }
 
-    TestCase(deserialize_version_check)
+    TestCase(binary_deserialize_version_check)
     {
 
+    }
+
+    TestCase(string_serialize_simple)
+    {
+        string_serializer buf;
+        Struct3{ 42, "42" }.serialize(buf);
+        Struct3 s3; buf.view() >> s3;
+        AssertThat(s3.a, 42);
+        AssertThat(s3.b, "42");
+        AssertThat(buf.view(), "a;42;b;42;\n")
     }
 
 } Impl;

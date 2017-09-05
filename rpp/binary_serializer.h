@@ -2,9 +2,6 @@
 #ifndef RPP_BINARY_SERIALIZER_H
 #define RPP_BINARY_SERIALIZER_H
 #include "binary_stream.h"
-#include "delegate.h"
-//#include "binary_reader.h"
-//#include "binary_writer.h"
 
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
@@ -73,14 +70,23 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////
 
+    struct string_serializer : string_buffer
+    {
+        using string_buffer::string_buffer;
+    };
+
     template<class T> struct member_serialize
     {
-        using serialize_func   = void(*)(const T* inst, int offset, binary_stream& w);
-        using deserialize_func = void(*)(T* inst,       int offset, binary_stream& r);
+        using bserialize_func   = void(*)(const T* inst, int offset, binary_stream& w);
+        using bdeserialize_func = void(*)(T* inst,       int offset, binary_stream& r);
+        using sserialize_func   = void(*)(const T* inst, int offset, string_serializer& w);
+        using sdeserialize_func = void(*)(T* inst,       int offset, strview token);
         int offset;
         strview name; // for named serialization such as json
-        serialize_func   serialize;
-        deserialize_func deserialize;
+        bserialize_func   bserialize;
+        bdeserialize_func bdeserialize;
+        sserialize_func   sserialize;
+        sdeserialize_func sdeserialize;
     };
 
     template<class T> struct serializable
@@ -94,39 +100,43 @@ namespace rpp
             }();
         }
 
+        template<class U> static void binary_serialize(const T* inst, int offset, binary_stream& w)
+        {
+            U& var = *(U*)((byte*)inst + offset);
+            w << var;
+        }
+        template<class U> static void binary_deserialize(T* inst, int offset, binary_stream& r)
+        {
+            U& var = *(U*)((byte*)inst + offset);
+            r >> var;
+        }
+
+        template<class U> static void string_serialize(const T* inst, int offset, string_serializer& w)
+        {
+            U& var = *(U*)((byte*)inst + offset);
+            w.write(var);
+        }
+        template<class U> static void string_deserialize(T* inst, int offset, strview token)
+        {
+            U& var = *(U*)((byte*)inst + offset);
+            token >> var;
+        }
+
         template<class U> void bind(U& elem) noexcept
         {
             member_serialize<T> m;
-            m.offset    = int((char*)&elem - (char*)this);
-            m.serialize = [](const T* inst, int offset, binary_stream& w)
-            {
-                U& var = *(U*)((byte*)inst + offset);
-                w << var;
-            };
-            m.deserialize = [](T* inst, int offset, binary_stream& r)
-            {
-                U& var = *(U*)((byte*)inst + offset);
-                r >> var;
-            };
+            m.offset       = int((char*)&elem - (char*)this);
+            m.bserialize   = &serializable::binary_serialize<U>;
+            m.bdeserialize = &serializable::binary_deserialize<U>;
+            m.sserialize   = &serializable::string_serialize<U>;
+            m.sdeserialize = &serializable::string_deserialize<U>;
             members.emplace_back(move(m));
         }
 
-        template<class U> void bind(strview name, U& elem) noexcept
+        template<class U> void bind_name(strview name, U& elem) noexcept
         {
-            member_serialize<T> m;
-            m.offset    = int((char*)&elem - (char*)this);
-            m.name      = name;
-            m.serialize = [](T* inst, int offset, binary_writer& w)
-            {
-                U& var = *(U*)((byte*)inst + offset);
-                w << var;
-            };
-            m.deserialize = [](T* inst, int offset, binary_reader& r)
-            {
-                U& var = *(U*)((byte*)inst + offset);
-                r >> var;
-            };
-            members.emplace_back(move(m));
+            bind(elem);
+            members.back().name = name;
         }
 
         template<class U, class... Args> void bind(U& first, Args&... args)
@@ -140,16 +150,47 @@ namespace rpp
             const T* inst = static_cast<const T*>(this);
             for (member_serialize<T>& memberInfo : members)
             {
-                memberInfo.serialize(inst, memberInfo.offset, w);
+                memberInfo.bserialize(inst, memberInfo.offset, w);
             }
         }
-
         void deserialize(binary_stream& r)
         {
             T* inst = static_cast<T*>(this);
             for (member_serialize<T>& memberInfo : members)
             {
-                memberInfo.deserialize(inst, memberInfo.offset, r);
+                memberInfo.bdeserialize(inst, memberInfo.offset, r);
+            }
+        }
+
+        // serializes this into a single line "name1;value1;name2;value2;\n"
+        void serialize(string_serializer& w) const
+        {
+            const T* inst = static_cast<const T*>(this);
+            for (member_serialize<T>& memberInfo : members)
+            {
+                w.write(memberInfo.name);
+                w.write(';');
+                memberInfo.sserialize(inst, memberInfo.offset, w);
+                w.write(';');
+            }
+            w.writeln();
+        }
+        // parses a single line from this string view and decomposes:
+        // "name1;value1;name2;value2;\n"
+        void deserialize(strview& r)
+        {
+            if (strview line = r.next('\n'))
+            {
+                T* inst = static_cast<T*>(this);
+                for (member_serialize<T>& memberInfo : members)
+                {
+                    strview key   = line.next(';');
+                    strview value = line.next(';');
+                    if (key != memberInfo.name) {
+                        throw std::runtime_error("string deserialize key does not match member name");
+                    }
+                    memberInfo.sdeserialize(inst, memberInfo.offset, value);
+                }
             }
         }
     };
@@ -164,7 +205,14 @@ namespace rpp
     {
         s.deserialize(r); return r;
     }
-
+    //template<class T> string_serializer& operator<<(string_serializer& w, const serializable<T>& s) 
+    //{
+    //    s.serialize(w); return w;
+    //}
+    template<class T> strview& operator>>(strview& r, serializable<T>& s) 
+    {
+        s.deserialize(r); return r;
+    }
     //////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
