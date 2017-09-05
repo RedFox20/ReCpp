@@ -106,6 +106,23 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
 #  define __assertion_failure(msg) /*nothing in release builds*/
 #endif
 
+#if __cplusplus
+template<class T>
+inline const T&    __wrap_arg(const T& arg)            { return arg; }
+inline const char* __wrap_arg(const std::string& arg)  { return arg.c_str();   }
+inline const char* __wrap_arg(const rpp::strview& arg) { return arg.to_cstr(); }
+
+#define __get_nth_arg(_1, _2, _3, _4, N, ...) N
+#define __wrap_args0(...)
+#define __wrap_args1(x, ...) , __wrap_arg(x)
+#define __wrap_args2(x, ...) , __wrap_arg(x) __wrap_args1(__VA_ARGS__)
+#define __wrap_args3(x, ...) , __wrap_arg(x) __wrap_args2(__VA_ARGS__)
+#define __wrap_args4(x, ...) , __wrap_arg(x) __wrap_args3(__VA_ARGS__)
+#define __wrap_args(...) __get_nth_arg(##__VA_ARGS__, __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)
+#else // C:
+  #define __wrap_args(...) , ##__VA_ARGS__
+#endif
+
 /**
  * Logs an info message to the backing error mechanism (Crashlytics on iOS)
  * No assertions are triggered.
@@ -116,7 +133,7 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
  * Logs a warning to the backing error mechanism (Crashlytics on iOS)
  * No assertions are triggered.
  */
-#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__), ##__VA_ARGS__)
+#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__))
 /**
  * Logs an error to the backing error mechanism (Crashlytics on iOS)
  * An ASSERT is triggered during DEBUG runs.
