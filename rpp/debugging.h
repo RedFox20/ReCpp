@@ -163,7 +163,7 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 
 #if defined(DEBUG) || defined(_DEBUG) || defined(BETA)
 // Asserts for a condition with message
-#  define Assert(expression, format, ...) do { if (!(expression)) LogError(format __wrap_args(__VA_ARGS__) ); } while(0)
+#  define Assert(expression, format, ...) do { if (!(expression)) LogError(format, ##__VA_ARGS__ ); } while(0)
 #else
 #  define Assert(expression, format, ...) /*do nothing in release builds*/
 #endif
