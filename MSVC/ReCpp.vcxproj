@@ -96,6 +96,7 @@
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -141,6 +142,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MinimalRebuild>true</MinimalRebuild>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
@@ -164,6 +166,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MinimalRebuild>true</MinimalRebuild>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PreprocessorDefinitions>_ITERATOR_DEBUG_LEVEL=0;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -178,9 +181,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\rpp\allocators.cpp" />
+    <ClCompile Include="..\rpp\binary_stream.cpp" />
     <ClCompile Include="..\rpp\binary_serializer.cpp" />
     <ClCompile Include="..\rpp\debugging.cpp" />
     <ClCompile Include="..\rpp\file_io.cpp" />
+    <ClCompile Include="..\rpp\json.cpp" />
     <ClCompile Include="..\rpp\sockets.cpp" />
     <ClCompile Include="..\rpp\strview.cpp" />
     <ClCompile Include="..\rpp\thread_pool.cpp" />
@@ -189,12 +194,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\allocators.h" />
-    <ClInclude Include="..\rpp\binary_reader.h" />
+    <ClInclude Include="..\rpp\binary_stream.h" />
     <ClInclude Include="..\rpp\binary_serializer.h" />
-    <ClInclude Include="..\rpp\binary_writer.h" />
     <ClInclude Include="..\rpp\debugging.h" />
     <ClInclude Include="..\rpp\delegate.h" />
     <ClInclude Include="..\rpp\file_io.h" />
+    <ClInclude Include="..\rpp\json.h" />
     <ClInclude Include="..\rpp\obfuscated_string.h" />
     <ClInclude Include="..\rpp\sockets.h" />
     <ClInclude Include="..\rpp\strview.h" />
@@ -203,6 +208,7 @@
     <ClInclude Include="..\rpp\vec.h" />
   </ItemGroup>
   <ItemGroup>
+    <Natvis Include="..\rpp\binary_reader.natvis" />
     <Natvis Include="..\rpp\strview.natvis" />
     <Natvis Include="..\rpp\vec.natvis" />
   </ItemGroup>

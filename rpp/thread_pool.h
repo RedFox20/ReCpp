@@ -169,6 +169,9 @@ namespace rpp
 
         // runs a generic parallel task
         pool_task* parallel_task(function<void()>&& genericTask) noexcept;
+
+        // return the number of physical cores
+        static int physical_cores();
     };
 
     /**

@@ -1,7 +1,10 @@
 #pragma once
 #ifndef RPP_BINARY_SERIALIZER_H
 #define RPP_BINARY_SERIALIZER_H
-#include "binary_readwrite.h"
+#include "binary_stream.h"
+#include "delegate.h"
+//#include "binary_reader.h"
+//#include "binary_writer.h"
 
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
@@ -52,85 +55,95 @@ namespace rpp
         binary_serializer() {}
         binary_serializer(uint layout) : layout(layout), length(0) {}
 
-        NOINLINE socket_writer& write(socket_writer& w) const noexcept;
-        NOINLINE socket_reader& read(socket_reader& r) noexcept;
+        NOINLINE binary_stream& write(binary_stream& w) const noexcept;
+        NOINLINE binary_stream& read(binary_stream& r) noexcept;
 
         /** @brief Returns the serialization layout size */
         NOINLINE int layout_size() const noexcept;
     };
 
-    inline socket_writer& operator<<(socket_writer& w, const binary_serializer& s) 
+    inline binary_stream& operator<<(binary_stream& w, const binary_serializer& s) 
     {
         return s.write(w); 
     }
-    inline socket_reader& operator>>(socket_reader& r, binary_serializer& s) 
+    inline binary_stream& operator>>(binary_stream& r, binary_serializer& s) 
     {
         return s.read(r); 
     }
 
     //////////////////////////////////////////////////////////////////////////////////
 
-    template<class T> constexpr int size_of(const T& v); // forward declr.
-
-    namespace detail
+    template<class T> struct member_serialize
     {
-        template<class T> struct size_of
+        using serialize_func   = void(*)(const T* inst, int offset, binary_stream& w);
+        using deserialize_func = void(*)(T* inst,       int offset, binary_stream& r);
+        int offset;
+        serialize_func   serialize;
+        deserialize_func deserialize;
+    };
+
+    template<class T> struct serializable
+    {
+        static vector<member_serialize<T>> members;
+        serializable()
         {
-            static constexpr int value(const T&) noexcept { return sizeof(T); };
-        };
+            static bool introspection_complete = [this](){
+                static_cast<T*>(this)->introspect();
+                return true;
+            }();
+        }
 
-        template<class T> struct size_of<vector<T>>
+        template<class U> void bind(U& elem) noexcept
         {
-            static const int value(const vector<T>& v) noexcept
+            member_serialize<T> m;
+            m.offset    = int((char*)&elem - (char*)this);
+            m.serialize = [](const T* inst, int offset, binary_stream& w)
             {
-                int size = sizeof(int);
-                for (const T& item : v) size += rpp::size_of(item);
-                return size;
-            }
-        };
+                U& var = *(U*)((byte*)inst + offset);
+                w << var;
+            };
+            m.deserialize = [](T* inst, int offset, binary_stream& r)
+            {
+                U& var = *(U*)((byte*)inst + offset);
+                r >> var;
+            };
+            members.emplace_back(move(m));
+        }
 
-        template<class Char> struct size_of<basic_string<Char>>
+        template<class U, class... Args> void bind(U& first, Args&... args)
         {
-            static const int value(const basic_string<Char>& s) noexcept
-            {
-                return sizeof(int) + sizeof(Char) * (int)s.size();
-            }
-        };
+            bind(first);
+            bind(args...);
+        }
 
-        template<> struct size_of<strview>
+        void serialize(binary_stream& w) const
         {
-            static const int value(const strview& s) noexcept
+            const T* inst = static_cast<const T*>(this);
+            for (member_serialize<T>& memberInfo : members)
             {
-                return sizeof(int) + s.len * sizeof(char);
+                memberInfo.serialize(inst, memberInfo.offset, w);
             }
-        };
+        }
 
-        template<class ...T> struct size_of<tuple<T...>>
+        void deserialize(binary_stream& r)
         {
-            static constexpr int size(const tuple<T...>& t)
+            T* inst = static_cast<T*>(this);
+            for (member_serialize<T>& memberInfo : members)
             {
-                return 0;
+                memberInfo.deserialize(inst, memberInfo.offset, r);
             }
+        }
+    };
 
-            //template<int N> static const int size(const tuple<T...>& t) noexcept
-            //{
-            //    return rpp::size_of(get<N - 1>(t)) + size<N-1>(t);
-            //}
+    template<class T> vector<member_serialize<T>> serializable<T>::members;
 
-            static const int value(const tuple<T...>& t) noexcept
-            {
-                return 0;
-                //return size<sizeof...(T)>(t);
-            }
-        };
+    template<class T> binary_stream& operator<<(binary_stream& w, const serializable<T>& s) 
+    {
+        s.serialize(w); return w;
     }
-
-    /**
-     * Runtime size of the objects once serialized
-     */
-    template<class T> constexpr int size_of(const T& v)
+    template<class T> binary_stream& operator>>(binary_stream& r, serializable<T>& s) 
     {
-        return detail::size_of<T>::value(v);
+        s.deserialize(r); return r;
     }
 
     //////////////////////////////////////////////////////////////////////////////////

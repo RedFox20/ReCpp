@@ -3,6 +3,7 @@
 #include <chrono>
 #include <memory>
 #include <algorithm>
+#include <unordered_set>
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
@@ -21,6 +22,13 @@ namespace rpp
     {
         static vector<test*> tests;
         return tests;
+    }
+
+    static test* find_test(strview name) noexcept
+    {
+        for (test* t : all_tests())
+            if (t->name == name) return t;
+        return nullptr;
     }
 
     test::test(strview name) : name(name)
@@ -63,7 +71,7 @@ namespace rpp
     void test::assert_failed(const char* file, int line, const char* fmt, ...)
     {
         static const char path[] = __FILE__;
-        static int path_skip = sizeof(path) - 10;
+        static int path_skip = int(strview{ path }.rfindany("\\/") - path) + 3;
 
         char message[8192];
         va_list ap; va_start(ap, fmt);
@@ -173,7 +181,7 @@ namespace rpp
         return run_tests(1, argv);
     }
 
-    int test::run_tests(int argc, char* argv[])
+    static void move_console_window()
     {
         // move console window to the other monitor to make test debugging more seamless
         // if debugger is attached with Visual Studio
@@ -201,13 +209,19 @@ namespace rpp
             SetWindowPos(GetConsoleWindow(), 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
     #endif
+    }
+
+    int test::run_tests(int argc, char* argv[])
+    {
+        move_console_window();
 
         int numTest = 0;
         if (argc > 1)
         {
-            // if arg is provided, we assume it is either:
-            // test_testname or testname
+            // if arg is provided, we assume they are:
+            // test_testname or testname or -test_testname or -testname
             // OR to run a specific test:  testname.specifictest
+            unordered_set<strview> enabled, disabled;
 
             for (int iarg = 1; iarg < argc; ++iarg)
             {
@@ -215,26 +229,45 @@ namespace rpp
                 rpp::strview testName = arg.next('.');
                 rpp::strview specific = arg.next('.');
 
+                const bool enableTest = testName[0] != '-';
+                if (!enableTest) testName.chomp_first();
+
                 const bool exactMatch = testName.starts_with("test_");
                 if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", argv[iarg]);
                 else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
 
                 for (test* t : all_tests())
                 {
-                    if ((exactMatch && t->name == testName) ||
+                    if (( exactMatch && t->name == testName) ||
                         (!exactMatch && t->name.find(testName)))
                     {
-                        t->run_test(specific);
-                        ++numTest;
+                        t->test_specific = specific;
+                        if (enableTest) enabled.insert(t->name);
+                        else            disabled.insert(t->name);
                         break;
                     }
                 }
+            }
+
+            if (disabled.size())
+            {
+                for (test* t : all_tests())
+                    t->test_enabled = disabled.find(t->name) == disabled.end();
+            }
+            else if (enabled.size())
+            {
+                for (test* t : all_tests())
+                    t->test_enabled = enabled.find(t->name) != enabled.end();
             }
         }
         else
         {
             consolef(Green, "Running all tests\n");
-            for (test* t : all_tests()) {
+        }
+
+        // run all the marked tests
+        for (test* t : all_tests()) {
+            if (t->test_enabled) {
                 t->run_test();
                 ++numTest;
             }
@@ -254,7 +287,8 @@ namespace rpp
         pause(5000);
         return 0;
     }
-}
+
+} // namespace rpp
 
 #if RPP_TESTS_DEFINE_MAIN
 int main(int argc, char* argv[])

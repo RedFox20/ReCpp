@@ -1300,7 +1300,7 @@ namespace rpp
 
     float BoundingBox::radius() const noexcept
     {
-        return (max - min).length() * 0.5f * float(M_SQRT2);
+        return (max - min).length() * 0.5f;
     }
 
     Vector3 BoundingBox::compare(const BoundingBox& bb) const noexcept

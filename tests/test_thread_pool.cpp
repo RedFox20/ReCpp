@@ -2,6 +2,7 @@
 #include <rpp/thread_pool.h>
 #include <rpp/timer.h> // performance measurement
 #include <atomic>
+#include <unordered_set>
 using namespace rpp;
 
 TestImpl(test_threadpool)
@@ -10,8 +11,21 @@ TestImpl(test_threadpool)
     {
     }
 
+    int parallelism_count(int numIterations)
+    {
+        unordered_set<thread::id> ids;
+        parallel_for(0, numIterations, [&](int start, int end)
+        {
+            ids.insert(this_thread::get_id());
+        });
+        return (int)ids.size();
+    }
+
     TestCase(threadpool_concurrency)
     {
+        printf("physical_cores: %d\n", thread_pool::physical_cores());
+        AssertThat(parallelism_count(1), 1);
+        AssertThat(parallelism_count(128), thread_pool::physical_cores());
     }
 
     TestCase(test_performance)

@@ -476,7 +476,7 @@ namespace rpp /* ReCpp */
     bool file_or_folder_exists(const char* fileOrFolder) noexcept
     {
         #if USE_WINAPI_IO
-            DWORD attr = GetFileAttributesA(filename);
+            DWORD attr = GetFileAttributesA(fileOrFolder);
             return attr != -1;
         #else
             struct stat s;

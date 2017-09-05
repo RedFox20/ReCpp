@@ -34,6 +34,12 @@
     <ClCompile Include="..\rpp\debugging.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\rpp\json.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\rpp\binary_stream.cpp">
+      <Filter>rpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\rpp\delegate.h">
@@ -46,12 +52,6 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\binary_serializer.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rpp\binary_writer.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rpp\binary_reader.h">
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\file_io.h">
@@ -75,12 +75,21 @@
     <ClInclude Include="..\rpp\obfuscated_string.h">
       <Filter>rpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\rpp\json.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rpp\binary_stream.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\rpp\strview.natvis">
       <Filter>rpp</Filter>
     </Natvis>
     <Natvis Include="..\rpp\vec.natvis">
+      <Filter>rpp</Filter>
+    </Natvis>
+    <Natvis Include="..\rpp\binary_reader.natvis">
       <Filter>rpp</Filter>
     </Natvis>
   </ItemGroup>
