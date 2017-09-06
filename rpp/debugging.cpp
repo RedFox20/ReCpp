@@ -141,6 +141,8 @@ void _LogExcept(const char* exceptionWhat, const char* format, ...)
     // only MSVC requires stderr write; other platforms do it in assert
     #if _MSC_VER
       fprintf(stderr, "%.*s: %s\n", len, messageBuf, exceptionWhat);
+    #else
+      (void)len;
     #endif
     
     if (ExceptHandler != nullptr)

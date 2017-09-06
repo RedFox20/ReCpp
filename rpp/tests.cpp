@@ -24,13 +24,6 @@ namespace rpp
         return tests;
     }
 
-    static test* find_test(strview name) noexcept
-    {
-        for (test* t : all_tests())
-            if (t->name == name) return t;
-        return nullptr;
-    }
-
     test::test(strview name) : name(name)
     {
         all_tests().push_back(this);
