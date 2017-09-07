@@ -63,15 +63,14 @@ namespace rpp
 
     void test::assert_failed(const char* file, int line, const char* fmt, ...)
     {
-        static const char path[] = __FILE__;
-        static int path_skip = int(strview{ path }.rfindany("\\/") - path) + 3;
+        const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
 
         char message[8192];
         va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
         ++asserts_failed;
-        consolef(Red, "FAILURE %12s:%d    %s\n", file + path_skip, line, message);
+        consolef(Red, "FAILURE %12s:%d    %s\n", filename, line, message);
     }
 
     void test::run_test(strview methodFilter)
