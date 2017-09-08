@@ -259,10 +259,13 @@ namespace rpp /* ReCpp */
             return write(str, int(sizeof(wchar_t)) * (N - 1));
         }
         int write(const string& str) noexcept {
-            return write(str.c_str(), (int)str.length());
+            return write(str.c_str(), (int)str.size());
         }
         int write(const strview& str) noexcept {
             return write(str.str, str.len);
+        }
+        int write(const string_buffer& buf) noexcept {
+            return write(buf.c_str(), buf.size());
         }
         int write(const wstring& str) noexcept {
             return write(str.c_str(), int(sizeof(wchar_t) * str.size()));
