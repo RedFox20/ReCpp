@@ -2,6 +2,9 @@
 #include <chrono>
 #include <cassert>
 #include <csignal>
+#if __APPLE__ || __linux__
+    #include <pthread.h>
+#endif
 
 namespace rpp
 {
@@ -9,31 +12,42 @@ namespace rpp
 
     pool_task::~pool_task() noexcept
     {
-        unique_lock<mutex> lock(mtx);
-        killed = true;
+        { lock_guard<mutex> lock(mtx);
+            killed = true;
+        }
         cv.notify_one();
         th.detach();
+        
+        fprintf(stderr, "Deleting pool_task, genericTask[3]=%p\n", genericTask.data[3]);
     }
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
-        unique_lock<mutex> lock(mtx);
-        genericTask  = {};
-        rangeTask    = newTask;
-        rangeStart   = start;
-        rangeEnd     = end;
-        taskRunning  = true;
+        { lock_guard<mutex> lock(mtx);
+            if (taskRunning) {
+                fprintf(stderr, "rpp::pool_task already running! Undefined behaviour!\n");
+            }
+            genericTask  = {};
+            rangeTask    = newTask;
+            rangeStart   = start;
+            rangeEnd     = end;
+            taskRunning  = true;
+        }
         cv.notify_one();
     }
 
-    void pool_task::run_generic(function<void()>&& newTask) noexcept
+    void pool_task::run_generic(delegate<void()>&& newTask) noexcept
     {
-        unique_lock<mutex> lock(mtx);
-        genericTask  = move(newTask);
-        rangeTask    = {};
-        rangeStart   = 0;
-        rangeEnd     = 0;
-        taskRunning  = true;
+        { lock_guard<mutex> lock(mtx);
+            if (taskRunning) {
+                fprintf(stderr, "rpp::pool_task already running! Undefined behaviour!\n");
+            }
+            genericTask  = move(newTask);
+            rangeTask    = {};
+            rangeStart   = 0;
+            rangeEnd     = 0;
+            taskRunning  = true;
+        }
         cv.notify_one();
     }
 
@@ -61,7 +75,11 @@ namespace rpp
 
     void pool_task::run() noexcept
     {
-        signal(SIGSEGV, segfault); // set SIGSEGV handler, so we can catch it
+        #if __APPLE__ || __linux__
+            pthread_setname_np("rpp::pool_task");
+        #endif
+        
+        signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
 
         while (!killed)
         {
@@ -69,11 +87,25 @@ namespace rpp
             {
                 try
                 {
-                    taskRunning = true;
-                    if (rangeTask)
-                        rangeTask(rangeStart, rangeEnd);
+                    decltype(rangeTask)   range;
+                    decltype(genericTask) generic;
+                    
+                    // consume the tasks atomically
+                    { lock_guard<mutex> lock{mtx};
+                        range   = move(rangeTask);
+                        generic = move(genericTask);
+                        taskRunning = true;
+                    }
+                    
+                    if (range)
+                    {
+                        range(rangeStart, rangeEnd);
+                    }
                     else
-                        genericTask();
+                    {
+                        generic();
+                        generic.reset();
+                    }
                 }
                 catch (const exception& e)
                 {
@@ -83,19 +115,33 @@ namespace rpp
                 {
                     fprintf(stderr, "pool_task::run unhandled exception!\n");
                 }
+                
+                taskRunning = false;
                 if (killed)
                     return;
             }
-            taskRunning = false;
             cv.notify_one();
         }
     }
 
+    bool pool_task::got_task() const noexcept
+    {
+        return (bool)rangeTask || (bool)genericTask;
+    }
+
     bool pool_task::wait_for_task() noexcept
     {
-        unique_lock<mutex> lock(mtx);
-        cv.wait(lock);
-        return (bool)rangeTask || (bool)genericTask; // got task?
+        unique_lock<mutex> lock {mtx};
+        for (;;)
+        {
+            if (killed)
+                return false;
+            if ((bool)rangeTask || (bool)genericTask)
+                return true;
+            
+            cv.wait(lock);
+        }
+        return true;
     }
 
 
@@ -246,7 +292,7 @@ namespace rpp
         rangeRunning = false;
     }
 
-    pool_task* thread_pool::parallel_task(function<void()>&& genericTask) noexcept
+    pool_task* thread_pool::parallel_task(delegate<void()>&& genericTask) noexcept
     {
         pool_task* task = get_task();
         task->run_generic(move(genericTask));

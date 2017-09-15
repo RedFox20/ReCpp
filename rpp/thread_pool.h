@@ -6,6 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include "delegate.h"
 
 namespace rpp
 {
@@ -56,152 +57,8 @@ namespace rpp
             (*Function)(Callee, args...);
         }
 
-        operator bool() const { return Callee != nullptr; }
+        explicit operator bool() const { return Callee != nullptr; }
     };
-
-
-    /**
-     * A simple thread-pool task. Can run owning generic tasks using standard function<> and
-     * also range non-owning tasks which use the impossibly fast delegate callback system.
-     */
-    class pool_task
-    {
-        mutex mtx;
-        condition_variable cv;
-        thread th { &pool_task::run, this };
-        function<void()> genericTask;
-        action<int, int> rangeTask;
-        int rangeStart;
-        int rangeEnd;
-        volatile bool taskRunning = false;
-        volatile bool killed      = false;
-
-    public:
-
-        bool running() const noexcept { return taskRunning; }
-
-        ~pool_task() noexcept;
-
-        // assigns a new parallel for task to run
-        // @warning This range task does not retain any resources, so you must ensure
-        //          it survives until end of the loop
-        // undefined behaviour if called when already running
-        void run_range(int start, int end, const action<int, int>& newTask) noexcept;
-
-        // assigns a new generic task to run
-        // undefined behaviour if called when already running
-        void run_generic(function<void()>&& genericTask) noexcept;
-
-        // wait for task to finish
-        void wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
-
-    private:
-        void run() noexcept;
-        bool wait_for_task() noexcept;
-    };
-
-
-    /**
-     * A generic thread pool that can be used to group and control pool lifetimes
-     * By default a global thread_pool is also available
-     *
-     * By design, nesting parallel for loops is detected as a fatal error, because
-     * creating nested threads will not bring any performance benefits
-     *
-     * Accidentally running nested parallel_for can end up in 8*8=64 threads on an 8-core CPU,
-     * which is why it's considered an error.
-     */
-    class thread_pool
-    {
-        mutex poolMutex;
-        vector<unique_ptr<pool_task>> tasks;
-        bool rangeRunning = false; // whether parallel range is running or not
-        
-    public:
-
-        // the default global thread pool
-        static thread_pool global;
-
-        thread_pool();
-        ~thread_pool() noexcept;
-
-        // number of thread pool tasks that are currently running
-        int active_tasks() noexcept;
-
-        // number of thread pool tasks that are in idle state
-        int idle_tasks() noexcept;
-
-        // number of running + idle tasks in this threadpool
-        int total_tasks() noexcept;
-
-        // if you're completely done with the thread pool, simply call this to clean up the threads
-        // returns the number of tasks cleared
-        int clear_idle_tasks() noexcept;
-
-        // always creates a brand new task that is registered in the pool (and will get reused)
-        pool_task* new_task() noexcept;
-
-        // gets the next available task (or creates a new one);
-        // @param poolIndex Initial value should be 0. Used to iterate all registered thread tasks
-        pool_task* next_task(size_t& poolIndex) noexcept;
-
-        // gets the next free task (or creates a new one)
-        pool_task* get_task() noexcept;
-
-        /**
-         * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
-         * parallel nesting is forbidden. This prevents quadratic thread explosion.
-         *
-         * This function will block until all parallel tasks have finished running
-         *
-         * @param rangeStart Usually 0
-         * @param rangeEnd Usually vec.size()
-         * @param rangeTask Non-owning callback action.
-         */
-        void parallel_for(int rangeStart, int rangeEnd, const action<int, int>& rangeTask) noexcept;
-
-        template<class Func> 
-        void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
-        {
-            parallel_for(rangeStart, rangeEnd, 
-                action<int, int>::from_function<Func, &Func::operator()>(&func));
-        }
-
-        // runs a generic parallel task
-        pool_task* parallel_task(function<void()>&& genericTask) noexcept;
-
-        // return the number of physical cores
-        static int physical_cores();
-    };
-
-    /**
-     * @brief Runs parallel_for on the default global thread pool
-     *
-     * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
-     * parallel nesting is forbidden. This prevents quadratic thread explosion.
-     *
-     * This function will block until all parallel tasks have finished running
-     *
-     * @param rangeStart Usually 0
-     * @param rangeEnd Usually vec.size()
-     * @param rangeTask Non-owning callback action.
-     */
-    template<class Func>
-    inline void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
-    {
-        thread_pool::global.parallel_for(rangeStart, rangeEnd,
-            action<int, int>::from_function<Func, &Func::operator()>(&func));
-    }
-
-    /**
-     * Runs a generic parallel task on the default global thread pool
-     * @note Returns immediately; does not wait for the task to complete.
-     */
-    inline pool_task* parallel_task(function<void()>&& genericTask) noexcept
-    {
-        return thread_pool::global.parallel_task(move(genericTask));
-    }
-
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -281,6 +138,151 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * A simple thread-pool task. Can run owning generic tasks using standard function<> and
+     * also range non-owning tasks which use the impossibly fast delegate callback system.
+     */
+    class pool_task
+    {
+        mutex mtx;
+        condition_variable cv;
+        thread th { &pool_task::run, this };
+        delegate<void()> genericTask;
+        action<int, int> rangeTask;
+        int rangeStart;
+        int rangeEnd;
+        volatile bool taskRunning = false;
+        volatile bool killed      = false;
+
+    public:
+
+        bool running() const noexcept { return taskRunning; }
+
+        ~pool_task() noexcept;
+
+        // assigns a new parallel for task to run
+        // @warning This range task does not retain any resources, so you must ensure
+        //          it survives until end of the loop
+        // undefined behaviour if called when already running
+        void run_range(int start, int end, const action<int, int>& newTask) noexcept;
+
+        // assigns a new generic task to run
+        // undefined behaviour if called when already running
+        void run_generic(delegate<void()>&& genericTask) noexcept;
+
+        // wait for task to finish
+        void wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
+
+    private:
+        void run() noexcept;
+        bool got_task() const noexcept;
+        bool wait_for_task() noexcept;
+    };
+
+
+    /**
+     * A generic thread pool that can be used to group and control pool lifetimes
+     * By default a global thread_pool is also available
+     *
+     * By design, nesting parallel for loops is detected as a fatal error, because
+     * creating nested threads will not bring any performance benefits
+     *
+     * Accidentally running nested parallel_for can end up in 8*8=64 threads on an 8-core CPU,
+     * which is why it's considered an error.
+     */
+    class thread_pool
+    {
+        mutex poolMutex;
+        vector<unique_ptr<pool_task>> tasks;
+        bool rangeRunning = false; // whether parallel range is running or not
+        
+    public:
+
+        // the default global thread pool
+        static thread_pool global;
+
+        thread_pool();
+        ~thread_pool() noexcept;
+
+        // number of thread pool tasks that are currently running
+        int active_tasks() noexcept;
+
+        // number of thread pool tasks that are in idle state
+        int idle_tasks() noexcept;
+
+        // number of running + idle tasks in this threadpool
+        int total_tasks() noexcept;
+
+        // if you're completely done with the thread pool, simply call this to clean up the threads
+        // returns the number of tasks cleared
+        int clear_idle_tasks() noexcept;
+
+        // always creates a brand new task that is registered in the pool (and will get reused)
+        pool_task* new_task() noexcept;
+
+        // gets the next available task (or creates a new one);
+        // @param poolIndex Initial value should be 0. Used to iterate all registered thread tasks
+        pool_task* next_task(size_t& poolIndex) noexcept;
+
+        // gets the next free task (or creates a new one)
+        pool_task* get_task() noexcept;
+
+        /**
+         * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
+         * parallel nesting is forbidden. This prevents quadratic thread explosion.
+         *
+         * This function will block until all parallel tasks have finished running
+         *
+         * @param rangeStart Usually 0
+         * @param rangeEnd Usually vec.size()
+         * @param rangeTask Non-owning callback action.
+         */
+        void parallel_for(int rangeStart, int rangeEnd, const action<int, int>& rangeTask) noexcept;
+
+        template<class Func> 
+        void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
+        {
+            parallel_for(rangeStart, rangeEnd, 
+                action<int, int>::from_function<Func, &Func::operator()>(&func));
+        }
+
+        // runs a generic parallel task
+        pool_task* parallel_task(delegate<void()>&& genericTask) noexcept;
+
+        // return the number of physical cores
+        static int physical_cores();
+    };
+
+    /**
+     * @brief Runs parallel_for on the default global thread pool
+     *
+     * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
+     * parallel nesting is forbidden. This prevents quadratic thread explosion.
+     *
+     * This function will block until all parallel tasks have finished running
+     *
+     * @param rangeStart Usually 0
+     * @param rangeEnd Usually vec.size()
+     * @param rangeTask Non-owning callback action.
+     */
+    template<class Func>
+    inline void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
+    {
+        thread_pool::global.parallel_for(rangeStart, rangeEnd,
+            action<int, int>::from_function<Func, &Func::operator()>(&func));
+    }
+
+    /**
+     * Runs a generic parallel task on the default global thread pool
+     * @note Returns immediately; does not wait for the task to complete.
+     */
+    inline pool_task* parallel_task(delegate<void()>&& genericTask) noexcept
+    {
+        return thread_pool::global.parallel_task(move(genericTask));
+    }
+
+
+    //////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
 

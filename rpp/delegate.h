@@ -44,6 +44,8 @@
  */
 #include <cstdlib> // malloc/free for event<()>
 #include <cstring> // memmove for event<()>
+#include <type_traits> // std::decay_t<>
+#include <cstdio>
 
 namespace rpp
 {
@@ -78,8 +80,12 @@ namespace rpp
             typedef Ret (__thiscall *memb_type)(void*, Args...);
             struct dummy {};
             typedef Ret (dummy::*dummy_type)(Args...);
-        #elif defined(__GNUG__) // G++
-            typedef Ret (__thiscall *memb_type)(void*, Args...);
+        #elif defined(__GNUG__) // G++ and clang
+            #if __ARM_ARCH // no __thiscall for ARM
+                typedef Ret (*memb_type)(void*, Args...);
+            #else
+                typedef Ret (__thiscall *memb_type)(void*, Args...);
+            #endif
             struct dummy {};
             typedef Ret (dummy::*dummy_type)(void*, Args...);
         #endif
@@ -89,9 +95,9 @@ namespace rpp
         struct callable
         {
             virtual ~callable() noexcept {}
-            virtual void copy(void* dst) const noexcept = 0;
-            virtual Ret operator()(Args&&... args) = 0;
-            virtual bool equals(const callable* c) const noexcept { return true; }
+            virtual void copy(void* dst) const noexcept { }
+            virtual Ret invoke(Args&&... args) = 0;
+            virtual bool equals(const callable* c) const noexcept = 0;
         };
         struct function : callable
         {
@@ -101,7 +107,7 @@ namespace rpp
             {
                 new (dst) function(ptr);
             }
-            Ret operator()(Args&&... args) override
+            Ret invoke(Args&&... args) override
             {
                 return (Ret)ptr((Args&&)args...);
             }
@@ -123,7 +129,7 @@ namespace rpp
             {
                 new (dst) member(obj, ptr);
             }
-            Ret operator()(Args&&... args) override
+            Ret invoke(Args&&... args) override
             {
                 return (Ret)ptr(obj, (Args&&)args...);
             }
@@ -154,17 +160,30 @@ namespace rpp
             }
             ~functor() noexcept override
             {
+                static FUNC* lastDeleted;
                 if (sizeof(FUNC) <= SZ)  (*(FUNC*)data).~FUNC();
-                else                     delete ftor;
+                else {
+                    if (lastDeleted == ftor) {
+                        fprintf(stderr, "Aaaargh! Double delete of %p!\n", ftor);
+                        return;
+                    }
+                    lastDeleted = ftor;
+                    fprintf(stderr, "DELETE %p (%d bytes)\n", ftor, (int)sizeof(FUNC));
+                    delete ftor;
+                }
             }
             void copy(void* dst) const noexcept override
             {
                 new (dst) functor(*ftor);
             }
-            Ret operator()(Args&&... args) override
+            Ret invoke(Args&&... args) override
             {
                 FUNC& fn = (sizeof(FUNC) <= SZ) ? *(FUNC*)data : *ftor;
                 return (Ret)fn((Args&&)args...);
+            }
+            bool equals(const callable* c) const noexcept override
+            {
+                return ftor == ((functor*)c)->ftor;
             }
         };
 
@@ -182,15 +201,17 @@ namespace rpp
         /** @brief Regular function constructor */
         delegate(func_type func) noexcept
         {
-            new (data) function(func); // placement new into data buffer
+            if (func) new (data) function(func); // placement new into data buffer
+            else *data = nullptr;
         }
         /** @brief Handles functor copy cleanup */
         ~delegate() noexcept
         {
-            if (*data) pcallable(data)->~callable();
+            if (*data) {
+                pcallable(data)->~callable();
+            }
         }
-
-
+        
 
         /** @brief Creates a copy of the delegate */
         delegate(const delegate& d) noexcept
@@ -236,6 +257,7 @@ namespace rpp
          */
         template<class IClass, class FClass> delegate(IClass* obj, Ret (FClass::*membfunc)(Args...)) noexcept
         {
+            if (obj && membfunc)
             #ifdef _MSC_BUILD // VC++
                 new (data) member(obj, (dummy_type)membfunc);
             #elif defined(__GNUG__) // G++
@@ -248,6 +270,7 @@ namespace rpp
          */
         template<class IClass, class FClass> delegate(IClass& obj, Ret (FClass::*membfunc)(Args...)) noexcept
         {
+            if (obj && membfunc)
             #ifdef _MSC_BUILD // VC++
                 new (data) member(&obj, (dummy_type)membfunc);
             #elif defined(__GNUG__) // G++
@@ -261,11 +284,11 @@ namespace rpp
          */
         template<class Functor> delegate(Functor&& ftor) noexcept
         {
-            new (data) typename delegate::functor<decay_t<Functor>>((Functor&&)ftor);
+            new (data) typename delegate::functor<std::decay_t<Functor>>((Functor&&)ftor);
         }
         template<class Functor> delegate(const Functor& ftor) noexcept
         {
-            new (data) typename delegate::functor<decay_t<Functor>>(ftor);
+            new (data) typename delegate::functor<std::decay_t<Functor>>(ftor);
         }
 
 
@@ -280,7 +303,20 @@ namespace rpp
 
         Ret operator()(Args... args)
         {
-            return (Ret)(*pcallable(data)) (forward<Args>(args)...);
+            return (Ret)pcallable(data)->invoke(forward<Args>(args)...);
+        }
+        Ret operator()(Args... args) const
+        {
+            return (Ret)pcallable(data)->invoke(forward<Args>(args)...);
+        }
+        
+        Ret invoke(Args... args)
+        {
+            return (Ret)pcallable(data)->invoke(forward<Args>(args)...);
+        }
+        Ret invoke(Args... args) const
+        {
+            return (Ret)pcallable(data)->invoke(forward<Args>(args)...);
         }
 
         /** @return true if this delegate is initialize an can be called */
@@ -294,20 +330,23 @@ namespace rpp
         /** @brief Resets the delegate to its default uninitialized state */
         void reset() noexcept
         {
-            this->~delegate();
-            *data = nullptr; // only set what we need to
+            if (*data) {
+                pcallable(data)->~callable();
+                *data = nullptr; // only set what we need to
+            }
         }
         /** @brief Resets the delegate to point to a function */
         void reset(func_type func) noexcept
         {
-            this->~delegate();
-            new (data) function(func);
+            reset();
+            if (func) new (data) function(func);
         }
         /** @brief Resets the delegate to point to a member function */
         template<class IClass, class FClass>
         void reset(IClass* obj, Ret (FClass::*membfunc)(Args...)) noexcept
         {
-            this->~delegate();
+            reset();
+            if (obj && membfunc)
             #ifdef _MSC_BUILD // VC++
                 new (data) member(obj, (dummy_type)membfunc);
             #elif defined(__GNUG__) // G++
@@ -318,7 +357,8 @@ namespace rpp
         template<class IClass, class FClass>
         void reset(IClass& obj, Ret (FClass::*membfunc)(Args...)) noexcept
         {
-            this->~delegate();
+            reset();
+            if (obj && membfunc)
             #ifdef _MSC_BUILD // VC++
                 new (data) member(&obj, (dummy_type)membfunc);
             #elif defined(__GNUG__) // G++
@@ -328,7 +368,7 @@ namespace rpp
         /** @brief Resets the delegate to point to a functor or lambda */
         template<class Functor> void reset(Functor&& ftor) noexcept
         {
-            this->~delegate();
+            reset();
             new (data) typename delegate::functor<decay_t<Functor>>(forward<Functor>(ftor));
         }
 
@@ -415,7 +455,6 @@ namespace rpp
             functor<Functor> vt; // vtable reference object
             return *data == *(void**)&vt; // comparing vtables should be enough
         }
-
     };
 
 
@@ -478,7 +517,7 @@ namespace rpp
         }
 
         /** @return TRUE if there are callable delegates */
-        inline operator bool() const noexcept { return ptr && ptr->size; }
+        explicit operator bool() const noexcept { return ptr && ptr->size; }
         /** @return Number of currently registered event delegates */
         inline int size() const noexcept { return ptr ? ptr->size : 0; }
 
