@@ -23,14 +23,14 @@ namespace rpp
         Func Function;
 
         template<class T, void (T::*TMethod)(TArgs...)>
-        static void methodCaller(void* callee, TArgs... args)
+        static void proxy(void* callee, TArgs... args)
         {
             T* p = static_cast<T*>(callee);
             return (p->*TMethod)(args...);
         }
 
         template<class T, void (T::*TMethod)(TArgs...)const>
-        static void methodCaller(void* callee, TArgs... args)
+        static void proxy(void* callee, TArgs... args)
         {
             const T* p = static_cast<T*>(callee);
             return (p->*TMethod)(args...);
@@ -43,13 +43,13 @@ namespace rpp
         template<class T, void (T::*TMethod)(TArgs...)>
         static action from_function(T* callee)
         {
-            return { (void*)callee, &methodCaller<T, TMethod> };
+            return { (void*)callee, &proxy<T, TMethod> };
         }
 
         template<class T, void (T::*TMethod)(TArgs...)const>
         static action from_function(const T* callee)
         {
-            return { (void*)callee, &methodCaller<T, TMethod> };
+            return { (void*)callee, &proxy<T, TMethod> };
         }
 
         inline void operator()(TArgs... args) const
@@ -116,12 +116,25 @@ namespace rpp
             unique_lock<mutex> lock{ m };
             while (value <= 0)
             {
-                std::chrono::duration<double> dur(timeoutSeconds);
+                chrono::duration<double> dur(timeoutSeconds);
                 if (cv.wait_for(lock, dur) == cv_status::timeout)
-                    return wait_result::timeout;
+                    return timeout;
             }
             --value;
-            return wait_result::notified;
+            return notified;
+        }
+
+        wait_result wait(int timeoutMillis)
+        {
+            unique_lock<mutex> lock{ m };
+            while (value <= 0)
+            {
+                chrono::milliseconds dur(timeoutMillis);
+                if (cv.wait_for(lock, dur) == cv_status::timeout)
+                    return timeout;
+            }
+            --value;
+            return notified;
         }
 
         bool try_wait()
@@ -143,7 +156,7 @@ namespace rpp
      */
     class pool_task
     {
-        mutex mtx;
+        mutex m;
         condition_variable cv;
         thread th;
         delegate<void()> genericTask;
@@ -211,7 +224,7 @@ namespace rpp
         int idle_tasks() noexcept;
 
         // number of running + idle tasks in this threadpool
-        int total_tasks() noexcept;
+        int total_tasks() const noexcept;
 
         // if you're completely done with the thread pool, simply call this to clean up the threads
         // returns the number of tasks cleared

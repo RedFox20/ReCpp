@@ -10,22 +10,23 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////
 
-    pool_task::pool_task() : th{ &pool_task::run, this }
+    pool_task::pool_task()
     {
+        th = thread{&pool_task::run, this};
     }
 
     pool_task::~pool_task() noexcept
     {
-        { lock_guard<mutex> lock(mtx);
+        { unique_lock<mutex> lock{m};
             killed = true;
         }
-        cv.notify_one();
-        th.detach();
+        cv.notify_all();
+        th.join();
     }
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
-        { lock_guard<mutex> lock(mtx);
+        { unique_lock<mutex> lock{m};
             if (taskRunning) {
                 fprintf(stderr, "rpp::pool_task already running! Undefined behaviour!\n");
             }
@@ -34,13 +35,13 @@ namespace rpp
             rangeStart   = start;
             rangeEnd     = end;
             taskRunning  = true;
+            cv.notify_one();
         }
-        cv.notify_one();
     }
 
     void pool_task::run_generic(delegate<void()>&& newTask) noexcept
     {
-        { lock_guard<mutex> lock(mtx);
+        { unique_lock<mutex> lock{m};
             if (taskRunning) {
                 fprintf(stderr, "rpp::pool_task already running! Undefined behaviour!\n");
             }
@@ -58,7 +59,7 @@ namespace rpp
         //printf("wait for (%d, %d)\n", loopStart, loopEnd);
         while (taskRunning) // duplicate check is intentional (to avoid lock)
         {
-            unique_lock<mutex> lock(mtx);
+            unique_lock<mutex> lock{m};
             if (!taskRunning)
                 return;
             if (timeoutMillis)
@@ -73,7 +74,7 @@ namespace rpp
         }
     }
 
-    #if _MSC_VER
+    #if _WIN32
     #include <Windows.h>
     #pragma pack(push,8)
     struct THREADNAME_INFO
@@ -97,7 +98,7 @@ namespace rpp
             const DWORD MS_VC_EXCEPTION = 0x406D1388;
             __try {
                 RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
-            } __except (EXCEPTION_EXECUTE_HANDLER){}
+            } __except (1){}
         #pragma warning(pop)
     }
     #endif
@@ -106,57 +107,67 @@ namespace rpp
 
     void pool_task::run() noexcept
     {
+        static int pool_task_id;
+        char name[32];
+        snprintf(name, sizeof(name), "rpp_task_%d", pool_task_id++);
+
         #if __APPLE__
-            pthread_setname_np("rpp::pool_task");
+            pthread_setname_np(name);
         #elif __linux__
-            pthread_setname_np(pthread_self(), "rpp::pool_task");
-        #elif _MSC_VER
-            SetThreadName("rpp::pool_task");
+            pthread_setname_np(pthread_self(), name);
+        #elif _WIN32
+            SetThreadName(name);
         #endif
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
 
+        //printf("%s start\n", name);
         while (!killed)
         {
-            if (wait_for_task())
+            //printf("%s wait for task\n", name);
+            if (!wait_for_task())
+                break;
+
+            try
             {
-                try
-                {
-                    decltype(rangeTask)   range;
-                    decltype(genericTask) generic;
-                    
-                    // consume the tasks atomically
-                    { lock_guard<mutex> lock{mtx};
-                        range   = move(rangeTask);
-                        generic = move(genericTask);
-                        taskRunning = true;
-                    }
-                    
-                    if (range)
-                    {
-                        range(rangeStart, rangeEnd);
-                    }
-                    else
-                    {
-                        generic();
-                        generic.reset();
-                    }
-                }
-                catch (const exception& e)
-                {
-                    fprintf(stderr, "pool_task::run unhandled exception: %s\n", e.what());
-                }
-                catch (...) // prevent failure that would terminate the thread
-                {
-                    fprintf(stderr, "pool_task::run unhandled exception!\n");
+                decltype(rangeTask)   range;
+                decltype(genericTask) generic;
+                
+                // consume the tasks atomically
+                { lock_guard<mutex> lock{m};
+                    range   = move(rangeTask);
+                    generic = move(genericTask);
+                    rangeTask   = {};
+                    taskRunning = true;
                 }
                 
-                taskRunning = false;
-                if (killed)
-                    return;
+                if (range)
+                {
+                    //printf("%s range [%d,%d) \n", name, rangeStart, rangeEnd);
+                    range(rangeStart, rangeEnd);
+                }
+                else
+                {
+                    //printf("%s task\n", name);
+                    generic();
+                    generic.reset();
+                }
             }
-            cv.notify_one();
+            catch (const exception& e)
+            {
+                fprintf(stderr, "pool_task::run unhandled exception: %s\n", e.what());
+            }
+            catch (...) // prevent failure that would terminate the thread
+            {
+                fprintf(stderr, "pool_task::run unhandled exception!\n");
+            }
+                
+            { lock_guard<mutex> lock{m};
+                taskRunning = false;
+                cv.notify_all();
+            }
         }
+        //printf("%s killed: %d\n", name, killed);
     }
 
     bool pool_task::got_task() const noexcept
@@ -166,27 +177,25 @@ namespace rpp
 
     bool pool_task::wait_for_task() noexcept
     {
-        unique_lock<mutex> lock {mtx};
+        unique_lock<mutex> lock {m};
         for (;;)
         {
             if (killed)
                 return false;
             if ((bool)rangeTask || (bool)genericTask)
                 return true;
-            
             cv.wait(lock);
         }
-        return true;
     }
 
 
     ///////////////////////////////////////////////////////////////////////////////
 
+
     thread_pool thread_pool::global;
     static int core_count;
 
 #if _WIN32
-    #include <Windows.h>
     static int num_physical_cores()
     {
         DWORD bytes = 0;
@@ -241,7 +250,7 @@ namespace rpp
         return idle;
     }
 
-    int thread_pool::total_tasks() noexcept
+    int thread_pool::total_tasks() const noexcept
     {
         return (int)tasks.size();
     }
@@ -249,7 +258,7 @@ namespace rpp
     int thread_pool::clear_idle_tasks() noexcept
     {
         int cleared = 0;
-        for (int i = 0; i < (int)tasks.size(); ++i)
+        for (int i = 0; i < (int)tasks.size();)
         {
             if (!tasks[i]->running())
             {
@@ -257,6 +266,7 @@ namespace rpp
                 tasks.pop_back();
                 ++cleared;
             }
+            else ++i;
         }
         return cleared;
     }
@@ -273,7 +283,10 @@ namespace rpp
         {
             pool_task* task = tasks[poolIndex].get();
             if (!task->running())
+            {
+                ++poolIndex;
                 return task;
+            }
         }
         return new_task();
     }
@@ -288,7 +301,7 @@ namespace rpp
                                    const action<int, int>& rangeTask) noexcept
     {
         assert(!rangeRunning && "Fatal error: nested parallel loops are forbidden!");
-        assert(core_count != 0);
+        assert(core_count != 0 && "The appears to be no hardware concurrency");
 
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
@@ -305,8 +318,9 @@ namespace rpp
         }
 
         pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
+        //vector<pool_task*> active(cores, nullptr);
         {
-            lock_guard<mutex> lock(poolMutex);
+            lock_guard<mutex> lock{poolMutex};
             rangeRunning = true;
 
             size_t poolIndex = 0;

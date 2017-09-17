@@ -25,9 +25,6 @@
     <ClCompile Include="..\tests\test_serialization.cpp">
       <Filter>tests</Filter>
     </ClCompile>
-    <ClCompile Include="..\tests\test_thread_pool.cpp">
-      <Filter>tests</Filter>
-    </ClCompile>
     <ClCompile Include="..\tests\test_vec.cpp">
       <Filter>tests</Filter>
     </ClCompile>
@@ -41,6 +38,9 @@
       <Filter>tests</Filter>
     </ClCompile>
     <ClCompile Include="..\tests\test_debugging.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tests\test_threadpool.cpp">
       <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>

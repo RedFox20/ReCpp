@@ -11,13 +11,16 @@ TestImpl(test_threadpool)
     {
     }
 
-    int parallelism_count(int numIterations)
+    static int parallelism_count(int numIterations)
     {
+        mutex m;
         unordered_set<thread::id> ids;
         parallel_for(0, numIterations, [&](int start, int end)
         {
+            lock_guard<mutex> lock{m};
             ids.insert(this_thread::get_id());
         });
+        lock_guard<mutex> lock{m};
         return (int)ids.size();
     }
 
@@ -28,7 +31,26 @@ TestImpl(test_threadpool)
         AssertThat(parallelism_count(128), thread_pool::physical_cores());
     }
 
-    TestCase(test_performance)
+    TestCase(generic_task)
+    {
+        semaphore sync;
+        string s = "Data";
+        delegate<void()> fun = [x=s, &s, &sync]()
+        {
+            printf("generic_task: %s\n", x.c_str());
+            s = "completed";
+            sync.notify();
+        };
+        parallel_task([f=move(fun)]()
+        {
+            f();
+        });
+
+        sync.wait();
+        AssertThat(s, "completed");
+    }
+
+    TestCase(parallel_for_performance)
     {
         auto numbers = vector<int>(133333337);
         int* ptr = numbers.data();
@@ -67,6 +89,16 @@ TestImpl(test_threadpool)
         for (int i = 0; i < len; ++i)
             sum2 += ptr[i];
         printf("Singlethread elapsed: %.3fs  result: %lld\n", timer.elapsed(), (long long)sum2);
+    }
+
+    TestCase(repeat_tests)
+    {
+        for (int i = 0; i < 2; ++i)
+        {
+            test_threadpool_concurrency();
+            test_generic_task();
+            test_parallel_for_performance();
+        }
     }
 
 } Impl;
