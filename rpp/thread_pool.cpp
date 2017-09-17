@@ -10,6 +10,10 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////
 
+    pool_task::pool_task() : th{ &pool_task::run, this }
+    {
+    }
+
     pool_task::~pool_task() noexcept
     {
         { lock_guard<mutex> lock(mtx);
@@ -17,8 +21,6 @@ namespace rpp
         }
         cv.notify_one();
         th.detach();
-        
-        fprintf(stderr, "Deleting pool_task, genericTask[3]=%p\n", genericTask.data[3]);
     }
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept

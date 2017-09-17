@@ -2,131 +2,239 @@
 #include <rpp/delegate.h>
 using namespace rpp;
 
-static int func1(int arg0)
-{
-    printf("%d: %s\n", arg0, __FUNCTION__);
-    return 1;
-}
-struct BaseClass
-{
-    int func2(int arg0)
-    {
-        printf("%d: %s\n", arg0, __FUNCTION__);
-        return 2;
-    }
-    virtual int func3(int arg0)
-    {
-        printf("%d: %s\n", arg0, __FUNCTION__);
-        return 3;
-    }
-};
-struct MyClass : BaseClass
-{
-    virtual int func3(int arg0) override
-    {
-        printf("%d: %s\n", arg0, __FUNCTION__);
-        return 4;
-    }
-};
-struct MyFunctor
-{
-    int a = 11, b = 22, c = 33;
 
-    int operator()(int arg0)
-    {
-        printf("%d: %s\n", arg0, __FUNCTION__);
-        return 7;
+// a generic data container for testing instances, functors and lambdas
+class Data
+{
+public:
+    char* data = nullptr;
+    static char* alloc(const char* str) {
+        size_t n = strlen(str) + 1;
+        return (char*)memcpy(new char[n], str, n);
     }
+    explicit Data(const char* s) : data(alloc(s)) {}
+    Data()                       : data(alloc("data")) {}
+    Data(const Data& d)          : data(alloc(d.data)) {}
+    Data(Data&& d) noexcept      : data(d.data) { d.data = nullptr; }
+    ~Data() { delete[] data; }
+    Data& operator=(Data&& d) noexcept {
+        std::swap(data, d.data);
+        return *this;
+    }
+    Data& operator=(const Data& d) {
+        if (this != &d) {
+            delete[] data;
+            data = alloc(d.data);
+        }
+        return *this;
+    }
+    bool operator==(const char* s) const { return strcmp(data, s) == 0; }
+    bool operator!=(const char* s) const { return strcmp(data, s) != 0; }
 };
+string to_string(const Data& d) { return d.data; }
 
-void evt_func1(int arg0)
+static Data validate(const char* name, const Data& a)
 {
-    printf("%d: %s\n", arg0, __FUNCTION__);
+    printf("%s: '%s'\n", name, a.data);
+    return Data{name};
 }
-struct EvtClass
+static Data validate(const char* name, const Data& a, const Data& x)
 {
-    void evt_func2(int arg0)
-    {
-        printf("%d: %s\n", arg0, __FUNCTION__);
-    }
-    void evt_func3(int arg0)
-    {
-        printf("%d: %s\n", arg0, __FUNCTION__);
-    }
-};
+    printf("%s: '%s' '%s'\n", name, a.data, x.data);
+    return Data{name};
+}
+
 
 TestImpl(test_delegate)
 {
+    using DataDelegate = delegate<Data(Data a)>;
+    Data data;
+
     TestInit(test_delegate)
     {
-//#if __GNUG__
-//		BaseClass a;
-//		typedef int(*func_type)(BaseClass* a, int i);
-//		int (BaseClass::*membfunc)(int i) = &BaseClass::func3;
-//		func_type fp = (func_type)(&a->*membfunc);
-//		printf("BaseClass::func3 %p\n", fp);
-//#endif
+        //#if __GNUG__
+        //		BaseClass a;
+        //		typedef int(*func_type)(BaseClass* a, int i);
+        //		int (BaseClass::*membfunc)(int i) = &BaseClass::func3;
+        //		func_type fp = (func_type)(&a->*membfunc);
+        //		printf("BaseClass::func3 %p\n", fp);
+        //#endif
+    }
 
-        MyClass inst;
-        int params1 = 11, params2 = 22;
+    ////////////////////////////////////////////////////
 
-        delegate<int(int)> d1 = &func1;
-        Assert(d1(10) == 1);
-        delegate<int(int)> d2(inst, &MyClass::func2);
-        Assert(d2(20) == 2);
-
-        BaseClass binst = inst;
-        delegate<int(int)> d3(binst, &BaseClass::func3);
-        Assert(d3(30) == 3); // this must result in BaseClass::func3 virtual call
-
-        delegate<int(int)> d4((BaseClass*)&inst, &BaseClass::func3);
-        Assert(d4(40) == 4); // this must result in MyClass::func3 virtual call
-
-        delegate<int(int)> d5(inst, &MyClass::func3);
-        Assert(d5(50) == 4); // this must result in MyClass::func3 virtual call
-
-        delegate<int(int)> d6 = [](int arg0) {
-            printf("%d: %s\n", arg0, __FUNCTION__);
-            return 5;
+    TestCase(functions)
+    {
+        Data (*function)(Data a) = [](Data a)
+        {
+            return validate("function", a);
         };
-        Assert(d6(60) == 5);
-        delegate<int(int)> d7 = [&inst, &params1, &params2](int arg0) {
-            printf("%d: %s\n", arg0, __FUNCTION__);
-            return 6;
+
+        DataDelegate func = function;
+        AssertThat(func(data), "function");
+    }
+
+    ////////////////////////////////////////////////////
+
+    struct Base
+    {
+        Data x;
+        virtual ~Base(){}
+        Data method(Data a)
+        {
+            return validate("method", a, x);
+        }
+        Data const_method(Data a) const
+        {
+            return validate("const_method", a, x);
+        }
+        virtual Data virtual_method(Data a)
+        {
+            return validate("virtual_method", a, x);
+        }
+    };
+    struct Derived : Base
+    {
+        Data virtual_method(Data a) override
+        {
+            return validate("derived_method", a, x);
+        }
+    };
+
+    TestCase(methods_bug)
+    {
+        return;
+        using memb_type = Data (__fastcall*)(void*, Data);
+        struct dummy {};
+        using dummy_type = Data (dummy::*)(Data a);
+        union method_helper
+        {
+            memb_type mfunc;
+            dummy_type dfunc;
         };
-        Assert(d7(70) == 6);
 
-        delegate<int(int)> d8 = MyFunctor();
-        Assert(d8(80) == 7);
+        Base inst;
+        Data (Base::*method)(Data a) = &Base::method;
 
+        void* obj = &inst;
+        //printf("obj:  %p\n", obj);
 
-        EvtClass evc;
-        event<void(int)> evt;
+        method_helper u;
+        u.dfunc = (dummy_type)method;
+
+        dummy* dum = (dummy*)obj;
+        (dum->*u.dfunc)(data);
+    }
+
+    TestCase(methods)
+    {
+        Derived inst;
+        DataDelegate func1(inst, &Derived::method);
+        AssertThat(func1(data), "method");
+
+        DataDelegate func2(inst, &Derived::const_method);
+        AssertThat(func2(data), "const_method");
+    }
+
+    TestCase(virtuals)
+    {
+        Base    base;
+        Derived inst;
+
+        DataDelegate func1(base, &Base::virtual_method);
+        AssertThat(func1(data), "virtual_method");
+
+        DataDelegate func2((Base*)&inst, &Base::virtual_method);
+        AssertThat(func2(data), "derived_method");
+
+        DataDelegate func3(inst, &Derived::virtual_method);
+        AssertThat(func3(data), "derived_method");
+    }
+
+    ////////////////////////////////////////////////////
+
+    TestCase(lambdas)
+    {
+        DataDelegate lambda1 = [](Data a)
+        {
+            return validate("lambda1", a);
+        };
+        AssertThat(lambda1(data), "lambda1");
+
+        DataDelegate lambda2 = [x=data](Data a)
+        {
+            return validate("lambda2", a, x);
+        };
+        AssertThat(lambda2(data), "lambda2");
+    }
+
+    TestCase(functor)
+    {
+        struct Functor
+        {
+            Data x;
+            Data operator()(Data a) const
+            {
+                return validate("functor", a, x);
+            }
+        };
+
+        DataDelegate func = Functor();
+        AssertThat(func(data), "functor");
+    }
+
+    ////////////////////////////////////////////////////
+
+    static void event_func(Data a)
+    {
+        validate("event_func", a);
+    }
+
+    TestCase(multicast_delegates)
+    {
+        struct Receiver
+        {
+            Data x;
+            void event_method(Data a)
+            {
+                validate("event_method", a, x);
+            }
+            void const_method(Data a) const
+            {
+                validate("const_method", a, x);
+            }
+            void unused_method(Data a) const { const_method(a); }
+        };
+
+        Receiver receiver;
+        multicast_delegate<Data> evt;
         Assert(evt.size() == 0); // yeah...
 
         // add 2 events
-        evt += &evt_func1;
-        evt.add(evc, &EvtClass::evt_func2);
-        evt(10);
-        Assert(evt.size() == 2);
+        evt += &event_func;
+        evt.add(receiver, &Receiver::event_method);
+        evt.add(receiver, &Receiver::const_method);
+        evt(data);
+        Assert(evt.size() == 3);
 
         // remove one event
-        evt -= &evt_func1;
-        evt(20);
-        Assert(evt.size() == 1);
+        evt -= &event_func;
+        evt(data);
+        Assert(evt.size() == 2);
 
         // try to remove an incorrect function:
-        evt -= &func1;
-        Assert(evt.size() == 1); // nothing must change
-        evt.remove(evc, &EvtClass::evt_func3);
-        Assert(evt.size() == 1); // nothing must change
+        evt -= &event_func;
+        Assert(evt.size() == 2); // nothing must change
+        evt.remove(receiver, &Receiver::unused_method);
+        Assert(evt.size() == 2); // nothing must change
 
-        // remove final event
-        evt.remove(evc, &EvtClass::evt_func2);
-        evt(00);
+        // remove final events
+        evt.remove(receiver, &Receiver::event_method);
+        evt.remove(receiver, &Receiver::const_method);
+        evt(data);
         Assert(evt.size() == 0); // must be empty now
     }
 
-
+    ////////////////////////////////////////////////////
 
 } Impl;

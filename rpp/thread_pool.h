@@ -67,7 +67,6 @@ namespace rpp
      */
     class semaphore
     {
-    private:
         mutex m;
         condition_variable cv;
         int value = 0;
@@ -146,11 +145,11 @@ namespace rpp
     {
         mutex mtx;
         condition_variable cv;
-        thread th { &pool_task::run, this };
+        thread th;
         delegate<void()> genericTask;
         action<int, int> rangeTask;
-        int rangeStart;
-        int rangeEnd;
+        int rangeStart = 0;
+        int rangeEnd   = 0;
         volatile bool taskRunning = false;
         volatile bool killed      = false;
 
@@ -158,6 +157,7 @@ namespace rpp
 
         bool running() const noexcept { return taskRunning; }
 
+        pool_task();
         ~pool_task() noexcept;
 
         // assigns a new parallel for task to run
