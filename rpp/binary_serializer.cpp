@@ -17,7 +17,7 @@ namespace rpp
 		case 1: w << *(char*)p;        p += 1; continue;
 		case 2: w << *(short*)p;       p += 2; continue;
 		case 3: w << *(int*)p;         p += 4; continue;
-		case 4: w << *(__int64*)p;     p += 8; continue;
+		case 4: w << *(int64*)p;       p += 8; continue;
 		case 5: w << *(std::string*)p; p += sizeof(std::string); continue;
 		}
 		return w;
@@ -33,7 +33,7 @@ namespace rpp
 		case 1: r >> *(char*)p;    p += 1; size += 1; continue;
 		case 2: r >> *(short*)p;   p += 2; size += 2; continue;
 		case 3: r >> *(int*)p;     p += 4; size += 4; continue;
-		case 4: r >> *(__int64*)p; p += 8; size += 8; continue;
+		case 4: r >> *(int64*)p;   p += 8; size += 8; continue;
 		case 5: {
 			r >> *(std::string*)p;
 			size += 2 + (int)((std::string*)p)->size();

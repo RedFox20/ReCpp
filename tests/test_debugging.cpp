@@ -12,9 +12,9 @@ TestImpl(test_debugging)
     {
         std::string a = "string";
         rpp::strview b = "strview";
-        int c = 42;
+        int   c = 42;
         float d = 42.0f;
-        char e = '4';
+        char  e = '4';
 
         LogInfo("Log(0)");
         LogInfo("Log(1): '%s'", a);

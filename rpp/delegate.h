@@ -51,6 +51,13 @@ namespace rpp
 {
     using namespace std; // we love std; you should too.
 
+    #if INTPTR_MAX == INT64_MAX
+        #define RPP_64BIT 1
+    #endif
+//    #if _WIN64 || __x86_x64__ || __ppc64__ || __arm64__ || __LP64__ || _M_X64 || __amd64__
+//        #define RPP_64BIT 1
+//    #endif
+
     /**
      * @brief Function delegate to encapsulate global functions,
      *        instance member functions, lambdas and functors
@@ -80,11 +87,15 @@ namespace rpp
         using dtor_type = void (*)(void*);
         using copy_type = void (*)(void*, delegate&);
         struct dummy {};
-        #ifdef _MSC_VER // VC++
-            using memb_type = Ret (__thiscall*)(void*, Args...);
+        #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if RPP_64BIT // no __thiscall for 64-bit
+                using memb_type = Ret (*)(void*, Args...);
+            #else
+                using memb_type = Ret (__thiscall*)(void*, Args...);
+            #endif
             using dummy_type = Ret (dummy::*)(Args...);
-        #elif defined(__GNUG__) // G++ and clang
-            #if __ARM_ARCH // no __thiscall for ARM64
+        #elif defined(__GNUG__) // G++
+            #if RPP_64BIT // no __thiscall for 64-bit
                 using memb_type = Ret (*)(void*, Args...);
             #else
                 using memb_type = Ret (__thiscall*)(void*, Args...);
@@ -98,8 +109,8 @@ namespace rpp
             memb_type  mfunc;
             dummy_type dfunc;
         };
-        void*     obj;
-        dtor_type destructor;
+        void*     obj        = nullptr;
+        dtor_type destructor = nullptr;
         copy_type proxy_copy;
 
     public:
@@ -117,25 +128,25 @@ namespace rpp
             }
         }
         
-        void copy(delegate& dest) noexcept
+        void copy(delegate& to) const noexcept
         {
             if (destructor) // looks like we have a functor
             {
-                proxy_copy(obj, dest);
-                dest.func       = func;
-                dest.proxy_copy = proxy_copy;
+                proxy_copy(obj, to);
+                to.func       = func;
+                to.proxy_copy = proxy_copy;
             }
             else
             {
-                dest.func = func;
-                dest.obj  = obj;
+                to.func = func;
+                to.obj  = obj;
             }
         }
 
         /** @brief Creates a copy of the delegate */
         delegate(const delegate& d) noexcept : delegate()
         {
-            d.copy(this);
+            d.copy(*this);
         }
         /** @brief Assigns a copy of the delegate */
         delegate& operator=(const delegate& d) noexcept
@@ -143,7 +154,7 @@ namespace rpp
             if (this != &d)
             {
                 this->~delegate();
-                d.copy(this);
+                d.copy(*this);
             }
             return *this;
         }
@@ -188,11 +199,8 @@ namespace rpp
 
         template<class IClass, class FClass> void init_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
         {
-            FClass* pclass = &inst;
-            IClass* iclass = &inst;
-
             obj = &inst;
-            #ifdef _MSC_BUILD // VC++
+            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
                 dfunc = (dummy_type)method;
             #elif defined(__GNUG__) // G++
                 mfunc = (memb_type)(inst.*method);
@@ -203,7 +211,7 @@ namespace rpp
         template<class IClass, class FClass> void init_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             obj = (void*)&inst;
-            #ifdef _MSC_BUILD // VC++
+            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
                 dfunc = (dummy_type)method;
             #elif defined(__GNUG__) // G++
                 mfunc = (memb_type)(inst.*method);
@@ -222,7 +230,7 @@ namespace rpp
         template<class IClass, class FClass> bool equal_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
         {
             method_helper u;
-            #ifdef _MSC_BUILD // VC++
+            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
                 u.dfunc = (dummy_type)method;
             #elif defined(__GNUG__) // G++
                 u.mfunc = (memb_type)(inst.*method);
@@ -233,23 +241,12 @@ namespace rpp
         template<class IClass, class FClass> bool equal_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             method_helper u;
-            #ifdef _MSC_BUILD // VC++
+            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
                 u.dfunc = (dummy_type)method;
             #elif defined(__GNUG__) // G++
                 u.mfunc = (memb_type)(inst.*method);
             #endif
             return func == u.func;
-        }
-
-        template<class T, void (T::*Method)(Args...)> static void methodCaller(void* callee, Args... args)
-        {
-            T* p = static_cast<T*>(callee);
-            return (p->*Method)(args...);
-        }
-        template<class T, void (T::*Method)(Args...)const> static void methodCaller(void* callee, Args... args)
-        {
-            const T* p = static_cast<T*>(callee);
-            return (p->*Method)(args...);
         }
 
         void init_clear()
@@ -304,19 +301,18 @@ namespace rpp
 
         template<class Functor> void init_functor(Functor&& ftor)
         {
-            using FunctorType = std::decay_t<Functor>;
-
+            typedef std::decay_t<Functor> FunctorType;
             init_method(ftor, &FunctorType::operator());
 
             obj  = new FunctorType(forward<Functor>(ftor));
             destructor = [](void* obj)
             {
-                FunctorType* instance = (FunctorType*)obj;
+                auto* instance = (FunctorType*)obj;
                 delete instance;
             };
             proxy_copy = [](void* obj, delegate& dest)
             {
-                FunctorType* instance = (FunctorType*)obj;
+                auto* instance = (FunctorType*)obj;
                 dest.reset(*instance);
             };
         }
@@ -404,23 +400,29 @@ namespace rpp
         {
             if (obj)
             {
-                dummy* inst = (dummy*)obj;
+            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+                auto* inst = (dummy*)obj;
                 return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
-                //return (Ret)mfunc(obj, forward<XArgs>(args)...);
+            #else
+                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+            #endif
             }
             else
-                return func(forward<XArgs>(args)...);
+                return (Ret)func(forward<XArgs>(args)...);
         }
         template<class ...XArgs> Ret invoke(XArgs... args) const
         {
             if (obj)
             {
-                dummy* inst = (dummy*)obj;
+            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+                auto* inst = (dummy*)obj;
                 return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
-                //return (Ret)mfunc(obj, forward<XArgs>(args)...);
+            #else
+                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+            #endif
             }
             else
-                return (Ret)func(forward<XArgs>(args)...);
+                return (Ret)func(forward<XArgs...>(args)...);
         }
 
         /** @return true if this delegate is initialize and can be called */
@@ -651,22 +653,22 @@ namespace rpp
         /**
          * @brief Invoke all subscribed event delegates.
          */
-        void operator()(Args... args) const
+        template<class ...XArgs> void operator()(XArgs... args) const
         {
-            int count = ptr->size;
-            auto data = ptr->data;
+            int   count = ptr->size;
+            deleg* data = ptr->data;
             for (int i = 0; i < count; ++i)
             {
-                data[i](args...);
+                data[i](forward<XArgs>(args)...);
             }
         }
-        void invoke(Args... args) const
+        template<class ...XArgs> void invoke(XArgs... args) const
         {
-            int count = ptr->size;
-            auto data = ptr->data;
+            int   count = ptr->size;
+            deleg* data = ptr->data;
             for (int i = 0; i < count; ++i)
             {
-                data[i](args...);
+                data[i](forward<XArgs>(args)...);
             }
         }
     };

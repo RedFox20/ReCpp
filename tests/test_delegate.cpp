@@ -103,8 +103,7 @@ TestImpl(test_delegate)
 
     TestCase(methods_bug)
     {
-        return;
-        using memb_type = Data (__fastcall*)(void*, Data);
+        using memb_type = Data (*)(void*, Data);
         struct dummy {};
         using dummy_type = Data (dummy::*)(Data a);
         union method_helper

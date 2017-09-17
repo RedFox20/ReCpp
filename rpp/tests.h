@@ -108,8 +108,9 @@ namespace rpp
         }
 
         // adds a test to the automatic test run list
-        template<class T, class Lambda> int add_test_func(strview name, T* self, Lambda)
+        template<class T, class Lambda> int add_test_func(strview name, T* self, Lambda lambda)
         {
+            (void)lambda;
             test_funcs.emplace_back(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
             return (int)test_funcs.size() - 1;
         }
@@ -144,7 +145,7 @@ namespace rpp
 #define TestCleanup(testclass) ~testclass()
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(#testname, this, [this]{ this->test_##testname();}); \
+    const int _test_##testname = add_test_func(#testname, this, [this]{ test_##testname();}); \
     void test_##testname()
 
 }

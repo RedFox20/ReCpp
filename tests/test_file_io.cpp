@@ -12,14 +12,14 @@ TestImpl(test_file_io)
     {
         printf("working_dir: %s\n", working_dir().c_str());
 
-        int mode = ios::in | ios::binary;
-        ifstream refFile { FileName, mode };
+        fstream::openmode mode = ios::in | ios::binary;
+        fstream refFile { FileName, mode };
         if (!refFile.good()) {
             FileName = "../" + FileName;
             refFile.open(FileName.c_str(), mode);
         }
         AssertMsg(refFile.good(), "Test file '%s' is missing", FileName.c_str());
-        FileSize = (int)refFile.seekg(0, SEEK_END).tellg();
+        FileSize = (int)refFile.seekg(0, fstream::end).tellg();
     }
 
     TestCleanup(test_file_io)

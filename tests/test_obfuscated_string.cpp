@@ -8,20 +8,11 @@ TestImpl(test_obfuscated_string)
     {
     }
 
-#if __clang__ || __GNUC__
-    TestCase(clang_and_gcc)
-    {
-        constexpr auto str = "test!1234!õäöü"_obfuscated;
-        string decrypted = str.to_string();
-        AssertThat(decrypted, "test!1234!õäöü"s);
-    }
-#endif
-
     TestCase(cross_platform)
     {
-        constexpr auto str = make_obfuscated("test!1234!õäöü");
+        constexpr auto str = make_obfuscated("test!1234!ÃµÃ¤Ã¶Ã¼");
         string decrypted = str.to_string();
-        AssertThat(decrypted, "test!1234!õäöü"s);
+        AssertThat(decrypted, "test!1234!ÃµÃ¤Ã¶Ã¼"s);
     }
 
 } Impl;

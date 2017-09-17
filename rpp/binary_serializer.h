@@ -98,6 +98,7 @@ namespace rpp
                 static_cast<T*>(this)->introspect();
                 return true;
             }();
+            (void)introspection_complete;
         }
 
         template<class U> static void binary_serialize(const T* inst, int offset, binary_stream& w)
@@ -212,6 +213,11 @@ namespace rpp
     template<class T> strview& operator>>(strview& r, serializable<T>& s) 
     {
         s.deserialize(r); return r;
+    }
+    template<class T> string_serializer& operator>>(string_serializer& r, serializable<T>& s)
+    {
+        strview sv = r.view();
+        s.deserialize(sv); return r;
     }
     //////////////////////////////////////////////////////////////////////////////////
 

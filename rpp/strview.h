@@ -42,38 +42,38 @@ namespace rpp
 {
     using namespace std; // we love std; you should too.
 
-#ifndef RPP_BASIC_INTEGER_TYPEDEFS
-#define RPP_BASIC_INTEGER_TYPEDEFS
-#if !_HAS_STD_BYTE
-    typedef unsigned char      byte;
-#endif
-    typedef unsigned short     ushort;
-    typedef unsigned int       uint;
-    typedef unsigned long      ulong;
-    typedef long long          int64;
-    typedef unsigned long long uint64;
-#endif
+    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
+    #define RPP_BASIC_INTEGER_TYPEDEFS
+    #if !_HAS_STD_BYTE
+        typedef unsigned char      byte;
+    #endif
+        typedef unsigned short     ushort;
+        typedef unsigned int       uint;
+        typedef unsigned long      ulong;
+        typedef long long          int64;
+        typedef unsigned long long uint64;
+    #endif
 
     //// @note Some functions get inlined too aggressively, leading to some serious code bloat
     ////       Need to hint the compiler to take it easy ^_^'
-#ifndef NOINLINE
-#ifdef _MSC_VER
-#define NOINLINE __declspec(noinline)
-#else
-#define NOINLINE __attribute__((noinline))
-#endif
-#endif
+    #ifndef NOINLINE
+        #ifdef _MSC_VER
+            #define NOINLINE __declspec(noinline)
+        #else
+            #define NOINLINE __attribute__((noinline))
+        #endif
+    #endif
 
-//// @note Some strong hints that some functions are merely wrappers, so should be forced inline
-#ifndef FINLINE
-#ifdef _MSC_VER
-#define FINLINE __forceinline
-#elif __APPLE__
-#define FINLINE inline __attribute__((always_inline))
-#else
-#define FINLINE __attribute__((always_inline))
-#endif
-#endif
+    //// @note Some strong hints that some functions are merely wrappers, so should be forced inline
+    #ifndef FINLINE
+        #ifdef _MSC_VER
+            #define FINLINE __forceinline
+        #elif __APPLE__
+            #define FINLINE inline __attribute__((always_inline))
+        #else
+            #define FINLINE __attribute__((always_inline))
+        #endif
+    #endif
 
 /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 

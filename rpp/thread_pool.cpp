@@ -73,12 +73,45 @@ namespace rpp
         }
     }
 
+    #if _MSC_VER
+    #include <Windows.h>
+    #pragma pack(push,8)
+    struct THREADNAME_INFO
+    {
+        DWORD dwType; // Must be 0x1000.
+        LPCSTR szName; // Pointer to name (in user addr space).
+        DWORD dwThreadID; // Thread ID (-1=caller thread).
+        DWORD dwFlags; // Reserved for future use, must be zero.
+    };
+    #pragma pack(pop)
+    void SetThreadName(const char* threadName)
+    {
+        THREADNAME_INFO info;
+        info.dwType     = 0x1000;
+        info.szName     = threadName;
+        info.dwThreadID = (DWORD)-1;
+        info.dwFlags    = 0;
+
+        #pragma warning(push)
+        #pragma warning(disable: 6320 6322)
+            const DWORD MS_VC_EXCEPTION = 0x406D1388;
+            __try {
+                RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+            } __except (EXCEPTION_EXECUTE_HANDLER){}
+        #pragma warning(pop)
+    }
+    #endif
+
     static void segfault(int) { throw runtime_error("SIGSEGV"); }
 
     void pool_task::run() noexcept
     {
-        #if __APPLE__ || __linux__
+        #if __APPLE__
             pthread_setname_np("rpp::pool_task");
+        #elif __linux__
+            pthread_setname_np(pthread_self(), "rpp::pool_task");
+        #elif _MSC_VER
+            SetThreadName("rpp::pool_task");
         #endif
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it

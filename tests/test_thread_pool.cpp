@@ -46,7 +46,8 @@ TestImpl(test_threadpool)
         //});
 
         Timer timer;
-        atomic_int64_t sum = 0;
+
+        atomic<int64_t> sum { 0 };;
         parallel_for(0, (int)numbers.size(), [&](int start, int end) {
             int64_t isum = 0;
             for (int i = start; i < end; ++i)
@@ -59,13 +60,13 @@ TestImpl(test_threadpool)
         //concurrency::parallel_for(size_t(0), numbers.size(), [&](int index) {
         //    sum += ptr[index];
         //});
-        printf("ParallelFor  elapsed: %.3fs  result: %lld\n", timer.elapsed(), (int64_t)sum);
+        printf("ParallelFor  elapsed: %.3fs  result: %ld\n", timer.elapsed(), (int64_t)sum);
 
         timer.start();
         int64_t sum2 = 0;
         for (int i = 0; i < len; ++i)
             sum2 += ptr[i];
-        printf("Singlethread elapsed: %.3fs  result: %lld\n", timer.elapsed(), sum2);
+        printf("Singlethread elapsed: %.3fs  result: %ld\n", timer.elapsed(), sum2);
     }
 
 } Impl;

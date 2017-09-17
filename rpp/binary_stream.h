@@ -13,11 +13,14 @@ namespace rpp /* ReCpp */
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
-        typedef unsigned char    byte;
-        typedef unsigned short   ushort;
-        typedef unsigned int     uint;
-        typedef __int64          int64;
-        typedef unsigned __int64 uint64;
+    #if !_HAS_STD_BYTE
+        typedef unsigned char      byte;
+    #endif
+        typedef unsigned short     ushort;
+        typedef unsigned int       uint;
+        typedef unsigned long      ulong;
+        typedef long long          int64;
+        typedef unsigned long long uint64;
     #endif
 
     #ifndef RPP_MOVECOPY_MACROS_DEFINED

@@ -947,12 +947,12 @@ namespace rpp
             client.set_noblock_nodelay();
             client.Category = SC_Accept;
         }
-        return move(client);
+        return client;
     }
     socket socket::accept(int millis) const noexcept
     {
         socket client;
-        try_for_period(millis, [this, &client]() {
+        try_for_period(millis, [this, &client]() -> bool {
             return (client = accept()).good();
         });
         return client;
@@ -1045,9 +1045,9 @@ namespace rpp
         for (int i = 0; i < 10; ++i) {
             int port = (rand() % (65536 - 8000));
             if (socket s = socket::make_udp(port, AF_IPv4, opt))
-                return move(s);
+                return s;
         }
-        return{};
+        return {};
     }
 
     socket make_tcp_randomport(socket_option opt)
@@ -1055,9 +1055,9 @@ namespace rpp
         for (int i = 0; i < 10; ++i) {
             int port = (rand() % (65536 - 8000));
             if (socket s = socket::listen_to(port, AF_IPv4, IPP_TCP, opt))
-                return move(s);
+                return s;
         }
-        return{};
+        return {};
     }
 
     ////////////////////////////////////////////////////////////////////////////////

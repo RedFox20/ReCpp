@@ -30,11 +30,14 @@ namespace rpp
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
-        typedef unsigned char    byte;
-        typedef unsigned short   ushort;
-        typedef unsigned int     uint;
-        typedef __int64          int64;
-        typedef unsigned __int64 uint64;
+    #if !_HAS_STD_BYTE
+        typedef unsigned char      byte;
+    #endif
+        typedef unsigned short     ushort;
+        typedef unsigned int       uint;
+        typedef unsigned long      ulong;
+        typedef long long          int64;
+        typedef unsigned long long uint64;
     #endif
 
     enum address_family
@@ -119,7 +122,9 @@ namespace rpp
     {
         address_family Family;     // IPv4 or IPv6
         unsigned short Port;       // port in host byte order
+#if _MSC_VER
         #pragma warning(disable:4201)
+#endif
         union {
             union {
                 unsigned long Addr4; // IPv4 Address
