@@ -219,13 +219,6 @@ namespace rpp
         template<class IClass, class FClass> void init_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
         {
             obj = &inst;
-            #if DEBUG
-                if (sizeof(method) > sizeof(void*)) {
-                    fprintf(stderr, "Unsupported pointer-to-member size: %ld bytes\n", sizeof(method));
-                    assert(sizeof(method) <= sizeof(void*));
-                }
-            #endif
-            printf("sizeof(method): %ld\n", sizeof(method));
             #if defined(_MSC_VER)  // VC++
                 dfunc = (dummy_type)method;
             #elif defined(__clang__)
@@ -239,13 +232,6 @@ namespace rpp
         template<class IClass, class FClass> void init_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             obj = (void*)&inst;
-            #if DEBUG
-                if (sizeof(method) > sizeof(void*)) {
-                    fprintf(stderr, "Unsupported pointer-to-member size: %ld bytes\n", sizeof(method));
-                    assert(sizeof(method) <= sizeof(void*));
-                }
-            #endif
-            printf("sizeof(method): %ld\n", sizeof(method));
             #if defined(_MSC_VER)  // VC++
                 dfunc = (dummy_type)method;
             #elif defined(__clang__)

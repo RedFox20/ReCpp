@@ -7,6 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include "delegate.h"
+#include <functional>
 
 namespace rpp
 {
@@ -159,7 +160,7 @@ namespace rpp
         mutex m;
         condition_variable cv;
         thread th;
-        delegate<void()> genericTask;
+        function<void()> genericTask;
         action<int, int> rangeTask;
         int rangeStart = 0;
         int rangeEnd   = 0;
@@ -181,7 +182,7 @@ namespace rpp
 
         // assigns a new generic task to run
         // undefined behaviour if called when already running
-        void run_generic(delegate<void()>&& genericTask) noexcept;
+        void run_generic(function<void()>&& genericTask) noexcept;
 
         // wait for task to finish
         void wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -260,7 +261,7 @@ namespace rpp
         }
 
         // runs a generic parallel task
-        pool_task* parallel_task(delegate<void()>&& genericTask) noexcept;
+        pool_task* parallel_task(function<void()>&& genericTask) noexcept;
 
         // return the number of physical cores
         static int physical_cores();
@@ -289,7 +290,7 @@ namespace rpp
      * Runs a generic parallel task on the default global thread pool
      * @note Returns immediately; does not wait for the task to complete.
      */
-    inline pool_task* parallel_task(delegate<void()>&& genericTask) noexcept
+    inline pool_task* parallel_task(function<void()>&& genericTask) noexcept
     {
         return thread_pool::global.parallel_task(move(genericTask));
     }

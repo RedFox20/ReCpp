@@ -39,7 +39,7 @@ namespace rpp
         }
     }
 
-    void pool_task::run_generic(delegate<void()>&& newTask) noexcept
+    void pool_task::run_generic(function<void()>&& newTask) noexcept
     {
         { unique_lock<mutex> lock{m};
             if (taskRunning) {
@@ -150,7 +150,6 @@ namespace rpp
                 {
                     //printf("%s task\n", name);
                     generic();
-                    generic.reset();
                 }
             }
             catch (const exception& e)
@@ -341,7 +340,7 @@ namespace rpp
         rangeRunning = false;
     }
 
-    pool_task* thread_pool::parallel_task(delegate<void()>&& genericTask) noexcept
+    pool_task* thread_pool::parallel_task(function<void()>&& genericTask) noexcept
     {
         pool_task* task = get_task();
         task->run_generic(move(genericTask));
