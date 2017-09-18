@@ -107,6 +107,48 @@ namespace rpp
                 cv.wait(lock);
             --value;
         }
+
+        /**
+         * Waits while @taskIsRunning is TRUE and sets it to TRUE again before returning
+         * This works well for atomic barriers, for example:
+         * @code
+         *   sync.wait_barrier_while(IsRunning);  // waits while IsRunning == true and sets it to true on return
+         *   processTask();
+         * @endocde
+         * @param taskIsRunning Reference to atomic flag to wait on
+         */
+        void wait_barrier_while(atomic_bool& taskIsRunning)
+        {
+            if (!taskIsRunning) {
+                taskIsRunning = true;
+                return;
+            }
+            unique_lock<mutex> lock{ m };
+            while (taskIsRunning)
+                cv.wait(lock);
+            taskIsRunning = true;
+        }
+        
+        /**
+         * Waits while @atomicFlag is FALSE and sets it to FALSE again before returning
+         * This works well for atomic barriers, for example:
+         * @code
+         *   sync.wait_barrier_until(HasFinished);  // waits while HasFinished == false and sets it to false on return
+         *   processResults();
+         * @endocde
+         * @param hasFinished Reference to atomic flag to wait on
+         */
+        void wait_barrier_until(atomic_bool& hasFinished)
+        {
+            if (hasFinished) {
+                hasFinished = false;
+                return;
+            }
+            unique_lock<mutex> lock{ m };
+            while (!hasFinished)
+                cv.wait(lock);
+            hasFinished = false;
+        }
         
         /**
          * @param timeoutSeconds Maximum number of seconds to wait for this semaphore to be notified
