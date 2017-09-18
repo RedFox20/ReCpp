@@ -11,41 +11,53 @@
  * Usage examples:
  *
  *  -) Declaring and resetting the delegate
+ *  @code
  *     delegate<void(int)> fn;
  *     fn.reset();               // clear delegate (uninitialize)
  *     if (fn) fn(42);           // call if initialized
+ *  @endcode
  *
  *  -) Regular function
+ *  @code
  *     delegate<void(int)> fn = &func;
  *     fn(42);
+ *  @endcode
  *
  *  -) Member function
+ *  @code
  *     delegate<void(int)> fn(myClass, &MyClass::func);  // construct
  *     fn.reset(myClass, &MyClass::func);                // or reset
  *     fn(42);
+ *  @endcode
  *
  *  -) Lambdas:
+ *  @code
  *     delegate<void(int)> fn = [](int a) { cout << a << endl; };
  *     fn(42);
+ *  @endcode
  *
  *  -) Functors:
+ *  @code
  *     delegate<bool(int,int)> comparer = std::less<int>();
  *     bool result = comparer(37, 42);
+ *  @endcode
  *
  *  -) Events:
- *
- *     event<void(int,int)> on_mouse_move;
- *     on_mouse_move += &scene_mousemove;   // register events
- *     on_mouse_move += &gui_mouse_handler; 
- *     on_mouse_move(deltaX, deltaY);       // invoke multicast delegate (event)
+ *  @code
+ *     multicast_delegate<void(int,int)> onMouseMove;
+ *     onMouseMove += &scene_mousemove;   // register events
+ *     onMouseMove.add(gui, &Gui::MouseMove);
+ *     onMouseMove(deltaX, deltaY);       // invoke multicast delegate (event)
  *     ...
- *     on_mouse_move -= &scene_mousemove;   // unregister existing event
- *     on_mouse_move.clear();               // unregister all
+ *     onMouseMove -= &scene_mousemove;   // unregister existing event
+ *     onMouseMove.clear();               // unregister all
+ *  @endcode
  */
 #include <cstdlib> // malloc/free for event<()>
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
 #include <cstdio>
+#include <cassert>
 
 namespace rpp
 {
@@ -87,7 +99,14 @@ namespace rpp
         using dtor_type = void (*)(void*);
         using copy_type = void (*)(void*, delegate&);
         struct dummy {};
-        #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+        #if defined(_MSC_VER)  // VC++
+            #if RPP_64BIT // no __thiscall for 64-bit
+                using memb_type = Ret (*)(void*, Args...);
+            #else
+                using memb_type = Ret (__thiscall*)(void*, Args...);
+            #endif
+            using dummy_type = Ret (dummy::*)(Args...);
+        #elif defined(__clang__)
             #if RPP_64BIT // no __thiscall for 64-bit
                 using memb_type = Ret (*)(void*, Args...);
             #else
@@ -109,8 +128,8 @@ namespace rpp
             memb_type  mfunc;
             dummy_type dfunc;
         };
-        void*     obj        = nullptr;
-        dtor_type destructor = nullptr;
+        void*     obj;
+        dtor_type destructor;
         copy_type proxy_copy;
 
     public:
@@ -200,7 +219,16 @@ namespace rpp
         template<class IClass, class FClass> void init_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
         {
             obj = &inst;
-            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if DEBUG
+                if (sizeof(method) > sizeof(void*)) {
+                    fprintf(stderr, "Unsupported pointer-to-member size: %ld bytes\n", sizeof(method));
+                    assert(sizeof(method) <= sizeof(void*));
+                }
+            #endif
+            printf("sizeof(method): %ld\n", sizeof(method));
+            #if defined(_MSC_VER)  // VC++
+                dfunc = (dummy_type)method;
+            #elif defined(__clang__)
                 dfunc = (dummy_type)method;
             #elif defined(__GNUG__) // G++
                 mfunc = (memb_type)(inst.*method);
@@ -211,7 +239,16 @@ namespace rpp
         template<class IClass, class FClass> void init_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             obj = (void*)&inst;
-            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if DEBUG
+                if (sizeof(method) > sizeof(void*)) {
+                    fprintf(stderr, "Unsupported pointer-to-member size: %ld bytes\n", sizeof(method));
+                    assert(sizeof(method) <= sizeof(void*));
+                }
+            #endif
+            printf("sizeof(method): %ld\n", sizeof(method));
+            #if defined(_MSC_VER)  // VC++
+                dfunc = (dummy_type)method;
+            #elif defined(__clang__)
                 dfunc = (dummy_type)method;
             #elif defined(__GNUG__) // G++
                 mfunc = (memb_type)(inst.*method);
@@ -396,13 +433,17 @@ namespace rpp
         /**
          * @brief Invoke the delegate with specified args list
          */
-        template<class ...XArgs> Ret operator()(XArgs... args) const
+        template<class ...XArgs> Ret operator()(XArgs&&... args) const
         {
             if (obj)
             {
-            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if defined(_MSC_VER)  // VC++
                 auto* inst = (dummy*)obj;
                 return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
+            #elif defined(__clang__)
+                auto* inst = (dummy*)obj;
+                return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
+//                return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #else
                 return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #endif
@@ -410,13 +451,17 @@ namespace rpp
             else
                 return (Ret)func(forward<XArgs>(args)...);
         }
-        template<class ...XArgs> Ret invoke(XArgs... args) const
+        template<class ...XArgs> Ret invoke(XArgs&&... args) const
         {
             if (obj)
             {
-            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if defined(_MSC_VER)  // VC++
                 auto* inst = (dummy*)obj;
                 return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
+            #elif defined(__clang__)
+                auto* inst = (dummy*)obj;
+                return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
+//                return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #else
                 return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #endif
@@ -542,8 +587,8 @@ namespace rpp
         {
             if (ptr)
             {
-                int size = ptr->size;
-                auto data = ptr->data;
+                int    size = ptr->size;
+                deleg* data = ptr->data;
                 for (int i = 0; i < size; ++i)
                     data[i].~deleg();
                 free(ptr);
@@ -552,7 +597,7 @@ namespace rpp
         /** @brief Destructs the event container and frees all used memory */
         void clear() noexcept
         {
-            ~multicast_delegate();
+            this->~multicast_delegate();
             ptr = nullptr;
         }
 
@@ -587,8 +632,8 @@ namespace rpp
          */
         void remove(deleg&& d) noexcept
         {
-            int size = ptr->size;
-            auto data = ptr->data;
+            int    size = ptr->size;
+            deleg* data = ptr->data;
             for (int i = 0; i < size; ++i)
             {
                 if (data[i] == d)
@@ -653,22 +698,22 @@ namespace rpp
         /**
          * @brief Invoke all subscribed event delegates.
          */
-        template<class ...XArgs> void operator()(XArgs... args) const
+        template<class ...XArgs> void operator()(XArgs&&... args) const
         {
-            int   count = ptr->size;
+            int    size = ptr->size;
             deleg* data = ptr->data;
-            for (int i = 0; i < count; ++i)
+            for (int i = 0; i < size; ++i)
             {
-                data[i](forward<XArgs>(args)...);
+                data[i].invoke(forward<XArgs>(args)...);
             }
         }
-        template<class ...XArgs> void invoke(XArgs... args) const
+        template<class ...XArgs> void invoke(XArgs&&... args) const
         {
-            int   count = ptr->size;
+            int    size = ptr->size;
             deleg* data = ptr->data;
-            for (int i = 0; i < count; ++i)
+            for (int i = 0; i < size; ++i)
             {
-                data[i](forward<XArgs>(args)...);
+                data[i].invoke(forward<XArgs>(args)...);
             }
         }
     };

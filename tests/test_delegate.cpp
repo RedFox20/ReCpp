@@ -103,26 +103,26 @@ TestImpl(test_delegate)
 
     TestCase(methods_bug)
     {
-        using memb_type = Data (*)(void*, Data);
-        struct dummy {};
-        using dummy_type = Data (dummy::*)(Data a);
-        union method_helper
-        {
-            memb_type mfunc;
-            dummy_type dfunc;
-        };
-
-        Base inst;
-        Data (Base::*method)(Data a) = &Base::method;
-
-        void* obj = &inst;
-        //printf("obj:  %p\n", obj);
-
-        method_helper u;
-        u.dfunc = (dummy_type)method;
-
-        dummy* dum = (dummy*)obj;
-        (dum->*u.dfunc)(data);
+//        using memb_type = Data (*)(void*, Data);
+//        struct dummy {};
+//        using dummy_type = Data (dummy::*)(Data a);
+//        union method_helper
+//        {
+//            memb_type mfunc;
+//            dummy_type dfunc;
+//        };
+//
+//        Base inst;
+//        Data (Base::*method)(Data a) = &Base::method;
+//
+//        void* obj = &inst;
+//        //printf("obj:  %p\n", obj);
+//
+//        method_helper u;
+//        u.dfunc = (dummy_type)method;
+//
+//        dummy* dum = (dummy*)obj;
+//        (dum->*u.dfunc)(data);
     }
 
     TestCase(methods)
@@ -160,10 +160,10 @@ TestImpl(test_delegate)
         };
         AssertThat(lambda1(data), "lambda1");
 
-        DataDelegate lambda2 = [x=data](Data a)
+        DataDelegate lambda2 = DataDelegate([x=data](Data a)
         {
             return validate("lambda2", a, x);
-        };
+        });
         AssertThat(lambda2(data), "lambda2");
     }
 

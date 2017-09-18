@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(ReCpp)
 
-set(RPP_CXX_FLAGS -std=c++14 -Wall -march=native -m64)
+set(RPP_CXX_FLAGS -std=c++14 -Wall -march=native)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(RPP_CXX_FLAGS ${RPP_CXX_FLAGS} -DDEBUG)
 endif()

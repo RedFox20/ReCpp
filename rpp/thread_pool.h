@@ -26,14 +26,14 @@ namespace rpp
         static void proxy(void* callee, TArgs... args)
         {
             T* p = static_cast<T*>(callee);
-            return (p->*TMethod)(args...);
+            return (p->*TMethod)(forward<TArgs>(args)...);
         }
 
         template<class T, void (T::*TMethod)(TArgs...)const>
         static void proxy(void* callee, TArgs... args)
         {
             const T* p = static_cast<T*>(callee);
-            return (p->*TMethod)(args...);
+            return (p->*TMethod)(forward<TArgs>(args)...);
         }
 
     public:
