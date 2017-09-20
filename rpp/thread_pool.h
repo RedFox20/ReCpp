@@ -5,6 +5,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include <condition_variable>
 #include "delegate.h"
 #include <functional>
