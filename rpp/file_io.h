@@ -782,6 +782,33 @@ namespace rpp /* ReCpp */
      * @param recursive (default: false) If true, will perform a recursive search
      * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of folders found
+     *
+     * @example out [recursive=false] [fullpath=false] vector<string> {
+     *     "bin",
+     *     "src",
+     *     "lib",
+     * };
+     * @example out [recursive=true] [fullpath=false] vector<string> {
+     *     "bin",
+     *     "bin/data",
+     *     "bin/data/models",
+     *     "src",
+     *     "src/mesh",
+     *     "lib",
+     * };
+     * @example out [recursive=false] [fullpath=true] vector<string> {
+     *     "/projects/ReCpp/bin",
+     *     "/projects/ReCpp/src",
+     *     "/projects/ReCpp/lib",
+     * };
+     * @example out [recursive=true] [fullpath=true] vector<string> {
+     *     "/projects/ReCpp/bin",
+     *     "/projects/ReCpp/bin/data",
+     *     "/projects/ReCpp/bin/data/models",
+     *     "/projects/ReCpp/src",
+     *     "/projects/ReCpp/src/mesh",
+     *     "/projects/ReCpp/lib",
+     * };
      */
     int list_dirs(vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
 
@@ -811,8 +838,35 @@ namespace rpp /* ReCpp */
      * @code
      *     vector<string> relativePaths          = list_files(folder);
      *     vector<string> recursiveRelativePaths = list_files_recursive(folder);
-     *     
      * @endcode
+     * @example out [recursive=false] [fullpath=false] vector<string> {
+     *     "main.cpp",
+     *     "file_io.h",
+     *     "file_io.cpp",
+     * };
+     * @example out [recursive=false] [fullpath=true] vector<string> {
+     *     "/projects/ReCpp/main.cpp",
+     *     "/projects/ReCpp/file_io.h",
+     *     "/projects/ReCpp/file_io.cpp",
+     * };
+     * @example out [recursive=true] [fullpath=false] vector<string> {
+     *     "main.cpp",
+     *     "file_io.h",
+     *     "file_io.cpp",
+     *     "mesh/mesh.h",
+     *     "mesh/mesh.cpp",
+     *     "mesh/mesh_obj.cpp",
+     *     "mesh/mesh_fbx.cpp",
+     * };
+     * @example out [recursive=true] [fullpath=true] vector<string> {
+     *     "/projects/ReCpp/main.cpp",
+     *     "/projects/ReCpp/file_io.h",
+     *     "/projects/ReCpp/file_io.cpp",
+     *     "/projects/ReCpp/mesh/mesh.h",
+     *     "/projects/ReCpp/mesh/mesh.cpp",
+     *     "/projects/ReCpp/mesh/mesh_obj.cpp",
+     *     "/projects/ReCpp/mesh/mesh_fbx.cpp",
+     * };
      */
     int list_files(vector<string>& out, strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept;
     inline vector<string> list_files(strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept {
