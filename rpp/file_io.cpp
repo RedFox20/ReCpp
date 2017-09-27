@@ -726,7 +726,33 @@ namespace rpp /* ReCpp */
         }
         return path;
     }
-
+    
+    string file_name_append(const strview path, const strview add)
+    {
+        string result = folder_path(path);
+        result += file_name(path);
+        result += add;
+        if (strview ext = file_ext(path)) {
+            result += '.';
+            result += ext;
+        }
+        return result;
+    }
+    
+    string file_name_replace(const strview path, const strview newFileName)
+    {
+        string result = folder_path(path) + newFileName;
+        if (strview ext = file_ext(path)) {
+            result += '.';
+            result += ext;
+        }
+        return result;
+    }
+    
+    string file_nameext_replace(const strview path, const strview newFileNameAndExt)
+    {
+        return folder_path(path) + newFileNameAndExt;
+    }
 
     strview folder_name(const strview path) noexcept
     {

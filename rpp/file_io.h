@@ -627,6 +627,33 @@ namespace rpp /* ReCpp */
      * @result file.old      ==> file.new
      */
     string file_replace_ext(const strview path, const strview ext);
+    
+    /**
+     * @brief Changes only the file name by appending a string, leaving directory and extension untouched
+     * @result /dir/file.txt ==> /dir/fileadd.txt
+     * @result /dir/file     ==> /dir/fileadd
+     * @result /dir/         ==> /dir/
+     * @result file.txt      ==> fileadd.txt
+     */
+    string file_name_append(const strview path, const strview add);
+    
+    /**
+     * @brief Replaces only the file name of the path, leaving directory and extension untouched
+     * @result /dir/file.txt ==> /dir/replaced.txt
+     * @result /dir/file     ==> /dir/replaced
+     * @result /dir/         ==> /dir/
+     * @result file.txt      ==> replaced.txt
+     */
+    string file_name_replace(const strview path, const strview newFileName);
+    
+    /**
+     * @brief Replaces the file name and extension, leaving directory untouched
+     * @result /dir/file.txt ==> /dir/replaced.bin
+     * @result /dir/file     ==> /dir/replaced
+     * @result /dir/         ==> /dir/
+     * @result file.txt      ==> replaced.bin
+     */
+    string file_nameext_replace(const strview path, const strview newFileNameAndExt);
 
     /**
      * @brief Extract the foldername from a path name
