@@ -12,7 +12,7 @@ namespace rpp
 
     pool_task::pool_task()
     {
-        th = thread{&pool_task::run, this};
+        th = thread{[this] { run(); }};
     }
 
     pool_task::~pool_task() noexcept

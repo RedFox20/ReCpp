@@ -4,6 +4,7 @@
 #include "strview.h"
 #include <cmath>
 #include <cstdarg>
+#include <cstdlib>
 
 namespace rpp
 {

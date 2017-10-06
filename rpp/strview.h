@@ -1095,10 +1095,7 @@ namespace rpp
     /**
      * Forward all Misc to_string calls from rpp namespace to std::to_string
      */
-    template<class T> inline std::string to_string(const T& object)
-    {
-        return std::to_string(object);
-    }
+    template<class T> std::string to_string(const T& object);
 
     /**
      * Always null terminated version of stringstream, which is compatible with strview
