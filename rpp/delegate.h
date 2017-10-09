@@ -100,25 +100,18 @@ namespace rpp
         using copy_type = void (*)(void*, delegate&);
         struct dummy {};
         #if defined(_MSC_VER)  // VC++
-            #if RPP_64BIT // no __thiscall for 64-bit
-                using memb_type = Ret (*)(void*, Args...);
+            #if !RPP_64BIT // __thiscall only applies for 32-bit MSVC
+                #define THISCALL __thiscall
             #else
-                using memb_type = Ret (__thiscall*)(void*, Args...);
+                #define THISCALL
             #endif
+            using memb_type = Ret (THISCALL*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
         #elif defined(__clang__)
-            #if RPP_64BIT // no __thiscall for 64-bit
-                using memb_type = Ret (*)(void*, Args...);
-            #else
-                using memb_type = Ret (__thiscall*)(void*, Args...);
-            #endif
+            using memb_type = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
         #elif defined(__GNUG__) // G++
-            #if RPP_64BIT // no __thiscall for 64-bit
-                using memb_type = Ret (*)(void*, Args...);
-            #else
-                using memb_type = Ret (__thiscall*)(void*, Args...);
-            #endif
+            using memb_type = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(void*, Args...);
         #endif
     private:
