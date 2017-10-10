@@ -251,7 +251,7 @@ namespace rpp
                     if (t->auto_run) { // only consider disabling auto_run tests
                         t->test_enabled = disabled.find(t->name) == disabled.end();
                         if (!t->test_enabled)
-                            consolef(ConsoleColor::Red, "Disabled test %s", t->name.to_cstr());
+                            consolef(ConsoleColor::Red, "Disabled test %s\n", t->name.to_cstr());
                     }
                 }
             }
@@ -260,7 +260,7 @@ namespace rpp
                 for (test* t : all_tests()) { // enable whatever was requested
                     t->test_enabled = enabled.find(t->name) != enabled.end();
                     if (t->test_enabled)
-                        consolef(ConsoleColor::Green, "Enabled test %s", t->name.to_cstr());
+                        consolef(ConsoleColor::Green, "Enabled test %s\n", t->name.to_cstr());
                 }
             }
         }
