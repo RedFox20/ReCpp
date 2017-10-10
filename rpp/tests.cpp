@@ -24,7 +24,7 @@ namespace rpp
         return tests;
     }
 
-    test::test(strview name) : name(name)
+    test::test(strview name, bool autorun) : name(name), auto_run(autorun)
     {
         all_tests().push_back(this);
     }
@@ -206,6 +206,10 @@ namespace rpp
     int test::run_tests(int argc, char* argv[])
     {
         move_console_window();
+        
+        for (test* t : all_tests()) { // set the defaults
+            if (!t->auto_run) t->test_enabled = false;
+        }
 
         int numTest = 0;
         if (argc > 1)
@@ -243,18 +247,26 @@ namespace rpp
 
             if (disabled.size())
             {
-                for (test* t : all_tests())
-                    t->test_enabled = disabled.find(t->name) == disabled.end();
+                for (test* t : all_tests()) {
+                    if (t->auto_run) { // only consider disabling auto_run tests
+                        t->test_enabled = disabled.find(t->name) == disabled.end();
+                        if (!t->test_enabled)
+                            consolef(ConsoleColor::Red, "Disabled test %s", t->name.to_cstr());
+                    }
+                }
             }
             else if (enabled.size())
             {
-                for (test* t : all_tests())
+                for (test* t : all_tests()) { // enable whatever was requested
                     t->test_enabled = enabled.find(t->name) != enabled.end();
+                    if (t->test_enabled)
+                        consolef(ConsoleColor::Green, "Enabled test %s", t->name.to_cstr());
+                }
             }
         }
         else
         {
-            consolef(Green, "Running all tests\n");
+            consolef(Green, "Running all auto-run tests\n");
         }
 
         // run all the marked tests

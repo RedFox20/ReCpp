@@ -35,9 +35,12 @@ namespace rpp
         strview name;
         vector<test_func> test_funcs; // all the automatic tests to run
         strview test_specific;
-        bool test_enabled = true;
-
-        explicit test(strview name);
+    private:
+        bool test_enabled = true; // internal: this is automatically set by the test system
+        bool auto_run = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
+    
+    public:
+        explicit test(strview name, bool autorun = true);
         virtual ~test();
         static void assert_failed(const char* file, int line, const char* fmt, ...);
 
@@ -139,6 +142,11 @@ namespace rpp
 
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \
+    using ClassType = testclass;           \
+    void run() override
+
+#define TestInitNoAutorun(testclass)       \
+    testclass() : test(#testclass,false){} \
     using ClassType = testclass;           \
     void run() override
 
