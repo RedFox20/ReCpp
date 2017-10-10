@@ -87,19 +87,26 @@ namespace rpp
         auto count = test_funcs.size();
         if (methodFilter)
         {
-            for (auto i = 0u; i < count; ++i) {
-                if (funcs[i].name.find(methodFilter)) {
-                    (funcs[i].lambda.*funcs[i].func)();
-                }
-            }
+            for (size_t i = 0u; i < count; ++i)
+                if (funcs[i].name.find(methodFilter))
+                    run_test(funcs[i]);
         }
         else
         {
-            for (auto i = 0u; i < count; ++i) {
-                (funcs[i].lambda.*funcs[i].func)();
-            }
+            for (size_t i = 0u; i < count; ++i)
+                run_test(funcs[i]);
         }
         consolef(Yellow, "%s\n\n", (char*)memset(title, '-', len)); // "-------------"
+    }
+
+    void test::run_test(test_func& test)
+    {
+        try {
+            (test.lambda.*test.func)();
+        } catch (const std::exception& e) {
+            consolef(Red, "Unhandled Exception in [%s]: %s\n", test.name, e.what());
+            ++asserts_failed;
+        }
     }
 
     void test::sleep(int millis)

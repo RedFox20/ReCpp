@@ -55,6 +55,7 @@ namespace rpp
          * the methodFilter substring are run
          */
         void run_test(strview methodFilter = {});
+        void run_test(test_func& test);
 
         // generic sleep for testing purposes
         static void sleep(int millis);

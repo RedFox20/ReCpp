@@ -956,6 +956,8 @@ namespace rpp /* ReCpp */
 
     /**
      * @return The current working directory of the application
+     * @example "/Projects/ReCpp"
+     * @example "C:\\Projects\\ReCpp"
      */
     string working_dir() noexcept;
 
