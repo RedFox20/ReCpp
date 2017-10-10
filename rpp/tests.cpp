@@ -231,7 +231,7 @@ namespace rpp
                 const bool exactMatch = testName.starts_with("test_");
                 if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", argv[iarg]);
                 else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
-
+                
                 for (test* t : all_tests())
                 {
                     if (( exactMatch && t->name == testName) ||
@@ -272,7 +272,7 @@ namespace rpp
         // run all the marked tests
         for (test* t : all_tests()) {
             if (t->test_enabled) {
-                t->run_test();
+                t->run_test(t->test_specific);
                 ++numTest;
             }
         }
