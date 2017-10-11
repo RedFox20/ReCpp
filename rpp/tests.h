@@ -16,11 +16,19 @@
 #define RPP_TESTS_DEFINE_MAIN 1
 #endif
 
+#ifndef DLLEXPORT
+  #if _MSC_VER
+    #define DLLEXPORT __declspec(dllexport)
+  #else // clang/gcc
+    #define DLLEXPORT __attribute__((visibility("default")))
+  #endif
+#endif
+
 namespace rpp
 {
     using namespace std;
 
-    struct test
+    struct DLLEXPORT test
     {
         struct lambda_base { test* self; };
         struct test_func
