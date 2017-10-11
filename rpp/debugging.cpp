@@ -41,7 +41,7 @@ EXTERNC LogSeverity GetLogSeverityFilter()
 static int SafeFormat(char* errBuf, int N, const char* format, va_list ap)
 {
     int len = vsnprintf(errBuf, size_t(N-1)/*spare room for \n*/, format, ap);
-    if (len < 0) { // err: didn't fit
+    if (len < 0 || len >= N) { // err: didn't fit
         len = N-2; // try to recover gracefully
         errBuf[len] = '\0';
     }
