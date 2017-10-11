@@ -79,7 +79,7 @@ namespace rpp
             timeout,
         };
     
-        semaphore(){}
+        semaphore() = default;
         explicit semaphore(int initialCount)
         {
             reset(initialCount);
@@ -91,22 +91,23 @@ namespace rpp
         {
             value = newCount;
             if (newCount > 0)
-                cv.notify_all();
+                cv.notify_one();
         }
 
         void notify()
         {
-            unique_lock<mutex> lock{ m };
-            ++value;
-            cv.notify_all();
+            { lock_guard<mutex> lock{ m };
+                ++value;
+            }
+            cv.notify_one();
         }
 
         void wait()
         {
             unique_lock<mutex> lock{ m };
-            while (value <= 0)
+            while (value <= 0) // wait until value is actually set
                 cv.wait(lock);
-            --value;
+            --value; // consume the value
         }
 
         /**
