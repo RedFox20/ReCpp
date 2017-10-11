@@ -8,10 +8,15 @@
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
     #include <conio.h> // _kbhit
+#elif __ANDROID__
+    #include <unistd.h> // usleep
+    #include <android/log.h>
+    #include <stdarg.h>
 #else
     #include <unistd.h>
     #include <termios.h>
 #endif
+
 
 namespace rpp
 {
@@ -55,6 +60,15 @@ namespace rpp
         if (color == Red) vfprintf(stderr, fmt, ap);
         else              vfprintf(stdout, fmt, ap);
         if (color != Default) SetConsoleTextAttribute(console, colormap[Default]);
+    #elif __ANDROID__
+        int priority = 0;
+        switch (color) {
+            case Default: priority = ANDROID_LOG_DEBUG; break;
+            case Green:   priority = ANDROID_LOG_INFO;  break;
+            case Yellow:  priority = ANDROID_LOG_WARN;  break;
+            case Red:     priority = ANDROID_LOG_ERROR; break;
+        }
+        __android_log_vprint(priority, "rpp", fmt, ap);
     #else // @todo Proper Linux & OSX implementations
         if (color == Red) vfprintf(stderr, fmt, ap);
         else              vfprintf(stdout, fmt, ap);
@@ -100,7 +114,7 @@ namespace rpp
         }
 
         run_cleanup();
-        consolef(Yellow, "%s\n\n", (char*)memset(title, '-', len)); // "-------------"
+        consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)len)); // "-------------"
     }
 
     bool test::run_init()
@@ -137,14 +151,16 @@ namespace rpp
 
     void test::sleep(int millis)
     {
-        #ifdef _WIN32
+        #if _WIN32
             Sleep(millis);
+        #elif __ANDROID__
+            usleep(useconds_t(millis) * 1000);
         #else
             usleep(millis * 1000);
         #endif
     }
 
-#ifndef _WIN32 // Linux:
+#if !_WIN32 && !__ANDROID__ // Linux:
     static int _kbhit()
     {
         termios oldSettings; tcgetattr(STDIN_FILENO, &oldSettings);
@@ -162,6 +178,10 @@ namespace rpp
 
         return count == 0 ? 0 : keycodes[0];
     }
+#endif
+
+#if __ANDROID__
+    static int _kbhit() { return 1; }
 #endif
 
     static void pause(int millis = -1/*forever*/)

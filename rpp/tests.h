@@ -141,6 +141,7 @@ namespace rpp
 #undef AssertNotEqual
 #undef TestImpl
 #undef TestInit
+#undef TestInitNoAutorun
 #undef TestCleanup
 #undef TestCase
 
