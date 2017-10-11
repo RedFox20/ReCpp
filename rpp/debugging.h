@@ -98,12 +98,16 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
 #endif
 
 #if defined(DEBUG) || defined(_DEBUG) || defined(BETA)
-#  ifdef __APPLE__ // clang iOS
-#    define  __assertion_failure(msg) __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, msg)
-#  elif defined __GNUC__ // other clang, mingw or linux gcc
-#    define  __assertion_failure(msg) __assert_fail(msg, _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
+#  if defined __APPLE__ || defined __clang__ // iOS or just clang
+#    if __ANDROID__
+#      define __assertion_failure(msg) __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), msg)
+#    else
+#      define __assertion_failure(msg) __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, msg)
+#    endif
 #  elif _MSC_VER // Windows VC++
 #    define __assertion_failure(msg) do { __debugbreak(); } while (0)
+#  elif defined __GNUC__ // other clang, mingw or linux gcc
+#    define  __assertion_failure(msg) __assert_fail(msg, _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
 #  else
 #    error Debugging Assert not defined for this compiler toolkit!
 #  endif

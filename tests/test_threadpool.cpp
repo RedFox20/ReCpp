@@ -101,4 +101,34 @@ TestImpl(test_threadpool)
         }
     }
 
+
+    TestCase(parallel_task_unhandled_exception)
+    {
+        int times_launched = 0; // this makes sure the threadpool loop doesn't retrigger our task
+        auto* task = rpp::parallel_task([&]() {
+            AssertThat(times_launched, 0);
+            ++times_launched;
+            throw "aaargh!";
+        });
+        task->wait();
+    }
+
+    TestCase(parallel_task_reentrance)
+    {
+        int times_launched = 0;
+        auto* task = rpp::parallel_task([&] {
+            ++times_launched;
+            this_thread::sleep_for(100ms);
+        });
+        task->wait();
+        AssertThat(times_launched, 1);
+
+        task = rpp::parallel_task([&] {
+            ++times_launched;
+            this_thread::sleep_for(100ms);
+        });
+        task->wait();
+        AssertThat(times_launched, 2);
+    }
+
 } Impl;

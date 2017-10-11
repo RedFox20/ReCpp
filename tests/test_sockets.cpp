@@ -11,7 +11,7 @@ using Socket = rpp::socket;
 
 TestImpl(test_sockets)
 {
-    TestInit(test_sockets)
+    TestInitNoAutorun(test_sockets)
     {
     }
 

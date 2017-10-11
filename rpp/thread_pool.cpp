@@ -26,25 +26,25 @@ namespace rpp
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
-        { unique_lock<mutex> lock{m};
-            if (taskRunning) {
-                fprintf(stderr, "rpp::pool_task already running! Undefined behaviour!\n");
-            }
+        if (taskRunning)
+            fprintf(stderr, "rpp::pool_task already running! This can cause a deadlock!\n");
+
+        { lock_guard<mutex> lock{m};
             genericTask  = {};
             rangeTask    = newTask;
             rangeStart   = start;
             rangeEnd     = end;
             taskRunning  = true;
-            cv.notify_one();
         }
+        cv.notify_one();
     }
 
     void pool_task::run_generic(function<void()>&& newTask) noexcept
     {
-        { unique_lock<mutex> lock{m};
-            if (taskRunning) {
-                fprintf(stderr, "rpp::pool_task already running! Undefined behaviour!\n");
-            }
+        if (taskRunning)
+            fprintf(stderr, "rpp::pool_task already running! This can cause a deadlock!\n");
+
+        { lock_guard<mutex> lock{m};
             genericTask  = move(newTask);
             rangeTask    = {};
             rangeStart   = 0;
@@ -103,7 +103,7 @@ namespace rpp
     }
     #endif
 
-    static void segfault(int) { throw runtime_error("SIGSEGV"); }
+    //static void segfault(int) { throw runtime_error("SIGSEGV"); }
 
     void pool_task::run() noexcept
     {
@@ -119,7 +119,7 @@ namespace rpp
             SetThreadName(name);
         #endif
         
-        signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
+        //signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
 
         //printf("%s start\n", name);
         while (!killed)
@@ -138,6 +138,7 @@ namespace rpp
                     range   = move(rangeTask);
                     generic = move(genericTask);
                     rangeTask   = {};
+                    genericTask = {}; // BUG: Clang on android doesn't move genericTask properly
                     taskRunning = true;
                 }
                 
@@ -160,7 +161,7 @@ namespace rpp
             {
                 fprintf(stderr, "pool_task::run unhandled exception!\n");
             }
-                
+            
             { lock_guard<mutex> lock{m};
                 taskRunning = false;
                 cv.notify_all();
