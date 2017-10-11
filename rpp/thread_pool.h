@@ -91,14 +91,14 @@ namespace rpp
         {
             value = newCount;
             if (newCount > 0)
-                cv.notify_one();
+                cv.notify_all();
         }
 
         void notify()
         {
             unique_lock<mutex> lock{ m };
             ++value;
-            cv.notify_one();
+            cv.notify_all();
         }
 
         void wait()
