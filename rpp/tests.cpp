@@ -81,7 +81,7 @@ namespace rpp
             : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
 
         consolef(Yellow, "%s\n", title);
-        run();
+        run_init();
 
         auto funcs = test_funcs.data();
         auto count = test_funcs.size();
@@ -93,10 +93,36 @@ namespace rpp
         }
         else
         {
-            for (size_t i = 0u; i < count; ++i)
+            for (size_t i = 0u; i < count; ++i) {
+                consolef(Yellow, "%s::%s\n", name.str, funcs[i].name.str);
                 run_test(funcs[i]);
+            }
         }
+
+        run_cleanup();
         consolef(Yellow, "%s\n\n", (char*)memset(title, '-', len)); // "-------------"
+    }
+
+    bool test::run_init()
+    {
+        try {
+            init_test();
+            return true;
+        } catch (const std::exception& e) {
+            consolef(Red, "Unhandled Exception in [%s]::TestInit(): %s\n", name, e.what());
+            ++asserts_failed;
+            return false;
+        }
+    }
+
+    void test::run_cleanup()
+    {
+        try {
+            cleanup_test();
+        } catch (const std::exception& e) {
+            consolef(Red, "Unhandled Exception in [%s]::TestCleanup(): %s\n", name, e.what());
+            ++asserts_failed;
+        }
     }
 
     void test::run_test(test_func& test)
@@ -104,7 +130,7 @@ namespace rpp
         try {
             (test.lambda.*test.func)();
         } catch (const std::exception& e) {
-            consolef(Red, "Unhandled Exception in [%s]: %s\n", test.name, e.what());
+            consolef(Red, "Unhandled Exception in %s::%s: %s\n", name, test.name, e.what());
             ++asserts_failed;
         }
     }

@@ -199,13 +199,17 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
     __assertion_failure(_FmtString((format ": %s") __wrap_args(__VA_ARGS__), std_except.what() )); \
 } while(0)
 
-// logs error message, triggers an assertion and throws an std::runtime_error
-#define ThrowErr(format, ...) do { \
+// logs error message, triggers an assertion and throws exceptionType
+#define ThrowErrType(exceptionClass, format, ...) do { \
     _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
-	auto* __formatted_error__ = _FmtString(format __wrap_args(__VA_ARGS__) ); \
+    auto* __formatted_error__ = _FmtString(format __wrap_args(__VA_ARGS__) ); \
     __assertion_failure(__formatted_error__); \
-	throw std::runtime_error(__formatted_error__); \
+    throw exceptionClass(__formatted_error__); \
 } while(0)
+
+// logs error message, triggers an assertion and throws an std::runtime_error
+#define ThrowErr(format, ...) ThrowErrType(std::runtime_error, format, ##__VA_ARGS__)
+
 
 #endif
 

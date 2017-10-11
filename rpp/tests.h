@@ -61,7 +61,13 @@ namespace rpp
         static void sleep(int millis);
 
         // main entry/initialization point for the test class
-        virtual void run() {}
+        virtual void init_test() {}
+
+        // optionally clean up the test
+        virtual void cleanup_test() {}
+
+        bool run_init();
+        void run_cleanup();
 
         /**
          * Run tests with a single filter pattern
@@ -144,14 +150,14 @@ namespace rpp
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \
     using ClassType = testclass;           \
-    void run() override
+    void init_test() override
 
 #define TestInitNoAutorun(testclass)       \
     testclass() : test(#testclass,false){} \
     using ClassType = testclass;           \
-    void run() override
+    void init_test() override
 
-#define TestCleanup(testclass) ~testclass()
+#define TestCleanup(testclass) void cleanup_test() override
 
 #define TestCase(testname) \
     const int _test_##testname = add_test_func(#testname, this, [this]{ test_##testname();}); \
