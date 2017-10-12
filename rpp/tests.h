@@ -90,13 +90,22 @@ namespace rpp
         static int run_tests(const char* testNamePattern);
 
         /**
+         * Pass multiple patterns for enabling multiple different tests
+         */
+        static int run_tests(const vector<string>& testNamePatterns);
+        static int run_tests(const char** testNamePatterns, int numPatterns);
+        template<int N> static int run_tests(const char* (&testNamePatterns)[N]) {
+            return run_tests(testNamePatterns, N);
+        }
+
+        /**
          * Same as run_tests(const char*), but it expects program argc and argv from main()
          * As usual to C++, argv[0] should be exe name and argv[1...] should be testNamePatterns 
          */
         static int run_tests(int argc, char* argv[]);
 
         /**
-         * Runs all the tests, no filtering is done
+         * Runs ALL the tests, no filtering is done
          */
         static int run_tests();
 

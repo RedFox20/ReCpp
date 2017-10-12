@@ -213,11 +213,26 @@ namespace rpp
 
     int test::run_tests(const char* testNamePattern)
     {
-        char empty[1] = "";
-        char name[1024]; strncpy(name, testNamePattern, 1024);
-        char* argv[2] = { empty, name };
-        return run_tests(2, argv);
+        return run_tests(&testNamePattern, 1);
     }
+
+    int test::run_tests(const vector<string>& testNamePatterns)
+    {
+        vector<const char*> names;
+        names.push_back("");
+        for (const string& name : testNamePatterns) names.push_back(name.c_str());
+        return run_tests((int)names.size(), (char**)names.data());
+    }
+
+    int test::run_tests(const char** testNamePatterns, int numPatterns)
+    {
+        vector<const char*> names;
+        names.push_back("");
+        names.insert(names.end(), testNamePatterns, testNamePatterns+numPatterns);
+        return run_tests((int)names.size(), (char**)names.data());
+    }
+
+
 
     int test::run_tests()
     {
