@@ -804,7 +804,7 @@ namespace rpp
         int newlen = len + count + 1;
         if (newlen > cap)
         {
-            int align = cap;
+            int align = cap; // cap is always aligned
             int newcap = newlen + align;
             if (int rem = newcap % align)
                 newcap += align - rem;
@@ -819,11 +819,11 @@ namespace rpp
     
     void string_buffer::writef(const char* format, ...)
     {
-        char buffer[4096];
+        char buffer[8192];
         va_list ap; va_start(ap, format);
         int n = vsnprintf(buffer, sizeof(buffer), format, ap);
-        if (n == -1)
-            n = 4095;
+        if (n < 0 || n >= sizeof(buffer))
+            n = sizeof(buffer)-1;
         reserve(n);
         memcpy(&ptr[len], buffer, (size_t)n);
         len += n;

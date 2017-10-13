@@ -51,6 +51,9 @@ namespace rpp
 
         /** Gets the next time sample, since the last call to next() or start() and calls start() again */
         double next() noexcept;
+
+        /** @return next() converted to milliseconds */
+        double next_ms() noexcept { return next() * 1000.0; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
