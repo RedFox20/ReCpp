@@ -3,13 +3,17 @@
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
-#elif __APPLE__ || __linux__ || __ANDROID_API__
+#elif __APPLE__ || __linux__ || __ANDROID__
+    #include <stdio.h>  // fprintf
     #include <unistd.h> // usleep()
     #if __APPLE__
         #include <mach/mach.h>
         #include <mach/mach_time.h>
-    #elif __linux__ || __ANDROID_API__ 
+    #elif __linux__ || __ANDROID__ 
         #include <sys/time.h>
+        #if __ANDROID__
+            #include <android/log.h>
+        #endif
     #endif
 #elif __EMSCRIPTEN__
     #include <unistd.h> // usleep()
@@ -17,9 +21,16 @@
     #include <thread>
     #include <chrono>
     using namespace std::chrono;
-#endif
-#include <chrono>
+#else
+    #include <chrono>
     using namespace std::chrono;
+#endif
+
+#if defined(__has_include) && __has_include("debugging.h")
+    #define HAS_DEBUGGING_H 1
+    #include "debugging.h"
+#endif
+
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,6 +144,33 @@ namespace rpp
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    ScopedPerfTimer::ScopedPerfTimer(const char* what) noexcept : what(what)
+    {
+    }
+
+    ScopedPerfTimer::~ScopedPerfTimer() noexcept
+    {
+        double elapsed_ms = timer.elapsed_ms();
+        #if HAS_DEBUGGING_H
+            LogInfo("%s elapsed: %.3fms", what, elapsed_ms);
+        #else
+            constexpr const char format[] = "$ %s elapsed: %.3fms\n";
+            #if _WIN32
+                static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+                SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN); // dark yellow
+                fprintf(stderr, format, what, elapsed_ms);
+                SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // default color
+            #elif __ANDROID__
+                __android_log_print(ANDROID_LOG_WARN, "rpp", format, what, elapsed_ms);
+            #else // @todo Proper Linux & OSX implementations
+                fprintf(stderr, format, what, elapsed_ms);
+            #endif
+        #endif
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
 } // rpp
 
 extern "C" double time_now_seconds()

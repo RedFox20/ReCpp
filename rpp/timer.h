@@ -54,6 +54,20 @@ namespace rpp
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Automatically logs performance from constructor to destructor and writes it to log
+     */
+    class ScopedPerfTimer
+    {
+        Timer timer;
+        const char* what;
+    public:
+        ScopedPerfTimer(const char* what) noexcept ;
+        ~ScopedPerfTimer() noexcept ;
+    };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 }
 #endif
 
