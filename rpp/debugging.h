@@ -186,11 +186,14 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 // Logs an error with custom file, line, func sources
 #define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
 
+// Asserts for a condition with message in all types of builds
+#define Assert(expression, format, ...) do { if (!(expression)) LogError(format, ##__VA_ARGS__ ); } while(0)
+
 #if defined(DEBUG) || defined(_DEBUG) || defined(BETA)
-// Asserts for a condition with message
-#  define Assert(expression, format, ...) do { if (!(expression)) LogError(format, ##__VA_ARGS__ ); } while(0)
+// Asserts for a condition with message only in DEBUG builds
+#  define DbgAssert(expression, format, ...) do { if (!(expression)) LogError(format, ##__VA_ARGS__ ); } while(0)
 #else
-#  define Assert(expression, format, ...) /*do nothing in release builds*/
+#  define DbgAssert(expression, format, ...) /*do nothing in release builds*/
 #endif
 
 #ifdef __cplusplus
