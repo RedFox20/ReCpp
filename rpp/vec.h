@@ -168,6 +168,7 @@ namespace rpp
          * To avoid FP errors, use almostZero() if you performed calculations */
         bool isZero()  const { return x == 0.0f && y == 0.0f; }
         bool notZero() const { return x != 0.0f || y != 0.0f; }
+        bool hasNaN() const { return isnan(x) || isnan(y); }
 
         /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
         bool almostZero() const;
@@ -302,6 +303,7 @@ namespace rpp
          * To avoid FP errors, use almostZero() if you performed calculations */
         bool isZero()  const { return x == 0.0 && y == 0.0; }
         bool notZero() const { return x != 0.0 || y != 0.0; }
+        bool hasNaN() const { return isnan(x) || isnan(y); }
 
         /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
         bool almostZero() const;
@@ -655,6 +657,7 @@ namespace rpp
          * To avoid FP errors, use almostZero() if you performed calculations */
         bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f; }
         bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f; }
+        bool hasNaN() const { return isnan(x) || isnan(y) || isnan(z); }
 
         /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
         bool almostZero() const;
@@ -802,7 +805,7 @@ namespace rpp
         
         Vector3d() {}
         constexpr Vector3d(double x, double y, double z) : x(x),   y(y),   z(z)   {}
-        constexpr Vector3d(const double3& v) : x(v.x) {}
+        constexpr Vector3d(const double3& v) : x(v.x), y(v.y), z(v.z) {}
         
         explicit operator Vector3() const { return {float(x), float(y), float(z)}; }
         
@@ -844,6 +847,7 @@ namespace rpp
          * To avoid FP errors, use almostZero() if you performed calculations */
         bool isZero()  const { return x == 0.0 && y == 0.0 && z == 0.0; }
         bool notZero() const { return x != 0.0 || y != 0.0 || z != 0.0; }
+        bool hasNaN() const { return isnan(x) || isnan(y) || isnan(z); }
 
         /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
         bool almostZero() const;
@@ -954,8 +958,9 @@ namespace rpp
 
         /** @return TRUE if all elements are exactly 0.0f, which implies default initialized.
         * To avoid FP errors, use almostZero() if you performed calculations */
-        bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f; }
-        bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f; }
+        bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f && w == 0.0f; }
+        bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f && z != 0.0f; }
+        bool hasNaN() const { return isnan(x) || isnan(y) || isnan(z) || isnan(w); }
         
         /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
         bool almostZero() const;
