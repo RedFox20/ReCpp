@@ -959,7 +959,7 @@ namespace rpp
         /** @return TRUE if all elements are exactly 0.0f, which implies default initialized.
         * To avoid FP errors, use almostZero() if you performed calculations */
         bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f && w == 0.0f; }
-        bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f && z != 0.0f; }
+        bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f || w != 0.0f; }
         bool hasNaN() const { return isnan(x) || isnan(y) || isnan(z) || isnan(w); }
         
         /** @return TRUE if this vector is almost zero, with all components abs < 0.0001 */
