@@ -4,6 +4,7 @@
 #include <csignal>
 #if __APPLE__ || __linux__
     #include <pthread.h>
+    #include <sys/prctl.h>
 #endif
 
 namespace rpp
@@ -36,7 +37,11 @@ namespace rpp
             rangeEnd     = end;
             taskRunning  = true;
         }
-        cv.notify_one();
+        if (th.joinable()) cv.notify_one();
+        else {
+
+            th = thread{[this] { run(); }}; // restart thread if needed
+        }
     }
 
     void pool_task::run_generic(function<void()>&& newTask) noexcept
@@ -103,7 +108,7 @@ namespace rpp
     }
     #endif
 
-    //static void segfault(int) { throw runtime_error("SIGSEGV"); }
+    static void segfault(int) { throw runtime_error("SIGSEGV"); }
 
     void pool_task::run() noexcept
     {
@@ -114,12 +119,15 @@ namespace rpp
         #if __APPLE__
             pthread_setname_np(name);
         #elif __linux__
-            pthread_setname_np(pthread_self(), name);
+            if (pthread_setname_np(pthread_self(), name)) {
+                // failed. try using prctl instead:
+                prctl(PR_SET_NAME, name, 0, 0, 0);
+            }
         #elif _WIN32
             SetThreadName(name);
         #endif
         
-        //signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
+        signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
 
         //printf("%s start\n", name);
         while (!killed)
