@@ -206,8 +206,9 @@ namespace rpp
         thread th;
         function<void()> genericTask;
         action<int, int> rangeTask;
-        int rangeStart = 0;
-        int rangeEnd   = 0;
+        int rangeStart  = 0;
+        int rangeEnd    = 0;
+        int maxIdleTime = 15;
         volatile bool taskRunning = false;
         volatile bool killed      = false;
 
@@ -217,6 +218,10 @@ namespace rpp
 
         pool_task();
         ~pool_task() noexcept;
+
+        // Sets the maximum idle time before this pool task is abandoned to free up thread handles
+        // @param maxIdleSeconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
+        void max_idle_time(int maxIdleSeconds = 15);
 
         // assigns a new parallel for task to run
         // @warning This range task does not retain any resources, so you must ensure
@@ -250,8 +255,9 @@ namespace rpp
      */
     class thread_pool
     {
-        mutex poolMutex;
+        recursive_mutex poolMutex;
         vector<unique_ptr<pool_task>> tasks;
+        int taskMaxIdleTime = 15; // new task timeout in seconds
         bool rangeRunning = false; // whether parallel range is running or not
         
     public:
@@ -284,6 +290,12 @@ namespace rpp
 
         // gets the next free task (or creates a new one)
         pool_task* get_task() noexcept;
+
+        // sets a new max idle time for spawned tasks
+        // this does not notify already idle tasks
+        // @param maxIdleSeconds Maximum idle seconds before tasks are abandoned and thread handle is released
+        //                       Setting this to 0 keeps pool tasks alive forever
+        void max_task_idle_time(int maxIdleSeconds = 15) noexcept;
 
         /**
          * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of

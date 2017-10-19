@@ -25,6 +25,8 @@ namespace rpp
         th.join();
     }
 
+    void pool_task::max_idle_time(int maxIdleSeconds) { maxIdleTime = maxIdleSeconds; }
+
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
         if (taskRunning)
@@ -190,9 +192,17 @@ namespace rpp
         {
             if (killed)
                 return false;
-            if ((bool)rangeTask || (bool)genericTask)
+            if (got_task())
                 return true;
-            cv.wait(lock);
+            if (maxIdleTime)
+            {
+                if (cv.wait_for(lock, chrono::seconds(maxIdleTime)) == cv_status::timeout)
+                    return false;
+            }
+            else
+            {
+                cv.wait(lock);
+            }
         }
     }
 
@@ -244,6 +254,7 @@ namespace rpp
 
     int thread_pool::active_tasks() noexcept
     {
+        lock_guard<recursive_mutex> lock{poolMutex};
         int active = 0;
         for (auto& task : tasks) 
             if (task->running()) ++active;
@@ -252,6 +263,7 @@ namespace rpp
 
     int thread_pool::idle_tasks() noexcept
     {
+        lock_guard<recursive_mutex> lock{poolMutex};
         int idle = 0;
         for (auto& task : tasks)
             if (!task->running()) ++idle;
@@ -265,6 +277,7 @@ namespace rpp
 
     int thread_pool::clear_idle_tasks() noexcept
     {
+        lock_guard<recursive_mutex> lock{poolMutex};
         int cleared = 0;
         for (int i = 0; i < (int)tasks.size();)
         {
@@ -281,12 +294,14 @@ namespace rpp
 
     pool_task* thread_pool::new_task() noexcept
     {
+        lock_guard<recursive_mutex> lock{poolMutex};
         tasks.emplace_back(make_unique<pool_task>());
         return tasks.back().get();
     }
 
     pool_task* thread_pool::next_task(size_t& poolIndex) noexcept
     {
+        lock_guard<recursive_mutex> lock{poolMutex};
         for (; poolIndex < tasks.size(); ++poolIndex)
         {
             pool_task* task = tasks[poolIndex].get();
@@ -303,6 +318,13 @@ namespace rpp
     {
         size_t i = 0;
         return next_task(i);
+    }
+
+    void thread_pool::max_task_idle_time(int maxIdleSeconds) noexcept
+    {
+        taskMaxIdleTime = maxIdleSeconds;
+        for (auto& task : tasks)
+            task->max_idle_time(taskMaxIdleTime);
     }
 
     void thread_pool::parallel_for(int rangeStart, int rangeEnd, 
@@ -328,7 +350,7 @@ namespace rpp
         pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
         //vector<pool_task*> active(cores, nullptr);
         {
-            lock_guard<mutex> lock{poolMutex};
+            lock_guard<recursive_mutex> lock{poolMutex};
             rangeRunning = true;
 
             size_t poolIndex = 0;
