@@ -39,11 +39,13 @@ namespace rpp
         };
 
         static int asserts_failed;
-
         strview name;
-        vector<test_func> test_funcs; // all the automatic tests to run
         strview test_specific;
     private:
+        // @note Need to use raw array because std::vector cannot be exported on MSVC
+        test_func* test_funcs = nullptr; // all the automatic tests to run
+        int test_count = 0;
+        int test_cap = 0;
         bool test_enabled = true; // internal: this is automatically set by the test system
         bool auto_run = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
     
@@ -134,12 +136,13 @@ namespace rpp
             assert_failed(file, line, "%s => '%s' %s '%s'", expr, sActual.c_str(), why, sExpect.c_str());
         }
 
+        int add_test_func(test_func func);
+
         // adds a test to the automatic test run list
         template<class T, class Lambda> int add_test_func(strview name, T* self, Lambda lambda)
         {
             (void)lambda;
-            test_funcs.emplace_back(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
-            return (int)test_funcs.size() - 1;
+            return add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
         }
     };
 

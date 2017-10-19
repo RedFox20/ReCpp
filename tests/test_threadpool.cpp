@@ -131,4 +131,33 @@ TestImpl(test_threadpool)
         AssertThat(times_launched, 2);
     }
 
+    TestCase(parallel_task_nested_nodeadlocks)
+    {
+        atomic_int times_launched = 0;
+        auto func = [&]() {
+            times_launched += 1;
+            pool_task* subtasks[4] = {
+                rpp::parallel_task([&]() { times_launched += 1; }),
+                rpp::parallel_task([&]() { times_launched += 1; }),
+                rpp::parallel_task([&]() { times_launched += 1; }),
+                rpp::parallel_task([&]() { times_launched += 1; }),
+            };
+
+            for (auto* task : subtasks)
+                AssertThat(task->wait(2000), pool_task::finished);
+        };
+        pool_task* tasks[4] = {
+            rpp::parallel_task(func),
+            rpp::parallel_task(func),
+            rpp::parallel_task(func),
+            rpp::parallel_task(func),
+        };
+
+        for (auto* task : tasks)
+            AssertThat(task->wait(2000), pool_task::finished);
+
+        int expected = 4 * 5;
+        AssertThat((int)times_launched, expected);
+    }
+
 } Impl;

@@ -61,24 +61,25 @@ namespace rpp
         cv.notify_one();
     }
 
-    void pool_task::wait(int timeoutMillis) noexcept
+    pool_task::wait_result pool_task::wait(int timeoutMillis) noexcept
     {
         //printf("wait for (%d, %d)\n", loopStart, loopEnd);
         while (taskRunning) // duplicate check is intentional (to avoid lock)
         {
             unique_lock<mutex> lock{m};
             if (!taskRunning)
-                return;
+                return finished;
             if (timeoutMillis)
             {
                 if (cv.wait_for(lock, chrono::milliseconds(timeoutMillis)) == cv_status::timeout)
-                    return;
+                    return timeout;
             }
             else
             {
                 cv.wait(lock);
             }
         }
+        return finished;
     }
 
     #if _WIN32
@@ -167,6 +168,10 @@ namespace rpp
             {
                 fprintf(stderr, "pool_task::run unhandled exception: %s\n", e.what());
             }
+            catch (const char* e) // prevent failure that would terminate the thread
+            {
+                fprintf(stderr, "pool_task::run unhandled exception: %s\n", e);
+            }
             catch (...) // prevent failure that would terminate the thread
             {
                 fprintf(stderr, "pool_task::run unhandled exception!\n");
@@ -254,7 +259,7 @@ namespace rpp
 
     int thread_pool::active_tasks() noexcept
     {
-        lock_guard<recursive_mutex> lock{poolMutex};
+        lock_guard<mutex> lock{tasksMutex};
         int active = 0;
         for (auto& task : tasks) 
             if (task->running()) ++active;
@@ -263,7 +268,7 @@ namespace rpp
 
     int thread_pool::idle_tasks() noexcept
     {
-        lock_guard<recursive_mutex> lock{poolMutex};
+        lock_guard<mutex> lock{tasksMutex};
         int idle = 0;
         for (auto& task : tasks)
             if (!task->running()) ++idle;
@@ -277,7 +282,7 @@ namespace rpp
 
     int thread_pool::clear_idle_tasks() noexcept
     {
-        lock_guard<recursive_mutex> lock{poolMutex};
+        lock_guard<mutex> lock{tasksMutex};
         int cleared = 0;
         for (int i = 0; i < (int)tasks.size();)
         {
@@ -294,21 +299,25 @@ namespace rpp
 
     pool_task* thread_pool::new_task() noexcept
     {
-        lock_guard<recursive_mutex> lock{poolMutex};
-        tasks.emplace_back(make_unique<pool_task>());
-        return tasks.back().get();
+        auto task = make_unique<pool_task>();
+        auto* ptr = task.get();
+
+        lock_guard<mutex> lock{tasksMutex};
+        tasks.emplace_back(move(task));
+        return ptr;
     }
 
     pool_task* thread_pool::next_task(size_t& poolIndex) noexcept
     {
-        lock_guard<recursive_mutex> lock{poolMutex};
-        for (; poolIndex < tasks.size(); ++poolIndex)
-        {
-            pool_task* task = tasks[poolIndex].get();
-            if (!task->running())
+        { lock_guard<mutex> lock{tasksMutex};
+            for (; poolIndex < tasks.size(); ++poolIndex)
             {
-                ++poolIndex;
-                return task;
+                pool_task* task = tasks[poolIndex].get();
+                if (!task->running())
+                {
+                    ++poolIndex;
+                    return task;
+                }
             }
         }
         return new_task();
@@ -322,6 +331,7 @@ namespace rpp
 
     void thread_pool::max_task_idle_time(int maxIdleSeconds) noexcept
     {
+        lock_guard<mutex> lock{tasksMutex};
         taskMaxIdleTime = maxIdleSeconds;
         for (auto& task : tasks)
             task->max_idle_time(taskMaxIdleTime);
@@ -331,7 +341,7 @@ namespace rpp
                                    const action<int, int>& rangeTask) noexcept
     {
         assert(!rangeRunning && "Fatal error: nested parallel loops are forbidden!");
-        assert(core_count != 0 && "The appears to be no hardware concurrency");
+        assert(core_count > 0 && "There appears to be no hardware concurrency");
 
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
@@ -341,7 +351,7 @@ namespace rpp
         const int len = range / cores;
 
         // only one physical core or only one task to run. don't run in a thread
-        if (cores == 1)
+        if (cores <= 1)
         {
             rangeTask(0, len);
             return;
@@ -350,7 +360,6 @@ namespace rpp
         pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
         //vector<pool_task*> active(cores, nullptr);
         {
-            lock_guard<recursive_mutex> lock{poolMutex};
             rangeRunning = true;
 
             size_t poolIndex = 0;

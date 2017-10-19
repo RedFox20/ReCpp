@@ -75,6 +75,14 @@ namespace rpp
         #endif
     #endif
 
+    #ifndef DLLEXPORT
+        #if _MSC_VER
+            #define DLLEXPORT __declspec(dllexport)
+        #else // clang/gcc
+            #define DLLEXPORT __attribute__((visibility("default")))
+        #endif
+    #endif
+
 /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
 // This is same as memchr, but optimized for very small control strings
@@ -212,7 +220,7 @@ namespace rpp
      *  - trim_start() trim_end()
      *  - to_int() to_float()
      */
-    struct strview
+    struct DLLEXPORT strview
     {
     #ifdef _MSC_VER
         union {

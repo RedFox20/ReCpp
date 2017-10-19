@@ -97,19 +97,17 @@ namespace rpp
         consolef(Yellow, "%s\n", title);
         run_init();
 
-        auto funcs = test_funcs.data();
-        auto count = test_funcs.size();
         if (methodFilter)
         {
-            for (size_t i = 0u; i < count; ++i)
-                if (funcs[i].name.find(methodFilter))
-                    run_test(funcs[i]);
+            for (size_t i = 0u; i < test_count; ++i)
+                if (test_funcs[i].name.find(methodFilter))
+                    run_test(test_funcs[i]);
         }
         else
         {
-            for (size_t i = 0u; i < count; ++i) {
-                consolef(Yellow, "%s::%s\n", name.str, funcs[i].name.str);
-                run_test(funcs[i]);
+            for (size_t i = 0u; i < test_count; ++i) {
+                consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
+                run_test(test_funcs[i]);
             }
         }
 
@@ -239,6 +237,20 @@ namespace rpp
         char empty[1] = "";
         char* argv[1] = { empty };
         return run_tests(1, argv);
+    }
+
+    int test::add_test_func(test_func func) // @note Because we can't dllexport std::vector
+    {
+        if (test_count == test_cap)
+        {
+            test_cap = test_funcs ? test_count * 2 : 8;
+            auto* funcs = new test_func[test_cap];
+            for (int i = 0; i < test_count; ++i) funcs[i] = move(test_funcs[i]);
+            delete[] test_funcs;
+            test_funcs = funcs;
+        }
+        test_funcs[test_count++] = move(func);
+        return test_count - 1;
     }
 
     static void move_console_window()

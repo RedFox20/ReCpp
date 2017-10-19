@@ -36,3 +36,5 @@ test_tmp/
 bin/libReCpp\.a
 
 cmake-build-debug/
+bin/Tests.lib
+bin/Tests.exp

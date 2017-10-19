@@ -4,7 +4,7 @@ using namespace rpp;
 
 TestImpl(test_debugging)
 {
-    TestInit(test_debugging)
+    TestInitNoAutorun(test_debugging)
     {
     }
 
@@ -46,7 +46,7 @@ TestImpl(test_debugging)
         catch (std::exception& e)
         {
             std::string param = "test@user.com";
-            LogExcept(e, "Testing log except with params: %s", param);
+            LogExcept(e, "This should trigger a breakpoint in your IDE. Testing log except with params: %s", param);
         }
     }
 

@@ -213,6 +213,10 @@ namespace rpp
         volatile bool killed      = false;
 
     public:
+        enum wait_result {
+            finished,
+            timeout,
+        };
 
         bool running() const noexcept { return taskRunning; }
 
@@ -234,7 +238,7 @@ namespace rpp
         void run_generic(function<void()>&& genericTask) noexcept;
 
         // wait for task to finish
-        void wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
+        wait_result wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
         void run() noexcept;
@@ -255,7 +259,7 @@ namespace rpp
      */
     class thread_pool
     {
-        recursive_mutex poolMutex;
+        mutex tasksMutex;
         vector<unique_ptr<pool_task>> tasks;
         int taskMaxIdleTime = 15; // new task timeout in seconds
         bool rangeRunning = false; // whether parallel range is running or not
