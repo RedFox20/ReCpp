@@ -4,7 +4,6 @@
 #include <csignal>
 #if __APPLE__ || __linux__
     #include <pthread.h>
-    #include <sys/prctl.h>
 #endif
 
 namespace rpp
@@ -121,11 +120,6 @@ namespace rpp
 
         #if __APPLE__
             pthread_setname_np(name);
-        #elif __linux__
-            if (pthread_setname_np(pthread_self(), name)) {
-                // failed. try using prctl instead:
-                prctl(PR_SET_NAME, name, 0, 0, 0);
-            }
         #elif _WIN32
             SetThreadName(name);
         #endif
