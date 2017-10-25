@@ -118,8 +118,10 @@ namespace rpp
         char name[32];
         snprintf(name, sizeof(name), "rpp_task_%d", pool_task_id++);
 
-        #if __APPLE__ || __linux__
+        #if __APPLE__
             pthread_setname_np(name);
+		#elif __linux__
+			pthread_setname_np(pthread_self(), name);
         #elif _WIN32
             SetThreadName(name);
         #endif
