@@ -109,17 +109,17 @@ EXTERNC void _LogError(const char* format, ...) {
 EXTERNC void LogEvent(const char* eventName, const char* format, ...)
 {
 #if __clang__
-  #if __has_feature(address_sanitizer)
+#if __has_feature(address_sanitizer)
     return; // ASAN reports a false positive with vsnprintf
-  #endif
+#endif
 #endif
     va_list ap; va_start(ap, format);
     char messageBuf[4096];
     int len = SafeFormat(messageBuf, sizeof(messageBuf), format, ap);
     va_end(ap);
-    
+
     printf("EVT %s: %s\n", eventName, messageBuf);
-    
+
     if (EventHandler != nullptr)
     {
         EventHandler(eventName, messageBuf, len);
@@ -129,9 +129,9 @@ EXTERNC void LogEvent(const char* eventName, const char* format, ...)
 void _LogExcept(const char* exceptionWhat, const char* format, ...)
 {
 #if __clang__
-  #if __has_feature(address_sanitizer)
+#if __has_feature(address_sanitizer)
     return; // ASAN reports a false positive with vsnprintf
-  #endif
+#endif
 #endif
     va_list ap; va_start(ap, format);
     char messageBuf[4096];
@@ -139,12 +139,12 @@ void _LogExcept(const char* exceptionWhat, const char* format, ...)
     va_end(ap);
 
     // only MSVC requires stderr write; other platforms do it in assert
-    #if _MSC_VER
-      fprintf(stderr, "%.*s: %s\n", len, messageBuf, exceptionWhat);
-    #else
-      (void)len;
-    #endif
-    
+#if _MSC_VER
+    fprintf(stderr, "%.*s: %s\n", len, messageBuf, exceptionWhat);
+#else
+    (void)len;
+#endif
+
     if (ExceptHandler != nullptr)
     {
         ExceptHandler(messageBuf, exceptionWhat);
@@ -184,14 +184,21 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
         if (*++ptr == ':') ++ptr;
     }
     else ptr = longFuncName;
-    
+
     char ch;
     int len = 0;
     for (; len < max && (ch = *ptr) != '\0'; ++ptr) {
-        if (ch == '<' && memcmp(ptr, "<lambda", 7) == 0) {
-            memcpy(&buf[len], "lambda", 6);
-            len += 6;
-            break;
+        if (ch == '<') {
+            if (memcmp(ptr, "<<lambda", 8) == 0) { // MSVC std::invoke<<lambda_....>&>
+                memcpy(&buf[len], "<lambda>", 8);
+                len += 8;
+                break;
+            }
+            if (memcmp(ptr, "<lambda", 7) == 0) {
+                memcpy(&buf[len], "lambda", 6);
+                len += 6;
+                break;
+            }
         }
         buf[len++] = ch;
     }

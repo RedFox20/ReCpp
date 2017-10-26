@@ -184,7 +184,7 @@ namespace rpp
 
     static void pause(int millis = -1/*forever*/)
     {
-        printf("\nPress any key to continue...");
+        printf("\nPress any key to continue...\n");
 
         using namespace chrono;
         auto start = system_clock::now();
@@ -371,7 +371,11 @@ namespace rpp
             consolef(Green, "\nSUCCESS: All test runs passed!\n");
         else
             consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
-        pause(5000);
+
+        #if _MSC_VER
+            if (IsDebuggerPresent()) // only pause if we launched from Visual Studio
+                pause();
+        #endif
         return 0;
     }
 

@@ -82,6 +82,9 @@ namespace rpp
     }
 
     #if _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN 1
+    #endif
     #include <Windows.h>
     #pragma pack(push,8)
     struct THREADNAME_INFO
@@ -110,7 +113,10 @@ namespace rpp
     }
     #endif
 
-    static void segfault(int) { throw runtime_error("SIGSEGV"); }
+    static void segfault(int)
+    {
+        throw runtime_error("SIGSEGV");
+    }
 
     void pool_task::run() noexcept
     {
@@ -120,8 +126,8 @@ namespace rpp
 
         #if __APPLE__
             pthread_setname_np(name);
-		#elif __linux__
-			pthread_setname_np(pthread_self(), name);
+        #elif __linux__
+            pthread_setname_np(pthread_self(), name);
         #elif _WIN32
             SetThreadName(name);
         #endif
