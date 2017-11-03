@@ -337,7 +337,7 @@ namespace rpp
      *
      * @param rangeStart Usually 0
      * @param rangeEnd Usually vec.size()
-     * @param rangeTask Non-owning callback action.
+     * @param func Non-owning callback action.
      */
     template<class Func>
     inline void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
