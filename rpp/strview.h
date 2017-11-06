@@ -1108,6 +1108,11 @@ namespace rpp
         return std::to_string(object);
     }
 
+    template<class T> std::string to_string(const T* object)
+    {
+        return object ? to_string(*object) : "null"s;
+    }
+
     /**
      * Always null terminated version of stringstream, which is compatible with strview
      * Not intended for moving or copying
