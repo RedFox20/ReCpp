@@ -194,9 +194,9 @@ namespace rpp
     int _tostring(char* buffer, uint   value);
     int _tostring(char* buffer, uint64 value);
 
-    inline int _tostring(char* buffer, byte value)   { return _tostring(buffer, (uint)value); }
-    inline int _tostring(char* buffer, short value)  { return _tostring(buffer, (int)value);  }
-    inline int _tostring(char* buffer, ushort value) { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, rpp::byte value) { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, short value)     { return _tostring(buffer, (int)value);  }
+    inline int _tostring(char* buffer, ushort value)    { return _tostring(buffer, (uint)value); }
 
 
 
@@ -1183,7 +1183,7 @@ namespace rpp
         void write(const char& value);
 
         void write(bool value)   { write(value ? "true"_sv : "false"_sv); }
-        void write(byte value)   { reserve(4);  len += _tostring(&ptr[len], value); }
+        void write(rpp::byte bv) { reserve(4);  len += _tostring(&ptr[len], bv);    }
         void write(short value)  { reserve(8);  len += _tostring(&ptr[len], value); }
         void write(ushort value) { reserve(8);  len += _tostring(&ptr[len], value); }
         void write(int value)    { reserve(16); len += _tostring(&ptr[len], value); }
@@ -1290,7 +1290,7 @@ namespace rpp
 
     int print(FILE* file, strview value);
     int print(FILE* file, char value);
-    int print(FILE* file, byte value);
+    int print(FILE* file, rpp::byte value);
     int print(FILE* file, short value);
     int print(FILE* file, ushort value);
     int print(FILE* file, int value);
@@ -1300,7 +1300,7 @@ namespace rpp
 
     int print(strview value);
     int print(char value);
-    int print(byte value);
+    int print(rpp::byte value);
     int print(short value);
     int print(ushort value);
     int print(int value);

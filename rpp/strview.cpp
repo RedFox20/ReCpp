@@ -850,7 +850,7 @@ namespace rpp
 
     int print(FILE* file, strview value) { return (int)fwrite(value.str, value.len, 1, file); }
     int print(FILE* file, char value)    { return (int)fwrite(&value, 1, 1, file);            }
-    int print(FILE* file, byte value)    { char buf[4];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, rpp::byte bv)  { char buf[4];  return (int)fwrite(buf, _tostring(buf, bv), 1, file);    }
     int print(FILE* file, short value)   { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, ushort value)  { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, int value)     { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
@@ -860,7 +860,7 @@ namespace rpp
 
     int print(strview value) { return print(stdout, value); }
     int print(char value)    { return print(stdout, value); }
-    int print(byte value)    { return print(stdout, value); }
+    int print(rpp::byte bv)  { return print(stdout, bv);    }
     int print(short value)   { return print(stdout, value); }
     int print(ushort value)  { return print(stdout, value); }
     int print(int value)     { return print(stdout, value); }
