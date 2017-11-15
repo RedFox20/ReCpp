@@ -556,6 +556,15 @@ namespace rpp /* ReCpp */
     inline bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
 
     /**
+     * @brief Copies sourceFile to destinationFile, overwriting the previous file!
+     * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
+     */
+    bool copy_file(const char* sourceFile, const char* destinationFile) noexcept;
+    inline bool copy_file(const strview sourceFile, const strview destinationFile) noexcept 
+    { return copy_file(sourceFile.to_cstr(), destinationFile.to_cstr()); }
+
+
+    /**
      * Creates a folder, recursively creating folders that do not exist
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */

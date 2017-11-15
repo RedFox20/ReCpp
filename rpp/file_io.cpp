@@ -538,6 +538,31 @@ namespace rpp /* ReCpp */
     {
         return ::remove(filename) == 0;
     }
+
+    bool copy_file(const char* sourceFile, const char* destinationFile) noexcept
+    {
+#if USE_WINAPI_IO
+        return CopyFileA(sourceFile, destinationFile, /*failIfExists:*/false) == TRUE;
+#else
+        file src{sourceFile, READONLY};
+        if (!src) return false;
+
+        file dst{destinationFile, CREATENEW};
+        if (!dst) return false;
+
+        constexpr int blockSize = 64*1024;
+        char buf[blockSize];
+        for (int totalBytesRead = 0, totalBytesWritten = 0; ;)
+        {
+            int bytesRead = src.read(buf, blockSize);
+            if (bytesRead <= 0)
+                break;
+            totalBytesRead    += bytesRead;
+            totalBytesWritten += dst.write(buf, bytesRead);
+        }
+        return totalBytesRead == totalBytesWritten;
+#endif
+    }
     
     // on failure, check errno for details, if folder (or file) exists, we consider it a success
     // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
