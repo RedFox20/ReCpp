@@ -552,7 +552,9 @@ namespace rpp /* ReCpp */
 
         constexpr int blockSize = 64*1024;
         char buf[blockSize];
-        for (int totalBytesRead = 0, totalBytesWritten = 0; ;)
+        int totalBytesRead    = 0;
+        int totalBytesWritten = 0;
+        for (;;)
         {
             int bytesRead = src.read(buf, blockSize);
             if (bytesRead <= 0)
