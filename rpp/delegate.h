@@ -317,7 +317,7 @@ namespace rpp
 
         template<class Functor> void init_functor(Functor&& ftor)
         {
-            typedef std::decay_t<Functor> FunctorType;
+            typedef typename std::decay<Functor>::type FunctorType;
             init_method(ftor, &FunctorType::operator());
 
             obj  = new FunctorType(forward<Functor>(ftor));
