@@ -101,8 +101,10 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
 #  if defined __APPLE__ || defined __clang__ // iOS or just clang
 #    if __ANDROID__
 #      define __assertion_failure(msg) __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), msg)
-#    else
+#    elif __APPLE__
 #      define __assertion_failure(msg) __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, msg)
+#    else
+#      define __assertion_failure(msg) __assert_fail(msg, _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
 #    endif
 #  elif _MSC_VER // Windows VC++
 #    define __assertion_failure(msg) do { __debugbreak(); } while (0)
