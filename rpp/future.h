@@ -12,8 +12,39 @@ namespace rpp
 {
     using namespace std;
 
+    template<class T> class composable_future;
+
     template<class T, class Work>
-    auto then(future<T> f, Work w) -> future<decltype(w(f.get()))>
+    auto then(future<T> f, Work w) -> composable_future<decltype(w(f.get()))>;
+
+    template<class Work>
+    auto then(future<void> f, Work w) -> composable_future<decltype(w())>;
+
+
+    template<class T> class composable_future : public future<T>
+    {
+    public:
+        using future::future;
+
+        composable_future(future<T>&& f) noexcept : future<T>(move(f))
+        {
+        }
+
+        composable_future& operator=(future<T>&& f) noexcept
+        {
+            future<T>::operator=(move(f));
+            return *this;
+        }
+
+        template<class Work> auto then(Work w)
+        {
+            return rpp::then(move(*this), move(w));
+        }
+    };
+
+
+    template<class T, class Work>
+    auto then(future<T> f, Work w) -> composable_future<decltype(w(f.get()))>
     {
         return std::async([](future<T> f, Work w)
         { 
@@ -22,7 +53,7 @@ namespace rpp
     }
 
     template<class Work>
-    auto then(future<void> f, Work w) -> future<decltype(w())>
+    auto then(future<void> f, Work w) -> composable_future<decltype(w())>
     {
         return std::async([](future<void> f, Work w)
         { 
