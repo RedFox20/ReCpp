@@ -220,7 +220,7 @@ namespace rpp
      *  - trim_start() trim_end()
      *  - to_int() to_float()
      */
-    struct strview
+    struct DLLEXPORT strview
     {
     #ifdef _MSC_VER
         union {

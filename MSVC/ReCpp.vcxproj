@@ -199,6 +199,7 @@
     <ClInclude Include="..\rpp\debugging.h" />
     <ClInclude Include="..\rpp\delegate.h" />
     <ClInclude Include="..\rpp\file_io.h" />
+    <ClInclude Include="..\rpp\future.h" />
     <ClInclude Include="..\rpp\json.h" />
     <ClInclude Include="..\rpp\obfuscated_string.h" />
     <ClInclude Include="..\rpp\sockets.h" />

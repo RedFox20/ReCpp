@@ -81,6 +81,9 @@
     <ClInclude Include="..\rpp\binary_stream.h">
       <Filter>rpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\rpp\future.h">
+      <Filter>rpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\rpp\strview.natvis">
