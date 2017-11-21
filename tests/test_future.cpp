@@ -63,8 +63,7 @@ TestImpl(test_future)
 
     TestCase(cross_thread_exception_propagation)
     {
-        future<void> asyncThrowingTask = std::async(launch::async, [] 
-        {
+        future<void> asyncThrowingTask = std::async(launch::async, [] {
             throw runtime_error("background_thread_exception_msg");
         });
 
@@ -96,6 +95,48 @@ TestImpl(test_future)
             AssertThat(x, 42);
         }).get();
         AssertThat(totalCalls, 2);
+    }
+
+    TestCase(except_handler)
+    {
+        composable_future<void> f = std::async(launch::async, [] {
+            throw runtime_error("background_thread_exception_msg");
+        });
+
+        bool exceptHandlerCalled = false;
+        int result = f.then([] {
+            AssertMsg(false, "This callback should never be executed");
+            return 0;
+        }, [&](const exception& e) {
+           exceptHandlerCalled = true;
+           AssertThat(e.what(), "background_thread_exception_msg"s);
+           return 42;
+        }).get();
+
+        AssertThat(exceptHandlerCalled, true);
+        AssertThat(result, 42);
+    }
+
+    TestCase(except_handler_chaining)
+    {
+        composable_future<string> f = std::async(launch::async, [] {
+            return "future string"s;
+        });
+
+        bool secondExceptHandlerCalled = false;
+        int result = f.then([](string s) {
+            throw runtime_error("future_continuation_exception_msg");
+            return 0;
+        }).then([](int x) { 
+            return 5;
+        }, [&](const exception& e) {
+            secondExceptHandlerCalled = true;
+            AssertThat(e.what(), "future_continuation_exception_msg"s);
+            return 42;
+        }).get();
+
+        AssertThat(secondExceptHandlerCalled, true);
+        AssertThat(result, 42);
     }
 
 } Impl;

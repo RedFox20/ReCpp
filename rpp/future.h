@@ -1,8 +1,7 @@
 #pragma once
 /**
  * Minimal resumable future extensions for C++11 std::future, Copyright (c) 2017 - Jorma Rebane
- * Original implementation description by Herb Sutter
- *
+ * Original implementation description by Herb Sutter at C++ and beyond 2012
  */
 #include <memory> // shared_ptr
 #include <functional>
@@ -11,14 +10,6 @@
 namespace rpp
 {
     using namespace std;
-
-    template<class T> class composable_future;
-
-    template<class T, class Work>
-    auto then(future<T> f, Work w) -> composable_future<decltype(w(f.get()))>;
-
-    template<class Work>
-    auto then(future<void> f, Work w) -> composable_future<decltype(w())>;
 
 
     template<class T> class composable_future : public future<T>
@@ -40,6 +31,11 @@ namespace rpp
         {
             return rpp::then(move(*this), move(w));
         }
+
+        template<class Work, class Except> auto then(Work w, Except e)
+        {
+            return rpp::then(move(*this), move(w), move(e));
+        }
     };
 
 
@@ -52,6 +48,7 @@ namespace rpp
         }, move(f), move(w));
     }
 
+
     template<class Work>
     auto then(future<void> f, Work w) -> composable_future<decltype(w())>
     {
@@ -61,4 +58,40 @@ namespace rpp
             return w();
         }, move(f), move(w));
     }
+
+
+    template<class T, class Work, class Except>
+    auto then(future<T> f, Work w, Except handler) -> composable_future<decltype(w(f.get()))>
+    {
+        return std::async([](future<T> f, Work w, Except handler)
+        { 
+            try
+            {
+                return w(f.get());
+            }
+            catch (const exception& e)
+            {
+                return handler(e);
+            }
+        }, move(f), move(w), move(handler));
+    }
+
+
+    template<class Work, class Except>
+    auto then(future<void> f, Work w, Except handler) -> composable_future<decltype(w())>
+    {
+        return std::async([](future<void> f, Work w, Except handler)
+        { 
+            try
+            {
+                f.get();
+                return w();
+            }
+            catch (const exception& e)
+            {
+                return handler(e);
+            }
+        }, move(f), move(w), move(handler));
+    }
+
 }
