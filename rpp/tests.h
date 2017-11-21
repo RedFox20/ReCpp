@@ -28,8 +28,10 @@ namespace rpp
 {
     using namespace std;
 
+#if _MSC_VER
     // warning C4251: 'rpp::test::name': struct 'rpp::strview' needs to have dll-interface to be used by clients of struct 'rpp::test'
     #pragma warning( disable : 4251 ) 
+#endif
 
     struct DLLEXPORT test
     {
