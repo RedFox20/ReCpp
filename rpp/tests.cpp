@@ -121,7 +121,7 @@ namespace rpp
             init_test();
             return true;
         } catch (const std::exception& e) {
-            consolef(Red, "Unhandled Exception in [%s]::TestInit(): %s\n", name, e.what());
+            consolef(Red, "Unhandled Exception in [%s]::TestInit(): %s\n", name.str, e.what());
             ++asserts_failed;
             return false;
         }
@@ -132,7 +132,7 @@ namespace rpp
         try {
             cleanup_test();
         } catch (const std::exception& e) {
-            consolef(Red, "Unhandled Exception in [%s]::TestCleanup(): %s\n", name, e.what());
+            consolef(Red, "Unhandled Exception in [%s]::TestCleanup(): %s\n", name.str, e.what());
             ++asserts_failed;
         }
     }
@@ -142,7 +142,7 @@ namespace rpp
         try {
             (test.lambda.*test.func)();
         } catch (const std::exception& e) {
-            consolef(Red, "Unhandled Exception in %s::%s: %s\n", name, test.name, e.what());
+            consolef(Red, "Unhandled Exception in %s::%s: %s\n", name.str, test.name.str, e.what());
             ++asserts_failed;
         }
     }
