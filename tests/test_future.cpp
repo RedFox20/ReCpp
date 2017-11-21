@@ -139,4 +139,27 @@ TestImpl(test_future)
         AssertThat(result, 42);
     }
 
+    TestCase(ready_future)
+    {
+        auto future = make_ready_future(42);
+        int result = future.get();
+        AssertThat(result, 42);
+    }
+
+    TestCase(exceptional_future)
+    {
+        bool exceptionWasThrown = false;
+        try
+        {
+            auto future = make_exceptional_future<int>(exception("aargh!"));
+            future.get();
+        }
+        catch (const exception& e)
+        {
+            exceptionWasThrown = true;
+            AssertThat(e.what(), "aargh!"s);
+        }
+        AssertThat(exceptionWasThrown, true);
+    }
+
 } Impl;

@@ -97,4 +97,18 @@ namespace rpp
         }
     };
 
+
+    template<class T> composable_future<T> make_ready_future(T&& value)
+    {
+        promise<T> p;
+        p.set_value(move(value));
+        return p.get_future();
+    }
+
+    template<class T, class E> composable_future<T> make_exceptional_future(E&& e)
+    {
+        promise<T> p;
+        p.set_exception(make_exception_ptr(std::forward<E>(e)));
+        return p.get_future();
+    }
 }
