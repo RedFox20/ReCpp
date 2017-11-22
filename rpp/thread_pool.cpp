@@ -45,7 +45,7 @@ namespace rpp
         }
     }
 
-    void pool_task::run_generic(function<void()>&& newTask) noexcept
+    void pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
     {
         if (taskRunning)
             fprintf(stderr, "rpp::pool_task already running! This can cause a deadlock!\n");
@@ -382,7 +382,7 @@ namespace rpp
         rangeRunning = false;
     }
 
-    pool_task* thread_pool::parallel_task(function<void()>&& genericTask) noexcept
+    pool_task* thread_pool::parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
         pool_task* task = get_task();
         task->run_generic(move(genericTask));

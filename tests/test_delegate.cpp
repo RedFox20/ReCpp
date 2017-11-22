@@ -103,26 +103,26 @@ TestImpl(test_delegate)
 
     TestCase(methods_bug)
     {
-//        using memb_type = Data (*)(void*, Data);
-//        struct dummy {};
-//        using dummy_type = Data (dummy::*)(Data a);
-//        union method_helper
-//        {
-//            memb_type mfunc;
-//            dummy_type dfunc;
-//        };
-//
-//        Base inst;
-//        Data (Base::*method)(Data a) = &Base::method;
-//
-//        void* obj = &inst;
-//        //printf("obj:  %p\n", obj);
-//
-//        method_helper u;
-//        u.dfunc = (dummy_type)method;
-//
-//        dummy* dum = (dummy*)obj;
-//        (dum->*u.dfunc)(data);
+        using memb_type = Data (*)(void*, Data);
+        struct dummy {};
+        using dummy_type = Data (dummy::*)(Data a);
+        union method_helper
+        {
+            memb_type mfunc;
+            dummy_type dfunc;
+        };
+
+        Base inst;
+        Data (Base::*method)(Data a) = &Base::method;
+
+        void* obj = &inst;
+        //printf("obj:  %p\n", obj);
+
+        method_helper u;
+        u.dfunc = (dummy_type)method;
+
+        dummy* dum = (dummy*)obj;
+        (dum->*u.dfunc)(data);
     }
 
     TestCase(methods)

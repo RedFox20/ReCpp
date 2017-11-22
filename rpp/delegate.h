@@ -389,7 +389,7 @@ namespace rpp
         template<class Functor> void reset(Functor&& ftor) noexcept
         {
             reset();
-            init_functor(forward<Functor>(ftor));
+            init_functor(move(ftor));
         }
 
 

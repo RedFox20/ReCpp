@@ -14,6 +14,8 @@ namespace rpp
 {
     using namespace std;
 
+
+
     // Optimized Action delegate, using the 'Fastest Possible C++ Delegates' method
     // This supports lambdas by grabbing a pointer to the lambda instance,
     // so its main intent is to be used during blocking calls like parallel_for
@@ -195,6 +197,9 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
+    template<class Signature>
+    using task_delegate = delegate<Signature>;
+
     /**
      * A simple thread-pool task. Can run owning generic tasks using standard function<> and
      * also range non-owning tasks which use the impossibly fast delegate callback system.
@@ -204,7 +209,7 @@ namespace rpp
         mutex m;
         condition_variable cv;
         thread th;
-        function<void()> genericTask;
+        task_delegate<void()> genericTask;
         action<int, int> rangeTask;
         int rangeStart  = 0;
         int rangeEnd    = 0;
@@ -235,7 +240,7 @@ namespace rpp
 
         // assigns a new generic task to run
         // undefined behaviour if called when already running
-        void run_generic(function<void()>&& genericTask) noexcept;
+        void run_generic(task_delegate<void()>&& genericTask) noexcept;
 
         // wait for task to finish
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -321,7 +326,7 @@ namespace rpp
         }
 
         // runs a generic parallel task
-        pool_task* parallel_task(function<void()>&& genericTask) noexcept;
+        pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept;
 
         // return the number of physical cores
         static int physical_cores();
@@ -350,9 +355,65 @@ namespace rpp
      * Runs a generic parallel task on the default global thread pool
      * @note Returns immediately; does not wait for the task to complete.
      */
-    inline pool_task* parallel_task(function<void()>&& genericTask) noexcept
+    inline pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
         return thread_pool::global.parallel_task(move(genericTask));
+    }
+
+    /**
+     * Runs a generic lambda with no arguments
+     * @note Returns immediately
+     * @code
+     * rpp::parallel_task([s] {
+     *     run_slow_work(s);
+     * });
+     * @endcode
+     */
+    template<class Func>
+    inline pool_task* parallel_taks(Func&& func)
+    {
+        return thread_pool::global.parallel_task([f=move(func)] {
+            f();
+        });
+    }
+
+    /**
+     * Runs a generic lambda with arguments
+     * @note Returns immediately
+     * @code 
+     * rpp::parallel_task([](string s) {
+     *     auto r = run_slow_work(s, 42);
+     *     send_results(r);
+     * }, "somestring"s);
+     * @endcode
+     */
+    template<class Func, class A>
+    inline pool_task* parallel_task(Func&& func, A&& a)
+    {
+        return thread_pool::global.parallel_task([func=move(func),a=move(a)]() mutable {
+            func(move(a));
+        });
+    }
+    template<class Func, class A, class B>
+    inline pool_task* parallel_task(Func&& func, A&& a, B&& b)
+    {
+        return thread_pool::global.parallel_task([func=move(func),a=move(a),b=move(b)]() mutable {
+            func(move(a), move(b));
+        });
+    }
+    template<class Func, class A, class B, class C>
+    inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c)
+    {
+        return thread_pool::global.parallel_task([func=move(func),a=move(a),b=move(b),c=move(c)]() mutable {
+            func(move(a), move(b), move(c));
+        });
+    }
+    template<class Func, class A, class B, class C, class D>
+    inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
+    {
+        return thread_pool::global.parallel_task([func=move(func),a=move(a),b=move(b),c=move(c),d=move(d)]() mutable {
+            func(move(a), move(b), move(c), move(d));
+        });
     }
 
 

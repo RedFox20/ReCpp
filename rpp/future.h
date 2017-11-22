@@ -13,21 +13,17 @@
 #include <thread>
 #endif
 
-#ifndef NODISCARD
-#define NODISCARD [[nodiscard]]
-#endif
-
 namespace rpp
 {
     using namespace std;
 
+    template<class T> class [[nodiscard]] composable_future;
 
-
-    template<class T> class composable_future;
+    ////////////////////////////////////////////////////////////////////////////////
 
 
     template<class T, class Work>
-    NODISCARD auto then(std::future<T> f, Work w) -> composable_future<decltype(w(f.get()))>
+    auto then(std::future<T> f, Work w) -> composable_future<decltype(w(f.get()))>
     {
         return std::async([](future<T> f, Work w)
         { 
@@ -37,7 +33,7 @@ namespace rpp
 
 
     template<class Work>
-    NODISCARD auto then(std::future<void> f, Work w) -> composable_future<decltype(w())>
+    auto then(std::future<void> f, Work w) -> composable_future<decltype(w())>
     {
         return std::async([](future<void> f, Work w)
         { 
@@ -48,16 +44,13 @@ namespace rpp
 
 
     template<class T, class Work, class Except>
-    NODISCARD auto then(std::future<T> f, Work w, Except handler) -> composable_future<decltype(w(f.get()))>
+    auto then(std::future<T> f, Work w, Except handler) -> composable_future<decltype(w(f.get()))>
     {
         return std::async([](future<T> f, Work w, Except handler)
         { 
-            try
-            {
+            try {
                 return w(f.get());
-            }
-            catch (const exception& e)
-            {
+            } catch (exception& e) {
                 return handler(e);
             }
         }, move(f), move(w), move(handler));
@@ -65,64 +58,89 @@ namespace rpp
 
 
     template<class Work, class Except>
-    NODISCARD auto then(std::future<void> f, Work w, Except handler) -> composable_future<decltype(w())>
+    auto then(std::future<void> f, Work w, Except handler) -> composable_future<decltype(w())>
     {
         return std::async([](future<void> f, Work w, Except handler)
         { 
-            try
-            {
+            try {
                 f.get();
                 return w();
-            }
-            catch (const exception& e)
-            {
+            } catch (exception& e) {
                 return handler(e);
             }
         }, move(f), move(w), move(handler));
     }
 
 
+    ////////////////////////////////////////////////////////////////////////////////
+
+
     template<class T, class Work> void continue_with(std::future<T> f, Work w)
     {
+        auto lambda = [](std::future<T> f, Work w) {
+            w(f.get());
+        };
         #if RPP_FUTURE_USE_THREADPOOL
-            struct state {
-                std::future<T> f;
-                Work w;
-                state(std::future<T>&& f, Work&& w) : f(move(f)), w(move(w)) {}
-            };
-            rpp::parallel_task([s = make_shared<state>(move(f), move(w))]() mutable {
-                s->w(s->f.get());
-            });
+            rpp::parallel_task(move(lambda), move(f), move(w));
         #else
-            std::thread{[](std::future<T> f, Work w) {
-                w(f.get());
-            }, move(f), move(w)}.detach();
+            std::thread{move(lambda), move(f), move(w)}.detach();
         #endif
     }
 
 
     template<class Work> void continue_with(std::future<void> f, Work w)
     {
+        auto lambda = [](std::future<void> f, Work w) {
+            f.get();
+            w();
+        };
         #if RPP_FUTURE_USE_THREADPOOL
-            struct state {
-                std::future<void> f;
-                Work w;
-                state(std::future<void>&& f, Work&& w) : f(move(f)), w(move(w)) {}
-            };
-            rpp::parallel_task([s = make_shared<state>(move(f), move(w))]() mutable {
-                s->f.get();
-                s->w();
-            });
+            rpp::parallel_task(move(lambda), move(f), move(w));
         #else
-            std::thread{[](std::future<void> f, Work w) {
-                f.get();
-                w();
-            }, move(f), move(w)}.detach();
+            std::thread{move(lambda), move(f), move(w)}.detach();
         #endif
     }
 
 
-    template<class T> class composable_future : public std::future<T>
+    template<class T, class Work, class Except> void continue_with(std::future<T> f, Work w, Except handler)
+    {
+        auto lambda = [](std::future<T> f, Work w, Except handler) {
+            try {
+                return w(f.get());
+            } catch (exception& e) {
+                return handler(e);
+            }
+        };
+        #if RPP_FUTURE_USE_THREADPOOL
+            rpp::parallel_task(move(lambda), move(f), move(w), move(handler));
+        #else
+            std::thread{move(lambda), move(f), move(w), move(handler)}.detach();
+        #endif
+    }
+
+
+    template<class Work, class Except> void continue_with(std::future<void> f, Work w, Except handler)
+    {
+        auto lambda = [](std::future<void> f, Work w, Except handler) {
+            try {
+                f.get();
+                return w();
+            } catch (exception& e) {
+                return handler(e);
+            }
+        };
+        #if RPP_FUTURE_USE_THREADPOOL
+            rpp::parallel_task(move(lambda), move(f), move(w), move(handler));
+        #else
+            std::thread{move(lambda), move(f), move(w), move(handler)}.detach();
+        #endif
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    template<class T> class [[nodiscard]] composable_future : public std::future<T>
     {
     public:
         composable_future(std::future<T>&& f) noexcept : std::future<T>(move(f))
@@ -135,19 +153,25 @@ namespace rpp
             return *this;
         }
 
-        template<class Work> NODISCARD auto then(Work w)
+        template<class Work> auto then(Work w)
         {
             return rpp::then(move(*this), move(w));
         }
 
-        template<class Work, class Except> NODISCARD auto then(Work w, Except e)
+        template<class Work, class Except> auto then(Work w, Except e)
         {
             return rpp::then(move(*this), move(w), move(e));
         }
 
+        // similar to .then(), but doesn't return a future
         template<class Work> void continue_with(Work w)
         {
             rpp::continue_with(move(*this), move(w));
+        }
+
+        template<class Work, class Except> void continue_with(Work w, Except e)
+        {
+            rpp::continue_with(move(*this), move(w), move(e));
         }
     };
 
