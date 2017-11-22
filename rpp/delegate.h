@@ -99,7 +99,7 @@ namespace rpp
         using dtor_type = void (*)(void*);
         using copy_type = void (*)(void*, delegate&);
         struct dummy {};
-        #if defined(_MSC_VER)  // VC++
+        #if _MSC_VER  // VC++
             #if !RPP_64BIT // __thiscall only applies for 32-bit MSVC
                 #define THISCALL __thiscall
             #else
@@ -107,11 +107,11 @@ namespace rpp
             #endif
             using memb_type = Ret (THISCALL*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
-        #elif defined(__clang__)
-            using memb_type = Ret (*)(void*, Args...);
+        #elif __clang__
+            using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
-        #elif defined(__GNUG__) // G++
-            using memb_type = Ret (*)(void*, Args...);
+        #elif __GNUG__ // G++
+            using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(void*, Args...);
         #endif
     private:
@@ -209,14 +209,42 @@ namespace rpp
 
     private:
 
+        #if !_MSC_VER && __clang__ // disable on VC++ clang, enable on all other clang builds
+            struct VCallThunk {
+                union {
+                    void* method;
+                    size_t vtable_index; // = vindex*2+1 (always odd)
+                };
+                size_t this_adjustment;
+            };
+            struct VTable {
+                void* entries[16]; // size is pseudo, mainly for gdb
+            };
+            static dummy_type devirtualize(const void* instance, dummy_type method) // resolve Thunks into method pointer
+            {
+                VCallThunk& t = *(struct VCallThunk*)&method;
+                if (intptr_t(t.method) & 1) { // is_thunk?
+                    VTable* vtable = (struct VTable*) *(void**)instance;
+                    size_t voffset = (t.vtable_index-1)/8;
+                    union {
+                        dummy_type dfunc;
+                        void* pfunc;
+                    } ch;
+                    ch.pfunc = vtable->entries[voffset]; // resolve thunk
+                    return ch.dfunc;
+                }
+                return method; // not a virtual method thunk
+            }
+        #endif
+
         template<class IClass, class FClass> void init_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
         {
             obj = &inst;
-            #if defined(_MSC_VER)  // VC++
+            #if _MSC_VER // VC++
                 dfunc = (dummy_type)method;
-            #elif defined(__clang__)
-                dfunc = (dummy_type)method;
-            #elif defined(__GNUG__) // G++
+            #elif __clang__
+                dfunc =  devirtualize(&inst, (dummy_type)method);
+            #elif __GNUG__ // G++
                 mfunc = (memb_type)(inst.*method);
             #endif
             destructor = nullptr;
@@ -225,11 +253,11 @@ namespace rpp
         template<class IClass, class FClass> void init_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             obj = (void*)&inst;
-            #if defined(_MSC_VER)  // VC++
+            #if _MSC_VER // VC++
                 dfunc = (dummy_type)method;
-            #elif defined(__clang__)
-                dfunc = (dummy_type)method;
-            #elif defined(__GNUG__) // G++
+            #elif __clang__
+                dfunc = devirtualize(&inst, (dummy_type)method);
+            #elif __GNUG__ // G++
                 mfunc = (memb_type)(inst.*method);
             #endif
             destructor = nullptr;
@@ -246,9 +274,11 @@ namespace rpp
         template<class IClass, class FClass> bool equal_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
         {
             method_helper u;
-            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if _MSC_VER // VC++ and clang
                 u.dfunc = (dummy_type)method;
-            #elif defined(__GNUG__) // G++
+            #elif __clang__
+                u.dfunc = devirtualize(&inst, (dummy_type)method);
+            #elif __GNUG__ // G++
                 u.mfunc = (memb_type)(inst.*method);
             #endif
             return func == u.func;
@@ -257,9 +287,11 @@ namespace rpp
         template<class IClass, class FClass> bool equal_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             method_helper u;
-            #if defined(_MSC_VER) || defined(__clang__) // VC++ and clang
+            #if _MSC_VER // VC++ and clang
                 u.dfunc = (dummy_type)method;
-            #elif defined(__GNUG__) // G++
+            #elif __clang__
+                u.dfunc = devirtualize(&inst, (dummy_type)method);
+            #elif __GNUG__ // G++
                 u.mfunc = (memb_type)(inst.*method);
             #endif
             return func == u.func;
@@ -416,13 +448,11 @@ namespace rpp
         {
             if (obj)
             {
-            #if defined(_MSC_VER)  // VC++
+            #if _MSC_VER  // VC++
                 auto* inst = (dummy*)obj;
                 return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
-            #elif defined(__clang__)
-                auto* inst = (dummy*)obj;
-                return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
-//                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+            #elif __clang__
+                return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #else
                 return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #endif
@@ -434,13 +464,11 @@ namespace rpp
         {
             if (obj)
             {
-            #if defined(_MSC_VER)  // VC++
+            #if _MSC_VER  // VC++
                 auto* inst = (dummy*)obj;
                 return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
-            #elif defined(__clang__)
-                auto* inst = (dummy*)obj;
-                return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
-//                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+            #elif __clang__
+                return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #else
                 return (Ret)mfunc(obj, forward<XArgs>(args)...);
             #endif
@@ -683,7 +711,7 @@ namespace rpp
             deleg* data = ptr->data;
             for (int i = 0; i < size; ++i)
             {
-                data[i].invoke(forward<XArgs>(args)...);
+                data[i](forward<XArgs>(args)...);
             }
         }
         template<class ...XArgs> void invoke(XArgs&&... args) const
@@ -692,7 +720,7 @@ namespace rpp
             deleg* data = ptr->data;
             for (int i = 0; i < size; ++i)
             {
-                data[i].invoke(forward<XArgs>(args)...);
+                data[i](forward<XArgs>(args)...);
             }
         }
     };

@@ -151,7 +151,7 @@ TestImpl(test_future)
         bool exceptionWasThrown = false;
         try
         {
-            auto future = make_exceptional_future<int>(exception("aargh!"));
+            auto future = make_exceptional_future<int>(runtime_error{"aargh!"s});
             future.get();
         }
         catch (const exception& e)

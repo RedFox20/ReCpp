@@ -133,7 +133,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_nested_nodeadlocks)
     {
-        atomic_int times_launched = 0;
+        atomic_int times_launched {0};
         auto func = [&]() {
             times_launched += 1;
             pool_task* subtasks[4] = {
