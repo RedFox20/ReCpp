@@ -158,7 +158,7 @@ namespace rpp
         #endif
     }
 
-#if !_WIN32 && !__ANDROID__ // Linux:
+#if !_WIN32 && !__ANDROID__ && !__APPLE__ // Linux:
     static int _kbhit()
     {
         termios oldSettings; tcgetattr(STDIN_FILENO, &oldSettings);
@@ -178,7 +178,7 @@ namespace rpp
     }
 #endif
 
-#if __ANDROID__
+#if __ANDROID__ || __APPLE__
     static int _kbhit() { return 1; }
 #endif
 
@@ -363,7 +363,9 @@ namespace rpp
         if (test::asserts_failed)
         {
             consolef(Red, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
-            pause();
+            #if _MSC_VER
+                pause();
+            #endif
             return -1;
         }
 
