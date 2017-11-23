@@ -54,6 +54,14 @@ EXTERNC void LogDisableFunctionNames();
 EXTERNC void SetLogSeverityFilter(LogSeverity filter);
 EXTERNC LogSeverity GetLogSeverityFilter();
 
+/**
+ * Writes a message to default output. On most platforms this is stdout/stderr
+ * On Android this writes to Android log, using the given tag.
+ * @param tag Android log tag. Not used on other platforms.
+ */
+EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len);
+EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
+
 /** Logs an error to the backing error mechanism (Crashlytics on iOS) */
 EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap);
 EXTERNC void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
@@ -64,7 +72,6 @@ EXTERNC void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* f
 EXTERNC const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 EXTERNC const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 EXTERNC const char* _LogFuncname(const char* longFuncName); // shortens the func name
-
 
 /** Provide special string overloads for C++ */
 #ifdef __cplusplus

@@ -1,7 +1,9 @@
 #include "debugging.h"
 #include <cstdio>
 #include <cstring>
-
+#if __ANDROID__
+  #include <android/log.h>
+#endif
 
 #ifdef QUIETLOG
 static LogSeverity Filter = LogSeverityWarn;
@@ -48,6 +50,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap)
     return len;
 }
 
+#if __linux__
 // split at $ and remove /long/path/ leaving just "filename.cpp:123 func() $ message"
 static void ShortFilePathMessage(char*& ptr, int& len)
 {
@@ -63,6 +66,30 @@ static void ShortFilePathMessage(char*& ptr, int& len)
         ptr[len] = '\0';
     }
 }
+#endif
+
+EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
+{
+    #if __ANDROID__
+        auto priority = severity == LogSeverityInfo ? ANDROID_LOG_INFO :
+                        severity == LogSeverityWarn ? ANDROID_LOG_WARN :
+                                                      ANDROID_LOG_ERROR;
+        __android_log_write(priority, tag, err);
+    #else
+        FILE* out = (severity == LogSeverityError) ? stderr : stdout;
+        fwrite(err, (size_t)len, 1, out);
+        fwrite("\n", 1, 1, out);
+    #endif
+}
+
+EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len)
+{
+    #if __ANDROID__
+        __android_log_print(ANDROID_LOG_INFO, tag, "EVT %s: %.*s", eventName, len, message);
+    #else
+        printf("EVT %s: %.*s\n", eventName, len, message);
+    #endif
+}
 
 EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
 {
@@ -71,24 +98,18 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
     
     char errBuf[4096];
     int len = SafeFormat(errBuf, sizeof(errBuf), format, ap);
-    errBuf[len++] = '\n'; // force append a newline
-    errBuf[len]   = '\0';
     
-    // some default logging behavior:
-    char* ptr = errBuf;
-    #ifndef __linux__
-      ShortFilePathMessage(ptr, len);
-    #endif
-    fwrite(ptr, (size_t)len, 1, (severity == LogSeverityError) ? stderr : stdout);
-    
-    // optional error handler for iOS Crashlytics logging
-    if (ErrorHandler != nullptr)
+    if (ErrorHandler)
     {
-        ptr[--len] = '\0'; // remove the newline we added
+        char* ptr = errBuf;
         #ifdef __linux__
           ShortFilePathMessage(ptr, len);
         #endif
         ErrorHandler(severity, ptr, len);
+    }
+    else
+    {
+        LogWriteToDefaultOutput("ReCpp", severity, errBuf, len);
     }
 }
 
@@ -118,11 +139,13 @@ EXTERNC void LogEvent(const char* eventName, const char* format, ...)
     int len = SafeFormat(messageBuf, sizeof(messageBuf), format, ap);
     va_end(ap);
 
-    printf("EVT %s: %s\n", eventName, messageBuf);
-
-    if (EventHandler != nullptr)
+    if (EventHandler)
     {
         EventHandler(eventName, messageBuf, len);
+    }
+    else
+    {
+        LogEventToDefaultOutput("ReCpp", eventName, messageBuf, len);
     }
 }
 
