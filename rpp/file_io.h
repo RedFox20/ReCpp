@@ -981,8 +981,15 @@ namespace rpp /* ReCpp */
     /**
      * @return The system temporary directory for storing misc files
      * @note For windows this is: %USERPROFILE%/AppData/Local/Temp
+     * @note for iOS this is $TMPDIR: %APPSTORAGE%/tmp
      */
     string temp_dir() noexcept;
+    
+    /**
+     * @return The system home directory for this user
+     * @note ENV $HOME is used
+     */
+    string home_dir() noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 

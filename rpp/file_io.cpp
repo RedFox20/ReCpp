@@ -22,6 +22,9 @@
     #define _fstat64 fstat
     #define stat64   stat
 #endif
+#if __APPLE__
+#include <TargetConditionals.h>
+#endif
 
 namespace rpp /* ReCpp */
 {
@@ -1035,16 +1038,24 @@ namespace rpp /* ReCpp */
             DWORD len = GetTempPathA(sizeof(path), path);
             normalize(path);
             return { path, path + len };
+        #elif TARGET_OS_IPHONE
+            return getenv("TMPDIR");
         #else
             const char* path;
             (path = getenv("TMP")) ||
             (path = getenv("TEMP")) ||
+            (path = getenv("TMPDIR")) ||
             (path = getenv("TEMPDIR")) ||
             (path = "/tmp");
             return path;
         #endif
     }
-
+    
+    string home_dir() noexcept
+    {
+        return getenv("HOME");
+    }
+    
     ////////////////////////////////////////////////////////////////////////////////
 
 
