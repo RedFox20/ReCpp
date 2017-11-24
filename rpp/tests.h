@@ -8,12 +8,12 @@
 #include <rpp/strview.h> // we love strview, so it's a common dependency :)
 
 /**
- * If you don't want the tests framework to define the main function, then
- * set this to 0 in PROJECT BUILD SETTINGS,
- * which means you have to call rpp::run_tests(...) manually to run any of the tests
- */ 
+ * If you want the tests framework to define the main function, then
+ * set this to 1 in PROJECT BUILD SETTINGS,
+ * otherwise you have to call rpp::run_tests(...) manually to run any of the tests
+ */
 #ifndef RPP_TESTS_DEFINE_MAIN
-#define RPP_TESTS_DEFINE_MAIN 1
+#define RPP_TESTS_DEFINE_MAIN 0
 #endif
 
 #ifndef DLLEXPORT
