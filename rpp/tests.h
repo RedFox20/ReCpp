@@ -176,17 +176,19 @@ namespace rpp
 #define TestInit(testclass)                \
     testclass() : test(#testclass){}       \
     using ClassType = testclass;           \
+    ClassType* self() { return this; }     \
     void init_test() override
 
 #define TestInitNoAutorun(testclass)       \
     testclass() : test(#testclass,false){} \
     using ClassType = testclass;           \
+    ClassType* self() { return this; }     \
     void init_test() override
 
 #define TestCleanup(testclass) void cleanup_test() override
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(#testname, this, [this]{ test_##testname();}); \
+    const int _test_##testname = add_test_func(#testname, self(), [=]{ test_##testname();}); \
     void test_##testname()
 
 }
