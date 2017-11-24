@@ -158,30 +158,7 @@ namespace rpp
         #endif
     }
 
-#if !_WIN32 && !__ANDROID__ && !__APPLE__ // Linux:
-    static int _kbhit()
-    {
-        termios oldSettings; tcgetattr(STDIN_FILENO, &oldSettings);
-        termios newSettings = oldSettings;
-        newSettings.c_cc[VTIME] = 0;
-        newSettings.c_cc[VMIN] = 0;
-        newSettings.c_iflag &= ~(IXOFF);
-        newSettings.c_lflag &= ~(ECHO | ICANON);
-        tcsetattr(STDIN_FILENO, TCSANOW, &newSettings);
-
-        char keycodes[16];
-        int count = (int)::read(fileno(stdin), (void*)keycodes, 16);
-
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldSettings);
-
-        return count == 0 ? 0 : keycodes[0];
-    }
-#endif
-
-#if __ANDROID__ || __APPLE__
-    static int _kbhit() { return 1; }
-#endif
-
+#if _MSC_VER
     static void pause(int millis = -1/*forever*/)
     {
         printf("\nPress any key to continue...\n");
@@ -199,15 +176,7 @@ namespace rpp
             test::sleep(50);
         }
     }
-
-    //TestImpl(test_test)
-    //{
-    //	Implement(test_test)
-    //	{
-    //		Assert(1 == 1);
-    //	}
-    //}
-    //Instance;
+#endif
 
     int test::run_tests(const char* testNamePattern)
     {
