@@ -444,7 +444,7 @@ namespace rpp
         /**
          * @brief Invoke the delegate with specified args list
          */
-        template<class ...XArgs> Ret operator()(XArgs&&... args) const
+        template<class ...XArgs> inline Ret operator()(XArgs&&... args) const
         {
             if (obj)
             {
@@ -460,7 +460,7 @@ namespace rpp
             else
                 return (Ret)func(forward<XArgs>(args)...);
         }
-        template<class ...XArgs> Ret invoke(XArgs&&... args) const
+        template<class ...XArgs> inline Ret invoke(XArgs&&... args) const
         {
             if (obj)
             {
