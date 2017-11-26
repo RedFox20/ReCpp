@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <unordered_set>
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN 1
     #include <Windows.h>
     #include <conio.h> // _kbhit
 #elif __ANDROID__
@@ -50,7 +50,7 @@ namespace rpp
         va_start(ap, fmt);
     #if _WIN32
         static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-        static const int colormap[] = {
+        static const WORD colormap[] = {
             FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE, // Default
             FOREGROUND_GREEN, // dark green
             FOREGROUND_RED | FOREGROUND_GREEN, // dark yellow

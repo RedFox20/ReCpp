@@ -4,6 +4,10 @@
 #if __ANDROID__
   #include <android/log.h>
 #endif
+#if _WIN32
+#define WIN32_LEAN_AND_MEAN 1
+#include <Windows.h>
+#endif
 
 #ifdef QUIETLOG
 static LogSeverity Filter = LogSeverityWarn;
@@ -75,12 +79,28 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
                                                       ANDROID_LOG_ERROR;
         __android_log_write(priority, tag, err);
+    #elif _WIN32
+        static HANDLE winout = GetStdHandle(STD_OUTPUT_HANDLE);
+        static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
+        static const WORD colormap[] = {
+            FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY, // white - Info
+            FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY, // bright yellow - Warning
+            FOREGROUND_RED | FOREGROUND_INTENSITY, // bright red - Error
+        };
+        bool is_error = severity == LogSeverityError;
+        HANDLE out = is_error ? winout : winerr;
+        DWORD written;
+    
+        SetConsoleTextAttribute(out, colormap[severity]);
+        WriteConsoleA(out, err, len, &written, nullptr);
+        WriteConsoleA(out, "\n", 1, &written, nullptr);
+        SetConsoleTextAttribute(out, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
     #else
-        (void)tag;
         FILE* out = (severity == LogSeverityError) ? stderr : stdout;
         fwrite(err, (size_t)len, 1, out);
         fwrite("\n", 1, 1, out);
     #endif
+    (void)tag;
 }
 
 EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len)
@@ -90,6 +110,7 @@ EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, con
     #else
         printf("EVT %s: %.*s\n", eventName, len, message);
     #endif
+    (void)tag;
 }
 
 EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
