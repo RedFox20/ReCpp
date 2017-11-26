@@ -14,7 +14,7 @@ namespace rpp
 {
     using namespace std;
 
-
+    //////////////////////////////////////////////////////////////////////////////////////////
 
     // Optimized Action delegate, using the 'Fastest Possible C++ Delegates' method
     // This supports lambdas by grabbing a pointer to the lambda instance,
@@ -223,7 +223,7 @@ namespace rpp
             timeout,
         };
 
-        bool running() const noexcept { return taskRunning; }
+        bool running()  const noexcept { return taskRunning; }
 
         pool_task();
         ~pool_task() noexcept;
@@ -267,7 +267,7 @@ namespace rpp
         mutex tasksMutex;
         vector<unique_ptr<pool_task>> tasks;
         int taskMaxIdleTime = 15; // new task timeout in seconds
-        bool rangeRunning = false; // whether parallel range is running or not
+        atomic_bool rangeRunning { false }; // whether parallel range is running or not
         
     public:
 
@@ -290,15 +290,9 @@ namespace rpp
         // returns the number of tasks cleared
         int clear_idle_tasks() noexcept;
 
-        // always creates a brand new task that is registered in the pool (and will get reused)
-        pool_task* new_task() noexcept;
-
-        // gets the next available task (or creates a new one);
-        // @param poolIndex Initial value should be 0. Used to iterate all registered thread tasks
-        pool_task* next_task(size_t& poolIndex) noexcept;
-
-        // gets the next free task (or creates a new one)
-        pool_task* get_task() noexcept;
+        // starts a single range task atomically
+        pool_task* start_range_task(size_t& poolIndex, int rangeStart, int rangeEnd, 
+                                    const action<int, int>& rangeTask) noexcept;
 
         // sets a new max idle time for spawned tasks
         // this does not notify already idle tasks

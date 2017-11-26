@@ -89,7 +89,7 @@ TestImpl(test_serialization)
         Struct3 s3; buf >> s3;
         AssertThat(s3.a, 42);
         AssertThat(s3.b, "42");
-        AssertThat(buf.view(), "a;42;b;42;\n")
+        AssertThat(buf.view(), "a;42;b;42;\n");
     }
 
 } Impl;

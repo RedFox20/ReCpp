@@ -164,12 +164,17 @@ namespace rpp
 
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
-#define AssertThat(expr, expected) \
-    if ((expr) != (expected)) { assumption_failed(__FILE__, __LINE__, #expr, expr, "but expected", expected); }
-
+#define AssertThat(expr, expected) do { \
+    auto&& __expr     = expr;           \
+    auto&& __expected = expected;       \
+    if (__expr != __expected) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expected); } \
+} while (false)
 #define AssertEqual AssertThat
-#define AssertNotEqual(expr, mustNotEqual) \
-    if ((expr) == (mustNotEqual)) { assumption_failed(__FILE__, __LINE__, #expr, expr, "must not equal", mustNotEqual); }
+#define AssertNotEqual(expr, mustNotEqual) do { \
+    auto&& __expr    = expr;                    \
+    auto&& __mustnot = mustNotEqual;            \
+    if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
+} while (false)
 
 #define TestImpl(testclass) static struct testclass : public rpp::test
 
@@ -188,7 +193,7 @@ namespace rpp
 #define TestCleanup(testclass) void cleanup_test() override
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(#testname, self(), [=]{ test_##testname();}); \
+    const int _test_##testname = add_test_func(#testname, self(), [=]{ this->test_##testname();}); \
     void test_##testname()
 
 }

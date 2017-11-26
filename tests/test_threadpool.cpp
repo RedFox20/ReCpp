@@ -17,8 +17,10 @@ TestImpl(test_threadpool)
         unordered_set<thread::id> ids;
         parallel_for(0, numIterations, [&](int start, int end)
         {
-            lock_guard<mutex> lock{m};
-            ids.insert(this_thread::get_id());
+            this_thread::sleep_for(1ms);
+            { lock_guard<mutex> lock{m};
+                ids.insert(this_thread::get_id());
+            }
         });
         lock_guard<mutex> lock{m};
         return (int)ids.size();
@@ -136,7 +138,8 @@ TestImpl(test_threadpool)
         atomic_int times_launched {0};
         auto func = [&]() {
             times_launched += 1;
-            pool_task* subtasks[4] = {
+            pool_task* subtasks[5] = {
+                rpp::parallel_task([&]() { times_launched += 1; }),
                 rpp::parallel_task([&]() { times_launched += 1; }),
                 rpp::parallel_task([&]() { times_launched += 1; }),
                 rpp::parallel_task([&]() { times_launched += 1; }),
@@ -156,7 +159,7 @@ TestImpl(test_threadpool)
         for (auto* task : tasks)
             AssertThat(task->wait(2000), pool_task::finished);
 
-        int expected = 4 * 5;
+        int expected = 4 * 6;
         AssertThat((int)times_launched, expected);
     }
 

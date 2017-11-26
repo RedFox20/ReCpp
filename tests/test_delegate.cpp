@@ -167,6 +167,23 @@ TestImpl(test_delegate)
         AssertThat(lambda2(data), "lambda2");
     }
 
+    TestCase(nested_lambdas)
+    {
+        DataDelegate lambda = [x=data](Data a)
+        {
+            DataDelegate nested = [x=x](Data a)
+            {
+                return validate("nested_lambda", x);
+            };
+            return nested(a);
+        };
+        AssertThat(lambda(data), "nested_lambda");
+
+        DataDelegate moved_lambda = move(lambda);
+        AssertThat(!lambda, true);
+        AssertThat(moved_lambda(data), "nested_lambda");
+    }
+
     TestCase(functor)
     {
         struct Functor

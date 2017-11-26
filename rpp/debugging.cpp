@@ -76,6 +76,7 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                                                       ANDROID_LOG_ERROR;
         __android_log_write(priority, tag, err);
     #else
+        (void)tag;
         FILE* out = (severity == LogSeverityError) ? stderr : stdout;
         fwrite(err, (size_t)len, 1, out);
         fwrite("\n", 1, 1, out);

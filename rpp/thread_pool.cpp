@@ -28,8 +28,7 @@ namespace rpp
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
-        if (taskRunning)
-            fprintf(stderr, "rpp::pool_task already running! This can cause a deadlock!\n");
+        assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
         { lock_guard<mutex> lock{m};
             genericTask  = {};
@@ -40,15 +39,13 @@ namespace rpp
         }
         if (th.joinable()) cv.notify_one();
         else {
-
             th = thread{[this] { run(); }}; // restart thread if needed
         }
     }
 
     void pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
     {
-        if (taskRunning)
-            fprintf(stderr, "rpp::pool_task already running! This can cause a deadlock!\n");
+        assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
         { lock_guard<mutex> lock{m};
             genericTask  = move(newTask);
@@ -57,7 +54,10 @@ namespace rpp
             rangeEnd     = 0;
             taskRunning  = true;
         }
-        cv.notify_one();
+        if (th.joinable()) cv.notify_one();
+        else {
+            th = thread{[this] { run(); }}; // restart thread if needed
+        }
     }
 
     pool_task::wait_result pool_task::wait(int timeoutMillis) noexcept
@@ -180,7 +180,7 @@ namespace rpp
             }
             
             { lock_guard<mutex> lock{m};
-                taskRunning = false;
+                taskRunning  = false;
                 cv.notify_all();
             }
         }
@@ -299,17 +299,8 @@ namespace rpp
         return cleared;
     }
 
-    pool_task* thread_pool::new_task() noexcept
-    {
-        auto task = make_unique<pool_task>();
-        auto* ptr = task.get();
-
-        lock_guard<mutex> lock{tasksMutex};
-        tasks.emplace_back(move(task));
-        return ptr;
-    }
-
-    pool_task* thread_pool::next_task(size_t& poolIndex) noexcept
+    pool_task* thread_pool::start_range_task(size_t& poolIndex, int rangeStart, int rangeEnd, 
+                                             const action<int, int>& rangeTask) noexcept
     {
         { lock_guard<mutex> lock{tasksMutex};
             for (; poolIndex < tasks.size(); ++poolIndex)
@@ -318,17 +309,19 @@ namespace rpp
                 if (!task->running())
                 {
                     ++poolIndex;
+                    task->run_range(rangeStart, rangeEnd, rangeTask);
                     return task;
                 }
             }
         }
-        return new_task();
-    }
 
-    pool_task* thread_pool::get_task() noexcept
-    {
-        size_t i = 0;
-        return next_task(i);
+        auto t  = make_unique<pool_task>();
+        auto* task = t.get();
+        task->run_range(rangeStart, rangeEnd, rangeTask);
+
+        lock_guard<mutex> lock{tasksMutex};
+        tasks.emplace_back(move(t));
+        return task;
     }
 
     void thread_pool::max_task_idle_time(int maxIdleSeconds) noexcept
@@ -369,10 +362,7 @@ namespace rpp
             {
                 const int start = i * len;
                 const int end   = i == cores - 1 ? rangeEnd : start + len;
-
-                pool_task* task = next_task(poolIndex);
-                active[i] = task;
-                task->run_range(start, end, rangeTask);
+                active[i] = start_range_task(poolIndex, start, end, rangeTask);
             }
         }
 
@@ -384,8 +374,25 @@ namespace rpp
 
     pool_task* thread_pool::parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
-        pool_task* task = get_task();
+        { lock_guard<mutex> lock{tasksMutex};
+            for (unique_ptr<pool_task>& t : tasks)
+            {
+                pool_task* task = t.get();
+                if (!task->running())
+                {
+                    task->run_generic(move(genericTask));
+                    return task;
+                }
+            }
+        }
+        
+        // create and run a new task atomically
+        auto t = make_unique<pool_task>();
+        auto* task = t.get();
         task->run_generic(move(genericTask));
+
+        lock_guard<mutex> lock{tasksMutex};
+        tasks.emplace_back(move(t));
         return task;
     }
 }

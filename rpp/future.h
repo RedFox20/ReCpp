@@ -4,7 +4,6 @@
  * Original implementation description by Herb Sutter at C++ and beyond 2012
  */
 #include <memory> // shared_ptr
-#include <functional>
 #include <future>
 #if __has_include("thread_pool.h")
 #define RPP_FUTURE_USE_THREADPOOL 1
@@ -35,7 +34,7 @@ namespace rpp
 
 
     template<class T, class Work>
-    auto then(std::future<T> f, Work w) -> composable_future<decltype(w(f.get()))>
+    auto then(future<T> f, Work w) -> composable_future<decltype(w(f.get()))>
     {
         return std::async([](future<T> f, Work w)
         { 
@@ -45,7 +44,7 @@ namespace rpp
 
 
     template<class Work>
-    auto then(std::future<void> f, Work w) -> composable_future<decltype(w())>
+    auto then(future<void> f, Work w) -> composable_future<decltype(w())>
     {
         return std::async([](future<void> f, Work w)
         { 
@@ -56,7 +55,7 @@ namespace rpp
 
 
     template<class T, class Work, class Except>
-    auto then(std::future<T> f, Work w, Except handler) -> composable_future<decltype(w(f.get()))>
+    auto then(future<T> f, Work w, Except handler) -> composable_future<decltype(w(f.get()))>
     {
         return std::async([](future<T> f, Work w, Except handler)
         { 
@@ -70,7 +69,7 @@ namespace rpp
 
 
     template<class Work, class Except>
-    auto then(std::future<void> f, Work w, Except handler) -> composable_future<decltype(w())>
+    auto then(future<void> f, Work w, Except handler) -> composable_future<decltype(w())>
     {
         return std::async([](future<void> f, Work w, Except handler)
         { 
@@ -87,9 +86,9 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    template<class T, class Work> void continue_with(std::future<T> f, Work w)
+    template<class T, class Work> void continue_with(future<T> f, Work w)
     {
-        auto lambda = [](std::future<T> f, Work w) {
+        auto lambda = [](future<T> f, Work w) {
             w(f.get());
         };
         #if RPP_FUTURE_USE_THREADPOOL
@@ -100,9 +99,9 @@ namespace rpp
     }
 
 
-    template<class Work> void continue_with(std::future<void> f, Work w)
+    template<class Work> void continue_with(future<void> f, Work w)
     {
-        auto lambda = [](std::future<void> f, Work w) {
+        auto lambda = [](future<void> f, Work w) {
             f.get();
             w();
         };
@@ -114,9 +113,9 @@ namespace rpp
     }
 
 
-    template<class T, class Work, class Except> void continue_with(std::future<T> f, Work w, Except handler)
+    template<class T, class Work, class Except> void continue_with(future<T> f, Work w, Except handler)
     {
-        auto lambda = [](std::future<T> f, Work w, Except handler) {
+        auto lambda = [](future<T> f, Work w, Except handler) {
             try {
                 return w(f.get());
             } catch (exception& e) {
@@ -131,9 +130,9 @@ namespace rpp
     }
 
 
-    template<class Work, class Except> void continue_with(std::future<void> f, Work w, Except handler)
+    template<class Work, class Except> void continue_with(future<void> f, Work w, Except handler)
     {
-        auto lambda = [](std::future<void> f, Work w, Except handler) {
+        auto lambda = [](future<void> f, Work w, Except handler) {
             try {
                 f.get();
                 return w();
@@ -152,14 +151,14 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    template<class T> class NODISCARD composable_future : public std::future<T>
+    template<class T> class NODISCARD composable_future : public future<T>
     {
     public:
-        composable_future(std::future<T>&& f) noexcept : std::future<T>(move(f))
+        composable_future(future<T>&& f) noexcept : future<T>(move(f))
         {
         }
 
-        composable_future& operator=(std::future<T>&& f) noexcept
+        composable_future& operator=(future<T>&& f) noexcept
         {
             future<T>::operator=(move(f));
             return *this;
