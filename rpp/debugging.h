@@ -104,7 +104,7 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
 #define __log_format(format, file, line, func) ("$ " format)
 #endif
 
-#if defined(DEBUG) || defined(_DEBUG) || defined(BETA)
+#if defined(DEBUG) || defined(_DEBUG) || defined(BETA) || defined(RPP_DEBUG)
 #  if defined __APPLE__ || defined __clang__ // iOS or just clang
 #    if __ANDROID__
 #      define __assertion_failure(msg) __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), msg)
