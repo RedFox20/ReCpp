@@ -157,11 +157,23 @@ namespace rpp
         composable_future(future<T>&& f) noexcept : future<T>(move(f))
         {
         }
-
+        composable_future(composable_future&& f) noexcept : future<T>(move(f))
+        {
+        }
         composable_future& operator=(future<T>&& f) noexcept
         {
             future<T>::operator=(move(f));
             return *this;
+        }
+        composable_future& operator=(composable_future&& f) noexcept
+        {
+            future<T>::operator=(move(f));
+            return *this;
+        }
+        ~composable_future() noexcept // always block if future is still incomplete
+        {
+            if (this->valid())
+                this->wait();
         }
 
         template<class Work> auto then(Work w)
