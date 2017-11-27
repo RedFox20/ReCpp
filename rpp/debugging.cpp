@@ -74,7 +74,7 @@ static void ShortFilePathMessage(char*& ptr, int& len)
 
 // this ensures default output newline is atomic with the rest of the error string
 #define AllocaPrintlineBuf(err, len) \
-    char* buf = (char*)__alloca(len + 2); \
+    char* buf = (char*)_alloca(len + 2); \
     memcpy(buf, err, len); \
     buf[len] = '\n'; \
     buf[len+1] = '\0';
