@@ -346,16 +346,7 @@ namespace rpp
     }
 
     /**
-     * Runs a generic parallel task on the default global thread pool
-     * @note Returns immediately; does not wait for the task to complete.
-     */
-    inline pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept
-    {
-        return thread_pool::global.parallel_task(move(genericTask));
-    }
-
-    /**
-     * Runs a generic lambda with no arguments
+     * Runs a generic parallel task with no arguments on the default global thread pool
      * @note Returns immediately
      * @code
      * rpp::parallel_task([s] {
@@ -363,12 +354,9 @@ namespace rpp
      * });
      * @endcode
      */
-    template<class Func>
-    inline pool_task* parallel_taks(Func&& func)
+    inline pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
-        return thread_pool::global.parallel_task([f=move(func)] {
-            f();
-        });
+        return thread_pool::global.parallel_task(move(genericTask));
     }
 
     /**

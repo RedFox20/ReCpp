@@ -72,6 +72,13 @@ static void ShortFilePathMessage(char*& ptr, int& len)
 }
 #endif
 
+// this ensures default output newline is atomic with the rest of the error string
+#define AllocaPrintlineBuf(err, len) \
+    char* buf = (char*)alloca(len + 2); \
+    memcpy(buf, err, len); \
+    buf[len] = '\n'; \
+    buf[len+1] = '\0';
+
 EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
 {
     #if __ANDROID__
@@ -91,14 +98,15 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         HANDLE out = is_error ? winout : winerr;
         DWORD written;
     
+        AllocaPrintlineBuf(err, len);
+    
         SetConsoleTextAttribute(out, colormap[severity]);
-        WriteConsoleA(out, err, len, &written, nullptr);
-        WriteConsoleA(out, "\n", 1, &written, nullptr);
+        WriteConsoleA(out, buf, len+1, &written, nullptr);
         SetConsoleTextAttribute(out, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
     #else
+        AllocaPrintlineBuf(err, len);
         FILE* out = (severity == LogSeverityError) ? stderr : stdout;
-        fwrite(err, (size_t)len, 1, out);
-        fwrite("\n", 1, 1, out);
+        fwrite(buf, (size_t)len+1, 1, out);
     #endif
     (void)tag;
 }
