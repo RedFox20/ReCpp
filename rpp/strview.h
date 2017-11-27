@@ -823,51 +823,20 @@ namespace rpp
 
     //////////////// handy stream operators /////////////////
 
-    inline strview& operator>>(strview& s, float& out)
-    {
-        out = s.next_float();
-        return s;
-    }
-    inline strview& operator>>(strview& s, double& out)
-    {
-        out = s.next_double();
-        return s;
-    }
-    inline strview& operator>>(strview& s, int& out)
-    {
-        out = s.next_int();
-        return s;
-    }
-    inline strview& operator>>(strview& s, unsigned& out)
-    {
-        out = (unsigned)s.next_int();
-        return s;
-    }
+    strview& operator>>(strview& s, float& out);
+    strview& operator>>(strview& s, double& out);
+    strview& operator>>(strview& s, int& out);
+    strview& operator>>(strview& s, unsigned& out);
+    strview& operator>>(strview& s, bool& out);
     // converts strview to std::string
-    inline strview& operator>>(strview& s, std::string& out)
-    {
-        s.to_string(out);
-        return s;
-    }
-    inline ostream& operator<<(ostream& stream, const strview& s)
-    {
-        return stream.write(s.str, s.len);
-    }
+    strview& operator>>(strview& s, std::string& out);
+    ostream& operator<<(ostream& stream, const strview& s);
 
     //////////////// string concatenate operators /////////////////
 
-    inline string& operator+=(string& a, const strview& b)
-    {
-        return a.append(b.str, size_t(b.len));
-    }
-    inline string operator+(const strview& a, const strview& b)
-    {
-        string str;
-        size_t al = size_t(a.len), bl = size_t(b.len);
-        str.reserve(al + bl);
-        str.append(a.str, al).append(b.str, bl);
-        return str;
-    }
+    string& operator+=(string& a, const strview& b);
+    string operator+(const strview& a, const strview& b);
+
     inline string operator+(const string& a, const strview& b){ return strview{a} + b;}
     inline string operator+(const strview& a, const string& b){ return a + strview{b};}
     inline string operator+(const char* a, const strview& b)  { return strview{a, strlen(a)} + b; }

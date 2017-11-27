@@ -7,16 +7,11 @@ namespace rpp
 {
     //////////////////////////////////////////////////////////////////////////////////
 
-    struct string_serializer : string_buffer
-    {
-        using string_buffer::string_buffer;
-    };
-
     template<class T> struct member_serialize
     {
         using bserialize_func   = void(*)(const T* inst, int offset, binary_stream& w);
         using bdeserialize_func = void(*)(T* inst,       int offset, binary_stream& r);
-        using sserialize_func   = void(*)(const T* inst, int offset, string_serializer& w);
+        using sserialize_func   = void(*)(const T* inst, int offset, string_buffer& w);
         using sdeserialize_func = void(*)(T* inst,       int offset, strview token);
         int offset;
         strview name; // for named serialization such as json
@@ -49,7 +44,7 @@ namespace rpp
             r >> var;
         }
 
-        template<class U> static void string_serialize(const T* inst, int offset, string_serializer& w)
+        template<class U> static void string_serialize(const T* inst, int offset, string_buffer& w)
         {
             U& var = *(U*)((byte*)inst + offset);
             w.write(var);
@@ -57,7 +52,8 @@ namespace rpp
         template<class U> static void string_deserialize(T* inst, int offset, strview token)
         {
             U& var = *(U*)((byte*)inst + offset);
-            token >> var;
+            operator>>(token, var);
+            //token >> var;
         }
 
 
@@ -106,7 +102,7 @@ namespace rpp
         }
 
         // serializes this into a single line "name1;value1;name2;value2;\n"
-        void serialize(string_serializer& w) const
+        void serialize(string_buffer& w) const
         {
             const T* inst = static_cast<const T*>(this);
             for (member_serialize<T>& memberInfo : members)
@@ -148,7 +144,7 @@ namespace rpp
     {
         s.deserialize(r); return r;
     }
-    //template<class T> string_serializer& operator<<(string_serializer& w, const serializable<T>& s) 
+    //template<class T> string_buffer& operator<<(string_buffer& w, const serializable<T>& s) 
     //{
     //    s.serialize(w); return w;
     //}
@@ -156,7 +152,7 @@ namespace rpp
     {
         s.deserialize(r); return r;
     }
-    template<class T> string_serializer& operator>>(string_serializer& r, serializable<T>& s)
+    template<class T> string_buffer& operator>>(string_buffer& r, serializable<T>& s)
     {
         strview sv = r.view();
         s.deserialize(sv); return r;

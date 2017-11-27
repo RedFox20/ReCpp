@@ -84,7 +84,7 @@ TestImpl(test_serialization)
 
     TestCase(string_serialize_simple)
     {
-        string_serializer buf;
+        string_buffer buf;
         Struct3{ 42, "42" }.serialize(buf);
         Struct3 s3; buf >> s3;
         AssertThat(s3.a, 42);
