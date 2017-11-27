@@ -153,7 +153,7 @@ namespace rpp
 
     const char* strview::find(const char* substr, int sublen) const
     {
-        if (int n = sublen) //// @note lots of micro-optimization here
+        if (size_t n = sublen) //// @note lots of micro-optimization here
         {
             const char* needle = substr;
             const char* haystr = str;
@@ -165,7 +165,8 @@ namespace rpp
                 if (!haystr) 
                     return nullptr; // definitely not found
 
-                if (memcmp(haystr, needle, n) == 0)
+                size_t haylen = hayend - haystr;
+                if (haylen >= n && memcmp(haystr, needle, n) == 0)
                     return haystr; // it's a match
                 ++haystr; // no match, reset search from next char
             }
