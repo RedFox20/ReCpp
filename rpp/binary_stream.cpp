@@ -133,7 +133,7 @@ namespace rpp
     uint binary_stream::fragmented_read(void* dst, uint bytesToRead, uint bufferBytes)
     {
         uint remainingBytes = bytesToRead;
-        if (bufferBytes) // available < bytesToRead,  buffer has less data, so it's a fragmented/partial fill
+        if (bufferBytes) // bufferBytes < bytesToRead,  buffer has less data, so it's a fragmented/partial fill
         {
             memcpy(dst, &Ptr[ReadPos], (size_t)bufferBytes);
             clear();
@@ -150,10 +150,10 @@ namespace rpp
 
     uint binary_stream::read(void* dst, uint bytesToRead)
     {
-        uint available = size();
-        if (available >= bytesToRead)
+        uint bufferBytes = size();
+        if (bufferBytes >= bytesToRead)
             return unsafe_buffer_read(dst, bytesToRead); // best case, all from buffer
-        return fragmented_read(dst, bytesToRead, available);
+        return fragmented_read(dst, bytesToRead, bufferBytes);
     }
 
     uint binary_stream::peek(void* dst, uint cnt)
@@ -189,30 +189,44 @@ namespace rpp
 
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 
-    int socket_stream::stream_write(const void* data, uint numBytes) noexcept
+    //// -- SOCKET WRITER -- ////
+
+    int socket_writer::stream_write(const void* data, uint numBytes) noexcept
     {
         if (stream_good())
             return Sock->send(data, numBytes);
         return -1;
     }
-    void socket_stream::stream_flush() noexcept
+    void socket_writer::stream_flush() noexcept
     {
         if (stream_good())
             Sock->flush();
     }
-    int socket_stream::stream_read(void* dst, int max) noexcept
+
+    //// -- FILE READER -- ////
+
+    void socket_reader::stream_flush() noexcept
     {
         if (stream_good())
+            Sock->flush();
+    }
+    int socket_reader::stream_read(void* dst, int max) noexcept
+    {
+        if (stream_good())
+        {
+            if (Sock->type() != ST_Stream)
+                return Sock->recvfrom(Addr, dst, max);
             return Sock->recv(dst, max);
+        }
         return -1;
     }
-    int socket_stream::stream_peek(void* dst, int max) noexcept
+    int socket_reader::stream_peek(void* dst, int max) noexcept
     {
         if (stream_good())
             return Sock->peek(dst, max);
         return -1;
     }
-    void socket_stream::stream_skip(int n) noexcept
+    void socket_reader::stream_skip(int n) noexcept
     {
         if (stream_good())
             Sock->skip(n);
@@ -226,24 +240,34 @@ namespace rpp
 
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
 
-    int file_stream::stream_write(const void* data, uint numBytes) noexcept
+    //// -- FILE WRITER -- ////
+
+    int file_writer::stream_write(const void* data, uint numBytes) noexcept
     {
         if (stream_good())
             return File->write(data, numBytes);
         return -1;
     }
-    void file_stream::stream_flush() noexcept
+    void file_writer::stream_flush() noexcept
     {
         if (stream_good())
             File->flush();
     }
-    int file_stream::stream_read(void* dst, int max) noexcept
+
+    //// -- FILE READER -- ////
+
+    void file_reader::stream_flush() noexcept
+    {
+        if (stream_good())
+            File->flush();
+    }
+    int file_reader::stream_read(void* dst, int max) noexcept
     {
         if (stream_good())
             return File->read(dst, max);
         return -1;
     }
-    int file_stream::stream_peek(void* dst, int max) noexcept
+    int file_reader::stream_peek(void* dst, int max) noexcept
     {
         if (stream_good())
         {
@@ -254,7 +278,7 @@ namespace rpp
         }
         return -1;
     }
-    void file_stream::stream_skip(int n) noexcept
+    void file_reader::stream_skip(int n) noexcept
     {
         if (stream_good())
             File->seek(n, SEEK_CUR);

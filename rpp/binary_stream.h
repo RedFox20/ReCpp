@@ -1,6 +1,7 @@
 #pragma once
 #include "strview.h"
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
+#include <mutex>
 #include "sockets.h"
 #endif
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
@@ -74,6 +75,11 @@ namespace rpp /* ReCpp */
         virtual int stream_read(void* dst, int max) noexcept = 0;
 
         /**
+         * @return Number of bytes available in the stream for future read operations
+         */
+        virtual int stream_available() const noexcept { return 0; }
+
+        /**
          * Peeks the stream for the next few bytes. Not all streams can be peeked, so this implementation is optional.
          * @param dst Destination buffer to read into
          * @param max Maximum number of characters to peek
@@ -103,21 +109,39 @@ namespace rpp /* ReCpp */
      *        For streams, buffering can be disabled by passing in capacity: 0,
      *        which means all data is piped into stream source.
      *        
-     * @warning There is no automatic flushing during normal write operations, for
+     * @warning There is no automatic flushing during normal write operations, so for
      *          large binary streams, you will need to manually flush the stream with .flush() or << endl
      *          The stream buffer is flushed in the destructor.
      * @code
      *     if (rpp::file f { filename })
      *     {
-     *         file_stream fs { f };
+     *         file_writer fs { f };
      *         fs << "binary string";
      *     
      *         fs << std::endl; // example: manual flush
      *         fs.flush();      // example: another manual flush
      *     
      *     } // f is autoflushed
-     * 
      * @endcode
+     * 
+     * @warning Binary Stream provides both read and write operations, on the same underlying
+     *          buffer, so you can immediatelly read anything that was written.
+     *          In the case of sockets this makes little sense, so for bidirectional
+     *          communication it makes sense to use two instances instead of one:
+     * @code
+     *     socket s = socket::connect_to(...);
+     *     socket_stream out {s};
+     *     socket_stream in  {s};
+     *     
+     *     out << "Hello!" << endl;
+     *     
+     *     if (s.select(2000, SF_Read) // wait 2000ms for response
+     *     {
+     *         string response;
+     *         in >> response;
+     *     }
+     * @endcode
+     *         
      */
     class binary_stream
     {
@@ -126,8 +150,8 @@ namespace rpp /* ReCpp */
 
         int ReadPos  = 0;  // read head position in the buffer
         int WritePos = 0;  // write head position in the buffer
-        int End = 0;      // end of data
-        int Cap = SBSize; // current buffer capacity
+        int End = 0;       // end of data
+        int Cap = SBSize;  // current buffer capacity
         char* Ptr;         // pointer to current buffer, either this->Buf or a dynamically allocated one
         stream_source* Src = nullptr;
         char  Buf[SBSize];
@@ -151,16 +175,20 @@ namespace rpp /* ReCpp */
 
         void disable_buffering();
 
-        const char* data() const { return &Ptr[ReadPos]; }
-        char*       data()       { return &Ptr[ReadPos]; }
+        const char* data()  const { return &Ptr[ReadPos]; }
+        char*       data()        { return &Ptr[ReadPos]; }
         const char* begin() const { return &Ptr[ReadPos]; }
         const char* end()   const { return &Ptr[End]; }
         uint readpos()      const { return ReadPos; }
         uint writepos()     const { return WritePos; }
+        // @return Number of bytes in the read buffer
         uint size()      const { return End - ReadPos; }
-        uint available() const { return End - ReadPos; }
         uint capacity()  const { return Cap; }
         strview view()   const { return { data(), (int)size() }; }
+
+        // @return Total buffered bytes and available stream bytes: 
+        //         size() + stream_available()
+        uint available() const noexcept { return (End - ReadPos) + (Src ? Src->stream_available() : 0); }
 
         /**
          * Sets the buffer position and size to 0; no data is flushed
@@ -379,26 +407,119 @@ namespace rpp /* ReCpp */
 
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 
+
     /**
-     * A generic binary socket I/O stream. For UDP sockets, use socket::bind to set the destination ipaddress.
+     * A generic binary socket writer. For UDP sockets, use socket::bind to set the destination ipaddress.
      */
-    class socket_stream : public binary_stream, protected stream_source
+    class socket_writer : public binary_stream, protected stream_source
     {
         rpp::socket* Sock = nullptr;
-
     public:
-        socket_stream() noexcept : binary_stream(this) {}
-        explicit socket_stream(rpp::socket& sock)      noexcept : binary_stream(this),           Sock(&sock) {}
-        socket_stream(rpp::socket& sock, int capacity) noexcept : binary_stream(capacity, this), Sock(&sock) {}
+        socket_writer() noexcept : binary_stream(this) {}
+        explicit socket_writer(rpp::socket& sock)      noexcept : binary_stream(this),           Sock(&sock) {}
+        socket_writer(rpp::socket& sock, int capacity) noexcept : binary_stream(capacity, this), Sock(&sock) {}
 
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
-
         int stream_write(const void* data, uint numBytes) noexcept override;
+        void stream_flush() noexcept override;
+
+        // does not support read operations
+        int stream_read(void* dst, int max) noexcept override { (void)dst; (void)max; return 0; }
+        int stream_peek(void* dst, int max) noexcept override { (void)dst; (void)max; return 0; }
+        void stream_skip(int n) noexcept override { (void)n; }
+    };
+
+
+    /**
+     * A generic binary socket reader. For UDP sockets the remote address can be inspected
+     * via socket_reader::addr()
+     */
+    class socket_reader : public binary_stream, protected stream_source
+    {
+        rpp::socket* Sock = nullptr;
+        rpp::ipaddress Addr;
+    public:
+        socket_reader() noexcept : binary_stream(this) {}
+        explicit socket_reader(rpp::socket& sock)      noexcept : binary_stream(this),           Sock(&sock) {}
+        socket_reader(rpp::socket& sock, int capacity) noexcept : binary_stream(capacity, this), Sock(&sock) {}
+
+        const rpp::ipaddress& addr() const noexcept { return Addr; }
+        bool stream_good() const noexcept override { return Sock && Sock->good(); }
+
+        // does not support write operations
+        int stream_write(const void* data, uint numBytes) noexcept override { (void)data; (void)numBytes; return 0; }
+
         void stream_flush() noexcept override;
         int stream_read(void* dst, int max) noexcept override;
         int stream_peek(void* dst, int max) noexcept override;
         void stream_skip(int n) noexcept override;
     };
+
+
+    /**
+     * Almost identical to lock_guard, but allows move semantics
+     */
+    template<class Mutex = std::mutex> struct scoped_guard
+    {
+        Mutex* Mut;
+        explicit scoped_guard(Mutex& m) : Mut(&m) { m.lock(); }
+        ~scoped_guard() noexcept { if (Mut) Mut->unlock(); }
+
+        scoped_guard(scoped_guard&& fwd) noexcept : Mut(fwd.Mut) { fwd.Mut = 0; }
+        scoped_guard& operator=(scoped_guard&& fwd) noexcept {
+            std::swap(Mut, fwd.Mut);
+            return *this;
+        }
+        scoped_guard(const scoped_guard&)            = delete;
+        scoped_guard& operator=(const scoped_guard&) = delete;
+    };
+
+
+    /**
+     * A simple socket_writer wrapper that provides a lock_guard facility
+     * for writing to the socket_writer buffer across multiple threads
+     *
+     * @warning Write operations may cause a flush(), so make sure to use nonblocking sockets
+     *          otherwise you will experience long lock times
+     */
+    class shared_socket_writer : public socket_writer
+    {
+    protected:
+        mutex Mutex;
+    public:
+        using socket_writer::socket_writer;
+
+        // Acquire a scoped lock_guard on this socket writer's mutex
+        // Ex:     auto&& lock = writer.guard();
+        //
+        scoped_guard<mutex> guard() noexcept {
+            return scoped_guard<mutex>{ Mutex };
+        }
+    };
+
+
+    /**
+     * A simple socket_reader wrapper that provides a lock_guard facility
+     * for reading from the socket_reader buffer across multiple threads
+     *
+     * @warning Read operations may cause a buffer fill event, so make
+     *          sure the socket has enough data available to continue
+     */
+    class shared_socket_reader : public socket_reader
+    {
+    protected:
+        mutex Mutex;
+    public:
+        using socket_reader::socket_reader;
+
+        // Acquire a scoped lock_guard on this socket reader's mutex
+        // Ex:     auto&& lock = reader.guard();
+        //
+        scoped_guard<mutex> guard() noexcept {
+            return scoped_guard<mutex>{ Mutex };
+        }
+    };
+
 
 #endif
 
@@ -407,20 +528,42 @@ namespace rpp /* ReCpp */
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
 
     /**
-     * A generic binary file stream. This is not the best for small inputs, but excels with huge contiguous streams
+     * A generic binary file writer. This is not the best for small inputs, but excels with huge contiguous streams
      */
-    class file_stream : public binary_stream, protected stream_source
+    class file_writer : public binary_stream, protected stream_source
     {
         rpp::file* File = nullptr;
-
     public:
-        file_stream() noexcept {}
-        explicit file_stream(rpp::file& file)      noexcept : File(&file) {}
-        file_stream(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
+        file_writer() noexcept {}
+        explicit file_writer(rpp::file& file)      noexcept : File(&file) {}
+        file_writer(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
+
+        bool stream_good() const noexcept override { return File && File->good(); }
+        int stream_write(const void* data, uint numBytes) noexcept override;
+        void stream_flush() noexcept override;
+
+        // does not support read operations
+        int stream_read(void* dst, int max) noexcept override { (void)dst; (void)max; return 0; }
+        int stream_peek(void* dst, int max) noexcept override { (void)dst; (void)max; return 0; }
+        void stream_skip(int n) noexcept override { (void)n; }
+    };
+
+    /**
+     * A generic binary file reader. This is not the best for small inputs, but excels with huge contiguous streams
+     */
+    class file_reader : public binary_stream, protected stream_source
+    {
+        rpp::file* File = nullptr;
+    public:
+        file_reader() noexcept {}
+        explicit file_reader(rpp::file& file)      noexcept : File(&file) {}
+        file_reader(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
 
         bool stream_good() const noexcept override { return File && File->good(); }
 
-        int stream_write(const void* data, uint numBytes) noexcept override;
+        // does not support write operations
+        int stream_write(const void* data, uint numBytes) noexcept override { (void)data; (void)numBytes; return 0; }
+
         void stream_flush() noexcept override;
         int stream_read(void* dst, int max) noexcept override;
         int stream_peek(void* dst, int max) noexcept override;

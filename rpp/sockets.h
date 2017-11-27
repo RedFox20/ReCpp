@@ -215,7 +215,7 @@ namespace rpp
         static constexpr int INVALID = -1;
         int       Sock;   // Socket handle
         ipaddress Addr;   // remote addr
-        bool       Shared; // if true, Socket is shared and dtor won't call closesocket()
+        bool      Shared; // if true, Socket is shared and dtor won't call closesocket()
         category  Category;
 
     public:
@@ -251,7 +251,7 @@ namespace rpp
         void set_shared(bool shared=true) noexcept { Shared = shared; }
         bool is_shared() const noexcept { return Shared != 0; }
 
-        operator bool() const noexcept { return Sock != INVALID; }
+        explicit operator bool() const noexcept { return Sock != INVALID; }
         // @return TRUE if Sock handle is currently VALID
         bool good() const noexcept { return Sock != INVALID; }
         // @return TRUE if Sock handle is currently INVALID
@@ -310,7 +310,7 @@ namespace rpp
          * Automatically closes socket during critical failure and returns -1
          * If there is no data in recv buffer, this function returns 0
          */
-        NOINLINE int available() noexcept;
+        NOINLINE int available() const noexcept;
 
         /**
          * Receive data from remote socket, return number of bytes received
@@ -540,7 +540,7 @@ namespace rpp
         // Tries to select this socket for conditions
         // Select suspends the thread until this Socket file descriptor is signaled
         // Return false on timeout or error. (check socket::last_err())
-        bool select(int timeoutMillis, SelectFlag selectFlags=SF_ReadWrite) noexcept;
+        bool select(int timeoutMillis, SelectFlag selectFlags = SF_ReadWrite) noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
 
@@ -600,7 +600,7 @@ namespace rpp
 
         /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay
-         * @param address Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @return TRUE: valid socket, false: error (check socket::last_err())
          */
         bool connect(const ipaddress& remoteAddr, socket_option opt) noexcept;
@@ -612,7 +612,7 @@ namespace rpp
         bool connect(const char* hostname, int port, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
-         * @param address Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param millis Timeout value if the server takes too long to respond
          * @return TRUE: valid socket, false: error (check socket::last_err())
          */
@@ -628,7 +628,7 @@ namespace rpp
 
         /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay
-         * @param address Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @return If successful, an initialized Socket object
          */
         static socket connect_to(const ipaddress& remoteAddr, socket_option opt = SO_None) noexcept;
@@ -640,7 +640,7 @@ namespace rpp
         static socket connect_to(const char* hostname, int port, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
-         * @param address Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param millis Timeout value if the server takes too long to respond
          * @return If successful, an initialized Socket object
          */
@@ -660,30 +660,30 @@ namespace rpp
          * To pend asynchronously forever, set timeoutMillis to -1
          * The callback(socket s) receives accepted Socket object
          */
-        template<class Func> void accept_async(Func func, int millis = -1) noexcept
+        template<class Func> void accept_async(Func&& func, int millis = -1) noexcept
         {
             struct async {
-                socket& listener;
+                socket* listener;
                 Func callback;
                 int millis;
                 static void accept(async* arg) {
-                    socket& listener = arg->listener;
+                    socket* listener = arg->listener;
                     auto    callback = arg->callback;
                     int     timeout  = arg->millis;
                     delete arg; // delete before callback (in case of exception)
-                    callback(move(listener.accept(timeout)));
+                    callback(move(listener->accept(timeout)));
                 }
             };
-            if (auto* arg = new async{ *this, func, millis })
+            if (auto* arg = new async{ this, std::forward<Func>(func), millis })
                 spawn_thread((void(*)(void*))&async::accept, arg);
         }
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
-         * @param addr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param func The callback(socket s) receives accepted Socket object
          * @param millis Timeout value if the server takes too long to respond
          */
-        template<class Func> void connect_async(const ipaddress& remoteAddr, Func func, int millis, socket_option opt = SO_None) noexcept
+        template<class Func> void connect_async(const ipaddress& remoteAddr, Func&& func, int millis, socket_option opt = SO_None) noexcept
         {
             struct async {
                 ipaddress remoteAddr;
@@ -698,7 +698,7 @@ namespace rpp
             };
             close();
             Addr = remoteAddr;
-            if (auto* arg = new async{ remoteAddr, func, millis, opt })
+            if (auto* arg = new async{ remoteAddr, std::forward<Func>(func), millis, opt })
                 spawn_thread((void(*)(void*))&async::connect, arg);
         }
     };

@@ -570,12 +570,14 @@ namespace rpp
         int  errcode = err ? err : os_getsockerr();
         #if _WIN32
             char* msg = buf + 1024;
-            int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, 0, errcode, 0, msg, 1024, 0);
+            int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, errcode, 0, msg, 1024, nullptr);
             if (msg[len - 2] == '\r') msg[len -= 2] = '\0';
         #else
             char* msg = strerror(errcode);
         #endif
-        return string{ buf, buf + sprintf(buf, "error %d: %s", errcode, msg) };
+        int errlen = snprintf(buf, sizeof(buf), "error %d: %s", errcode, msg);
+        if (errlen < 0) errlen = (int)strlen(buf);
+        return string{ buf, buf + errlen };
     }
 
 
@@ -614,7 +616,7 @@ namespace rpp
         skip(available()); // flush read buffer
     }
 
-    int socket::available() noexcept
+    int socket::available() const noexcept
     {
         int bytesAvail;
         return get_ioctl(FIONREAD, bytesAvail) ? -1 : bytesAvail;
@@ -631,7 +633,7 @@ namespace rpp
     {
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
-        if (type() != ST_Datagram)
+        if (type() == ST_Stream)
             return handle_txres(::recv(Sock, (char*)buffer, numBytes, MSG_PEEK));
         saddr a;
         socklen_t len = sizeof(a);
@@ -857,7 +859,10 @@ namespace rpp
     {
         auto sa = to_saddr(addr);
         if (!::bind(Sock, sa, sa.size()))
+        {
+            Addr = addr;
             return true;
+        }
         handle_errno();
         return false;
     }
@@ -909,7 +914,6 @@ namespace rpp
 
     bool socket::listen(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
-        Addr = localAddr;
         if (!create(localAddr.Family, ipp, opt) || !bind(localAddr))
             return false;
 
@@ -938,7 +942,7 @@ namespace rpp
         Assert(type() != socket_type::ST_Datagram, "Cannot use socket::accept() on UDP sockets, use recvfrom instead");
 
         // assume the listener socket is already non-blocking
-        socket client = { (int)::accept(Sock, NULL, NULL), ipaddress{} };
+        socket client = { (int)::accept(Sock, nullptr, nullptr), ipaddress{} };
 
         if (client.Sock != -1) // do we have a client?
         { 

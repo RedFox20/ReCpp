@@ -13,9 +13,6 @@
     <ClCompile Include="..\rpp\allocators.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\rpp\binary_serializer.cpp">
-      <Filter>rpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\rpp\strview.cpp">
       <Filter>rpp</Filter>
     </ClCompile>

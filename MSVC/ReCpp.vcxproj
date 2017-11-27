@@ -182,7 +182,6 @@
   <ItemGroup>
     <ClCompile Include="..\rpp\allocators.cpp" />
     <ClCompile Include="..\rpp\binary_stream.cpp" />
-    <ClCompile Include="..\rpp\binary_serializer.cpp" />
     <ClCompile Include="..\rpp\debugging.cpp" />
     <ClCompile Include="..\rpp\file_io.cpp" />
     <ClCompile Include="..\rpp\json.cpp" />
