@@ -74,6 +74,14 @@ namespace rpp
             #define FINLINE __attribute__((always_inline))
         #endif
     #endif
+    
+    #ifndef RPPAPI
+        #if _MSC_VER
+            #define RPPAPI __declspec(dllexport)
+        #else // clang/gcc
+            #define RPPAPI __attribute__((visibility("default")))
+        #endif
+    #endif
 
 /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
@@ -822,20 +830,63 @@ namespace rpp
     }
 
     //////////////// handy stream operators /////////////////
-
-    strview& operator>>(strview& s, float& out);
-    strview& operator>>(strview& s, double& out);
-    strview& operator>>(strview& s, int& out);
-    strview& operator>>(strview& s, unsigned& out);
-    strview& operator>>(strview& s, bool& out);
-    // converts strview to std::string
-    strview& operator>>(strview& s, std::string& out);
-    ostream& operator<<(ostream& stream, const strview& s);
-
+    
+    inline strview& operator>>(strview& s, float& out)
+    {
+        out = s.next_float();
+        return s;
+    }
+    inline strview& operator>>(strview& s, double& out)
+    {
+        out = s.next_double();
+        return s;
+    }
+    inline strview& operator>>(strview& s, int& out)
+    {
+        out = s.next_int();
+        return s;
+    }
+    inline strview& operator>>(strview& s, unsigned& out)
+    {
+        out = (unsigned)s.next_int();
+        return s;
+    }
+    inline strview& operator>>(strview& s, bool& out)
+    {
+        if      (s.equalsi("true")){ s.skip(4); out = true; }
+        else if (s.equalsi("yes")) { s.skip(3); out = true; }
+        else if (s.equalsi("on"))  { s.skip(2); out = true; }
+        else if (s.equalsi("1"))   { s.skip(1); out = true; }
+        else out = false;
+        return s;
+    }
+    inline strview& operator>>(strview& s, std::string& out)
+    {
+        s.to_string(out);
+        s.skip(s.len);
+        return s;
+    }
+    
+    inline ostream& operator<<(ostream& stream, const strview& s)
+    {
+        return stream.write(s.str, s.len);
+    }
+    
     //////////////// string concatenate operators /////////////////
-
-    string& operator+=(string& a, const strview& b);
-    string operator+(const strview& a, const strview& b);
+    
+    inline string& operator+=(string& a, const strview& b)
+    {
+        return a.append(b.str, size_t(b.len));
+    }
+    
+    inline string operator+(const strview& a, const strview& b)
+    {
+        string str;
+        size_t al = size_t(a.len), bl = size_t(b.len);
+        str.reserve(al + bl);
+        str.append(a.str, al).append(b.str, bl);
+        return str;
+    }
 
     inline string operator+(const string& a, const strview& b){ return strview{a} + b;}
     inline string operator+(const strview& a, const string& b){ return a + strview{b};}

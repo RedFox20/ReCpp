@@ -487,65 +487,6 @@ namespace rpp
         return *this;
     }
 
-    //////////////// handy stream operators /////////////////
-
-    strview& operator>>(strview& s, float& out)
-    {
-        out = s.next_float();
-        return s;
-    }
-    strview& operator>>(strview& s, double& out)
-    {
-        out = s.next_double();
-        return s;
-    }
-    strview& operator>>(strview& s, int& out)
-    {
-        out = s.next_int();
-        return s;
-    }
-    strview& operator>>(strview& s, unsigned& out)
-    {
-        out = (unsigned)s.next_int();
-        return s;
-    }
-    strview& operator>>(strview& s, bool& out)
-    {
-        if      (s.equalsi("true")){ s.skip(4); out = true; }
-        else if (s.equalsi("yes")) { s.skip(3); out = true; }
-        else if (s.equalsi("on"))  { s.skip(2); out = true; }
-        else if (s.equalsi("1"))   { s.skip(1); out = true; }
-        else out = false;
-        return s;
-    }
-    strview& operator>>(strview& s, std::string& out)
-    {
-        s.to_string(out);
-        s.skip(s.len);
-        return s;
-    }
-
-    ostream& operator<<(ostream& stream, const strview& s)
-    {
-        return stream.write(s.str, s.len);
-    }
-
-    //////////////// string concatenate operators /////////////////
-
-    string& operator+=(string& a, const strview& b)
-    {
-        return a.append(b.str, size_t(b.len));
-    }
-
-    string operator+(const strview& a, const strview& b)
-    {
-        string str;
-        size_t al = size_t(a.len), bl = size_t(b.len);
-        str.reserve(al + bl);
-        str.append(a.str, al).append(b.str, bl);
-        return str;
-    }
-
     ////////////////////// loose utility functions
 
     /**
