@@ -245,11 +245,14 @@ namespace rpp
         // wait for task to finish
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
+        // kill the task and wait for it to finish
+        wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
+
     private:
         void notify_task();
         void run() noexcept;
         bool got_task() const noexcept;
-        bool wait_for_task() noexcept;
+        bool wait_for_task(unique_lock<mutex>& lock) noexcept;
     };
 
 

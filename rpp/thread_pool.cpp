@@ -20,9 +20,9 @@ namespace rpp
 
 #if POOL_TASK_DEBUG
 #  ifdef LogWarning
-#    define TaskDebug(fmt, ...) LogWarning("pool_task: " fmt, ##__VA_ARGS__)
+#    define TaskDebug(fmt, ...) LogWarning(fmt, ##__VA_ARGS__)
 #  else
-#    define TaskDebug(fmt, ...) fprintf(stderr, "pool_task: " fmt "\n", ##__VA_ARGS__)
+#    define TaskDebug(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
 #  endif
 #else
 #  define TaskDebug(fmt, ...) // do nothing
@@ -35,12 +35,7 @@ namespace rpp
 
     pool_task::~pool_task() noexcept
     {
-        { unique_lock<mutex> lock{m};
-            killed = true;
-        }
-        cv.notify_all();
-        TaskDebug("killing pool_task");
-        th.join();
+        kill();
     }
 
     void pool_task::max_idle_time(int maxIdleSeconds) { maxIdleTime = maxIdleSeconds; }
@@ -63,6 +58,7 @@ namespace rpp
     {
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
+        //TaskDebug("queue task");
         { lock_guard<mutex> lock{m};
             genericTask  = move(newTask);
             rangeTask    = {};
@@ -75,9 +71,13 @@ namespace rpp
     
     void pool_task::notify_task()
     {
-        if (!th.joinable()) {
-            TaskDebug("resurrecting task");
-            th = thread{[this] { run(); }}; // restart thread if needed
+        { lock_guard<mutex> lock{m};
+            if (killed) {
+                TaskDebug("resurrecting task");
+                killed = false;
+                if (th.joinable()) th.join();
+                th = thread{[this] { run(); }}; // restart thread if needed
+            }
         }
         cv.notify_one();
     }
@@ -103,9 +103,28 @@ namespace rpp
         return finished;
     }
 
-    #if _WIN32
+    pool_task::wait_result pool_task::kill(int timeoutMillis) noexcept
+    {
+        if (killed) {
+            if (th.joinable()) th.join();
+            return finished;
+        }
+        { unique_lock<mutex> lock{m};
+            TaskDebug("killing task");
+            killed = true;
+        }
+        cv.notify_all();
+        wait_result result = wait(timeoutMillis);
+        if (th.joinable()) {
+            if (result == timeout) th.detach();
+            else                   th.join();
+        }
+        return result;
+    }
+
+#if _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN 1
+    #  define WIN32_LEAN_AND_MEAN 1
     #endif
     #include <Windows.h>
     #pragma pack(push,8)
@@ -156,12 +175,9 @@ namespace rpp
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
 
-        //printf("%s start\n", name);
-        while (!killed)
+        //TaskDebug("%s start", name);
+        for (;;)
         {
-            //printf("%s wait for task\n", name);
-            if (!wait_for_task())
-                break;
 
             try
             {
@@ -169,22 +185,27 @@ namespace rpp
                 decltype(genericTask) generic;
                 
                 // consume the tasks atomically
-                { lock_guard<mutex> lock{m};
+                { unique_lock<mutex> lock{m};
+                    //TaskDebug("%s wait for task", name);
+                    if (!wait_for_task(lock)) {
+                        TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
+                        killed = true;
+                        return;
+                    }
                     range   = move(rangeTask);
                     generic = move(genericTask);
                     rangeTask   = {};
                     genericTask = {}; // BUG: Clang on android doesn't move genericTask properly
                     taskRunning = true;
                 }
-                
                 if (range)
                 {
-                    TaskDebug("%s range [%d,%d)", name, rangeStart, rangeEnd);
+                    //TaskDebug("%s(range_task[%d,%d))", name, rangeStart, rangeEnd);
                     range(rangeStart, rangeEnd);
                 }
                 else
                 {
-                    TaskDebug("%s task", name);
+                    //TaskDebug("%s(generic_task)", name);
                     generic();
                 }
             }
@@ -200,13 +221,11 @@ namespace rpp
             {
                 fprintf(stderr, "pool_task::run unhandled exception!\n");
             }
-            
             { lock_guard<mutex> lock{m};
                 taskRunning  = false;
                 cv.notify_all();
             }
         }
-        TaskDebug("%s killed: %d", name, killed);
     }
 
     bool pool_task::got_task() const noexcept
@@ -214,9 +233,8 @@ namespace rpp
         return (bool)rangeTask || (bool)genericTask;
     }
 
-    bool pool_task::wait_for_task() noexcept
+    bool pool_task::wait_for_task(unique_lock<mutex>& lock) noexcept
     {
-        unique_lock<mutex> lock {m};
         for (;;)
         {
             if (killed)

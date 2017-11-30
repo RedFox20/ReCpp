@@ -133,6 +133,27 @@ TestImpl(test_threadpool)
         AssertThat(times_launched, 2);
     }
 
+    TestCase(parallel_task_resurrection)
+    {
+        thread_pool::global.max_task_idle_time(1);
+        thread_pool::global.clear_idle_tasks();
+        AssertThat(thread_pool::global.active_tasks(), 0);
+
+        atomic_int times_launched {0};
+        rpp::parallel_task([&] { times_launched += 1; })->wait(2000);
+        AssertThat((int)times_launched, 1);
+
+        printf("Waiting for pool task to die...\n");
+        this_thread::sleep_for(1s);
+        printf("Attempting pool task resurrection\n");
+        rpp::parallel_task([&] { 
+            times_launched += 1; 
+        })->wait(2000);
+        AssertThat((int)times_launched, 2);
+
+        thread_pool::global.max_task_idle_time(2);
+    }
+
     TestCase(parallel_task_nested_nodeadlocks)
     {
         atomic_int times_launched {0};
