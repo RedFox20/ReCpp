@@ -214,8 +214,8 @@ namespace rpp
         int rangeStart  = 0;
         int rangeEnd    = 0;
         int maxIdleTime = 15;
-        volatile bool taskRunning = false;
-        volatile bool killed      = false;
+        volatile bool taskRunning = false; // an active task is being executed
+        volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
 
     public:
         enum wait_result {

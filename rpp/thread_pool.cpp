@@ -37,10 +37,10 @@ namespace rpp
             rangeEnd     = end;
             taskRunning  = true;
         }
-        if (th.joinable()) cv.notify_one();
-        else {
+        if (!th.joinable()) {
             th = thread{[this] { run(); }}; // restart thread if needed
         }
+        cv.notify_one();
     }
 
     void pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
@@ -54,10 +54,10 @@ namespace rpp
             rangeEnd     = 0;
             taskRunning  = true;
         }
-        if (th.joinable()) cv.notify_one();
-        else {
+        if (!th.joinable()) {
             th = thread{[this] { run(); }}; // restart thread if needed
         }
+        cv.notify_one();
     }
 
     pool_task::wait_result pool_task::wait(int timeoutMillis) noexcept
@@ -317,6 +317,7 @@ namespace rpp
 
         auto t  = make_unique<pool_task>();
         auto* task = t.get();
+        task->max_idle_time(taskMaxIdleTime);
         task->run_range(rangeStart, rangeEnd, rangeTask);
 
         lock_guard<mutex> lock{tasksMutex};
@@ -389,6 +390,7 @@ namespace rpp
         // create and run a new task atomically
         auto t = make_unique<pool_task>();
         auto* task = t.get();
+        task->max_idle_time(taskMaxIdleTime);
         task->run_generic(move(genericTask));
 
         lock_guard<mutex> lock{tasksMutex};
