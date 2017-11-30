@@ -6,10 +6,28 @@
     #include <pthread.h>
 #endif
 
+#define POOL_TASK_DEBUG 1
+
+#if POOL_TASK_DEBUG
+#  if __has_include("debugging.h")
+#    include "debugging.h"
+#  endif
+#endif
+
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////
 
+#if POOL_TASK_DEBUG
+#  ifdef LogWarning
+#    define TaskDebug(fmt, ...) LogWarning("pool_task: " fmt, ##__VA_ARGS__)
+#  else
+#    define TaskDebug(fmt, ...) fprintf(stderr, "pool_task: " fmt "\n", ##__VA_ARGS__)
+#  endif
+#else
+#  define TaskDebug(fmt, ...) // do nothing
+#endif
+    
     pool_task::pool_task()
     {
         th = thread{[this] { run(); }};
@@ -21,6 +39,7 @@ namespace rpp
             killed = true;
         }
         cv.notify_all();
+        TaskDebug("killing pool_task");
         th.join();
     }
 
@@ -37,10 +56,7 @@ namespace rpp
             rangeEnd     = end;
             taskRunning  = true;
         }
-        if (!th.joinable()) {
-            th = thread{[this] { run(); }}; // restart thread if needed
-        }
-        cv.notify_one();
+        notify_task();
     }
 
     void pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
@@ -54,7 +70,13 @@ namespace rpp
             rangeEnd     = 0;
             taskRunning  = true;
         }
+        notify_task();
+    }
+    
+    void pool_task::notify_task()
+    {
         if (!th.joinable()) {
+            TaskDebug("resurrecting task");
             th = thread{[this] { run(); }}; // restart thread if needed
         }
         cv.notify_one();
@@ -157,12 +179,12 @@ namespace rpp
                 
                 if (range)
                 {
-                    //printf("%s range [%d,%d) \n", name, rangeStart, rangeEnd);
+                    TaskDebug("%s range [%d,%d)", name, rangeStart, rangeEnd);
                     range(rangeStart, rangeEnd);
                 }
                 else
                 {
-                    //printf("%s task\n", name);
+                    TaskDebug("%s task", name);
                     generic();
                 }
             }
@@ -184,7 +206,7 @@ namespace rpp
                 cv.notify_all();
             }
         }
-        //printf("%s killed: %d\n", name, killed);
+        TaskDebug("%s killed: %d", name, killed);
     }
 
     bool pool_task::got_task() const noexcept

@@ -246,6 +246,7 @@ namespace rpp
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
+        void notify_task();
         void run() noexcept;
         bool got_task() const noexcept;
         bool wait_for_task() noexcept;
