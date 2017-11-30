@@ -6,7 +6,7 @@
     #include <pthread.h>
 #endif
 
-#define POOL_TASK_DEBUG 1
+#define POOL_TASK_DEBUG 0
 
 #if POOL_TASK_DEBUG
 #  if __has_include("debugging.h")
