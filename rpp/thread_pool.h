@@ -8,7 +8,6 @@
 #include <atomic>
 #include <condition_variable>
 #include "delegate.h"
-#include <functional>
 
 namespace rpp
 {
@@ -402,6 +401,15 @@ namespace rpp
         });
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @return TRUE if @flag == @expectedValue and atomically sets @flag to @newValue
+     */
+    inline bool atomic_test_and_set(atomic_bool& flag, bool expectedValue = true, bool newValue = false)
+    {
+        return flag.compare_exchange_weak(expectedValue, newValue);
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
