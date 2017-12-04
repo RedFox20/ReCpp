@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cassert>
 #include <csignal>
+#include <unordered_map>
 #if __APPLE__ || __linux__
     #include <pthread.h>
 #endif
@@ -197,7 +198,8 @@ namespace rpp
         register_thread_task(this);
 
         // mark all running threads killed during SIGTERM, before dtors run
-        static int atExitRegistered = atexit([] {
+        static int atExitRegistered;
+        if (!atExitRegistered) atExitRegistered = !atexit([] {
             for (auto& task : activeTasks) {
                 task.second->killed = true;
                 task.second->cv.notify_all();
