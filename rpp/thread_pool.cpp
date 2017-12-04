@@ -159,6 +159,26 @@ namespace rpp
         throw runtime_error("SIGSEGV");
     }
 
+    // really nasty case where OS threads are just abandoned
+    // with none of the destructors being run
+    static mutex activeTaskMutex;
+    static unordered_map<int, pool_task*> activeTasks;
+    static int get_thread_id()
+    {
+        auto id = this_thread::get_id();
+        return *(int*)&id;
+    }
+    static void register_thread_task(pool_task* task)
+    {
+        lock_guard<mutex> lock{ activeTaskMutex };
+        activeTasks[get_thread_id()] = task;
+    }
+    static void erase_thread_task()
+    {
+        lock_guard<mutex> lock{ activeTaskMutex };
+        activeTasks.erase(get_thread_id());
+    }
+
     void pool_task::run() noexcept
     {
         static int pool_task_id;
@@ -174,11 +194,30 @@ namespace rpp
         #endif
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
+        register_thread_task(this);
+
+        // mark all running threads killed during SIGTERM, before dtors run
+        static int atExitRegistered = atexit([] {
+            for (auto& task : activeTasks) {
+                task.second->killed = true;
+                task.second->cv.notify_all();
+            }
+            activeTasks.clear();
+        });
+
+        struct thread_exiter {
+            pool_task* self;
+            ~thread_exiter() {
+                erase_thread_task();
+                self->killed = true;
+                self->taskRunning = false;
+                self->cv.notify_all();
+            }
+        } markKilledOnScopeExit { this }; // however, this doesn't handle exit(0) where threads are mutilated
 
         //TaskDebug("%s start", name);
         for (;;)
         {
-
             try
             {
                 decltype(rangeTask)   range;
@@ -189,7 +228,6 @@ namespace rpp
                     //TaskDebug("%s wait for task", name);
                     if (!wait_for_task(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
-                        killed = true;
                         return;
                     }
                     range   = move(rangeTask);
@@ -252,7 +290,6 @@ namespace rpp
             }
         }
     }
-
 
     ///////////////////////////////////////////////////////////////////////////////
 
