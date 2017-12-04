@@ -237,7 +237,7 @@ namespace rpp /* ReCpp */
     {
         #if USE_WINAPI_IO
             DWORD bytesRead;
-            ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, 0);
+            ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
             return bytesRead;
         #else
             return (int)fread(buffer, (size_t)bytesToRead, 1, (FILE*)Handle) * bytesToRead;
@@ -246,13 +246,26 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (!fileSize) return load_buffer(0, 0);
+        if (!fileSize) return load_buffer{nullptr, 0};
 
         // allocate +1 bytes for null terminator; this is for legacy API-s
         char* buffer = (char*)malloc(size_t(fileSize + 1));
         int bytesRead = read(buffer, fileSize);
         buffer[bytesRead] = '\0';
-        return load_buffer(buffer, bytesRead);
+        return load_buffer{buffer, bytesRead};
+    }
+    string file::read_text() noexcept
+    {
+        string out;
+        int fileSize = size();
+        if (fileSize <= 0) return out;
+
+        // allocate +1 bytes for null terminator; this is for legacy API-s
+        out.resize(size_t(fileSize));
+        int n = read(out.data(), fileSize);
+        if (n != fileSize)
+            out.resize(size_t(n));
+        return out;
     }
     load_buffer file::read_all(const char* filename) noexcept
     {
@@ -643,12 +656,12 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    bool delete_folder(const string& foldername, bool recursive) noexcept
+    bool delete_folder(const strview foldername, delete_mode mode) noexcept
     {
         // these would delete the root dir. NOPE! This is always a bug.
         if (foldername.empty() || foldername == "/"_sv)
             return false;
-        if (!recursive)
+        if (mode == non_recursive)
             return sys_rmdir(foldername); // easy path, just gently try to delete...
 
         vector<string> folders;
@@ -658,10 +671,10 @@ namespace rpp /* ReCpp */
         if (list_alldir(folders, files, foldername))
         {
             for (const string& folder : folders)
-                deletedChildren |= delete_folder(foldername + '/' + folder, true);
+                deletedChildren |= delete_folder(path_combine(foldername, folder), recursive);
 
             for (const string& file : files)
-                deletedChildren |= delete_file(foldername + '/' + file);
+                deletedChildren |= delete_file(path_combine(foldername, file));
         }
 
         if (deletedChildren)

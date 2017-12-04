@@ -448,8 +448,42 @@ namespace rpp
         return ret;
     }
 
+    ///////////////////////////////////////////////////////////////////////////////////////
 
+    string join(const strview& a, const strview& b)
+    {
+        string str;
+        size_t sa = size_t(a.len), sb = size_t(b.len);
+        str.reserve(sa + sb);
+        str.append(a.str, sa).append(b.str, sb);
+        return str;
+    }
+    string join(const strview& a, const strview& b, const strview& c)
+    {
+        string str;
+        size_t sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        str.reserve(sa + sb + sc);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
+        return str;
+    }
+    string join(const strview& a, const strview& b, const strview& c, const strview& d)
+    {
+        string str;
+        size_t sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        str.reserve(sa + sb + sc + sd);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
+        return str;
+    }
+    string join(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
+    {
+        string str;
+        size_t sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        str.reserve(sa + sb + sc + sd + se);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
+        return str;
+    }
 
+    ///////////////////////////////////////////////////////////////////////////////////////
 
     char* to_lower(char* str, int len)
     {

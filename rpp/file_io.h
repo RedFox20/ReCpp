@@ -201,6 +201,11 @@ namespace rpp /* ReCpp */
         load_buffer read_all() noexcept;
 
         /**
+         * Reads the entire contents of the file into an std::string
+         */
+        string read_text() noexcept;
+
+        /**
          * Reads the entire contents of the file into a load_buffer
          * The file is opened as READONLY, unbuffered_file is used internally
          */
@@ -572,14 +577,18 @@ namespace rpp /* ReCpp */
     bool create_folder(const wchar_t* foldername) noexcept;
     bool create_folder(const wstring& foldername) noexcept;
 
+    enum delete_mode
+    {
+        non_recursive,
+        recursive,
+    };
+
     /**
      * Deletes a folder, by default only if it's empty.
-     * @param recursive If TRUE, all subdirectories and files will also be deleted (permanently)
+     * @param mode If delete_mode::recursive, all subdirectories and files will also be deleted (permanently)
      * @return TRUE if the folder was deleted
      */
-    bool delete_folder(const string& foldername, bool recursive = false) noexcept;
-    inline bool delete_folder(const char*   foldername, bool recursive = false) noexcept { return delete_folder(string{ foldername },   recursive); }
-    inline bool delete_folder(const strview foldername, bool recursive = false) noexcept { return delete_folder(foldername.to_string(), recursive); }
+    bool delete_folder(const strview foldername, delete_mode mode = non_recursive) noexcept;
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution

@@ -5,41 +5,43 @@ using namespace rpp;
 
 TestImpl(test_file_io)
 {
-    string FileName = "README.md"s;
-    int    FileSize = 0;
+    string TestDir  = path_combine(temp_dir(), "_rpp_test_tmp");
+    string TestFile = path_combine(temp_dir(), "_rpp_test.txt");
+    int TestSize = 0;
 
     TestInit(test_file_io)
     {
-        printf("working_dir: %s\n", working_dir().c_str());
-
-        fstream::openmode mode = ios::in | ios::binary;
-        fstream refFile { FileName, mode };
-        if (!refFile.good()) {
-            FileName = "../" + FileName;
-            refFile.open(FileName.c_str(), mode);
-        }
-        AssertMsg(refFile.good(), "Test file '%s' is missing", FileName.c_str());
-        FileSize = (int)refFile.seekg(0, fstream::end).tellg();
     }
-
     TestCleanup(test_file_io)
     {
-        if (folder_exists("./test_tmp"))
-            Assert(delete_folder("test_tmp", true/*recursive*/));
+        if (folder_exists(TestDir))
+            Assert(delete_folder(TestDir, recursive));
+        if (file_exists(TestFile))
+            Assert(delete_file(TestFile));
     }
 
     TestCase(basic_file)
     {
-        file f = { FileName };
-        Assert(f.good());
-        Assert(!f.bad());
-        Assert(f.size() > 0);
-        Assert(f.size() == FileSize);
+        ofstream fstr { TestFile };
+        AssertMsg(fstr.good(), "std::ofstream create failed: '%s'", TestFile.c_str());
+
+        string aaaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        fstr << aaaa;
+        TestSize = (int)fstr.tellp();
+        fstr.close();
+
+
+        file f = { TestFile };
+        AssertThat(f.good(), true);
+        AssertThat(f.bad(), false);
+        AssertThat(f.size() > 0, true);
+        AssertThat(f.size(), TestSize);
+        AssertThat(f.read_text(), aaaa);
     }
 
     TestCase(if_initializer)
     {
-        if (file f = { FileName, READONLY })
+        if (file f = { TestFile, READONLY })
         {
             Assert(f.good() && !f.bad());
         }
@@ -59,14 +61,14 @@ TestImpl(test_file_io)
 
     TestCase(size)
     {
-        AssertThat(file_size(FileName),  FileSize);
-        AssertThat(file_sizel(FileName), (int64)FileSize);
+        AssertThat(file_size(TestFile), TestSize);
+        AssertThat(file_sizel(TestFile), (int64)TestSize);
     }
 
     TestCase(write_size_sanity)
     {
-        Assert(create_folder("./test_tmp"));
-        file f = { "./test_tmp/_size_sanity_test.txt", CREATENEW };
+        Assert(create_folder(TestDir));
+        file f = { TestDir + "/_size_sanity_test.txt", CREATENEW };
         Assert(f.good());
         int expectedSize = 0;
         srand((uint)time(nullptr));
@@ -97,20 +99,20 @@ TestImpl(test_file_io)
         //Assert(change_dir(".."));
         //Assert(delete_folder("dangerous"));
 
-        Assert(create_folder("./test_tmp/folder/path"));
-        Assert(folder_exists("./test_tmp/folder/path"));
-        Assert(delete_folder("./test_tmp/", true/*recursive*/));
-        Assert(!folder_exists("test_tmp"));
+        Assert(create_folder(TestDir+"/folder/path"));
+        Assert(folder_exists(TestDir+"/folder/path"));
+        Assert(delete_folder(TestDir+"/", recursive));
+        Assert(!folder_exists(TestDir));
 
-        Assert(create_folder("test_tmp/folder/path"));
-        Assert(folder_exists("test_tmp/folder/path"));
-        Assert(delete_folder("test_tmp", true/*recursive*/));
-        Assert(!folder_exists("test_tmp"));
+        Assert(create_folder(TestDir+"/folder/path"));
+        Assert(folder_exists(TestDir+"/folder/path"));
+        Assert(delete_folder(TestDir, recursive));
+        Assert(!folder_exists(TestDir));
 
-        Assert(create_folder("test_tmp/folder/path/"));
-        Assert(folder_exists("test_tmp/folder/path/"));
-        Assert(delete_folder("test_tmp", true/*recursive*/));
-        Assert(!folder_exists("test_tmp"));
+        Assert(create_folder(TestDir+"/folder/path/"));
+        Assert(folder_exists(TestDir+"/folder/path/"));
+        Assert(delete_folder(TestDir, recursive));
+        Assert(!folder_exists(TestDir));
     }
 
     TestCase(path_utils)
@@ -184,37 +186,37 @@ TestImpl(test_file_io)
 
     TestCase(file_and_folder_listing)
     {
-        Assert(create_folder("./test_tmp/folder/path"));
-        file::write_new("./test_tmp/folder/test1.txt",      "text1");
-        file::write_new("./test_tmp/folder/path/test2.txt", "text2");
-        file::write_new("./test_tmp/folder/path/test3.txt", "text3");
-        file::write_new("./test_tmp/folder/path/dummy.obj", "dummy");
+        Assert(create_folder(TestDir+"/folder/path"));
+        file::write_new(TestDir+"/folder/test1.txt",      "text1");
+        file::write_new(TestDir+"/folder/path/test2.txt", "text2");
+        file::write_new(TestDir+"/folder/path/test3.txt", "text3");
+        file::write_new(TestDir+"/folder/path/dummy.obj", "dummy");
 
-        vector<string> relpaths = list_files("./test_tmp/folder/path", ".txt");
+        vector<string> relpaths = list_files(TestDir+"/folder/path", ".txt");
         AssertThat(relpaths.size(), 2);
         AssertThat(relpaths.front(), "test2.txt");
         AssertThat(relpaths.back(),  "test3.txt");
 
-        vector<string> relpaths2 = list_files_recursive("./test_tmp", ".txt");
+        vector<string> relpaths2 = list_files_recursive(TestDir, ".txt");
         AssertThat(relpaths2.size(), 3);
         AssertThat(relpaths2[0], "folder/path/test2.txt");
         AssertThat(relpaths2[1], "folder/path/test3.txt");
         AssertThat(relpaths2[2], "folder/test1.txt");
 
-        string fullpath = full_path("./test_tmp");
-        vector<string> fullpaths = list_files_fullpath("./test_tmp/folder/path", ".txt");
+        string fullpath = full_path(TestDir);
+        vector<string> fullpaths = list_files_fullpath(TestDir+"/folder/path", ".txt");
         AssertThat(fullpaths.size(), 2);
         AssertThat(fullpaths[0], path_combine(fullpath,"folder/path/test2.txt"));
         AssertThat(fullpaths[1], path_combine(fullpath,"folder/path/test3.txt"));
 
-        vector<string> fullpaths2 = list_files_fullpath_recursive("./test_tmp", ".txt");
+        vector<string> fullpaths2 = list_files_fullpath_recursive(TestDir, ".txt");
         AssertThat(fullpaths2.size(), 3);
         AssertThat(fullpaths2[0], path_combine(fullpath,"folder/path/test2.txt"));
         AssertThat(fullpaths2[1], path_combine(fullpath,"folder/path/test3.txt"));
         AssertThat(fullpaths2[2], path_combine(fullpath,"folder/test1.txt"));
 
         vector<string> dirs, files;
-        list_alldir(dirs, files, "./test_tmp", true);
+        list_alldir(dirs, files, TestDir+"", true);
         Assert(contains(dirs, "folder"));
         Assert(contains(dirs, "folder/path"));
 
@@ -223,7 +225,7 @@ TestImpl(test_file_io)
         Assert(contains(files, "folder/path/test3.txt"));
         Assert(contains(files, "folder/path/dummy.obj"));
 
-        Assert(delete_folder("./test_tmp/", true/*recursive*/));
+        Assert(delete_folder(TestDir+"/", recursive));
     }
 
 } Impl;

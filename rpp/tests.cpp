@@ -3,6 +3,7 @@
 #include <chrono>
 #include <memory>
 #include <algorithm>
+#include <mutex>
 #include <unordered_set>
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN 1
@@ -49,17 +50,31 @@ namespace rpp
         va_list ap;
         va_start(ap, fmt);
     #if _WIN32
-        static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        static HANDLE winstd = GetStdHandle(STD_OUTPUT_HANDLE);
+        static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
         static const WORD colormap[] = {
             FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE, // Default
             FOREGROUND_GREEN, // dark green
             FOREGROUND_RED | FOREGROUND_GREEN, // dark yellow
             FOREGROUND_RED, // dark red
         };
-        if (color != Default) SetConsoleTextAttribute(console, colormap[color]);
-        if (color == Red) vfprintf(stderr, fmt, ap);
-        else              vfprintf(stdout, fmt, ap);
-        if (color != Default) SetConsoleTextAttribute(console, colormap[Default]);
+        HANDLE output = color == Red ? winerr : winstd;
+        static mutex consoleSync;
+        unique_lock<mutex> guard{ consoleSync, defer_lock };
+        if (color != Default) {
+            guard.lock();
+            SetConsoleTextAttribute(output, colormap[color]);
+        }
+        char buffer[8096];
+        int len = vsnprintf(buffer, sizeof(buffer), fmt, ap);
+        if (len < 0 || len >= 8096) {
+            len = sizeof(buffer)-1;
+            buffer[len] = '\0';
+        }
+        DWORD written;
+        WriteConsoleA(output, buffer, len, &written, nullptr);
+        if (color != Default) 
+            SetConsoleTextAttribute(output, colormap[Default]);
     #elif __ANDROID__
         int priority = 0;
         switch (color) {
@@ -227,11 +242,10 @@ namespace rpp
         // move console window to the other monitor to make test debugging more seamless
         // if debugger is attached with Visual Studio
     #if _WIN32 && _MSC_VER
-        int numMonitors = 0;
-        if (IsDebuggerPresent() && (numMonitors = GetSystemMetrics(SM_CMONITORS)) > 1)
+        if (IsDebuggerPresent() && GetSystemMetrics(SM_CMONITORS) > 1)
         {
             vector<HMONITOR> mon;
-            EnumDisplayMonitors(0, 0, [](HMONITOR monitor, HDC, RECT*, LPARAM data) {
+            EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR monitor, HDC, RECT*, LPARAM data) {
                 ((vector<HMONITOR>*)data)->push_back(monitor); return 1; }, (LPARAM)&mon);
 
             RECT consoleRect; GetWindowRect(GetConsoleWindow(), &consoleRect);
@@ -247,7 +261,7 @@ namespace rpp
                 ? otherMI.rcMonitor.right - (consoleRect.left - consoleMI.rcMonitor.left) - (consoleRect.right-consoleRect.left)
                 : otherMI.rcMonitor.left  + (consoleRect.left - consoleMI.rcMonitor.left);
             int y = otherMI.rcMonitor.top + (consoleRect.top - consoleMI.rcMonitor.top);
-            SetWindowPos(GetConsoleWindow(), 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            SetWindowPos(GetConsoleWindow(), nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
     #endif
     }

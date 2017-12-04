@@ -896,6 +896,13 @@ namespace rpp
     inline string operator+(char a, const strview& b)      { return strview{&a, 1} + b; }
     inline string&& operator+(string&& a,const strview& b) { return move(a.append(b.str, (size_t)b.len)); }
 
+    //////////////// optimized string join /////////////////
+
+    string join(const strview& a, const strview& b);
+    string join(const strview& a, const strview& b, const strview& c);
+    string join(const strview& a, const strview& b, const strview& c, const strview& d);
+    string join(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
+
     //////////////// string compare operators /////////////////
 
     inline bool operator< (const string& a,const strview& b) {return strview(a) <  b;}
