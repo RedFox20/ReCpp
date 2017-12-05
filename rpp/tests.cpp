@@ -176,6 +176,9 @@ namespace rpp
 #if _MSC_VER
     static void pause(int millis = -1/*forever*/)
     {
+        if (!IsDebuggerPresent()) // only pause if we launched from Visual Studio
+            return;
+
         printf("\nPress any key to continue...\n");
 
         using namespace chrono;
@@ -358,8 +361,7 @@ namespace rpp
             consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
 
         #if _MSC_VER
-            if (IsDebuggerPresent()) // only pause if we launched from Visual Studio
-                pause();
+            pause();
         #endif
         return 0;
     }
