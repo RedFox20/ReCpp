@@ -1,6 +1,7 @@
 #include "debugging.h"
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #if __ANDROID__
   #include <android/log.h>
 #endif
@@ -87,26 +88,33 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                                                       ANDROID_LOG_ERROR;
         __android_log_write(priority, tag, err);
     #elif _WIN32
-        static HANDLE winout = GetStdHandle(STD_OUTPUT_HANDLE);
+        static HANDLE winstd = GetStdHandle(STD_OUTPUT_HANDLE);
         static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
         static const WORD colormap[] = {
             FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY, // white - Info
             FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY, // bright yellow - Warning
             FOREGROUND_RED | FOREGROUND_INTENSITY, // bright red - Error
         };
-        bool is_error = severity == LogSeverityError;
-        HANDLE out = is_error ? winout : winerr;
-        DWORD written;
-    
+        HANDLE winout = severity == LogSeverityError ? winstd : winerr;
+        FILE*  cout   = severity == LogSeverityError ? stderr : stdout;
+
         AllocaPrintlineBuf(err, len);
-    
-        SetConsoleTextAttribute(out, colormap[severity]);
-        WriteConsoleA(out, buf, len+1, &written, nullptr);
-        SetConsoleTextAttribute(out, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+        
+        using namespace std;
+        static mutex consoleSync;
+        {
+            lock_guard<mutex> guard{ consoleSync };
+            SetConsoleTextAttribute(winout, colormap[severity]);
+            fwrite(buf, size_t(len + 1), 1, cout); // fwrite to sync with unix-like shells
+            SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+        }
+        fflush(cout); // flush needed for proper sync with unix-like shells
+
     #else
         AllocaPrintlineBuf(err, len);
-        FILE* out = (severity == LogSeverityError) ? stderr : stdout;
-        fwrite(buf, (size_t)len+1, 1, out);
+        FILE* cout = (severity == LogSeverityError) ? stderr : stdout;
+        fwrite(buf, size_t(len + 1), 1, cout);
+        fflush(cout); // flush needed for proper sync with unix-like shells
     #endif
     (void)tag;
 }

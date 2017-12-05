@@ -67,22 +67,17 @@ namespace rpp
         }
 
         HANDLE winout = color == Red ? winerr : winstd;
+        FILE*  cout   = color == Red ? stderr : stdout;
+
         static mutex consoleSync;
-        unique_lock<mutex> guard{ consoleSync, defer_lock };
-        if (color != Default) {
-            guard.lock();
+        {
+            lock_guard<mutex> guard{ consoleSync };
             SetConsoleTextAttribute(winout, colormap[color]);
-        }
-
-        // in order to properly sync with unix terminals like git bash
-        // we need to use fwrite
-        FILE* cout = color == Red ? stderr : stdout;
-        fwrite(buffer, size_t(len), 1, cout);
-        fflush(cout); // flush needed for proper sync with git bash
-
-        if (color != Default) {
+            fwrite(buffer, size_t(len), 1, cout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, colormap[Default]);
         }
+        fflush(cout); // flush needed for proper sync with unix-like shells
+
     #elif __ANDROID__
         int priority = 0;
         switch (color) {
@@ -93,8 +88,9 @@ namespace rpp
         }
         __android_log_vprint(priority, "rpp", fmt, ap);
     #else // @todo Proper Linux & OSX implementations
-        if (color == Red) vfprintf(stderr, fmt, ap);
-        else              vfprintf(stdout, fmt, ap);
+        FILE* cout = color == Red ? stderr : stdout;
+        vfprintf(stderr, fmt, ap);
+        fflush(cout); // flush needed for proper sync with different shells
     #endif
     }
 
