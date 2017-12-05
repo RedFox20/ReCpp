@@ -58,23 +58,31 @@ namespace rpp
             FOREGROUND_RED | FOREGROUND_GREEN, // dark yellow
             FOREGROUND_RED, // dark red
         };
-        HANDLE output = color == Red ? winerr : winstd;
+
+        char buffer[8096];
+        int len = vsnprintf(buffer, sizeof(buffer), fmt, ap);
+        if (len < 0 || len >= 8096) {
+            len = sizeof(buffer) - 1;
+            buffer[len] = '\0';
+        }
+
+        HANDLE winout = color == Red ? winerr : winstd;
         static mutex consoleSync;
         unique_lock<mutex> guard{ consoleSync, defer_lock };
         if (color != Default) {
             guard.lock();
-            SetConsoleTextAttribute(output, colormap[color]);
+            SetConsoleTextAttribute(winout, colormap[color]);
         }
-        char buffer[8096];
-        int len = vsnprintf(buffer, sizeof(buffer), fmt, ap);
-        if (len < 0 || len >= 8096) {
-            len = sizeof(buffer)-1;
-            buffer[len] = '\0';
+
+        // in order to properly sync with unix terminals like git bash
+        // we need to use fwrite
+        FILE* cout = color == Red ? stderr : stdout;
+        fwrite(buffer, size_t(len), 1, cout);
+        fflush(cout); // flush needed for proper sync with git bash
+
+        if (color != Default) {
+            SetConsoleTextAttribute(winout, colormap[Default]);
         }
-        DWORD written;
-        WriteConsoleA(output, buffer, len, &written, nullptr);
-        if (color != Default) 
-            SetConsoleTextAttribute(output, colormap[Default]);
     #elif __ANDROID__
         int priority = 0;
         switch (color) {
@@ -173,29 +181,6 @@ namespace rpp
         #endif
     }
 
-#if _MSC_VER
-    static void pause(int millis = -1/*forever*/)
-    {
-        if (!IsDebuggerPresent()) // only pause if we launched from Visual Studio
-            return;
-
-        printf("\nPress any key to continue...\n");
-
-        using namespace chrono;
-        auto start = system_clock::now();
-        while (!_kbhit())
-        {
-            if (millis != -1)
-            {
-                auto elapsed = duration_cast<milliseconds>(system_clock::now() - start);
-                if (elapsed.count() >= millis)
-                    break;
-            }
-            test::sleep(50);
-        }
-    }
-#endif
-
     int test::run_tests(const char* testNamePattern)
     {
         return run_tests(&testNamePattern, 1);
@@ -240,11 +225,31 @@ namespace rpp
         return test_count - 1;
     }
 
+#if _WIN32 && _MSC_VER
+    static void pause(int millis = -1/*forever*/)
+    {
+        if (!IsDebuggerPresent()) { // only pause if we launched from Visual Studio
+            return;
+        }
+        printf("\nPress any key to continue...\n");
+
+        using namespace chrono;
+        auto start = system_clock::now();
+        while (!_kbhit())
+        {
+            if (millis != -1)
+            {
+                auto elapsed = duration_cast<milliseconds>(system_clock::now() - start);
+                if (elapsed.count() >= millis)
+                    break;
+            }
+            test::sleep(50);
+        }
+    }
     static void move_console_window()
     {
         // move console window to the other monitor to make test debugging more seamless
         // if debugger is attached with Visual Studio
-    #if _WIN32 && _MSC_VER
         if (IsDebuggerPresent() && GetSystemMetrics(SM_CMONITORS) > 1)
         {
             vector<HMONITOR> mon;
@@ -266,13 +271,15 @@ namespace rpp
             int y = otherMI.rcMonitor.top + (consoleRect.top - consoleMI.rcMonitor.top);
             SetWindowPos(GetConsoleWindow(), nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
-    #endif
     }
+#endif
 
     int test::run_tests(int argc, char* argv[])
     {
+    #if _WIN32 && _MSC_VER
         move_console_window();
-        
+    #endif
+
         for (test* t : all_tests()) { // set the defaults
             if (!t->auto_run) t->test_enabled = false;
         }
@@ -349,7 +356,7 @@ namespace rpp
         if (test::asserts_failed)
         {
             consolef(Red, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
-            #if _MSC_VER
+            #if _WIN32 && _MSC_VER
                 pause();
             #endif
             return -1;
@@ -360,7 +367,7 @@ namespace rpp
         else
             consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
 
-        #if _MSC_VER
+        #if _WIN32 && _MSC_VER
             pause();
         #endif
         return 0;
