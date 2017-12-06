@@ -144,10 +144,10 @@ namespace rpp
         int add_test_func(test_func func);
 
         // adds a test to the automatic test run list
-        template<class T, class Lambda> int add_test_func(strview name, T* self, Lambda lambda)
+        template<class T, class Lambda> static int add_test_func(T* self, strview name, Lambda lambda)
         {
             (void)lambda;
-            return add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
+            return self->add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
         }
     };
 
@@ -165,14 +165,14 @@ namespace rpp
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
 #define AssertThat(expr, expected) do { \
-    auto&& __expr     = expr;           \
-    auto&& __expected = expected;       \
+    const auto& __expr     = expr;           \
+    const auto& __expected = expected;       \
     if (__expr != __expected) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expected); } \
 } while (false)
 #define AssertEqual AssertThat
 #define AssertNotEqual(expr, mustNotEqual) do { \
-    auto&& __expr    = expr;                    \
-    auto&& __mustnot = mustNotEqual;            \
+    const auto& __expr    = expr;                    \
+    const auto& __mustnot = mustNotEqual;            \
     if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
 } while (false)
 
@@ -193,7 +193,7 @@ namespace rpp
 #define TestCleanup(testclass) void cleanup_test() override
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(#testname, self(), [=]{ this->test_##testname();}); \
+    const int _test_##testname = add_test_func(self(), #testname, [=]{ this->test_##testname();}); \
     void test_##testname()
 
 }
