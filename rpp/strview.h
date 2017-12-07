@@ -2,17 +2,17 @@
 #ifndef RPP_STRVIEW_H
 #define RPP_STRVIEW_H
 /**
- * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
+ * String Tokenizer/View, Copyright (c) 2014-2018, Jorma Rebane
  */
 #ifdef _LIBCPP_STD_VER
-#  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 14)
+#  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
 #elif !defined(_HAS_STD_BYTE)
 #  define _HAS_STD_BYTE 0
 #endif
 #ifndef __cplusplus
   #error <rpp/strview.h> requires C++14 or higher
 #endif
-#include <cstring>   // C string utilities
+#include <cstring>    // C string utilities
 #include <string>     // compatibility with std::string
 #include <vector>     // std::vector for split
 #include <unordered_map> // std::unordered_map for to_string extensions
@@ -47,13 +47,15 @@ namespace rpp
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
         #if !_HAS_STD_BYTE
-            typedef unsigned char  byte;
+            using byte = unsigned char;
+        #else
+            using byte = std::byte;
         #endif
-        typedef unsigned short     ushort;
-        typedef unsigned int       uint;
-        typedef unsigned long      ulong;
-        typedef long long          int64;
-        typedef unsigned long long uint64;
+        using ushort = unsigned short;
+        using uint   = unsigned int;
+        using ulong  = unsigned long;
+        using int64  = long long;
+        using uint64 = unsigned long long;
     #endif
 
     //// @note Some functions get inlined too aggressively, leading to some serious code bloat
