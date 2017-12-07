@@ -4,8 +4,10 @@
 /**
  * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
  */
-#ifndef _HAS_STD_BYTE
-  #define _HAS_STD_BYTE 0
+#ifdef _LIBCPP_STD_VER
+#  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 14)
+#elif !defined(_HAS_STD_BYTE)
+#  define _HAS_STD_BYTE 0
 #endif
 #ifndef __cplusplus
   #error <rpp/strview.h> requires C++14 or higher
@@ -44,9 +46,9 @@ namespace rpp
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
-    #if !_HAS_STD_BYTE
-        typedef unsigned char      byte;
-    #endif
+        #if !_HAS_STD_BYTE
+            typedef unsigned char  byte;
+        #endif
         typedef unsigned short     ushort;
         typedef unsigned int       uint;
         typedef unsigned long      ulong;
