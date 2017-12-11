@@ -161,7 +161,16 @@ namespace rpp
         try {
             (test.lambda.*test.func)();
         } catch (const std::exception& e) {
-            consolef(Red, "UNHANDLED EXCEPTION in %s::%s: %s\n", name.str, test.name.str, e.what());
+            if (test.expectedExType) {
+                size_t hash = typeid(e).hash_code();
+                if (test.expectedExType == hash) {
+                    consolef(Yellow, "Caught Expected Exception in %s::%s: %s\n", 
+                             name.str, test.name.str, e.what());
+                    return;
+                }
+            }
+            consolef(Red, "UNHANDLED EXCEPTION in %s::%s: %s\n", 
+                     name.str, test.name.str, e.what());
             ++asserts_failed;
         }
     }

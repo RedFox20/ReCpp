@@ -6,6 +6,7 @@
 #include <vector>  // access to std::vector and std::string
 #include <functional>
 #include <rpp/strview.h> // we love strview, so it's a common dependency :)
+#include <typeinfo>
 
 /**
  * If you want the tests framework to define the main function, then
@@ -41,6 +42,7 @@ namespace rpp
             strview name;
             lambda_base lambda;
             void (lambda_base::*func)();
+            size_t expectedExType;
         };
 
         static int asserts_failed;
@@ -144,10 +146,12 @@ namespace rpp
         int add_test_func(test_func func);
 
         // adds a test to the automatic test run list
-        template<class T, class Lambda> static int add_test_func(T* self, strview name, Lambda lambda)
+        template<class T, class Lambda> static int add_test_func(
+            T* self, strview name, Lambda lambda, const std::type_info* ti = nullptr)
         {
             (void)lambda;
-            return self->add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator() });
+            size_t expectedExHash = ti ? ti->hash_code() : 0;
+            return self->add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator(), expectedExHash });
         }
     };
 
@@ -193,7 +197,12 @@ namespace rpp
 #define TestCleanup(testclass) void cleanup_test() override
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, [=]{ this->test_##testname();}); \
+    const int _test_##testname = add_test_func(self(), #testname, [=]{ this->test_##testname(); }); \
+    void test_##testname()
+
+#define TestCaseExpectedEx(testname, expectedExceptionType) \
+    const int _test_##testname = add_test_func(self(), #testname, [=]{ this->test_##testname(); }, \
+                                               &typeid(expectedExceptionType)); \
     void test_##testname()
 
 }
