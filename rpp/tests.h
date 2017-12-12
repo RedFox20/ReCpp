@@ -197,11 +197,11 @@ namespace rpp
 #define TestCleanup(testclass) void cleanup_test() override
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, [=]{ this->test_##testname(); }); \
+    const int _test_##testname = add_test_func(self(), #testname, [=]{ self()->test_##testname(); }); \
     void test_##testname()
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
-    const int _test_##testname = add_test_func(self(), #testname, [=]{ this->test_##testname(); }, \
+    const int _test_##testname = add_test_func(self(), #testname, [=]{ self()->test_##testname(); }, \
                                                &typeid(expectedExceptionType)); \
     void test_##testname()
 

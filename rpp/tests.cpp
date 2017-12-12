@@ -77,7 +77,6 @@ namespace rpp
             SetConsoleTextAttribute(winout, colormap[Default]);
         }
         fflush(cout); // flush needed for proper sync with unix-like shells
-
     #elif __ANDROID__
         int priority = 0;
         switch (color) {
@@ -87,9 +86,25 @@ namespace rpp
             case Red:     priority = ANDROID_LOG_ERROR; break;
         }
         __android_log_vprint(priority, "rpp", fmt, ap);
-    #else // @todo Proper Linux & OSX implementations
+    #elif __linux
         FILE* cout = color == Red ? stderr : stdout;
-        vfprintf(stderr, fmt, ap);
+        static const char* colors[] = {
+                "\33[0m",  // clears all formatting
+                "\33[32m", // green
+                "\33[33m", // yellow
+                "\33[31m", // red
+        };
+        static mutex consoleSync;
+        {
+            lock_guard<mutex> guard{ consoleSync };
+            fwrite(colors[color], strlen(colors[color]), 1, cout);
+            vfprintf(cout, fmt, ap);
+            fwrite(colors[Default], strlen(colors[Default]), 1, cout);
+        }
+        fflush(cout); // flush needed for proper sync with different shells
+    #else
+        FILE* cout = color == Red ? stderr : stdout;
+        vfprintf(cout, fmt, ap);
         fflush(cout); // flush needed for proper sync with different shells
     #endif
     }
