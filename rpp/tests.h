@@ -164,7 +164,9 @@ namespace rpp
 #undef TestInit
 #undef TestInitNoAutorun
 #undef TestCleanup
+#undef TestLambda
 #undef TestCase
+#undef TestCaseExpectedEx
 
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
@@ -196,13 +198,19 @@ namespace rpp
 
 #define TestCleanup(testclass) void cleanup_test() override
 
+
+#if _MSC_VER
+#  define TestLambda(testname) [=]{ this->test_##testname(); }
+#else
+#  define TestLambda(testname) [=]{ self()->test_##testname(); }
+#endif
+
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, [=]{ self()->test_##testname(); }); \
+    const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname) ); \
     void test_##testname()
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
-    const int _test_##testname = add_test_func(self(), #testname, [=]{ self()->test_##testname(); }, \
-                                               &typeid(expectedExceptionType)); \
+    const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname), &typeid(expectedExceptionType)); \
     void test_##testname()
 
 }
