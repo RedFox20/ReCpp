@@ -23,6 +23,18 @@
 #  define EXTERNC
 #endif
 
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
+#ifndef RPPCAPI
+#  define RPPCAPI EXTERNC RPPAPI
+#endif
+
 typedef enum {
     LogSeverityInfo,  // merely information;
     LogSeverityWarn,  // warning unexpected behaviour; -- but we can recover
@@ -36,42 +48,42 @@ typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 
 /** Sets the callback handler for any error messages */
-EXTERNC void SetLogErrorHandler(LogErrorCallback errfunc);
+RPPCAPI void SetLogErrorHandler(LogErrorCallback errfunc);
 
 /** Sets the callback handler for event messages  */
-EXTERNC void SetLogEventHandler(LogEventCallback eventFunc);
+RPPCAPI void SetLogEventHandler(LogEventCallback eventFunc);
 
 /** Sets the callback handler for C++ messages. You can even intercept these in C. */
-EXTERNC void SetLogExceptHandler(LogExceptCallback exceptFunc);
+RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptFunc);
 
 /** This will remove function and lambda name information from the logs */
-EXTERNC void LogDisableFunctionNames();
+RPPCAPI void LogDisableFunctionNames();
 
 /** Sets the default log severity filter: if (severity >= filter) log(..)
  *  This defaults to LogSeverityInfo, which is the most verbose
  *  If Debugging.c is compiled with QUIETLOG, then it defaults to LogSeverityWarn
  **/
-EXTERNC void SetLogSeverityFilter(LogSeverity filter);
-EXTERNC LogSeverity GetLogSeverityFilter();
+RPPCAPI void SetLogSeverityFilter(LogSeverity filter);
+RPPCAPI LogSeverity GetLogSeverityFilter();
 
 /**
  * Writes a message to default output. On most platforms this is stdout/stderr
  * On Android this writes to Android log, using the given tag.
  * @param tag Android log tag. Not used on other platforms.
  */
-EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len);
-EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
+RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len);
+RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
 
 /** Logs an error to the backing error mechanism (Crashlytics on iOS) */
-EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap);
-EXTERNC void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC void LogEvent    (const char* eventName,     PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
-EXTERNC void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
-EXTERNC const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-EXTERNC const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
-EXTERNC const char* _LogFuncname(const char* longFuncName); // shortens the func name
+RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap);
+RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+RPPCAPI void LogEvent    (const char* eventName,     PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
+RPPCAPI void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
+RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
+RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func name
 
 /** Provide special string overloads for C++ */
 #ifdef __cplusplus

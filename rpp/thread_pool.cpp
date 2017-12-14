@@ -54,10 +54,11 @@ namespace rpp
     {
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
-        trace.clear();
-        if (TraceProvider) trace = TraceProvider();
-
         { lock_guard<mutex> lock{m};
+            trace.clear();
+            error = nullptr;
+            if (auto tracer = TraceProvider)
+                trace = TraceProvider();
             genericTask  = {};
             rangeTask    = newTask;
             rangeStart   = start;
@@ -71,11 +72,12 @@ namespace rpp
     {
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
-        trace.clear();
-        if (TraceProvider) trace = TraceProvider();
-
         //TaskDebug("queue task");
         { lock_guard<mutex> lock{m};
+            trace.clear();
+            error = nullptr;
+            if (auto tracer = TraceProvider)
+                trace = TraceProvider();
             genericTask  = move(newTask);
             rangeTask    = {};
             rangeStart   = 0;
@@ -98,14 +100,11 @@ namespace rpp
         cv.notify_one();
     }
 
-    pool_task::wait_result pool_task::wait(int timeoutMillis) noexcept
+    pool_task::wait_result pool_task::wait(int timeoutMillis)
     {
-        //printf("wait for (%d, %d)\n", loopStart, loopEnd);
-        while (taskRunning) // duplicate check is intentional (to avoid lock)
+        unique_lock<mutex> lock{m};
+        while (taskRunning)
         {
-            unique_lock<mutex> lock{m};
-            if (!taskRunning)
-                return finished;
             if (timeoutMillis)
             {
                 if (cv.wait_for(lock, chrono::milliseconds(timeoutMillis)) == cv_status::timeout)
@@ -116,6 +115,7 @@ namespace rpp
                 cv.wait(lock);
             }
         }
+        if (error) rethrow_exception(error);
         return finished;
     }
 
@@ -170,11 +170,6 @@ namespace rpp
     }
 #endif
 
-    static void segfault(int) { SignalHandler("SIGSEGV"); }
-    static void sigterm(int)  { SignalHandler("SIGTERM"); }
-    static void sigabort(int) { SignalHandler("SIGABORT"); }
-
-
     // really nasty case where OS threads are just abandoned
     // with none of the destructors being run
     static mutex activeTaskMutex;
@@ -194,6 +189,12 @@ namespace rpp
         lock_guard<mutex> lock{ activeTaskMutex };
         activeTasks.erase(get_thread_id());
     }
+
+
+    static void segfault(int) { SignalHandler("SIGSEGV"); }
+    static void sigterm(int)  { SignalHandler("SIGTERM"); }
+    static void sigabort(int) { SignalHandler("SIGABORT"); }
+
 
     void pool_task::run() noexcept
     {
@@ -272,7 +273,7 @@ namespace rpp
             catch (const char* e)      { unhandled_exception(e);        }
             catch (...)                { unhandled_exception("");       }
             { lock_guard<mutex> lock{m};
-                taskRunning  = false;
+                taskRunning = false;
                 cv.notify_all();
             }
         }
@@ -280,8 +281,16 @@ namespace rpp
 
     void pool_task::unhandled_exception(const char* what) noexcept
     {
-        if (trace.empty()) UnhandledEx("%s", what);
-        else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
+        error = std::current_exception();
+
+        string err = what;
+        { lock_guard<mutex> lock{m};
+            if (!trace.empty()) {
+                err += "\nTask Start Trace:\n";
+                err += trace;
+            }
+        }
+        UnhandledEx("%s", err.c_str());
     }
 
     bool pool_task::got_task() const noexcept
@@ -311,9 +320,11 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
-
-    thread_pool thread_pool::global;
-    static int core_count;
+    thread_pool& thread_pool::global()
+    {
+        static thread_pool globalPool;
+        return globalPool;
+    }
 
 #if _WIN32
     static int num_physical_cores()
@@ -340,23 +351,24 @@ namespace rpp
 
     int thread_pool::physical_cores()
     {
-        if (!core_count) core_count = num_physical_cores();
-        return core_count;
+        return global().coreCount;
     }
 
     void thread_pool::set_signal_handler(pool_signal_handler signalHandler)
     {
+        lock_guard<mutex> lock{ tasksMutex };
         SignalHandler = signalHandler;
     }
 
     void thread_pool::set_task_tracer(pool_trace_provider traceProvider)
     {
+        lock_guard<mutex> lock{ tasksMutex };
         TraceProvider = traceProvider;
     }
 
     thread_pool::thread_pool()
     {
-        if (!core_count) core_count = num_physical_cores();
+        coreCount = num_physical_cores();
     }
 
     thread_pool::~thread_pool() noexcept
@@ -442,13 +454,13 @@ namespace rpp
                                    const action<int, int>& rangeTask) noexcept
     {
         assert(!rangeRunning && "Fatal error: nested parallel loops are forbidden!");
-        assert(core_count > 0 && "There appears to be no hardware concurrency");
+        assert(coreCount > 0 && "There appears to be no hardware concurrency");
 
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
             return;
 
-        const int cores = range < core_count ? range : core_count;
+        const int cores = range < coreCount ? range : coreCount;
         const int len = range / cores;
 
         // only one physical core or only one task to run. don't run in a thread

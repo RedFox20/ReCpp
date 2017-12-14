@@ -738,12 +738,17 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    const Matrix4 Matrix4::IDENTITY = {
+    static const Matrix4 IDENTITY = {
         { 1, 0, 0, 0 },
         { 0, 1, 0, 0 },
         { 0, 0, 1, 0 },
         { 0, 0, 0, 1 },
     };
+
+    const Matrix4& Matrix4::Identity()
+    {
+        return IDENTITY;
+    }
 
     Matrix4& Matrix4::loadIdentity()
     {

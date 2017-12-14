@@ -6,6 +6,14 @@
  */
 #include <stdint.h>
 
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
 #if __cplusplus
 namespace rpp
 {
@@ -14,26 +22,26 @@ namespace rpp
     /**
      * Gets the current timestamp from the system's most accurate time measurement
      */
-    uint64_t time_now() noexcept;
+    RPPAPI uint64_t time_now() noexcept;
 
     /**
      * Gets the time period for the system's most accurate time measurement
      * To convert time_now() to seconds:  double sec = time_now() * time_period() 
      */
-    double time_period() noexcept;
+    RPPAPI double time_period() noexcept;
 
     /** Let this thread sleep for provided milliseconds */
-    void sleep_ms(unsigned int millis) noexcept;
+    RPPAPI void sleep_ms(unsigned int millis) noexcept;
 
     /** Let this thread sleep for provided MICROSECONDS */
-    void sleep_us(unsigned int microseconds) noexcept;
+    RPPAPI void sleep_us(unsigned int microseconds) noexcept;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
      * High accuracy timer for performance profiling or deltaTime measurement
      */
-    struct Timer
+    struct RPPAPI Timer
     {
         uint64_t value;
 
@@ -61,7 +69,7 @@ namespace rpp
     /**
      * Automatically logs performance from constructor to destructor and writes it to log
      */
-    class ScopedPerfTimer
+    class RPPAPI ScopedPerfTimer
     {
         Timer timer;
         const char* what;
@@ -81,7 +89,7 @@ extern "C" {
     /**
      * @return Current time in seconds:  rpp::time_now() * rpp::time_period();
      */
-    double time_now_seconds();
+    RPPAPI double time_now_seconds();
 
 #if __cplusplus
 }

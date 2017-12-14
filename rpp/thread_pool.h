@@ -9,6 +9,14 @@
 #include <condition_variable>
 #include "delegate.h"
 
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
 namespace rpp
 {
     using namespace std;
@@ -196,24 +204,41 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
+
     template<class Signature>
     using task_delegate = delegate<Signature>;
+
+
+    /**
+     * Handles signals for pool tasks. This is expected to throw an exception derived
+     * from std::runtime_error
+     */
+    using pool_signal_handler = void (*)(const char* signal) throw(std::runtime_error);
+
+
+    /**
+     * Provides a plain function which traces the current callstack
+     */
+    using pool_trace_provider = std::string (*)();
+
 
     /**
      * A simple thread-pool task. Can run owning generic tasks using standard function<> and
      * also range non-owning tasks which use the impossibly fast delegate callback system.
      */
-    class pool_task
+    class RPPAPI pool_task
     {
         mutex m;
         condition_variable cv;
         thread th;
         task_delegate<void()> genericTask;
         action<int, int> rangeTask;
-        std::string trace;
         int rangeStart  = 0;
         int rangeEnd    = 0;
         int maxIdleTime = 15;
+        string trace;
+        exception_ptr error;
+        pool_signal_handler handler = nullptr;
         volatile bool taskRunning = false; // an active task is being executed
         volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
 
@@ -224,6 +249,7 @@ namespace rpp
         };
 
         bool running()  const noexcept { return taskRunning; }
+        const char* start_trace() const noexcept { return trace.empty() ? nullptr : trace.c_str(); }
 
         pool_task();
         ~pool_task() noexcept;
@@ -243,7 +269,9 @@ namespace rpp
         void run_generic(task_delegate<void()>&& genericTask) noexcept;
 
         // wait for task to finish
-        wait_result wait(int timeoutMillis = 0/*0=no timeout*/) noexcept;
+        // @note Throws any unhandled exceptions from background thread
+        //       This is similar to std::future behaviour
+        wait_result wait(int timeoutMillis = 0/*0=no timeout*/);
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -257,18 +285,6 @@ namespace rpp
     };
 
 
-    /**
-     * Handles signals for pool tasks. This is expected to throw an exception derived
-     * from std::runtime_error
-     */
-    using pool_signal_handler = void (*)(const char* signal) throw(std::runtime_error);
-
-
-    /**
-     * Provides a plain function which traces the current callstack
-     */
-    using pool_trace_provider = std::string (*)();
-
 
     /**
      * A generic thread pool that can be used to group and control pool lifetimes
@@ -280,17 +296,18 @@ namespace rpp
      * Accidentally running nested parallel_for can end up in 8*8=64 threads on an 8-core CPU,
      * which is why it's considered an error.
      */
-    class thread_pool
+    class RPPAPI thread_pool
     {
         mutex tasksMutex;
         vector<unique_ptr<pool_task>> tasks;
         int taskMaxIdleTime = 15; // new task timeout in seconds
+        int coreCount = 0;
         atomic_bool rangeRunning { false }; // whether parallel range is running or not
-        
+
     public:
 
         // the default global thread pool
-        static thread_pool global;
+        static thread_pool& global();
 
         thread_pool();
         ~thread_pool() noexcept;
@@ -348,7 +365,7 @@ namespace rpp
          * The default handler is `throw runtime_error("SIGSEGV");`
          * @note This handler is expected to throw a custom type of exception
          */
-        static void set_signal_handler(pool_signal_handler signalHandler);
+        void set_signal_handler(pool_signal_handler signalHandler);
 
         /**
          * Enables tracing of parallel task calls. This makes it possible
@@ -356,8 +373,9 @@ namespace rpp
          * there would be no hints where the it was launched if the task crashes.
          * @note This will slow down parallel task startup since the call stack is unwound for debugging
          */
-        static void set_task_tracer(pool_trace_provider traceProvider);
+        void set_task_tracer(pool_trace_provider traceProvider);
     };
+
 
     /**
      * @brief Runs parallel_for on the default global thread pool
@@ -374,7 +392,7 @@ namespace rpp
     template<class Func>
     inline void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
     {
-        thread_pool::global.parallel_for(rangeStart, rangeEnd,
+        thread_pool::global().parallel_for(rangeStart, rangeEnd,
             action<int, int>::from_function<Func, &Func::operator()>(&func));
     }
 
@@ -389,7 +407,7 @@ namespace rpp
      */
     inline pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
-        return thread_pool::global.parallel_task(move(genericTask));
+        return thread_pool::global().parallel_task(move(genericTask));
     }
 
     /**
@@ -405,28 +423,28 @@ namespace rpp
     template<class Func, class A>
     inline pool_task* parallel_task(Func&& func, A&& a)
     {
-        return thread_pool::global.parallel_task([func=move(func),a=move(a)]() mutable {
+        return thread_pool::global().parallel_task([func=move(func),a=move(a)]() mutable {
             func(move(a));
         });
     }
     template<class Func, class A, class B>
     inline pool_task* parallel_task(Func&& func, A&& a, B&& b)
     {
-        return thread_pool::global.parallel_task([func=move(func),a=move(a),b=move(b)]() mutable {
+        return thread_pool::global().parallel_task([func=move(func),a=move(a),b=move(b)]() mutable {
             func(move(a), move(b));
         });
     }
     template<class Func, class A, class B, class C>
     inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c)
     {
-        return thread_pool::global.parallel_task([func=move(func),a=move(a),b=move(b),c=move(c)]() mutable {
+        return thread_pool::global().parallel_task([func=move(func),a=move(a),b=move(b),c=move(c)]() mutable {
             func(move(a), move(b), move(c));
         });
     }
     template<class Func, class A, class B, class C, class D>
     inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
     {
-        return thread_pool::global.parallel_task([func=move(func),a=move(a),b=move(b),c=move(c),d=move(d)]() mutable {
+        return thread_pool::global().parallel_task([func=move(func),a=move(a),b=move(b),c=move(c),d=move(d)]() mutable {
             func(move(a), move(b), move(c), move(d));
         });
     }

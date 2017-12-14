@@ -10,6 +10,14 @@
 #include <time.h> // time_t
 #include "strview.h"
 
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
 namespace rpp /* ReCpp */
 {
     using namespace std; // we love std; you should too.
@@ -31,7 +39,7 @@ namespace rpp /* ReCpp */
     /**
      * Automatic whole file loading buffer
      */
-    struct load_buffer
+    struct RPPAPI load_buffer
     {
         char* str;  // dynamic or internal buffer
         int   len;  // buffer size in bytes
@@ -106,7 +114,7 @@ namespace rpp /* ReCpp */
      *     });
      * @endcode
      */
-    struct file
+    struct RPPAPI file
     {
         void*	Handle;	// File handle
         IOFlags	Mode;	// File openmode READWRITE or READONLY
@@ -487,21 +495,21 @@ namespace rpp /* ReCpp */
     /**
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
-    bool file_exists(const char* filename) noexcept;
+    RPPAPI bool file_exists(const char* filename) noexcept;
     inline bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
     inline bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
-    bool folder_exists(const char* folder) noexcept;
+    RPPAPI bool folder_exists(const char* folder) noexcept;
     inline bool folder_exists(const string& folder) noexcept { return folder_exists(folder.c_str());   }
     inline bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
 
     /**
      * @return TRUE if either a file or a folder exists at the given path
      */
-    bool file_or_folder_exists(const char* fileOrFolder) noexcept;
+    RPPAPI bool file_or_folder_exists(const char* fileOrFolder) noexcept;
     inline bool file_or_folder_exists(const string& folder) noexcept { return file_or_folder_exists(folder.c_str());   }
     inline bool file_or_folder_exists(const strview folder) noexcept { return file_or_folder_exists(folder.to_cstr()); }
 
@@ -520,35 +528,35 @@ namespace rpp /* ReCpp */
     /**
      * @return Short size of a file
      */
-    int file_size(const char* filename) noexcept;
+    RPPAPI int file_size(const char* filename) noexcept;
     inline int file_size(const string& filename) noexcept { return file_size(filename.c_str());   }
     inline int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
 
     /**
      * @return Long size of a file
      */
-    int64 file_sizel(const char* filename) noexcept;
+    RPPAPI int64 file_sizel(const char* filename) noexcept;
     inline int64 file_sizel(const string& filename) noexcept { return file_sizel(filename.c_str());   }
     inline int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
 
     /**
      * @return File creation date
      */
-    time_t file_created(const char* filename) noexcept;
+    RPPAPI time_t file_created(const char* filename) noexcept;
     inline time_t file_created(const string& filename) noexcept { return file_created(filename.c_str());   }
     inline time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
 
     /**
      * @return Last file access date
      */
-    time_t file_accessed(const char* filename) noexcept;
+    RPPAPI time_t file_accessed(const char* filename) noexcept;
     inline time_t file_accessed(const string& filename) noexcept { return file_accessed(filename.c_str());   }
     inline time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
 
     /**
      * @return Last file modification date
      */
-    time_t file_modified(const char* filename) noexcept;
+    RPPAPI time_t file_modified(const char* filename) noexcept;
     inline time_t file_modified(const string& filename) noexcept { return file_modified(filename.c_str());   }
     inline time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
 
@@ -556,7 +564,7 @@ namespace rpp /* ReCpp */
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
-    bool delete_file(const char* filename) noexcept;
+    RPPAPI bool delete_file(const char* filename) noexcept;
     inline bool delete_file(const string& filename) noexcept { return delete_file(filename.c_str());   }
     inline bool delete_file(const strview filename) noexcept { return delete_file(filename.to_cstr()); }
 
@@ -564,7 +572,7 @@ namespace rpp /* ReCpp */
      * @brief Copies sourceFile to destinationFile, overwriting the previous file!
      * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
      */
-    bool copy_file(const char* sourceFile, const char* destinationFile) noexcept;
+    RPPAPI bool copy_file(const char* sourceFile, const char* destinationFile) noexcept;
     inline bool copy_file(const strview sourceFile, const strview destinationFile) noexcept 
     { return copy_file(sourceFile.to_cstr(), destinationFile.to_cstr()); }
 
@@ -573,9 +581,9 @@ namespace rpp /* ReCpp */
      * Creates a folder, recursively creating folders that do not exist
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */
-    bool create_folder(const strview foldername) noexcept;
-    bool create_folder(const wchar_t* foldername) noexcept;
-    bool create_folder(const wstring& foldername) noexcept;
+    RPPAPI bool create_folder(const strview foldername) noexcept;
+    RPPAPI bool create_folder(const wchar_t* foldername) noexcept;
+    RPPAPI bool create_folder(const wstring& foldername) noexcept;
 
     enum delete_mode
     {
@@ -588,13 +596,13 @@ namespace rpp /* ReCpp */
      * @param mode If delete_mode::recursive, all subdirectories and files will also be deleted (permanently)
      * @return TRUE if the folder was deleted
      */
-    bool delete_folder(const strview foldername, delete_mode mode = non_recursive) noexcept;
+    RPPAPI bool delete_folder(const strview foldername, delete_mode mode = non_recursive) noexcept;
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
      * @result "path" ==> "C:\Projects\Test\path" 
      */
-    string full_path(const char* path) noexcept;
+    RPPAPI string full_path(const char* path) noexcept;
     inline string full_path(const string& path) noexcept { return full_path(path.c_str());   }
     inline string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
 
@@ -602,7 +610,7 @@ namespace rpp /* ReCpp */
      * @brief Merges all ../ inside of a path
      * @result  ../lib/../bin/file.txt ==> ../bin/file.txt
      */
-    string merge_dirups(const strview path) noexcept;
+    RPPAPI string merge_dirups(const strview path) noexcept;
 
     /**
      * @brief Extract the filename (no extension) from a file path
@@ -614,7 +622,7 @@ namespace rpp /* ReCpp */
      * @result /.git/f.reallylong ==> f.reallylong
      * @result /.git/filewnoext   ==> filewnoext
      */
-    strview file_name(const strview path) noexcept;
+    RPPAPI strview file_name(const strview path) noexcept;
 
     /**
      * @brief Extract the file part (with ext) from a file path
@@ -623,7 +631,7 @@ namespace rpp /* ReCpp */
      * @result /root/dir/         ==> 
      * @result file.ext           ==> file.ext
      */
-    strview file_nameext(const strview path) noexcept;
+    RPPAPI strview file_nameext(const strview path) noexcept;
 
     /**
      * @brief Extract the extension from a file path
@@ -634,7 +642,7 @@ namespace rpp /* ReCpp */
      * @result /.git/f.reallylong ==> 
      * @result /.git/filewnoext   ==> 
      */
-    strview file_ext(const strview path) noexcept;
+    RPPAPI strview file_ext(const strview path) noexcept;
 
     /**
      * @brief Replaces the current file path extension
@@ -644,7 +652,7 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.old      ==> file.new
      */
-    string file_replace_ext(const strview path, const strview ext);
+    RPPAPI string file_replace_ext(const strview path, const strview ext);
     
     /**
      * @brief Changes only the file name by appending a string, leaving directory and extension untouched
@@ -653,7 +661,7 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.txt      ==> fileadd.txt
      */
-    string file_name_append(const strview path, const strview add);
+    RPPAPI string file_name_append(const strview path, const strview add);
     
     /**
      * @brief Replaces only the file name of the path, leaving directory and extension untouched
@@ -662,7 +670,7 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.txt      ==> replaced.txt
      */
-    string file_name_replace(const strview path, const strview newFileName);
+    RPPAPI string file_name_replace(const strview path, const strview newFileName);
     
     /**
      * @brief Replaces the file name and extension, leaving directory untouched
@@ -671,7 +679,7 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.txt      ==> replaced.bin
      */
-    string file_nameext_replace(const strview path, const strview newFileNameAndExt);
+    RPPAPI string file_nameext_replace(const strview path, const strview newFileNameAndExt);
 
     /**
      * @brief Extract the foldername from a path name
@@ -681,7 +689,7 @@ namespace rpp /* ReCpp */
      * @result dir/               ==> dir
      * @result file.ext           ==> 
      */
-    strview folder_name(const strview path) noexcept;
+    RPPAPI strview folder_name(const strview path) noexcept;
 
     /**
      * @brief Extracts the full folder path from a file path.
@@ -692,9 +700,10 @@ namespace rpp /* ReCpp */
      * @result dir/               ==> dir/
      * @result file.ext           ==> 
      */
-    strview folder_path(const strview path) noexcept;
-    wstring folder_path(const wchar_t* path) noexcept;
-    wstring folder_path(const wstring& path) noexcept;
+    RPPAPI strview folder_path(const strview path) noexcept;
+    RPPAPI wstring folder_path(const wchar_t* path) noexcept;
+    RPPAPI wstring folder_path(const wstring& path) noexcept;
+
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note This does not perform full path expansion.
@@ -702,14 +711,14 @@ namespace rpp /* ReCpp */
      *
      * @result \root/dir\\file.ext ==> /root/dir/file.ext
      */
-    string& normalize(string& path, char sep = '/') noexcept;
-    char*   normalize(char*   path, char sep = '/') noexcept;
+    RPPAPI string& normalize(string& path, char sep = '/') noexcept;
+    RPPAPI char*   normalize(char*   path, char sep = '/') noexcept;
 
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note A copy of the string is made
      */
-    string normalized(const strview path, char sep = '/') noexcept;
+    RPPAPI string normalized(const strview path, char sep = '/') noexcept;
     
     /**
      * @brief Efficiently combines two path strings, removing any repeated / or \
@@ -718,7 +727,7 @@ namespace rpp /* ReCpp */
      * @result path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
      * @result path_combine("tmp/", "/folder//") ==> "tmp/folder"
      */
-    string path_combine(strview path1, strview path2) noexcept;
+    RPPAPI string path_combine(strview path1, strview path2) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -732,7 +741,7 @@ namespace rpp /* ReCpp */
      *         if (e.is_dir) e.add_path_to(out);
      * @endcode
      */
-    class dir_iterator
+    class RPPAPI dir_iterator
     {
         struct impl;
         struct dummy {
@@ -855,7 +864,7 @@ namespace rpp /* ReCpp */
      *     "/projects/ReCpp/lib",
      * };
      */
-    int list_dirs(vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
+    RPPAPI int list_dirs(vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
 
     inline vector<string> list_dirs(strview dir, bool recursive = false, bool fullpath = false) noexcept {
         vector<string> out; list_dirs(out, dir, recursive, fullpath); return out;
@@ -913,7 +922,7 @@ namespace rpp /* ReCpp */
      *     "/projects/ReCpp/mesh/mesh_fbx.cpp",
      * };
      */
-    int list_files(vector<string>& out, strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept;
+    RPPAPI int list_files(vector<string>& out, strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept;
     inline vector<string> list_files(strview dir, strview ext = {}, bool recursive = false, bool fullpath = false) noexcept {
         vector<string> out; list_files(out, dir, ext, recursive, fullpath); return out;
     }
@@ -956,7 +965,7 @@ namespace rpp /* ReCpp */
      *     // files: { ".git/config", ..., ".gitignore", ... }
      * @endcode
      */
-    int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir, 
+    RPPAPI int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir,
                     bool recursive = false, bool fullpath = false) noexcept;
 
 
@@ -967,7 +976,7 @@ namespace rpp /* ReCpp */
      * @param exts Filter files by extensions, ex: {"txt","cfg"}
      * @return vector of resulting relative file paths
      */
-    vector<string> list_files(strview dir, const vector<strview>& exts, bool recursive = false , bool fullpath = false) noexcept;
+    RPPAPI vector<string> list_files(strview dir, const vector<strview>& exts, bool recursive = false , bool fullpath = false) noexcept;
     inline vector<string> list_files_recursive(strview dir, const vector<strview>& exts, bool fullpath = false) noexcept {
         return list_files(dir, exts, true, fullpath);
     }
@@ -977,13 +986,13 @@ namespace rpp /* ReCpp */
      * @example "/Projects/ReCpp"
      * @example "C:\\Projects\\ReCpp"
      */
-    string working_dir() noexcept;
+    RPPAPI string working_dir() noexcept;
 
     /**
      * Calls chdir() to set the working directory of the application to a new value
      * @return TRUE if chdir() is successful
      */
-    bool change_dir(const char* new_wd) noexcept;
+    RPPAPI bool change_dir(const char* new_wd) noexcept;
     inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
     inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
 
@@ -992,13 +1001,13 @@ namespace rpp /* ReCpp */
      * @note For windows this is: %USERPROFILE%/AppData/Local/Temp
      * @note for iOS this is $TMPDIR: %APPSTORAGE%/tmp
      */
-    string temp_dir() noexcept;
+    RPPAPI string temp_dir() noexcept;
     
     /**
      * @return The system home directory for this user
      * @note ENV $HOME is used
      */
-    string home_dir() noexcept;
+    RPPAPI string home_dir() noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 

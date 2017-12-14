@@ -9,13 +9,13 @@
 
 // You can disable RPP SSE intrinsics by declaring #define RPP_SSE_INTRINSICS 0 before including <rpp/vec.h>
 #ifndef RPP_SSE_INTRINSICS
-    #if _M_IX86_FP || _M_AMD64 || _M_X64 || __SSE2__
-    #define RPP_SSE_INTRINSICS 1
-    #endif
+#  if _M_IX86_FP || _M_AMD64 || _M_X64 || __SSE2__
+#    define RPP_SSE_INTRINSICS 1
+#  endif
 #endif
 
 #if RPP_SSE_INTRINSICS
-#include <emmintrin.h>
+#  include <emmintrin.h>
 #endif
 
 #undef M_PI
@@ -26,6 +26,14 @@
 #if _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4201) // nameless struct/union warning
+#endif
+
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
 #endif
 
 namespace rpp
@@ -139,7 +147,7 @@ namespace rpp
     };
 
     /** @brief 2D Vector for UI calculations */
-    struct Vector2
+    struct RPPAPI Vector2
     {
         float x, y;
         static constexpr float2 ZERO  = { 0.0f, 0.0f }; // 0 0
@@ -274,7 +282,7 @@ namespace rpp
     };
 
     /** @brief 2D Vector for UI calculations */
-    struct Vector2d
+    struct RPPAPI Vector2d
     {
         double x, y;
         static constexpr double2 ZERO  = { 0.0, 0.0 }; // 0 0
@@ -411,7 +419,7 @@ namespace rpp
     /**
      * @brief Utility for dealing with integer-only points. Pretty rare, but useful.
      */
-    struct Point
+    struct RPPAPI Point
     {
         int x, y;
 
@@ -474,7 +482,7 @@ namespace rpp
     };
 
     /** @brief Utility for dealing with 2D Rects */
-    struct Rect
+    struct RPPAPI Rect
     {
         union {
             struct { float x, y, w, h; };
@@ -578,7 +586,7 @@ namespace rpp
      * +Y is Up on the screen
      * +Z is Forward INTO the screen
      */
-    struct Vector3
+    struct RPPAPI Vector3
     {
         union {
             struct { float x, y, z; };
@@ -795,7 +803,7 @@ namespace rpp
         double x, y, z;
     };
 
-    struct Vector3d
+    struct RPPAPI Vector3d
     {
         union {
             struct { double x, y, z; };
@@ -917,7 +925,7 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
     /** @brief 4D Vector for matrix calculations and quaternion rotations */
-    struct Vector4
+    struct RPPAPI Vector4
     {
         union {
             struct { float x, y, z, w; };
@@ -1102,7 +1110,7 @@ namespace rpp
     /**
      * 4x4 Affine Matrix for OpenGL in row-major order, which is best suitable for MODERN OPENGL development
      */
-    struct Matrix4
+    struct RPPAPI Matrix4
     {
         union {
             struct {
@@ -1123,7 +1131,7 @@ namespace rpp
         };
     
         /** @brief Global identity matrix for easy initialization */
-        static const Matrix4 IDENTITY;
+        static const Matrix4& Identity();
 
         inline Matrix4() {}
 
@@ -1213,7 +1221,7 @@ namespace rpp
         Matrix4& fromPosition(const Vector3& position);
         static inline Matrix4 createTranslation(const Vector3& position)
         {
-            Matrix4 mat = IDENTITY;
+            Matrix4 mat = Identity();
             mat.translate(position);
             return mat;
         }
@@ -1272,7 +1280,7 @@ namespace rpp
         Matrix4& setAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees);
         static inline Matrix4 createAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees)
         {
-            Matrix4 affine = Matrix4::IDENTITY;
+            Matrix4 affine = Matrix4::Identity();
             affine.setAffine3D(pos, scale, rotationDegrees);
             return affine;
         }
@@ -1305,7 +1313,7 @@ namespace rpp
      * Viewport utility for creating a projection matrix and managing projection from
      * 2D to 3D space and vice-versa
      */
-    struct PerspectiveViewport
+    struct RPPAPI PerspectiveViewport
     {
         float fov, width, height, zNear, zFar;
         Matrix4 projection;
@@ -1383,7 +1391,7 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
     
     /** 3D bounding box */
-    struct BoundingBox
+    struct RPPAPI BoundingBox
     {
         Vector3 min;
         Vector3 max;
@@ -1473,7 +1481,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    struct BoundingSphere
+    struct RPPAPI BoundingSphere
     {
         Vector3 center;
         float radius;
@@ -1498,7 +1506,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    struct Ray
+    struct RPPAPI Ray
     {
         Vector3 origin;
         Vector3 direction;

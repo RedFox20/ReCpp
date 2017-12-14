@@ -54,7 +54,7 @@ namespace rpp
         int test_count = 0;
         int test_cap = 0;
         bool test_enabled = true; // internal: this is automatically set by the test system
-        bool auto_run = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
+        bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
     
     public:
         explicit test(strview name, bool autorun = true);

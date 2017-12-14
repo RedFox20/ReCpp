@@ -120,14 +120,14 @@ namespace rpp
 
 
     // This is same as memchr, but optimized for very small control strings
-    bool strcontains(const char* str, int len, char ch);
+    RPPAPI bool strcontains(const char* str, int len, char ch);
     /**
      * @note Same as strpbrk, except we're not dealing with 0-term strings
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      */
-    const char* strcontains(const char* str, int nstr, const char* control, int ncontrol);
-    NOINLINE bool strequals(const char* s1, const char* s2, int len);
-    NOINLINE bool strequalsi(const char* s1, const char* s2, int len);
+    RPPAPI const char* strcontains(const char* str, int nstr, const char* control, int ncontrol);
+    RPPAPI NOINLINE bool strequals(const char* s1, const char* s2, int len);
+    RPPAPI NOINLINE bool strequalsi(const char* s1, const char* s2, int len);
 
 
 
@@ -140,7 +140,7 @@ namespace rpp
      * @param len Length of the string to parse
      * @return Parsed float
      */
-    double to_double(const char* str, int len, const char** end = nullptr);
+    RPPAPI double to_double(const char* str, int len, const char** end = nullptr);
     inline double to_double(const char* str, const char** end = nullptr)
     {
         return to_double(str, 64, end);
@@ -153,7 +153,7 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
-    int to_int(const char* str, int len, const char** end = nullptr);
+    RPPAPI int to_int(const char* str, int len, const char** end = nullptr);
     inline int to_int(const char* str, const char** end = nullptr)
     {
         return to_int(str, 32, end);
@@ -167,7 +167,7 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
-    int to_inthx(const char* str, int len, const char** end = nullptr);
+    RPPAPI int to_inthx(const char* str, int len, const char** end = nullptr);
     inline int to_inthx(const char* str, const char** end = nullptr)
     {
         return to_inthx(str, 32, end);
@@ -180,7 +180,7 @@ namespace rpp
      * @param value Float value to convert to string
      * @return Length of the string
      */
-    int _tostring(char* buffer, double value);
+    RPPAPI int _tostring(char* buffer, double value);
     inline int _tostring(char* buffer, float value)
     {
         return _tostring(buffer, (double)value);
@@ -193,10 +193,10 @@ namespace rpp
      * @param value Integer value to convert to string
      * @return Length of the string
      */
-    int _tostring(char* buffer, int    value);
-    int _tostring(char* buffer, int64  value);
-    int _tostring(char* buffer, uint   value);
-    int _tostring(char* buffer, uint64 value);
+    RPPAPI int _tostring(char* buffer, int    value);
+    RPPAPI int _tostring(char* buffer, int64  value);
+    RPPAPI int _tostring(char* buffer, uint   value);
+    RPPAPI int _tostring(char* buffer, uint64 value);
 
     inline int _tostring(char* buffer, rpp::byte value) { return _tostring(buffer, (uint)value); }
     inline int _tostring(char* buffer, short value)     { return _tostring(buffer, (int)value);  }
@@ -224,7 +224,7 @@ namespace rpp
      *  - trim_start() trim_end()
      *  - to_int() to_float()
      */
-    struct strview
+    struct RPPAPI strview
     {
     #ifdef _MSC_VER
         union {
@@ -902,10 +902,10 @@ namespace rpp
 
     //////////////// optimized string join /////////////////
 
-    string join(const strview& a, const strview& b);
-    string join(const strview& a, const strview& b, const strview& c);
-    string join(const strview& a, const strview& b, const strview& c, const strview& d);
-    string join(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
+    RPPAPI string join(const strview& a, const strview& b);
+    RPPAPI string join(const strview& a, const strview& b, const strview& c);
+    RPPAPI string join(const strview& a, const strview& b, const strview& c, const strview& d);
+    RPPAPI string join(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
 
     //////////////// string compare operators /////////////////
 
@@ -947,32 +947,32 @@ namespace rpp
     /**
      * Converts a string into its lowercase form
      */
-    char* to_lower(char* str, int len);
+    RPPAPI char* to_lower(char* str, int len);
 
     /**
      * Converts a string into its uppercase form
      */
-    char* to_upper(char* str, int len);
+    RPPAPI char* to_upper(char* str, int len);
 
     /**
      * Converts an std::string into its lowercase form
      */
-    string& to_lower(string& str);
+    RPPAPI string& to_lower(string& str);
 
     /**
      * Converts an std::string into its uppercase form
      */
-    string& to_upper(string& str);
+    RPPAPI string& to_upper(string& str);
 
     /**
      * Replaces characters of 'chOld' with 'chNew' inside the specified string
      */
-    char* replace(char* str, int len, char chOld, char chNew);
+    RPPAPI char* replace(char* str, int len, char chOld, char chNew);
 
     /**
      * Replaces characters of 'chOld' with 'chNew' inside this std::string
      */
-    string& replace(string& str, char chOld, char chNew);
+    RPPAPI string& replace(string& str, char chOld, char chNew);
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -984,7 +984,7 @@ namespace rpp
      *
      *  This is also an example on how to implement your own custom parsers using the strview structure
      */
-    class line_parser
+    class RPPAPI line_parser
     {
     protected:
         strview buffer;
@@ -1006,27 +1006,6 @@ namespace rpp
         NOINLINE strview read_line();
     };
 
-    /**
-     * Executes specified function for each line in the specified file
-     * @param buffer UTF8 data buffer to tokenize
-     * @param func Lambda function:   
-     *                    bool func(token line)
-     *                       -- return false to break early, otherwise return true
-     * @return Number of lines processed
-     */
-    template<class Func> int for_each_buffer_line(const strview& buffer, Func func)
-    {
-        line_parser parser = buffer;
-        int n = 0;
-        strview line;
-        while (parser.read_line(line)) {
-            ++n;
-            if (func(line) == false)
-                return n;
-        }
-        return n;
-    }
-
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -1043,7 +1022,7 @@ namespace rpp
      *
      * This is also an example on how to implement your own custom parsers using strview
      */
-    class keyval_parser
+    class RPPAPI keyval_parser
     {
     protected:
         strview buffer;
@@ -1092,7 +1071,7 @@ namespace rpp
      *  }
      *
      */
-    class bracket_parser
+    class RPPAPI bracket_parser
     {
     protected:
         strview buffer;
@@ -1126,12 +1105,12 @@ namespace rpp
     /**
      * Forward all Misc to_string calls from rpp namespace to std::to_string
      */
-    template<class T> std::string to_string(const T& object)
+    template<class T> inline std::string to_string(const T& object)
     {
         return std::to_string(object);
     }
 
-    template<class T> std::string to_string(const T* object)
+    template<class T> inline std::string to_string(const T* object)
     {
         return object ? to_string(*object) : "null"s;
     }
@@ -1140,7 +1119,7 @@ namespace rpp
      * Always null terminated version of stringstream, which is compatible with strview
      * Not intended for moving or copying
      */
-    struct string_buffer
+    struct RPPAPI string_buffer
     {
         static constexpr int SIZE = 512;
         char* ptr;
@@ -1311,28 +1290,28 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    int print(FILE* file, strview value);
-    int print(FILE* file, char value);
-    int print(FILE* file, rpp::byte value);
-    int print(FILE* file, short value);
-    int print(FILE* file, ushort value);
-    int print(FILE* file, int value);
-    int print(FILE* file, uint value);
-    int print(FILE* file, int64 value);
-    int print(FILE* file, uint64 value);
+    RPPAPI int print(FILE* file, strview value);
+    RPPAPI int print(FILE* file, char value);
+    RPPAPI int print(FILE* file, rpp::byte value);
+    RPPAPI int print(FILE* file, short value);
+    RPPAPI int print(FILE* file, ushort value);
+    RPPAPI int print(FILE* file, int value);
+    RPPAPI int print(FILE* file, uint value);
+    RPPAPI int print(FILE* file, int64 value);
+    RPPAPI int print(FILE* file, uint64 value);
 
-    int print(strview value);
-    int print(char value);
-    int print(rpp::byte value);
-    int print(short value);
-    int print(ushort value);
-    int print(int value);
-    int print(uint value);
-    int print(int64 value);
-    int print(uint64 value);
+    RPPAPI int print(strview value);
+    RPPAPI int print(char value);
+    RPPAPI int print(rpp::byte value);
+    RPPAPI int print(short value);
+    RPPAPI int print(ushort value);
+    RPPAPI int print(int value);
+    RPPAPI int print(uint value);
+    RPPAPI int print(int64 value);
+    RPPAPI int print(uint64 value);
 
-    int println(FILE* file);
-    int println();
+    RPPAPI int println(FILE* file);
+    RPPAPI int println();
 
     template<class T> int println(FILE* file, const T& value)
     {
@@ -1430,12 +1409,12 @@ namespace std
     /////////////////////// useful container tostr extensions //////////////////////
 
     /** @return "true" or "false" string */
-    string to_string(bool trueOrFalse) noexcept;
+    RPPAPI string to_string(bool trueOrFalse) noexcept;
 
     /**
      * @return std::string from cstring. If cstr == nullptr, returns empty string ""
      */
-    string to_string(const char* cstr) noexcept;
+    RPPAPI string to_string(const char* cstr) noexcept;
 
     /** 
      *  @brief Outputs a linear container like vector<string>{"hello","world"} as:
@@ -1461,27 +1440,27 @@ namespace std
      *  @endcode
      */
     template<class T, template<class,class...> class C, class... Args>
-    string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
+    inline string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
     }
-    template<class T> string to_string(const shared_ptr<T>& p) noexcept
+    template<class T> inline string to_string(const shared_ptr<T>& p) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
-    template<class T> string to_string(const weak_ptr<T>& p) noexcept
+    template<class T> inline string to_string(const weak_ptr<T>& p) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
 
     template<class T, class Alloc>
-    ostream& operator<<(ostream& os, const vector<T,Alloc>& v) noexcept
+    inline ostream& operator<<(ostream& os, const vector<T,Alloc>& v) noexcept
     {
         return os << to_string(v, true);
     }
 
     template<class K, class V, class Hash, class Equal, class Alloc>
-    ostream& operator<<(ostream& os, const unordered_map<K,V,Hash,Equal,Alloc>& map) noexcept
+    inline ostream& operator<<(ostream& os, const unordered_map<K,V,Hash,Equal,Alloc>& map) noexcept
     {
         return os << to_string(map, true);
     }
