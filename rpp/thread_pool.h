@@ -213,7 +213,7 @@ namespace rpp
      * Handles signals for pool tasks. This is expected to throw an exception derived
      * from std::runtime_error
      */
-    using pool_signal_handler = void (*)(const char* signal) throw(std::runtime_error);
+    using pool_signal_handler = void (*)(const char* signal);
 
 
     /**
