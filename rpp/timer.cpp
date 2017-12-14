@@ -38,9 +38,9 @@ namespace rpp
     static const double period = []
     {
         #if _WIN32
-                LARGE_INTEGER freq;
-                QueryPerformanceFrequency(&freq);
-                return 1.0 / double(freq.QuadPart);
+            LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            return 1.0 / double(freq.QuadPart);
         #elif __APPLE__
             mach_timebase_info_data_t timebase;
             mach_timebase_info(&timebase);

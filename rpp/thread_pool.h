@@ -210,6 +210,7 @@ namespace rpp
         thread th;
         task_delegate<void()> genericTask;
         action<int, int> rangeTask;
+        std::string trace;
         int rangeStart  = 0;
         int rangeEnd    = 0;
         int maxIdleTime = 15;
@@ -248,11 +249,25 @@ namespace rpp
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
+        void unhandled_exception(const char* what) noexcept;
         void notify_task();
         void run() noexcept;
         bool got_task() const noexcept;
         bool wait_for_task(unique_lock<mutex>& lock) noexcept;
     };
+
+
+    /**
+     * Handles signals for pool tasks. This is expected to throw an exception derived
+     * from std::runtime_error
+     */
+    using pool_signal_handler = void (*)(const char* signal) throw(std::runtime_error);
+
+
+    /**
+     * Provides a plain function which traces the current callstack
+     */
+    using pool_trace_provider = std::string (*)();
 
 
     /**
@@ -327,6 +342,21 @@ namespace rpp
 
         // return the number of physical cores
         static int physical_cores();
+
+        /**
+         * Sets the pool_task signal handler for fatal states such as SIGSEGV
+         * The default handler is `throw runtime_error("SIGSEGV");`
+         * @note This handler is expected to throw a custom type of exception
+         */
+        static void set_signal_handler(pool_signal_handler signalHandler);
+
+        /**
+         * Enables tracing of parallel task calls. This makes it possible
+         * to trace the callstack which triggered the parallel task, otherwise
+         * there would be no hints where the it was launched if the task crashes.
+         * @note This will slow down parallel task startup since the call stack is unwound for debugging
+         */
+        static void set_task_tracer(pool_trace_provider traceProvider);
     };
 
     /**

@@ -7,17 +7,20 @@
     #include <pthread.h>
 #endif
 
-#define POOL_TASK_DEBUG 0
-
-#if POOL_TASK_DEBUG
-#  if __has_include("debugging.h")
-#    include "debugging.h"
-#  endif
+#if __has_include("debugging.h")
+#  include "debugging.h"
 #endif
+
+#define POOL_TASK_DEBUG 0
 
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////
+
+    static pool_trace_provider TraceProvider;
+    static pool_signal_handler SignalHandler = [](const char* what) {
+        throw std::runtime_error(what);
+    };
 
 #if POOL_TASK_DEBUG
 #  ifdef LogWarning
@@ -27,6 +30,12 @@ namespace rpp
 #  endif
 #else
 #  define TaskDebug(fmt, ...) // do nothing
+#endif
+
+#ifdef LogWarning
+#  define UnhandledEx(fmt, ...) LogWarning(fmt, ##__VA_ARGS__)
+#else
+#  define UnhandledEx(fmt, ...) fprintf(stderr, "pool_task::unhandled_exception $ " fmt "\n", ##__VA_ARGS__)
 #endif
     
     pool_task::pool_task()
@@ -45,6 +54,9 @@ namespace rpp
     {
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
+        trace.clear();
+        if (TraceProvider) trace = TraceProvider();
+
         { lock_guard<mutex> lock{m};
             genericTask  = {};
             rangeTask    = newTask;
@@ -58,6 +70,9 @@ namespace rpp
     void pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
     {
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
+
+        trace.clear();
+        if (TraceProvider) trace = TraceProvider();
 
         //TaskDebug("queue task");
         { lock_guard<mutex> lock{m};
@@ -153,12 +168,12 @@ namespace rpp
             } __except (1){}
         #pragma warning(pop)
     }
-    #endif
+#endif
 
-    static void segfault(int)
-    {
-        throw runtime_error("SIGSEGV");
-    }
+    static void segfault(int) { SignalHandler("SIGSEGV"); }
+    static void sigterm(int)  { SignalHandler("SIGTERM"); }
+    static void sigabort(int) { SignalHandler("SIGABORT"); }
+
 
     // really nasty case where OS threads are just abandoned
     // with none of the destructors being run
@@ -195,6 +210,9 @@ namespace rpp
         #endif
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
+        signal(SIGTERM, sigterm);
+        signal(SIGABRT, sigabort);
+
         register_thread_task(this);
 
         // mark all running threads killed during SIGTERM, before dtors run
@@ -249,23 +267,21 @@ namespace rpp
                     generic();
                 }
             }
-            catch (const exception& e)
-            {
-                fprintf(stderr, "pool_task::run unhandled exception: %s\n", e.what());
-            }
-            catch (const char* e) // prevent failure that would terminate the thread
-            {
-                fprintf(stderr, "pool_task::run unhandled exception: %s\n", e);
-            }
-            catch (...) // prevent failure that would terminate the thread
-            {
-                fprintf(stderr, "pool_task::run unhandled exception!\n");
-            }
+            // prevent failures that would terminate the thread
+            catch (const exception& e) { unhandled_exception(e.what()); }
+            catch (const char* e)      { unhandled_exception(e);        }
+            catch (...)                { unhandled_exception("");       }
             { lock_guard<mutex> lock{m};
                 taskRunning  = false;
                 cv.notify_all();
             }
         }
+    }
+
+    void pool_task::unhandled_exception(const char* what) noexcept
+    {
+        if (trace.empty()) UnhandledEx("%s", what);
+        else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
     }
 
     bool pool_task::got_task() const noexcept
@@ -326,6 +342,16 @@ namespace rpp
     {
         if (!core_count) core_count = num_physical_cores();
         return core_count;
+    }
+
+    void thread_pool::set_signal_handler(pool_signal_handler signalHandler)
+    {
+        SignalHandler = signalHandler;
+    }
+
+    void thread_pool::set_task_tracer(pool_trace_provider traceProvider)
+    {
+        TraceProvider = traceProvider;
     }
 
     thread_pool::thread_pool()
