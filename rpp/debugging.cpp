@@ -246,13 +246,47 @@ EXTERNC const char* _LogFilename(const char* longFilePath)
     return eptr;
 }
 
+
+static const int funcname_max = 48;
+
+struct funcname_builder
+{
+    char* buffer;
+    const char* ptr;
+    int len = 0;
+
+    explicit funcname_builder(char* buffer, const char* original)
+        : buffer{buffer}, ptr{original-1} {}
+
+    char read_next() { return len < funcname_max ? *++ptr : '\0'; }
+
+    template<int N, int M> bool replace(const char (&what)[N], const char (&with)[M])
+    {
+        if (memcmp(ptr, what, N - 1) == 0)
+        {
+            memcpy(&buffer[len], with, M - 1);
+            len += M - 1;
+            return true;
+        }
+        return false;
+    }
+    template<int N> bool skip(const char (&what)[N])
+    {
+        if (memcmp(ptr, what, N - 1) == 0) {
+            ptr += N - 2; // - 2 because next() will bump the pointer
+            return true;
+        }
+        return false;
+    }
+
+    void append(char ch) { buffer[len++] = ch; }
+};
+
+
 EXTERNC const char* _LogFuncname(const char* longFuncName)
 {
     if (DisableFunctionNames) return "";
     if (longFuncName == nullptr) return "(null)";
-
-    static thread_local char buf[64];
-    static const int max = 36;
 
     // always skip the first ::
     const char* ptr = strchr(longFuncName, ':');
@@ -261,27 +295,33 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
     }
     else ptr = longFuncName;
 
-    char ch;
-    int len = 0;
-    for (; len < max && (ch = *ptr) != '\0'; ++ptr) {
+    static thread_local char funcname_buf[64];
+
+    funcname_builder fb { funcname_buf, ptr };
+    while (char ch = fb.read_next())
+    {
         if (ch == '<') {
-            if (memcmp(ptr, "<<lambda", 8) == 0) { // MSVC std::invoke<<lambda_....>&>
-                memcpy(&buf[len], "<lambda>", 8);
-                len += 8;
-                break;
-            }
-            if (memcmp(ptr, "<lambda", 7) == 0) {
-                memcpy(&buf[len], "lambda", 6);
-                len += 6;
-                break;
-            }
+            // replace invoke<<lambda_....>&> with just invoke<lambda>
+            if (fb.replace("<<lambda", "<lambda>")) break; // no idea how long lambda, so stop here
+            if (fb.replace("<lambda", "lambda"))    break;
         }
-        buf[len++] = ch;
+
+        // clean all std:: symbols
+        if (ch == 's' && fb.skip("std::")) continue;
+
+    #if !_MSC_VER // also skip __1:: to clean the symbols on clang
+        if (ch == '_' && fb.skip("__1::")) continue;
+    #else
+        if (ch == ' ' && fb.skip(" __cdecl")) continue;
+    #endif
+
+        fb.append(ch);
     }
-    if (buf[len-1] == ']')
-        --len; // remove Objective-C method ending bracket
-    buf[len] = '\0';
-    return buf;
+
+    if (fb.buffer[fb.len-1] == ']')
+        --fb.len; // remove Objective-C method ending bracket
+    fb.append('\0');
+    return fb.buffer;
 }
 
 void Log(LogSeverity severity, rpp::strview message)
