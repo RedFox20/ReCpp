@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <thread>
+#include <string>
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
@@ -219,7 +220,7 @@ namespace rpp
     /**
      * Provides a plain function which traces the current callstack
      */
-    using pool_trace_provider = std::string (*)();
+    using pool_trace_provider = string (*)();
 
 
     /**
@@ -238,7 +239,6 @@ namespace rpp
         int maxIdleTime = 15;
         string trace;
         exception_ptr error;
-        pool_signal_handler handler = nullptr;
         volatile bool taskRunning = false; // an active task is being executed
         volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
 
