@@ -58,7 +58,7 @@ namespace rpp
             trace.clear();
             error = nullptr;
             if (auto tracer = TraceProvider)
-                trace = TraceProvider();
+                trace = tracer();
             genericTask  = {};
             rangeTask    = newTask;
             rangeStart   = start;
@@ -77,7 +77,7 @@ namespace rpp
             trace.clear();
             error = nullptr;
             if (auto tracer = TraceProvider)
-                trace = TraceProvider();
+                trace = tracer();
             genericTask  = move(newTask);
             rangeTask    = {};
             rangeStart   = 0;
@@ -190,11 +190,7 @@ namespace rpp
         activeTasks.erase(get_thread_id());
     }
 
-
     static void segfault(int) { SignalHandler("SIGSEGV"); }
-    static void sigterm(int)  { SignalHandler("SIGTERM"); }
-    static void sigabort(int) { SignalHandler("SIGABORT"); }
-
 
     void pool_task::run() noexcept
     {
@@ -211,9 +207,6 @@ namespace rpp
         #endif
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
-        signal(SIGTERM, sigterm);
-        signal(SIGABRT, sigabort);
-
         register_thread_task(this);
 
         // mark all running threads killed during SIGTERM, before dtors run
@@ -254,7 +247,7 @@ namespace rpp
                     range   = move(rangeTask);
                     generic = move(genericTask);
                     rangeTask   = {};
-                    genericTask = {}; // BUG: Clang on android doesn't move genericTask properly
+                    genericTask = {};
                     taskRunning = true;
                 }
                 if (range)
