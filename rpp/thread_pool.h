@@ -130,7 +130,7 @@ namespace rpp
          * @code
          *   sync.wait_barrier_while(IsRunning);  // waits while IsRunning == true and sets it to true on return
          *   processTask();
-         * @endocde
+         * @endcode
          * @param taskIsRunning Reference to atomic flag to wait on
          */
         void wait_barrier_while(atomic_bool& taskIsRunning)
@@ -151,7 +151,7 @@ namespace rpp
          * @code
          *   sync.wait_barrier_until(HasFinished);  // waits while HasFinished == false and sets it to false on return
          *   processResults();
-         * @endocde
+         * @endcode
          * @param hasFinished Reference to atomic flag to wait on
          */
         void wait_barrier_until(atomic_bool& hasFinished)
