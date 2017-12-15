@@ -1,7 +1,7 @@
-#ifndef RPP_DEBUGGING_H
-#define RPP_DEBUGGING_H
+#pragma once
 /**
- * Cross platform debugging interface, Copyright (c) 2017 - Jorma Rebane
+ * Cross platform debugging interface, Copyright (c) 2017-2018, Jorma Rebane
+ * Distributed under MIT Software License
  */
 #include <assert.h> // platform specific assert stuff
 #include <stdarg.h>
@@ -238,7 +238,4 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 // logs error message, triggers an assertion and throws an std::runtime_error
 #define ThrowErr(format, ...) ThrowErrType(std::runtime_error, format, ##__VA_ARGS__)
 
-
-#endif
-
-#endif /* RPP_DEBUGGING_H */
+#endif // __cplusplus

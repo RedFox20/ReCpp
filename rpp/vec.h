@@ -1,9 +1,8 @@
 #pragma once
 /**
  * Basic Vector Math, Copyright (c) 2015 - Jorma Rebane
+ * Distributed under MIT Software License
  */
-#ifndef RPP_VECTORMATH_H
-#define RPP_VECTORMATH_H
 #include "strview.h"
 #include <cmath> // fabsf, fabs
 
@@ -140,7 +139,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Vector2 */
-    struct float2
+    struct RPPAPI float2
     {
         float x, y;
         constexpr float2(float x, float y) : x(x), y(y) {}
@@ -275,7 +274,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Vector2d */
-    struct double2
+    struct RPPAPI double2
     {
         double x, y;
         constexpr double2(double x, double y) : x(x), y(y) {}
@@ -410,7 +409,7 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Point */
-    struct int2
+    struct RPPAPI int2
     {
         int x, y;
         constexpr int2(int x, int y) : x(x), y(y) {}
@@ -475,7 +474,7 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Vector4 and Rect */
-    struct float4
+    struct RPPAPI float4
     {
         float x, y, z, w;
         constexpr float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
@@ -571,7 +570,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     /** @brief Proxy to allow constexpr initialization inside Vector3 */
-    struct float3
+    struct RPPAPI float3
     { 
         float x, y, z;
         constexpr float3(float x, float y, float z) : x(x), y(y), z(z) {}
@@ -798,7 +797,7 @@ namespace rpp
     
     ////////////////////////////////////////////////////////////////////////////////
 
-    struct double3
+    struct RPPAPI double3
     {
         double x, y, z;
     };
@@ -1102,7 +1101,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    struct _Matrix4RowVis
+    struct RPPAPI _Matrix4RowVis
     {
         float x, y, z, w;
     };
@@ -1548,5 +1547,3 @@ namespace rpp
 #if _MSC_VER
 #pragma warning(pop) // nameless struct/union warning
 #endif
-
-#endif /* RPP_VECTORMATH_H */

@@ -1,15 +1,26 @@
+#pragma once
 /**
- * Basic JSON serialize/deserialize, Copyright (c) 2017 - Jorma Rebane
+ * Basic JSON serialize/deserialize, Copyright (c) 2017-2018, Jorma Rebane
+ * Distributed under MIT Software License
  */
-#ifndef RPP_JSON_H
-#define RPP_JSON_H
+#if _MSC_VER
+#  pragma warning(disable: 4251)
+#endif
 #include "file_io.h"
+
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
 
 namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    class json
+    class RPPAPI json
     {
     public:
         enum type
@@ -266,5 +277,3 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 }
-
-#endif /* RPP_JSON_H */

@@ -1,7 +1,11 @@
 #pragma once
-#ifndef RPP_THREAD_POOL_H
-#define RPP_THREAD_POOL_H
-
+/**
+ * Fast cross-platform thread-pool, Copyright (c) 2017-2018, Jorma Rebane
+ * Distributed under MIT Software License
+ */
+#if _MSC_VER
+#  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
+#endif
 #include <vector>
 #include <thread>
 #include <string>
@@ -285,7 +289,6 @@ namespace rpp
     };
 
 
-
     /**
      * A generic thread pool that can be used to group and control pool lifetimes
      * By default a global thread_pool is also available
@@ -462,5 +465,3 @@ namespace rpp
     //////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
-
-#endif // RPP_THREAD_POOL_H

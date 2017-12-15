@@ -104,15 +104,15 @@ TestImpl(test_threadpool)
     }
 
 
-    TestCase(parallel_task_unhandled_exception)
+    TestCaseExpectedEx(parallel_task_exception, std::logic_error)
     {
         int times_launched = 0; // this makes sure the threadpool loop doesn't retrigger our task
         auto* task = rpp::parallel_task([&]() {
             AssertThat(times_launched, 0);
             ++times_launched;
-            throw "aaargh!";
+            throw std::logic_error("aaargh!");
         });
-        task->wait();
+        task->wait(); // @note this should rethrow
     }
 
     TestCase(parallel_task_reentrance)
@@ -135,9 +135,9 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_resurrection)
     {
-        thread_pool::global.max_task_idle_time(1);
-        thread_pool::global.clear_idle_tasks();
-        AssertThat(thread_pool::global.active_tasks(), 0);
+        thread_pool::global().max_task_idle_time(1);
+        thread_pool::global().clear_idle_tasks();
+        AssertThat(thread_pool::global().active_tasks(), 0);
 
         atomic_int times_launched {0};
         rpp::parallel_task([&] { times_launched += 1; })->wait(2000);
@@ -151,7 +151,7 @@ TestImpl(test_threadpool)
         })->wait(2000);
         AssertThat((int)times_launched, 2);
 
-        thread_pool::global.max_task_idle_time(2);
+        thread_pool::global().max_task_idle_time(2);
     }
 
     TestCase(parallel_task_nested_nodeadlocks)

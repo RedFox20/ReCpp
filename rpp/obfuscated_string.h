@@ -1,10 +1,8 @@
-//
-//  obfuscated_string.h
-//
-//  Compile-time string obfuscation, Copyright (c) 2017 - Jorma Rebane
-//
-#ifndef RPP_OBFUSCATED_STRING_H
-#define RPP_OBFUSCATED_STRING_H
+#pragma once
+/**
+ * Compile-time string obfuscation, Copyright (c) 2017, Jorma Rebane
+ * Distributed under MIT Software License
+ */
 #include <string>
 #include <utility>
 
@@ -133,5 +131,3 @@ namespace rpp
 #endif
 
 }
-
-#endif // RPP_OBFUSCATED_STRING_H

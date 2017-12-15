@@ -1,11 +1,27 @@
 #pragma once
+/**
+ * Efficient binary streams, Copyright (c) 2017-2018, Jorma Rebane
+ * Distributed under MIT Software License
+ */
 #include "strview.h"
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
-#include <mutex>
-#include "sockets.h"
+#  include <mutex>
+#  include "sockets.h"
 #endif
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
-#include "file_io.h"
+#  include "file_io.h"
+#endif
+
+#if _MSC_VER
+#  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
+#endif
+
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
 #endif
 
 namespace rpp /* ReCpp */ 
@@ -14,22 +30,29 @@ namespace rpp /* ReCpp */
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
-    #if !_HAS_STD_BYTE
-        typedef unsigned char      byte;
-    #endif
-        typedef unsigned short     ushort;
-        typedef unsigned int       uint;
-        typedef unsigned long      ulong;
-        typedef long long          int64;
-        typedef unsigned long long uint64;
+        #ifdef _LIBCPP_STD_VER
+        #  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
+        #elif !defined(_HAS_STD_BYTE)
+        #  define _HAS_STD_BYTE 0
+        #endif
+        #if !_HAS_STD_BYTE
+            using byte = unsigned char;
+        #else
+            using byte = std::byte;
+        #endif
+        using ushort = unsigned short;
+        using uint   = unsigned int;
+        using ulong  = unsigned long;
+        using int64  = long long;
+        using uint64 = unsigned long long;
     #endif
 
     #ifndef RPP_MOVECOPY_MACROS_DEFINED
-        #define RPP_MOVECOPY_MACROS_DEFINED
-        #define MOVE(Class,value) Class(Class&&)=value;       Class&operator=(Class&&)=value;
-        #define NOCOPY(Class)     Class(const Class&)=delete; Class&operator=(const Class&)=delete;
-        #define NOCOPY_MOVE(Class)   MOVE(Class,default) NOCOPY(Class) 
-        #define NOCOPY_NOMOVE(Class) MOVE(Class,delete)  NOCOPY(Class) 
+    #  define RPP_MOVECOPY_MACROS_DEFINED
+    #  define MOVE(Class,value) Class(Class&&)=value;       Class&operator=(Class&&)=value;
+    #  define NOCOPY(Class)     Class(const Class&)=delete; Class&operator=(const Class&)=delete;
+    #  define NOCOPY_MOVE(Class)   MOVE(Class,default) NOCOPY(Class) 
+    #  define NOCOPY_NOMOVE(Class) MOVE(Class,delete)  NOCOPY(Class) 
     #endif
 
     #ifndef RPP_MINMAX_DEFINED
@@ -46,7 +69,7 @@ namespace rpp /* ReCpp */
     /**
      * @brief A generic stream source.
      */
-    struct stream_source
+    struct RPPAPI stream_source
     {
         virtual ~stream_source() noexcept = default;
 
@@ -143,7 +166,7 @@ namespace rpp /* ReCpp */
      * @endcode
      *         
      */
-    class binary_stream
+    class RPPAPI binary_stream
     {
         // Small Buffer Optimization size:
         static constexpr int SBSize = 512;
@@ -396,7 +419,7 @@ namespace rpp /* ReCpp */
     /**
      * Special case of a binary stream, which doesn't flush any of the data
      */
-    class binary_buffer : public binary_stream
+    class RPPAPI binary_buffer : public binary_stream
     {
         using binary_stream::binary_stream;
     };
@@ -411,7 +434,7 @@ namespace rpp /* ReCpp */
     /**
      * A generic binary socket writer. For UDP sockets, use socket::bind to set the destination ipaddress.
      */
-    class socket_writer : public binary_stream, protected stream_source
+    class RPPAPI socket_writer : public binary_stream, protected stream_source
     {
         rpp::socket* Sock = nullptr;
     public:
@@ -434,7 +457,7 @@ namespace rpp /* ReCpp */
      * A generic binary socket reader. For UDP sockets the remote address can be inspected
      * via socket_reader::addr()
      */
-    class socket_reader : public binary_stream, protected stream_source
+    class RPPAPI socket_reader : public binary_stream, protected stream_source
     {
         rpp::socket* Sock = nullptr;
         rpp::ipaddress Addr;
@@ -482,7 +505,7 @@ namespace rpp /* ReCpp */
      * @warning Write operations may cause a flush(), so make sure to use nonblocking sockets
      *          otherwise you will experience long lock times
      */
-    class shared_socket_writer : public socket_writer
+    class RPPAPI shared_socket_writer : public socket_writer
     {
     protected:
         mutex Mutex;
@@ -505,7 +528,7 @@ namespace rpp /* ReCpp */
      * @warning Read operations may cause a buffer fill event, so make
      *          sure the socket has enough data available to continue
      */
-    class shared_socket_reader : public socket_reader
+    class RPPAPI shared_socket_reader : public socket_reader
     {
     protected:
         mutex Mutex;
@@ -530,7 +553,7 @@ namespace rpp /* ReCpp */
     /**
      * A generic binary file writer. This is not the best for small inputs, but excels with huge contiguous streams
      */
-    class file_writer : public binary_stream, protected stream_source
+    class RPPAPI file_writer : public binary_stream, protected stream_source
     {
         rpp::file* File = nullptr;
     public:
@@ -551,7 +574,7 @@ namespace rpp /* ReCpp */
     /**
      * A generic binary file reader. This is not the best for small inputs, but excels with huge contiguous streams
      */
-    class file_reader : public binary_stream, protected stream_source
+    class RPPAPI file_reader : public binary_stream, protected stream_source
     {
         rpp::file* File = nullptr;
     public:

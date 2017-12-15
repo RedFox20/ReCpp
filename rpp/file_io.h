@@ -1,12 +1,14 @@
 #pragma once
-#ifndef RPP_FILE_IO_H
-#define RPP_FILE_IO_H
 /**
- * Cross platform file utilities, Copyright (c) 2014 - Jorma Rebane
+ * Cross platform file utilities, Copyright (c) 2014-2018, Jorma Rebane
+ * Distributed under MIT Software License
  *
  * @note This module predates C++17 filesystem and offers a different
  *       set of convenient API's for dealing with every-day File I/O tasks.
  */
+#if _MSC_VER
+#  pragma warning(disable: 4251)
+#endif
 #include <time.h> // time_t
 #include "strview.h"
 
@@ -1013,4 +1015,3 @@ namespace rpp /* ReCpp */
 
 
 } // namespace rpp
-#endif // RPP_FILE_IO_H

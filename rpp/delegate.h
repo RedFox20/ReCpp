@@ -1,48 +1,46 @@
 #pragma once
-#ifndef RPP_DELEGATE_H
-#define RPP_DELEGATE_H
 /**
- * Copyright (c) 2015 - Jorma Rebane
- * Usage license: MIT
+ * Copyright (c) 2015-2017, Jorma Rebane
+ * Distributed under MIT Software License
  *
  * Optimized delegate and event class for VC++ 2013/2015/...
  *
  *
  * Usage examples:
  *
- *  -) Declaring and resetting the delegate
+ *  Declaring and resetting the delegate
  *  @code
  *     delegate<void(int)> fn;
  *     fn.reset();               // clear delegate (uninitialize)
  *     if (fn) fn(42);           // call if initialized
  *  @endcode
  *
- *  -) Regular function
+ *  Regular function
  *  @code
  *     delegate<void(int)> fn = &func;
  *     fn(42);
  *  @endcode
  *
- *  -) Member function
+ *  Member function
  *  @code
  *     delegate<void(int)> fn(myClass, &MyClass::func);  // construct
  *     fn.reset(myClass, &MyClass::func);                // or reset
  *     fn(42);
  *  @endcode
  *
- *  -) Lambdas:
+ *  Lambdas:
  *  @code
  *     delegate<void(int)> fn = [](int a) { cout << a << endl; };
  *     fn(42);
  *  @endcode
  *
- *  -) Functors:
+ *  Functors:
  *  @code
  *     delegate<bool(int,int)> comparer = std::less<int>();
  *     bool result = comparer(37, 42);
  *  @endcode
  *
- *  -) Events:
+ *  Events:
  *  @code
  *     multicast_delegate<void(int,int)> onMouseMove;
  *     onMouseMove += &scene_mousemove;   // register events
@@ -727,4 +725,3 @@ namespace rpp
 
 } // namespace rpp
 
-#endif // RPP_DELEGATE_H

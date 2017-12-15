@@ -1,4 +1,8 @@
 #pragma once
+/**
+ * Efficient binary serialization/deserialization, Copyright (c) 2017-2018, Jorma Rebane
+ * Distributed under MIT Software License
+ */
 #ifndef RPP_BINARY_SERIALIZER_H
 #define RPP_BINARY_SERIALIZER_H
 #include "binary_stream.h"

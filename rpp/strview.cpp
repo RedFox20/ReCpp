@@ -68,7 +68,7 @@ namespace rpp
     bool strview::is_whitespace() const
     {
         auto* s = str, *e = s+len;
-        for (; s < e && *(byte*)s <= ' '; ++s) {} // loop while is whitespace
+        for (; s < e && *(char*)s <= ' '; ++s) {} // loop while is whitespace
         return s == e;
     }
     
@@ -100,7 +100,7 @@ namespace rpp
     {
         auto s = str;
         auto n = len;
-        for (; n && *(byte*)s <= ' '; ++s, --n) {} // loop while is whitespace
+        for (; n && *(char*)s <= ' '; ++s, --n) {} // loop while is whitespace
         str = s; len = n; // result writeout
         return *this;
     }

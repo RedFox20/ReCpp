@@ -1,8 +1,7 @@
 #pragma once
-#ifndef RPP_TIMER_H
-#define RPP_TIMER_H
 /**
- * Simple performance timer, Copyright (c) 2017 - Jorma Rebane
+ * Simple performance timer, Copyright (c) 2016-2017, Jorma Rebane
+ * Distributed under MIT Software License
  */
 #include <stdint.h>
 
@@ -95,5 +94,3 @@ extern "C" {
 }
 #endif
 
-
-#endif // RPP_TIMER_H

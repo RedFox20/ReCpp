@@ -97,20 +97,20 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
             FOREGROUND_RED | FOREGROUND_INTENSITY, // bright red - Error
         };
         HANDLE winout = severity == LogSeverityError ? winstd : winerr;
-        FILE*  cout   = severity == LogSeverityError ? stderr : stdout;
+        FILE*  fout   = severity == LogSeverityError ? stderr : stdout;
 
         AllocaPrintlineBuf(err, len);
         static mutex consoleSync;
         {
             lock_guard<mutex> guard{ consoleSync };
             SetConsoleTextAttribute(winout, colormap[severity]);
-            fwrite(buf, size_t(len + 1), 1, cout); // fwrite to sync with unix-like shells
+            fwrite(buf, size_t(len + 1), 1, fout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
         }
-        fflush(cout); // flush needed for proper sync with unix-like shells
+        fflush(fout); // flush needed for proper sync with unix-like shells
     #elif __linux
         AllocaPrintlineBuf(err, len);
-        FILE* cout = severity == LogSeverityError ? stderr : stdout;
+        FILE* fout = severity == LogSeverityError ? stderr : stdout;
         static const char clearColor[] = "\33[0m"; // Default: clear all formatting
         static const char* colors[] = {
                 "\33[0m",  // Default: white
@@ -120,16 +120,16 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         static mutex consoleSync;
         {
             lock_guard<mutex> guard{ consoleSync };
-            fwrite(colors[severity], strlen(colors[severity]), 1, cout);
-            fwrite(buf, size_t(len) + 1, 1, cout);
-            fwrite(clearColor, sizeof(clearColor)-1, 1, cout);
+            fwrite(colors[severity], strlen(colors[severity]), 1, fout);
+            fwrite(buf, size_t(len) + 1, 1, fout);
+            fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
         }
-        fflush(cout); // flush needed for proper sync with different shells
+        fflush(fout); // flush needed for proper sync with different shells
     #else
         AllocaPrintlineBuf(err, len);
-        FILE* cout = severity == LogSeverityError ? stderr : stdout;
-        fwrite(buf, size_t(len) + 1, 1, cout);
-        fflush(cout); // flush needed for proper sync with unix-like shells
+        FILE* fout = severity == LogSeverityError ? stderr : stdout;
+        fwrite(buf, size_t(len) + 1, 1, fout);
+        fflush(fout); // flush needed for proper sync with unix-like shells
     #endif
     (void)tag;
 }

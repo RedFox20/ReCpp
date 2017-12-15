@@ -1,7 +1,8 @@
 #pragma once
 /**
- * Minimal resumable future extensions for C++11 std::future, Copyright (c) 2017 - Jorma Rebane
- * Original implementation description by Herb Sutter at C++ and beyond 2012
+ * Minimal resumable future extensions for C++11 std::future, Copyright (c) 2017-2018, Jorma Rebane
+ * Distributed under MIT Software License
+ * @note Original implementation description by Herb Sutter at C++ and beyond 2012
  */
 #include <memory> // shared_ptr
 #include <future>

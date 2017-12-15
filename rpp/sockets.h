@@ -1,27 +1,48 @@
 #pragma once
-#ifndef RPP_SOCKETS_H
-#define RPP_SOCKETS_H
+/**
+ * Simple and efficient wrapper around POSIX sockets, Copyright (c) 2014-2018, Jorma Rebane
+ * Distributed under MIT Software License
+ */
+#if _MSC_VER
+#  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
+#endif
 #include <string>   // std::string, std::wstring
 #include <vector>   // std::vector
 #include <ostream>  // ostream& operator<<
 
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE
-    #ifdef _MSC_VER
-    #  define NOINLINE __declspec(noinline)
-    #else
-    #  define NOINLINE __attribute__((noinline))
-    #endif
+#  ifdef _MSC_VER
+#    define NOINLINE __declspec(noinline)
+#  else
+#    define NOINLINE __attribute__((noinline))
+#  endif
 #endif
 
 //// @note Some strong hints that some functions are merely wrappers, so should be forced inline
 #ifndef FINLINE
-    #ifdef _MSC_VER
-        #define FINLINE __forceinline
-    #else
-        #define FINLINE  __attribute__((always_inline))
-    #endif
+#  ifdef _MSC_VER
+#    define FINLINE __forceinline
+#  elif __APPLE__
+#    define FINLINE inline __attribute__((always_inline))
+#  else
+#    define FINLINE __attribute__((always_inline))
+#  endif
+#endif
+
+#ifdef _LIBCPP_STD_VER
+#  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
+#elif !defined(_HAS_STD_BYTE)
+#  define _HAS_STD_BYTE 0
 #endif
 
 namespace rpp
@@ -30,17 +51,24 @@ namespace rpp
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
-    #if !_HAS_STD_BYTE
-        typedef unsigned char      byte;
-    #endif
-        typedef unsigned short     ushort;
-        typedef unsigned int       uint;
-        typedef unsigned long      ulong;
-        typedef long long          int64;
-        typedef unsigned long long uint64;
+        #ifdef _LIBCPP_STD_VER
+        #  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
+        #elif !defined(_HAS_STD_BYTE)
+        #  define _HAS_STD_BYTE 0
+        #endif
+        #if !_HAS_STD_BYTE
+            using byte = unsigned char;
+        #else
+            using byte = std::byte;
+        #endif
+        using ushort = unsigned short;
+        using uint   = unsigned int;
+        using ulong  = unsigned long;
+        using int64  = long long;
+        using uint64 = unsigned long long;
     #endif
 
-    enum address_family
+    enum RPPAPI address_family
     {
         AF_DontCare,    // unspecified AddressFamily, service provider will choose most appropriate
         AF_IPv4,        // The Internet Protocol version 4 (IPv4) address family
@@ -48,7 +76,7 @@ namespace rpp
         AF_Bth,         // Bluetooth address family, supported since WinXP SP2
     };
 
-    enum socket_type
+    enum RPPAPI socket_type
     {
         ST_Unspecified, // unspecified socket type (invalid socket)
         ST_Stream,      // TCP only, byte stream for IPv4 or IPv6 protocols
@@ -58,7 +86,7 @@ namespace rpp
         ST_SeqPacket,   // TCP based, similar to ST_Stream but slower, however packet boundaries are respected "TCP datagrams"
     };
 
-    enum ip_protocol
+    enum RPPAPI ip_protocol
     {
         IPP_DontCare,   // generic IP based protocol, service provider will choose most appropriate
         IPP_ICMP,       // only supported with ST_Raw on IPv4 or IPv6
@@ -70,7 +98,7 @@ namespace rpp
         IPP_PGM,        // PGM - only supported with ST_RDM on IPv4
     };
 
-    enum socket_option
+    enum RPPAPI socket_option
     {
         SO_None,        // --
         SO_ReuseAddr = (1<<0),  // allows multiple sockets to bind to the same address
@@ -94,7 +122,7 @@ namespace rpp
     int ipproto_int(ip_protocol ipProtocol) noexcept;
 
 
-    struct protocol_info
+    struct RPPAPI protocol_info
     {
         int            ProtoVersion; // protocol version identifier (ip_protocol OR SO_TYPE)
         address_family Family;
@@ -108,23 +136,23 @@ namespace rpp
 
 
     // Sleeps for specified milliseconds duration
-    void thread_sleep(int milliseconds) noexcept;
+    void RPPAPI thread_sleep(int milliseconds) noexcept;
 
     // Spawns a new thread, thread handles are automatically closed
-    void spawn_thread(void(*thread_func)(void* arg), void* arg) noexcept;
+    void RPPAPI spawn_thread(void(*thread_func)(void* arg), void* arg) noexcept;
 
     // Measure highest accuracy time in seconds for both Windows and Linux
-    double timer_time() noexcept;
+    double RPPAPI timer_time() noexcept;
 
 
     // Basic IP-Address abstraction
-    struct ipaddress
+    struct RPPAPI ipaddress
     {
         address_family Family;     // IPv4 or IPv6
         unsigned short Port;       // port in host byte order
-#if _MSC_VER
-        #pragma warning(disable:4201)
-#endif
+        #if _MSC_VER
+        #  pragma warning(disable:4201)
+        #endif
         union {
             union {
                 unsigned long Addr4; // IPv4 Address
@@ -158,14 +186,14 @@ namespace rpp
         void clear() noexcept;
         int port() const noexcept;
     };
-    struct ipaddress4 : public ipaddress
+    struct RPPAPI ipaddress4 : public ipaddress
     {
         ipaddress4() noexcept : ipaddress(AF_IPv4) {}
         ipaddress4(int port) noexcept : ipaddress(AF_IPv4, port) {}
         ipaddress4(const char* hostname, int port) noexcept : ipaddress(AF_IPv4, hostname, port) {}
         ipaddress4(const string& ipAddressAndPort) noexcept : ipaddress(AF_IPv4, ipAddressAndPort) {}
     };
-    struct ipaddress6 : public ipaddress
+    struct RPPAPI ipaddress6 : public ipaddress
     {
         ipaddress6() noexcept : ipaddress(AF_IPv6) {}
         ipaddress6(int port) noexcept : ipaddress(AF_IPv6, port) {}
@@ -181,7 +209,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    struct ipinterface
+    struct RPPAPI ipinterface
     {
         string    name; // friendly name
         ipaddress addr; // address of the IP interface
@@ -200,7 +228,7 @@ namespace rpp
     /**
      * A lightweight C++ Socket object with basic error handling and resource safety
      */
-    class socket
+    class RPPAPI socket
     {
     protected:
 
@@ -703,22 +731,18 @@ namespace rpp
         }
     };
 
-    static constexpr int SOCKET_SIZE = sizeof(socket);
-
     ////////////////////////////////////////////////////////////////////////////////
 
     /**
      * Makes an UDP socket with a random port
      */
-    socket make_udp_randomport(socket_option opt = SO_None);
+    RPPAPI socket make_udp_randomport(socket_option opt = SO_None);
 
     /**
      * Creates a loopback (127.0.0.1) TCP Listener with a random port number
      */
-    socket make_tcp_randomport(socket_option opt = SO_None);
+    RPPAPI socket make_tcp_randomport(socket_option opt = SO_None);
 
     ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
-
-#endif // RPP_SOCKETS_H

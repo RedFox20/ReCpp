@@ -1,16 +1,10 @@
 #pragma once
-#ifndef RPP_STRVIEW_H
-#define RPP_STRVIEW_H
 /**
  * String Tokenizer/View, Copyright (c) 2014-2018, Jorma Rebane
+ * Distributed under MIT Software License
  */
-#ifdef _LIBCPP_STD_VER
-#  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
-#elif !defined(_HAS_STD_BYTE)
-#  define _HAS_STD_BYTE 0
-#endif
 #ifndef __cplusplus
-  #error <rpp/strview.h> requires C++14 or higher
+#  error <rpp/strview.h> requires C++14 or higher
 #endif
 #include <cstring>    // C string utilities
 #include <string>     // compatibility with std::string
@@ -36,9 +30,40 @@
  */
 
 #if _MSC_VER
-#pragma warning(push)
-#pragma warning(disable:4201) // nameless struct/union warning
+#  pragma warning(push)
+#  pragma warning(disable:4201) // nameless struct/union warning
 #endif
+
+
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI __declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
+//// @note Some functions get inlined too aggressively, leading to some serious code bloat
+////       Need to hint the compiler to take it easy ^_^'
+#ifndef NOINLINE
+#  ifdef _MSC_VER
+#    define NOINLINE __declspec(noinline)
+#  else
+#    define NOINLINE __attribute__((noinline))
+#  endif
+#endif
+
+//// @note Some strong hints that some functions are merely wrappers, so should be forced inline
+#ifndef FINLINE
+#  ifdef _MSC_VER
+#    define FINLINE __forceinline
+#  elif __APPLE__
+#    define FINLINE inline __attribute__((always_inline))
+#  else
+#    define FINLINE __attribute__((always_inline))
+#  endif
+#endif
+
 
 namespace rpp
 {
@@ -46,6 +71,11 @@ namespace rpp
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
+        #ifdef _LIBCPP_STD_VER
+        #  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
+        #elif !defined(_HAS_STD_BYTE)
+        #  define _HAS_STD_BYTE 0
+        #endif
         #if !_HAS_STD_BYTE
             using byte = unsigned char;
         #else
@@ -58,34 +88,6 @@ namespace rpp
         using uint64 = unsigned long long;
     #endif
 
-    //// @note Some functions get inlined too aggressively, leading to some serious code bloat
-    ////       Need to hint the compiler to take it easy ^_^'
-    #ifndef NOINLINE
-        #ifdef _MSC_VER
-            #define NOINLINE __declspec(noinline)
-        #else
-            #define NOINLINE __attribute__((noinline))
-        #endif
-    #endif
-
-    //// @note Some strong hints that some functions are merely wrappers, so should be forced inline
-    #ifndef FINLINE
-        #ifdef _MSC_VER
-            #define FINLINE __forceinline
-        #elif __APPLE__
-            #define FINLINE inline __attribute__((always_inline))
-        #else
-            #define FINLINE __attribute__((always_inline))
-        #endif
-    #endif
-    
-    #ifndef RPPAPI
-        #if _MSC_VER
-            #define RPPAPI __declspec(dllexport)
-        #else // clang/gcc
-            #define RPPAPI __attribute__((visibility("default")))
-        #endif
-    #endif
 
 /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
@@ -1471,5 +1473,3 @@ namespace std
 #if _MSC_VER
 #pragma warning(pop) // pop nameless struct/union warning
 #endif
-
-#endif // MFGRAPHICS_STRVIEW_HPP

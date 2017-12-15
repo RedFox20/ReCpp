@@ -4,14 +4,13 @@
 #include <csignal>
 #include <unordered_map>
 #if __APPLE__ || __linux__
-    #include <pthread.h>
+# include <pthread.h>
 #endif
-
 #if __has_include("debugging.h")
-#  include "debugging.h"
+# include "debugging.h"
 #endif
 
-#define POOL_TASK_DEBUG 0
+#define POOL_TASK_DEBUG 1
 
 namespace rpp
 {
@@ -170,26 +169,6 @@ namespace rpp
     }
 #endif
 
-    // really nasty case where OS threads are just abandoned
-    // with none of the destructors being run
-    static mutex activeTaskMutex;
-    static unordered_map<int, pool_task*> activeTasks;
-    static int get_thread_id()
-    {
-        auto id = this_thread::get_id();
-        return *(int*)&id;
-    }
-    static void register_thread_task(pool_task* task)
-    {
-        lock_guard<mutex> lock{ activeTaskMutex };
-        activeTasks[get_thread_id()] = task;
-    }
-    static void erase_thread_task()
-    {
-        lock_guard<mutex> lock{ activeTaskMutex };
-        activeTasks.erase(get_thread_id());
-    }
-
     static void segfault(int) { SignalHandler("SIGSEGV"); }
 
     void pool_task::run() noexcept
@@ -207,22 +186,10 @@ namespace rpp
         #endif
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
-        register_thread_task(this);
-
-        // mark all running threads killed during SIGTERM, before dtors run
-        static int atExitRegistered;
-        if (!atExitRegistered) atExitRegistered = !atexit([] {
-            for (auto& task : activeTasks) {
-                task.second->killed = true;
-                task.second->cv.notify_all();
-            }
-            activeTasks.clear();
-        });
 
         struct thread_exiter {
             pool_task* self;
             ~thread_exiter() {
-                erase_thread_task();
                 self->killed = true;
                 self->taskRunning = false;
                 self->cv.notify_all();
@@ -274,16 +241,9 @@ namespace rpp
 
     void pool_task::unhandled_exception(const char* what) noexcept
     {
+        if (trace.empty()) UnhandledEx("%s", what);
+        else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
         error = std::current_exception();
-
-        string err = what;
-        { lock_guard<mutex> lock{m};
-            if (!trace.empty()) {
-                err += "\nTask Start Trace:\n";
-                err += trace;
-            }
-        }
-        UnhandledEx("%s", err.c_str());
     }
 
     bool pool_task::got_task() const noexcept
