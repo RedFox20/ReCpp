@@ -71,7 +71,9 @@ namespace rpp
 
         static mutex consoleSync;
         {
-            lock_guard<mutex> guard{ consoleSync };
+            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
+
             SetConsoleTextAttribute(winout, colormap[color]);
             fwrite(buffer, size_t(len), 1, cout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, colormap[Default]);
@@ -96,7 +98,9 @@ namespace rpp
         };
         static mutex consoleSync;
         {
-            lock_guard<mutex> guard{ consoleSync };
+            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
+
             fwrite(colors[color], strlen(colors[color]), 1, cout);
             vfprintf(cout, fmt, ap);
             fwrite(colors[Default], strlen(colors[Default]), 1, cout);

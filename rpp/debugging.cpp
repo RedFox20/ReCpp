@@ -102,7 +102,9 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         AllocaPrintlineBuf(err, len);
         static mutex consoleSync;
         {
-            lock_guard<mutex> guard{ consoleSync };
+            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
+
             SetConsoleTextAttribute(winout, colormap[severity]);
             fwrite(buf, size_t(len + 1), 1, fout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
@@ -119,7 +121,9 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         };
         static mutex consoleSync;
         {
-            lock_guard<mutex> guard{ consoleSync };
+            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
+
             fwrite(colors[severity], strlen(colors[severity]), 1, fout);
             fwrite(buf, size_t(len) + 1, 1, fout);
             fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
@@ -258,9 +262,9 @@ struct funcname_builder
     explicit funcname_builder(char* buffer, const char* original)
         : buffer{buffer}, ptr{original-1} {}
 
-    char read_next() { return len < funcname_max ? *++ptr : '\0'; }
+    char read_next() { return len < funcname_max ? *++ptr : char('\0'); }
 
-    template<int N, int M> bool replace(const char (&what)[N], const char (&with)[M])
+    template<size_t N, size_t M> bool replace(const char (&what)[N], const char (&with)[M])
     {
         if (memcmp(ptr, what, N - 1) == 0)
         {
@@ -270,7 +274,7 @@ struct funcname_builder
         }
         return false;
     }
-    template<int N> bool skip(const char (&what)[N])
+    template<size_t N> bool skip(const char (&what)[N])
     {
         if (memcmp(ptr, what, N - 1) == 0) {
             ptr += N - 2; // - 2 because next() will bump the pointer
@@ -282,7 +286,6 @@ struct funcname_builder
     void append(char ch) { buffer[len++] = ch; }
 };
 
-
 EXTERNC const char* _LogFuncname(const char* longFuncName)
 {
     if (DisableFunctionNames) return "";
@@ -292,8 +295,7 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
     const char* ptr = strchr(longFuncName, ':');
     if (ptr != nullptr) {
         if (*++ptr == ':') ++ptr;
-    }
-    else ptr = longFuncName;
+    } else ptr = longFuncName;
 
     static thread_local char funcname_buf[64];
 

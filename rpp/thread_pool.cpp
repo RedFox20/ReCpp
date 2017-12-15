@@ -10,7 +10,7 @@
 # include "debugging.h"
 #endif
 
-#define POOL_TASK_DEBUG 1
+#define POOL_TASK_DEBUG 0
 
 namespace rpp
 {
@@ -39,6 +39,7 @@ namespace rpp
     
     pool_task::pool_task()
     {
+        // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
         th = thread{[this] { run(); }};
     }
 
@@ -101,6 +102,13 @@ namespace rpp
 
     pool_task::wait_result pool_task::wait(int timeoutMillis)
     {
+        wait_result result = wait(timeoutMillis, nothrow);
+        if (error) rethrow_exception(error);
+        return result;
+    }
+
+    pool_task::wait_result pool_task::wait(int timeoutMillis, nothrow_t) noexcept
+    {
         unique_lock<mutex> lock{m};
         while (taskRunning)
         {
@@ -114,7 +122,6 @@ namespace rpp
                 cv.wait(lock);
             }
         }
-        if (error) rethrow_exception(error);
         return finished;
     }
 
@@ -129,7 +136,7 @@ namespace rpp
             killed = true;
         }
         cv.notify_all();
-        wait_result result = wait(timeoutMillis);
+        wait_result result = wait(timeoutMillis, nothrow);
         if (th.joinable()) {
             if (result == timeout) th.detach();
             else                   th.join();
@@ -326,7 +333,9 @@ namespace rpp
 
     thread_pool::~thread_pool() noexcept
     {
-        // defined destructor to prevent agressive inlining
+        // defined destructor to prevent agressive inlining and to manually control task destruction
+        lock_guard<mutex> lock{tasksMutex};
+        tasks.clear();
     }
 
     int thread_pool::active_tasks() noexcept
@@ -423,7 +432,7 @@ namespace rpp
             return;
         }
 
-        pool_task** active = (pool_task**)alloca(sizeof(pool_task*) * cores);
+        auto active = (pool_task**)alloca(sizeof(pool_task*) * cores);
         //vector<pool_task*> active(cores, nullptr);
         {
             rangeRunning = true;

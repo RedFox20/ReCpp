@@ -276,6 +276,7 @@ namespace rpp
         // @note Throws any unhandled exceptions from background thread
         //       This is similar to std::future behaviour
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/);
+        wait_result wait(int timeoutMillis, nothrow_t) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
