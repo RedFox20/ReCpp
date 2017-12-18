@@ -88,11 +88,10 @@ namespace rpp
         using uint64 = unsigned long long;
     #endif
 
+    /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
-/////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
-
-// This is same as memchr, but optimized for very small control strings
-// Retains string literal array length information
+    // This is same as memchr, but optimized for very small control strings
+    // Retains string literal array length information
     template<int N> FINLINE bool strcontains(const char(&str)[N], char ch) {
         for (int i = 0; i < N; ++i)
             if (str[i] == ch) return true;
@@ -107,7 +106,7 @@ namespace rpp
         for (; nstr; --nstr, ++str)
             if (strcontains<N>(control, *str))
                 return str; // done
-        return 0; // not found
+        return nullptr; // not found
     }
     template<int N> NOINLINE bool strequals(const char* s1, const char(&s2)[N]) {
         for (int i = 0; i < (N - 1); ++i)
@@ -143,10 +142,7 @@ namespace rpp
      * @return Parsed float
      */
     RPPAPI double to_double(const char* str, int len, const char** end = nullptr);
-    inline double to_double(const char* str, const char** end = nullptr)
-    {
-        return to_double(str, 64, end);
-    }
+    inline double to_double(const char* str, const char** end = nullptr) { return to_double(str, 64, end); }
 
     /**
      * Fast locale agnostic atoi
@@ -156,10 +152,7 @@ namespace rpp
      * @return Parsed int
      */
     RPPAPI int to_int(const char* str, int len, const char** end = nullptr);
-    inline int to_int(const char* str, const char** end = nullptr)
-    {
-        return to_int(str, 32, end);
-    }
+    inline int to_int(const char* str, const char** end = nullptr) { return to_int(str, 32, end); }
 
     /**
      * Fast locale agnostic atoi
@@ -170,10 +163,7 @@ namespace rpp
      * @return Parsed int
      */
     RPPAPI int to_inthx(const char* str, int len, const char** end = nullptr);
-    inline int to_inthx(const char* str, const char** end = nullptr)
-    {
-        return to_inthx(str, 32, end);
-    }
+    inline int to_inthx(const char* str, const char** end = nullptr) { return to_inthx(str, 32, end); }
 
 
     /**
@@ -183,10 +173,7 @@ namespace rpp
      * @return Length of the string
      */
     RPPAPI int _tostring(char* buffer, double value);
-    inline int _tostring(char* buffer, float value)
-    {
-        return _tostring(buffer, (double)value);
-    }
+    inline int _tostring(char* buffer, float value) { return _tostring(buffer, (double)value); }
 
 
     /**
@@ -429,8 +416,6 @@ namespace rpp
          * Count number of occurrances of this character inside the strview bounds
          */
         int count(char ch) const;
-
-        
         int indexof(char ch) const;
         
         // reverse iterating indexof
@@ -687,21 +672,15 @@ namespace rpp
         void decompose(const Delim& delim, T& outFirst, Rest&... outRest)
         {
             if (starts_with(delim)) // this is an empty entry, just skip it;
-            {
                 skipByLength(delim);
-            }
             else
-            {
-                strview token = next(delim);
-                token.convertTo(outFirst);
-            }
+                next(delim).convertTo(outFirst);
             decompose(delim, outRest...);
         }
         template<class Delim, class T>
         void decompose(const Delim& delim, T& outFirst)
         {
-            strview token = next(delim);
-            token.convertTo(outFirst);
+            next(delim).convertTo(outFirst);
         }
 
         /**
@@ -722,10 +701,7 @@ namespace rpp
          * @return 0.0f if there's nothing to parse or a parsed float
          */
         NOINLINE double next_double();
-        inline float next_float()
-        {
-            return (float)next_double();
-        }
+        float next_float() { return (float)next_double(); }
 
         /** 
          * Parses next int from current Token, example: "1,asvc2,x*3" will parse [1] [2] [3]
