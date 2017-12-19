@@ -64,9 +64,6 @@ namespace rpp
     #if INTPTR_MAX == INT64_MAX
         #define RPP_64BIT 1
     #endif
-//    #if _WIN64 || __x86_x64__ || __ppc64__ || __arm64__ || __LP64__ || _M_X64 || __amd64__
-//        #define RPP_64BIT 1
-//    #endif
 
     /**
      * @brief Function delegate to encapsulate global functions,
