@@ -143,7 +143,7 @@ TestImpl(test_threadpool)
         rpp::parallel_task([&] { times_launched += 1; })->wait(2000);
         AssertThat((int)times_launched, 1);
 
-        printf("Waiting for pool task to die...\n");
+        printf("Waiting for pool tasks to die naturally...\n");
         this_thread::sleep_for(1s);
         printf("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 

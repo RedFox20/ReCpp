@@ -63,9 +63,16 @@ namespace rpp
             rangeTask    = newTask;
             rangeStart   = start;
             rangeEnd     = end;
-            taskRunning  = true;
+
+            if (killed) {
+                TaskDebug("resurrecting task");
+                killed = false;
+                if (th.joinable()) th.join();
+                th = thread{[this] { run(); }}; // restart thread if needed
+            }
+            taskRunning = true;
+            cv.notify_one();
         }
-        notify_task();
     }
 
     void pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
@@ -82,22 +89,16 @@ namespace rpp
             rangeTask    = {};
             rangeStart   = 0;
             rangeEnd     = 0;
-            taskRunning  = true;
-        }
-        notify_task();
-    }
-    
-    void pool_task::notify_task()
-    {
-        { lock_guard<mutex> lock{m};
+
             if (killed) {
                 TaskDebug("resurrecting task");
                 killed = false;
                 if (th.joinable()) th.join();
                 th = thread{[this] { run(); }}; // restart thread if needed
             }
+            taskRunning = true;
+            cv.notify_one();
         }
-        cv.notify_one();
     }
 
     pool_task::wait_result pool_task::wait(int timeoutMillis)
@@ -194,15 +195,6 @@ namespace rpp
         
         signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
 
-        struct thread_exiter {
-            pool_task* self;
-            ~thread_exiter() {
-                self->killed = true;
-                self->taskRunning = false;
-                self->cv.notify_all();
-            }
-        } markKilledOnScopeExit { this }; // however, this doesn't handle exit(0) where threads are mutilated
-
         //TaskDebug("%s start", name);
         for (;;)
         {
@@ -216,6 +208,9 @@ namespace rpp
                     //TaskDebug("%s wait for task", name);
                     if (!wait_for_task(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
+                        killed = true;
+                        taskRunning = false;
+                        cv.notify_all();
                         return;
                     }
                     range   = move(rangeTask);
@@ -269,7 +264,7 @@ namespace rpp
             if (maxIdleTime)
             {
                 if (cv.wait_for(lock, chrono::seconds(maxIdleTime)) == cv_status::timeout)
-                    return false;
+                    return got_task(); // make sure to check for task even if it timeouts
             }
             else
             {

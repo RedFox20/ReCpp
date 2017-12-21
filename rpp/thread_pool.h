@@ -283,7 +283,6 @@ namespace rpp
 
     private:
         void unhandled_exception(const char* what) noexcept;
-        void notify_task();
         void run() noexcept;
         bool got_task() const noexcept;
         bool wait_for_task(unique_lock<mutex>& lock) noexcept;
