@@ -1,6 +1,7 @@
 #include "file_io.h"
 #include <cstdlib>
 #include <cstdio>
+#include <cerrno>
 #include <sys/stat.h> // stat,fstat
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN

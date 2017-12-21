@@ -7,6 +7,7 @@
 #  pragma warning(disable: 4251)
 #endif
 #include "file_io.h"
+#include <iostream>
 
 #ifndef RPPAPI
 #  if _MSC_VER
