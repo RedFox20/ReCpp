@@ -105,6 +105,5 @@ endif (DWARF_FOUND)
 
 mark_as_advanced(DWARF_INCLUDE_DIR LIBDW_INCLUDE_DIR DWARF_LIBRARY ELF_LIBRARY EBL_LIBRARY)
 include_directories(${DWARF_INCLUDE_DIR} ${LIBDW_INCLUDE_DIR})
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_SOURCE_DIR}/config.h)
 
 message(STATUS "Checking availability of DWARF and ELF development libraries - done")
