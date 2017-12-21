@@ -16,22 +16,28 @@
  */
 namespace rpp
 {
-    struct unique_flag {
-        bool v = true;
-        explicit operator bool() const { return v; }
-        unique_flag() = default;
-        unique_flag(unique_flag&& b) noexcept : v{b.v} {}
-        unique_flag& operator=(unique_flag&& uf) noexcept { v = uf.v; uf.v = false; return *this; }
-        unique_flag(const unique_flag&)            = delete;
-        unique_flag& operator=(const unique_flag&) = delete;
+    template<class Func> struct scope_finalizer
+    {
+        Func func;
+        bool valid = true;
+        ~scope_finalizer() { if (valid) func(); }
+        scope_finalizer(Func&& func)          noexcept : func{move(func)} {}
+        scope_finalizer(scope_finalizer&& sf) noexcept : func{move(sf.func)} { sf.valid = false; }
+        scope_finalizer& operator=(scope_finalizer&& sf) noexcept
+        {
+            func = move(sf.func);
+            valid = sf.valid;
+            sf.valid = false;
+            return *this;
+        }
+        scope_finalizer(const scope_finalizer&) = delete;
+        scope_finalizer& operator=(const scope_finalizer&) = delete;
+
     };
-    template<class Func> struct scope_finalizer {
-        Func f;
-        unique_flag v;
-        ~scope_finalizer() { if (v) f(); }
-    };
-    template<class Func> scope_finalizer<Func> make_scope_guard(Func&& f) {
-        return { forward<Func>(f) };
+
+    template<class Func> scope_finalizer<Func> make_scope_guard(Func&& f)
+    {
+        return scope_finalizer<Func>{ (Func&&)f };
     }
 }
 
