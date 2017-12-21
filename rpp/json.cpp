@@ -141,7 +141,7 @@ namespace rpp
         }
     }
 
-    const char *json::type_string() const
+    const char* json::type_string() const
     {
         switch (Type) {
             default:      return "<?garbage?>";

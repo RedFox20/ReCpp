@@ -190,8 +190,8 @@ namespace rpp
     private:
         load_buffer buffer;
         std::string err;
-        int line = 0;
-        int errline = 0;
+//        int line = 0;
+//        int errline = 0;
         error_handling errors = nothrow;
         bool stralloc = false;
 

@@ -3,7 +3,7 @@
 #include <cstring>
 #include <mutex>
 #if __ANDROID__
-  #include <android/log.h>
+# include <android/log.h>
 #endif
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN 1
@@ -324,19 +324,4 @@ EXTERNC const char* _LogFuncname(const char* longFuncName)
         --fb.len; // remove Objective-C method ending bracket
     fb.append('\0');
     return fb.buffer;
-}
-
-void Log(LogSeverity severity, rpp::strview message)
-{
-    if (severity < Filter)
-        return;
-
-    auto file = (severity == LogSeverityError) ? stderr : stdout;
-    fwrite(message.str, (size_t)message.len, 1, file);
-    fwrite("\n", 1, 1, file);
-
-    if (ErrorHandler != nullptr)
-    {
-        ErrorHandler(severity, message.str, message.len);
-    }
 }

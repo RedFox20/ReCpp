@@ -1075,6 +1075,9 @@ namespace rpp
 
 } // namespace rpp
 
+// support for "debugging.h"
+inline const char* __wrap_arg(const rpp::strview& arg) { return arg.to_cstr(); }
+
 namespace std
 {
     /////////////////////// std::hash to use strview in maps ///////////////////////

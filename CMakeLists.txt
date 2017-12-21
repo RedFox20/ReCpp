@@ -64,6 +64,11 @@ if(LINUX)
 else()
     set(DWARF_LIBRARY "")
 endif()
+if(ANDROID)
+    set(RUNTIME android log)
+else()
+    set(RUNTIME "")
+endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
 
@@ -74,7 +79,7 @@ add_library(ReCpp ${RPP_SRC})
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_compile_options(ReCpp PRIVATE ${RPP_CXX_FLAGS})
-target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY})
+target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME})
 set(TARGET ReCpp RUNTIME_OUTPUT_DIRECTORY ./bin)
 
 ####################################################

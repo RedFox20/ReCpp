@@ -85,31 +85,6 @@ RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_C
 RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func name
 
-/** Provide special string overloads for C++ */
-#if __cplusplus && __has_include("sprint.h")
-#include "sprint.h"
-void Log(LogSeverity severity, rpp::strview message);
-template<class T, class... Args> void Log(LogSeverity severity, const T& first, const Args&... args)
-{
-    if (severity < GetLogSeverityFilter())
-        return;
-    rpp::string_buffer sb;
-    sb.prettyprint(first, args...);
-    Log(severity, sb.view());
-}
-template<class T, class... Args> inline void LogInf(const T& first, const Args&... args) {
-    Log(LogSeverityInfo, first, args...);
-}
-template<class T, class... Args> inline void LogWarn(const T& first, const Args&... args) {
-    Log(LogSeverityWarn, first, args...);
-
-}
-template<class T, class... Args> inline void LogErr(const T& first, const Args&... args) {
-    Log(LogSeverityError, first, args...);
-}
-#endif
-
-
 #ifndef QUIETLOG
 #define __log_format(format, file, line, func) ("%s:%d %s $ " format), _LogFilename(file), line, _LogFuncname(func)
 #else
@@ -137,10 +112,11 @@ template<class T, class... Args> inline void LogErr(const T& first, const Args&.
 #endif
 
 #if __cplusplus
+#include <string>
 template<class T>
 inline const T&    __wrap_arg(const T& arg)            { return arg; }
 inline const char* __wrap_arg(const std::string& arg)  { return arg.c_str();   }
-inline const char* __wrap_arg(const rpp::strview& arg) { return arg.to_cstr(); }
+// __wrap_arg(const rpp::strview& arg) defined in "strview.h"
 inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 
 #define __get_nth_arg(_unused, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
