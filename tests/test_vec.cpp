@@ -8,18 +8,18 @@ TestImpl(test_vec)
     {
     }
 
-    TestCase(test_initialization)
+    TestCase(initialization)
     {
+#if _DEBUG // this is only possible in unoptimized builds, because /O2 will load Vector2 into xmm registers
         Vector2 point;
 
         // Force un-initialized variables
-
         AssertNotEqual(point.x, 0.0f);
         AssertNotEqual(point.y, 0.0f);
-
+#endif
     }
 
-    TestCase(test_bounding_box)
+    TestCase(bounding_box)
     {
         BoundingBox unitbox = { Vector3::ZERO, Vector3::ONE };
 

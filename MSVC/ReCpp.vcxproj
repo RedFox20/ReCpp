@@ -186,7 +186,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\rpp\allocators.cpp" />
     <ClCompile Include="..\rpp\binary_stream.cpp" />
     <ClCompile Include="..\rpp\debugging.cpp" />
     <ClCompile Include="..\rpp\file_io.cpp" />
@@ -198,7 +197,6 @@
     <ClCompile Include="..\rpp\vec.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\rpp\allocators.h" />
     <ClInclude Include="..\rpp\binary_stream.h" />
     <ClInclude Include="..\rpp\binary_serializer.h" />
     <ClInclude Include="..\rpp\debugging.h" />

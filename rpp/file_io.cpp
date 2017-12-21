@@ -262,7 +262,7 @@ namespace rpp /* ReCpp */
 
         // allocate +1 bytes for null terminator; this is for legacy API-s
         out.resize(size_t(fileSize));
-        int n = read(out.data(), fileSize);
+        int n = read((void*)out.data(), fileSize);
         if (n != fileSize)
             out.resize(size_t(n));
         return out;

@@ -10,9 +10,6 @@
     <ClCompile Include="..\rpp\sockets.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\rpp\allocators.cpp">
-      <Filter>rpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\rpp\strview.cpp">
       <Filter>rpp</Filter>
     </ClCompile>
@@ -43,9 +40,6 @@
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\sockets.h">
-      <Filter>rpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rpp\allocators.h">
       <Filter>rpp</Filter>
     </ClInclude>
     <ClInclude Include="..\rpp\binary_serializer.h">

@@ -162,7 +162,6 @@
   <ItemGroup>
     <ClCompile Include="..\rpp\tests.cpp" />
     <ClCompile Include="..\tests\test_future.cpp" />
-    <ClCompile Include="..\tests\test_allocators.cpp" />
     <ClCompile Include="..\tests\test_debugging.cpp" />
     <ClCompile Include="..\tests\test_json.cpp" />
     <ClCompile Include="..\tests\test_obfuscated_string.cpp" />

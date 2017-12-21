@@ -1,15 +1,4 @@
 #include "sockets.h"
-/**
- * Uses C99 dialect, so compile with -std=gnu99 or -std=c99
- * or via IDE-s Visual Studio 2013 (and higher) / DevC++5.7 (and higher)
- *
- * Visual C/C++:   Create an empty project, compile and run.
- *
- * DevC++ (MinGW): Project Options... -> Parameters -> Linker
- *                                    -> Add Library or Object:  libws2_32.a
- *
- * GCC (linux):    gcc -std=gnu99 -pthread sockets.c -o sockets
- */
 #include <stdlib.h>    // malloc
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
@@ -98,7 +87,7 @@ namespace rpp
     void spawn_thread(void(*thread_func)(void* arg), void* arg) noexcept
     {
     #if _WIN32
-        _beginthreadex(0, 0, (unsigned(_stdcall*)(void*))thread_func, arg, 0, 0);
+        _beginthreadex(nullptr, 0, (unsigned(_stdcall*)(void*))thread_func, arg, 0, nullptr);
     #else // Linux
         pthread_t threadHandle;
         pthread_attr_t attr;
@@ -324,7 +313,7 @@ namespace rpp
 
         saddr a;
         socklen_t len = sizeof(a);
-        if (getsockname(socket, &a.sa, &len)) {
+        if (getsockname(socket, (sockaddr*)&a, &len)) {
             Family=AF_IPv4, Port=0, FlowInfo=0, ScopeId=0;
             return; // quiet fail on error/invalid socket
         }
@@ -346,7 +335,7 @@ namespace rpp
         inwin32(InitWinSock());
 
         if (inet_ntop(addrfamily_int(Family), (void*)&Addr4, dst, maxCount)) {
-            return Port ? sprintf(dst, "%s:%d", dst, Port) : (int)strlen(dst);
+            return Port ? snprintf(dst, maxCount, "%s:%d", dst, Port) : (int)strlen(dst);
         }
         return 0;
     }
@@ -415,7 +404,7 @@ namespace rpp
     static string to_string(const wchar_t* wstr) noexcept
     {
     #if _MSC_VER
-        wstring_convert<codecvt_utf8<wchar_t>, wchar_t> cvt;
+        wstring_convert<codecvt<wchar_t, char, mbstate_t>, wchar_t> cvt;
         return cvt.to_bytes(wstr, wstr + wcslen(wstr));
     #else
         return string{ wstr, wstr + wcslen(wstr) };
@@ -432,10 +421,10 @@ namespace rpp
         InitWinSock();
 
         ULONG bufLen = 0;
-        GetAdaptersAddresses(family, 0, 0, 0, &bufLen);
+        GetAdaptersAddresses(family, 0, nullptr, nullptr, &bufLen);
         IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)alloca(bufLen);
 
-        if (!GetAdaptersAddresses(family, 0, 0, ipa_addrs, &bufLen))
+        if (!GetAdaptersAddresses(family, 0, nullptr, ipa_addrs, &bufLen))
         {
             int count = 0;
             for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next) {
