@@ -21,11 +21,14 @@ namespace rpp
         Func func;
         bool valid = true;
         ~scope_finalizer() { if (valid) func(); }
-        scope_finalizer(Func&& func)          noexcept : func{move(func)} {}
-        scope_finalizer(scope_finalizer&& sf) noexcept : func{move(sf.func)} { sf.valid = false; }
+        scope_finalizer(Func&& func)          noexcept : func{(Func&&)func} {}
+        scope_finalizer(scope_finalizer&& sf) noexcept : func{(Func&&)sf.func}
+        {
+            sf.valid = false;
+        }
         scope_finalizer& operator=(scope_finalizer&& sf) noexcept
         {
-            func = move(sf.func);
+            func = (Func&&)sf.func;
             valid = sf.valid;
             sf.valid = false;
             return *this;
