@@ -52,6 +52,14 @@ namespace rpp
         return object ? to_string(*object) : "null"s;
     }
 
+    /** @return "true" or "false" string */
+    RPPAPI string to_string(bool trueOrFalse) noexcept;
+
+    /**
+     * @return std::string from cstring. If cstr == nullptr, returns empty string ""
+     */
+    RPPAPI string to_string(const char* cstr) noexcept;
+
     /**
      * Always null terminated version of stringstream, which is compatible with strview
      * Not intended for moving or copying
@@ -297,16 +305,7 @@ namespace rpp
         return buf.str();
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
     /////////////////////// useful container tostr extensions //////////////////////
-
-    /** @return "true" or "false" string */
-    RPPAPI string to_string(bool trueOrFalse) noexcept;
-
-    /**
-     * @return std::string from cstring. If cstr == nullptr, returns empty string ""
-     */
-    RPPAPI string to_string(const char* cstr) noexcept;
 
     /** 
      *  @brief Outputs a linear container like vector<string>{"hello","world"} as:
@@ -344,4 +343,6 @@ namespace rpp
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
+
+    ////////////////////////////////////////////////////////////////////////////////
 }
