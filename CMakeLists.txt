@@ -11,11 +11,13 @@ else()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CLANG true)
+    set(CLANG TRUE)
 elseif(MSVC)
 else()
     message(FATAL_ERROR "Unsupported CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 endif()
+
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(CLANG)
     add_definitions(-Wall)
@@ -58,14 +60,22 @@ message("ReCpp ${COMPILE_DEFINITIONS}: ${CURRENT_DEFINES}")
 ####################################################
 
 find_package(Threads REQUIRED)
-file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h)
+if(LINUX)
+    find_package(DWARF)
+else()
+    set(DWARF_LIBRARY "")
+endif()
 
+file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
+
+source_group(rpp FILES ${RPP_SRC})
 add_library(ReCpp ${RPP_SRC})
+
 
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_compile_options(ReCpp PRIVATE ${RPP_CXX_FLAGS})
-target_link_libraries(ReCpp PUBLIC Threads::Threads)
+target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY})
 set(TARGET ReCpp RUNTIME_OUTPUT_DIRECTORY ./bin)
 
 ####################################################

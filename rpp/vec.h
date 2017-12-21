@@ -1430,7 +1430,6 @@ namespace rpp
         bool contains(const Vector3& v) const noexcept;
 
         // @return Distance to vec3 point from this boundingbox's corners
-        // @todo Improve this to be more accurate
         float distanceTo(const Vector3& v) const noexcept;
 
         // grow the bounding box by the given value across all axes
@@ -1520,19 +1519,6 @@ namespace rpp
     };
 
     ////////////////////////////////////////////////////////////////////////////////
-
-    inline ostream& operator<<(ostream& os, const rpp::Vector3& v) {
-        return os << v.x << ';' << v.y << ';' << v.z << ';';
-    }
-    inline ostream& operator<<(ostream& os, const rpp::Vector3d& v) {
-        return os << v.x << ';' << v.y << ';' << v.z << ';';
-    }
-    inline rpp::string_buffer& operator<<(rpp::string_buffer& sb, const rpp::Vector3& v) {
-        return sb << v.x << ';' << v.y << ';' << v.z << ';';
-    }
-    inline rpp::string_buffer& operator<<(rpp::string_buffer& sb, const rpp::Vector3d& v) {
-        return sb << v.x << ';' << v.y << ';' << v.z << ';';
-    }
 
     inline string to_string(const Vector2& v)  { char buf[32];  return { v.toString(buf, sizeof(buf)) }; }
     inline string to_string(const Point& v)    { char buf[48];  return { v.toString(buf, sizeof(buf)) }; }

@@ -86,8 +86,8 @@ RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened 
 RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func name
 
 /** Provide special string overloads for C++ */
-#ifdef __cplusplus
-#include "strview.h"
+#if __cplusplus && __has_include("sprint.h")
+#include "sprint.h"
 void Log(LogSeverity severity, rpp::strview message);
 template<class T, class... Args> void Log(LogSeverity severity, const T& first, const Args&... args)
 {

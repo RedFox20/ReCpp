@@ -11,6 +11,9 @@
 #endif
 #include <time.h> // time_t
 #include "strview.h"
+#if __has_include("sprint.h")
+#include "sprint.h"
+#endif
 
 #ifndef RPPAPI
 #  if _MSC_VER
@@ -279,12 +282,14 @@ namespace rpp /* ReCpp */
         int write(const strview& str) noexcept {
             return write(str.str, str.len);
         }
-        int write(const string_buffer& buf) noexcept {
-            return write(buf.c_str(), buf.size());
-        }
         int write(const wstring& str) noexcept {
             return write(str.c_str(), int(sizeof(wchar_t) * str.size()));
         }
+#if RPP_SPRINT_H
+        int write(const string_buffer& sb) noexcept {
+            return write(sb.ptr, sb.len);
+        }
+#endif
         
         /**
          * Writes a formatted string to file
@@ -303,6 +308,7 @@ namespace rpp /* ReCpp */
          */
         int writeln() noexcept;
 
+#if RPP_SPRINT_H
         /**
          * @brief Stringifies and appends the input arguments one by one with an endline, filling gaps with spaces, similar to Python print()
          * 
@@ -315,6 +321,7 @@ namespace rpp /* ReCpp */
             buf.writeln(first, args...);
             return write(buf.ptr, buf.len);
         }
+#endif
 
         /**
          * Forcefully flushes any OS file buffers to send all data to the storage device
@@ -839,12 +846,12 @@ namespace rpp /* ReCpp */
      * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of folders found
      *
-     * @example out [recursive=false] [fullpath=false] vector<string> {
+     * @example [recursive=false] [fullpath=false] vector<string> {
      *     "bin",
      *     "src",
      *     "lib",
      * };
-     * @example out [recursive=true] [fullpath=false] vector<string> {
+     * @example [recursive=true] [fullpath=false] vector<string> {
      *     "bin",
      *     "bin/data",
      *     "bin/data/models",
@@ -852,12 +859,12 @@ namespace rpp /* ReCpp */
      *     "src/mesh",
      *     "lib",
      * };
-     * @example out [recursive=false] [fullpath=true] vector<string> {
+     * @example [recursive=false] [fullpath=true] vector<string> {
      *     "/projects/ReCpp/bin",
      *     "/projects/ReCpp/src",
      *     "/projects/ReCpp/lib",
      * };
-     * @example out [recursive=true] [fullpath=true] vector<string> {
+     * @example [recursive=true] [fullpath=true] vector<string> {
      *     "/projects/ReCpp/bin",
      *     "/projects/ReCpp/bin/data",
      *     "/projects/ReCpp/bin/data/models",
@@ -895,17 +902,17 @@ namespace rpp /* ReCpp */
      *     vector<string> relativePaths          = list_files(folder);
      *     vector<string> recursiveRelativePaths = list_files_recursive(folder);
      * @endcode
-     * @example out [recursive=false] [fullpath=false] vector<string> {
+     * @example [recursive=false] [fullpath=false] vector<string> {
      *     "main.cpp",
      *     "file_io.h",
      *     "file_io.cpp",
      * };
-     * @example out [recursive=false] [fullpath=true] vector<string> {
+     * @example [recursive=false] [fullpath=true] vector<string> {
      *     "/projects/ReCpp/main.cpp",
      *     "/projects/ReCpp/file_io.h",
      *     "/projects/ReCpp/file_io.cpp",
      * };
-     * @example out [recursive=true] [fullpath=false] vector<string> {
+     * @example [recursive=true] [fullpath=false] vector<string> {
      *     "main.cpp",
      *     "file_io.h",
      *     "file_io.cpp",
@@ -914,7 +921,7 @@ namespace rpp /* ReCpp */
      *     "mesh/mesh_obj.cpp",
      *     "mesh/mesh_fbx.cpp",
      * };
-     * @example out [recursive=true] [fullpath=true] vector<string> {
+     * @example [recursive=true] [fullpath=true] vector<string> {
      *     "/projects/ReCpp/main.cpp",
      *     "/projects/ReCpp/file_io.h",
      *     "/projects/ReCpp/file_io.cpp",

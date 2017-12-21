@@ -1,12 +1,8 @@
 #include <rpp/tests.h>
 #include <rpp/sockets.h>
 #include <thread>
-#ifdef __MINGW32__ // std::thread support for MinGW...
-    #include "mingw.thread.h"
-#endif
 
 using namespace rpp;
-
 using Socket = rpp::socket;
 
 TestImpl(test_sockets)

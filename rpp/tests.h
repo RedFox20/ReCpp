@@ -5,7 +5,7 @@
 #include <cstdio>  // some basic printf etc.
 #include <vector>  // access to std::vector and std::string
 #include <functional>
-#include <rpp/strview.h> // we love strview, so it's a common dependency :)
+#include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency :)
 #include <typeinfo>
 
 /**
