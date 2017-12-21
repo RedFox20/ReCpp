@@ -2,10 +2,20 @@
 #include <rpp/tests.h>
 using namespace rpp;
 
+struct test_type
+{
+};
+std::string to_string(test_type) { return "test_type"; }
+
 TestImpl(test_sprint)
 {
     TestInit(test_sprint)
     {
+    }
+
+    TestCase(to_string)
+    {
+        AssertThat(rpp::sprint(test_type{}), "test_type");
     }
 
     TestCase(string_buf)

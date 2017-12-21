@@ -47,14 +47,6 @@ namespace rpp
     using namespace std;
     ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Forward all Misc to_string calls from rpp namespace to std::to_string
-     */
-    template<class T> inline std::string to_string(const T& object)
-    {
-        return std::to_string(object);
-    }
-
     template<class T> inline std::string to_string(const T* object)
     {
         return object ? to_string(*object) : "null"s;
