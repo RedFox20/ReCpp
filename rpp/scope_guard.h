@@ -12,6 +12,27 @@
  *          clibrary_free_handle(h);
  *      });
  *  }
+ *  // more complicated example dealing with legacy C API-s
+ *  bool example2() nothrow 
+ *  {
+ *      void* h = clibrary_create_handle();
+ *      scope_guard([&]{ clibrary_free_handle(h); });
+ *      if (!h)
+ *          return false;
+ *
+ *      if (FILE* f = fopen("example", "rb"))
+ *      {
+ *          scope_guard([&]{ fclose(f); });
+ *          if (check_file_header(f) == false)
+ *              return false;
+ *          
+ *          binary_record br;
+ *          if (read_record(&br) == false)
+ *              return false;
+ *          // ...
+ *          return true;
+ *      }
+ *  }
  * @endcode
  */
 namespace rpp
