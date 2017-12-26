@@ -25,6 +25,9 @@ class RecppConan(ConanFile):
         # self.run('cmake %s/hello %s' % (self.source_folder, cmake.command_line))
         # self.run("cmake --build . %s" % cmake.build_config)
 
+    def test(self):
+        self.run("bin/RppTests")
+
     def package(self):
         self.copy("*.h", dst="", src="ReCpp")
         self.copy("*ReCpp.lib", dst="lib", keep_path=False)
