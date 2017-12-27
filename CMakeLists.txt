@@ -20,10 +20,9 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(CLANG)
-    add_definitions(-Wall)
-    add_definitions(-std=c++1z)
+    set(RPP_CXX_FLAGS "-Wall -std=c++1z")
     if(LINUX)
-        add_definitions(-march=native)
+        set(RPP_CXX_FLAGS "${RPP_CXX_FLAGS} -march=native")
     endif()
 elseif(MSVC)
     # /MD - MultiThreaded Dynamic CRT
@@ -35,10 +34,8 @@ elseif(MSVC)
     # /Zi - Debug Database
     # /Oi - Intrinsics Enabled
     # /MP - MultiProcess build
-    add_definitions(/std:c++latest /arch:AVX2 /Oi)
-    add_definitions(/MD /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi)
+    set(RPP_CXX_FLAGS "/std:c++latest /arch:AVX2 /Oi /MD /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP")
     add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
-    add_definitions(/MP)
     
     foreach(MODE "_DEBUG" "_MINSIZEREL" "_RELEASE" "_RELWITHDEBINFO")
         string(REPLACE "/MDd" "/MD" TMP "${CMAKE_C_FLAGS${MODE}}")
@@ -80,7 +77,7 @@ add_library(ReCpp ${RPP_SRC})
 
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
-target_compile_options(ReCpp PRIVATE ${RPP_CXX_FLAGS})
+target_compile_definitions(ReCpp PRIVATE ${RPP_CXX_FLAGS})
 target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME})
 
 ####################################################
@@ -89,7 +86,7 @@ file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
 add_executable(RppTests ${RPP_TESTS})
 
 target_include_directories(RppTests PUBLIC ".")
-target_compile_options(RppTests PRIVATE ${RPP_CXX_FLAGS})
+target_compile_definitions(RppTests PRIVATE ${RPP_CXX_FLAGS})
 target_link_libraries(RppTests ReCpp)
 
 ####################################################
