@@ -19,10 +19,11 @@ endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+############## RPP Compilation Flags ##############
 if(CLANG)
-    set(RPP_CXX_FLAGS "-Wall -std=c++1z")
+    add_compile_options(-Wall -std=c++1z)
     if(LINUX)
-        set(RPP_CXX_FLAGS "${RPP_CXX_FLAGS} -march=native")
+        add_compile_options(-march=native)
     endif()
 elseif(MSVC)
     # /MD - MultiThreaded Dynamic CRT
@@ -34,7 +35,7 @@ elseif(MSVC)
     # /Zi - Debug Database
     # /Oi - Intrinsics Enabled
     # /MP - MultiProcess build
-    set(RPP_CXX_FLAGS "/std:c++latest /arch:AVX2 /Oi /MD /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP")
+    add_compile_options(/std:c++latest /arch:AVX2 /Oi /MD /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP)
     add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
     
     foreach(MODE "_DEBUG" "_MINSIZEREL" "_RELEASE" "_RELWITHDEBINFO")
@@ -52,10 +53,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 get_directory_property(CURRENT_DEFINES DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
-message("ReCpp ${CMAKE_BUILD_TYPE}: ${CMAKE_CXX_FLAGS} ")
-message("ReCpp ${COMPILE_DEFINITIONS}: ${CURRENT_DEFINES}")
-
-####################################################
+message("ReCpp ${CMAKE_BUILD_TYPE} CXX FLAGS: ${CMAKE_CXX_FLAGS} ")
+message("ReCpp DEFINES: ${CURRENT_DEFINES}")
+###################################################
 
 find_package(Threads REQUIRED)
 if(LINUX)
@@ -77,18 +77,16 @@ add_library(ReCpp ${RPP_SRC})
 
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
-target_compile_definitions(ReCpp PRIVATE ${RPP_CXX_FLAGS})
 target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME})
 
-####################################################
+###################################################
 
 file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
 add_executable(RppTests ${RPP_TESTS})
 
 target_include_directories(RppTests PUBLIC ".")
-target_compile_definitions(RppTests PRIVATE ${RPP_CXX_FLAGS})
 target_link_libraries(RppTests ReCpp)
 
-####################################################
+###################################################
 
 install(TARGETS ReCpp RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
