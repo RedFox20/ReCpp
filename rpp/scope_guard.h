@@ -65,4 +65,9 @@ namespace rpp
     }
 }
 
-#define scope_guard(lambda) auto scopeFinalizer__##__LINE__ = rpp::make_scope_guard(lambda)
+#ifndef RPP_CONCAT
+#  define RPP_CONCAT1(x,y) x##y
+#  define RPP_CONCAT(x,y) RPP_CONCAT1(x,y)
+#endif
+
+#define scope_guard(lambda) auto RPP_CONCAT(scopeFinalizer__,__LINE__) = rpp::make_scope_guard(lambda)

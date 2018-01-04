@@ -4,7 +4,7 @@ using namespace rpp;
 
 TestImpl(test_debugging)
 {
-    TestInitNoAutorun(test_debugging)
+    TestInit(test_debugging)
     {
     }
 
