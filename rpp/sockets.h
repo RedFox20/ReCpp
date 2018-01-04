@@ -369,7 +369,7 @@ namespace rpp
 
     private: 
         int handle_errno(int err=0) noexcept;
-        int handle_txres(int ret) noexcept;
+        int handle_txres(long ret) noexcept;
 
         template<class Action> static bool try_for_period(int millis, Action action) noexcept {
             const double timeout = millis / 1000.0; // millis to seconds

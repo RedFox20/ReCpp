@@ -370,13 +370,13 @@ namespace rpp
         a.sa4.sin_family = (uint16_t)addrfamily_int(ipa.Family);
         a.sa4.sin_port   = htons(ipa.Port);
         if (ipa.Family == AF_IPv4) {
-            a.sa4.sin_addr.s_addr = ipa.Addr4;
+            a.sa4.sin_addr.s_addr = (unsigned)ipa.Addr4;
             memset(a.sa4.sin_zero, 0, sizeof(a.sa4.sin_zero));
         }
         else { // AF_IPv6
             memcpy(&a.sa6.sin6_addr, ipa.Addr6, sizeof(ipa.Addr6));
-            a.sa6.sin6_flowinfo = ipa.FlowInfo;
-            a.sa6.sin6_scope_id = ipa.ScopeId;
+            a.sa6.sin6_flowinfo = (unsigned)ipa.FlowInfo;
+            a.sa6.sin6_scope_id = (unsigned)ipa.ScopeId;
         }
         return a;
     }
@@ -657,7 +657,7 @@ namespace rpp
 
     // properly handles the crazy responses given by the recv() and send() functions
     // returns -1 on critical failure, otherwise it returns bytesAvailable (0...N)
-    int socket::handle_txres(int ret) noexcept
+    int socket::handle_txres(long ret) noexcept
     {
         if (ret == 0) { // socket closed gracefully
             close();
@@ -666,7 +666,7 @@ namespace rpp
         else if (ret == -1) { // socket error?
             return handle_errno();
         }
-        return ret; // return as bytesAvailable
+        return (int)ret; // return as bytesAvailable
     }
 
     #if _WIN32
