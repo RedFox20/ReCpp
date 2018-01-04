@@ -1,6 +1,8 @@
 #pragma once
-#ifndef RPP_TESTSFRAMEWORK_H
-#define RPP_TESTSFRAMEWORK_H
+/**
+ * Minimal Unit Testing Framework, Copyright (c) 2016-2018, Jorma Rebane
+ * Distributed under MIT Software License
+ */
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
 #include <vector>  // access to std::vector and std::string
@@ -215,5 +217,3 @@ namespace rpp
     void test_##testname()
 
 }
-
-#endif // RPP_TESTSFRAMEWORK_H

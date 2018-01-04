@@ -161,27 +161,27 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
  * No assertions are triggered.
  * NO FILE:LINE information is given. Info logs don't need it.
  */
-#define LogInfo(format, ...) _LogInfo(("$ " format) __wrap_args(__VA_ARGS__) )
+#define LogInfo(format, ...) _LogInfo(("$ " format) __wrap_args( __VA_ARGS__ ) )
 /**
  * Logs a warning to the backing error mechanism (Crashlytics on iOS)
  * No assertions are triggered.
  */
-#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) )
+#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args( __VA_ARGS__ ) )
 /**
  * Logs an error to the backing error mechanism (Crashlytics on iOS)
  * An ASSERT is triggered during DEBUG runs.
  */
 #define LogError(format, ...) do { \
-    _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
+    _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args( __VA_ARGS__ ) ); \
     __assertion_failure(_FmtString(format __wrap_args(__VA_ARGS__) )); \
 } while(0)
 
 // Logs an info message with custom file, line, func sources
-#define LogInfoFL(file, line, func, format, ...) _LogInfo(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
+#define LogInfoFL(file, line, func, format, ...) _LogInfo(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
 // Logs a warning with custom file, line, func sources
-#define LogWarningFL(file, line, func, format, ...) _LogWarning(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
+#define LogWarningFL(file, line, func, format, ...) _LogWarning(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
 // Logs an error with custom file, line, func sources
-#define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
+#define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
 
 // Asserts for a condition with message in all types of builds
 #define Assert(expression, format, ...) do { if (!(expression)) LogError(format, ##__VA_ARGS__ ); } while(0)
