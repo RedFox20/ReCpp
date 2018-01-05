@@ -79,15 +79,21 @@ target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME})
 
-###################################################
-
-file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
-add_executable(RppTests ${RPP_TESTS})
-set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
-
-target_include_directories(RppTests PUBLIC ".")
-target_link_libraries(RppTests ReCpp)
+install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################
 
-install(TARGETS ReCpp RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+if (NOT APPLE)
+    file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
+    add_executable(RppTests ${RPP_TESTS})
+    set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
+
+    target_include_directories(RppTests PUBLIC ".")
+    target_link_libraries(RppTests ReCpp)
+
+    install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+endif()
+
+###################################################
+
+
