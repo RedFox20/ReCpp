@@ -7,6 +7,8 @@
 #if DEBUG || _DEBUG
 #  ifdef __APPLE__ // clang iOS
 #    define  __assertion_failure() __assert_rtn(__FUNCTION__, __FILE__, __LINE__, "")
+#  elif defined __ANDROID__
+#    define  __assertion_failure() __assert2(__FILE__, __LINE__, __PRETTY_FUNCTION__, "")
 #  elif defined __GNUC__ // other clang, mingw or linux gcc
 #    define  __assertion_failure() __assert_fail("", __FILE__, __LINE__, __FUNCTION__)
 #  elif _MSC_VER // windows VC++
