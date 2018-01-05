@@ -37,7 +37,7 @@ TestImpl(test_threadpool)
     {
         semaphore sync;
         string s = "Data";
-        delegate<void()> fun = [x=s, &s, &sync]()
+        rpp::task_delegate<void()> fun = [x=s, &s, &sync]()
         {
             printf("generic_task: %s\n", x.c_str());
             s = "completed";

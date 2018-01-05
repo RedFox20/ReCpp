@@ -210,8 +210,7 @@ namespace rpp
     //////////////////////////////////////////////////////////////////////////////////////////
 
 
-    template<class Signature>
-    using task_delegate = delegate<Signature>;
+    template<class Signature> using task_delegate = rpp::delegate<Signature>;
 
 
     /**
