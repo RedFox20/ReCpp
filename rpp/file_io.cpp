@@ -26,6 +26,9 @@
 #if __APPLE__
 #include <TargetConditionals.h>
 #endif
+#if __ANDROID__
+#include <jni.h>
+#endif
 
 namespace rpp /* ReCpp */
 {
@@ -1054,6 +1057,12 @@ namespace rpp /* ReCpp */
             return { path, path + len };
         #elif TARGET_OS_IPHONE
             return getenv("TMPDIR");
+        #elif __ANDROID__
+
+            // return getContext().getExternalFilesDir(null).getPath();
+
+
+            return "/data/local/tmp";
         #else
             const char* path;
             (path = getenv("TMP")) ||

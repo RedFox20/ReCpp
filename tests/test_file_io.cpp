@@ -5,12 +5,14 @@ using namespace rpp;
 
 TestImpl(test_file_io)
 {
-    string TestDir  = path_combine(temp_dir(), "_rpp_test_tmp");
-    string TestFile = path_combine(temp_dir(), "_rpp_test.txt");
+    string TestDir;
+    string TestFile;
     int TestSize = 0;
 
     TestInit(test_file_io)
     {
+        TestDir  = path_combine(temp_dir(), "_rpp_test_tmp");
+        TestFile = path_combine(temp_dir(), "_rpp_test.txt");
     }
     TestCleanup(test_file_io)
     {
