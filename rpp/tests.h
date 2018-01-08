@@ -125,7 +125,7 @@ namespace rpp
         static const string& as_string(const string& v) { return v; }
         static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
         static string as_string(const char* s)    { return string{s};}
-        static string as_string(nullptr_t)        { return "null"; }
+        static string as_string(std::nullptr_t)   { return "null"; }
         static string as_string(int v)            { return std::to_string(v); }
         template<class T> static string as_string(const T& v) { return to_string(v); }
 
