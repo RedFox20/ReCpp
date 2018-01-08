@@ -50,7 +50,7 @@ namespace rpp
 
     void string_buffer::write(const string_buffer& sb) { write(sb.view()); }
     void string_buffer::write_ptr_begin() { write("*{");   }
-    void string_buffer::write(nullptr_t)  { write("null"); }
+    void string_buffer::write(std::nullptr_t)  { write("null"); }
     void string_buffer::write_ptr_end()   { write('}');    }
 
     void string_buffer::write(const strview& s)
