@@ -10,7 +10,7 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <tchar.h>
-#include <stdio.h>
+#include <cstdio>
 #include <TlHelp32.h>
 #include <Psapi.h>
 #include <vector>
@@ -37,7 +37,8 @@
 
 namespace rpp
 {
-    using namespace std;
+    using std::string;
+    using std::runtime_error;
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Trivial convenience wrappers
 
@@ -95,7 +96,7 @@ namespace rpp
             throw traced_exception("SIGSEGV");
         });
     }
-    void register_segfault_tracer(nothrow_t)
+    void register_segfault_tracer(std::nothrow_t)
     {
         signal(SIGSEGV, [](int)
         {
@@ -235,6 +236,9 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
 
 #if HAS_LIBDW
+    
+    using std::vector;
+    using std::unordered_map;
 
     struct FlatDie
     {
@@ -380,8 +384,8 @@ namespace rpp
         auto it = moduleDies.find(mod);
         if (it == moduleDies.end())
         {
-            static mutex sync;
-            lock_guard<mutex> guard {sync};
+            static std::mutex sync;
+            std::lock_guard<std::mutex> guard {sync};
             map = &moduleDies[mod];
             map->init(mod);
         }
@@ -498,7 +502,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Windows implementation
 
-    static mutex DbgHelpMutex; // DbgHelp.dll is single-threaded
+    static std::mutex DbgHelpMutex; // DbgHelp.dll is single-threaded
 
     static void OnDebugError(const char* what, int lastError, uint64_t offset)
     {

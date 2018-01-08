@@ -14,6 +14,7 @@
 
 namespace rpp
 {
+
     ///////////////////////////////////////////////////////////////////////////////
 
     static pool_trace_provider TraceProvider;
@@ -103,7 +104,7 @@ namespace rpp
 
     pool_task::wait_result pool_task::wait(int timeoutMillis)
     {
-        wait_result result = wait(timeoutMillis, nothrow);
+        wait_result result = wait(timeoutMillis, std::nothrow);
         if (error) rethrow_exception(error);
         return result;
     }
@@ -115,7 +116,7 @@ namespace rpp
         {
             if (timeoutMillis)
             {
-                if (cv.wait_for(lock, chrono::milliseconds(timeoutMillis)) == cv_status::timeout)
+                if (cv.wait_for(lock, std::chrono::milliseconds(timeoutMillis)) == std::cv_status::timeout)
                     return timeout;
             }
             else
@@ -137,7 +138,7 @@ namespace rpp
             killed = true;
         }
         cv.notify_all();
-        wait_result result = wait(timeoutMillis, nothrow);
+        wait_result result = wait(timeoutMillis, std::nothrow);
         if (th.joinable()) {
             if (result == timeout) th.detach();
             else                   th.join();
@@ -263,7 +264,7 @@ namespace rpp
                 return true;
             if (maxIdleTime)
             {
-                if (cv.wait_for(lock, chrono::seconds(maxIdleTime)) == cv_status::timeout)
+                if (cv.wait_for(lock, seconds_t(maxIdleTime)) == cv_status::timeout)
                     return got_task(); // make sure to check for task even if it timeouts
             }
             else
@@ -389,7 +390,7 @@ namespace rpp
             }
         }
 
-        auto t  = make_unique<pool_task>();
+        auto t  = std::make_unique<pool_task>();
         auto* task = t.get();
         task->max_idle_time(taskMaxIdleTime);
         task->run_range(rangeStart, rangeEnd, rangeTask);
@@ -462,7 +463,7 @@ namespace rpp
         }
         
         // create and run a new task atomically
-        auto t = make_unique<pool_task>();
+        auto t = std::make_unique<pool_task>();
         auto* task = t.get();
         task->max_idle_time(taskMaxIdleTime);
         task->run_generic(move(genericTask));

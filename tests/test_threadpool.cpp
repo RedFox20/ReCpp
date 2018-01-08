@@ -4,6 +4,13 @@
 #include <atomic>
 #include <unordered_set>
 using namespace rpp;
+using std::mutex;
+using std::atomic;
+using std::atomic_int;
+using std::unordered_set;
+using namespace std::this_thread;
+using namespace std::chrono_literals;
+
 
 TestImpl(test_threadpool)
 {
@@ -17,9 +24,9 @@ TestImpl(test_threadpool)
         unordered_set<thread::id> ids;
         parallel_for(0, numIterations, [&](int start, int end)
         {
-            this_thread::sleep_for(1ms);
+            ::sleep_for(1ms);
             { lock_guard<mutex> lock{m};
-                ids.insert(this_thread::get_id());
+                ids.insert(::get_id());
             }
         });
         lock_guard<mutex> lock{m};
@@ -120,14 +127,14 @@ TestImpl(test_threadpool)
         int times_launched = 0;
         auto* task = rpp::parallel_task([&] {
             ++times_launched;
-            this_thread::sleep_for(100ms);
+            ::sleep_for(100ms);
         });
         task->wait();
         AssertThat(times_launched, 1);
 
         task = rpp::parallel_task([&] {
             ++times_launched;
-            this_thread::sleep_for(100ms);
+            ::sleep_for(100ms);
         });
         task->wait();
         AssertThat(times_launched, 2);
@@ -144,7 +151,7 @@ TestImpl(test_threadpool)
         AssertThat((int)times_launched, 1);
 
         printf("Waiting for pool tasks to die naturally...\n");
-        this_thread::sleep_for(1s);
+        ::sleep_for(1s);
         printf("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 

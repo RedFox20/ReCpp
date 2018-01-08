@@ -24,7 +24,23 @@
 
 namespace rpp
 {
-    using namespace std;
+    using std::mutex;
+    using std::condition_variable;
+    using std::lock_guard;
+    using std::unique_lock;
+    using std::atomic_bool;
+    using std::string;
+    using std::thread;
+    using std::vector;
+    using std::unique_ptr;
+    using std::move;
+    using std::nothrow_t;
+    using std::cv_status;
+    using std::exception;
+    using std::exception_ptr;
+    using seconds_t = std::chrono::seconds;
+    using milliseconds_t = std::chrono::milliseconds;
+    template<class T> using duration_t = std::chrono::duration<T>;
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,14 +58,14 @@ namespace rpp
         static void proxy(void* callee, TArgs... args)
         {
             T* p = static_cast<T*>(callee);
-            return (p->*TMethod)(forward<TArgs>(args)...);
+            return (p->*TMethod)(std::forward<TArgs>(args)...);
         }
 
         template<class T, void (T::*TMethod)(TArgs...)const>
         static void proxy(void* callee, TArgs... args)
         {
             const T* p = static_cast<T*>(callee);
-            return (p->*TMethod)(forward<TArgs>(args)...);
+            return (p->*TMethod)(std::forward<TArgs>(args)...);
         }
 
     public:
@@ -172,10 +188,10 @@ namespace rpp
          */
         wait_result wait(double timeoutSeconds)
         {
+            duration_t<double> dur(timeoutSeconds);
             unique_lock<mutex> lock{ m };
             while (value <= 0)
             {
-                chrono::duration<double> dur(timeoutSeconds);
                 if (cv.wait_for(lock, dur) == cv_status::timeout)
                     return timeout;
             }
@@ -185,10 +201,10 @@ namespace rpp
 
         wait_result wait(int timeoutMillis)
         {
+            milliseconds_t dur(timeoutMillis);
             unique_lock<mutex> lock{ m };
             while (value <= 0)
             {
-                chrono::milliseconds dur(timeoutMillis);
                 if (cv.wait_for(lock, dur) == cv_status::timeout)
                     return timeout;
             }
@@ -269,7 +285,7 @@ namespace rpp
 
         // assigns a new generic task to run
         // undefined behaviour if called when already running
-        void run_generic(task_delegate<void()>&& genericTask) noexcept;
+        void run_generic(task_delegate<void()>&& newTask) noexcept;
 
         // wait for task to finish
         // @note Throws any unhandled exceptions from background thread
@@ -409,7 +425,7 @@ namespace rpp
      */
     inline pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
-        return thread_pool::global().parallel_task(move(genericTask));
+        return thread_pool::global().parallel_task(std::move(genericTask));
     }
 
     /**

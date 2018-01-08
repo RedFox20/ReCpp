@@ -8,13 +8,13 @@
 
 namespace rpp
 {
-    using namespace std;
+    using std::string;
 
     static constexpr char obfuscate  (char ch, int i) { return char((ch + i) ^ 0x55); }
     static constexpr char deobfuscate(char ch, int i) { return char((ch ^ 0x55) - i); }
 
-    template<int... i>  using int32_sequence = integer_sequence<int, i...>;
-    template<int count> using int32_indices  = make_integer_sequence<int, count>;
+    template<int... i>  using int32_sequence = std::integer_sequence<int, i...>;
+    template<int count> using int32_indices  = std::make_integer_sequence<int, count>;
 
 
 
@@ -41,7 +41,7 @@ namespace rpp
      *   Deobfuscated: 'super@secret.com'
      */
     template<char... chars>
-    struct obfuscated_string<integer_sequence<char, chars...>> // specialize for tstring
+    struct obfuscated_string<std::integer_sequence<char, chars...>> // specialize for tstring
     {
         static constexpr int length = sizeof...(chars);
         template<int... index> static string create_obfuscated_string(int32_sequence<index...>)

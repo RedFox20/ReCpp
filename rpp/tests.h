@@ -6,8 +6,7 @@
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
 #include <vector>  // access to std::vector and std::string
-#include <functional>
-#include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency :)
+#include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
 #include <typeinfo>
 
 /**
@@ -29,7 +28,10 @@
 
 namespace rpp
 {
-    using namespace std;
+    using std::to_string;
+    using std::string;
+    using std::vector;
+    using std::move;
 
 #if _MSC_VER
     // warning C4251: 'rpp::test::name': struct 'rpp::strview' needs to have dll-interface to be used by clients of struct 'rpp::test'

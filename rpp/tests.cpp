@@ -21,6 +21,10 @@
 
 namespace rpp
 {
+    using std::mutex;
+    using std::unique_lock;
+    using std::defer_lock;
+
     int test::asserts_failed;
 
     // there are initialization order issues with this global variable, so wrap it to guarantee initialization order
@@ -241,11 +245,11 @@ namespace rpp
         {
             test_cap = test_funcs ? test_count * 2 : 8;
             auto* funcs = new test_func[test_cap];
-            for (int i = 0; i < test_count; ++i) funcs[i] = move(test_funcs[i]);
+            for (int i = 0; i < test_count; ++i) funcs[i] = std::move(test_funcs[i]);
             delete[] test_funcs;
             test_funcs = funcs;
         }
-        test_funcs[test_count++] = move(func);
+        test_funcs[test_count++] = std::move(func);
         return test_count - 1;
     }
 
@@ -257,7 +261,7 @@ namespace rpp
         }
         printf("\nPress any key to continue...\n");
 
-        using namespace chrono;
+        using namespace std::chrono;
         auto start = system_clock::now();
         while (!_kbhit())
         {
@@ -314,7 +318,7 @@ namespace rpp
             // if arg is provided, we assume they are:
             // test_testname or testname or -test_testname or -testname
             // OR to run a specific test:  testname.specifictest
-            unordered_set<strview> enabled, disabled;
+            std::unordered_set<strview> enabled, disabled;
 
             for (int iarg = 1; iarg < argc; ++iarg)
             {

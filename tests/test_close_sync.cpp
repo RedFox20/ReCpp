@@ -2,6 +2,8 @@
 #include <rpp/thread_pool.h>
 #include <rpp/tests.h>
 using namespace rpp;
+using namespace std::chrono_literals;
+using namespace std::this_thread;
 
 TestImpl(test_close_sync)
 {
@@ -26,11 +28,11 @@ TestImpl(test_close_sync)
             parallel_task([this]
             {
                 try_lock_or_return(CloseSync);
-                this_thread::sleep_for(30ms);
+                ::sleep_for(30ms);
                 AssertThat(data, "xxxxyyyyzzzzaaaabbbbcccc");
                 data = "aaaabbbbcccc";
             });
-            this_thread::sleep_for(1ms);
+            ::sleep_for(1ms);
         }
     };
 

@@ -1,6 +1,6 @@
-#include <rpp/tests.h>
-#include <rpp/file_io.h>
 #include <fstream> // use fstream as a baseline
+#include <rpp/file_io.h>
+#include <rpp/tests.h>
 using namespace rpp;
 
 TestImpl(test_file_io)
@@ -24,7 +24,7 @@ TestImpl(test_file_io)
 
     TestCase(basic_file)
     {
-        ofstream fstr { TestFile };
+        std::ofstream fstr { TestFile };
         AssertMsg(fstr.good(), "std::ofstream create failed: '%s'", TestFile.c_str());
 
         string aaaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

@@ -8,7 +8,6 @@
 #endif
 #include <string>   // std::string, std::wstring
 #include <vector>   // std::vector
-#include <ostream>  // ostream& operator<<
 
 #ifndef RPPAPI
 #  if _MSC_VER
@@ -47,7 +46,10 @@
 
 namespace rpp
 {
-    using namespace std; // we love std, you should too.
+    using std::string;
+    using std::wstring;
+    using std::basic_string;
+    using std::vector;
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
@@ -181,7 +183,6 @@ namespace rpp
         int name(char* dst, int maxCount) const noexcept;
         string name() const noexcept;
         const char* cname() const noexcept;
-        ostream& operator<<(ostream& os) const noexcept;
 
         void clear() noexcept;
         int port() const noexcept;
@@ -200,12 +201,6 @@ namespace rpp
         ipaddress6(const char* hostname, int port) noexcept : ipaddress(AF_IPv6, hostname, port) {}
         ipaddress6(const string& ipAddressAndPort) noexcept : ipaddress(AF_IPv6, ipAddressAndPort) {}
     };
-
-    // allow os << ipaddress();
-    inline ostream& operator<<(ostream& os, const ipaddress& addr) noexcept {
-        return addr.operator<<(os);
-    }
-
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -699,7 +694,7 @@ namespace rpp
                     auto    callback = arg->callback;
                     int     timeout  = arg->millis;
                     delete arg; // delete before callback (in case of exception)
-                    callback(move(listener->accept(timeout)));
+                    callback(std::move(listener->accept(timeout)));
                 }
             };
             if (auto* arg = new async{ this, std::forward<Func>(func), millis })
@@ -719,9 +714,9 @@ namespace rpp
                 int millis;
                 socket_option opt;
                 static void connect(async* arg) {
-                    async a { move(*arg) };
+                    async a { std::move(*arg) };
                     delete arg; // delete before callback (in case of an exception)
-                    a.callback(move(socket::connect_to(a.remoteAddr, a.millis, a.opt)));
+                    a.callback(std::move(socket::connect_to(a.remoteAddr, a.millis, a.opt)));
                 }
             };
             close();

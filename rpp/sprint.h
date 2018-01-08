@@ -59,7 +59,7 @@ namespace rpp
 
     template<class T> inline std::string to_string(const T* object)
     {
-        using namespace std;
+        using std::to_string;
         return object ? to_string(*object) : "null"s;
     }
 

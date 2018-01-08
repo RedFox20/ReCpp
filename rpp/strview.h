@@ -800,9 +800,14 @@ namespace rpp
 
     //////////////// strview literal operator ///////////////
 
-    constexpr strview operator "" _sv(const char* str, std::size_t len)
+    inline namespace literals
     {
-        return { str, (int)len };
+        using namespace std::string_literals;
+
+        constexpr strview operator "" _sv(const char* str, std::size_t len)
+        {
+            return { str, (int)len };
+        }
     }
 
     //////////////// handy stream operators /////////////////

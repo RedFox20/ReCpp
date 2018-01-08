@@ -27,7 +27,10 @@
 
 namespace rpp
 {
-    using namespace std;
+    using std::future;
+    using std::promise;
+    using std::exception;
+    using std::move;
 
     template<class T> class NODISCARD composable_future;
 

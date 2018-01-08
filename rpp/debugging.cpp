@@ -83,7 +83,8 @@ static void ShortFilePathMessage(char*& ptr, int& len)
 
 EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
 {
-    using namespace std;
+    using std::mutex;
+    using std::unique_lock;
     #if __ANDROID__
         auto priority = severity == LogSeverityInfo ? ANDROID_LOG_INFO :
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
@@ -103,7 +104,7 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         AllocaPrintlineBuf(err, len);
         static mutex consoleSync;
         {
-            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            unique_lock<mutex> guard{ consoleSync, std::defer_lock };
             if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
             SetConsoleTextAttribute(winout, colormap[severity]);
@@ -122,7 +123,7 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         };
         static mutex consoleSync;
         {
-            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            unique_lock<mutex> guard{ consoleSync, std::defer_lock };
             if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
             fwrite(colors[severity], strlen(colors[severity]), 1, fout);

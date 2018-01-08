@@ -1,7 +1,10 @@
 #include <rpp/future.h>
 #include <rpp/tests.h>
 using namespace rpp;
-
+using namespace std::chrono_literals;
+using namespace std::this_thread;
+using std::launch;
+using std::runtime_error;
 
 TestImpl(test_future)
 {
@@ -12,7 +15,7 @@ TestImpl(test_future)
     TestCase(simple_chaining)
     {
         std::packaged_task<string()> loadString{[]{ 
-            this_thread::sleep_for(15ms);
+            ::sleep_for(15ms);
             return "future string";
         }};
         std::thread{[&]{ loadString(); }}.detach();
@@ -29,7 +32,7 @@ TestImpl(test_future)
     TestCase(chain_mutate_void_to_string)
     {
         std::packaged_task<void()> loadSomething{[]{ 
-            this_thread::sleep_for(15ms);
+            ::sleep_for(15ms);
         }};
         std::thread{[&]{ loadSomething(); }}.detach();
 
@@ -45,7 +48,7 @@ TestImpl(test_future)
     TestCase(chain_decay_string_to_void)
     {
         std::packaged_task<string()> loadString{[]{ 
-            this_thread::sleep_for(15ms);
+            ::sleep_for(15ms);
             return "some string";
         }};
         std::thread{[&]{ loadString(); }}.detach();

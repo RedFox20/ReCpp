@@ -508,15 +508,15 @@ namespace rpp /* ReCpp */
     class RPPAPI shared_socket_writer : public socket_writer
     {
     protected:
-        mutex Mutex;
+        std::mutex Mutex;
     public:
         using socket_writer::socket_writer;
 
         // Acquire a scoped lock_guard on this socket writer's mutex
         // Ex:     auto&& lock = writer.guard();
         //
-        scoped_guard<mutex> guard() noexcept {
-            return scoped_guard<mutex>{ Mutex };
+        scoped_guard<std::mutex> guard() noexcept {
+            return scoped_guard<std::mutex>{ Mutex };
         }
     };
 
@@ -531,15 +531,15 @@ namespace rpp /* ReCpp */
     class RPPAPI shared_socket_reader : public socket_reader
     {
     protected:
-        mutex Mutex;
+        std::mutex Mutex;
     public:
         using socket_reader::socket_reader;
 
         // Acquire a scoped lock_guard on this socket reader's mutex
         // Ex:     auto&& lock = reader.guard();
         //
-        scoped_guard<mutex> guard() noexcept {
-            return scoped_guard<mutex>{ Mutex };
+        scoped_guard<std::mutex> guard() noexcept {
+            return scoped_guard<std::mutex>{ Mutex };
         }
     };
 

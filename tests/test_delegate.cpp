@@ -1,5 +1,5 @@
-#include <rpp/tests.h>
 #include <rpp/delegate.h>
+#include <rpp/tests.h>
 using namespace rpp;
 
 

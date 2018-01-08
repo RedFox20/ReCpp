@@ -2,8 +2,8 @@
 #include <rpp/thread_pool.h>
 #include <rpp/timer.h>
 #include <rpp/debugging.h>
-#include <rpp/tests.h>
 #include <future>
+#include <rpp/tests.h>
 using namespace rpp;
 
 static void segfault_handler(const char* what) { throw traced_exception(what); }
@@ -41,14 +41,14 @@ TestImpl(test_stack_trace)
     }
     TestCaseExpectedEx(trace_ex_from_function, traced_exception)
     {
-        function<void()> f = [] {
+        std::function<void()> f = [] {
             throw traced_exception{ "TracedException from std::function" };
         };
         f();
     }
     TestCaseExpectedEx(trace_ex_from_future, traced_exception)
     {
-        async(launch::async, [] {
+        std::async(std::launch::async, [] {
             throw traced_exception{ "TracedException from std::async" };
         }).get();
     }

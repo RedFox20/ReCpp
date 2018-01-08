@@ -1,7 +1,8 @@
-#include <rpp/tests.h>
 #include <rpp/sockets.h>
 #include <thread>
+#include <rpp/tests.h>
 
+using std::thread;
 using namespace rpp;
 using Socket = rpp::socket;
 

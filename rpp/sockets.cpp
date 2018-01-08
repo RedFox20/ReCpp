@@ -77,8 +77,6 @@
 
 namespace rpp
 {
-    using namespace std;
-
     /////////////////////////////////////////////////////////////////////////////
     // sleeps for specified milliseconds duration
     void thread_sleep(int milliseconds) noexcept
@@ -349,13 +347,8 @@ namespace rpp
     const char* ipaddress::cname() const noexcept
     {
         static char buf[128];
-        name(buf, 128);
+        (void)name(buf, 128);
         return buf;
-    }
-    ostream& ipaddress::operator<<(ostream& os) const noexcept
-    {
-        char buf[128];
-        return os.write(buf, name(buf, 128));
     }
     void ipaddress::clear() noexcept
     {
@@ -406,7 +399,7 @@ namespace rpp
     static string to_string(const wchar_t* wstr) noexcept
     {
     #if _MSC_VER
-        wstring_convert<codecvt<wchar_t, char, mbstate_t>, wchar_t> cvt;
+        std::wstring_convert<std::codecvt<wchar_t, char, mbstate_t>, wchar_t> cvt;
         return cvt.to_bytes(wstr, wstr + wcslen(wstr));
     #else
         return string{ wstr, wstr + wcslen(wstr) };

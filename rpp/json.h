@@ -7,7 +7,6 @@
 #  pragma warning(disable: 4251)
 #endif
 #include "file_io.h"
-#include <iostream>
 
 #ifndef RPPAPI
 #  if _MSC_VER
@@ -96,7 +95,7 @@ namespace rpp
         };
 
     public:
-        json() noexcept : Type(null) {}
+        json() noexcept;
         json(type defaultObjectType) noexcept;
         json(json&& fwd)       noexcept;
         json(const json& copy) noexcept;
@@ -243,16 +242,6 @@ namespace rpp
          * @return true on success, false on error (check json_parser::error())
          */
         bool parse_file(strview filePath, error_handling errors = nothrow);
-
-        /**
-         * Parses an UTF-8 input stream. This uses a different stream parser that consumes input
-         * as it arrives, token by token. Perfect for incredibly slow HDD-s(rare nowadays) or for network parsing.
-         * @note Look at rpp::json benchmarks for parse_stream network stream vs download & parse_data
-         * @param stream Input stream to read bytes from.
-         * @param errors [nothrow] if set to error_handling::throw_on_error, an exception is thrown on error.
-         * @return true on success, false on error (check json_parser::error())
-         */
-        bool parse_stream(std::istream& stream, error_handling errors = nothrow);
 
         // generic stream, in case you don't use std::istream
         struct stream

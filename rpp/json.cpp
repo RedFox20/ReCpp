@@ -11,6 +11,10 @@ namespace rpp
 
     using string_t = json::string_t;
 
+    json::json() noexcept
+    {
+    }
+
     json::json(json::type defaultObjectType) noexcept
     {
         set(defaultObjectType);
@@ -359,45 +363,23 @@ namespace rpp
         return set_error("json_parser::parse_file() $ Failed to open file '%s'", filePath.to_cstr());
     }
 
-    struct istream_adapter : json_parser::stream
-    {
-        std::istream& stream;
-        explicit istream_adapter(std::istream& stream) noexcept : stream(stream) {}
-        int read(char* buf, int max) override
-        {
-            if (!stream.good())
-                return 0;
-            return (int)stream.readsome(buf, (std::streamsize)max);
-        }
-    };
-
-    bool json_parser::parse_stream(std::istream& stream, error_handling errhandling)
-    {
-        errors = errhandling;
-        if (!stream.good())
-            return set_error("json_parser::parse_stream() $ bad istream; is the stream open?");
-
-        istream_adapter streamAdapter { stream };
-        return parse_stream(streamAdapter, errhandling);
-    }
-
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    bool json_parser::parse_data(strview buf, error_handling errhandling)
+    bool json_parser::parse_data(strview buffer, error_handling errors)
     {
-        errors = errhandling;
+        this->errors = errors;
 
         // @todo Parser implementation
-        (void)buf;
+        (void)buffer;
 
         return true;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    bool json_parser::parse_stream(stream& stream, error_handling errhandling)
+    bool json_parser::parse_stream(stream& stream, error_handling errors)
     {
-        errors = errhandling;
+        this->errors = errors;
 
         // @todo Stream Parser implementation
         (void)stream;
