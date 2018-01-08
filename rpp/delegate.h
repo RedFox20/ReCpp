@@ -216,7 +216,7 @@ namespace rpp
             static dummy_type devirtualize(const void* instance, dummy_type method) // resolve Thunks into method pointer
             {
                 VCallThunk& t = *(struct VCallThunk*)&method;
-                if (std::intptr_t(t.method) & 1) { // is_thunk?
+                if (size_t(t.method) & 1) { // is_thunk?
                     VTable* vtable = (struct VTable*) *(void**)instance;
                     size_t voffset = (t.vtable_index-1)/8;
                     union {
