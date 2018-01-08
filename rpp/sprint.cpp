@@ -39,7 +39,7 @@ namespace rpp
         char buffer[8192];
         va_list ap; va_start(ap, format);
         int n = vsnprintf(buffer, sizeof(buffer), format, ap);
-        if (n < 0 || n >= sizeof(buffer))
+        if (n < 0 || n >= (int)sizeof(buffer))
             n = sizeof(buffer) - 1;
         reserve(n);
         memcpy(&ptr[len], buffer, (size_t)n);
@@ -102,16 +102,16 @@ namespace rpp
         if (++i < count) write(", ");
         if (newlines) write('\n');
     }
-    void string_buffer::pretty_cont_end(bool newlines)
+    void string_buffer::pretty_cont_end(int count, bool newlines)
     {
-        write(" }");
+        if (count > 0) write(" }");
         if (newlines) write('\n');
     }
     ////////////////////////////////////////////////////////////////////////////////
 
     int print(FILE* file, strview value) { return (int)fwrite(value.str, value.len, 1, file); }
     int print(FILE* file, char value)    { return (int)fwrite(&value, 1, 1, file); }
-    int print(FILE* file, rpp::byte bv)  { char buf[4];  return (int)fwrite(buf, _tostring(buf, bv), 1, file); }
+    int print(FILE* file, rpp::byte value){char buf[4];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, short value)   { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, ushort value)  { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, int value)     { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
@@ -121,7 +121,7 @@ namespace rpp
 
     int print(strview value)             { return print(stdout, value); }
     int print(char value)                { return print(stdout, value); }
-    int print(rpp::byte bv)              { return print(stdout, bv); }
+    int print(rpp::byte value)           { return print(stdout, value); }
     int print(short value)               { return print(stdout, value); }
     int print(ushort value)              { return print(stdout, value); }
     int print(int value)                 { return print(stdout, value); }

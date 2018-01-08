@@ -136,7 +136,7 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 
 #define __wrap_args(...) __wrap_exp(__get_nth_arg(0, ##__VA_ARGS__, \
                                     __wrap_args8, __wrap_args7, __wrap_args6, __wrap_args5, \
-                                    __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)(##__VA_ARGS__))
+                                    __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)(__VA_ARGS__))
 #else
 #define __wrap_args1(x)      , __wrap_arg(x)
 #define __wrap_args2(x, ...) , __wrap_arg(x) __wrap_args1(__VA_ARGS__)

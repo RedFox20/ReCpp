@@ -44,21 +44,24 @@
 
 namespace rpp
 {
-    using namespace std;
-    ////////////////////////////////////////////////////////////////////////////////
+    using std::string;
+    using namespace std::string_literals;
 
-    template<class T> inline std::string to_string(const T* object)
-    {
-        return object ? to_string(*object) : "null"s;
-    }
+    ////////////////////////////////////////////////////////////////////////////////
 
     /** @return "true" or "false" string */
     RPPAPI string to_string(bool trueOrFalse) noexcept;
 
     /**
-     * @return std::string from cstring. If cstr == nullptr, returns empty string ""
-     */
+    * @return std::string from cstring. If cstr == nullptr, returns empty string ""
+    */
     RPPAPI string to_string(const char* cstr) noexcept;
+
+    template<class T> inline std::string to_string(const T* object)
+    {
+        using namespace std;
+        return object ? to_string(*object) : "null"s;
+    }
 
     /**
      * Always null terminated version of stringstream, which is compatible with strview
@@ -188,7 +191,7 @@ namespace rpp
         void pretty_cont_start(int count, bool newlines);
         void pretty_cont_item_start(bool newlines);
         void pretty_cont_item_end(int i, int count, bool newlines);
-        void pretty_cont_end(bool newlines);
+        void pretty_cont_end(int count, bool newlines);
 
         template<typename T, template<class,class...> class C, class... Args>
         NOINLINE void prettyprint(const C<T,Args...>& container, bool newlines = true)
@@ -202,7 +205,7 @@ namespace rpp
                 prettyprint(item);
                 pretty_cont_item_end(++i, count, newlines);
             }
-            pretty_cont_end(newlines);
+            pretty_cont_end(count, newlines);
         }
         
         /**
