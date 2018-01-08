@@ -103,7 +103,7 @@ namespace rpp
         void clear();
         void reserve(int count) noexcept;
         void writef(const char* format, ...);
-        void write(nullptr_t);
+        void write(std::nullptr_t);
         void write(const string_buffer& sb);
 
         template<class T> FINLINE void write(const T& value)

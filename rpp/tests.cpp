@@ -126,7 +126,7 @@ namespace rpp
         vsnprintf(message, 8192, fmt, ap);
 
         ++asserts_failed;
-        consolef(Red, "ASSERT FAILED %12s:%d    %s\n", filename, line, message);
+        consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
     }
 
     void test::run_test(strview methodFilter)
@@ -163,7 +163,7 @@ namespace rpp
             init_test();
             return true;
         } catch (const std::exception& e) {
-            consolef(Red, "UNHANDLED EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
+            consolef(Red, "FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
             ++asserts_failed;
             return false;
         }
@@ -174,7 +174,7 @@ namespace rpp
         try {
             cleanup_test();
         } catch (const std::exception& e) {
-            consolef(Red, "UNHANDLED EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
+            consolef(Red, "FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
             ++asserts_failed;
         }
     }
@@ -192,7 +192,7 @@ namespace rpp
                     return;
                 }
             }
-            consolef(Red, "UNHANDLED EXCEPTION in %s::%s: %s\n", 
+            consolef(Red, "FAILED with EXCEPTION in %s::%s: %s\n", 
                      name.str, test.name.str, e.what());
             ++asserts_failed;
         }
