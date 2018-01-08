@@ -4,6 +4,9 @@
 
 namespace rpp
 {
+    using std::swap;
+    using std::runtime_error;
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     using string_t = json::string_t;
@@ -158,7 +161,7 @@ namespace rpp
     ThrowErr("this[%d] expects json::array but this is json::%s", index, type_string()); } while(0)
 
 #define RPP_JSON_CHECK_IS_OBJECT(key) do { if (!is_object()) \
-    ThrowErr("this['%s'] expects json::object but this is json::%s", key.to_cstr(), type_string()); } while(0)
+    ThrowErr("this['%s'] expects json::object but this is json::%s", (key).to_cstr(), type_string()); } while(0)
 
 #define RPP_JSON_CHECK_IS_TYPE(what, type) do { if (!is_##type()) \
     ThrowErr(what "expects json::" #type " but this is json::%s", type_string()); } while(0)
@@ -263,7 +266,7 @@ namespace rpp
     string_t json::find_string(const strview &key, string_t defaultValue) const
     {
         auto* item = find(key);
-        return item ? item->as_string(defaultValue) : defaultValue;
+        return item ? item->as_string(move(defaultValue)) : defaultValue;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -278,7 +281,7 @@ namespace rpp
         if (owns) str = copy.str; else sv = copy.sv;
     }
 
-    string_t& string_t::operator=(string_t&& fwd) noexcept
+    json::string_t& string_t::operator=(string_t&& fwd) noexcept
     {
         string_t temp { move(fwd) };
         new (&fwd) string_t{move(*this)};
@@ -307,24 +310,21 @@ namespace rpp
         return *this;
     }
 
-    template<class T> static inline void destruct(T& obj) { obj.~T(); }
-
     string_t& string_t::operator=(const strview& s) noexcept
     {
-        if (owns) { destruct(str); owns = false; }
+        if (owns) { str.~basic_string(); owns = false; }
         sv = s;
         return *this;
     }
 
     string_t::~string_t() noexcept
     {
-        if (owns)
-            destruct(str);
+        if (owns) { str.~basic_string(); }
     }
 
     void string_t::clear()
     {
-        if (owns) { destruct(str); owns = false; }
+        if (owns) { str.~basic_string(); owns = false; }
         else sv.clear();
     }
 
@@ -361,21 +361,21 @@ namespace rpp
 
     struct istream_adapter : json_parser::stream
     {
-        istream& stream;
-        explicit istream_adapter(istream& stream) noexcept : stream(stream) {}
+        std::istream& stream;
+        explicit istream_adapter(std::istream& stream) noexcept : stream(stream) {}
         int read(char* buf, int max) override
         {
             if (!stream.good())
                 return 0;
-            return (int)stream.readsome(buf, (streamsize)max);
+            return (int)stream.readsome(buf, (std::streamsize)max);
         }
     };
 
-    bool json_parser::parse_stream(istream& stream, error_handling errhandling)
+    bool json_parser::parse_stream(std::istream& stream, error_handling errhandling)
     {
         errors = errhandling;
         if (!stream.good())
-            return set_error("json_parser::parse_stream()  $ bad istream; is the stream open?");
+            return set_error("json_parser::parse_stream() $ bad istream; is the stream open?");
 
         istream_adapter streamAdapter { stream };
         return parse_stream(streamAdapter, errhandling);

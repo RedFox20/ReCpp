@@ -389,10 +389,10 @@ namespace rpp
         if (len) { ++str; --len; } // skip after
         return *this;
     }
-    strview& strview::skip_after(const char* sstr, int slen)
+    strview& strview::skip_after(const char* substr, int sublen)
     {
-        skip_until(sstr, slen);
-        if (len) { str += slen; len -= slen; } // skip after
+        skip_until(substr, sublen);
+        if (len) { str += sublen; len -= sublen; } // skip after
         return *this;
     }
 

@@ -4,7 +4,8 @@
  * Distributed under MIT Software License
  */
 #include "strview.h"
-#include <cmath> // fabsf, fabs
+#include <cmath>  // fabsf, fabs
+#include <vector> // for vector<Vector3> and vector<int>
 
 // You can disable RPP SSE intrinsics by declaring #define RPP_SSE_INTRINSICS 0 before including <rpp/vec.h>
 #ifndef RPP_SSE_INTRINSICS
@@ -1436,17 +1437,19 @@ namespace rpp
         void grow(float growth) noexcept;
 
         // calculates the bounding box of the given point cloud
-        static BoundingBox create(const vector<Vector3>& points) noexcept;
+        static BoundingBox create(const std::vector<Vector3>& points) noexcept;
 
         // calculates the bounding box using ID-s from IdVector3-s, which index the given point cloud
-        static BoundingBox create(const vector<Vector3>& points, const vector<IdVector3>& ids) noexcept;
+        static BoundingBox create(const std::vector<Vector3>& points, const std::vector<IdVector3>& ids) noexcept;
 
         // calculates the bounding box using vertex ID-s, which index the given point cloud
-        static BoundingBox create(const vector<Vector3>& points, const vector<int>& ids) noexcept;
+        static BoundingBox create(const std::vector<Vector3>& points, const std::vector<int>& ids) noexcept;
 
         /**
          * Calculates the bounding box from an arbitrary vertex array
          * @note Position data must be the first Vector3 element!
+         * @param vertexData Array of vertices
+         * @param vertexCount Number of vertices in vertexData
          * @param stride The step in bytes(!!) to the next element
          * 
          * Example:
@@ -1467,7 +1470,7 @@ namespace rpp
          *     auto bb = BoundingBox::create(vertices);
          * @endcode
          */
-        template<class Vertex> static BoundingBox create(const vector<Vertex>& vertices)
+        template<class Vertex> static BoundingBox create(const std::vector<Vertex>& vertices)
         {
             return create((Vector3*)vertices.data(), (int)vertices.size(), sizeof(Vertex));
         }
@@ -1488,11 +1491,11 @@ namespace rpp
         BoundingSphere(const BoundingBox& bbox) : center(bbox.center()), radius(bbox.radius()) {}
 
         // calculates the bounding sphere from basic bounding box of the point cloud
-        static BoundingSphere create(const vector<Vector3>& points) noexcept
+        static BoundingSphere create(const std::vector<Vector3>& points) noexcept
         {
             return { BoundingBox::create(points) };
         }
-        template<class Vertex> static BoundingSphere create(const vector<Vertex>& vertices)
+        template<class Vertex> static BoundingSphere create(const std::vector<Vertex>& vertices)
         {
             return { BoundingBox::create(vertices) };
         }

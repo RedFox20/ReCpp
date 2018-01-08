@@ -4,7 +4,8 @@
  * Distributed under MIT Software License
  */
 #ifndef RPP_BINARY_SERIALIZER_H
-#define RPP_BINARY_SERIALIZER_H
+#define RPP_BINARY_SERIALIZER_H 1
+#endif
 #include "binary_stream.h"
 
 namespace rpp
@@ -67,10 +68,10 @@ namespace rpp
         {
             member_serialize<T> m;
             m.offset       = int((char*)&elem - (char*)this);
-            m.bserialize   = &serializable::binary_serialize<U>;
-            m.bdeserialize = &serializable::binary_deserialize<U>;
-            m.sserialize   = &serializable::string_serialize<U>;
-            m.sdeserialize = &serializable::string_deserialize<U>;
+            m.bserialize   = &serializable::template binary_serialize<U>;
+            m.bdeserialize = &serializable::template binary_deserialize<U>;
+            m.sserialize   = &serializable::template string_serialize<U>;
+            m.sdeserialize = &serializable::template string_deserialize<U>;
             members.emplace_back(move(m));
         }
 
@@ -164,5 +165,3 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////
 } // namespace rpp
-
-#endif // RPP_BINARY_SERIALIZER_H

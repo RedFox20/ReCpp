@@ -19,6 +19,8 @@
 
 namespace rpp
 {
+    using std::tuple;
+    using std::move;
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     class RPPAPI json
@@ -60,7 +62,7 @@ namespace rpp
 
             operator std::string() const { return owns ? str : sv.to_string(); }
             operator strview()     const { return owns ? strview{str} : sv;    }
-            template<class Str> string_t& assign(Str&& s) { return *this = forward<Str>(s); }
+            template<class Str> string_t& assign(Str&& s) { return *this = std::forward<Str>(s); }
 
             const char* c_str()  const { return owns ? str.c_str()     : sv.str; }
             const char* data()   const { return owns ? str.c_str()     : sv.str; }
@@ -262,7 +264,7 @@ namespace rpp
              * @return Number of bytes actually read. Return <= 0 for End Of Stream.
              */
             virtual int read(char* buf, int max) = 0;
-            virtual ~stream() noexcept {}
+            virtual ~stream() noexcept = default;
         };
 
         /**

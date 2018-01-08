@@ -59,8 +59,6 @@
 
 namespace rpp
 {
-    using namespace std; // we love std; you should too.
-
     #if INTPTR_MAX == INT64_MAX
         #define RPP_64BIT 1
     #endif
@@ -342,13 +340,13 @@ namespace rpp
 
     private:
 
-        template<class Functor> void init_functor(Functor&& ftor)
+        template<class Functor> void init_functor(Functor&& ftor) noexcept
         {
             typedef typename std::decay<Functor>::type FunctorType;
 
             dfunc = (dummy_type)&FunctorType::operator();
 
-            obj  = new FunctorType(forward<Functor>(ftor));
+            obj  = new FunctorType(std::forward<Functor>(ftor));
             destructor = [](void* obj)
             {
                 auto* instance = (FunctorType*)obj;
@@ -372,7 +370,7 @@ namespace rpp
          */
         template<class Functor> delegate(Functor&& ftor) noexcept
         {
-            init_functor(forward<Functor>(ftor));
+            init_functor(std::move(ftor));
         }
         template<class Functor> delegate(const Functor& ftor) noexcept
         {
@@ -417,9 +415,13 @@ namespace rpp
         template<class Functor> void reset(Functor&& ftor) noexcept
         {
             reset();
-            init_functor(move(ftor));
+            init_functor(std::move(ftor));
         }
-
+        template<class Functor> void reset(const Functor& ftor) noexcept
+        {
+            reset();
+            init_functor(ftor);
+        }
 
         /** @brief Resets the delegate to its default uninitialized state */
         void reset() noexcept
@@ -446,15 +448,15 @@ namespace rpp
             {
             #if _MSC_VER  // VC++
                 auto* inst = (dummy*)obj;
-                return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
+                return (Ret)(inst->*dfunc)(std::forward<XArgs>(args)...);
             #elif __clang__
-                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
             #else
-                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
             #endif
             }
             else
-                return (Ret)func(forward<XArgs>(args)...);
+                return (Ret)func(std::forward<XArgs>(args)...);
         }
         template<class ...XArgs> inline Ret invoke(XArgs&&... args) const
         {
@@ -462,15 +464,15 @@ namespace rpp
             {
             #if _MSC_VER  // VC++
                 auto* inst = (dummy*)obj;
-                return (Ret)(inst->*dfunc)(forward<XArgs>(args)...);
+                return (Ret)(inst->*dfunc)(std::forward<XArgs>(args)...);
             #elif __clang__
-                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
             #else
-                return (Ret)mfunc(obj, forward<XArgs>(args)...);
+                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
             #endif
             }
             else
-                return (Ret)func(forward<XArgs...>(args)...);
+                return (Ret)func(std::forward<XArgs...>(args)...);
         }
 
         /** @return true if this delegate is initialize and can be called */
@@ -488,7 +490,7 @@ namespace rpp
         }
         template<class Functor> delegate& operator=(Functor&& functor)
         {
-            reset(forward<Functor>(functor));
+            reset(std::forward<Functor>(functor));
             return *this;
         }
 
@@ -707,7 +709,7 @@ namespace rpp
             deleg* data = ptr->data;
             for (int i = 0; i < size; ++i)
             {
-                data[i](forward<XArgs>(args)...);
+                data[i](std::forward<XArgs>(args)...);
             }
         }
         template<class ...XArgs> void invoke(XArgs&&... args) const
@@ -716,7 +718,7 @@ namespace rpp
             deleg* data = ptr->data;
             for (int i = 0; i < size; ++i)
             {
-                data[i](forward<XArgs>(args)...);
+                data[i](std::forward<XArgs>(args)...);
             }
         }
     };

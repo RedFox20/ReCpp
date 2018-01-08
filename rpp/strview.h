@@ -8,7 +8,6 @@
 #endif
 #include <cstring>    // C string utilities
 #include <string>     // compatibility with std::string
-#include <vector>     // std::vector for split
 #include <functional> // std::hash
 
 #ifndef RPP_STRVIEW_H
@@ -68,7 +67,7 @@
 
 namespace rpp
 {
-    using namespace std; // we love std; you should too.
+    using std::string;
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
@@ -140,6 +139,7 @@ namespace rpp
      * C-locale specific, simplified atof that also outputs the end of parsed string
      * @param str Input string, e.g. "-0.25" / ".25", etc.. '+' is not accepted as part of the number
      * @param len Length of the string to parse
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed float
      */
     RPPAPI double to_double(const char* str, int len, const char** end = nullptr);
@@ -170,11 +170,11 @@ namespace rpp
     /**
      * C-locale specific, simplified ftoa() that prints pretty human-readable floats
      * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough.
-     * @param value Float value to convert to string
+     * @param f Float value to convert to string
      * @return Length of the string
      */
-    RPPAPI int _tostring(char* buffer, double value);
-    inline int _tostring(char* buffer, float value) { return _tostring(buffer, (double)value); }
+    RPPAPI int _tostring(char* buffer, double f);
+    inline int _tostring(char* buffer, float f) { return _tostring(buffer, (double)f); }
 
 
     /**
@@ -240,13 +240,6 @@ namespace rpp
         template<class StringT>
         FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const { return str[index]; }
-
-
-        strview(strview&& t)                 = default;
-        strview(const strview& t)            = default;
-        strview& operator=(strview&& t)      = default;
-        strview& operator=(const strview& t) = default;
-
 
         /** Creates a new string from this string-strview */
         FINLINE string& to_string(string& out) const { return out.assign(str, (size_t)len); }
@@ -382,7 +375,7 @@ namespace rpp
         /** @return Pointer to char if found, NULL otherwise */
         FINLINE const char* find(char c) const { return (const char*)memchr(str, c, (size_t)len); }
         /** @return Pointer to start of substring if found, NULL otherwise */
-        NOINLINE const char* find(const char* substr, int len) const;
+        NOINLINE const char* find(const char* substr, int sublen) const;
         FINLINE const char* find(const strview& substr) const { 
             return find(substr.str, substr.len); 
         }
@@ -516,9 +509,9 @@ namespace rpp
         /**
          * Splits the string into TWO and returns strview to the first one
          * @param substr Substring to split with
-         * @param n Length of the substring
+         * @param sublen Length of the substring
          */
-        NOINLINE strview split_first(const char* substr, int n) const;
+        NOINLINE strview split_first(const char* substr, int sublen) const;
         template<int N> FINLINE strview split_first(const char(&substr)[N]) {
             return split_first(substr, N-1);
         }
@@ -647,8 +640,8 @@ namespace rpp
         inline void convertTo(int& outValue)     const { outValue = to_int();    }
         inline void convertTo(float& outValue)   const { outValue = to_float();  }
         inline void convertTo(double& outValue)  const { outValue = to_double(); }
-        inline void convertTo(string& outValue)  const { to_string(outValue);    }
-        inline void convertTo(strview& outValue) const { outValue = *this;       }
+        inline void convertTo(string& outValue)  const { (void)to_string(outValue); }
+        inline void convertTo(strview& outValue) const { outValue = *this;          }
         
     private:
         inline void skipByLength(strview text) { skip(text.len); }
@@ -749,9 +742,9 @@ namespace rpp
          * Skips start of the string until the specified substring is found or end of string is reached.
          * The specified substring itself is consumed.
          * @param substr Substring to skip after
-         * @param len Length of the substring
+         * @param sublen Length of the substring
          */
-        NOINLINE strview& skip_after(const char* substr, int len);
+        NOINLINE strview& skip_after(const char* substr, int sublen);
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
@@ -845,7 +838,7 @@ namespace rpp
     }
     inline strview& operator>>(strview& s, std::string& out)
     {
-        s.to_string(out);
+        (void)s.to_string(out);
         s.skip(s.len);
         return s;
     }
@@ -908,7 +901,7 @@ namespace rpp
             };
             strview_vishelper v;	// VC++ visualization helper
         };
-        FINLINE operator strview()              { return strview{str, len}; }
+        FINLINE operator strview()        const { return strview{str, len}; }
         FINLINE operator strview&()             { return *(rpp::strview*)this; }
         FINLINE operator const strview&() const { return *(rpp::strview*)this; }
         FINLINE strview* operator->()     const { return  (rpp::strview*)this; }

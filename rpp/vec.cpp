@@ -1369,7 +1369,7 @@ namespace rpp
         max.z += growth;
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points) noexcept
+    BoundingBox BoundingBox::create(const std::vector<Vector3>& points) noexcept
     {
         if (points.empty())
             return { Vector3::ZERO, Vector3::ZERO };
@@ -1392,7 +1392,7 @@ namespace rpp
         return { min, max };
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<IdVector3>& ids) noexcept
+    BoundingBox BoundingBox::create(const std::vector<Vector3>& points, const std::vector<IdVector3>& ids) noexcept
     {
         if (points.empty() || ids.empty())
             return { Vector3::ZERO, Vector3::ZERO };
@@ -1416,7 +1416,7 @@ namespace rpp
         return { min, max };
     }
 
-    BoundingBox BoundingBox::create(const vector<Vector3>& points, const vector<int>& ids) noexcept
+    BoundingBox BoundingBox::create(const std::vector<Vector3>& points, const std::vector<int>& ids) noexcept
     {
         if (points.empty() || ids.empty())
             return { Vector3::ZERO, Vector3::ZERO };

@@ -8,7 +8,6 @@
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
-    #include <io.h>
     #define USE_WINAPI_IO 1
     #define stat64 _stat64
     #define fseeki64 _fseeki64
@@ -153,7 +152,7 @@ namespace rpp /* ReCpp */
     }
     file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
     {
-        f.Handle = 0;
+        f.Handle = nullptr;
     }
     file::~file()
     {
@@ -164,7 +163,7 @@ namespace rpp /* ReCpp */
         close();
         Handle = f.Handle;
         Mode = f.Mode;
-        f.Handle = 0;
+        f.Handle = nullptr;
         return *this;
     }
     bool file::open(const char* filename, IOFlags mode) noexcept
@@ -173,7 +172,7 @@ namespace rpp /* ReCpp */
         Mode = mode;
         return (Handle = OpenOrCreate(filename, mode)) != nullptr;
     }
-    bool file::open(const strview filename, IOFlags mode) noexcept
+    bool file::open(strview filename, IOFlags mode) noexcept
     {
         char buf[512];
         return open(filename.to_cstr(buf), mode);
@@ -607,7 +606,7 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    bool create_folder(const strview foldername) noexcept
+    bool create_folder(strview foldername) noexcept
     {
         if (!foldername.len || foldername == "./")
             return false;
@@ -660,7 +659,7 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    bool delete_folder(const strview foldername, delete_mode mode) noexcept
+    bool delete_folder(strview foldername, delete_mode mode) noexcept
     {
         // these would delete the root dir. NOPE! This is always a bug.
         if (foldername.empty() || foldername == "/"_sv)
@@ -702,7 +701,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    string merge_dirups(const strview path) noexcept
+    string merge_dirups(strview path) noexcept
     {
         strview pathstr = path;
         const bool isDirPath = path.back() == '/' || path.back() == '\\';
@@ -733,7 +732,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    strview file_name(const strview path) noexcept
+    strview file_name(strview path) noexcept
     {
         strview nameext = file_nameext(path);
 
@@ -751,7 +750,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    strview file_ext(const strview path) noexcept
+    strview file_ext(strview path) noexcept
     {
         if (auto* ptr = path.substr(path.len - 8).rfindany("./\\")) {
             if (*ptr == '.') return { ptr + 1, path.end() };
@@ -760,7 +759,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    string file_replace_ext(const strview path, const strview ext)
+    string file_replace_ext(strview path, strview ext)
     {
         if (strview oldext = file_ext(path))
         {
@@ -774,7 +773,7 @@ namespace rpp /* ReCpp */
         return path;
     }
     
-    string file_name_append(const strview path, const strview add)
+    string file_name_append(strview path, strview add)
     {
         string result = folder_path(path);
         result += file_name(path);
@@ -786,7 +785,7 @@ namespace rpp /* ReCpp */
         return result;
     }
     
-    string file_name_replace(const strview path, const strview newFileName)
+    string file_name_replace(strview path, strview newFileName)
     {
         string result = folder_path(path) + newFileName;
         if (strview ext = file_ext(path)) {
@@ -796,12 +795,12 @@ namespace rpp /* ReCpp */
         return result;
     }
     
-    string file_nameext_replace(const strview path, const strview newFileNameAndExt)
+    string file_nameext_replace(strview path, strview newFileNameAndExt)
     {
         return folder_path(path) + newFileNameAndExt;
     }
 
-    strview folder_name(const strview path) noexcept
+    strview folder_name(strview path) noexcept
     {
         strview folder = folder_path(path);
         if (folder)
@@ -813,7 +812,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    strview folder_path(const strview path) noexcept
+    strview folder_path(strview path) noexcept
     {
         if (const char* end = path.rfindany("/\\"))
             return strview{ path.str, end + 1 };
@@ -827,14 +826,14 @@ namespace rpp /* ReCpp */
                 break;
         return path == end ? wstring{} : wstring{path, end + 1};
     }
-    wstring folder_path(const wstring& filename) noexcept
+    wstring folder_path(const wstring& path) noexcept
     {
-        auto* path = filename.c_str();
-        auto* end  = path + filename.size();
-        for (; path < end; --end)
+        auto* ptr = path.c_str();
+        auto* end  = ptr + path.size();
+        for (; ptr < end; --end)
             if (*end == '/' || *end == '\\')
                 break;
-        return path == end ? wstring{} : wstring{path, end + 1};
+        return ptr == end ? wstring{} : wstring{ptr, end + 1};
     }
 
 
@@ -861,7 +860,7 @@ namespace rpp /* ReCpp */
         return path;
     }
 
-    string normalized(const strview path, char sep) noexcept
+    string normalized(strview path, char sep) noexcept
     {
         string res = path.to_string();
         normalize(res, sep);

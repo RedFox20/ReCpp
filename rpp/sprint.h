@@ -118,8 +118,8 @@ namespace rpp
             write_ptr_begin(); write(*ptr); write_ptr_end();
         }
         template<class T> FINLINE void write(T* ptr)                 { write((const T*)ptr); }
-        template<class T> FINLINE void write(const weak_ptr<T>& p)   { write(p.lock()); }
-        template<class T> FINLINE void write(const shared_ptr<T>& p) { write(p.get());  }
+        template<class T> FINLINE void write(const std::weak_ptr<T>& p)   { write(p.lock()); }
+        template<class T> FINLINE void write(const std::shared_ptr<T>& p) { write(p.get());  }
 
         template<int N> 
         FINLINE void write(const char (&value)[N])   { write(strview{ value }); }
@@ -173,9 +173,9 @@ namespace rpp
             if (ptr == nullptr) return write(nullptr);
             write_ptr_begin(); prettyprint(*ptr); write_ptr_end();
         }
-        template<class T> FINLINE void prettyprint(T* ptr)                 { prettyprint((const T*)ptr); }
-        template<class T> FINLINE void prettyprint(const weak_ptr<T>& p)   { prettyprint(p.lock());  }
-        template<class T> FINLINE void prettyprint(const shared_ptr<T>& p) { prettyprint(p.get());   }
+        template<class T> FINLINE void prettyprint(T* ptr)                      { prettyprint((const T*)ptr); }
+        template<class T> FINLINE void prettyprint(const std::weak_ptr<T>& p)   { prettyprint(p.lock());  }
+        template<class T> FINLINE void prettyprint(const std::shared_ptr<T>& p) { prettyprint(p.get());   }
 
 
         FINLINE void prettyprint(const string& value)  { write_quote(); write(value); write_quote(); }
@@ -184,7 +184,7 @@ namespace rpp
         template<class K, class V> FINLINE void prettyprint(const K& key, const V& value) {
             prettyprint(key); write_colon(); prettyprint(value);
         }
-        template<class K, class V> FINLINE void prettyprint(const pair<K, V>& pair) {
+        template<class K, class V> FINLINE void prettyprint(const std::pair<K, V>& pair) {
             prettyprint(pair.first); write_colon(); prettyprint(pair.second);
         }
 
@@ -338,11 +338,11 @@ namespace rpp
     {
         rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
     }
-    template<class T> NOINLINE string to_string(const shared_ptr<T>& p) noexcept
+    template<class T> NOINLINE string to_string(const std::shared_ptr<T>& p) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
-    template<class T> NOINLINE string to_string(const weak_ptr<T>& p) noexcept
+    template<class T> NOINLINE string to_string(const std::weak_ptr<T>& p) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
