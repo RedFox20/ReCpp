@@ -304,7 +304,8 @@ namespace rpp
 
             max = int(flatmap.size()) - 1;
 
-            sort(flatmap.data(), flatmap.data()+flatmap.size(), [](const FlatDie& a, const FlatDie& b) {
+            std::sort(flatmap.data(), flatmap.data()+flatmap.size(), 
+                      [](const FlatDie& a, const FlatDie& b) {
                 return a.lo < b.lo && a.hi < b.hi;
             });
     //        print_flatmap();
