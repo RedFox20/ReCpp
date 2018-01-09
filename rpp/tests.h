@@ -123,6 +123,7 @@ namespace rpp
         static int run_tests();
 
         static const string& as_string(const string& v) { return v; }
+
         static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
         static string as_string(const char* s)    { return string{s};}
         static string as_string(std::nullptr_t)   { return "null"; }

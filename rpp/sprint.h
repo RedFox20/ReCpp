@@ -57,9 +57,12 @@ namespace rpp
     */
     RPPAPI string to_string(const char* cstr) noexcept;
 
+    RPPAPI inline const string& to_string(const string& s) noexcept { return s; }
+
     template<class T> inline std::string to_string(const T* object)
     {
         using std::to_string;
+        using rpp::to_string;
         return object ? to_string(*object) : "null"s;
     }
 
