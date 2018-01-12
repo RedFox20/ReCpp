@@ -16,6 +16,7 @@ namespace rpp
     {
         T* first;
         T* sentinel;
+        element_range() noexcept : first{nullptr}, sentinel{nullptr} {}
         element_range(T* first, T* sentinel) noexcept : first{first}, sentinel{sentinel} {}
         element_range(T* ptr, int n)         noexcept : first{ptr},   sentinel{ptr+n}    {}
         element_range(T* ptr, size_t n)      noexcept : first{ptr},   sentinel{ptr+n}    {}
@@ -23,6 +24,11 @@ namespace rpp
         T* end()   { return sentinel; }
         const T* begin() const { return first;    }
         const T* end()   const { return sentinel; }
+        int size() const { return int(sentinel-first); }
+              T& operator[](int index)       { return first[index]; }
+        const T& operator[](int index) const { return first[index]; }
+              T* data()       { return first; }
+        const T* data() const { return first; }
     };
 
     template<class T>           element_range<T> range(T* data, T* end)      noexcept { return { data, end  }; }
@@ -232,6 +238,30 @@ namespace rpp
         return it != map.end() ? &it->second : nullptr;
     }
 
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    template<class T> T* find(element_range<T> v, const T& item) noexcept
+    {
+        for (T& elem : v) if (elem == item) return &elem;
+        return nullptr;
+    }
+
+    template<class T, class Pred> T* find_if(element_range<T> v, const Pred& predicate) noexcept
+    {
+        for (T& elem : v) if (predicate(elem)) return &elem;
+        return nullptr;
+    }
+
+    template<class T, class Pred> T* find_last_if(element_range<T> v, const Pred& predicate) noexcept
+    {
+        T* first = v.begin();
+        T* last  = v.end();
+        while (last != first) {
+            if (predicate(*last)) return last;
+            --last;
+        }
+        return nullptr;
+    }
 
     /////////////////////////////////////////////////////////////////////////////////////
 
