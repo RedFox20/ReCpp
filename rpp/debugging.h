@@ -221,7 +221,7 @@ EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 // triggers an assertion in debug builds
 #define LogExcept(std_except, format, ...) do { \
     _LogExcept(std_except.what(), __log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
-    __assertion_failure(format ": %s", ##__VA_ARGS__, std_except.what() ); \
+    __debug_assert(format ": %s", ##__VA_ARGS__, std_except.what() ); \
 } while(0)
 
 // uses printf style formatting to build an exception message
