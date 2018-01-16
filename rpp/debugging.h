@@ -151,6 +151,8 @@ EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __dead2
 #    define __assertion_failure(fmt,...) \
     __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, __assert_format(fmt, ##__VA_ARGS__))
 #  else
+EXTERNC void __assert_fail(const char *__assertion, const char *__file,
+                           unsigned int __line, const char *__function) __THROW __attribute__ ((__noreturn__));
 #    define __assertion_failure(fmt,...) \
     __assert_fail(__assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
 #  endif

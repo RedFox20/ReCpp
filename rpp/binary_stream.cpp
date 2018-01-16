@@ -1,4 +1,5 @@
 #include "binary_stream.h"
+#include <stdlib.h>
 
 namespace rpp
 {
