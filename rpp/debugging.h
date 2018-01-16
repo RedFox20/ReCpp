@@ -8,6 +8,7 @@
 #include <stdio.h> // fprintf
 
 #ifdef _MSC_VER
+#  include <crtdbg.h>
 #  define PRINTF_CHECKFMT
 #  define PRINTF_CHECKFMT2
 #  define PRINTF_FMTSTR _In_z_ _Printf_format_string_
@@ -91,26 +92,6 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 #define __log_format(format, file, line, func) ("$ " format)
 #endif
 
-#if defined(DEBUG) || defined(_DEBUG) || defined(BETA) || defined(RPP_DEBUG)
-#  if defined __APPLE__ || defined __clang__ // iOS or just clang
-#    if __ANDROID__
-#      define __assertion_failure(msg) __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), msg)
-#    elif __APPLE__
-#      define __assertion_failure(msg) __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, msg)
-#    else
-#      define __assertion_failure(msg) __assert_fail(msg, _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
-#    endif
-#  elif _MSC_VER // Windows VC++
-#    define __assertion_failure(msg) do { __debugbreak(); } while (0)
-#  elif defined __GNUC__ // other clang, mingw or linux gcc
-#    define  __assertion_failure(msg) __assert_fail(msg, _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
-#  else
-#    error Debugging Assert not defined for this compiler toolkit!
-#  endif
-#else
-#  define __assertion_failure(msg) /*nothing in release builds*/
-#endif
-
 #if __cplusplus
 #include <string>
 template<class T>
@@ -156,6 +137,44 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
   #define __wrap_args(...) , ##__VA_ARGS__
 #endif
 
+
+// wraps and formats message string for assertions, std::string and rpp::strview are wrapped and .c_str() called
+#define __assert_format(fmt, ...) _FmtString((fmt) __wrap_args(__VA_ARGS__) )
+
+
+#if defined __APPLE__ || defined __clang__ // iOS or just clang
+#  if __ANDROID__
+#    define __assertion_failure(fmt,...) \
+    __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), __assert_format(fmt, ##__VA_ARGS__))
+#  elif __APPLE__
+EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __dead2 __disable_tail_calls;
+#    define __assertion_failure(fmt,...) \
+    __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, __assert_format(fmt, ##__VA_ARGS__))
+#  else
+#    define __assertion_failure(fmt,...) \
+    __assert_fail(__assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
+#  endif
+#elif _MSC_VER // Windows VC++
+#  ifndef _DEBUG
+#    define __assertion_failure(fmt,...) do { __debugbreak(); } while (0)
+#  else // MSVC++ debug assert is quite unique since it supports Format strings. Wish all toolchains did that:
+#    define __assertion_failure(fmt,...) do { \
+    _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt __wrap_args(##__VA_ARGS__) ); } while (0)
+#  endif
+#elif defined __GNUC__ // other clang, mingw or linux gcc
+#  define  __assertion_failure(fmt,...) \
+    __assert_fail(__assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
+#else
+#  error Debugging Assert not defined for this compiler toolkit!
+#endif
+
+#if defined(DEBUG) || defined(_DEBUG) || defined(BETA) || defined(RPP_DEBUG)
+#  define __debug_assert __assertion_failure
+#else
+#  define __debug_assert(...) /*nothing in release builds*/
+#endif
+
+
 /**
  * Logs an info message to the backing error mechanism (Crashlytics on iOS)
  * No assertions are triggered.
@@ -173,7 +192,7 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
  */
 #define LogError(format, ...) do { \
     _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args( __VA_ARGS__ ) ); \
-    __assertion_failure(_FmtString(format __wrap_args(__VA_ARGS__) )); \
+    __debug_assert(format, ##__VA_ARGS__); \
 } while(0)
 
 // Logs an info message with custom file, line, func sources
@@ -200,7 +219,7 @@ inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 // triggers an assertion in debug builds
 #define LogExcept(std_except, format, ...) do { \
     _LogExcept(std_except.what(), __log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
-    __assertion_failure(_FmtString((format ": %s") __wrap_args(__VA_ARGS__), std_except.what() )); \
+    __assertion_failure(format ": %s", ##__VA_ARGS__, std_except.what() )); \
 } while(0)
 
 // uses printf style formatting to build an exception message
