@@ -56,8 +56,6 @@ namespace rpp
 
     bool strview::to_bool() const
     {
-        if ((uint)len > 4)
-            return false; // can't be any of true literals
         return strequalsi(str, "true") ||
                strequalsi(str, "yes")  ||
                strequalsi(str, "on")   ||
@@ -262,16 +260,16 @@ namespace rpp
 
     bool strview::next(strview& out, char delim)
     {
-        bool result = next_notrim(out, delim);
-        if (result && len) { ++str; --len; } // trim match
-        return result;
+        return _next_trim(out, [delim](const char* s, int n) {
+            return (const char*)memchr(s, delim, size_t(n));
+        });
     }
 
     bool strview::next(strview& out, const char* delims, int ndelims)
     {
-        bool result = next_notrim(out, delims, ndelims);
-        if (result && len) { ++str; --len; } // trim match
-        return result;
+        return _next_trim(out, [delims, ndelims](const char* s, int n) {
+            return strcontains(s, n, delims, ndelims);
+        });
     }
 
 

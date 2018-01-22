@@ -273,7 +273,12 @@ namespace rpp
         FINLINE float to_float()   const { return (float)rpp::to_double(str, len); }
         /** Parses this strview as a double */
         FINLINE double to_double() const { return rpp::to_double(str, len); }
-        /** Parses this strview as a bool */
+        // Relaxed parsing of this strview as a boolean.
+        // Accepts strings that start_with ignorecase: "true", "yes", "on", "1"
+        // Everything else is parsed as false.
+        // strings such as "true\n" will be parsed as true; same for "trueStatement" --> true,
+        // because the conversion is relaxed, not strict.
+        // For strict parsing, you should use strview::equalsi("true")
         bool to_bool() const;
 
         /** Clears the strview */
@@ -544,11 +549,9 @@ namespace rpp
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
         template<int N> NOINLINE bool next(strview& out, const char (&delims)[N]) {
-            bool result = _next_notrim(out, [&delims](const char* s, int n) {
+            return _next_trim(out, [&delims](const char* s, int n) {
                 return strcontains<N>(s, n, delims);
             });
-            if (result && len) { ++str; --len; } // trim match
-            return result;
         }
         /**
          * Same as bool next(strview& out, char delim), but returns a token instead
@@ -615,14 +618,32 @@ namespace rpp
                 if (s >= end)       // out of bounds?
                     return false;   // no more tokens available
                 if (const char* p = searchFn(s, int(end - s))) {
-                    if (s == p) {   // this is an empty token?
-                        ++s;        // increment search string
-                        continue;   // try again
-                    }
                     out.str = s;    // writeout start/end
                     out.len = int(p - s);
                     str = p;        // stop on identified token
                     len = int(end - p);
+                    return true;    // we got what we needed
+                }
+                out.str = s;        // writeout start/end
+                out.len = int(end - s);  // 
+                str = end;          // last token, set to end for debugging convenience
+                len = 0;
+                return true;
+            }
+        }
+
+        template<class SearchFn> FINLINE bool _next_trim(strview& out, SearchFn searchFn)
+        {
+            auto s = str, end = s + len;
+            for (;;) { // using a loop to skip empty tokens
+                if (s >= end)       // out of bounds?
+                    return false;   // no more tokens available
+                if (const char* p = searchFn(s, int(end - s))) {
+                    out.str = s;    // writeout start/end
+                    out.len = int(p - s);
+                    str = p;        // stop on identified token
+                    len = int(end - p);
+                    if (len) { ++str; --len; }
                     return true;    // we got what we needed
                 }
                 out.str = s;        // writeout start/end
