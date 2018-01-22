@@ -874,10 +874,10 @@ namespace rpp
 
     //////////////// optimized string join /////////////////
 
-    RPPAPI string join(const strview& a, const strview& b);
-    RPPAPI string join(const strview& a, const strview& b, const strview& c);
-    RPPAPI string join(const strview& a, const strview& b, const strview& c, const strview& d);
-    RPPAPI string join(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
+    RPPAPI string concat(const strview& a, const strview& b);
+    RPPAPI string concat(const strview& a, const strview& b, const strview& c);
+    RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d);
+    RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
 
     //////////////// string compare operators /////////////////
 
