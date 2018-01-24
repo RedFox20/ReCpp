@@ -995,10 +995,10 @@ namespace rpp /* ReCpp */
         return (int)out.size();
     }
 
-    int list_files(vector<string>& out, strview dir, strview ext, bool recursive, bool fullpath) noexcept
+    int list_files(vector<string>& out, strview dir, strview suffix, bool recursive, bool fullpath) noexcept
     {
         traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
-            if (ext.empty() || strview{path}.ends_withi(ext))
+            if (suffix.empty() || strview{path}.ends_withi(suffix))
                 out.emplace_back(move(path));
         });
         return (int)out.size();
@@ -1013,12 +1013,12 @@ namespace rpp /* ReCpp */
         return (int)outDirs.size() + (int)outFiles.size();
     }
 
-    vector<string> list_files(strview dir, const vector<strview>& exts, bool recursive, bool fullpath) noexcept
+    vector<string> list_files(strview dir, const vector<strview>& suffixes, bool recursive, bool fullpath) noexcept
     {
         vector<string> out;
         traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
-            for (const strview& ext : exts) {
-                if (strview{ path }.ends_withi(ext)) {
+            for (const strview& suffix : suffixes) {
+                if (strview{ path }.ends_withi(suffix)) {
                     out.emplace_back(move(path));
                     return;
                 }
