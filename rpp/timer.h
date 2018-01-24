@@ -61,6 +61,22 @@ namespace rpp
 
         /** @return next() converted to milliseconds */
         double next_ms() noexcept { return next() * 1000.0; }
+
+        /** Measure block execution time as seconds */
+        template<class Func> static double measure(const Func& f)
+        {
+            Timer t;
+            f();
+            return t.elapsed();
+        }
+
+        /** Measure block execution time as milliseconds */
+        template<class Func> static double measure_ms(const Func& f)
+        {
+            Timer t;
+            f();
+            return t.elapsed_ms();
+        }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

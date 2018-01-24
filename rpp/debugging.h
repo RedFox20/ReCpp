@@ -71,11 +71,14 @@ RPPCAPI LogSeverity GetLogSeverityFilter();
  * Writes a message to default output. On most platforms this is stdout/stderr
  * On Android this writes to Android log, using the given tag.
  * @param tag Android log tag. Not used on other platforms.
+ * @param severity Info/Warning/Error
+ * @param err String
+ * @param len Length of string err
  */
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len);
 RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
 
-/** Logs an error to the backing error mechanism (Crashlytics on iOS) */
+/** Logs an error to the backing error mechanism */
 RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap);
 RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
