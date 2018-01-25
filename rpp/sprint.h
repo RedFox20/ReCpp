@@ -311,6 +311,17 @@ namespace rpp
         return buf.str();
     }
 
+    inline const char* __format_wrap(const string& s)  { return s.c_str();    }
+    inline const char* __format_wrap(const strview& s) { return s.to_cstr();  }
+    template<class T> inline const T& __format_wrap(const T& t) { return t; }
+
+    RPPAPI string __format(const char* format, ...); 
+
+    template<class... Args> inline string format(const char* format, const Args&... args)
+    {
+        return __format(format, __format_wrap(args)...);
+    }
+
     /////////////////////// useful container tostr extensions //////////////////////
 
     /** 

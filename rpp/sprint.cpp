@@ -132,6 +132,19 @@ namespace rpp
     int println(FILE* file)              { return print(file, '\n'); }
     int println()                        { return print(stdout, '\n'); }
 
+    string __format(const char* format, ...)
+    {
+        char buf[8192];
+        va_list ap;
+        va_start(ap, format);
+        int n = vsnprintf(buf, sizeof(buf), format, ap);
+        if (n < 0 || n >= sizeof(buf)) {
+            n = sizeof(buf)-1;
+            buf[n] = '\0';
+        }
+        return string{buf, buf+n};
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
 
     string to_string(bool trueOrFalse) noexcept

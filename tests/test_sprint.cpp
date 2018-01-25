@@ -56,4 +56,10 @@ TestImpl(test_sprint)
         println("hello", 10, "println", 20);
     }
 
+    TestCase(format)
+    {
+        string s = rpp::format("%02d, %s, %.1f\n", 7, "format", 0.5);
+        AssertThat(s, "07, format, 0.5\n");
+    }
+
 } Impl;
