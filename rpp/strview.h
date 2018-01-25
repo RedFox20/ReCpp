@@ -1092,10 +1092,10 @@ namespace rpp
         NOINLINE char peek_next() const;
     };
 
-} // namespace rpp
+    // support for "debugging.h"
+    inline const char* __wrap_arg(const strview& arg) { return arg.to_cstr(); }
 
-// support for "debugging.h"
-inline const char* __wrap_arg(const rpp::strview& arg) { return arg.to_cstr(); }
+} // namespace rpp
 
 namespace std
 {
