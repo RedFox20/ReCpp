@@ -326,8 +326,14 @@ namespace rpp
                 rpp::strview testName = arg.next('.');
                 rpp::strview specific = arg.next('.');
 
-                const bool enableTest = testName[0] != '-';
-                if (!enableTest) testName.chomp_first();
+                bool enableTest = testName[0] != '-';
+                if (!enableTest) {
+                    testName.chomp_first();
+                }
+                else {
+                    enableTest = !testName.starts_with("no:");
+                    if (!enableTest) testName.skip(3);
+                }
 
                 const bool exactMatch = testName.starts_with("test_");
                 if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", argv[iarg]);
