@@ -346,7 +346,7 @@ namespace rpp
                 }
             }
 
-            if (disabled.size())
+            if (!disabled.empty())
             {
                 for (test* t : all_tests()) {
                     if (t->auto_run) { // only consider disabling auto_run tests
@@ -356,7 +356,7 @@ namespace rpp
                     }
                 }
             }
-            else if (enabled.size())
+            else if (!enabled.empty())
             {
                 for (test* t : all_tests()) { // enable whatever was requested
                     t->test_enabled = enabled.find(t->name) != enabled.end();
@@ -381,9 +381,9 @@ namespace rpp
             }
         }
 
-        if (test::asserts_failed)
+        if (asserts_failed)
         {
-            consolef(Red, "\nWARNING: %d assertions failed!\n", test::asserts_failed);
+            consolef(Red, "\nWARNING: %d assertions failed!\n", asserts_failed);
             #if _WIN32 && _MSC_VER
                 pause();
             #endif
