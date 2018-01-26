@@ -149,6 +149,7 @@ namespace rpp
 
     string to_string(bool trueOrFalse) noexcept
     {
+        using namespace std::literals;
         return trueOrFalse ? "true"s : "false"s;
     }
 

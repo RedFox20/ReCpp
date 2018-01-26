@@ -45,7 +45,6 @@
 namespace rpp
 {
     using std::string;
-    using namespace std::string_literals;
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -63,6 +62,7 @@ namespace rpp
     {
         using std::to_string;
         using rpp::to_string;
+        using namespace std::literals;
         return object ? to_string(*object) : "null"s;
     }
 
