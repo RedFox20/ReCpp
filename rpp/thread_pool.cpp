@@ -112,7 +112,7 @@ namespace rpp
     pool_task::wait_result pool_task::wait(int timeoutMillis, nothrow_t) noexcept
     {
         unique_lock<mutex> lock{m};
-        while (taskRunning)
+        while (taskRunning && !killed)
         {
             if (timeoutMillis)
             {

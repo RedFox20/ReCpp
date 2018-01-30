@@ -126,7 +126,7 @@ namespace rpp /* ReCpp */
     template<class TChar> static void* OpenOrCreate(const TChar* filename, IOFlags mode) noexcept
     {
         void* handle = OpenFile(filename, mode);
-        if (!handle && mode == CREATENEW)
+        if (!handle && (mode == CREATENEW || mode == APPEND))
         {
             // assume the directory doesn't exist
             if (create_folder(folder_path(filename))) {
