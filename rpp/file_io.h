@@ -588,9 +588,13 @@ namespace rpp /* ReCpp */
      * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
      */
     RPPAPI bool copy_file(const char* sourceFile, const char* destinationFile) noexcept;
-    inline bool copy_file(const strview sourceFile, const strview destinationFile) noexcept 
-    { return copy_file(sourceFile.to_cstr(), destinationFile.to_cstr()); }
+    RPPAPI bool copy_file(const strview sourceFile, const strview destinationFile) noexcept;
 
+    /**
+     * @brief Copies sourceFile into destinationFolder, overwriting the previous file!
+     * @return TRUE if sourceFile was opened && destinationFolder was created && copied successfully
+     */
+    RPPAPI bool copy_file_into_folder(const strview sourceFile, const strview destinationFolder) noexcept;
 
     /**
      * Creates a folder, recursively creating folders that do not exist

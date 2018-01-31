@@ -584,6 +584,20 @@ namespace rpp /* ReCpp */
         return totalBytesRead == totalBytesWritten;
 #endif
     }
+
+    bool copy_file(const strview sourceFile, const strview destinationFile) noexcept
+    {
+        char buf1[1024];
+        char buf2[1024];
+        return copy_file(sourceFile.to_cstr(buf1), destinationFile.to_cstr(buf2));
+    }
+
+    bool copy_file_into_folder(const strview sourceFile, const strview destinationFolder) noexcept
+    {
+        char buf1[1024];
+        string destFile = path_combine(destinationFolder, file_nameext(sourceFile));
+        return copy_file(sourceFile.to_cstr(buf1), destFile.c_str());
+    }
     
     // on failure, check errno for details, if folder (or file) exists, we consider it a success
     // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
