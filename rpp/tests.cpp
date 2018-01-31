@@ -159,10 +159,13 @@ namespace rpp
 
     bool test::run_init()
     {
-        try {
+        try
+        {
             init_test();
             return true;
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e)
+        {
             consolef(Red, "FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
             ++asserts_failed;
             return false;
@@ -171,9 +174,12 @@ namespace rpp
 
     void test::run_cleanup()
     {
-        try {
+        try
+        {
             cleanup_test();
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e)
+        {
             consolef(Red, "FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
             ++asserts_failed;
         }
@@ -181,18 +187,29 @@ namespace rpp
 
     void test::run_test(test_func& test)
     {
-        try {
+        try
+        {
             (test.lambda.*test.func)();
-        } catch (const std::exception& e) {
-            if (test.expectedExType) {
+            if (test.expectedExType) // we expected an exception, but none happened?!
+            {
+                consolef(Red, "FAILED with expected EXCEPTION NOT THROWN in %s::%s\n", 
+                         name.str, test.name.str);
+                ++asserts_failed;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            if (test.expectedExType)
+            {
                 size_t hash = typeid(e).hash_code();
-                if (test.expectedExType == hash) {
-                    consolef(Yellow, "Caught Expected Exception in %s::%s: %s\n", 
+                if (test.expectedExType == hash)
+                {
+                    consolef(Yellow, "Caught Expected Exception in %s::%s:\n  %s\n", 
                              name.str, test.name.str, e.what());
                     return;
                 }
             }
-            consolef(Red, "FAILED with EXCEPTION in %s::%s: %s\n", 
+            consolef(Red, "FAILED with EXCEPTION in %s::%s:\n  %s\n", 
                      name.str, test.name.str, e.what());
             ++asserts_failed;
         }

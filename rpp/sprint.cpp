@@ -99,7 +99,7 @@ namespace rpp
     }
     void string_buffer::pretty_cont_item_end(int i, int count, bool newlines)
     {
-        if (++i < count) write(", ");
+        if (i < count) write(", ");
         if (newlines) write('\n');
     }
     void string_buffer::pretty_cont_end(int count, bool newlines)
