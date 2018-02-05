@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cerrno>
+#include <array>
 #include <sys/stat.h> // stat,fstat
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -881,32 +882,53 @@ namespace rpp /* ReCpp */
         return res;
     }
 
+    template<size_t N> string slash_combine(const std::array<strview, N>& args)
+    {
+        size_t res = args[0].size();
+        for (size_t i = 1; i < N; ++i) {
+            if (size_t n = (size_t)args[i].size()) {
+                if (res != 0)
+                    res += 1;
+                res += n;
+            }
+        }
+        
+        string result; result.reserve(res);
+        result.append(args[0].c_str(), args[0].size());
+
+        for (size_t i = 1; i < N; ++i) {
+            if (size_t n = (size_t)args[i].size()) {
+                if (!result.empty())
+                    result.append(1, '/');
+                result.append(args[i].c_str(), n);
+            }
+        }
+        return result;
+    }
+
     string path_combine(strview path1, strview path2) noexcept
     {
         path1.trim_end("/\\");
-        path2.trim_start("/\\");
-        path2.trim_end("/\\");
-
-        if (path1.empty())
-        {
-            if (path2.empty()) // path_combine("", "") ==> ""
-                return {};
-            return path2;  // path_combine("", "/tmp.txt") ==> "tmp.txt"
-        }
-        if (path2.empty())
-        {
-            return path1;  // path_combine("tmp/", "") ==> "tmp"
-        }
-
-        string combined;
-        combined.reserve(size_t(path1.len + 1 + path2.len));
-        combined.append(path1.str, size_t(path1.len));
-        combined.append(1, '/');
-        combined.append(path2.str, size_t(path2.len));
-        return combined;
+        path2.trim("/\\");
+        return slash_combine(std::array<strview, 2>{path1, path2});
     }
-    
 
+    string path_combine(strview path1, strview path2, strview path3) noexcept
+    {
+        path1.trim_end("/\\");
+        path2.trim("/\\");
+        path3.trim("/\\");
+        return slash_combine(std::array<strview, 3>{path1, path2, path3});
+    }
+
+    string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept
+    {
+        path1.trim_end("/\\");
+        path2.trim("/\\");
+        path3.trim("/\\");
+        path4.trim("/\\");
+        return slash_combine(std::array<strview, 4>{path1, path2, path3, path4});
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 

@@ -167,6 +167,10 @@ TestImpl(test_file_io)
         AssertThat(normalized("/root\\dir\\file.ext", '\\'), "\\root\\dir\\file.ext");
         AssertThat(normalized("\\root/dir/file.ext",  '\\'), "\\root\\dir\\file.ext");
 
+    }
+
+    TestCase(path_combine2)
+    {
         AssertThat(path_combine("tmp",  "file.txt" ), "tmp/file.txt");
         AssertThat(path_combine("tmp/", "file.txt" ), "tmp/file.txt");
         AssertThat(path_combine("tmp/", "/file.txt"), "tmp/file.txt");
@@ -179,6 +183,26 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     ""         ), "");
     }
     
+    TestCase(path_combine3)
+    {
+        AssertThat(path_combine("tmp",  "path", "file.txt" ), "tmp/path/file.txt");
+        AssertThat(path_combine("tmp/", "path", "file.txt" ), "tmp/path/file.txt");
+        AssertThat(path_combine("tmp/", "path/", "file.txt" ),"tmp/path/file.txt");
+        AssertThat(path_combine("tmp/", "path", "/file.txt"), "tmp/path/file.txt");
+        AssertThat(path_combine("tmp/", "path", "/folder//"), "tmp/path/folder");
+        AssertThat(path_combine("tmp/", "/path/", "/folder//"), "tmp/path/folder");
+        AssertThat(path_combine("tmp/", "path", ""         ), "tmp/path");
+        AssertThat(path_combine("tmp/", "path/", ""        ), "tmp/path");
+        AssertThat(path_combine("tmp",  "",     ""         ), "tmp");
+        AssertThat(path_combine("",     "",     "tmp"      ), "tmp");
+        AssertThat(path_combine("",     "",     "/tmp"     ), "tmp");
+        AssertThat(path_combine("",     "",     "/tmp/"    ), "tmp");
+        AssertThat(path_combine("",     "/",     "tmp"     ), "tmp");
+        AssertThat(path_combine("",     "/",     "/tmp"    ), "tmp");
+        AssertThat(path_combine("",     "/",     "/tmp/"   ), "tmp");
+        AssertThat(path_combine("",     "",     ""         ), "");
+    }
+
     static bool contains(const vector<string>& v, const string& s)
     {
         for (const string& item : v)

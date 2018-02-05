@@ -750,6 +750,16 @@ namespace rpp /* ReCpp */
      */
     RPPAPI string path_combine(strview path1, strview path2) noexcept;
 
+    /**
+     * @brief Efficiently combines three path strings, removing any repeated / or \
+     */
+    RPPAPI string path_combine(strview path1, strview path2, strview path3) noexcept;
+    
+    /**
+     * @brief Efficiently combines four path strings, removing any repeated / or \
+     */
+    RPPAPI string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept;
+
     ////////////////////////////////////////////////////////////////////////////////
 
 
