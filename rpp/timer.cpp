@@ -133,7 +133,7 @@ namespace rpp
     double Timer::elapsed() const noexcept
     {
         uint64_t end = time_now();
-        return (end - value) * period;
+        return (end - value) * rpp::period;
     }
 
     double Timer::next() noexcept
@@ -167,6 +167,42 @@ namespace rpp
                 fprintf(stderr, format, what, elapsed_ms);
             #endif
         #endif
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    void StopWatch::start()
+    {
+        if (!begin) {
+            begin = time_now();
+            end   = 0;
+        }
+    }
+
+    void StopWatch::stop()
+    {
+        if (begin && !end)
+            end = time_now();
+    }
+
+    void StopWatch::resume()
+    {
+        end = 0;
+    }
+
+    void StopWatch::reset()
+    {
+        begin = 0;
+        end   = 0;
+    }
+
+    double StopWatch::elapsed() const
+    {
+        if (begin) {
+            if (end) return (end - begin) * rpp::period;
+            return (time_now() - begin) * rpp::period;
+        }
+        return 0.0;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

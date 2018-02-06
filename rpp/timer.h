@@ -82,6 +82,57 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * High accuracy stopwatch for measuring specific events and keeping the results
+     */
+    struct RPPAPI StopWatch
+    {
+        uint64_t begin = 0;
+        uint64_t end   = 0;
+
+        /** Creates an uninitialized StopWatch. Reported time is always 0.0 */
+        StopWatch() = default;
+
+        /** 
+         * Sets the initial starting point of the stopwatch and resets the stop point
+         * only if the stopwatch hasn't started already
+         * @note No effect if started()
+         */
+        void start();
+
+        /**
+         * Sets the stop point of the stopwatch only if start point
+         * exists and not already stopped
+         * @note No effect if !started() || stopped()
+         */
+        void stop();
+
+        /** Clears the stop point and resumes timing */
+        void resume();
+
+        /** Resets both start and stop times */
+        void reset();
+
+        /** Has the stopwatch been started? */
+        bool started() const { return begin != 0; }
+
+        /** Has the stopwatch been stopped with a valid time? */
+        bool stopped() const { return end != 0; }
+
+        /** 
+         * Reports the currently elapsed time. 
+         * If stopwatch is stopped, it will report the stored time
+         * If stopwatch is still running, it will report the currently elapsed time
+         * Otherwise reports 0.0
+         */
+        double elapsed() const;
+
+        /** Currently elpased time in milliseconds */
+        double elapsed_ms() const { return elapsed() * 1000.0; }
+    };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
      * Automatically logs performance from constructor to destructor and writes it to log
      */
     class RPPAPI ScopedPerfTimer
