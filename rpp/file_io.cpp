@@ -910,7 +910,7 @@ namespace rpp /* ReCpp */
     {
         path1.trim_end("/\\");
         path2.trim("/\\");
-        return slash_combine(std::array<strview, 2>{path1, path2});
+        return slash_combine(std::array<strview, 2>{{path1, path2}});
     }
 
     string path_combine(strview path1, strview path2, strview path3) noexcept
@@ -918,7 +918,7 @@ namespace rpp /* ReCpp */
         path1.trim_end("/\\");
         path2.trim("/\\");
         path3.trim("/\\");
-        return slash_combine(std::array<strview, 3>{path1, path2, path3});
+        return slash_combine(std::array<strview, 3>{{path1, path2, path3}});
     }
 
     string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept
@@ -927,7 +927,7 @@ namespace rpp /* ReCpp */
         path2.trim("/\\");
         path3.trim("/\\");
         path4.trim("/\\");
-        return slash_combine(std::array<strview, 4>{path1, path2, path3, path4});
+        return slash_combine(std::array<strview, 4>{{path1, path2, path3, path4}});
     }
 
     ////////////////////////////////////////////////////////////////////////////////
