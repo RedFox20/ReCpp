@@ -132,6 +132,18 @@ namespace rpp
             cv.notify_one();
         }
 
+        bool notify_once() // only notify if count <= 0
+        {
+            bool shouldNotify = false;
+            { lock_guard<mutex> lock{ m };
+                shouldNotify = value <= 0;
+                if (shouldNotify)
+                    ++value;
+            }
+            if (shouldNotify) cv.notify_one();
+            return shouldNotify;
+        }
+
         void wait()
         {
             unique_lock<mutex> lock{ m };
