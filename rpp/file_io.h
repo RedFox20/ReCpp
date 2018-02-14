@@ -330,6 +330,25 @@ namespace rpp /* ReCpp */
 #endif
 
         /**
+         * Truncate front part of the file
+         * @param newLength The new length of the file, with any data in the front discarded
+         */
+        void truncate_front(int64 newLength);
+
+        /**
+         * Truncate end of file
+         * @param newLength The new length of the file, with any data in the end truncated
+         */
+        void truncate_end(int64 newLength);
+
+        /**
+         * Calls OS truncate. This can be used to resize files. Behaviour depends on platform.
+         * @param newLength The new length of the file
+         */
+        void truncate(int64 newLength);
+
+
+        /**
          * Forcefully flushes any OS file buffers to send all data to the storage device
          * @warning Don't call this too haphazardly, or you will ruin your IO performance!
          */

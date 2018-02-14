@@ -358,6 +358,41 @@ namespace rpp /* ReCpp */
         return write("\n", 1);
     }
 
+    void file::truncate_front(int64 newLength)
+    {
+        int64 len = sizel();
+        if (len <= newLength)
+            return;
+
+        int64 bytesToTrunc = len - newLength;
+        seekl(bytesToTrunc, SEEK_SET);
+        
+        std::vector<char> buf; buf.resize((size_t)newLength);
+        int bytesRead = read(buf.data(), (int)newLength);
+
+        truncate(newLength);
+        seek(0, SEEK_SET);
+        write(buf.data(), bytesRead);
+    }
+
+    void file::truncate_end(int64 newLength)
+    {
+        int64 len = sizel();
+        if (len <= newLength)
+            return;
+        truncate(newLength);
+    }
+
+    void file::truncate(int64 newLength)
+    {
+        #if USE_WINAPI_IO
+            seekl(newLength, SEEK_SET);
+            SetEndOfFile((HANDLE)Handle);
+        #else
+            ftruncate(fileno((FILE*)Handle), (off_t)newLength);
+        #endif
+    }
+
     void file::flush() noexcept
     {
         #if USE_WINAPI_IO
