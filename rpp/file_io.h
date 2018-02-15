@@ -34,10 +34,10 @@ namespace rpp /* ReCpp */
     using std::unordered_map;
 
     enum IOFlags {
-        READONLY,			// opens an existing file for reading
-        READWRITE,			// opens an existing file for read/write
-        CREATENEW,			// creates new file for writing
-        APPEND,             // create new OR opens an existing file for appending only
+        READONLY,   // opens an existing file for reading
+        READWRITE,  // opens or creates file for read/write
+        CREATENEW,  // always creates (overwrite) a new file for read/write
+        APPEND,     // opens or creates file for appending only, seek operations will not work
     };
 
 
@@ -530,6 +530,7 @@ namespace rpp /* ReCpp */
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
     RPPAPI bool file_exists(const char* filename) noexcept;
+    RPPAPI bool file_exists(const wchar_t* filename) noexcept;
     inline bool file_exists(const string& filename) noexcept { return file_exists(filename.c_str());   }
     inline bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
 

@@ -4,11 +4,15 @@
 #include <cerrno>
 #include <array>
 #include <sys/stat.h> // stat,fstat
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
+#include <codecvt> // codecvt_utf8
+#include <locale>  // wstring_convert
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
+    #include <io.h>     // _chsize
     #define USE_WINAPI_IO 1
     #define stat64 _stat64
     #define fseeki64 _fseeki64
@@ -28,6 +32,7 @@
 #endif
 #if __ANDROID__
 #include <jni.h>
+
 #endif
 
 namespace rpp /* ReCpp */
@@ -62,6 +67,12 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    static string to_string(const wchar_t* ws)
+    {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
+        return cvt.to_bytes(ws);
+    }
+
 #if USE_WINAPI_IO
     static void* OpenF(const char* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
     { return CreateFileA(f, a, s, sa, c, o, 0); }
@@ -69,16 +80,23 @@ namespace rpp /* ReCpp */
     { return CreateFileW(f, a, s, sa, c, o, 0); }
 #else
     static void* OpenF(const char* f, IOFlags mode) {
-        const char* modes[] = { "rb", "wbx", "wb", "ab" };
+        if (mode == READWRITE) {
+            if (file_exists(f)) return fopen(f, "rb+"); // open existing file for read/write
+            else                return fopen(f, "wb");  // create new for read/write
+        }
+        const char* modes[] = { "rb", "", "wb", "ab" };
         return fopen(f, modes[mode]);
     }
     static void* OpenF(const wchar_t* f, IOFlags mode) {
     #if _WIN32
-        const wchar_t* modes[] = { L"rb", L"wbx", L"wb", L"ab" };
+        if (mode == READWRITE) {
+            if (file_exists(f)) return _wfopen(f, L"rb+"); // open existing file for read/write
+            else                return _wfopen(f, L"wb");  // create new for read/write
+        }
+        const wchar_t* modes[] = { L"rb", L"", L"wb", L"ab" };
         return _wfopen(f, modes[mode]); 
     #else
-        string s = { f, f + wcslen(f) }; // @todo Add proper UCS2 --> UTF8 conversion
-        return OpenF(s.c_str(), mode);
+        return OpenF(to_string(f).c_str(), mode);
     #endif
     }
 #endif
@@ -99,8 +117,8 @@ namespace rpp /* ReCpp */
                 break;
             case READWRITE:
                 access     = FILE_GENERIC_READ|FILE_GENERIC_WRITE;
-                sharing	   = FILE_SHARE_READ;
-                createmode = OPEN_EXISTING; // if not exists, fail
+                sharing    = FILE_SHARE_READ;
+                createmode = OPEN_ALWAYS; // create file if it doesn't exist
                 openFlags  = FILE_ATTRIBUTE_NORMAL;
                 break;
             case CREATENEW:
@@ -239,6 +257,7 @@ namespace rpp /* ReCpp */
     }
     int file::read(void* buffer, int bytesToRead) noexcept
     {
+        if (!Handle) return 0;
         #if USE_WINAPI_IO
             DWORD bytesRead;
             ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
@@ -310,7 +329,7 @@ namespace rpp /* ReCpp */
     {
         if (bytesToWrite <= 0)
             return 0;
-        if (Handle == nullptr)
+        if (!Handle)
             return 0;
         
         #if USE_WINAPI_IO
@@ -327,7 +346,7 @@ namespace rpp /* ReCpp */
     }
     int file::writef(const char* format, ...) noexcept
     {
-        if (Handle == nullptr)
+        if (!Handle)
             return 0;
         va_list ap; va_start(ap, format);
         #if USE_WINAPI_IO // @note This is heavily optimized
@@ -385,9 +404,12 @@ namespace rpp /* ReCpp */
 
     void file::truncate(int64 newLength)
     {
+        if (!Handle) return;
         #if USE_WINAPI_IO
             seekl(newLength, SEEK_SET);
             SetEndOfFile((HANDLE)Handle);
+        #elif _MSC_VER
+            _chsize_s(fileno((FILE*)Handle), newLength);
         #else
             ftruncate(fileno((FILE*)Handle), (off_t)newLength);
         #endif
@@ -395,6 +417,7 @@ namespace rpp /* ReCpp */
 
     void file::flush() noexcept
     {
+        if (!Handle) return;
         #if USE_WINAPI_IO
             FlushFileBuffers((HANDLE)Handle);
         #else
@@ -414,6 +437,8 @@ namespace rpp /* ReCpp */
 
     int file::seek(int filepos, int seekmode) noexcept
     {
+        if (!Handle)
+            return 0;
         #if USE_WINAPI_IO
             return SetFilePointer((HANDLE)Handle, filepos, 0, seekmode);
         #else
@@ -423,6 +448,8 @@ namespace rpp /* ReCpp */
     }
     uint64 file::seekl(int64 filepos, int seekmode) noexcept
     {
+        if (!Handle)
+            return 0LL;
         #if USE_WINAPI_IO
             LARGE_INTEGER newpos, nseek;
             nseek.QuadPart = filepos;
@@ -435,6 +462,8 @@ namespace rpp /* ReCpp */
     }
     int file::tell() const noexcept
     {
+        if (!Handle)
+            return 0;
         #if USE_WINAPI_IO
             return SetFilePointer((HANDLE)Handle, 0, 0, FILE_CURRENT);
         #else
@@ -444,6 +473,8 @@ namespace rpp /* ReCpp */
 
     int64 file::tell64() const noexcept
     {
+        if (!Handle)
+            return 0LL;
         #if USE_WINAPI_IO
             LARGE_INTEGER current;
             SetFilePointerEx((HANDLE)Handle, { 0 }, &current, FILE_CURRENT);
@@ -463,6 +494,8 @@ namespace rpp /* ReCpp */
 
     bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
+        if (!Handle)
+            return false;
     #if USE_WINAPI_IO
         FILETIME c, a, m;
         if (GetFileTime((HANDLE)Handle, outCreated?&c:0,outAccessed?&a:0, outModified?&m:0)) {
@@ -514,6 +547,19 @@ namespace rpp /* ReCpp */
         #else
             struct stat s;
             return stat(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
+        #endif
+    }
+
+    bool file_exists(const wchar_t* filename) noexcept
+    {
+        #if USE_WINAPI_IO
+            DWORD attr = GetFileAttributesW(filename);
+            return attr != -1 && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+        #elif _MSC_VER
+            struct _stat64 s;
+            return _wstat64(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
+        #else
+            return file_exists(to_string(filename).c_str());
         #endif
     }
 
