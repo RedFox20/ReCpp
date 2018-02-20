@@ -133,20 +133,37 @@ TestImpl(test_collections)
         AssertThat(v.size(), 2ul);
     }
 
-    TestCase(erase_back_swap_if)
+    TestCase(erase_back_swap_first_if)
     {
         vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
-        erase_back_swap_if(v, [](auto& s) { return s == "1337"; });
+        erase_back_swap_first_if(v, [](auto& s) { return s == "1337"; });
         AssertThat(v.size(), 5ul);
 
-        erase_back_swap_if(v, [](auto& s) { return s == "5"; });
+        erase_back_swap_first_if(v, [](auto& s) { return s == "5"; });
         AssertThat(v.size(), 4ul);
 
-        erase_back_swap_if(v, [](auto& s) { return s == "3"; });
+        erase_back_swap_first_if(v, [](auto& s) { return s == "3"; });
         AssertThat(v.size(), 3ul);
         
-        erase_back_swap_if(v, [](auto& s) { return s == "1"; });
+        erase_back_swap_first_if(v, [](auto& s) { return s == "1"; });
+        AssertThat(v.size(), 2ul);
+    }
+    
+    TestCase(erase_back_swap_all_if)
+    {
+        vector<string> v { "1"s, "1"s, "2"s, "3"s, "3"s, "4"s, "5"s, "5"s };
+
+        erase_back_swap_all_if(v, [](auto& s) { return s == "1337"; });
+        AssertThat(v.size(), 8ul);
+
+        erase_back_swap_all_if(v, [](auto& s) { return s == "5"; });
+        AssertThat(v.size(), 6ul);
+
+        erase_back_swap_all_if(v, [](auto& s) { return s == "3"; });
+        AssertThat(v.size(), 4ul);
+        
+        erase_back_swap_all_if(v, [](auto& s) { return s == "1"; });
         AssertThat(v.size(), 2ul);
     }
 

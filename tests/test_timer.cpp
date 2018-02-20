@@ -6,6 +6,8 @@ using namespace std::literals;
 
 TestImpl(test_timer)
 {
+    static constexpr double sigma_s = 0.002;
+    static constexpr double sigma_ms = sigma_s * 1000.0;
     TestInit(test_timer)
     {
     }
@@ -16,7 +18,7 @@ TestImpl(test_timer)
         std::this_thread::sleep_for(100ms);
         double elapsed = t.elapsed();
         println("100ms sleep time:", elapsed, "seconds");
-        AssertThat(0.1 <= elapsed && elapsed <= 0.101, true);
+        AssertThat(0.1 <= elapsed && elapsed <= 0.1 + sigma_s, true);
     }
 
     TestCase(basic_timer_ms)
@@ -25,7 +27,7 @@ TestImpl(test_timer)
         std::this_thread::sleep_for(100ms);
         double elapsed = t.elapsed_ms();
         println("100ms sleep time:", elapsed, "milliseconds");
-        AssertThat(100.0 <= elapsed && elapsed <= 101.0, true);
+        AssertThat(100.0 <= elapsed && elapsed <= 100.0 + sigma_ms, true);
     }
 
     TestCase(basic_stopwatch)
@@ -45,7 +47,7 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), true);
         println("100ms stopwatch time:", sw.elapsed(), "seconds");
-        AssertThat(0.1 <= sw.elapsed() && sw.elapsed() <= 0.101, true);
+        AssertThat(0.1 <= sw.elapsed() && sw.elapsed() <= 0.1 + sigma_s, true);
         AssertThat(sw.elapsed(), sw.elapsed()); // ensure time is stable after stop
 
         sw.resume();

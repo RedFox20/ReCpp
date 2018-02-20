@@ -153,10 +153,12 @@ namespace rpp
     // and then popping the last element
     template<class T> void erase_back_swap(std::vector<T>& v, int i)
     {
-        v[i] = std::move(v.back());
+        if (i != (int)v.size() - 1)
+            v[i] = std::move(v.back());
         v.pop_back();
     }
     
+    // erases a SINGLE item using ERASE-BACK-SWAP idiom
     template<class T, class U> void erase_item_back_swap(std::vector<T>& v, const U& item)
     {
         T* data = v.data();
@@ -172,7 +174,8 @@ namespace rpp
         }
     }
     
-    template<class T, class Pred> void erase_back_swap_if(std::vector<T>& v, const Pred& condition)
+    // erases a SINGLE item using ERASE-BACK-SWAP idiom
+    template<class T, class Pred> void erase_back_swap_first_if(std::vector<T>& v, const Pred& condition)
     {
         T* data = v.data();
         for (size_t i = 0, n = v.size(); i < n; ++i)
@@ -184,6 +187,23 @@ namespace rpp
                 v.pop_back();
                 return;
             }
+        }
+    }
+
+    // erases ALL matching items using ERASE-BACK-SWAP idiom
+    template<class T, class Pred> void erase_back_swap_all_if(std::vector<T>& v, const Pred& condition)
+    {
+        T* data = v.data();
+        for (size_t i = 0, n = v.size(); i < n; )
+        {
+            if (condition(data[i]))
+            {
+                if (i != n-1)
+                    data[i] = std::move(data[n-1]); // move last item to data[i]
+                v.pop_back();
+                --n;
+            }
+            else ++i;
         }
     }
 
