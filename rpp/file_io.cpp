@@ -81,8 +81,9 @@ namespace rpp /* ReCpp */
 #else
     static void* OpenF(const char* f, IOFlags mode) {
         if (mode == READWRITE) {
-            if (file_exists(f)) return fopen(f, "rb+"); // open existing file for read/write
-            else                return fopen(f, "wb");  // create new for read/write
+            if (FILE* file = fopen(f, "rb+")) // open existing file for read/write
+                return file;
+            return fopen(f, "wb");  // create new for read/write         
         }
         const char* modes[] = { "rb", "", "wb", "ab" };
         return fopen(f, modes[mode]);
@@ -90,8 +91,9 @@ namespace rpp /* ReCpp */
     static void* OpenF(const wchar_t* f, IOFlags mode) {
     #if _WIN32
         if (mode == READWRITE) {
-            if (file_exists(f)) return _wfopen(f, L"rb+"); // open existing file for read/write
-            else                return _wfopen(f, L"wb");  // create new for read/write
+            if (FILE* file = _wfopen(f, L"rb+")) // open existing file for read/write
+                return file;
+            return _wfopen(f, L"wb");  // create new for read/write
         }
         const wchar_t* modes[] = { L"rb", L"", L"wb", L"ab" };
         return _wfopen(f, modes[mode]); 
