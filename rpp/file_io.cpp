@@ -17,6 +17,7 @@
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64
+    #undef min
 #else
     #include <unistd.h>
     #include <dirent.h> // opendir()
