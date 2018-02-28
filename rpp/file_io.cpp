@@ -83,9 +83,9 @@ namespace rpp /* ReCpp */
         if (mode == READWRITE) {
             if (FILE* file = fopen(f, "rb+")) // open existing file for read/write
                 return file;
-            return fopen(f, "wb");  // create new for read/write         
+            mode = CREATENEW;
         }
-        const char* modes[] = { "rb", "", "wb", "ab" };
+        const char* modes[] = { "rb", "", "wb+", "ab" };
         return fopen(f, modes[mode]);
     }
     static void* OpenF(const wchar_t* f, IOFlags mode) {
@@ -93,9 +93,9 @@ namespace rpp /* ReCpp */
         if (mode == READWRITE) {
             if (FILE* file = _wfopen(f, L"rb+")) // open existing file for read/write
                 return file;
-            return _wfopen(f, L"wb");  // create new for read/write
+            mode = CREATENEW;
         }
-        const wchar_t* modes[] = { L"rb", L"", L"wb", L"ab" };
+        const wchar_t* modes[] = { L"rb", L"", L"wb+", L"ab" };
         return _wfopen(f, modes[mode]); 
     #else
         return OpenF(to_string(f).c_str(), mode);
@@ -265,7 +265,7 @@ namespace rpp /* ReCpp */
             ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
             return bytesRead;
         #else
-            return (int)fread(buffer, (size_t)bytesToRead, 1, (FILE*)Handle) * bytesToRead;
+            return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
         #endif
     }
     load_buffer file::read_all() noexcept
@@ -299,23 +299,30 @@ namespace rpp /* ReCpp */
         file dst{filename, CREATENEW};
         if (!dst) return false;
 
+        int64 size = sizel();
+        if (size == 0) return true;
+
         int64 startpos = tell64();
         seek(0);
-        constexpr int blockSize = 64*1024;
+
+        constexpr int64 blockSize = 64*1024;
         char buf[blockSize];
         int64 totalBytesRead    = 0;
         int64 totalBytesWritten = 0;
         for (;;)
         {
-            int bytesRead = read(buf, blockSize);
+            int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
+            if (bytesToRead <= 0)
+                break;
+            int bytesRead = read(buf, (int)bytesToRead);
             if (bytesRead <= 0)
                 break;
             totalBytesRead    += bytesRead;
             totalBytesWritten += dst.write(buf, bytesRead);
         }
+        
         seekl(startpos);
         return totalBytesRead == totalBytesWritten;
-
     }
     load_buffer file::read_all(const char* filename) noexcept
     {
@@ -678,13 +685,19 @@ namespace rpp /* ReCpp */
         file dst{destinationFile, CREATENEW};
         if (!dst) return false;
 
-        constexpr int blockSize = 64*1024;
+        int64 size = src.sizel();
+        if (size == 0) return true;
+
+        constexpr int64 blockSize = 64*1024;
         char buf[blockSize];
-        int totalBytesRead    = 0;
-        int totalBytesWritten = 0;
+        int64 totalBytesRead    = 0;
+        int64 totalBytesWritten = 0;
         for (;;)
         {
-            int bytesRead = src.read(buf, blockSize);
+            int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
+            if (bytesToRead <= 0)
+                break;
+            int bytesRead = src.read(buf, (int)bytesToRead);
             if (bytesRead <= 0)
                 break;
             totalBytesRead    += bytesRead;
