@@ -282,15 +282,40 @@ namespace rpp /* ReCpp */
     string file::read_text() noexcept
     {
         string out;
-        int fileSize = size();
-        if (fileSize <= 0) return out;
+        int pos   = tell();
+        int count = size() - pos;
+        if (count <= 0) return out;
 
-        // allocate +1 bytes for null terminator; this is for legacy API-s
-        out.resize(size_t(fileSize));
-        int n = read((void*)out.data(), fileSize);
-        if (n != fileSize)
+        out.resize(size_t(count));
+        int n = read((void*)out.data(), count);
+        if (n != count) {
             out.resize(size_t(n));
+            out.shrink_to_fit();
+        }
         return out;
+    }
+    bool file::save_as(const strview& filename) noexcept
+    {
+        file dst{filename, CREATENEW};
+        if (!dst) return false;
+
+        int64 startpos = tell64();
+        seek(0);
+        constexpr int blockSize = 64*1024;
+        char buf[blockSize];
+        int64 totalBytesRead    = 0;
+        int64 totalBytesWritten = 0;
+        for (;;)
+        {
+            int bytesRead = read(buf, blockSize);
+            if (bytesRead <= 0)
+                break;
+            totalBytesRead    += bytesRead;
+            totalBytesWritten += dst.write(buf, bytesRead);
+        }
+        seekl(startpos);
+        return totalBytesRead == totalBytesWritten;
+
     }
     load_buffer file::read_all(const char* filename) noexcept
     {

@@ -220,9 +220,15 @@ namespace rpp /* ReCpp */
         load_buffer read_all() noexcept;
 
         /**
-         * Reads the entire contents of the file into an std::string
+         * Reads contents from current seek pos until end as std::string
          */
         string read_text() noexcept;
+        
+        /**
+         * Save all contents to a new file.
+         * @return TRUE if entire file was copied successfully
+         */
+        bool save_as(const strview& filename) noexcept;
 
         /**
          * Reads the entire contents of the file into a load_buffer
@@ -415,7 +421,7 @@ namespace rpp /* ReCpp */
          *
          * @param filepos Position in file where to seek to
          * @param seekmode Seekmode to use: SEEK_SET, SEEK_CUR or SEEK_END
-         * @return Current position in the file
+         * @return The new position in the file
          */
         int seek(int filepos, int seekmode = SEEK_SET) noexcept;
         uint64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept;
