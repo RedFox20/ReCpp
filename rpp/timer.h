@@ -43,9 +43,16 @@ namespace rpp
     struct RPPAPI Timer
     {
         uint64_t value;
+        
+        enum StartMode {
+            NoStart,
+            AutoStart, // default behaviour
+        };
 
         /** Initializes a new timer by calling start */
         Timer() noexcept;
+        
+        explicit Timer(StartMode startMode) noexcept;
 
         /** Starts the timer */
         void start() noexcept;

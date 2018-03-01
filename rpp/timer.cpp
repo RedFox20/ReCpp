@@ -124,6 +124,14 @@ namespace rpp
     {
         start();
     }
+    
+    Timer::Timer(StartMode startMode) noexcept
+    {
+        if (startMode == StartMode::AutoStart)
+            start();
+        else
+            value = 0;
+    }
 
     void Timer::start() noexcept
     {
