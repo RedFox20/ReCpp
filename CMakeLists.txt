@@ -59,7 +59,7 @@ message("ReCpp DEFINES: ${CURRENT_DEFINES}")
 
 find_package(Threads REQUIRED)
 if(LINUX)
-    find_package(DWARF REQUIRED)
+    find_package(DWARF)
     message("DWARF LIBS: ${DWARF_LIBRARY}")
 else()
     set(DWARF_LIBRARY "")
