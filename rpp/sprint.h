@@ -196,13 +196,13 @@ namespace rpp
         void pretty_cont_item_end(int i, int count, bool newlines);
         void pretty_cont_end(int count, bool newlines);
 
-        template<typename T, template<class,class...> class C, class... Args>
-        NOINLINE void prettyprint(const C<T,Args...>& container, bool newlines = true)
+        template<typename T, template<class, class...> class C, class... Args>
+        NOINLINE void prettyprint(const C<T, Args...>& container, bool newlines = true)
         {
             int count = (int)container.size();
             pretty_cont_start(count, newlines);
             int i = 0;
-            for (const auto& item : container) {
+            for (const T& item : container) {
 
                 pretty_cont_item_start(newlines);
                 prettyprint(item);
