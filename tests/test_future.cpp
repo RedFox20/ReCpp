@@ -165,4 +165,27 @@ TestImpl(test_future)
         AssertThat(exceptionWasThrown, true);
     }
 
+    TestCase(basic_async_task)
+    {
+        composable_future<string> f = async_task([] {
+            return "future string"s;
+        });
+        AssertThat(f.get(), "future string"s);
+    }
+
+    TestCase(basic_async_task_chaining)
+    {
+        composable_future<string> f = async_task([] {
+            return "future string"s;
+        });
+
+        bool continuationCalled = false;
+        f.then([&](string s) {
+            continuationCalled = true;
+            AssertThat(s.empty(), false);
+        }).get();
+
+        AssertThat(continuationCalled, true);
+    }
+
 } Impl;

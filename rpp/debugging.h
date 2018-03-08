@@ -107,7 +107,7 @@ namespace rpp
     inline int __wrap_arg() { return 0; } // default expansion case if no varargs
 }
 
-#define __get_nth_arg(_unused, _12, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
+#define __get_nth_wrap_arg(_unused, _12, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
 #define __wrap_args0(...)
 
 // MSVC needs a proxy macro to properly expand __VA_ARGS__
@@ -126,7 +126,7 @@ namespace rpp
 #define __wrap_args11(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args10(__VA_ARGS__))
 #define __wrap_args12(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args11(__VA_ARGS__))
 
-#define __wrap_args(...) __wrap_exp(__get_nth_arg(0, ##__VA_ARGS__, \
+#define __wrap_args(...) __wrap_exp(__get_nth_wrap_arg(0, ##__VA_ARGS__, \
                                     __wrap_args12, __wrap_args11, __wrap_args10, __wrap_args9, \
                                     __wrap_args8, __wrap_args7, __wrap_args6, __wrap_args5, \
                                     __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)(__VA_ARGS__))
@@ -144,7 +144,7 @@ namespace rpp
 #define __wrap_args11(x, ...) , rpp::__wrap_arg(x) __wrap_args10(__VA_ARGS__)
 #define __wrap_args12(x, ...) , rpp::__wrap_arg(x) __wrap_args11(__VA_ARGS__)
 
-#define __wrap_args(...) __get_nth_arg(0, ##__VA_ARGS__, \
+#define __wrap_args(...) __get_nth_wrap_arg(0, ##__VA_ARGS__, \
                             __wrap_args12, __wrap_args11, __wrap_args10, __wrap_args9, \
                             __wrap_args8, __wrap_args7, __wrap_args6, __wrap_args5, \
                             __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)(__VA_ARGS__)

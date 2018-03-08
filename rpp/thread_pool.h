@@ -440,6 +440,74 @@ namespace rpp
         return thread_pool::global().parallel_task(std::move(genericTask));
     }
 
+#undef move_args
+#define __get_nth_move_arg(_unused, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
+#define __move_args0(...)
+
+#if _MSC_VER
+#define __move_exp(x) x
+#define __move_args1(x)      x=std::move(x)
+#define __move_args2(x, ...) x=std::move(x),  __move_exp(__move_args1(__VA_ARGS__))
+#define __move_args3(x, ...) x=std::move(x),  __move_exp(__move_args2(__VA_ARGS__))
+#define __move_args4(x, ...) x=std::move(x),  __move_exp(__move_args3(__VA_ARGS__))
+#define __move_args5(x, ...) x=std::move(x),  __move_exp(__move_args4(__VA_ARGS__))
+#define __move_args6(x, ...) x=std::move(x),  __move_exp(__move_args5(__VA_ARGS__))
+#define __move_args7(x, ...) x=std::move(x),  __move_exp(__move_args6(__VA_ARGS__))
+#define __move_args8(x, ...) x=std::move(x),  __move_exp(__move_args7(__VA_ARGS__))
+
+#define move_args(...) __move_exp(__get_nth_move_arg(0, ##__VA_ARGS__, \
+        __move_args8, __move_args7, __move_args6, __move_args5, \
+        __move_args4, __move_args3, __move_args2, __move_args1, __move_args0)(__VA_ARGS__))
+#else
+#define __move_args1(x)      x=std::move(x)
+#define __move_args2(x, ...) x=std::move(x),  __move_args1(__VA_ARGS__)
+#define __move_args3(x, ...) x=std::move(x),  __move_args2(__VA_ARGS__)
+#define __move_args4(x, ...) x=std::move(x),  __move_args3(__VA_ARGS__)
+#define __move_args5(x, ...) x=std::move(x),  __move_args4(__VA_ARGS__)
+#define __move_args6(x, ...) x=std::move(x),  __move_args5(__VA_ARGS__)
+#define __move_args7(x, ...) x=std::move(x),  __move_args6(__VA_ARGS__)
+#define __move_args8(x, ...) x=std::move(x),  __move_args7(__VA_ARGS__)
+
+#define move_args(...) __get_nth_move_arg(0, ##__VA_ARGS__, \
+        __move_args8, __move_args7, __move_args6, __move_args5, \
+        __move_args4, __move_args3, __move_args2, __move_args1, __move_args0)(__VA_ARGS__)
+#endif
+
+
+#undef forward_args
+#define __get_nth_forward_arg(_unused, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
+#define __forward_args0(...)
+
+#if _MSC_VER
+#define __forward_exp(x) x
+#define __forward_args1(x)      std::forward<decltype(x)>(x)
+#define __forward_args2(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args1(__VA_ARGS__))
+#define __forward_args3(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args2(__VA_ARGS__))
+#define __forward_args4(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args3(__VA_ARGS__))
+#define __forward_args5(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args4(__VA_ARGS__))
+#define __forward_args6(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args5(__VA_ARGS__))
+#define __forward_args7(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args6(__VA_ARGS__))
+#define __forward_args8(x, ...) std::forward<decltype(x)>(x),  __forward_exp(__forward_args7(__VA_ARGS__))
+
+#define forward_args(...) __forward_exp(__get_nth_forward_arg(0, ##__VA_ARGS__, \
+        __forward_args8, __forward_args7, __forward_args6, __forward_args5, \
+        __forward_args4, __forward_args3, __forward_args2, __forward_args1, __forward_args0)(__VA_ARGS__))
+#else
+#define __forward_args1(x)      x=std::move(x)
+#define __forward_args2(x, ...) x=std::move(x),  __forward_args1(__VA_ARGS__)
+#define __forward_args3(x, ...) x=std::move(x),  __forward_args2(__VA_ARGS__)
+#define __forward_args4(x, ...) x=std::move(x),  __forward_args3(__VA_ARGS__)
+#define __forward_args5(x, ...) x=std::move(x),  __forward_args4(__VA_ARGS__)
+#define __forward_args6(x, ...) x=std::move(x),  __forward_args5(__VA_ARGS__)
+#define __forward_args7(x, ...) x=std::move(x),  __forward_args6(__VA_ARGS__)
+#define __forward_args8(x, ...) x=std::move(x),  __forward_args7(__VA_ARGS__)
+
+#define forward_args(...) __get_nth_forward_arg(0, ##__VA_ARGS__, \
+        __forward_args8, __forward_args7, __forward_args6, __forward_args5, \
+        __forward_args4, __forward_args3, __forward_args2, __forward_args1, __forward_args0)(__VA_ARGS__)
+#endif
+
+
     /**
      * Runs a generic lambda with arguments
      * @note Returns immediately
@@ -453,29 +521,29 @@ namespace rpp
     template<class Func, class A>
     inline pool_task* parallel_task(Func&& func, A&& a)
     {
-        return thread_pool::global().parallel_task([func=move(func),a=move(a)]() mutable {
-            func(move(a));
+        return thread_pool::global().parallel_task([move_args(func, a)]() mutable {
+            func(forward_args(a));
         });
     }
     template<class Func, class A, class B>
     inline pool_task* parallel_task(Func&& func, A&& a, B&& b)
     {
-        return thread_pool::global().parallel_task([func=move(func),a=move(a),b=move(b)]() mutable {
-            func(move(a), move(b));
+        return thread_pool::global().parallel_task([move_args(func, a, b)]() mutable {
+            func(forward_args(a, b));
         });
     }
     template<class Func, class A, class B, class C>
     inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c)
     {
-        return thread_pool::global().parallel_task([func=move(func),a=move(a),b=move(b),c=move(c)]() mutable {
-            func(move(a), move(b), move(c));
+        return thread_pool::global().parallel_task([move_args(func, a, b, c)]() mutable {
+            func(forward_args(a, b, c));
         });
     }
     template<class Func, class A, class B, class C, class D>
     inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
     {
-        return thread_pool::global().parallel_task([func=move(func),a=move(a),b=move(b),c=move(c),d=move(d)]() mutable {
-            func(move(a), move(b), move(c), move(d));
+        return thread_pool::global().parallel_task([move_args(func, a, b, c, d)]() mutable {
+            func(forward_args(a, b, c, d));
         });
     }
 
