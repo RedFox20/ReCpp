@@ -123,6 +123,81 @@ TestImpl(test_future)
         AssertThat(result, 42);
     }
 
+    TestCase(except_handlers_catch_first)
+    {
+        cfuture<void> f = std::async(launch::async, [] {
+            throw std::domain_error("background_thread_exception_msg");
+        });
+
+        bool exceptHandlerCalled = false;
+        int result = f.then([] {
+            AssertMsg(false, "This callback should never be executed");
+            return 0;
+        },
+        [&](std::domain_error e) {
+            exceptHandlerCalled = true;
+            AssertThat(e.what(), "background_thread_exception_msg"s);
+            return 42;
+        },
+        [&](std::runtime_error e) {
+            return 21;
+        }).get();
+
+        AssertThat(exceptHandlerCalled, true);
+        AssertThat(result, 42);
+    }
+
+    TestCase(except_handlers_catch_second)
+    {
+        cfuture<void> f = std::async(launch::async, [] {
+            throw runtime_error("background_thread_exception_msg");
+        });
+
+        bool exceptHandlerCalled = false;
+        int result = f.then([] {
+            AssertMsg(false, "This callback should never be executed");
+            return 0;
+        },
+        [&](std::domain_error e) {
+            return 21;
+        },
+        [&](std::runtime_error e) {
+            exceptHandlerCalled = true;
+            AssertThat(e.what(), "background_thread_exception_msg"s);
+            return 42;
+        }).get();
+
+        AssertThat(exceptHandlerCalled, true);
+        AssertThat(result, 42);
+    }
+
+    TestCase(except_handlers_catch_third)
+    {
+        cfuture<void> f = std::async(launch::async, [] {
+            throw std::exception("background_thread_exception_msg");
+        });
+
+        bool exceptHandlerCalled = false;
+        int result = f.then([] {
+            AssertMsg(false, "This callback should never be executed");
+            return 0;
+        },
+        [&](std::range_error e) {
+            return 1;
+        },
+        [&](std::runtime_error e) {
+            return 2;
+        },
+        [&](std::exception e) {
+            exceptHandlerCalled = true;
+            AssertThat(e.what(), "background_thread_exception_msg"s);
+            return 3;
+        }).get();
+
+        AssertThat(exceptHandlerCalled, true);
+        AssertThat(result, 3);
+    }
+
     TestCase(except_handler_chaining)
     {
         cfuture<string> f = std::async(launch::async, [] {

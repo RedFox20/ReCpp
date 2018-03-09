@@ -12,6 +12,7 @@
     #include <type_traits>
 #else
     #include <thread>
+    #include <functional>
 #endif
 
 #ifndef NODISCARD
@@ -109,6 +110,51 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 
+    namespace
+    {
+        template<class T>
+        struct function_traits : function_traits<decltype(&T::operator())> {
+        };
+
+        template<class R, class... Args>
+        struct function_traits<R(Args...)> { // function type
+            using ret_type = R;
+            using arg_types = std::tuple<Args...>;
+        };
+        
+        template<class R, class... Args>
+        struct function_traits<R (*)(Args...)> { // function pointer
+            using ret_type = R;
+            using arg_types = std::tuple<Args...>;
+        };
+
+        template<class R, class... Args>
+        struct function_traits<std::function<R(Args...)>> {
+            using ret_type = R;
+            using arg_types = std::tuple<Args...>;
+        };
+
+        
+        template<class T, class R, class... Args>
+        struct function_traits<R (T::*)(Args...)> { // member func ptr
+            using ret_type = R;
+            using arg_types = std::tuple<Args...>;
+        };
+
+        template<class T, class R, class... Args>
+        struct function_traits<R (T::*)(Args...) const> {  // const member func ptr
+            using ret_type = R;
+            using arg_types = std::tuple<Args...>;
+        };
+
+        template<class T>
+        using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
     template<class T> class NODISCARD cfuture : public future<T>
     {
     public:
@@ -134,6 +180,14 @@ namespace rpp
                 this->wait();
         }
 
+        // downcast chain cfuture<T> to cfuture<void>
+        cfuture<void> then()
+        {
+            return rpp::async_task([f=move(*this)]() mutable {
+                (void)f.get();
+            });
+        }
+
         template<class Task>
         auto then(Task&& task) -> cfuture<decltype(task(get()))>
         {
@@ -142,12 +196,39 @@ namespace rpp
             });
         }
 
-        template<class Task, class Except>
-        auto then(Task&& task, Except&& handler) -> cfuture<decltype(task(get()))>
+        template<class Task, class ExceptHA>
+        auto then(Task&& task, ExceptHA&& exhA) -> cfuture<decltype(task(get()))>
         {
-            return async_task([f=move(*this), move_args(task, handler)]() mutable {
+            using ExceptA = first_arg_type<ExceptHA>;
+            return async_task([f=move(*this), move_args(task, exhA)]() mutable {
                 try { return task(f.get()); } 
-                catch (std::exception& e) { return handler(e); }
+                catch (ExceptA& a) { return exhA(a); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB>
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) -> cfuture<decltype(task())>
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            return async_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+                try { return task(f.get()); }
+                catch (ExceptA& a) { return exhA(a); }
+                catch (ExceptB& b) { return exhB(b); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) -> cfuture<decltype(task())>
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            return async_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+                try { return task(f.get()); }
+                catch (ExceptA& a) { return exhA(a); }
+                catch (ExceptB& b) { return exhB(b); }
+                catch (ExceptC& c) { return exhC(c); }
             });
         }
 
@@ -160,12 +241,39 @@ namespace rpp
             });
         }
 
-        template<class Task, class Except>
-        void continue_with(Task&& task, Except&& handler)
+        template<class Task, class ExceptHA>
+        void continue_with(Task&& task, ExceptHA&& exhA)
         {
-            rpp::parallel_task([f=move(*this), move_args(task, handler)]() mutable {
+            using ExceptA = first_arg_type<ExceptHA>;
+            rpp::parallel_task([f=move(*this), move_args(task, exhA)]() mutable {
                 try { (void)task(f.get()); }
-                catch (std::exception& e) { (void)handler(e); }
+                catch (ExceptA& a) { (void)exhA(a); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB>
+        void continue_with(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+                try { (void)task(f.get()); }
+                catch (ExceptA& a) { (void)exhA(a); }
+                catch (ExceptB& b) { (void)exhB(b); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
+        void continue_with(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+                try { (void)task(f.get()); }
+                catch (ExceptA& a) { (void)exhA(a); }
+                catch (ExceptB& b) { (void)exhB(b); }
+                catch (ExceptC& c) { (void)exhC(c); }
             });
         }
     };
@@ -205,14 +313,39 @@ namespace rpp
             });
         }
 
-        template<class Task, class Except>
-        auto then(Task&& task, Except&& handler) -> cfuture<decltype(task())>
+        template<class Task, class ExceptHA>
+        auto then(Task&& task, ExceptHA&& exhA) -> cfuture<decltype(task())>
         {
-            return async_task([f=move(*this), move_args(task, handler)]() mutable {
-                try {
-                    f.get();
-                    return task();
-                } catch (std::exception& e) { return handler(e); }
+            using ExceptA = first_arg_type<ExceptHA>;
+            return async_task([f=move(*this), move_args(task, exhA)]() mutable {
+                try { f.get(); return task(); }
+                catch (ExceptA& a) { return exhA(a); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB>
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) -> cfuture<decltype(task())>
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            return async_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+                try { f.get(); return task(); }
+                catch (ExceptA& a) { return exhA(a); }
+                catch (ExceptB& b) { return exhB(b); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) -> cfuture<decltype(task())>
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            return async_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+                try { f.get(); return task(); }
+                catch (ExceptA& a) { return exhA(a); }
+                catch (ExceptB& b) { return exhB(b); }
+                catch (ExceptC& c) { return exhC(c); }
             });
         }
 
@@ -226,14 +359,39 @@ namespace rpp
             });
         }
 
-        template<class Task, class Except>
-        void continue_with(Task&& task, Except&& handler)
+        template<class Task, class ExceptHA>
+        void continue_with(Task&& task, ExceptHA&& exhA)
         {
-            rpp::parallel_task([f=move(*this), move_args(task, handler)]() mutable {
-                try {
-                    f.get();
-                    (void)task();
-                } catch (std::exception& e) { (void)handler(e); }
+            using ExceptA = first_arg_type<ExceptHA>;
+            rpp::parallel_task([f=move(*this), move_args(task, exhA)]() mutable {
+                try { f.get(); (void)task(); }
+                catch (ExceptA& a) { (void)exhA(a); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB>
+        void continue_with(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+                try { f.get(); (void)task(); }
+                catch (ExceptA& a) { (void)exhA(a); }
+                catch (ExceptB& b) { (void)exhB(b); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
+        void continue_with(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+                try { f.get(); (void)task(); }
+                catch (ExceptA& a) { (void)exhA(a); }
+                catch (ExceptB& b) { (void)exhB(b); }
+                catch (ExceptC& c) { (void)exhC(c); }
             });
         }
     };
