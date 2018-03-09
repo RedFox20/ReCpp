@@ -322,6 +322,10 @@ namespace rpp
     int test::run_tests(int argc, char* argv[])
     {
     #if _WIN32 && _MSC_VER
+        #if _CRTDBG_MAP_ALLOC  
+            _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+            _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
+        #endif
         move_console_window();
     #endif
 
@@ -404,24 +408,31 @@ namespace rpp
             }
         }
 
+        int result = 0;
         if (asserts_failed)
         {
             consolef(Red, "\nWARNING: %d assertions failed!\n", asserts_failed);
-            #if _WIN32 && _MSC_VER
-                pause();
-            #endif
-            return -1;
+            result = -1;
+        }
+        else if (numTest > 0)
+        {
+            consolef(Green, "\nSUCCESS: All test runs passed!\n");
+        }
+        else
+        {
+            consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
         }
 
-        if (numTest > 0)
-            consolef(Green, "\nSUCCESS: All test runs passed!\n");
-        else
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
+        volatile char* ptr = new char[1337];
+        printf("%.1s\n", ptr);
 
         #if _WIN32 && _MSC_VER
+            #if _CRTDBG_MAP_ALLOC
+                _CrtDumpMemoryLeaks();
+            #endif
             pause();
         #endif
-        return 0;
+        return result;
     }
 
 } // namespace rpp

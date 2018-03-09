@@ -20,7 +20,8 @@ TestImpl(test_future)
         }};
         std::thread{[&]{ loadString(); }}.detach();
 
-        future<bool> chain = then(loadString.get_future(), [](string arg) -> bool
+        cfuture<string> futureString = loadString.get_future();
+        cfuture<bool> chain = futureString.then([](string arg) -> bool
         {
             return arg.length() > 0;
         });
@@ -36,7 +37,8 @@ TestImpl(test_future)
         }};
         std::thread{[&]{ loadSomething(); }}.detach();
 
-        future<string> async = then(loadSomething.get_future(), []() -> string
+        cfuture<void> futureSomething = loadSomething.get_future();
+        cfuture<string> async = futureSomething.then([]() -> string
         {
             return "operation complete!"s;
         });
@@ -54,7 +56,8 @@ TestImpl(test_future)
         std::thread{[&]{ loadString(); }}.detach();
 
         bool continuationCalled = false;
-        future<void> async = then(loadString.get_future(), [&](string s)
+        cfuture<string> futureString = loadString.get_future();
+        cfuture<void> async = futureString.then([&](string s)
         {
             continuationCalled = true;
             AssertThat(s.empty(), false);
@@ -66,7 +69,7 @@ TestImpl(test_future)
 
     TestCase(cross_thread_exception_propagation)
     {
-        future<void> asyncThrowingTask = std::async(launch::async, [] {
+        cfuture<void> asyncThrowingTask = std::async(launch::async, [] {
             throw runtime_error("background_thread_exception_msg");
         });
 
@@ -84,7 +87,7 @@ TestImpl(test_future)
 
     TestCase(composable_future_type)
     {
-        composable_future<string> f = std::async(launch::async, [] {
+        cfuture<string> f = std::async(launch::async, [] {
             return "future string"s;
         });
 
@@ -102,7 +105,7 @@ TestImpl(test_future)
 
     TestCase(except_handler)
     {
-        composable_future<void> f = std::async(launch::async, [] {
+        cfuture<void> f = std::async(launch::async, [] {
             throw runtime_error("background_thread_exception_msg");
         });
 
@@ -122,7 +125,7 @@ TestImpl(test_future)
 
     TestCase(except_handler_chaining)
     {
-        composable_future<string> f = std::async(launch::async, [] {
+        cfuture<string> f = std::async(launch::async, [] {
             return "future string"s;
         });
 
@@ -167,7 +170,7 @@ TestImpl(test_future)
 
     TestCase(basic_async_task)
     {
-        composable_future<string> f = async_task([] {
+        cfuture<string> f = async_task([] {
             return "future string"s;
         });
         AssertThat(f.get(), "future string"s);
@@ -175,7 +178,7 @@ TestImpl(test_future)
 
     TestCase(basic_async_task_chaining)
     {
-        composable_future<string> f = async_task([] {
+        cfuture<string> f = async_task([] {
             return "future string"s;
         });
 
