@@ -124,14 +124,14 @@ namespace rpp
 
     template<class T, class Work> void continue_with(future<T> f, Work w)
     {
-        rpp::async_task([move_args(f, w)]() mutable {
+        rpp::parallel_task([move_args(f, w)]() mutable {
             compose_task<T, Work>::get(f, w);
         });
     }
 
     template<class T, class Work, class Except> void continue_with(future<T> f, Work w, Except handler)
     {
-        rpp::async_task([move_args(f, w, handler)]() mutable {
+        rpp::parallel_task([move_args(f, w, handler)]() mutable {
             compose_task<T, Work>::get(f, w, handler);
         });
     }
@@ -183,7 +183,7 @@ namespace rpp
         // similar to .then(), but doesn't return a future
         template<class Work> void continue_with(Work w)
         {
-            rpp::async_task([f=move(*this), move_args(w)]() mutable {
+            rpp::parallel_task([f=move(*this), move_args(w)]() mutable {
                 compose_task<T, Work>::get(f, w);
             });
         }
@@ -191,7 +191,7 @@ namespace rpp
         template<class Work, class Except> void continue_with(
             Work w, Except handler)
         {
-            rpp::async_task([f=move(*this), move_args(w, handler)]() mutable {
+            rpp::parallel_task([f=move(*this), move_args(w, handler)]() mutable {
                 compose_task<T, Work>::get(f, w, handler);
             });
         }
