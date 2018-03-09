@@ -148,6 +148,9 @@ namespace rpp
         };
 
         template<class T>
+        using ret_type = typename function_traits<T>::ret_type;
+
+        template<class T>
         using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
     }
 
@@ -207,7 +210,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) -> cfuture<decltype(task())>
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) -> cfuture<decltype(task(get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -219,7 +222,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) -> cfuture<decltype(task())>
+        auto then(Task task, ExceptHA exhA, ExceptHB exhB, ExceptHC exhC) -> cfuture<decltype(task(get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
