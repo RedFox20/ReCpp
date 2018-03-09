@@ -58,6 +58,7 @@ namespace rpp
             // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
             if (!std::is_trivially_destructible_v<Task>) {
                 Task t = move(task);
+                (void)t;
             }
             std::promise<T>::set_value(move(value));
         }
@@ -72,6 +73,7 @@ namespace rpp
             // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
             if (!std::is_trivially_destructible_v<Task>) {
                 Task t = move(task);
+                (void)t;
             }
             std::promise<void>::set_value();
         }
@@ -184,15 +186,10 @@ namespace rpp
         }
 
         // downcast chain cfuture<T> to cfuture<void>
-        cfuture<void> then()
-        {
-            return rpp::async_task([f=move(*this)]() mutable {
-                (void)f.get();
-            });
-        }
+        cfuture<void> then();
 
         template<class Task>
-        auto then(Task&& task) -> cfuture<decltype(task(get()))>
+        cfuture<ret_type<Task>> then(Task&& task)
         {
             return rpp::async_task([f=move(*this), move_args(task)]() mutable {
                 return task(f.get());
@@ -200,7 +197,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA>
-        auto then(Task&& task, ExceptHA&& exhA) -> cfuture<decltype(task(get()))>
+        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=move(*this), move_args(task, exhA)]() mutable {
@@ -210,7 +207,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) -> cfuture<decltype(task(get()))>
+        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -222,7 +219,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        auto then(Task task, ExceptHA exhA, ExceptHB exhB, ExceptHC exhC) -> cfuture<decltype(task(get()))>
+        cfuture<ret_type<Task>> then(Task task, ExceptHA exhA, ExceptHB exhB, ExceptHC exhC)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -307,8 +304,10 @@ namespace rpp
                 this->wait();
         }
 
+        cfuture<void> then() { return { move(*this) }; }
+
         template<class Task>
-        auto then(Task&& task) -> cfuture<decltype(task())>
+        cfuture<ret_type<Task>> then(Task&& task)
         {
             return rpp::async_task([f=move(*this), move_args(task)]() mutable {
                 f.get();
@@ -317,7 +316,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA>
-        auto then(Task&& task, ExceptHA&& exhA) -> cfuture<decltype(task())>
+        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=move(*this), move_args(task, exhA)]() mutable {
@@ -327,7 +326,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) -> cfuture<decltype(task())>
+        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -339,7 +338,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) -> cfuture<decltype(task())>
+        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -399,6 +398,13 @@ namespace rpp
         }
     };
 
+    template<class T> cfuture<void> cfuture<T>::then()
+    {
+        return rpp::async_task([f=move(*this)]() mutable {
+            (void)f.get();
+        });
+    }
+
 
     template<class T> cfuture<T> make_ready_future(T&& value)
     {
@@ -410,7 +416,7 @@ namespace rpp
     template<class T, class E> cfuture<T> make_exceptional_future(E&& e)
     {
         promise<T> p;
-        p.set_exception(make_exception_ptr(std::forward<E>(e)));
+        p.set_exception(std::make_exception_ptr(std::forward<E>(e)));
         return p.get_future();
     }
 }

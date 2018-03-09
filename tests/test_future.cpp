@@ -171,10 +171,15 @@ TestImpl(test_future)
         AssertThat(result, 42);
     }
 
+    struct SpecificError : std::range_error
+    {
+        using std::range_error::range_error;
+    };
+
     TestCase(except_handlers_catch_third)
     {
         cfuture<void> f = std::async(launch::async, [] {
-            throw std::exception("background_thread_exception_msg");
+            throw SpecificError("background_thread_exception_msg");
         });
 
         bool exceptHandlerCalled = false;
@@ -182,13 +187,13 @@ TestImpl(test_future)
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
-        [&](std::range_error e) {
+        [&](const SpecificError& e) {
             return 1;
         },
-        [&](std::runtime_error e) {
+        [&](const std::range_error& e) {
             return 2;
         },
-        [&](std::exception e) {
+        [&](const std::runtime_error& e) {
             exceptHandlerCalled = true;
             AssertThat(e.what(), "background_thread_exception_msg"s);
             return 3;
