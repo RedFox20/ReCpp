@@ -18,9 +18,6 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     static pool_trace_provider TraceProvider;
-    static pool_signal_handler SignalHandler = [](const char* what) {
-        throw std::runtime_error(what);
-    };
 
 #if POOL_TASK_DEBUG
 #  ifdef LogWarning
@@ -178,8 +175,6 @@ namespace rpp
     }
 #endif
 
-    static void segfault(int) { SignalHandler("SIGSEGV"); }
-
     void pool_task::run() noexcept
     {
         static int pool_task_id;
@@ -194,8 +189,6 @@ namespace rpp
             SetThreadName(name);
         #endif
         
-        signal(SIGSEGV, segfault); // set SIGSEGV handler so we can catch it
-
         //TaskDebug("%s start", name);
         for (;;)
         {
@@ -308,12 +301,6 @@ namespace rpp
     int thread_pool::physical_cores()
     {
         return global().coreCount;
-    }
-
-    void thread_pool::set_signal_handler(pool_signal_handler signalHandler)
-    {
-        lock_guard<mutex> lock{ tasksMutex };
-        SignalHandler = signalHandler;
     }
 
     void thread_pool::set_task_tracer(pool_trace_provider traceProvider)

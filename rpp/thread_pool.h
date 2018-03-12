@@ -391,13 +391,6 @@ namespace rpp
         static int physical_cores();
 
         /**
-         * Sets the pool_task signal handler for fatal states such as SIGSEGV
-         * The default handler is `throw runtime_error("SIGSEGV");`
-         * @note This handler is expected to throw a custom type of exception
-         */
-        void set_signal_handler(pool_signal_handler signalHandler);
-
-        /**
          * Enables tracing of parallel task calls. This makes it possible
          * to trace the callstack which triggered the parallel task, otherwise
          * there would be no hints where the it was launched if the task crashes.
