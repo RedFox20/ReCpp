@@ -13,7 +13,6 @@ TestImpl(test_stack_trace)
 {
     TestInit(test_stack_trace)
     {
-        thread_pool::global().set_signal_handler(&segfault_handler);
         thread_pool::global().set_task_tracer(&stack_tracer);
     }
     TestCase(first_trace_performance)
