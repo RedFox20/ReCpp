@@ -102,7 +102,7 @@ namespace rpp
         return *this;
     }
 
-    strview& strview::trim_start(char ch)
+    strview& strview::trim_start(const char ch)
     {
         auto s = str;
         auto n = len;
@@ -129,7 +129,7 @@ namespace rpp
         return *this;
     }
 
-    strview& strview::trim_end(char ch)
+    strview& strview::trim_end(const char ch)
     {
         auto n = len;
         auto e = str + n;

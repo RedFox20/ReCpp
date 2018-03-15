@@ -492,6 +492,9 @@ namespace rpp /* ReCpp */
         static buffer_parser from_file(strview filename) noexcept {
             return { file::read_all(filename) };
         }
+        static buffer_parser from_file(file& f) noexcept {
+            return { f.read_all() };
+        }
     };
 
     using buffer_line_parser    = buffer_parser<line_parser>;

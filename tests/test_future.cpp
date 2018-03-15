@@ -179,7 +179,7 @@ TestImpl(test_future)
     TestCase(except_handlers_catch_third)
     {
         cfuture<void> f = std::async(launch::async, [] {
-            throw SpecificError("background_thread_exception_msg");
+            throw std::runtime_error("background_thread_exception_msg");
         });
 
         bool exceptHandlerCalled = false;

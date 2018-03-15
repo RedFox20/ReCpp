@@ -279,6 +279,23 @@ namespace rpp /* ReCpp */
         binary_stream& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }
         binary_stream& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
 
+        template<class T, class A>
+        binary_stream& write_vector(const std::vector<T, A>& v)
+        {
+            write_int((int)v.size());
+            for (const T& item : v)
+                *this << item; // @note ADL fails easily here, use write_vector with custom writer instead
+            return *this;
+        }
+
+        template<class T, class A, class Writer>
+        binary_stream& write_vector(const std::vector<T, A>& v, const Writer& writer)
+        {
+            write_int((int)v.size());
+            for (const T& item : v)
+                writer(*this, item);
+            return *this;
+        }
 
         ////////////////////// ----- Reader Fields ----- //////////////////////////
 
@@ -375,6 +392,28 @@ namespace rpp /* ReCpp */
         std::string  peek_string()  { std::string  s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] string */
         std::wstring peek_wstring() { std::wstring s; peek(s); return s; } /** @brief Peeks a length specified [uint16 len][data] wstring */
         strview      peek_strview() { strview s; peek(s); return s; }      /** @brief Peeks a length specified [uint16 len][data] string view */
+    
+        template<class T, class A>
+        binary_stream& read_vector(std::vector<T, A>& out)
+        {
+            int n = read_int();
+            out.clear();
+            out.reserve(size_t(n));
+            for (int i = 0; i < n; ++i)
+                *this >> out.emplace_back();
+            return *this;
+        }
+
+        template<class T, class A, class Reader>
+        binary_stream& read_vector(std::vector<T, A>& out, const Reader& reader)
+        {
+            int n = read_int();
+            out.clear();
+            out.reserve(size_t(n));
+            for (int i = 0; i < n; ++i)
+                reader(*this, out.emplace_back());
+            return *this;
+        }
     };
 
     // explicit operator<< overloads
@@ -392,6 +431,11 @@ namespace rpp /* ReCpp */
     inline binary_stream& operator<<(binary_stream& w, uint64 v) { return w.write(v); }
     inline binary_stream& operator<<(binary_stream& w, float v)  { return w.write(v); }
     inline binary_stream& operator<<(binary_stream& w, double v) { return w.write(v); }
+    template<class T>
+    binary_stream& operator<<(binary_stream& w, const std::vector<T>& v)
+    {
+        return w.write_vector(v);
+    }
     inline binary_stream& operator<<(binary_stream& w, binary_stream& m(binary_stream&)) { return m(w); }
     inline binary_stream& endl(binary_stream& w) { w.flush(); return w; }
 
@@ -409,6 +453,11 @@ namespace rpp /* ReCpp */
     inline binary_stream& operator>>(binary_stream& r, uint64& v) { r.read(v); return r; }
     inline binary_stream& operator>>(binary_stream& r, float& v)  { r.read(v); return r; }
     inline binary_stream& operator>>(binary_stream& r, double& v) { r.read(v); return r; }
+    template<class T, class A>
+    binary_stream& operator>>(binary_stream& r, std::vector<T, A>& out)
+    {
+        return r.read_vector(out);
+    }
     inline binary_stream& operator>>(binary_stream& r, binary_stream& m(binary_stream&)) { return m(r); }
 
 
@@ -557,7 +606,7 @@ namespace rpp /* ReCpp */
     {
         rpp::file* File = nullptr;
     public:
-        file_writer() noexcept {}
+        file_writer() = default;
         explicit file_writer(rpp::file& file)      noexcept : File(&file) {}
         file_writer(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
 

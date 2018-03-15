@@ -240,6 +240,10 @@ namespace rpp
         template<class StringT>
         FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const { return str[index]; }
+        
+        // disallow accidental init from char or bool
+        strview(const char) = delete;
+        strview(bool) = delete;
 
         /** Creates a new string from this string-strview */
         FINLINE string& to_string(string& out) const { return out.assign(str, (size_t)len); }
@@ -305,7 +309,7 @@ namespace rpp
         /** Trims the start of the string from any whitespace */
         NOINLINE strview& trim_start();
         /** Trims start from this char */
-        NOINLINE strview& trim_start(char ch);
+        NOINLINE strview& trim_start(const char ch);
         NOINLINE strview& trim_start(const char* chars, int nchars);
         /* Optimized noinline version for specific character sequences */
         template<int N> NOINLINE strview& trim_start(const char (&chars)[N]) { 
@@ -319,7 +323,7 @@ namespace rpp
         inline strview& trim_start(strview s) { return trim_start(s.str, s.len); }
 
         /** Trims end from this char */
-        NOINLINE strview& trim_end(char ch);
+        NOINLINE strview& trim_end(const char ch);
         /** Trims the end of the string from any whitespace */
         NOINLINE strview& trim_end();
         NOINLINE strview& trim_end(const char* chars, int nchars);
