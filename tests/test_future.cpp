@@ -271,4 +271,22 @@ TestImpl(test_future)
         AssertThat(continuationCalled, true);
     }
 
+    TestCase(sharing_future_string)
+    {
+        cfuture<string> f1 = async_task([] {
+            return "future string"s;
+        });
+        cfuture<string> f2 = f1;  // NOLINT
+        AssertThat(f1.get(), "future string"s);
+        AssertThat(f2.get(), "future string"s);
+    }
+
+    TestCase(sharing_future_void)
+    {
+        cfuture<void> f1 = async_task([] { });
+        cfuture<void> f2 = f1;
+        f1.get();
+        f2.get(); // already OK if this doesn't throw exception
+    }
+
 } Impl;

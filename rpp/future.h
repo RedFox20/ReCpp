@@ -173,6 +173,9 @@ namespace rpp
         cfuture(cfuture&& f) noexcept : super(move(f))
         {
         }
+        cfuture(const cfuture& f) noexcept : super(f)
+        {
+        }
         cfuture& operator=(future<T>&& f) noexcept
         {
             super::operator=(move(f));
@@ -186,6 +189,11 @@ namespace rpp
         cfuture& operator=(cfuture&& f) noexcept
         {
             super::operator=(move(f));
+            return *this;
+        }
+        cfuture& operator=(const cfuture& f) noexcept
+        {
+            super::operator=(f);
             return *this;
         }
         ~cfuture() noexcept // always block if future is still incomplete
@@ -301,6 +309,9 @@ namespace rpp
         cfuture(cfuture&& f) noexcept : super(move(f))
         {
         }
+        cfuture(const cfuture& f) noexcept : super(f)
+        {
+        }
         cfuture& operator=(future<void>&& f) noexcept
         {
             super::operator=(move(f));
@@ -312,6 +323,11 @@ namespace rpp
             return *this;
         }
         cfuture& operator=(cfuture&& f) noexcept
+        {
+            super::operator=(move(f));
+            return *this;
+        }
+        cfuture& operator=(const cfuture& f) noexcept
         {
             super::operator=(move(f));
             return *this;
