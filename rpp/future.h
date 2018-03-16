@@ -40,6 +40,7 @@
 namespace rpp
 {
     using std::future;
+    using std::shared_future;
     using std::promise;
     using std::exception;
     using std::move;
@@ -49,7 +50,7 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    template<class T> struct cpromise : public std::promise<T>
+    template<class T> struct cpromise : std::promise<T>
     {
         template<class Task> void compose(Task& task)
         {
@@ -64,7 +65,7 @@ namespace rpp
         }
     };
 
-    template<> struct cpromise<void> : public std::promise<void>
+    template<> struct cpromise<void> : std::promise<void>
     {
         template<class Task> void compose(Task& task)
         {
@@ -86,7 +87,7 @@ namespace rpp
     {
         using T = decltype(task());
         cpromise<T> p;
-        future<T> f = p.get_future();
+        shared_future<T> f = p.get_future().share();
         rpp::parallel_task([move_args(p, task)]() mutable
         {
             try {
@@ -120,32 +121,31 @@ namespace rpp
 
         template<class R, class... Args>
         struct function_traits<R(Args...)> { // function type
-            using ret_type = R;
+            using ret_type  = R;
             using arg_types = std::tuple<Args...>;
         };
         
         template<class R, class... Args>
         struct function_traits<R (*)(Args...)> { // function pointer
-            using ret_type = R;
+            using ret_type  = R;
             using arg_types = std::tuple<Args...>;
         };
 
         template<class R, class... Args>
         struct function_traits<std::function<R(Args...)>> {
-            using ret_type = R;
+            using ret_type  = R;
             using arg_types = std::tuple<Args...>;
         };
-
         
         template<class T, class R, class... Args>
         struct function_traits<R (T::*)(Args...)> { // member func ptr
-            using ret_type = R;
+            using ret_type  = R;
             using arg_types = std::tuple<Args...>;
         };
 
         template<class T, class R, class... Args>
         struct function_traits<R (T::*)(Args...) const> {  // const member func ptr
-            using ret_type = R;
+            using ret_type  = R;
             using arg_types = std::tuple<Args...>;
         };
 
@@ -160,23 +160,32 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    template<class T> class NODISCARD cfuture : public future<T>
+    template<class T> class NODISCARD cfuture : public shared_future<T>
     {
+        using super = shared_future<T>;
     public:
-        cfuture(future<T>&& f) noexcept : future<T>(move(f))
+        cfuture(future<T>&& f) noexcept : super(move(f))
         {
         }
-        cfuture(cfuture&& f) noexcept : future<T>(move(f))
+        cfuture(shared_future<T>&& f) noexcept : super(move(f))
+        {
+        }
+        cfuture(cfuture&& f) noexcept : super(move(f))
         {
         }
         cfuture& operator=(future<T>&& f) noexcept
         {
-            future<T>::operator=(move(f));
+            super::operator=(move(f));
+            return *this;
+        }
+        cfuture& operator=(shared_future<T>&& f) noexcept
+        {
+            super::operator=(move(f));
             return *this;
         }
         cfuture& operator=(cfuture&& f) noexcept
         {
-            future<T>::operator=(move(f));
+            super::operator=(move(f));
             return *this;
         }
         ~cfuture() noexcept // always block if future is still incomplete
@@ -279,23 +288,32 @@ namespace rpp
     };
 
 
-    template<> class NODISCARD cfuture<void> : public future<void>
+    template<> class NODISCARD cfuture<void> : public shared_future<void>
     {
+        using super = shared_future<void>;
     public:
-        cfuture(future<void>&& f) noexcept : future<void>(move(f))
+        cfuture(future<void>&& f) noexcept : super(move(f))
         {
         }
-        cfuture(cfuture&& f) noexcept : future<void>(move(f))
+        cfuture(shared_future<void>&& f) noexcept : super(move(f))
+        {
+        }
+        cfuture(cfuture&& f) noexcept : super(move(f))
         {
         }
         cfuture& operator=(future<void>&& f) noexcept
         {
-            future<void>::operator=(move(f));
+            super::operator=(move(f));
+            return *this;
+        }
+        cfuture& operator=(shared_future<void>&& f) noexcept
+        {
+            super::operator=(move(f));
             return *this;
         }
         cfuture& operator=(cfuture&& f) noexcept
         {
-            future<void>::operator=(move(f));
+            super::operator=(move(f));
             return *this;
         }
         ~cfuture() noexcept // always block if future is still incomplete
