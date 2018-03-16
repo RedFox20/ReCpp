@@ -164,6 +164,7 @@ namespace rpp
     {
         using super = shared_future<T>;
     public:
+        cfuture() noexcept : super{} {}
         cfuture(future<T>&& f) noexcept : super(move(f))
         {
         }
@@ -293,6 +294,12 @@ namespace rpp
                 catch (ExceptC& c) { (void)exhC(c); }
             });
         }
+
+        // abandons this future and prevents any waiting in destructor
+        void abandon()
+        {
+            this->continue_with([](T) {});
+        }
     };
 
 
@@ -300,6 +307,7 @@ namespace rpp
     {
         using super = shared_future<void>;
     public:
+        cfuture() noexcept : super{} {}
         cfuture(future<void>&& f) noexcept : super(move(f))
         {
         }
@@ -429,6 +437,12 @@ namespace rpp
                 catch (ExceptB& b) { (void)exhB(b); }
                 catch (ExceptC& c) { (void)exhC(c); }
             });
+        }
+
+        // abandons this future and prevents any waiting in destructor
+        void abandon()
+        {
+            this->continue_with([]() {});
         }
     };
 
