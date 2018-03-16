@@ -298,7 +298,10 @@ namespace rpp
         // abandons this future and prevents any waiting in destructor
         void abandon()
         {
-            this->continue_with([](T) {});
+            if (this->valid()) rpp::parallel_task([f = move(*this)]() mutable {
+                try { (void)f.get(); }
+                catch (...) {}
+            });
         }
     };
 
@@ -442,7 +445,9 @@ namespace rpp
         // abandons this future and prevents any waiting in destructor
         void abandon()
         {
-            this->continue_with([]() {});
+            if (this->valid()) rpp::parallel_task([f = move(*this)]() mutable {
+                try { f.get(); } catch (...) {}
+            });
         }
     };
 
