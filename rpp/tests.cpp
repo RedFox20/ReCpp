@@ -423,9 +423,6 @@ namespace rpp
             consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
         }
 
-        volatile char* ptr = new char[1337];
-        printf("%.1s\n", ptr);
-
         #if _WIN32 && _MSC_VER
             #if _CRTDBG_MAP_ALLOC
                 _CrtDumpMemoryLeaks();
