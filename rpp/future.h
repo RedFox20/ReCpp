@@ -466,6 +466,13 @@ namespace rpp
         return p.get_future();
     }
 
+    inline cfuture<void> make_ready_future()
+    {
+        promise<void> p;
+        p.set_value();
+        return p.get_future();
+    }
+
     template<class T, class E> cfuture<T> make_exceptional_future(E&& e)
     {
         promise<T> p;
