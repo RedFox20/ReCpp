@@ -62,4 +62,18 @@ TestImpl(test_sprint)
         AssertThat(s, "07, format, 0.5\n");
     }
 
+    TestCase(float_formatting)
+    {
+        double x = -0.17080;
+        double y = -2.00120;
+        double z = +0.99590;
+        rpp::string_buffer sb;
+        sb.separator = ";";
+        sb.write(x, y, z);
+
+        println("float_format:", sb.view());
+        AssertThat(sb.view(), "-0.1708;-2.001199;0.995899");
+
+    }
+
 } Impl;

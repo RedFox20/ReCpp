@@ -613,8 +613,13 @@ namespace rpp
     {
         int64 value = (int64)f;
         f -= value; // -1.2 -= -1 --> -0.2
-        if (value < 0) f = -f;
-        char* end = buffer + _tostring(buffer, value);
+        char* end = buffer;
+        if (f < 0.0) {
+            f = -f;
+            value = -value;
+            *end++ = '-';
+        }
+        end += _tostring(end, value);
 
         if (f != 0.0) { // do we have a fraction ?
             double cmp = 0.00001; // 6 decimal places max
