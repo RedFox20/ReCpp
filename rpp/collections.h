@@ -138,11 +138,23 @@ namespace rpp
         v.push_back(item);
     }
     
+    // erases a SINGLE item
     template<class T, class U> void erase_item(std::vector<T>& v, const U& item)
     {
         T* data = v.data();
         for (size_t i = 0, n = v.size(); i < n; ++i) {
             if (data[i] == item) {
+                v.erase(v.begin() + i);
+                return;
+            }
+        }
+    }
+
+    template<class T, class Pred> void erase_first_if(std::vector<T>& v, const Pred& pred)
+    {
+        T* data = v.data();
+        for (size_t i = 0, n = v.size(); i < n; ++i) {
+            if (pred(data[i])) {
                 v.erase(v.begin() + i);
                 return;
             }
