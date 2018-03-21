@@ -102,10 +102,9 @@ namespace rpp
         if (i < count) write(", ");
         if (newlines) write('\n');
     }
-    void string_buffer::pretty_cont_end(int count, bool newlines)
+    void string_buffer::pretty_cont_end(int count)
     {
         if (count > 0) write(" }");
-        if (newlines) write('\n');
     }
     ////////////////////////////////////////////////////////////////////////////////
 
