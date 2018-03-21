@@ -237,7 +237,7 @@ namespace rpp
         }
 
         template<class Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        cfuture<ret_type<Task>> then(Task task, ExceptHA exhA, ExceptHB exhB, ExceptHC exhC)
+        cfuture<ret_type<Task>> then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC)
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -247,6 +247,22 @@ namespace rpp
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
                 catch (ExceptC& c) { return exhC(c); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
+        cfuture<ret_type<Task>> then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            using ExceptD = first_arg_type<ExceptHD>;
+            return async_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+                try { return task(f.get()); }
+                catch (ExceptA& a) { return exhA(a); }
+                catch (ExceptB& b) { return exhB(b); }
+                catch (ExceptC& c) { return exhC(c); }
+                catch (ExceptD& d) { return exhD(d); }
             });
         }
 
@@ -292,6 +308,22 @@ namespace rpp
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
                 catch (ExceptC& c) { (void)exhC(c); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
+        void continue_with(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            using ExceptD = first_arg_type<ExceptHD>;
+            rpp::parallel_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+                try { (void)task(f.get()); }
+                catch (ExceptA& a) { (void)exhA(a); }
+                catch (ExceptB& b) { (void)exhB(b); }
+                catch (ExceptC& c) { (void)exhC(c); }
+                catch (ExceptD& d) { (void)exhD(d); }
             });
         }
 
@@ -396,6 +428,22 @@ namespace rpp
             });
         }
 
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
+        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            using ExceptD = first_arg_type<ExceptHD>;
+            return async_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+                try { f.get(); return task(); }
+                catch (ExceptA& a) { return exhA(a); }
+                catch (ExceptB& b) { return exhB(b); }
+                catch (ExceptC& c) { return exhC(c); }
+                catch (ExceptD& d) { return exhD(d); }
+            });
+        }
+
         // similar to .then(), but doesn't return a future
         template<class Task>
         void continue_with(Task&& task)
@@ -439,6 +487,22 @@ namespace rpp
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
                 catch (ExceptC& c) { (void)exhC(c); }
+            });
+        }
+
+        template<class Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
+        void continue_with(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD)
+        {
+            using ExceptA = first_arg_type<ExceptHA>;
+            using ExceptB = first_arg_type<ExceptHB>;
+            using ExceptC = first_arg_type<ExceptHC>;
+            using ExceptD = first_arg_type<ExceptHD>;
+            rpp::parallel_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+                try { f.get(); (void)task(); }
+                catch (ExceptA& a) { (void)exhA(a); }
+                catch (ExceptB& b) { (void)exhB(b); }
+                catch (ExceptC& c) { (void)exhC(c); }
+                catch (ExceptD& d) { (void)exhD(d); }
             });
         }
 
