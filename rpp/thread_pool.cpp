@@ -65,7 +65,7 @@ namespace rpp
             if (killed) {
                 TaskDebug("resurrecting task");
                 killed = false;
-                if (th.joinable()) th.join();
+                (void)join_or_detach(finished);
                 th = thread{[this] { run(); }}; // restart thread if needed
             }
             taskRunning = true;
@@ -91,7 +91,7 @@ namespace rpp
             if (killed) {
                 TaskDebug("resurrecting task");
                 killed = false;
-                if (th.joinable()) th.join();
+                (void)join_or_detach(finished);
                 th = thread{[this] { run(); }}; // restart thread if needed
             }
             taskRunning = true;
@@ -127,8 +127,7 @@ namespace rpp
     pool_task::wait_result pool_task::kill(int timeoutMillis) noexcept
     {
         if (killed) {
-            if (th.joinable()) th.join();
-            return finished;
+            return join_or_detach(finished);
         }
         { unique_lock<mutex> lock{m};
             TaskDebug("killing task");
@@ -136,9 +135,21 @@ namespace rpp
         }
         cv.notify_all();
         wait_result result = wait(timeoutMillis, std::nothrow);
-        if (th.joinable()) {
-            if (result == timeout) th.detach();
-            else                   th.join();
+        return join_or_detach(result);
+    }
+
+    pool_task::wait_result pool_task::join_or_detach(wait_result result) noexcept
+    {
+        if (th.joinable())
+        {
+            if (result == timeout)
+                th.detach();
+            // can't join if we're on the same thread as the task itself
+            // (can happen during exit())
+            else if (std::this_thread::get_id() == th.get_id())
+                th.detach();
+            else
+                th.join();
         }
         return result;
     }

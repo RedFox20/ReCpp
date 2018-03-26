@@ -313,6 +313,7 @@ namespace rpp
         void run() noexcept;
         bool got_task() const noexcept;
         bool wait_for_task(unique_lock<mutex>& lock) noexcept;
+        wait_result join_or_detach(wait_result result = finished) noexcept;
     };
 
 
