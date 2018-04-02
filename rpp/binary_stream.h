@@ -483,7 +483,7 @@ namespace rpp /* ReCpp */
     template<class T>
     binary_stream& operator<<(binary_stream& w, const std::vector<T>& v)
     {
-        return w.write_vector(v);
+        return w.write(v);
     }
     inline binary_stream& operator<<(binary_stream& w, binary_stream& m(binary_stream&)) { return m(w); }
     inline binary_stream& endl(binary_stream& w) { w.flush(); return w; }
