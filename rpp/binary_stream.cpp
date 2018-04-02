@@ -96,7 +96,7 @@ namespace rpp
             clear();
         }
         // now ask the source itself to flush the stuff
-
+        Src->stream_flush();
     }
 
     void binary_stream::ensure_space(int numBytes)
@@ -119,6 +119,13 @@ namespace rpp
         WritePos += numBytes;
         End      += numBytes;
         return *this;
+    }
+
+    void binary_stream::unsafe_write(const void* data, int numBytes)
+    {
+        memcpy(&Ptr[WritePos], data, (size_t)numBytes);
+        WritePos += numBytes;
+        End      += numBytes;
     }
 
     ////////////////////////////////////////////////////////////////////////////

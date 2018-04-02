@@ -264,6 +264,17 @@ namespace rpp /* ReCpp */
             return *this;
         }
 
+    private:
+        void unsafe_write(const void* data, int numBytes);
+        template<class T> void unsafe_write(const T& data)
+        {
+            *(T*)&Ptr[WritePos] = data;
+            WritePos += (int)sizeof(T);
+            End      += (int)sizeof(T);
+        }
+
+    public:
+
         /** @brief Appends data from other binary_writer to this one */
         binary_stream& write(const binary_stream& w) { return write(w.data(), w.size()); }
         binary_stream& write_byte(uint8_t value)  { return write(value); } /** @brief Writes a 8-bit unsigned byte into the buffer */
@@ -284,19 +295,39 @@ namespace rpp /* ReCpp */
         binary_stream& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }
         binary_stream& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
 
+        template<class T>
+        static constexpr bool is_trivial_type = std::is_default_constructible_v<T>
+                                             && std::is_trivially_destructible_v<T>;
+
         template<class T, class A>
         binary_stream& write(const std::vector<T, A>& v)
         {
-            write_int((int)v.size());
-            for (const T& item : v)
-                *this << item; // @note ADL fails easily here, use write_vector with custom writer instead
+            int n = (int)v.size();
+            int cap = min(4 + n * (int)sizeof(T), 1024 * 1024); // fuzzy capacity
+            ensure_space(cap);
+
+            if constexpr(is_trivial_type<T>)
+            {
+                unsafe_write<int>(n);
+                unsafe_write(v.data(), n * (int)sizeof(T));
+            }
+            else
+            {
+                write<int>(n);
+                for (const T& item : v)
+                    *this << item; // @note ADL fails easily here, use write_vector with custom writer instead
+            }
             return *this;
         }
 
         template<class T, class A, class Writer>
         binary_stream& write(const std::vector<T, A>& v, const Writer& writer)
         {
-            write_int((int)v.size());
+            int n = (int)v.size();
+            int cap = min(4 + n * (int)sizeof(T), 1024*1024); // fuzzy capacity
+            ensure_space(cap);
+
+            write<int>(n);
             for (const T& item : v)
                 writer(*this, item);
             return *this;
@@ -408,9 +439,17 @@ namespace rpp /* ReCpp */
         {
             int n = read_int();
             out.clear();
-            out.reserve(size_t(n));
-            for (int i = 0; i < n; ++i)
-                *this >> out.emplace_back();
+            if constexpr(is_trivial_type<T>)
+            {
+                out.resize(size_t(n));
+                read(out.data(), n * (int)sizeof(T));
+            }
+            else
+            {
+                out.reserve(size_t(n));
+                for (int i = 0; i < n; ++i)
+                    *this >> out.emplace_back();
+            }
             return *this;
         }
 
@@ -497,9 +536,9 @@ namespace rpp /* ReCpp */
     {
         rpp::socket* Sock = nullptr;
     public:
-        socket_writer() noexcept : binary_stream(this) {}
-        explicit socket_writer(rpp::socket& sock)      noexcept : binary_stream(this),           Sock(&sock) {}
-        socket_writer(rpp::socket& sock, int capacity) noexcept : binary_stream(capacity, this), Sock(&sock) {}
+        socket_writer() noexcept : binary_stream{this} {}
+        explicit socket_writer(rpp::socket& sock)      noexcept : binary_stream{this},           Sock(&sock) {}
+        socket_writer(rpp::socket& sock, int capacity) noexcept : binary_stream{ capacity, this }, Sock(&sock) {}
 
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
@@ -521,9 +560,9 @@ namespace rpp /* ReCpp */
         rpp::socket* Sock = nullptr;
         rpp::ipaddress Addr;
     public:
-        socket_reader() noexcept : binary_stream(this) {}
-        explicit socket_reader(rpp::socket& sock)      noexcept : binary_stream(this),           Sock(&sock) {}
-        socket_reader(rpp::socket& sock, int capacity) noexcept : binary_stream(capacity, this), Sock(&sock) {}
+        socket_reader() noexcept : binary_stream{this} {}
+        explicit socket_reader(rpp::socket& sock)      noexcept : binary_stream{this},           Sock(&sock) {}
+        socket_reader(rpp::socket& sock, int capacity) noexcept : binary_stream{capacity, this}, Sock(&sock) {}
 
         const rpp::ipaddress& addr() const noexcept { return Addr; }
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
@@ -617,8 +656,8 @@ namespace rpp /* ReCpp */
         rpp::file* File = nullptr;
     public:
         file_writer() = default;
-        explicit file_writer(rpp::file& file)      noexcept : File(&file) {}
-        file_writer(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
+        explicit file_writer(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
+        file_writer(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
 
         bool stream_good() const noexcept override { return File && File->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
