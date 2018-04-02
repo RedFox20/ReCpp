@@ -6,8 +6,7 @@
 #include <rpp/tests.h>
 using namespace rpp;
 
-static void segfault_handler(const char* what) { throw traced_exception(what); }
-static string stack_tracer()                   { return stack_trace();         }
+static string stack_tracer() { return stack_trace(); }
 
 TestImpl(test_stack_trace)
 {
