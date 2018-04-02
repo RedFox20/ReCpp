@@ -601,7 +601,7 @@ namespace rpp
         static constexpr float3 LEFT           = { -1.0f, 0.0f, 0.0f };     // -X axis
         static constexpr float3 RIGHT          = { +1.0f, 0.0f, 0.0f };     // +X axis
         static constexpr float3 UP             = { 0.0f, +1.0f, 0.0f };     // +Y axis
-        static constexpr float3 DOWN           = { 0.0f, -1.0f, 1.0f };     // -Y axis
+        static constexpr float3 DOWN           = { 0.0f, -1.0f, 0.0f };     // -Y axis
         static constexpr float3 FORWARD        = { 0.0f, 0.0f, +1.0f };     // +Z axis
         static constexpr float3 BACKWARD       = { 0.0f, 0.0f, -1.0f };     // -Z axis
         

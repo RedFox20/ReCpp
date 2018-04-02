@@ -655,7 +655,7 @@ namespace rpp /* ReCpp */
     {
         rpp::file* File = nullptr;
     public:
-        file_writer() = default;
+        file_writer() noexcept : binary_stream{this} {}
         explicit file_writer(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
         file_writer(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
 
@@ -676,9 +676,9 @@ namespace rpp /* ReCpp */
     {
         rpp::file* File = nullptr;
     public:
-        file_reader() noexcept {}
-        explicit file_reader(rpp::file& file)      noexcept : File(&file) {}
-        file_reader(rpp::file& file, int capacity) noexcept : binary_stream(capacity), File(&file) {}
+        file_reader() noexcept : binary_stream{this} {}
+        explicit file_reader(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
+        file_reader(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
 
         bool stream_good() const noexcept override { return File && File->good(); }
 
