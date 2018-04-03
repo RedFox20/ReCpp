@@ -28,7 +28,6 @@
 
 namespace rpp
 {
-    using std::to_string;
     using std::string;
     using std::vector;
     using std::move;
@@ -127,7 +126,15 @@ namespace rpp
         static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
         static string as_string(const char* s)    { return string{s};}
         static string as_string(std::nullptr_t)   { return "null"; }
-        static string as_string(int v)            { return std::to_string(v); }
+        static string as_string(int v)    { return rpp::to_string(v); }
+        static string as_string(uint v)   { return rpp::to_string(v); }
+        static string as_string(long v)   { return rpp::to_string(v); }
+        static string as_string(ulong v)  { return rpp::to_string(v); }
+        static string as_string(int64 v)  { return rpp::to_string(v); }
+        static string as_string(uint64 v) { return rpp::to_string(v); }
+        static string as_string(short v)  { return rpp::to_string(v); }
+        static string as_string(ushort v) { return rpp::to_string(v); }
+        static string as_string(byte v)   { return rpp::to_string(v); }
         template<class T> static string as_string(const T& v) { return to_string(v); }
 
         template<class T> static string as_short_string(const T& obj, size_t maxLen = 512)

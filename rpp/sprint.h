@@ -48,19 +48,38 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Converts a single char 'x' into string "x"
+     */
+    RPPAPI string to_string(char v)   noexcept;
+
+    /**
+     * Simple and fast locale-agnostic to_string utilities:
+     */
+    RPPAPI string to_string(byte v)   noexcept;
+    RPPAPI string to_string(short v)  noexcept;
+    RPPAPI string to_string(ushort v) noexcept;
+    RPPAPI string to_string(int v)    noexcept;
+    RPPAPI string to_string(uint v)   noexcept;
+    RPPAPI string to_string(long v)   noexcept;
+    RPPAPI string to_string(ulong v)  noexcept;
+    RPPAPI string to_string(int64 v)  noexcept;
+    RPPAPI string to_string(uint64 v) noexcept;
+    RPPAPI string to_string(float v)  noexcept;
+    RPPAPI string to_string(double v) noexcept;
+
     /** @return "true" or "false" string */
     RPPAPI string to_string(bool trueOrFalse) noexcept;
 
     /**
-    * @return std::string from cstring. If cstr == nullptr, returns empty string ""
-    */
+     * @return std::string from cstring. If cstr == nullptr, returns empty string ""
+     */
     RPPAPI string to_string(const char* cstr) noexcept;
 
     RPPAPI inline const string& to_string(const string& s) noexcept { return s; }
 
     template<class T> inline std::string to_string(const T* object)
     {
-        using std::to_string;
         using rpp::to_string;
         using namespace std::literals;
         return object ? to_string(*object) : "null"s;

@@ -191,6 +191,8 @@ namespace rpp
     inline int _tostring(char* buffer, rpp::byte value) { return _tostring(buffer, (uint)value); }
     inline int _tostring(char* buffer, short value)     { return _tostring(buffer, (int)value);  }
     inline int _tostring(char* buffer, ushort value)    { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, long value)      { return _tostring(buffer, (int)value);  }
+    inline int _tostring(char* buffer, ulong value)     { return _tostring(buffer, (uint)value); }
 
 
 

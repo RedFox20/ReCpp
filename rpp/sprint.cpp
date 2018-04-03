@@ -110,7 +110,7 @@ namespace rpp
 
     int print(FILE* file, strview value) { return (int)fwrite(value.str, value.len, 1, file); }
     int print(FILE* file, char value)    { return (int)fwrite(&value, 1, 1, file); }
-    int print(FILE* file, rpp::byte value){char buf[4];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, rpp::byte value){char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, short value)   { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, ushort value)  { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
     int print(FILE* file, int value)     { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
@@ -145,6 +145,19 @@ namespace rpp
     }
 
     ////////////////////////////////////////////////////////////////////////////////
+
+    string to_string(char v)   noexcept { return string(&v, 1ul); }
+    string to_string(byte v)   noexcept { char buf[8];  return string(buf, buf + _tostring(buf, v)); }
+    string to_string(short v)  noexcept { char buf[8];  return string(buf, buf + _tostring(buf, v)); }
+    string to_string(ushort v) noexcept { char buf[8];  return string(buf, buf + _tostring(buf, v)); }
+    string to_string(int v)    noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(uint v)   noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(long v)   noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(ulong v)  noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(int64 v)  noexcept { char buf[40]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(uint64 v) noexcept { char buf[40]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(float v)  noexcept { char buf[32]; return string(buf, buf + _tostring(buf, v)); }
+    string to_string(double v) noexcept { char buf[32]; return string(buf, buf + _tostring(buf, v)); }
 
     string to_string(bool trueOrFalse) noexcept
     {
