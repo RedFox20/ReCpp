@@ -18,8 +18,6 @@
 #  include <emmintrin.h>
 #endif
 
-#undef M_PI
-#undef M_SQRT2
 #undef min
 #undef max
 
@@ -40,20 +38,20 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////
 
-    constexpr double M_PI     = 3.14159265358979323846264338327950288;
-    constexpr float  M_PIf    = 3.14159265358979323846264338327950288f;
-    constexpr double M_SQRT2  = 1.41421356237309504880;  // sqrt(2)
-    constexpr float  M_SQRT2f = 1.41421356237309504880f; // sqrt(2)
+    constexpr double PI     = 3.14159265358979323846264338327950288;
+    constexpr float  PIf    = 3.14159265358979323846264338327950288f;
+    constexpr double SQRT2  = 1.41421356237309504880;  // sqrt(2)
+    constexpr float  SQRT2f = 1.41421356237309504880f; // sqrt(2)
 
     /** @return Radians from degrees */
     static constexpr float radf(float degrees)
     {
-        return (degrees * M_PIf) / 180.0f; // rads=(degs*PI)/180
+        return (degrees * rpp::PIf) / 180.0f; // rads=(degs*PI)/180
     }
     /** @return Radians from degrees */
     static constexpr double radf(double degrees)
     {
-        return (degrees * M_PI) / 180.0; // rads=(degs*PI)/180
+        return (degrees * rpp::PI) / 180.0; // rads=(degs*PI)/180
     }
 
     /** @brief Clamps a value between:  min <= value <= max */

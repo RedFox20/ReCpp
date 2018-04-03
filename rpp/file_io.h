@@ -182,6 +182,7 @@ namespace rpp /* ReCpp */
          */
         bool good() const noexcept;
         explicit operator bool() const noexcept { return good(); }
+        bool is_open() const noexcept { return good(); }
 
         /**
          * @return TRUE if the file handle is INVALID
