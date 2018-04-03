@@ -68,11 +68,13 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
+#if !USE_WINAPI_IO && !_WIN32
     static string to_string(const wchar_t* ws)
     {
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
         return cvt.to_bytes(ws);
     }
+#endif
 
 #if USE_WINAPI_IO
     static void* OpenF(const char* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
@@ -1233,7 +1235,14 @@ namespace rpp /* ReCpp */
     
     string home_dir() noexcept
     {
+    #if _MSC_VER
+        size_t len = 0;
+        char buf[512];
+        getenv_s(&len, buf, sizeof(buf), "HOME");
+        return { buf, buf + len };
+    #else
         return getenv("HOME");
+    #endif
     }
     
     ////////////////////////////////////////////////////////////////////////////////
