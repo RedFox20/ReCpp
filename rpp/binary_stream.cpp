@@ -18,7 +18,6 @@ namespace rpp
 
     binary_stream::~binary_stream() noexcept
     {
-        try { flush(); } catch (...) {}
         if (Cap > SBSize)
             free(Ptr);
     }
@@ -86,13 +85,9 @@ namespace rpp
     void binary_stream::flush() 
     {
         if (!Src) return;
-        if (int numBytes = size())
+        if (int writePos = WritePos) // were we writing something?
         {
-            int written = Src->stream_write(data(), numBytes);
-            if (written != (int)numBytes)
-            {
-                // @todo Write failed. How do we recover?
-            }
+            (void)Src->stream_write(Ptr, End);
             clear();
         }
         // now ask the source itself to flush the stuff
@@ -248,6 +243,11 @@ namespace rpp
 
     //// -- SOCKET WRITER -- ////
 
+    socket_writer::~socket_writer() noexcept
+    {
+        try { flush(); } catch (...) {}
+    }
+
     int socket_writer::stream_write(const void* data, int numBytes) noexcept
     {
         if (stream_good())
@@ -260,7 +260,12 @@ namespace rpp
             Sock->flush();
     }
 
-    //// -- FILE READER -- ////
+    //// -- SOCKET READER -- ////
+    
+    socket_reader::~socket_reader() noexcept
+    {
+        // nothing to flush
+    }
 
     void socket_reader::stream_flush() noexcept
     {
@@ -299,6 +304,11 @@ namespace rpp
 
     //// -- FILE WRITER -- ////
 
+    file_writer::~file_writer() noexcept
+    {
+        try { flush(); } catch (...) {}
+    }
+
     int file_writer::stream_write(const void* data, int numBytes) noexcept
     {
         if (stream_good())
@@ -312,6 +322,11 @@ namespace rpp
     }
 
     //// -- FILE READER -- ////
+    
+    file_reader::~file_reader() noexcept
+    {
+        // nothing to flush for reader
+    }
 
     void file_reader::stream_flush() noexcept
     {
