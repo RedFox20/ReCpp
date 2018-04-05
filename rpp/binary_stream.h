@@ -539,6 +539,7 @@ namespace rpp /* ReCpp */
         socket_writer() noexcept : binary_stream{this} {}
         explicit socket_writer(rpp::socket& sock)      noexcept : binary_stream{this},           Sock(&sock) {}
         socket_writer(rpp::socket& sock, int capacity) noexcept : binary_stream{ capacity, this }, Sock(&sock) {}
+        ~socket_writer() noexcept;
 
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
@@ -563,6 +564,7 @@ namespace rpp /* ReCpp */
         socket_reader() noexcept : binary_stream{this} {}
         explicit socket_reader(rpp::socket& sock)      noexcept : binary_stream{this},           Sock(&sock) {}
         socket_reader(rpp::socket& sock, int capacity) noexcept : binary_stream{capacity, this}, Sock(&sock) {}
+        ~socket_reader() noexcept;
 
         const rpp::ipaddress& addr() const noexcept { return Addr; }
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
@@ -658,6 +660,7 @@ namespace rpp /* ReCpp */
         file_writer() noexcept : binary_stream{this} {}
         explicit file_writer(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
         file_writer(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
+        ~file_writer() noexcept;
 
         bool stream_good() const noexcept override { return File && File->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
@@ -679,6 +682,7 @@ namespace rpp /* ReCpp */
         file_reader() noexcept : binary_stream{this} {}
         explicit file_reader(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
         file_reader(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
+        ~file_reader() noexcept;
 
         bool stream_good() const noexcept override { return File && File->good(); }
 
