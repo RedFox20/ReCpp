@@ -611,6 +611,10 @@ namespace rpp
 
     int _tostring(char* buffer, double f)
     {
+        if (isnan(f)) {
+            buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
+            return 3;
+        }
         int64 value = (int64)f;
         f -= value; // -1.2 -= -1 --> -0.2
         char* end = buffer;
