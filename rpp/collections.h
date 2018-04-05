@@ -297,6 +297,14 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
+    template<class T, class Pred> bool any_of(const std::vector<T>& v, const Pred& predicate)
+    {
+        auto* ptr = v.data();
+        return std::any_of(ptr, ptr + v.size(), predicate);
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
     template<class T> T sum_all(const std::vector<T>& v)
     {
         T sum {};
