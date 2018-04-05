@@ -141,15 +141,19 @@ namespace rpp
 
         if (methodFilter)
         {
-            for (size_t i = 0u; i < test_count; ++i)
-                if (test_funcs[i].name.find(methodFilter))
+            for (int i = 0; i < test_count; ++i)
+                if (test_funcs[i].name.find(methodFilter)) {
+                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
                     run_test(test_funcs[i]);
+                }
         }
         else
         {
-            for (size_t i = 0u; i < test_count; ++i) {
-                consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
-                run_test(test_funcs[i]);
+            for (int i = 0; i < test_count; ++i) {
+                if (test_funcs[i].autorun) {
+                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
+                    run_test(test_funcs[i]);
+                }
             }
         }
 

@@ -46,6 +46,7 @@ namespace rpp
             lambda_base lambda;
             void (lambda_base::*func)();
             size_t expectedExType;
+            bool autorun = true;
         };
 
         static int asserts_failed;
@@ -160,11 +161,11 @@ namespace rpp
 
         // adds a test to the automatic test run list
         template<class T, class Lambda> static int add_test_func(
-            T* self, strview name, Lambda lambda, const std::type_info* ti = nullptr)
+            T* self, strview name, Lambda lambda, const std::type_info* ti = nullptr, bool autorun = true)
         {
             (void)lambda;
             size_t expectedExHash = ti ? ti->hash_code() : 0;
-            return self->add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator(), expectedExHash });
+            return self->add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator(), expectedExHash, autorun });
         }
     };
 
@@ -224,6 +225,10 @@ namespace rpp
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
     const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname), &typeid(expectedExceptionType)); \
+    void test_##testname()
+
+#define TestCaseNoAutorun(testname) \
+    const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname), nullptr, false); \
     void test_##testname()
 
 }
