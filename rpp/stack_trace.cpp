@@ -89,17 +89,23 @@ namespace rpp
     {
     }
 
+    using signal_handler_t = void (__cdecl*)(int sig);
+
+    static signal_handler_t OldHandler;
+
     void register_segfault_tracer()
     {
-        signal(SIGSEGV, [](int)
+        OldHandler = signal(SIGSEGV, [](int sig)
         {
+            if (OldHandler) OldHandler(sig);
             throw traced_exception("SIGSEGV");
         });
     }
     void register_segfault_tracer(std::nothrow_t)
     {
-        signal(SIGSEGV, [](int)
+        OldHandler = signal(SIGSEGV, [](int sig)
         {
+            if (OldHandler) OldHandler(sig);
             print_trace();
         });
     }

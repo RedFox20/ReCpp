@@ -8,7 +8,6 @@ TestImpl(test_collections)
 {
     TestInit(test_collections)
     {
-        rpp::register_segfault_tracer();
     }
 
     TestCase(element_range)
