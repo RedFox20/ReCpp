@@ -191,4 +191,4 @@ TestImpl(test_threadpool)
         AssertThat((int)times_launched, expected);
     }
 
-} Impl;
+};

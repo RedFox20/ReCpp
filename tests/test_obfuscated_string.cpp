@@ -15,4 +15,4 @@ TestImpl(test_obfuscated_string)
         AssertThat(decrypted, "test!1234!õäöü"s);
     }
 
-} Impl;
+};

@@ -289,4 +289,4 @@ TestImpl(test_future)
         f2.get(); // already OK if this doesn't throw exception
     }
 
-} Impl;
+};

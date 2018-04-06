@@ -36,4 +36,4 @@ TestImpl(test_vec)
         AssertThat(unitbox.depth(),  1.0f);
     }
 
-} Impl;
+};

@@ -50,4 +50,4 @@ TestImpl(test_debugging)
         }
     }
 
-} Impl;
+};

@@ -32,4 +32,4 @@ TestImpl(test_scope_guard)
         AssertThat(valueToDecrement, 0);
     }
 
-} Impl;
+};

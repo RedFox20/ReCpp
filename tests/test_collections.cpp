@@ -293,4 +293,4 @@ TestImpl(test_collections)
     //    AssertThat(reduced, 15);
     //}
 
-} Impl;
+};

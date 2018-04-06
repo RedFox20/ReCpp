@@ -59,4 +59,4 @@ TestImpl(test_timer)
         AssertThat(sw.stopped(), false);
     }
 
-} Impl;
+};

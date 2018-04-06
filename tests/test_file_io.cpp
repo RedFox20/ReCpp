@@ -254,4 +254,4 @@ TestImpl(test_file_io)
         Assert(delete_folder(TestDir+"/", recursive));
     }
 
-} Impl;
+};

@@ -57,4 +57,4 @@ TestImpl(test_stack_trace)
         });
         task->wait(); // @note this will throw the exception from parallel task
     }
-} Impl;
+};

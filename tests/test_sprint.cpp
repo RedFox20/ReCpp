@@ -76,4 +76,4 @@ TestImpl(test_sprint)
 
     }
 
-} Impl;
+};

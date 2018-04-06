@@ -44,4 +44,4 @@ TestImpl(test_close_sync)
         }
     }
 
-} Impl;
+};

@@ -1,8 +1,6 @@
 #include "tests.h"
-#include <cstdlib>
 #include <chrono>
 #include <memory>
-#include <algorithm>
 #include <mutex>
 #include <unordered_set>
 #ifdef _WIN32
@@ -24,30 +22,26 @@ namespace rpp
     using std::mutex;
     using std::unique_lock;
     using std::defer_lock;
+    ///////////////////////////////////////////////////////////////////////////
 
     int test::asserts_failed;
 
-    // there are initialization order issues with this global variable, so wrap it to guarantee initialization order
-    static vector<test*>& all_tests() noexcept
+    // C++17 feature: inline global variable guarantees
+    // one instance across all modules
+    inline vector<test_info> all_tests;
+
+    void register_test(strview name, test_factory factory, bool autorun)
     {
-        static vector<test*> tests;
-        return tests;
+        all_tests.emplace_back(test_info{ name, factory, {}, true, autorun });
     }
 
-    test::test(strview name, bool autorun) : name(name), auto_run(autorun)
+    ///////////////////////////////////////////////////////////////////////////
+
+    test::test(strview name) : name{name}
     {
-        all_tests().push_back(this);
     }
 
-    test::~test()
-    {
-        if (!all_tests().empty())
-        {
-            auto it = find(all_tests().begin(), all_tests().end(), this);
-            if (it != all_tests().end())
-                all_tests().erase(it);
-        }
-    }
+    test::~test() = default;
 
     void test::consolef(ConsoleColor color, const char* fmt, ...)
     {
@@ -266,11 +260,11 @@ namespace rpp
         {
             test_cap = test_funcs ? test_count * 2 : 8;
             auto* funcs = new test_func[test_cap];
-            for (int i = 0; i < test_count; ++i) funcs[i] = std::move(test_funcs[i]);
+            for (int i = 0; i < test_count; ++i) funcs[i] = test_funcs[i];
             delete[] test_funcs;
             test_funcs = funcs;
         }
-        test_funcs[test_count++] = std::move(func);
+        test_funcs[test_count++] = func;
         return test_count - 1;
     }
 
@@ -333,8 +327,8 @@ namespace rpp
         move_console_window();
     #endif
 
-        for (test* t : all_tests()) { // set the defaults
-            if (!t->auto_run) t->test_enabled = false;
+        for (test_info& t : all_tests) { // set the defaults
+            if (!t.auto_run) t.test_enabled = false;
         }
 
         int numTest = 0;
@@ -364,14 +358,14 @@ namespace rpp
                 if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", argv[iarg]);
                 else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
                 
-                for (test* t : all_tests())
+                for (test_info& t : all_tests)
                 {
-                    if (( exactMatch && t->name == testName) ||
-                        (!exactMatch && t->name.find(testName)))
+                    if (( exactMatch && t.name == testName) ||
+                        (!exactMatch && t.name.find(testName)))
                     {
-                        t->test_specific = specific;
-                        if (enableTest) enabled.insert(t->name);
-                        else            disabled.insert(t->name);
+                        t.case_filter = specific;
+                        if (enableTest) enabled.insert(t.name);
+                        else            disabled.insert(t.name);
                         break;
                     }
                 }
@@ -379,35 +373,36 @@ namespace rpp
 
             if (!disabled.empty())
             {
-                for (test* t : all_tests()) {
-                    if (t->auto_run) { // only consider disabling auto_run tests
-                        t->test_enabled = disabled.find(t->name) == disabled.end();
-                        if (!t->test_enabled)
-                            consolef(Red, "  Disabled %s\n", t->name.to_cstr());
+                for (test_info& t : all_tests) {
+                    if (t.auto_run) { // only consider disabling auto_run tests
+                        t.test_enabled = disabled.find(t.name) == disabled.end();
+                        if (!t.test_enabled)
+                            consolef(Red, "  Disabled %s\n", t.name.to_cstr());
                     }
                 }
             }
             else if (!enabled.empty())
             {
-                for (test* t : all_tests()) { // enable whatever was requested
-                    t->test_enabled = enabled.find(t->name) != enabled.end();
-                    if (t->test_enabled)
-                        consolef(Green, "  Enabled %s\n", t->name.to_cstr());
+                for (test_info& t : all_tests) { // enable whatever was requested
+                    t.test_enabled = enabled.find(t.name) != enabled.end();
+                    if (t.test_enabled)
+                        consolef(Green, "  Enabled %s\n", t.name.to_cstr());
                 }
             }
         }
         else
         {
             consolef(Green, "Running all auto-run tests\n");
-            for (test* t : all_tests())
-                if (!t->auto_run && !t->test_enabled)
-                    consolef(Yellow, "  Disabled NoAutoRun %s\n", t->name.to_cstr());
+            for (test_info& t : all_tests)
+                if (!t.auto_run && !t.test_enabled)
+                    consolef(Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
         }
 
         // run all the marked tests
-        for (test* t : all_tests()) {
-            if (t->test_enabled) {
-                t->run_test(t->test_specific);
+        for (test_info& t : all_tests) {
+            if (t.test_enabled) {
+                auto test = t.factory(t.name);
+                test->run_test(t.case_filter);
                 ++numTest;
             }
         }
@@ -424,7 +419,7 @@ namespace rpp
         }
         else
         {
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests().size());
+            consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests.size());
         }
 
         #if _WIN32 && _MSC_VER

@@ -19,4 +19,4 @@ TestImpl(test_json)
 
     }
 
-} Impl;
+};

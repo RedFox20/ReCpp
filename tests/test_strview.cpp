@@ -158,4 +158,4 @@ TestImpl(test_strview)
         AssertThat(y, true);
     }
 
-} Impl;
+};

@@ -18,26 +18,38 @@
 #define RPP_TESTS_DEFINE_MAIN 0
 #endif
 
-#ifndef DLLEXPORT
-  #if _MSC_VER
-    #define DLLEXPORT __declspec(dllexport)
-  #else // clang/gcc
-    #define DLLEXPORT __attribute__((visibility("default")))
-  #endif
-#endif
-
 namespace rpp
 {
     using std::string;
     using std::vector;
     using std::move;
+    using std::unique_ptr;
 
 #if _MSC_VER
     // warning C4251: 'rpp::test::name': struct 'rpp::strview' needs to have dll-interface to be used by clients of struct 'rpp::test'
     #pragma warning( disable : 4251 ) 
 #endif
 
-    struct DLLEXPORT test
+    struct test;
+    struct test_info;
+
+    using test_factory = unique_ptr<test> (*)(strview name);
+
+    struct RPPAPI test_info
+    {
+        strview name;
+        test_factory factory;
+
+        strview case_filter;      // internal: only execute test cases that pass this filter
+        bool test_enabled = true; // internal: this is automatically set by the test system
+        bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
+    };
+
+    extern RPPAPI vector<test_info> all_tests;
+
+    RPPAPI void register_test(strview name, test_factory factory, bool autorun);
+
+    struct RPPAPI test
     {
         struct lambda_base { test* self; };
         struct test_func
@@ -51,17 +63,15 @@ namespace rpp
 
         static int asserts_failed;
         strview name;
-        strview test_specific;
     private:
         // @note Need to use raw array because std::vector cannot be exported on MSVC
         test_func* test_funcs = nullptr; // all the automatic tests to run
         int test_count = 0;
         int test_cap = 0;
-        bool test_enabled = true; // internal: this is automatically set by the test system
-        bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
+
     
     public:
-        explicit test(strview name, bool autorun = true);
+        explicit test(strview name);
         virtual ~test();
         static void assert_failed(const char* file, int line, const char* fmt, ...);
 
@@ -169,6 +179,8 @@ namespace rpp
         }
     };
 
+
+
 #undef Assert
 #undef AssertMsg
 #undef AssertThat
@@ -196,19 +208,22 @@ namespace rpp
     if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
 } while (false)
 
-#define TestImpl(testclass) static struct testclass : public rpp::test
+#define TestImpl(testclass) struct testclass : public rpp::test
 
-#define TestInit(testclass)                \
-    testclass() : test(#testclass){}       \
-    using ClassType = testclass;           \
-    ClassType* self() { return this; }     \
+#define __TestInit(testclass, autorun)                                \
+    explicit testclass(rpp::strview name) : rpp::test{name} {}        \
+    static std::unique_ptr<test> __create(rpp::strview name)          \
+    { return std::unique_ptr<test>( new testclass{name} ); }          \
+    inline static bool __registered = [] {                            \
+        rpp::register_test(#testclass, &__create, autorun);           \
+        return true;                                                  \
+    }();                                                              \
+    using ClassType = testclass;                                      \
+    ClassType* self() { return this; }                                \
     void init_test() override
 
-#define TestInitNoAutorun(testclass)       \
-    testclass() : test(#testclass,false){} \
-    using ClassType = testclass;           \
-    ClassType* self() { return this; }     \
-    void init_test() override
+#define TestInit(testclass)          __TestInit(testclass, true)
+#define TestInitNoAutorun(testclass) __TestInit(testclass, false)
 
 #define TestCleanup(testclass) void cleanup_test() override
 

@@ -92,4 +92,4 @@ TestImpl(test_serialization)
         AssertThat(buf.view(), "a;42;b;42;\n");
     }
 
-} Impl;
+};

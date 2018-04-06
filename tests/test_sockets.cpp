@@ -131,4 +131,4 @@ TestImpl(test_sockets)
         printf("remote: closing down\n");
     }
 
-} Impl;
+};

@@ -155,4 +155,4 @@ TestImpl(test_binary_stream)
             AssertThat(tmp[i], (uint8_t)(i + 1));
     }
 
-} Impl;
+};
