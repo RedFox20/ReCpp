@@ -116,9 +116,9 @@ namespace rpp
             return readonly_lock{ mut, std::try_to_lock };
         }
 
-		exclusive_lock acquire_exclusive_lock() noexcept
+        exclusive_lock acquire_exclusive_lock() noexcept
         {
-			return exclusive_lock{ mut };
+            return exclusive_lock{ mut };
         }
     };
 
