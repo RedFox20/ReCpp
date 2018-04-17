@@ -161,6 +161,20 @@ namespace rpp
         void write(float  value);
         void write(double value);
 
+        FINLINE string_buffer& operator<<(const std::string& value) { write(strview{ value }); return *this; }
+        FINLINE string_buffer& operator<<(const char* value)        { write(strview{ value }); return *this; }
+        FINLINE string_buffer& operator<<(const char& value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(bool   value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(rpp::byte bv) { write(bv);    return *this; }
+        FINLINE string_buffer& operator<<(short  value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(ushort value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(int    value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(uint   value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(int64  value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(uint64 value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(float  value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(double value) { write(value); return *this; }
+
         void writeln(); // \n
         void write_quote(); // <">
         void write_apos();  // <'>
