@@ -92,7 +92,7 @@ namespace rpp
         close_sync& operator=(const close_sync&) = delete;
 
         using readonly_lock  = std::shared_lock<std::shared_mutex>;
-        using exclusive_lock = std::lock_guard<std::shared_mutex>;
+        using exclusive_lock = std::unique_lock<std::shared_mutex>;
 
         close_sync() = default;
         ~close_sync()
@@ -113,7 +113,12 @@ namespace rpp
 
         readonly_lock try_lock() noexcept
         {
-            return { mut, std::try_to_lock };
+            return readonly_lock{ mut, std::try_to_lock };
+        }
+
+		exclusive_lock acquire_exclusive_lock() noexcept
+        {
+			return exclusive_lock{ mut };
         }
     };
 
@@ -145,4 +150,5 @@ namespace rpp
     #define try_lock_or_return(closeSync, ...) \
         auto RPP_CONCAT(lock_,__LINE__) { closeSync.try_lock() }; \
         if (!RPP_CONCAT(lock_,__LINE__)) return ##__VA_ARGS__;
+
 }
