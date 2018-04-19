@@ -125,6 +125,12 @@ namespace rpp
         delegate() noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
         {
         }
+
+        /** @brief Default constructor from nullptr */
+        explicit delegate(nullptr_t) noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
+        {
+        }
+
         /** @brief Handles functor copy cleanup */
         ~delegate() noexcept
         {
@@ -362,17 +368,29 @@ namespace rpp
     public:
 
         /**
+         * Enable delegate initialization overloads only if:
+         * 1) not delegate, delegate&& or const delegate&
+         * 2) Functor matches `Ret(Args...)`
+         */
+        template<class Functor>
+        using enable_if_callable_t = std::enable_if_t<!std::is_same_v<std::decay_t<Functor>, delegate> // not const delegate& or delegate&&
+                                                    && std::is_invocable_r_v<Ret, Functor, Args...>>; // matches `Ret(Args...)`
+
+        /**
          * @brief Functor type constructor for lambdas and old-style functors
          * @code
          *   delegate<void(int)> d = [this](int a) { ... };
          *   delegate<bool(int,int)> compare = std::less<int>();
          * @endcode
          */
-        template<class Functor> delegate(Functor&& ftor) noexcept
+        template<class Functor, typename = enable_if_callable_t<Functor>>
+        delegate(Functor&& ftor) noexcept
         {
             init_functor(std::move(ftor));
         }
-        template<class Functor> delegate(const Functor& ftor) noexcept
+
+        template<class Functor, typename = enable_if_callable_t<Functor>>
+        delegate(const Functor& ftor) noexcept
         {
             init_functor(ftor);
         }
@@ -412,12 +430,14 @@ namespace rpp
             init_method(inst, method);
         }
         /** @brief Resets the delegate to point to a functor or lambda */
-        template<class Functor> void reset(Functor&& ftor) noexcept
+        template<class Functor, typename = enable_if_callable_t<Functor>>
+        void reset(Functor&& ftor) noexcept
         {
             reset();
             init_functor(std::move(ftor));
         }
-        template<class Functor> void reset(const Functor& ftor) noexcept
+        template<class Functor, typename = enable_if_callable_t<Functor>>
+        void reset(const Functor& ftor) noexcept
         {
             reset();
             init_functor(ftor);
@@ -442,38 +462,8 @@ namespace rpp
         /**
          * @brief Invoke the delegate with specified args list
          */
-        template<class ...XArgs> inline Ret operator()(XArgs&&... args) const
-        {
-            if (obj)
-            {
-            #if _MSC_VER  // VC++
-                auto* inst = (dummy*)obj;
-                return (Ret)(inst->*dfunc)(std::forward<XArgs>(args)...);
-            #elif __clang__
-                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
-            #else
-                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
-            #endif
-            }
-            else
-                return (Ret)func(std::forward<XArgs>(args)...);
-        }
-        template<class ...XArgs> inline Ret invoke(XArgs&&... args) const
-        {
-            if (obj)
-            {
-            #if _MSC_VER  // VC++
-                auto* inst = (dummy*)obj;
-                return (Ret)(inst->*dfunc)(std::forward<XArgs>(args)...);
-            #elif __clang__
-                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
-            #else
-                return (Ret)mfunc(obj, std::forward<XArgs>(args)...);
-            #endif
-            }
-            else
-                return (Ret)func(std::forward<XArgs...>(args)...);
-        }
+        Ret operator()(Args... args) const;
+        Ret invoke(Args... args) const;
 
         /** @return true if this delegate is initialize and can be called */
         explicit operator bool() const noexcept
@@ -549,7 +539,42 @@ namespace rpp
     };
 
 
+    template<class Ret, class... Args> inline
+    Ret delegate<Ret(Args...)>::operator()(Args... args) const
+    {
+        if (obj)
+        {
+        #if _MSC_VER  // VC++
+            auto* inst = (dummy*)obj;
+            return (Ret)(inst->*dfunc)(std::forward<Args>(args)...);
+        #elif __clang__
+            return (Ret)mfunc(obj, std::forward<Args>(args)...);
+        #else
+            return (Ret)mfunc(obj, std::forward<Args>(args)...);
+        #endif
+        }
+        else
+            return (Ret)func(std::forward<Args>(args)...);
+    }
 
+
+    template<class Ret, class... Args> inline
+    Ret delegate<Ret(Args...)>::invoke(Args... args) const
+    {
+        if (obj)
+        {
+        #if _MSC_VER  // VC++
+            auto* inst = (dummy*)obj;
+            return (Ret)(inst->*dfunc)(std::forward<Args>(args)...);
+        #elif __clang__
+            return (Ret)mfunc(obj, std::forward<Args>(args)...);
+        #else
+            return (Ret)mfunc(obj, std::forward<Args>(args)...);
+        #endif
+        }
+        else
+            return (Ret)func(std::forward<Args...>(args)...);
+    }
 
 
 

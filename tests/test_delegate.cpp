@@ -71,6 +71,7 @@ TestImpl(test_delegate)
         };
 
         DataDelegate func = function;
+        AssertThat((bool)func, true);
         AssertThat(func(data), "function");
     }
 
@@ -197,6 +198,19 @@ TestImpl(test_delegate)
 
         DataDelegate func = Functor();
         AssertThat(func(data), "functor");
+    }
+
+    TestCase(move_init)
+    {
+        DataDelegate lambda = [x=data](Data a)
+        {
+            return validate("move_init", a);  
+        };
+
+        DataDelegate init { move(lambda) };
+        AssertThat((bool)init, true);
+        AssertThat((bool)lambda, false);
+        AssertThat(init(data), "move_init");
     }
 
     ////////////////////////////////////////////////////
