@@ -174,6 +174,7 @@ namespace rpp
         FINLINE string_buffer& operator<<(uint64 value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(float  value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(double value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(const string_buffer& buf) { write(buf); return *this; }
 
         void writeln(); // \n
         void write_quote(); // <">
