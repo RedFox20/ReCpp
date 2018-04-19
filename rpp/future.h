@@ -328,7 +328,7 @@ namespace rpp
         }
 
         // abandons this future and prevents any waiting in destructor
-        void abandon()
+        void detach()
         {
             if (this->valid()) rpp::parallel_task([f = move(*this)]() mutable {
                 try { (void)f.get(); }
@@ -507,7 +507,7 @@ namespace rpp
         }
 
         // abandons this future and prevents any waiting in destructor
-        void abandon()
+        void detach()
         {
             if (this->valid()) rpp::parallel_task([f = move(*this)]() mutable {
                 try { f.get(); } catch (...) {}
