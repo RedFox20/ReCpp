@@ -239,7 +239,9 @@ namespace rpp
         FINLINE strview(const char* str, const char* end)      : str(str), len(int(end-str))     {}
         FINLINE strview(const void* str, const void* end)      : strview((const char*)str, (const char*)end) {}
         FINLINE strview(const string& s)                       : str(s.c_str()), len((int)s.length()) {}
-        template<class StringT>
+
+        template<class StringT,
+                 typename = std::enable_if_t<std::is_member_function_pointer_v<decltype(&StringT::c_str)>> >
         FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const { return str[index]; }
         

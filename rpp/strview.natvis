@@ -32,4 +32,18 @@
     </Expand>
     </Type>
 
+    <Type Name="rpp::string_buffer">
+        <DisplayString>{ptr,na}</DisplayString>
+        <StringView>ptr,[len]</StringView>
+        <Expand>
+            <Item Name="[length]">len</Item>
+            <Item Name="[capacity]">cap</Item>
+            <Item Name="[pointer]">ptr</Item>
+            <ArrayItems>
+                <Size>len</Size>
+                <ValuePointer>ptr</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+
 </AutoVisualizer>
