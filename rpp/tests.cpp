@@ -26,13 +26,18 @@ namespace rpp
 
     int test::asserts_failed;
 
-    // C++17 feature: inline global variable guarantees
-    // one instance across all modules
-    inline vector<test_info> all_tests;
+    vector<test_info>& get_rpp_tests()
+    {
+        if (!_rpp_tests)
+            _rpp_tests = new vector<test_info>();
+        return *_rpp_tests;
+    }
+
+    static vector<test_info>& all_tests = get_rpp_tests();
 
     void register_test(strview name, test_factory factory, bool autorun)
     {
-        all_tests.emplace_back(test_info{ name, factory, {}, true, autorun });
+        get_rpp_tests().emplace_back(test_info{ name, factory, {}, true, autorun });
     }
 
     ///////////////////////////////////////////////////////////////////////////
