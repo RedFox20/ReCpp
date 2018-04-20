@@ -447,8 +447,14 @@ namespace rpp /* ReCpp */
             else
             {
                 out.reserve(size_t(n));
-                for (int i = 0; i < n; ++i)
+                for (int i = 0; i < n; ++i) {
+                #if _MSC_VER
                     *this >> out.emplace_back();
+                #else
+                    out.emplace_back();
+                    *this >> out.back();
+                #endif
+                }
             }
             return *this;
         }
