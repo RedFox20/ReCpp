@@ -127,7 +127,7 @@ namespace rpp
         }
 
         /** @brief Default constructor from nullptr */
-        explicit delegate(nullptr_t) noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
+        explicit delegate(std::nullptr_t) noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
         {
         }
 
