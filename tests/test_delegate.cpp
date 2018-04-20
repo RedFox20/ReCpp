@@ -1,4 +1,6 @@
+#define _DEBUG_FUNCTIONAL_MACHINERY
 #include <rpp/delegate.h>
+#include <rpp/stack_trace.h>
 #include <rpp/tests.h>
 using namespace rpp;
 
@@ -33,14 +35,38 @@ public:
 };
 string to_string(const Data& d) { return d.data; }
 
+#define __validate_data_arg(arg) \
+    if (!arg.data || arg != "data") \
+        throw traced_exception("Argument `"#arg"` did not contain \"data\"");
+
 static Data validate(const char* name, const Data& a)
 {
     printf("%s: '%s'\n", name, a.data);
+    __validate_data_arg(a);
     return Data{name};
 }
-static Data validate(const char* name, const Data& a, const Data& x)
+static Data validate(const char* name, const Data& a, const Data& b)
 {
-    printf("%s: '%s' '%s'\n", name, a.data, x.data);
+    printf("%s: '%s' '%s'\n", name, a.data, b.data);
+    __validate_data_arg(a);
+    __validate_data_arg(b);
+    return Data{name};
+}
+static Data validate(const char* name, const Data& a, const Data& b, const Data& c)
+{
+    printf("%s: '%s' '%s' '%s'\n", name, a.data, b.data, c.data);
+    __validate_data_arg(a);
+    __validate_data_arg(b);
+    __validate_data_arg(c);
+    return Data{name};
+}
+static Data validate(const char* name, const Data& a, const Data& b, const Data& c, const Data& d)
+{
+    printf("%s: '%s' '%s' '%s' '%s'\n", name, a.data, b.data, c.data, d.data);
+    __validate_data_arg(a);
+    __validate_data_arg(b);
+    __validate_data_arg(c);
+    __validate_data_arg(d);
     return Data{name};
 }
 
@@ -181,7 +207,7 @@ TestImpl(test_delegate)
         AssertThat(lambda(data), "nested_lambda");
 
         DataDelegate moved_lambda = move(lambda);
-        AssertThat(!lambda, true);
+        AssertThat((bool)lambda, false);
         AssertThat(moved_lambda(data), "nested_lambda");
     }
 
@@ -262,7 +288,80 @@ TestImpl(test_delegate)
         evt.remove(receiver, &Receiver::event_method);
         evt.remove(receiver, &Receiver::const_method);
         evt(data);
-        Assert(evt.size() == 0); // must be empty now
+        AssertThat(evt.size(), 0); // must be empty now
+        AssertThat(evt.empty(), true);
+        AssertThat((bool)evt, false);
+    }
+
+    TestCase(multicast_delegate_copy_and_move)
+    {
+        int count = 0;
+        multicast_delegate<Data> evt;
+        evt += [&](Data a)
+        {
+            ++count;
+            validate("evt1", a); 
+        };
+        evt += [&](Data a)
+        {
+            ++count;
+            validate("evt2", a);
+        };
+        AssertThat(evt.empty(), false);
+        AssertThat((bool)evt, true);
+        AssertThat(evt.size(), 2);
+        evt(data);
+        AssertThat(count, 2);
+
+        count = 0;
+        multicast_delegate<Data> evt2 = evt;
+        AssertThat(evt2.empty(), false);
+        AssertThat((bool)evt2, true);
+        AssertThat(evt2.size(), 2);
+        evt2(data);
+        AssertThat(count, 2);
+
+        count = 0;
+        multicast_delegate<Data> evt3 = move(evt2);
+        AssertThat(evt3.empty(), false);
+        AssertThat((bool)evt3, true);
+        AssertThat(evt3.size(), 2);
+        evt3(data);
+        AssertThat(count, 2);
+    }
+
+    TestCase(std_function_args)
+    {
+        std::function<void(Data, Data&, const Data&, Data&&)> fun =
+            [&](Data a, Data& b, const Data& c, Data&& d)
+        {
+            validate("stdfun", a, b, c, d); 
+        };
+        Data copy = data;
+        fun.operator()(data, data, data, std::move(copy));
+    }
+
+    TestCase(multicast_delegate_mixed_reference_args)
+    {
+        int count = 0;
+        multicast_delegate<Data, Data&, const Data&, Data&&> evt;
+        evt += [&](Data a, Data& b, const Data& c, Data&& d)
+        {
+            ++count;
+            validate("evt1", a, b, c, d); 
+        };
+        evt += [&](Data a, Data& b, const Data& c, Data&& d)
+        {
+            ++count;
+            validate("evt2", a, b, c, d); 
+        };
+        AssertThat(evt.empty(), false);
+        AssertThat((bool)evt, true);
+        AssertThat(evt.size(), 2);
+
+        Data copy = data;
+        evt(data, data, data, std::move(copy));
+        AssertThat(count, 2);
     }
 
     ////////////////////////////////////////////////////

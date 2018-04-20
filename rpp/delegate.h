@@ -54,7 +54,6 @@
 #include <cstdlib> // malloc/free for event<()>
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
-#include <cstdio>
 #include <cassert>
 
 namespace rpp
@@ -155,7 +154,7 @@ namespace rpp
         }
 
         /** @brief Creates a copy of the delegate */
-        delegate(const delegate& d) noexcept : delegate()
+        delegate(const delegate& d) noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
         {
             d.copy(*this);
         }
@@ -463,17 +462,8 @@ namespace rpp
         //////////////////////////////////////////////////////////////////////////////////////
 
 
-        /**
-         * @brief Invoke the delegate with specified args list
-         */
-        Ret operator()(Args... args) const;
-        Ret invoke(Args... args) const;
-
         /** @return true if this delegate is initialize and can be called */
-        explicit operator bool() const noexcept
-        {
-            return func != nullptr;
-        }
+        explicit operator bool() const noexcept { return func != nullptr; }
 
 
         /** @brief Basic operator= shortcuts for reset() */
@@ -540,6 +530,14 @@ namespace rpp
             Functor inst;
             return equal_method(inst, &Functor::operator());
         }
+
+        //////////////////////////////////////////////////////////////////////////////////////
+
+        /**
+         * @brief Invoke the delegate with specified args list
+         */
+        inline Ret operator()(Args... args) const;
+        inline Ret invoke(Args... args) const;
     };
 
 
@@ -614,7 +612,7 @@ namespace rpp
 
 
         /** @brief Creates an uninitialized event multicast delegate */
-        multicast_delegate() noexcept : ptr(nullptr)
+        multicast_delegate() noexcept : ptr{nullptr}
         {
         }
         ~multicast_delegate() noexcept
@@ -628,6 +626,32 @@ namespace rpp
                 free(ptr);
             }
         }
+
+        multicast_delegate(multicast_delegate&& d) noexcept : ptr{d.ptr}
+        {
+            d.ptr = nullptr;
+        }
+        multicast_delegate& operator=(multicast_delegate&& d) noexcept
+        {
+            std::swap(ptr, d.ptr);
+            return* this;
+        }
+
+        multicast_delegate(const multicast_delegate& d) noexcept : ptr{nullptr}
+        {
+            this->operator=(d);
+        }
+        multicast_delegate& operator=(const multicast_delegate& d) noexcept
+        {
+            if (this != &d)
+            {
+                clear();
+                for (const deleg& del : d)
+                    this->add(del);
+            }
+            return* this;
+        }
+
         /** @brief Destructs the event container and frees all used memory */
         void clear() noexcept
         {
@@ -637,12 +661,19 @@ namespace rpp
 
         /** @return TRUE if there are callable delegates */
         explicit operator bool() const noexcept { return ptr && ptr->size; }
+        bool empty() const { return !ptr || !ptr->size; }
+
         /** @return Number of currently registered event delegates */
         int size() const noexcept { return ptr ? ptr->size : 0; }
 
+              deleg* begin()       { return ptr ? &ptr->data[0] : nullptr; }
+        const deleg* begin() const { return ptr ? &ptr->data[0] : nullptr; }
+              deleg* end()       { return ptr ? &ptr->data[0] + ptr->size : nullptr; }
+        const deleg* end() const { return ptr ? &ptr->data[0] + ptr->size : nullptr; }
 
-        /** @brief Registers a new delegate to receive notifications */
-        void add(deleg&& d) noexcept
+    private:
+
+        void grow()
         {
             if (!ptr)
             {
@@ -658,13 +689,28 @@ namespace rpp
                 ptr = (container*)realloc(ptr,
                     sizeof(container) + sizeof(deleg) * (ptr->capacity - 1));
             }
+        }
+
+    public:
+
+        /** @brief Registers a new delegate to receive notifications */
+        void add(deleg&& d) noexcept
+        {
+            grow();
             new (&ptr->data[ptr->size++]) deleg((deleg&&)d);
         }
+
+        void add(const deleg& d) noexcept
+        {
+            grow();
+            new (&ptr->data[ptr->size++]) deleg(d);
+        }
+
         /**
          * @brief Unregisters the first matching delegate from this event
          * @note Removing lambdas and functors is somewhat inefficient due to functor copying
          */
-        void remove(deleg&& d) noexcept
+        void remove(const deleg& d) noexcept
         {
             int    size = ptr->size;
             deleg* data = ptr->data;
@@ -672,8 +718,7 @@ namespace rpp
             {
                 if (data[i] == d)
                 {
-                    memmove(&data[i], &data[i + 1],
-                        sizeof(deleg)*(size - i - 1)); // unshift
+                    memmove(&data[i], &data[i + 1], sizeof(deleg)*(size - i - 1)); // unshift
                     --ptr->size;
                     return;
                 }
@@ -722,9 +767,14 @@ namespace rpp
             add((deleg&&)d);
             return *this;
         }
-        multicast_delegate& operator-=(deleg&& d) noexcept
+        multicast_delegate& operator+=(const deleg& d) noexcept
         {
-            remove((deleg&&)d);
+            add(d);
+            return *this;
+        }
+        multicast_delegate& operator-=(const deleg& d) noexcept
+        {
+            remove(d);
             return *this;
         }
 
@@ -732,25 +782,36 @@ namespace rpp
         /**
          * @brief Invoke all subscribed event delegates.
          */
-        template<class ...XArgs> void operator()(XArgs&&... args) const
-        {
-            int    size = ptr->size;
-            deleg* data = ptr->data;
-            for (int i = 0; i < size; ++i)
-            {
-                data[i](std::forward<XArgs>(args)...);
-            }
-        }
-        template<class ...XArgs> void invoke(XArgs&&... args) const
-        {
-            int    size = ptr->size;
-            deleg* data = ptr->data;
-            for (int i = 0; i < size; ++i)
-            {
-                data[i](std::forward<XArgs>(args)...);
-            }
-        }
+        inline  void operator()(Args... args) const;
+        inline  void invoke(Args... args) const;
     };
+
+    template<class T> struct multicast_fwd      { using type = const T&; };
+    template<class T> struct multicast_fwd<T&>  { using type = T&;       };
+    template<class T> struct multicast_fwd<T&&> { using type = T&&;      };
+    template<class T> using multicast_fwd_t = typename multicast_fwd<T>::type;
+
+    template<class... Args> inline
+    void multicast_delegate<Args...>::operator()(Args... args) const
+    {
+        int    size = ptr->size;
+        deleg* data = ptr->data;
+        for (int i = 0; i < size; ++i)
+        {
+            data[i](static_cast<multicast_fwd_t<Args>>(args)...);
+        }
+    }
+    template<class... Args> inline
+    void multicast_delegate<Args...>::invoke(Args... args) const
+    {
+        int    size = ptr->size;
+        deleg* data = ptr->data;
+        for (int i = 0; i < size; ++i)
+        {
+            data[i](static_cast<multicast_fwd_t<Args>>(args)...);
+        }
+    }
+
 
 } // namespace rpp
 
