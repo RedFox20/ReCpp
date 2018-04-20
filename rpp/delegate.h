@@ -374,7 +374,11 @@ namespace rpp
          */
         template<class Functor>
         using enable_if_callable_t = std::enable_if_t<!std::is_same_v<std::decay_t<Functor>, delegate> // not const delegate& or delegate&&
+                                                #if _MSC_VER
                                                     && std::is_invocable_r_v<Ret, Functor, Args...>>; // matches `Ret(Args...)`
+                                                #else
+                                                    && std::__invokable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                                #endif
 
         /**
          * @brief Functor type constructor for lambdas and old-style functors
