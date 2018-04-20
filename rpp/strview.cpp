@@ -46,12 +46,33 @@ namespace rpp
         return buf;
     }
 
+    struct ringbuf {
+        static constexpr int max = 1024;
+        int pos;
+        char buf[max];
+        struct chunk {
+            char* ptr;
+            int len;
+        };
+        chunk next(int n) {
+            int rem = max - pos;
+            if (rem < n) {
+                pos = 0;
+                rem = max;
+            }
+            char* ptr = buf+pos;
+            pos += n;
+            return { ptr, rem };
+        }
+    };
+
     const char* strview::to_cstr() const
     {
         if (str[len] == '\0')
             return str;
-        static thread_local char buf[512];
-        return to_cstr(buf, sizeof(buf));
+        static thread_local ringbuf ringbuf;
+        auto chunk = ringbuf.next(len+1);
+        return to_cstr(chunk.ptr, chunk.len);
     }
 
     bool strview::to_bool() const

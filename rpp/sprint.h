@@ -118,6 +118,7 @@ namespace rpp
         FINLINE const char* data()  const { return ptr; }
         FINLINE rpp::strview view() const { return { ptr, len }; }
         FINLINE std::string  str()  const { return { ptr, ptr+len }; }
+        FINLINE char back() const { return len ? ptr[len-1] : '\0'; }
 
         FINLINE explicit operator bool()         const { return len > 0; }
         FINLINE explicit operator rpp::strview() const { return { ptr, len }; }
