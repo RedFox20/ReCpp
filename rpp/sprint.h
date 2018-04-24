@@ -125,6 +125,9 @@ namespace rpp
 
         void clear();
         void reserve(int count) noexcept;
+
+        /** @param count Size of buffer to emplace */
+        char* emplace_buffer(int count) noexcept;
         void writef(const char* format, ...);
         void write(std::nullptr_t);
         void write(const string_buffer& sb);

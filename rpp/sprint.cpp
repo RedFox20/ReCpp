@@ -34,6 +34,14 @@ namespace rpp
         }
     }
 
+    char* string_buffer::emplace_buffer(int count) noexcept
+    {
+        reserve(count);
+        char* result = &ptr[len];
+        len += count;
+        return result;
+    }
+
     void string_buffer::writef(const char* format, ...)
     {
         char buffer[8192];
@@ -137,7 +145,7 @@ namespace rpp
         va_list ap;
         va_start(ap, format);
         int n = vsnprintf(buf, sizeof(buf), format, ap);
-        if (n < 0 || n >= sizeof(buf)) {
+        if (n < 0 || n >= (int)sizeof(buf)) {
             n = sizeof(buf)-1;
             buf[n] = '\0';
         }
