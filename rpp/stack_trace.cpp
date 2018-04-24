@@ -89,7 +89,7 @@ namespace rpp
     {
     }
 
-    using signal_handler_t = void (__cdecl*)(int sig);
+    using signal_handler_t = void (*)(int sig);
 
     static signal_handler_t OldHandler;
 

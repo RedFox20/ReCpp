@@ -52,14 +52,14 @@ static Data validate(const char* name, const Data& a, const Data& b)
     __validate_data_arg(b);
     return Data{name};
 }
-static Data validate(const char* name, const Data& a, const Data& b, const Data& c)
-{
-    printf("%s: '%s' '%s' '%s'\n", name, a.data, b.data, c.data);
-    __validate_data_arg(a);
-    __validate_data_arg(b);
-    __validate_data_arg(c);
-    return Data{name};
-}
+//static Data validate(const char* name, const Data& a, const Data& b, const Data& c)
+//{
+//    printf("%s: '%s' '%s' '%s'\n", name, a.data, b.data, c.data);
+//    __validate_data_arg(a);
+//    __validate_data_arg(b);
+//    __validate_data_arg(c);
+//    return Data{name};
+//}
 static Data validate(const char* name, const Data& a, const Data& b, const Data& c, const Data& d)
 {
     printf("%s: '%s' '%s' '%s' '%s'\n", name, a.data, b.data, c.data, d.data);
