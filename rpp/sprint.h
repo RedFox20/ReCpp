@@ -150,7 +150,7 @@ namespace rpp
         FINLINE void write(const char* value)        { write(strview{ value }); }
 
         void write(const strview& s);
-        void write(const char& value);
+        void write(char value);
         void write(bool   value);
         void write(rpp::byte bv);
         void write(short  value);
@@ -164,7 +164,7 @@ namespace rpp
 
         FINLINE string_buffer& operator<<(const std::string& value) { write(strview{ value }); return *this; }
         FINLINE string_buffer& operator<<(const char* value)        { write(strview{ value }); return *this; }
-        FINLINE string_buffer& operator<<(const char& value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(char   value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(bool   value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(rpp::byte bv) { write(bv);    return *this; }
         FINLINE string_buffer& operator<<(short  value) { write(value); return *this; }

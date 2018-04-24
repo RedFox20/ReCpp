@@ -62,7 +62,7 @@ namespace rpp
         ptr[len] = '\0';
     }
 
-    void string_buffer::write(const char& value)
+    void string_buffer::write(char value)
     {
         reserve(1);
         ptr[len++] = value;
