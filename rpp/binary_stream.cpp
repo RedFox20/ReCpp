@@ -1,20 +1,20 @@
 #include "binary_stream.h"
-#include <stdlib.h>
 
 namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////
 
-    binary_stream::binary_stream(stream_source* src) noexcept : Ptr(Buf), Src(src)
+    // ReSharper disable CppPossiblyUninitializedMember
+    binary_stream::binary_stream(stream_source* src) noexcept : Ptr(Buf), Src(src) // NOLINT
     {
     }
-
-    binary_stream::binary_stream(int capacity, stream_source* src) noexcept : Ptr(Buf), Src(src)
+    binary_stream::binary_stream(int capacity, stream_source* src) noexcept : Ptr(Buf), Src(src) // NOLINT
     {
         if (capacity > SBSize)
             Ptr = (char*)malloc(capacity);
         Cap = capacity;
     }
+    // ReSharper restore CppPossiblyUninitializedMember
 
     binary_stream::~binary_stream() noexcept
     {
@@ -85,13 +85,17 @@ namespace rpp
     void binary_stream::flush() 
     {
         if (!Src) return;
-        if (int writePos = WritePos) // were we writing something?
+        flush_buffer();
+        Src->stream_flush(); // now ask the source itself to flush the stuff
+    }
+
+    void binary_stream::flush_buffer()
+    {
+        if (WritePos) // were we writing something?
         {
             (void)Src->stream_write(Ptr, End);
             clear();
         }
-        // now ask the source itself to flush the stuff
-        Src->stream_flush();
     }
 
     void binary_stream::ensure_space(int numBytes)
@@ -262,10 +266,7 @@ namespace rpp
 
     //// -- SOCKET READER -- ////
     
-    socket_reader::~socket_reader() noexcept
-    {
-        // nothing to flush
-    }
+    socket_reader::~socket_reader() noexcept = default;
 
     void socket_reader::stream_flush() noexcept
     {
@@ -323,10 +324,7 @@ namespace rpp
 
     //// -- FILE READER -- ////
     
-    file_reader::~file_reader() noexcept
-    {
-        // nothing to flush for reader
-    }
+    file_reader::~file_reader() noexcept = default;
 
     void file_reader::stream_flush() noexcept
     {

@@ -245,9 +245,14 @@ namespace rpp /* ReCpp */
         void reserve(int capacity);
 
         /** 
-         * @brief Flush write buffer on this writer.
+         * @brief Flush write buffer and then flush to the underlying stream.
          */
         void flush();
+
+        /**
+         * @brief Flush write buffer only. Underlying stream will take care of its own things.
+         */
+        void flush_buffer();
 
     private:
         NOINLINE void ensure_space(int numBytes);
