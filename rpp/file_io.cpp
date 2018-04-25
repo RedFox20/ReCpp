@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <array>
 #include <locale>  // wstring_convert
+#include <sys/stat.h> // stat,fstat
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
@@ -28,12 +29,8 @@
 #if !_WIN32
     #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
     #include <codecvt> // codecvt_utf8
-#endif
-#if !USE_WINAPI_IO
-    #include <sys/stat.h> // stat,fstat
-    #if _WIN32
-        #include <io.h>     // _chsize
-    #endif
+#elif !USE_WINAPI_IO
+    #include <io.h>     // _chsize
 #endif
 #if __APPLE__
     #include <TargetConditionals.h>
