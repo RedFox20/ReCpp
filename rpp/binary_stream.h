@@ -46,16 +46,15 @@ namespace rpp /* ReCpp */
         using int64  = long long;
         using uint64 = unsigned long long;
     #endif
-
+    
     #ifndef NOCOPY_NOMOVE
-    #define NOCOPY_NOMOVE(Class)                                   \
-                          Class(Class&&)                 = delete; \
-                          Class(const Class&)            = delete; \
-                          Class& operator=(Class&&)      = delete; \
-                          Class& operator=(const Class&) = delete;
+    #define NOCOPY_NOMOVE(T) \
+            T(T&& fwd)             = delete; \
+            T& operator=(T&& fwd)  = delete; \
+            T(const T&)            = delete; \
+            T& operator=(const T&) = delete;
     #endif
-
-
+    
     #ifndef RPP_MINMAX_DEFINED
     #define RPP_MINMAX_DEFINED
         template<class T> T max(T a, T b) { return a > b ? a : b; }
