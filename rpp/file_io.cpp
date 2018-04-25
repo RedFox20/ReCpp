@@ -3,17 +3,14 @@
 #include <cstdio>
 #include <cerrno>
 #include <array>
-#include <sys/stat.h> // stat,fstat
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
-#include <codecvt> // codecvt_utf8
 #include <locale>  // wstring_convert
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
-    #include <io.h>     // _chsize
     #define USE_WINAPI_IO 1
+
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64
@@ -28,12 +25,19 @@
     #define _fstat64 fstat
     #define stat64   stat
 #endif
+#if !_WIN32
+    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
+    #include <codecvt> // codecvt_utf8
+#endif
+#if !USE_WINAPI_IO
+    #include <sys/stat.h> // stat,fstat
+    #include <io.h>     // _chsize
+#endif
 #if __APPLE__
-#include <TargetConditionals.h>
+    #include <TargetConditionals.h>
 #endif
 #if __ANDROID__
-#include <jni.h>
-
+    #include <jni.h>
 #endif
 
 namespace rpp /* ReCpp */
@@ -44,7 +48,7 @@ namespace rpp /* ReCpp */
     }
     load_buffer::load_buffer(load_buffer&& mv) noexcept : str(mv.str), len(mv.len)
     {
-        mv.str = 0;
+        mv.str = nullptr;
         mv.len = 0;
     }
     load_buffer& load_buffer::operator=(load_buffer&& mv) noexcept
@@ -61,14 +65,14 @@ namespace rpp /* ReCpp */
     char* load_buffer::steal_ptr() noexcept
     {
         char* p = str;
-        str = 0;
+        str = nullptr;
         return p;
     }
 
 
     ////////////////////////////////////////////////////////////////////////////////
 
-#if !USE_WINAPI_IO && !_WIN32
+#if !_WIN32
     static string to_string(const wchar_t* ws)
     {
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
@@ -78,9 +82,9 @@ namespace rpp /* ReCpp */
 
 #if USE_WINAPI_IO
     static void* OpenF(const char* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
-    { return CreateFileA(f, a, s, sa, c, o, 0); }
+    { return CreateFileA(f, a, s, sa, c, o, nullptr); }
     static void* OpenF(const wchar_t* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
-    { return CreateFileW(f, a, s, sa, c, o, 0); }
+    { return CreateFileW(f, a, s, sa, c, o, nullptr); }
 #else
     static void* OpenF(const char* f, IOFlags mode) {
         if (mode == READWRITE) {
@@ -139,9 +143,9 @@ namespace rpp /* ReCpp */
                 openFlags  = FILE_ATTRIBUTE_NORMAL;
                 break;
         }
-        SECURITY_ATTRIBUTES secu = { sizeof(secu), NULL, TRUE };
+        SECURITY_ATTRIBUTES secu = { sizeof(secu), nullptr, TRUE };
         void* handle = OpenF(filename, access, sharing, &secu, createmode, openFlags);
-        return handle != INVALID_HANDLE_VALUE ? handle : 0;
+        return handle != INVALID_HANDLE_VALUE ? handle : nullptr;
     #else
         return OpenF(filename, mode);
     #endif
@@ -211,11 +215,11 @@ namespace rpp /* ReCpp */
     {
         if (Handle)
         {
-            #if USE_WINAPI_IO
-                CloseHandle((HANDLE)Handle);
-            #else
-                fclose((FILE*)Handle);
-            #endif
+        #if USE_WINAPI_IO
+            CloseHandle((HANDLE)Handle);
+        #else
+            fclose((FILE*)Handle);
+        #endif
             Handle = nullptr;
         }
     }
@@ -230,46 +234,47 @@ namespace rpp /* ReCpp */
     int file::size() const noexcept
     {
         if (!Handle) return 0;
-        #if USE_WINAPI_IO
-            return GetFileSize((HANDLE)Handle, 0);
-        #else
-            struct stat s;
-            if (fstat(fileno((FILE*)Handle), &s)) {
-                //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
-                return 0;
-            }
-            return (int)s.st_size;
-        #endif
+    #if USE_WINAPI_IO
+        return GetFileSize((HANDLE)Handle, nullptr);
+    #else
+        struct stat s;
+        if (fstat(fileno((FILE*)Handle), &s)) {
+            //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
+            return 0;
+        }
+        return (int)s.st_size;
+    #endif
     }
     int64 file::sizel() const noexcept
     {
         if (!Handle) return 0;
-        #if USE_WINAPI_IO
-            LARGE_INTEGER size;
-            if (!GetFileSizeEx((HANDLE)Handle, &size)) {
-                //fprintf(stderr, "GetFileSizeEx error: [%d]\n", GetLastError());
-                return 0ull;
-            }
-            return (int64)size.QuadPart;
-        #else
-            struct stat64 s;
-            if (_fstat64(fileno((FILE*)Handle), &s)) {
-                //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));
-                return 0ull;
-            }
-            return (int64)s.st_size;
-        #endif
+    #if USE_WINAPI_IO
+        LARGE_INTEGER size;
+        if (!GetFileSizeEx((HANDLE)Handle, &size)) {
+            //fprintf(stderr, "GetFileSizeEx error: [%d]\n", GetLastError());
+            return 0ull;
+        }
+        return (int64)size.QuadPart;
+    #else
+        struct stat64 s;
+        if (_fstat64(fileno((FILE*)Handle), &s)) {
+            //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));
+            return 0ull;
+        }
+        return (int64)s.st_size;
+    #endif
     }
+    // ReSharper disable once CppMemberFunctionMayBeConst
     int file::read(void* buffer, int bytesToRead) noexcept
     {
         if (!Handle) return 0;
-        #if USE_WINAPI_IO
-            DWORD bytesRead;
-            ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
-            return bytesRead;
-        #else
-            return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        DWORD bytesRead;
+        ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
+        return bytesRead;
+    #else
+        return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
+    #endif
     }
     load_buffer file::read_all() noexcept
     {
@@ -277,7 +282,7 @@ namespace rpp /* ReCpp */
         if (!fileSize) return load_buffer{nullptr, 0};
 
         // allocate +1 bytes for null terminator; this is for legacy API-s
-        char* buffer = (char*)malloc(size_t(fileSize + 1));
+        auto buffer = (char*)malloc(size_t(fileSize + 1));
         int bytesRead = read(buffer, fileSize);
         buffer[bytesRead] = '\0';
         return load_buffer{buffer, bytesRead};
@@ -361,7 +366,7 @@ namespace rpp /* ReCpp */
             map[key] = value;
         return map;
     }
-
+    // ReSharper disable once CppMemberFunctionMayBeConst
     int file::write(const void* buffer, int bytesToWrite) noexcept
     {
         if (bytesToWrite <= 0)
@@ -369,39 +374,39 @@ namespace rpp /* ReCpp */
         if (!Handle)
             return 0;
         
-        #if USE_WINAPI_IO
-            DWORD bytesWritten;
-            WriteFile((HANDLE)Handle, buffer, bytesToWrite, &bytesWritten, 0);
-            return bytesWritten;
-        #elif WIN32
-            // MSVC writes to buffer byte by byte, so to get decent performance, flip the count
-            int result = (int)fwrite(buffer, bytesToWrite, 1, (FILE*)Handle);
-            return result > 0 ? result * bytesToWrite : result;
-        #else
-            return (int)fwrite(buffer, 1, bytesToWrite, (FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        DWORD bytesWritten;
+        WriteFile((HANDLE)Handle, buffer, bytesToWrite, &bytesWritten, nullptr);
+        return bytesWritten;
+    #elif WIN32
+        // MSVC writes to buffer byte by byte, so to get decent performance, flip the count
+        int result = (int)fwrite(buffer, bytesToWrite, 1, (FILE*)Handle);
+        return result > 0 ? result * bytesToWrite : result;
+    #else
+        return (int)fwrite(buffer, 1, bytesToWrite, (FILE*)Handle);
+    #endif
     }
     int file::writef(const char* format, ...) noexcept
     {
         if (!Handle)
             return 0;
         va_list ap; va_start(ap, format);
-        #if USE_WINAPI_IO // @note This is heavily optimized
-            char buf[4096];
-            int n = vsnprintf(buf, sizeof(buf), format, ap);
-            if (n >= sizeof(buf))
-            {
-                const int n2 = n + 1;
-                const bool heap = (n2 > 64 * 1024);
-                char* b2 = (char*)(heap ? malloc(n2) : _alloca(n2));
-                n = write(b2, vsnprintf(b2, n2, format, ap));
-                if (heap) free(b2);
-                return n;
-            }
-            return write(buf, n);
-        #else
-            return vfprintf((FILE*)Handle, format, ap);
-        #endif
+    #if USE_WINAPI_IO // @note This is heavily optimized
+        char buf[4096];
+        int n = vsnprintf(buf, sizeof(buf), format, ap);
+        if (n >= (int)sizeof(buf))
+        {
+            const int n2 = n + 1;
+            const bool heap = (n2 > 64 * 1024);
+            auto b2 = (char*)(heap ? malloc(n2) : _alloca(n2));
+            n = write(b2, vsnprintf(b2, n2, format, ap));
+            if (heap) free(b2);
+            return n;
+        }
+        return write(buf, n);
+    #else
+        return vfprintf((FILE*)Handle, format, ap);
+    #endif
     }
 
     int file::writeln(const strview& str) noexcept
@@ -442,24 +447,25 @@ namespace rpp /* ReCpp */
     void file::truncate(int64 newLength)
     {
         if (!Handle) return;
-        #if USE_WINAPI_IO
-            seekl(newLength, SEEK_SET);
-            SetEndOfFile((HANDLE)Handle);
-        #elif _MSC_VER
-            _chsize_s(fileno((FILE*)Handle), newLength);
-        #else
-            ftruncate(fileno((FILE*)Handle), (off_t)newLength);
-        #endif
+    #if USE_WINAPI_IO
+        seekl(newLength, SEEK_SET);
+        SetEndOfFile((HANDLE)Handle);
+    #elif _MSC_VER
+        _chsize_s(fileno((FILE*)Handle), newLength);
+    #else
+        ftruncate(fileno((FILE*)Handle), (off_t)newLength);
+    #endif
     }
 
+    // ReSharper disable once CppMemberFunctionMayBeConst
     void file::flush() noexcept
     {
         if (!Handle) return;
-        #if USE_WINAPI_IO
-            FlushFileBuffers((HANDLE)Handle);
-        #else
-            fflush((FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        FlushFileBuffers((HANDLE)Handle);
+    #else
+        fflush((FILE*)Handle);
+    #endif
     }
     int file::write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept
     {
@@ -472,59 +478,62 @@ namespace rpp /* ReCpp */
         return write_new(filename.to_cstr(buf), buffer, bytesToWrite);
     }
 
+    // ReSharper disable once CppMemberFunctionMayBeConst
     int file::seek(int filepos, int seekmode) noexcept
     {
         if (!Handle)
             return 0;
-        #if USE_WINAPI_IO
-            return SetFilePointer((HANDLE)Handle, filepos, 0, seekmode);
-        #else
-            fseek((FILE*)Handle, filepos, seekmode);
-            return (int)ftell((FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        return SetFilePointer((HANDLE)Handle, filepos, nullptr, seekmode);
+    #else
+        fseek((FILE*)Handle, filepos, seekmode);
+        return (int)ftell((FILE*)Handle);
+    #endif
     }
+
+    // ReSharper disable once CppMemberFunctionMayBeConst
     uint64 file::seekl(int64 filepos, int seekmode) noexcept
     {
         if (!Handle)
             return 0LL;
-        #if USE_WINAPI_IO
-            LARGE_INTEGER newpos, nseek;
-            nseek.QuadPart = filepos;
-            SetFilePointerEx((HANDLE)Handle, nseek, &newpos, seekmode);
-            return newpos.QuadPart;
-        #else
-            fseeki64((FILE*)Handle, filepos, seekmode);
-            return (uint64)ftelli64((FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        LARGE_INTEGER newpos, nseek;
+        nseek.QuadPart = filepos;
+        SetFilePointerEx((HANDLE)Handle, nseek, &newpos, seekmode);
+        return newpos.QuadPart;
+    #else
+        fseeki64((FILE*)Handle, filepos, seekmode);
+        return (uint64)ftelli64((FILE*)Handle);
+    #endif
     }
     int file::tell() const noexcept
     {
         if (!Handle)
             return 0;
-        #if USE_WINAPI_IO
-            return SetFilePointer((HANDLE)Handle, 0, 0, FILE_CURRENT);
-        #else
-            return (int)ftell((FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        return SetFilePointer((HANDLE)Handle, 0, nullptr, FILE_CURRENT);
+    #else
+        return (int)ftell((FILE*)Handle);
+    #endif
     }
 
     int64 file::tell64() const noexcept
     {
         if (!Handle)
             return 0LL;
-        #if USE_WINAPI_IO
-            LARGE_INTEGER current;
-            SetFilePointerEx((HANDLE)Handle, { 0 }, &current, FILE_CURRENT);
-            return current.QuadPart;
-        #else
-            return (int64)ftelli64((FILE*)Handle);
-        #endif
+    #if USE_WINAPI_IO
+        LARGE_INTEGER current;
+        SetFilePointerEx((HANDLE)Handle, { {0, 0} }, &current, FILE_CURRENT);
+        return current.QuadPart;
+    #else
+        return (int64)ftelli64((FILE*)Handle);
+    #endif
     }
 
 #if USE_WINAPI_IO
     static time_t to_time_t(const FILETIME& ft)
     {
-        ULARGE_INTEGER ull = { ft.dwLowDateTime, ft.dwHighDateTime };
+        ULARGE_INTEGER ull = { { ft.dwLowDateTime, ft.dwHighDateTime } };
         return ull.QuadPart / 10000000ULL - 11644473600ULL;
     }
 #endif
@@ -535,7 +544,7 @@ namespace rpp /* ReCpp */
             return false;
     #if USE_WINAPI_IO
         FILETIME c, a, m;
-        if (GetFileTime((HANDLE)Handle, outCreated?&c:0,outAccessed?&a:0, outModified?&m:0)) {
+        if (GetFileTime((HANDLE)Handle, outCreated?&c:nullptr,outAccessed?&a: nullptr, outModified?&m: nullptr)) {
             if (outCreated)  *outCreated  = to_time_t(c);
             if (outAccessed) *outAccessed = to_time_t(a);
             if (outModified) *outModified = to_time_t(m);
@@ -554,9 +563,9 @@ namespace rpp /* ReCpp */
         return false;
     #endif
     }
-    time_t file::time_created()  const noexcept { time_t t; return time_info(&t, 0, 0) ? t : time_t(0); }
-    time_t file::time_accessed() const noexcept { time_t t; return time_info(0, &t, 0) ? t : time_t(0); }
-    time_t file::time_modified() const noexcept { time_t t; return time_info(0, 0, &t) ? t : time_t(0); }
+    time_t file::time_created()  const noexcept { time_t t; return time_info(&t, nullptr, nullptr) ? t : time_t(0); }
+    time_t file::time_accessed() const noexcept { time_t t; return time_info(nullptr, &t, nullptr) ? t : time_t(0); }
+    time_t file::time_modified() const noexcept { time_t t; return time_info(nullptr, nullptr, &t) ? t : time_t(0); }
 
     int file::size_and_time_modified(time_t* outModified) const noexcept
     {
@@ -580,7 +589,7 @@ namespace rpp /* ReCpp */
     {
         #if USE_WINAPI_IO
             DWORD attr = GetFileAttributesA(filename);
-            return attr != -1 && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+            return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
         #else
             struct stat s;
             return stat(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
@@ -591,7 +600,7 @@ namespace rpp /* ReCpp */
     {
         #if USE_WINAPI_IO
             DWORD attr = GetFileAttributesW(filename);
-            return attr != -1 && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+            return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
         #elif _MSC_VER
             struct _stat64 s;
             return _wstat64(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
@@ -604,7 +613,7 @@ namespace rpp /* ReCpp */
     {
         #if USE_WINAPI_IO
             DWORD attr = GetFileAttributesA(folder);
-            return attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY);
+            return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_DIRECTORY);
         #else
             struct stat s;
             return ::stat(folder, &s) ? false : (s.st_mode & S_IFDIR) != 0;
@@ -615,7 +624,7 @@ namespace rpp /* ReCpp */
     {
         #if USE_WINAPI_IO
             DWORD attr = GetFileAttributesA(fileOrFolder);
-            return attr != -1;
+            return attr != DWORD(-1);
         #else
             struct stat s;
             return stat(fileOrFolder, &s) == 0;
@@ -628,7 +637,7 @@ namespace rpp /* ReCpp */
     #if USE_WINAPI_IO
         WIN32_FILE_ATTRIBUTE_DATA data;
         if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data)) {
-            if (filesize) *filesize = LARGE_INTEGER{data.nFileSizeLow,(LONG)data.nFileSizeHigh}.QuadPart;
+            if (filesize) *filesize = LARGE_INTEGER{ {data.nFileSizeLow,(LONG)data.nFileSizeHigh} }.QuadPart;
             if (created)  *created  = to_time_t(data.ftCreationTime);
             if (accessed) *accessed = to_time_t(data.ftLastAccessTime);
             if (modified) *modified = to_time_t(data.ftLastWriteTime);
@@ -650,27 +659,27 @@ namespace rpp /* ReCpp */
     int file_size(const char* filename) noexcept
     {
         int64 s; 
-        return file_info(filename, &s, 0, 0, 0) ? (int)s : 0;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? (int)s : 0;
     }
     int64 file_sizel(const char* filename) noexcept
     {
         int64 s; 
-        return file_info(filename, &s, 0, 0, 0) ? s : 0ll;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
     time_t file_created(const char* filename) noexcept
     {
         time_t t; 
-        return file_info(filename, 0, &t, 0, 0) ? t : time_t(0);
+        return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
     }
     time_t file_accessed(const char* filename) noexcept
     {
         time_t t; 
-        return file_info(filename, 0, 0, &t, 0) ? t : time_t(0);
+        return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
     }
     time_t file_modified(const char* filename) noexcept
     {
         time_t t; 
-        return file_info(filename, 0, 0, 0, &t) ? t : time_t(0);
+        return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
     }
     bool delete_file(const char* filename) noexcept
     {
@@ -747,10 +756,12 @@ namespace rpp /* ReCpp */
 
     bool create_folder(strview foldername) noexcept
     {
-        if (!foldername.len || foldername == "./")
+        if (!foldername.len) // fail on empty strings purely for catching bugs
             return false;
-        if (sys_mkdir(foldername))
-            return true; // best case, no recursive mkdir required
+        if (foldername == "./") // current folder already exists
+            return true;
+        if (sys_mkdir(foldername)) // best case, no recursive mkdir required
+            return true;
 
         // ugh, need to work our way upward to find a root dir that exists:
         // @note heavily optimized to minimize folder_exists() and mkdir() syscalls
@@ -800,7 +811,7 @@ namespace rpp /* ReCpp */
 
     bool delete_folder(strview foldername, delete_mode mode) noexcept
     {
-        // these would delete the root dir. NOPE! This is always a bug.
+        // these would delete the root dir...
         if (foldername.empty() || foldername == "/"_sv)
             return false;
         if (mode == non_recursive)
@@ -902,7 +913,7 @@ namespace rpp /* ReCpp */
     {
         if (strview oldext = file_ext(path))
         {
-            int len = int(oldext.str - path.str);
+            auto len = int(oldext.str - path.str);
             return strview{ path.str, len } + ext;
         }
         if (path && path.back() != '/' && path.back() != '\\')
@@ -1010,7 +1021,7 @@ namespace rpp /* ReCpp */
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
-            if (size_t n = (size_t)args[i].size()) {
+            if (auto n = (size_t)args[i].size()) {
                 if (res != 0)
                     res += 1;
                 res += n;
@@ -1021,7 +1032,7 @@ namespace rpp /* ReCpp */
         result.append(args[0].c_str(), args[0].size());
 
         for (size_t i = 1; i < N; ++i) {
-            if (size_t n = (size_t)args[i].size()) {
+            if (auto n = (size_t)args[i].size()) {
                 if (!result.empty())
                     result.append(1, '/');
                 result.append(args[i].c_str(), n);
@@ -1080,13 +1091,15 @@ namespace rpp /* ReCpp */
     }
 
 #if _WIN32
-        dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {
-            char path[512]; snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());
-            if ((s->hFind = FindFirstFileA(path, &s->ffd)) == INVALID_HANDLE_VALUE)
-                s->hFind = nullptr;
-        }
-        dir_iterator::~dir_iterator() { if (s->hFind) FindClose(s->hFind); }
-        dir_iterator::operator bool()  const { return s->hFind != nullptr; }
+    // ReSharper disable CppSomeObjectMembersMightNotBeInitialized
+    dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {  // NOLINT
+        char path[512]; snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());
+        if ((s->hFind = FindFirstFileA(path, &s->ffd)) == INVALID_HANDLE_VALUE)
+            s->hFind = nullptr;
+    // ReSharper restore CppSomeObjectMembersMightNotBeInitialized
+    }
+    dir_iterator::~dir_iterator() { if (s->hFind) FindClose(s->hFind); }
+    dir_iterator::operator bool()  const { return s->hFind != nullptr; }
         bool    dir_iterator::next()         { return s->hFind && FindNextFileA(s->hFind, &s->ffd) != 0; }
         bool    dir_iterator::is_dir() const { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
         strview dir_iterator::name()   const { return s->hFind ? s->ffd.cFileName : ""_sv; }

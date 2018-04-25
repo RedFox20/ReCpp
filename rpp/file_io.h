@@ -828,6 +828,11 @@ namespace rpp /* ReCpp */
         explicit dir_iterator(string&& dir);
         ~dir_iterator();
 
+        dir_iterator(dir_iterator&& it) = delete;
+        dir_iterator(const dir_iterator&) = delete;
+        dir_iterator& operator=(dir_iterator&& it) = delete;
+        dir_iterator& operator=(const dir_iterator&) = delete;
+
         struct entry
         {
             const dir_iterator* it;
