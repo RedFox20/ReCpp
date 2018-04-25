@@ -6,14 +6,9 @@
  */
 #include <memory> // shared_ptr
 #include <future>
-#if __has_include("thread_pool.h")
-    #define CFUTURE_USE_RPP_THREAD_POOL 1
-    #include "thread_pool.h"
-    #include <type_traits>
-#else
-    #include <thread>
-    #include <functional>
-#endif
+#include "thread_pool.h"
+#include <type_traits>
+
 
 #ifndef NODISCARD
     #if __clang__
@@ -81,7 +76,6 @@ namespace rpp
     };
 
 
-#if CFUTURE_USE_RPP_THREAD_POOL
     template<class Task>
     auto async_task(Task&& task) -> cfuture<decltype(task())>
     {
@@ -98,16 +92,6 @@ namespace rpp
         });
         return f;
     }
-#else // std::async is incredibly slower
-    template<class Task>
-    auto async_task(Task&& task) -> cfuture<decltype(task())>
-    {
-        return std::async(std::launch::async, [move_args(task)]() mutable
-        {
-            return task();
-        });
-    }
-#endif
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -164,7 +148,7 @@ namespace rpp
     {
         using super = shared_future<T>;
     public:
-        cfuture() noexcept : super{} {}
+        cfuture() noexcept = default;
         cfuture(future<T>&& f) noexcept : super(move(f))
         {
         }
@@ -342,7 +326,7 @@ namespace rpp
     {
         using super = shared_future<void>;
     public:
-        cfuture() noexcept : super{} {}
+        cfuture() noexcept = default;
         cfuture(future<void>&& f) noexcept : super(move(f))
         {
         }

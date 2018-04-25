@@ -47,13 +47,14 @@ namespace rpp /* ReCpp */
         using uint64 = unsigned long long;
     #endif
 
-    #ifndef RPP_MOVECOPY_MACROS_DEFINED
-    #  define RPP_MOVECOPY_MACROS_DEFINED
-    #  define MOVE(Class,value) Class(Class&&)=value;       Class&operator=(Class&&)=value;
-    #  define NOCOPY(Class)     Class(const Class&)=delete; Class&operator=(const Class&)=delete;
-    #  define NOCOPY_MOVE(Class)   MOVE(Class,default) NOCOPY(Class) 
-    #  define NOCOPY_NOMOVE(Class) MOVE(Class,delete)  NOCOPY(Class) 
+    #ifndef NOCOPY_NOMOVE
+    #define NOCOPY_NOMOVE(Class)                                   \
+                          Class(Class&&)                 = delete; \
+                          Class(const Class&)            = delete; \
+                          Class& operator=(Class&&)      = delete; \
+                          Class& operator=(const Class&) = delete;
     #endif
+
 
     #ifndef RPP_MINMAX_DEFINED
     #define RPP_MINMAX_DEFINED
@@ -71,6 +72,7 @@ namespace rpp /* ReCpp */
      */
     struct RPPAPI stream_source
     {
+        stream_source() = default;
         virtual ~stream_source() noexcept = default;
 
         /**
@@ -119,6 +121,9 @@ namespace rpp /* ReCpp */
          * @param numBytesToSkip Number of bytes to skip from the read stream
          */
         virtual void stream_skip(int numBytesToSkip) noexcept = 0;
+
+        // stream_source is pure virtual and shouldn't be copied or moved
+        NOCOPY_NOMOVE(stream_source)
     };
 
 
@@ -196,7 +201,7 @@ namespace rpp /* ReCpp */
 
         virtual ~binary_stream() noexcept;
 
-        // binary_writer is pure virtual and shouldn't be copied or moved
+        // binary_stream is pure virtual and shouldn't be copied or moved
         NOCOPY_NOMOVE(binary_stream)
 
         void disable_buffering();
@@ -546,6 +551,8 @@ namespace rpp /* ReCpp */
         explicit socket_writer(rpp::socket& sock)      noexcept : binary_stream{this},           Sock(&sock) {}
         socket_writer(rpp::socket& sock, int capacity) noexcept : binary_stream{ capacity, this }, Sock(&sock) {}
         ~socket_writer() noexcept;
+        void set_socket(rpp::socket& sock) noexcept { Sock = &sock; }
+        NOCOPY_NOMOVE(socket_writer)
 
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
@@ -571,6 +578,8 @@ namespace rpp /* ReCpp */
         explicit socket_reader(rpp::socket& sock)      noexcept : binary_stream{this},           Sock(&sock) {}
         socket_reader(rpp::socket& sock, int capacity) noexcept : binary_stream{capacity, this}, Sock(&sock) {}
         ~socket_reader() noexcept;
+        void set_socket(rpp::socket& sock) noexcept { Sock = &sock; }
+        NOCOPY_NOMOVE(socket_reader)
 
         const rpp::ipaddress& addr() const noexcept { return Addr; }
         bool stream_good() const noexcept override { return Sock && Sock->good(); }
@@ -667,6 +676,8 @@ namespace rpp /* ReCpp */
         explicit file_writer(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
         file_writer(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
         ~file_writer() noexcept;
+        void set_file(rpp::file& file) noexcept { File = &file; }
+        NOCOPY_NOMOVE(file_writer)
 
         bool stream_good() const noexcept override { return File && File->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
@@ -689,6 +700,8 @@ namespace rpp /* ReCpp */
         explicit file_reader(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
         file_reader(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
         ~file_reader() noexcept;
+        void set_file(rpp::file& file) noexcept { File = &file; }
+        NOCOPY_NOMOVE(file_reader)
 
         bool stream_good() const noexcept override { return File && File->good(); }
 
