@@ -31,7 +31,9 @@
 #endif
 #if !USE_WINAPI_IO
     #include <sys/stat.h> // stat,fstat
-    #include <io.h>     // _chsize
+    #if _WIN32
+        #include <io.h>     // _chsize
+    #endif
 #endif
 #if __APPLE__
     #include <TargetConditionals.h>
