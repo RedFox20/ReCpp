@@ -34,6 +34,12 @@ namespace rpp
         }
     }
 
+    void string_buffer::resize(int count) noexcept
+    {
+        reserve(count);
+        len = count;
+    }
+
     char* string_buffer::emplace_buffer(int count) noexcept
     {
         reserve(count);
@@ -83,6 +89,8 @@ namespace rpp
     void string_buffer::write(ushort value) { reserve(8);  len += _tostring(&ptr[len], value); }
     void string_buffer::write(int value)    { reserve(16); len += _tostring(&ptr[len], value); }
     void string_buffer::write(uint value)   { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(long value)   { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(ulong value)  { reserve(16); len += _tostring(&ptr[len], value); }
     void string_buffer::write(int64 value)  { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(uint64 value) { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(float value)  { reserve(32); len += _tostring(&ptr[len], value); }

@@ -125,6 +125,7 @@ namespace rpp
 
         void clear();
         void reserve(int count) noexcept;
+        void resize(int count) noexcept;
 
         /** @param count Size of buffer to emplace */
         char* emplace_buffer(int count) noexcept;
@@ -160,6 +161,8 @@ namespace rpp
         void write(ushort value);
         void write(int    value);
         void write(uint   value);
+        void write(long   value);
+        void write(ulong  value);
         void write(int64  value);
         void write(uint64 value);
         void write(float  value);
@@ -174,6 +177,8 @@ namespace rpp
         FINLINE string_buffer& operator<<(ushort value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(int    value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(uint   value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(long   value) { write(value); return *this; }
+        FINLINE string_buffer& operator<<(ulong  value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(int64  value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(uint64 value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(float  value) { write(value); return *this; }
