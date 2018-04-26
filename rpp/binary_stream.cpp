@@ -1,4 +1,5 @@
 #include "binary_stream.h"
+#include <cstdlib> // realloc (include needed for Linux build)
 
 namespace rpp
 {
