@@ -99,22 +99,12 @@ namespace rpp
     template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
     template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
 
-    template<class T> constexpr bool has_std_to_string   = is_detected_v<std_to_string_expression, T>;
     template<class T> constexpr bool has_to_string       = is_detected_v<to_string_expression, T>;
     template<class T> constexpr bool has_to_string_memb  = is_detected_v<to_string_memb_expression, T>;
-    template<class T> constexpr bool is_to_stringable = has_std_to_string<T> || has_to_string<T> || has_to_string_memb<T>;
+    template<class T> constexpr bool is_to_stringable = has_to_string<T> || has_to_string_memb<T>;
 
     template<class T> constexpr bool is_byte_array_type = std::is_same_v<T, void>
                                                        || std::is_same_v<T, uint8_t>;
-
-    //template<class T, std::enable_if_t<has_std_to_string<T> || has_to_string<T>, int> = 0>
-    //std::string to_string(const T* object)
-    //{
-    //    using rpp::to_string;
-    //    using namespace std::literals;
-    //    return object ? to_string(*object) : "null"s;
-    //}
-
 
     enum format_opt
     {
@@ -196,9 +186,7 @@ namespace rpp
         template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
         FINLINE void write(const T& value)
         {
-            if constexpr(has_std_to_string<T>)
-                this->write(std::to_string(value));
-            else if constexpr(has_to_string<T>)
+            if constexpr(has_to_string<T>)
                 this->write(to_string(value));
             else if constexpr(has_to_string_memb<T>)
                 this->write(value.to_string());

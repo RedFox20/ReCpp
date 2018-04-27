@@ -22,6 +22,22 @@ std::ostream& operator<<(std::ostream& os, const ostream_operator&)
     return os << "ostream_operator";
 }
 
+enum stringable_enum
+{
+    strenum_first,
+    strenum_last,
+};
+
+const char* to_string(stringable_enum e)
+{
+    switch (e)
+    {
+        case strenum_first:   return "first";
+        case strenum_last:    return "last";
+        default: return "undefined";
+    }
+}
+
 TestImpl(test_sprint)
 {
     TestInit(test_sprint)
@@ -106,8 +122,13 @@ TestImpl(test_sprint)
     {
         string_buffer sb;
 
-        sb.write((long double)0.16); // std::to_string(long double)
-        AssertThat(sb.view(), "0.160000");
+        sb.write(0.16);
+        AssertThat(sb.view(), "0.16");
+        sb.clear();
+
+        stringable_enum strenum = strenum_last;
+        sb.write(strenum);
+        AssertThat(sb.view(), "last");
         sb.clear();
 
         sb.write(external_to_string{});
@@ -140,8 +161,13 @@ TestImpl(test_sprint)
     {
         string_buffer sb;
 
-        sb << (long double)0.16; // std::to_string(long double)
-        AssertThat(sb.view(), "0.160000");
+        sb << 0.16;
+        AssertThat(sb.view(), "0.16");
+        sb.clear();
+
+        stringable_enum strenum = strenum_last;
+        sb << strenum;
+        AssertThat(sb.view(), "last");
         sb.clear();
 
         sb << external_to_string{};
@@ -173,7 +199,8 @@ TestImpl(test_sprint)
     
     TestCase(sprint_to_stringable)
     {
-        AssertThat(rpp::sprint((long double)0.16), "0.160000"); // std::to_string(long double)
+        AssertThat(rpp::sprint(0.16), "0.16");
+        AssertThat(rpp::sprint(strenum_last), "last");
         AssertThat(rpp::sprint(external_to_string{}), "external_to_string");
         AssertThat(rpp::sprint(member_to_string{}), "member_to_string");
         AssertThat(rpp::sprint(string_buffer_operator{}), "string_buffer_operator");
