@@ -289,6 +289,13 @@ namespace rpp
             return *this;
         }
 
+        template<typename T, template<class, class...> class C, class... Args>
+        FINLINE string_buffer& operator<<(const C<T, Args...>& container)
+        {
+            this->prettyprint(container);
+            return *this;
+        }
+
         /**
          * Appends a full hex string from the given byte buffer
          * @param data Bytes

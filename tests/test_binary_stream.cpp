@@ -18,7 +18,7 @@ TestImpl(test_binary_stream)
         AssertThat(buf.read_int(), 0);
         AssertThat(buf.read_int64(), 0LL);
         AssertThat(buf.peek_string(), "");
-        AssertThat(buf.peek_wstring(), L"");
+        Assert(buf.peek_wstring().empty());
         AssertThat(buf.peek_strview(), "");
         AssertThat(buf.read_string(), "");
 
