@@ -2,20 +2,30 @@
 #include <rpp/tests.h>
 using namespace rpp;
 
-struct test_type
+struct external_to_string { };
+std::string to_string(external_to_string) { return "external_to_string"; }
+
+struct member_to_string
 {
+    std::string to_string() const { return "member_to_string"; }
 };
-std::string to_string(test_type) { return "test_type"; }
+
+struct string_buffer_operator { };
+string_buffer& operator<<(string_buffer& sb, const string_buffer_operator&)
+{
+    return sb << "string_buffer_operator";
+}
+
+struct ostream_operator { };
+std::ostream& operator<<(std::ostream& os, const ostream_operator&)
+{
+    return os << "ostream_operator";
+}
 
 TestImpl(test_sprint)
 {
     TestInit(test_sprint)
     {
-    }
-
-    TestCase(to_string)
-    {
-        AssertThat(rpp::sprint(test_type{}), "test_type");
     }
 
     TestCase(string_buf)
@@ -90,4 +100,90 @@ TestImpl(test_sprint)
         string ashex = sb.str();
         AssertThat(ashex, referenceHex(input));
     }
+
+    
+    TestCase(to_stringable)
+    {
+        string_buffer sb;
+
+        sb.write((long double)0.16); // std::to_string(long double)
+        AssertThat(sb.view(), "0.160000");
+        sb.clear();
+
+        sb.write(external_to_string{});
+        AssertThat(sb.view(), "external_to_string");
+        sb.clear();
+
+        sb.write(member_to_string{});
+        AssertThat(sb.view(), "member_to_string");
+        sb.clear();
+
+        sb.write(string_buffer_operator{});
+        AssertThat(sb.view(), "string_buffer_operator");
+        sb.clear();
+
+        sb.write(ostream_operator{});
+        AssertThat(sb.view(), "ostream_operator");
+        sb.clear();
+
+        external_to_string ext;
+        sb.write(&ext);
+        AssertThat(sb.view(), "*{external_to_string}");
+        sb.clear();
+
+        sb.write((const external_to_string*)&ext);
+        AssertThat(sb.view(), "*{external_to_string}");
+        sb.clear();
+    }
+
+    TestCase(string_buffer_shift_op)
+    {
+        string_buffer sb;
+
+        sb << (long double)0.16; // std::to_string(long double)
+        AssertThat(sb.view(), "0.160000");
+        sb.clear();
+
+        sb << external_to_string{};
+        AssertThat(sb.view(), "external_to_string");
+        sb.clear();
+
+        sb << member_to_string{};
+        AssertThat(sb.view(), "member_to_string");
+        sb.clear();
+
+        sb << string_buffer_operator{};
+        AssertThat(sb.view(), "string_buffer_operator");
+        sb.clear();
+
+        sb << ostream_operator{};
+        AssertThat(sb.view(), "ostream_operator");
+        sb.clear();
+
+        external_to_string ext;
+        sb << &ext;
+        AssertThat(sb.view(), "*{external_to_string}");
+        sb.clear();
+
+        sb << (const external_to_string*)&ext;
+        AssertThat(sb.view(), "*{external_to_string}");
+        sb.clear();
+    }
+
+    
+    TestCase(sprint_to_stringable)
+    {
+        AssertThat(rpp::sprint((long double)0.16), "0.160000"); // std::to_string(long double)
+        AssertThat(rpp::sprint(external_to_string{}), "external_to_string");
+        AssertThat(rpp::sprint(member_to_string{}), "member_to_string");
+        AssertThat(rpp::sprint(string_buffer_operator{}), "string_buffer_operator");
+        AssertThat(rpp::sprint(ostream_operator{}), "ostream_operator");
+
+        external_to_string ext;
+        AssertThat(rpp::sprint(&ext), "*{external_to_string}");
+        AssertThat(rpp::sprint((const external_to_string*)&ext), "*{external_to_string}");
+
+    }
+
+
 };

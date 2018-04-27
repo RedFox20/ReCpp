@@ -90,8 +90,8 @@ TestImpl(test_file_io)
 
     TestCase(create_delete_folder)
     {
-        Assert(create_folder("") == false);
-        Assert(create_folder("./") == false);
+        Assert(create_folder("") == false); // this is most likely a programming error, so give false
+        Assert(create_folder("./") == true); // because "./" always exists, it should return true
 
         // these tests are extremely volatile, don't run without a step-in debugger
         //Assert(create_folder("dangerous"));

@@ -8,6 +8,7 @@
 #include <cstdio>        // fprintf
 #include <memory>        // std::shared_ptr
 #include <unordered_map> // std::unordered_map for to_string extensions
+#include <sstream>
 
 #ifndef RPP_SPRINT_H
 #define RPP_SPRINT_H 1
@@ -94,18 +95,17 @@ namespace rpp
     constexpr bool is_detected_v = detail::is_detected<std::void_t<>, Operation, Arguments...>::value;
 
 
-    template<class T> using std_to_string_expression = decltype(std::to_string(std::declval<T>()));
-    template<class T> using to_string_expression     = decltype(to_string(std::declval<T>()));
-
-    struct string_buffer;
-
-    template<class T>
-    using string_buffer_operator = decltype(std::declval<rpp::string_buffer&>() << std::declval<T>());
+    template<class T> using std_to_string_expression  = decltype(std::to_string(std::declval<T>()));
+    template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
+    template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
 
     template<class T> constexpr bool has_std_to_string   = is_detected_v<std_to_string_expression, T>;
     template<class T> constexpr bool has_to_string       = is_detected_v<to_string_expression, T>;
-    template<class T> constexpr bool has_strbuf_operator = false;// is_detected_v<rpp::string_buffer_operator, T>;
-    template<class T> constexpr bool is_stringable = has_std_to_string<T> || has_to_string<T> || has_strbuf_operator<T>;
+    template<class T> constexpr bool has_to_string_memb  = is_detected_v<to_string_memb_expression, T>;
+    template<class T> constexpr bool is_to_stringable = has_std_to_string<T> || has_to_string<T> || has_to_string_memb<T>;
+
+    template<class T> constexpr bool is_byte_array_type = std::is_same_v<T, void>
+                                                       || std::is_same_v<T, uint8_t>;
 
     //template<class T, std::enable_if_t<has_std_to_string<T> || has_to_string<T>, int> = 0>
     //std::string to_string(const T* object)
@@ -168,46 +168,60 @@ namespace rpp
         /** @param count Size of buffer to emplace */
         char* emplace_buffer(int count) noexcept;
         void writef(const char* format, ...);
-        void write(std::nullptr_t);
-        void write(const string_buffer& sb);
 
 
         void write_ptr_begin();
         void write_ptr_end();
 
-        template<class T, std::enable_if_t<is_stringable<T>, int> = 0>
-        FINLINE void write(const T& value)
-        {
-            if constexpr(has_std_to_string<T>)
-                write(std::to_string(value));
-            else if constexpr(has_to_string<T>)
-                write(to_string(value));
-            else if constexpr(has_strbuf_operator<T>)
-                *this << value;
-        }
-
-        template<class T, std::enable_if_t<is_stringable<T>, int> = 0>
+        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
         void write(const T* ptr)
         {
             if (ptr == nullptr) return write(nullptr);
-            using Type = std::decay_t<T>;
-            if constexpr (std::is_same_v<Type, void*> || std::is_same_v<Type, uint8_t*>)
-            {
-                this->write_ptr(ptr);
-            }
-            else
-            {
-                write_ptr_begin(); this->write(*ptr); write_ptr_end();
-            }
+            write_ptr_begin(); this->write(*ptr); write_ptr_end();
         }
-        template<class T> FINLINE void write(const std::weak_ptr<T>& p)   { write(p.lock()); }
-        template<class T> FINLINE void write(const std::shared_ptr<T>& p) { write(p.get());  }
 
-        template<int N> 
-        FINLINE void write(const char (&value)[N])   { write(strview{ value }); }
-        FINLINE void write(const std::string& value) { write(strview{ value }); }
-        FINLINE void write(const char* value)        { write(strview{ value }); }
+        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        void write(T* ptr)
+        {
+            if (ptr == nullptr) return write(nullptr);
+            write_ptr_begin(); this->write(*ptr); write_ptr_end();
+        }
 
+        template<class T> using sbuf_op = decltype(std::declval<string_buffer&>() << std::declval<T>());
+        template<class T> static constexpr bool has_sbuf_op = is_detected_v<sbuf_op, T>;
+
+        template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
+        template<class T> static constexpr bool has_ostrm_op = is_detected_v<ostrm_op, T>;
+
+        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        FINLINE void write(const T& value)
+        {
+            if constexpr(has_std_to_string<T>)
+                this->write(std::to_string(value));
+            else if constexpr(has_to_string<T>)
+                this->write(to_string(value));
+            else if constexpr(has_to_string_memb<T>)
+                this->write(value.to_string());
+        }
+
+        template<class T, std::enable_if_t<!is_to_stringable<T> && has_sbuf_op<T>, int> = 0>
+        FINLINE void write(const T& value)
+        {
+            *this << value;
+        }
+
+        template<class T, std::enable_if_t<!is_to_stringable<T> && !has_sbuf_op<T> && has_ostrm_op<T>, int> = 0>
+        FINLINE void write(const T& value)
+        {
+            std::stringstream ss;
+            ss << value;
+            this->write(ss.str());
+        }
+
+        template<int N>
+        FINLINE void write(const char (&value)[N])   { this->write(strview{ value }); }
+        FINLINE void write(const std::string& value) { this->write(strview{ value }); }
+        FINLINE void write(const char* value)        { this->write(strview{ value }); }
         void write(const strview& s);
         void write(char value);
         void write(bool   value);
@@ -222,38 +236,66 @@ namespace rpp
         void write(uint64 value);
         void write(float  value);
         void write(double value);
+        void write(std::nullptr_t);
+        void write(const string_buffer& sb);
+        FINLINE void write(const void* ptr)    { this->write_ptr(ptr); }
+        FINLINE void write(const uint8_t* ptr) { this->write_ptr(ptr); }
+        FINLINE void write(void* ptr)          { this->write_ptr(ptr); }
+        FINLINE void write(uint8_t* ptr)       { this->write_ptr(ptr); }
+        template<class T> FINLINE void write(const std::weak_ptr<T>& p)   { this->write(p.lock()); }
+        template<class T> FINLINE void write(const std::shared_ptr<T>& p) { this->write(p.get());  }
 
-        FINLINE string_buffer& operator<<(const std::string& value) { write(strview{ value }); return *this; }
-        FINLINE string_buffer& operator<<(const char* value)        { write(strview{ value }); return *this; }
-        FINLINE string_buffer& operator<<(char   value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(bool   value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(rpp::byte bv) { write(bv);    return *this; }
-        FINLINE string_buffer& operator<<(short  value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(ushort value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(int    value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(uint   value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(long   value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(ulong  value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(int64  value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(uint64 value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(float  value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(double value) { write(value); return *this; }
-        FINLINE string_buffer& operator<<(const string_buffer& buf) { write(buf); return *this; }
 
-        template<class T, std::enable_if_t<is_stringable<T>, int> = 0>
+        FINLINE string_buffer& operator<<(const std::string& value) { this->write(strview{ value }); return *this; }
+        FINLINE string_buffer& operator<<(const char* value)        { this->write(strview{ value }); return *this; }
+        FINLINE string_buffer& operator<<(const strview& value)     { this->write(value);            return *this; }
+        FINLINE string_buffer& operator<<(char   value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(bool   value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(rpp::byte bv) { this->write(bv);    return *this; }
+        FINLINE string_buffer& operator<<(short  value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(ushort value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(int    value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(uint   value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(long   value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(ulong  value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(int64  value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(uint64 value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(float  value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(double value) { this->write(value); return *this; }
+        FINLINE string_buffer& operator<<(std::nullptr_t) { this->write(std::nullptr_t{}); return *this; }
+        FINLINE string_buffer& operator<<(const string_buffer& buf) { this->write(buf); return *this; }
+        FINLINE string_buffer& operator<<(const void* ptr)    { this->write_ptr(ptr); return *this; }
+        FINLINE string_buffer& operator<<(const uint8_t* ptr) { this->write_ptr(ptr); return *this; }
+        FINLINE string_buffer& operator<<(void* ptr)          { this->write_ptr(ptr); return *this; }
+        FINLINE string_buffer& operator<<(uint8_t* ptr)       { this->write_ptr(ptr); return *this; }
+        template<class T> FINLINE string_buffer& operator<<(const std::weak_ptr<T>& p)   { this->write(p.lock()); return *this; }
+        template<class T> FINLINE string_buffer& operator<<(const std::shared_ptr<T>& p) { this->write(p.get());  return *this; }
+
+        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        FINLINE string_buffer& operator<<(const T* obj)  { this->write(obj); return *this; }
+
+        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        FINLINE string_buffer& operator<<(T* obj)        { this->write(obj); return *this; }
+
+        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        FINLINE string_buffer& operator<<(const T& obj)  { this->write(obj); return *this; }
+
+        template<class T, std::enable_if_t<!is_to_stringable<T> && has_ostrm_op<T>, int> = 0>
         FINLINE string_buffer& operator<<(const T& obj)
         {
-            this->write(obj);
+            std::stringstream ss;
+            ss << obj;
+            this->write(ss.str());
             return *this;
         }
 
         /**
          * Appends a full hex string from the given byte buffer
          * @param data Bytes
-         * @param len Number of bytes
+         * @param numBytes Number of bytes
          * @param opt Formatting options [lowercase, uppercase]
          */
-        void write_hex(const void* data, int len, format_opt opt = lowercase);
+        void write_hex(const void* data, int numBytes, format_opt opt = lowercase);
         void write_hex(const strview& str, format_opt opt = lowercase) {
             write_hex(str.str, str.len, opt);
         }
@@ -270,13 +312,19 @@ namespace rpp
             this->write_hex(&value, sizeof(value), opt);
         }
 
-        void write_ptr(const void* ptr, format_opt opt = lowercase);
+        void write_ptr(const void* p, format_opt opt = lowercase);
 
         void writeln(); // \n
         void write_quote(); // <">
         void write_apos();  // <'>
         void write_colon(); // <: >
         void write_separator(); // this->separator
+
+        template<class T> FINLINE void write_with_separator(const T& arg)
+        {
+            write_separator();
+            write(arg);
+        }
 
         /**
          * Stringifies and appends the input arguments one by one, filling gaps with delimiter
@@ -285,7 +333,9 @@ namespace rpp
          */
         template<class T, class... Args> FINLINE void write(const T& first, const Args&... args)
         {
-            write(first); write_separator(); write(args...);
+            write(first);
+            (..., write_with_separator(args)); // C++17 Fold Expressions
+            //write_separator(); write(args...);
         }
         template<class T> FINLINE void writeln(const T& value)
         {
@@ -299,7 +349,7 @@ namespace rpp
         ////////////////////////////////////////////////////////////////////////////////////////////
 
         template<class T> FINLINE void prettyprint(const T& value) {
-            write(to_string(value));
+            write(value);
         }
         template<class T> void prettyprint(const T* ptr)
         {
