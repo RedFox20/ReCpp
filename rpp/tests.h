@@ -134,30 +134,16 @@ namespace rpp
          */
         static int run_tests();
 
-        static const string& as_string(const string& v) { return v; }
-
-        static string as_string(const strview& s) { return { s.str, (size_t)s.len }; }
-        static string as_string(const char* s)    { return string{s};}
-        static string as_string(std::nullptr_t)   { return "null"; }
-        static string as_string(int v)    { return rpp::to_string(v); }
-        static string as_string(uint v)   { return rpp::to_string(v); }
-        static string as_string(long v)   { return rpp::to_string(v); }
-        static string as_string(ulong v)  { return rpp::to_string(v); }
-        static string as_string(int64 v)  { return rpp::to_string(v); }
-        static string as_string(uint64 v) { return rpp::to_string(v); }
-        static string as_string(short v)  { return rpp::to_string(v); }
-        static string as_string(ushort v) { return rpp::to_string(v); }
-        static string as_string(byte v)   { return rpp::to_string(v); }
-        template<class T> static string as_string(const T& v) { return to_string(v); }
-
-        template<class T> static string as_short_string(const T& obj, size_t maxLen = 512)
+        template<class T> static string as_short_string(const T& obj, int maxLen = 512)
         {
-            string s = as_string(obj);
-            if (s.size() <= maxLen)
-                return s;
-            s.resize(maxLen);
-            s += "...";
-            return s;
+            string_buffer sb;
+            sb << obj;
+            if (sb.size() > maxLen)
+            {
+                sb.resize(maxLen);
+                sb << "...";
+            }
+            return sb.str();
         }
 
         template<class Actual, class Expected>

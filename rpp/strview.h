@@ -248,7 +248,7 @@ namespace rpp
         FINLINE const char& operator[](int index) const { return str[index]; }
         
         // disallow accidental init from char or bool
-        strview(const char) = delete;
+        strview(char) = delete;
         strview(bool) = delete;
 
         /** Creates a new string from this string-strview */

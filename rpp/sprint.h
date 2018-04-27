@@ -78,12 +78,50 @@ namespace rpp
 
     RPPAPI inline const string& to_string(const string& s) noexcept { return s; }
 
-    template<class T> inline std::string to_string(const T* object)
+    namespace detail
     {
-        using rpp::to_string;
-        using namespace std::literals;
-        return object ? to_string(*object) : "null"s;
+        template<typename, template<typename...> class, typename...>
+        struct is_detected : std::false_type {};
+
+        template<template<class...> class Operation, typename... Arguments>
+        struct is_detected<std::void_t<Operation<Arguments...>>, Operation, Arguments...> : std::true_type {};
     }
+
+    template<template<class...> class Operation, typename... Arguments>
+    using is_detected = detail::is_detected<std::void_t<>, Operation, Arguments...>;
+
+    template<template<class...> class Operation, typename... Arguments>
+    constexpr bool is_detected_v = detail::is_detected<std::void_t<>, Operation, Arguments...>::value;
+
+
+    template<class T> using std_to_string_expression = decltype(std::to_string(std::declval<T>()));
+    template<class T> using to_string_expression     = decltype(to_string(std::declval<T>()));
+
+    struct string_buffer;
+
+    template<class T>
+    using string_buffer_operator = decltype(std::declval<rpp::string_buffer&>() << std::declval<T>());
+
+    template<class T> constexpr bool has_std_to_string   = is_detected_v<std_to_string_expression, T>;
+    template<class T> constexpr bool has_to_string       = is_detected_v<to_string_expression, T>;
+    template<class T> constexpr bool has_strbuf_operator = false;// is_detected_v<rpp::string_buffer_operator, T>;
+    template<class T> constexpr bool is_stringable = has_std_to_string<T> || has_to_string<T> || has_strbuf_operator<T>;
+
+    //template<class T, std::enable_if_t<has_std_to_string<T> || has_to_string<T>, int> = 0>
+    //std::string to_string(const T* object)
+    //{
+    //    using rpp::to_string;
+    //    using namespace std::literals;
+    //    return object ? to_string(*object) : "null"s;
+    //}
+
+
+    enum format_opt
+    {
+        none,
+        lowercase,
+        uppercase,
+    };
 
     /**
      * Always null terminated version of stringstream, which is compatible with strview
@@ -133,18 +171,35 @@ namespace rpp
         void write(std::nullptr_t);
         void write(const string_buffer& sb);
 
-        template<class T> FINLINE void write(const T& value)
-        {
-            write(to_string(value));
-        }
+
         void write_ptr_begin();
         void write_ptr_end();
-        template<class T> void write(const T* ptr)
+
+        template<class T, std::enable_if_t<is_stringable<T>, int> = 0>
+        FINLINE void write(const T& value)
+        {
+            if constexpr(has_std_to_string<T>)
+                write(std::to_string(value));
+            else if constexpr(has_to_string<T>)
+                write(to_string(value));
+            else if constexpr(has_strbuf_operator<T>)
+                *this << value;
+        }
+
+        template<class T, std::enable_if_t<is_stringable<T>, int> = 0>
+        void write(const T* ptr)
         {
             if (ptr == nullptr) return write(nullptr);
-            write_ptr_begin(); write(*ptr); write_ptr_end();
+            using Type = std::decay_t<T>;
+            if constexpr (std::is_same_v<Type, void*> || std::is_same_v<Type, uint8_t*>)
+            {
+                this->write_ptr(ptr);
+            }
+            else
+            {
+                write_ptr_begin(); this->write(*ptr); write_ptr_end();
+            }
         }
-        template<class T> FINLINE void write(T* ptr)                 { write((const T*)ptr); }
         template<class T> FINLINE void write(const std::weak_ptr<T>& p)   { write(p.lock()); }
         template<class T> FINLINE void write(const std::shared_ptr<T>& p) { write(p.get());  }
 
@@ -184,6 +239,38 @@ namespace rpp
         FINLINE string_buffer& operator<<(float  value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(double value) { write(value); return *this; }
         FINLINE string_buffer& operator<<(const string_buffer& buf) { write(buf); return *this; }
+
+        template<class T, std::enable_if_t<is_stringable<T>, int> = 0>
+        FINLINE string_buffer& operator<<(const T& obj)
+        {
+            this->write(obj);
+            return *this;
+        }
+
+        /**
+         * Appends a full hex string from the given byte buffer
+         * @param data Bytes
+         * @param len Number of bytes
+         * @param opt Formatting options [lowercase, uppercase]
+         */
+        void write_hex(const void* data, int len, format_opt opt = lowercase);
+        void write_hex(const strview& str, format_opt opt = lowercase) {
+            write_hex(str.str, str.len, opt);
+        }
+        void write_hex(const string& str, format_opt opt = lowercase) {
+            write_hex(str.c_str(), (int)str.size(), opt);
+        }
+
+        /**
+         * Appends a single value (such as int or char) as a hex string
+         * @param value Any value to convert to a hex string
+         * @param opt Formatting options [lowercase, uppercase]
+         */
+        template<class T> void write_hex(const T& value, format_opt opt = lowercase) {
+            this->write_hex(&value, sizeof(value), opt);
+        }
+
+        void write_ptr(const void* ptr, format_opt opt = lowercase);
 
         void writeln(); // \n
         void write_quote(); // <">
@@ -266,7 +353,16 @@ namespace rpp
             prettyprint(first, args...); writeln();
         }
     };
-    
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    RPPAPI inline string to_hex_string(const strview& s, format_opt opt = lowercase)
+    {
+        rpp::string_buffer sb;
+        sb.write_hex(s, opt);
+        return sb.str();
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
 
     RPPAPI int print(FILE* file, strview value);

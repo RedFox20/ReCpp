@@ -96,6 +96,27 @@ namespace rpp
     void string_buffer::write(float value)  { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(double value) { reserve(48); len += _tostring(&ptr[len], value); }
 
+    void string_buffer::write_hex(const void* data, int len, format_opt opt)
+    {
+        static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };
+        static const char HEXUP[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
+        const char* hex = opt == uppercase ? HEXUP : HEX;
+        const uint8_t* src = reinterpret_cast<const uint8_t*>(data);
+        reserve(len*2);
+        for (int i = 0; i < len; ++i)
+        {
+            uint8_t ch = src[i];
+            write(hex[ch >> 4]);
+            write(hex[ch & 0x0f]);
+        }
+    }
+
+    void string_buffer::write_ptr(const void* ptr, format_opt opt)
+    {
+        write("0x"_sv);
+        write_hex(&ptr, sizeof(ptr), opt);
+    }
+
     void string_buffer::writeln()     { write('\n'); }
     void string_buffer::write_quote() { write('"');  }
     void string_buffer::write_apos()  { write('\''); }

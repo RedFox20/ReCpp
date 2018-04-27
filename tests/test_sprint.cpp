@@ -76,4 +76,18 @@ TestImpl(test_sprint)
 
     }
 
+    TestCase(write_hex)
+    {
+        auto referenceHex = [](strview in) {
+            string_buffer sb;
+            for (uint8_t ch : in) sb.writef("%02x", ch);
+            return sb.str();
+        };
+
+        string input = "simple STRING with ! different CHARS_and 0123456789;";
+        string_buffer sb;
+        sb.write_hex(input);
+        string ashex = sb.str();
+        AssertThat(ashex, referenceHex(input));
+    }
 };
