@@ -3,13 +3,52 @@
 
 namespace rpp
 {
-    
+    /**
+     * Provides necessary utilities for constructing C++ objects
+     * directly from the pool.
+     * Deallocation depends on pool reuse strategy
+     */
+    template<class Pool>
+    struct pool_types_constructor
+    {
+        template<class T> T* allocate()
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            return reinterpret_cast<T*>(pool->allocate(sizeof(T)));
+        }
+
+        template<class T> T* construct()
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));;
+            return new (obj) T{};
+        }
+
+        template<class T, class... Args> T* construct(Args&&...args)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));
+            if constexpr (std::is_constructible_v<T, Args...>)
+                return new (obj) T(std::forward<Args>(args)...);
+            else
+                return new (obj) T{std::forward<Args>(args)...};
+        }
+
+        // Calls the destructor on the object
+        template<class T> void destruct(T* obj)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            obj->~T();
+            pool->deallocate(reinterpret_cast<void*>(obj));
+        }
+    };
+
     /**
      * Simplest type of memory pool.
      * Has a predetermined static size.
      * There is no deallocate!
      */
-    class linear_static_pool
+    class linear_static_pool : public pool_types_constructor<linear_static_pool>
     {
         int Remaining;
         char* Buffer;
@@ -58,30 +97,8 @@ namespace rpp
             return mem;
         }
 
-        template<class T> T* allocate()
-        {
-            return reinterpret_cast<T*>(allocate(sizeof(T)));
-        }
-
-        template<class T> T* construct()
-        {
-            T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));;
-            return new (obj) T{};
-        }
-
-        template<class T, class... Args> T* construct(Args...args)
-        {
-            T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));
-            return new (obj) T{std::forward<Args>(args)...};
-        }
-
         // There is no deallocate -- by design !!
-
-        // Calls the destructor on the object
-        template<class T> void destruct(T* obj)
-        {
-            obj->~T();
-        }
+        void deallocate(void*) { }
     };
 
 
@@ -90,7 +107,7 @@ namespace rpp
      * and grows in large dynamic chunks.
      * Chunk growth can be controlled
      */
-    class linear_dynamic_pool
+    class linear_dynamic_pool : public pool_types_constructor<linear_dynamic_pool>
     {
         int BlockSize;
         float BlockGrowth;
@@ -134,30 +151,8 @@ namespace rpp
             return pool->allocate(size);
         }
 
-        template<class T> T* allocate()
-        {
-            return reinterpret_cast<T*>(allocate(sizeof(T)));
-        }
-
-        template<class T> T* construct()
-        {
-            T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));;
-            return new (obj) T{};
-        }
-
-        template<class T, class... Args> T* construct(Args...args)
-        {
-            T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));
-            return new (obj) T{std::forward<Args>(args)...};
-        }
-
         // There is no deallocate -- by design !!
-
-        // Calls the destructor on the object
-        template<class T> void destruct(T* obj)
-        {
-            obj->~T();
-        }
+        void deallocate(void*) { }
     };
 
 
