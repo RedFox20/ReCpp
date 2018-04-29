@@ -1,5 +1,12 @@
 #include <rpp/memory_pool.h>
 #include <rpp/tests.h>
+using namespace std::literals;
+
+struct TestObject
+{
+    std::string Name = "DefaultName";
+    float Value = 2.0f;
+};
 
 TestImpl(memory_pool)
 {
@@ -50,5 +57,36 @@ TestImpl(memory_pool)
         // try to allocate way too much
         AssertThat(pool.allocate(64), nullptr);
         AssertThat(pool.available(), 0);
+    }
+
+    TestCase(object_construct)
+    {
+        rpp::linear_static_pool pool { 1024 };
+
+        TestObject* deflt = pool.construct<TestObject>();
+        AssertThat(deflt->Name, "DefaultName");
+        AssertThat(deflt->Value, 2.0f);
+
+
+        TestObject* init = pool.construct<TestObject>("TestObject"s, 10.0f);
+        AssertThat(init->Name, "TestObject");
+        AssertThat(init->Value, 10.0f);
+    }
+
+    TestCase(object_construct_pool_grow)
+    {
+        rpp::linear_dynamic_pool pool { sizeof(TestObject) };
+
+        TestObject* obj = pool.construct<TestObject>("TestObject"s, 10.0f);
+        AssertThat(obj->Name, "TestObject");
+        AssertThat(obj->Value, 10.0f);
+
+        pool.allocate(32);
+        pool.allocate(32);
+        pool.allocate(32);
+        pool.allocate(32);
+
+        AssertThat(obj->Name, "TestObject");
+        AssertThat(obj->Value, 10.0f);
     }
 };

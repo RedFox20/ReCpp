@@ -69,6 +69,12 @@ namespace rpp
             return new (obj) T{};
         }
 
+        template<class T, class... Args> T* construct(Args...args)
+        {
+            T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));
+            return new (obj) T{std::forward<Args>(args)...};
+        }
+
         // There is no deallocate -- by design !!
 
         // Calls the destructor on the object
@@ -137,6 +143,12 @@ namespace rpp
         {
             T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));;
             return new (obj) T{};
+        }
+
+        template<class T, class... Args> T* construct(Args...args)
+        {
+            T* obj = reinterpret_cast<T*>(allocate(sizeof(T)));
+            return new (obj) T{std::forward<Args>(args)...};
         }
 
         // There is no deallocate -- by design !!
