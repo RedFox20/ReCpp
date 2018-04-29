@@ -20,18 +20,17 @@ namespace rpp
         template<class T> T* construct()
         {
             Pool* pool = static_cast<Pool*>(this);
-            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));;
-            return new (obj) T{};
+            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));
+
+            return ::new (static_cast<void*>(obj)) T{};
         }
 
         template<class T, class... Args> T* construct(Args&&...args)
         {
             Pool* pool = static_cast<Pool*>(this);
             T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));
-            if constexpr (std::is_constructible_v<T, Args...>)
-                return new (obj) T(std::forward<Args>(args)...);
-            else
-                return new (obj) T{std::forward<Args>(args)...};
+
+            return ::new (static_cast<void*>(obj)) T{std::forward<Args>(args)...};
         }
 
         // Calls the destructor on the object
