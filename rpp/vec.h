@@ -53,6 +53,16 @@ namespace rpp
     {
         return (degrees * rpp::PI) / 180.0; // rads=(degs*PI)/180
     }
+    /** @return Degrees from radians */
+    static constexpr float degf(float radians)
+    {
+        return radians * (180.0f / rpp::PIf); // degs=rads*(180/PI)
+    }
+    /** @return Degrees from radians */
+    static constexpr double degf(double radians)
+    {
+        return radians * (180.0 / rpp::PI); // degs=rads*(180/PI)
+    }
 
     /** @brief Clamps a value between:  min <= value <= max */
     template<class T> static constexpr T clamp(const T value, const T min, const T max) 
