@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <cstdlib>
 
 namespace rpp
 {
@@ -14,23 +15,23 @@ namespace rpp
         template<class T> T* allocate()
         {
             Pool* pool = static_cast<Pool*>(this);
-            return reinterpret_cast<T*>(pool->allocate(sizeof(T)));
+            return reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
         }
 
         template<class T> T* construct()
         {
             Pool* pool = static_cast<Pool*>(this);
-            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));
+            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
 
-            return ::new (static_cast<void*>(obj)) T{};
+            return new (obj) T{};
         }
 
         template<class T, class... Args> T* construct(Args&&...args)
         {
             Pool* pool = static_cast<Pool*>(this);
-            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T)));
+            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
 
-            return ::new (static_cast<void*>(obj)) T{std::forward<Args>(args)...};
+            return new (obj) T{std::forward<Args>(args)...};
         }
 
         // Calls the destructor on the object
@@ -38,7 +39,7 @@ namespace rpp
         {
             Pool* pool = static_cast<Pool*>(this);
             obj->~T();
-            pool->deallocate(reinterpret_cast<void*>(obj));
+            pool->deallocate(obj);
         }
     };
 
@@ -55,12 +56,16 @@ namespace rpp
 
     public:
         explicit linear_static_pool(int staticBlockSize)
-            : Remaining{staticBlockSize}, Buffer{new char[staticBlockSize]}, Ptr{Buffer}
+            : Remaining{staticBlockSize}, Buffer{(char*)malloc(staticBlockSize)}, Ptr{Buffer}
         {
+            if (int rem = size_t(Buffer) % 16) { // always align Ptr to 16 bytes
+                Remaining -= (16 - rem);
+                Ptr       += (16 - rem);
+            }
         }
         ~linear_static_pool() noexcept
         {
-            delete[] Buffer;
+            free(Buffer);
         }
 
         linear_static_pool(linear_static_pool&& pool) noexcept
@@ -86,13 +91,22 @@ namespace rpp
         int capacity()  const { return int(Ptr - Buffer) + Remaining; }
         int available() const { return Remaining; }
 
-        void* allocate(int size)
+        void* allocate(int size, int align = 8)
         {
-            if (Remaining < size)
+            int alignOffset = 0;
+            int alignedSize = size;
+            if (int rem = size_t(Ptr) % align)
+            {
+                alignOffset = align - rem;
+                alignedSize += alignOffset;
+            }
+
+            if (Remaining < alignedSize)
                 return nullptr;
-            char* mem = Ptr;
-            Ptr += size;
-            Remaining -= size;
+
+            char* mem = Ptr + alignOffset;
+            Ptr       += alignedSize;
+            Remaining -= alignedSize;
             return mem;
         }
 
@@ -133,7 +147,7 @@ namespace rpp
             return Pools.back().available();
         }
 
-        void* allocate(int size)
+        void* allocate(int size, int align = 8)
         {
             linear_static_pool* pool = &Pools.back();
             int available = pool->available();
@@ -147,7 +161,7 @@ namespace rpp
                 Pools.emplace_back(newBlockSize);
                 pool = &Pools.back();
             }
-            return pool->allocate(size);
+            return pool->allocate(size, align);
         }
 
         // There is no deallocate -- by design !!
