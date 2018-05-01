@@ -11,6 +11,8 @@ namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////////
 
+    template<class T>
+    using enable_if_iterable_t = std::enable_if_t<std::is_pointer_v<decltype(std::declval<T>().begin())>>;
 
     template<class T> struct element_range
     {
@@ -20,6 +22,10 @@ namespace rpp
         element_range(T* first, T* sentinel) noexcept : first{first}, sentinel{sentinel} {}
         element_range(T* ptr, int n)         noexcept : first{ptr},   sentinel{ptr+n}    {}
         element_range(T* ptr, size_t n)      noexcept : first{ptr},   sentinel{ptr+n}    {}
+
+        template<class Container, typename = enable_if_iterable_t<Container>>
+        element_range(Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
+
         T* begin() { return first;    }
         T* end()   { return sentinel; }
         const T* begin() const { return first;    }
@@ -47,6 +53,11 @@ namespace rpp
     template<class T, size_t N> element_range<const T> range(const std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
     template<class T, class A>  element_range<const T> range(const std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
 
+    template<class C, typename = enable_if_iterable_t<C>>
+    auto range(C& container) -> element_range<std::remove_reference_t<decltype(*container.begin())>>
+    {
+        return { &*container.begin(), &*container.end() };
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////
 

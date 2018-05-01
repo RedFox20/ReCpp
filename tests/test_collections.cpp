@@ -44,6 +44,32 @@ TestImpl(test_collections)
         AssertThat(k, 5);
     }
 
+    struct StringCollection
+    {
+        std::vector<std::string> items;
+
+        std::string* begin() { return items.data(); }
+        std::string* end()   { return items.data() + items.size(); }
+    };
+
+    TestCase(implicit_range_from_iterable)
+    {
+        StringCollection collection { { "a", "b", "c", "d" } };
+        element_range<std::string> stringRange = collection;
+
+        AssertThat(stringRange.size(), (int)collection.items.size());
+        AssertThat(stringRange[0], "a");
+    }
+
+    TestCase(explicit_range_from_iterable)
+    {
+        StringCollection collection { { "a", "b", "c", "d" } };
+        element_range<std::string> stringRange = rpp::range(collection);
+
+        AssertThat(stringRange.size(), collection.items.size());
+        AssertThat(stringRange[0], "a");
+    }
+
     TestCase(index_range)
     {
         int n = 0;
