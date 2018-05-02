@@ -34,6 +34,10 @@ namespace rpp
         const float3 Vector3::DOWN;
         const float3 Vector3::FORWARD;
         const float3 Vector3::BACKWARD;
+
+        const float3 Vector3::XAXIS;
+        const float3 Vector3::YAXIS;
+        const float3 Vector3::ZAXIS;
         
         const float3 Vector3::WHITE;
         const float3 Vector3::BLACK;
@@ -454,6 +458,21 @@ namespace rpp
         return x*v.x + y*v.y + z*v.z;
     }
 
+    Vector3 Vector3::mask() const
+    {
+        return { x > 0.0f ? 0.f : 1.f, 
+                 y > 0.0f ? 0.f : 1.f, 
+                 z > 0.0f ? 0.f : 1.f };
+    }
+
+    Vector3 Vector3::toEulerAngles() const
+    {
+        float pitchAdjacent = sqrt(x*x + z*z); 
+        float pitch = atan2(pitchAdjacent, y);
+        float yaw   = atan2(x, z);
+        return Vector3{/*roll:*/0.0f, pitch, yaw};
+    }
+
     void Vector3::print() const
     {
         char buffer[48];
@@ -816,31 +835,62 @@ namespace rpp
         return *this;
     }
 
+    //Matrix4& Matrix4::rotate(float angleDegs, const Vector3& rotationAxis)
+    //{
+    //    float rad = radf(angleDegs);
+    //    float c = cosf(rad);
+    //    const Vector3 axis  = rotationAxis.normalized();
+    //    const Vector3 temp  = axis * (1.0f - c);
+    //    const Vector3 sAxis = axis * sinf(rad);
+    //    const Vector3 rot0 = {  c + temp.x*axis.x,
+    //                            temp.x*axis.y + sAxis.z,
+    //                            temp.x*axis.z - sAxis.y, };
+    //    const Vector3 rot1 = {  temp.y*axis.x - sAxis.z,
+    //                            c + temp.y*axis.y,
+    //                            temp.y*axis.z + sAxis.x, };
+    //    const Vector3 rot2 = {  temp.z*axis.x + sAxis.y,
+    //                            temp.z*axis.y - sAxis.x,
+    //                            c + temp.z*axis.z };
+
+    //    const Vector4 new0 = (r0 * rot0.x) + (r1 * rot0.y) + (r2 * rot0.z);
+    //    const Vector4 new1 = (r0 * rot1.x) + (r1 * rot1.y) + (r2 * rot1.z);
+    //    const Vector4 new2 = (r0 * rot2.x) + (r1 * rot2.y) + (r2 * rot2.z);
+    //    r0 = new0;
+    //    r1 = new1;
+    //    r2 = new2;
+    //    return *this;
+    //}
+
     Matrix4& Matrix4::rotate(float angleDegs, const Vector3& rotationAxis)
     {
-        float rad = radf(angleDegs);
-        float c = cosf(rad);
-        const Vector3 axis  = rotationAxis.normalized();
-        const Vector3 temp  = axis * (1.0f - c);
-        const Vector3 sAxis = axis * sinf(rad);
-        const Vector3 rot0 = {  c + temp.x*axis.x,
-                                temp.x*axis.y + sAxis.z,
-                                temp.x*axis.z - sAxis.y, };
-        const Vector3 rot1 = {  temp.y*axis.x - sAxis.z,
-                                c + temp.y*axis.y,
-                                temp.y*axis.z + sAxis.x, };
-        const Vector3 rot2 = {  temp.z*axis.x + sAxis.y,
-                                temp.z*axis.y - sAxis.x,
-                                c + temp.z*axis.z };
+		float a = radf(angleDegs);		
+		float c = cos(a);
+		float s = sin(a);
+		Vector3 axis = rotationAxis.normalized();
+		Vector3 temp = (1.0f - c) * axis;
 
-        const Vector4 new0 = (r0 * rot0.x) + (r1 * rot0.y) + (r2 * rot0.z);
-        const Vector4 new1 = (r0 * rot1.x) + (r1 * rot1.y) + (r2 * rot1.z);
-        const Vector4 new2 = (r0 * rot2.x) + (r1 * rot2.y) + (r2 * rot2.z);
+        Matrix4 rot;
+        rot.m00 = c + temp.x * axis.x;
+		rot.m01 = 0 + temp.x * axis.y + s * axis.z;
+		rot.m02 = 0 + temp.x * axis.z - s * axis.y;
+
+		rot.m10 = 0 + temp.y * axis.x - s * axis.z;
+		rot.m11 = c + temp.y * axis.y;
+		rot.m12 = 0 + temp.y * axis.z + s * axis.x;
+
+		rot.m20 = 0 + temp.z * axis.x + s * axis.y;
+		rot.m21 = 0 + temp.z * axis.y - s * axis.x;
+		rot.m22 = c + temp.z * axis.z;
+
+        const Vector4 new0 = r0 * rot.m00 + r1 * rot.m01 + r2 * rot.m02;
+		const Vector4 new1 = r0 * rot.m10 + r1 * rot.m11 + r2 * rot.m12;
+		const Vector4 new2 = r0 * rot.m20 + r1 * rot.m21 + r2 * rot.m22;
         r0 = new0;
         r1 = new1;
         r2 = new2;
         return *this;
     }
+
     Matrix4& Matrix4::rotate(float angleDegs, float x, float y, float z)
     {
         return rotate(angleDegs, {x,y,z});

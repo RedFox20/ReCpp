@@ -606,12 +606,16 @@ namespace rpp
         static constexpr float3 ZERO           = { 0.0f, 0.0f, 0.0f };      // 0 0 0
         static constexpr float3 ONE            = { 1.0f, 1.0f, 1.0f };      // 1 1 1
 
-        static constexpr float3 LEFT           = { -1.0f, 0.0f, 0.0f };     // -X axis
-        static constexpr float3 RIGHT          = { +1.0f, 0.0f, 0.0f };     // +X axis
-        static constexpr float3 UP             = { 0.0f, +1.0f, 0.0f };     // +Y axis
-        static constexpr float3 DOWN           = { 0.0f, -1.0f, 0.0f };     // -Y axis
-        static constexpr float3 FORWARD        = { 0.0f, 0.0f, +1.0f };     // +Z axis
-        static constexpr float3 BACKWARD       = { 0.0f, 0.0f, -1.0f };     // -Z axis
+        static constexpr float3 LEFT           = { -1.0f,  0.0f,  0.0f };   // -X axis
+        static constexpr float3 RIGHT          = { +1.0f,  0.0f,  0.0f };   // +X axis
+        static constexpr float3 UP             = {  0.0f, +1.0f,  0.0f };   // +Y axis
+        static constexpr float3 DOWN           = {  0.0f, -1.0f,  0.0f };   // -Y axis
+        static constexpr float3 FORWARD        = {  0.0f,  0.0f, +1.0f };   // +Z axis
+        static constexpr float3 BACKWARD       = {  0.0f,  0.0f, -1.0f };   // -Z axis
+
+        static constexpr float3 XAXIS          = { +1.0f,  0.0f,  0.0f };   // +X axis
+        static constexpr float3 YAXIS          = {  0.0f, +1.0f,  0.0f };   // +Y axis
+        static constexpr float3 ZAXIS          = {  0.0f,  0.0f, +1.0f };   // +Z axis
         
         static constexpr float3 WHITE          = { 1.0f, 1.0f, 1.0f };       // RGB 1 1 1
         static constexpr float3 BLACK          = { 0.0f, 0.0f, 0.0f };       // RGB 0 0 0
@@ -659,6 +663,31 @@ namespace rpp
     
         /** @return Dot product with another vector */
         float dot(const Vector3& b) const;
+
+        /**
+         * Creates a mask vector for each component
+         * x = almostZero(x) ? 1.0f : 0.0f;
+         */
+        Vector3 mask() const;
+
+        /**
+         * @return Assuming this is a direction vector, gives XYZ Euler rotation in RADIANS
+         * X: Roll
+         * Y: Pitch
+         * Z: Yaw
+         */
+        Vector3 toEulerAngles() const;
+
+        /**
+         * Transforms this Vector3 with a transformation functor
+         * @param componentTransform   `float transform(float v)`
+         */
+        template<class Transform> void transform(const Transform& componentTransform)
+        {
+            x = componentTransform(x);
+            y = componentTransform(y);
+            z = componentTransform(z);
+        }
 
         void print() const;
         const char* toString() const;
