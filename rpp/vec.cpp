@@ -863,28 +863,28 @@ namespace rpp
 
     Matrix4& Matrix4::rotate(float angleDegs, const Vector3& rotationAxis)
     {
-		float a = radf(angleDegs);		
-		float c = cos(a);
-		float s = sin(a);
-		Vector3 axis = rotationAxis.normalized();
-		Vector3 temp = (1.0f - c) * axis;
+        float a = radf(angleDegs);		
+        float c = cos(a);
+        float s = sin(a);
+        Vector3 axis = rotationAxis.normalized();
+        Vector3 temp = (1.0f - c) * axis;
 
         Matrix4 rot;
         rot.m00 = c + temp.x * axis.x;
-		rot.m01 = 0 + temp.x * axis.y + s * axis.z;
-		rot.m02 = 0 + temp.x * axis.z - s * axis.y;
+        rot.m01 = 0 + temp.x * axis.y + s * axis.z;
+        rot.m02 = 0 + temp.x * axis.z - s * axis.y;
 
-		rot.m10 = 0 + temp.y * axis.x - s * axis.z;
-		rot.m11 = c + temp.y * axis.y;
-		rot.m12 = 0 + temp.y * axis.z + s * axis.x;
+        rot.m10 = 0 + temp.y * axis.x - s * axis.z;
+        rot.m11 = c + temp.y * axis.y;
+        rot.m12 = 0 + temp.y * axis.z + s * axis.x;
 
-		rot.m20 = 0 + temp.z * axis.x + s * axis.y;
-		rot.m21 = 0 + temp.z * axis.y - s * axis.x;
-		rot.m22 = c + temp.z * axis.z;
+        rot.m20 = 0 + temp.z * axis.x + s * axis.y;
+        rot.m21 = 0 + temp.z * axis.y - s * axis.x;
+        rot.m22 = c + temp.z * axis.z;
 
         const Vector4 new0 = r0 * rot.m00 + r1 * rot.m01 + r2 * rot.m02;
-		const Vector4 new1 = r0 * rot.m10 + r1 * rot.m11 + r2 * rot.m12;
-		const Vector4 new2 = r0 * rot.m20 + r1 * rot.m21 + r2 * rot.m22;
+        const Vector4 new1 = r0 * rot.m10 + r1 * rot.m11 + r2 * rot.m12;
+        const Vector4 new2 = r0 * rot.m20 + r1 * rot.m21 + r2 * rot.m22;
         r0 = new0;
         r1 = new1;
         r2 = new2;
@@ -951,23 +951,36 @@ namespace rpp
 
     Matrix4& Matrix4::fromRotation(const Vector3& rotationDegrees)
     {
-        Vector4 q = Vector4::fromRotation(rotationDegrees);
-        m00 = 1 - 2 * q.y * q.y - 2 * q.z * q.z;
-        m01 = 2 * q.x * q.y + 2 * q.w * q.z;
-        m02 = 2 * q.x * q.z - 2 * q.w * q.y;
-        m03 = 0.0f;
-        m10 = 2 * q.x * q.y - 2 * q.w * q.z;
-        m11 = 1 - 2 * q.x * q.x - 2 * q.z * q.z;
-        m12 = 2 * q.y * q.z + 2 * q.w * q.x;
-        m13 = 0.0f;
-        m20 = 2 * q.x * q.z + 2 * q.w * q.y;
-        m21 = 2 * q.y * q.z - 2 * q.w * q.x;
-        m22 = 1 - 2 * q.x * q.x - 2 * q.y * q.y;
-        m23 = 0.0f;
-        m30 = 0.0f;
-        m31 = 0.0f;
-        m32 = 0.0f;
-        m33 = 1.0f;
+        loadIdentity();
+        rotate(rotationDegrees.x, Vector3::XAXIS);
+        rotate(rotationDegrees.y, Vector3::YAXIS);
+        rotate(rotationDegrees.z, Vector3::ZAXIS);
+
+        //Matrix4 rotX = Identity();
+        //Matrix4 rotY = Identity();
+        //Matrix4 rotZ = Identity();
+        //rotX.rotate(rotationDegrees.x, Vector3::XAXIS);
+        //rotY.rotate(rotationDegrees.y, Vector3::YAXIS);
+        //rotZ.rotate(rotationDegrees.z, Vector3::ZAXIS);
+        //multiply(rotX).multiply(rotY).multiply(rotZ);
+
+        //Vector4 q = Vector4::fromRotation(rotationDegrees);
+        //m00 = 1 - 2 * q.y * q.y - 2 * q.z * q.z;
+        //m01 = 2 * q.x * q.y + 2 * q.w * q.z;
+        //m02 = 2 * q.x * q.z - 2 * q.w * q.y;
+        //m03 = 0.0f;
+        //m10 = 2 * q.x * q.y - 2 * q.w * q.z;
+        //m11 = 1 - 2 * q.x * q.x - 2 * q.z * q.z;
+        //m12 = 2 * q.y * q.z + 2 * q.w * q.x;
+        //m13 = 0.0f;
+        //m20 = 2 * q.x * q.z + 2 * q.w * q.y;
+        //m21 = 2 * q.y * q.z - 2 * q.w * q.x;
+        //m22 = 1 - 2 * q.x * q.x - 2 * q.y * q.y;
+        //m23 = 0.0f;
+        //m30 = 0.0f;
+        //m31 = 0.0f;
+        //m32 = 0.0f;
+        //m33 = 1.0f;
         return *this;
     }
 
@@ -1004,7 +1017,7 @@ namespace rpp
         return *this;
     }
     
-    Matrix4& Matrix4::setAffine3D(const Vector3 & pos, const Vector3 & scale, const Vector3 & rotationDegrees)
+    Matrix4& Matrix4::setAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees)
     {
         // affine 3d: move, scale to size and then rotate
         fromPosition(pos);
