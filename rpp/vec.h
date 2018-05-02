@@ -1029,14 +1029,24 @@ namespace rpp
             return toString(buffer, SIZE);
         }
 
+        /** @brief Assuming this is a quaternion, gives the Euler XYZ angles (degrees) */
+        Vector3 quatToEulerAngles() const;
+        Vector3 quatToEulerRadians() const;
+
         /** @brief Creates a quaternion rotation from an Euler angle (degrees), rotation axis must be specified */
-        static Vector4 fromAngleAxis(float angle, const Vector3& axis);
-    
+        static Vector4 fromAngleAxis(float degrees, const Vector3& axis)
+        { return fromAngleAxis(degrees, axis.x, axis.y, axis.z); }
+        static Vector4 fromRadianAxis(float radians, const Vector3& axis)
+        { return fromRadianAxis(radians, axis.x, axis.y, axis.z); }
+
+
         /** @brief Creates a quaternion rotation from an Euler angle (degrees), rotation axis must be specified */
         static Vector4 fromAngleAxis(float angle, float x, float y, float z);
+        static Vector4 fromRadianAxis(float radians, float x, float y, float z);
     
         /** @brief Creates a quaternion rotation from Euler XYZ (degrees) rotation */
-        static Vector4 fromRotation(const Vector3& rotation);
+        static Vector4 fromRotationAngles(const Vector3& rotationDegrees);
+        static Vector4 fromRotationRadians(const Vector3& rotationRadians);
 
         /** @return A 3-component float color from integer RGBA color */
         static constexpr Vector3 RGB(int r, int g, int b)
@@ -1138,10 +1148,114 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+
+    struct RPPAPI _Matrix3RowVis
+    {
+        float x, y, z;
+    };
+
+
+    /**
+     * 3x3 Rotation Matrix for OpenGL in row-major order, which is best suitable for MODERN OPENGL development
+     */
+    struct RPPAPI Matrix3
+    {
+        union {
+            struct {
+                float m00, m01, m02; // row0  0-2
+                float m10, m11, m12; // row1  0-2
+                float m20, m21, m22; // row2  0-2
+            };
+            struct {
+                Vector3 r0, r1, r2; // rows 0-3
+            };
+            struct {
+                _Matrix3RowVis vis0, vis1, vis2;
+            };
+            float m[12]; // 3x3 float matrix
+
+            Vector3 r[3]; // rows 0-2
+        };
+
+        inline Matrix3() {}
+
+        inline constexpr Matrix3(
+            float m00, float m01, float m02,
+            float m10, float m11, float m12,
+            float m20, float m21, float m22) :
+            m00(m00), m01(m01), m02(m02),
+            m10(m10), m11(m11), m12(m12),
+            m20(m20), m21(m21), m22(m22) { }
+
+        inline constexpr Matrix3(Vector3 r0, Vector3 r1, Vector3 r2)
+            : r0(r0), r1(r1), r2(r2) { }
+
+        /** @brief Global identity matrix for easy initialization */
+        static const Matrix3& Identity();
+
+        /** @brief Loads identity matrix */
+        Matrix3& loadIdentity();
+    
+        /** @brief Multiplies this matrix: this = this * mb */
+        Matrix3& multiply(const Matrix3& mb);
+
+        /** @brief Multiplies this matrix ma with matrix mb and returns the result as mc */
+        Matrix3 operator*(const Matrix3& mb) const;
+
+        /** @brief Transforms 3D vector v with this matrix and return the resulting vec3 */
+        Vector3 operator*(const Vector3& v) const;
+
+        // Transposes THIS Matrix4
+        Matrix3& transpose();
+
+        // Returns a transposed copy of this matrix
+        Matrix3 transposed() const;
+
+        float norm() const;
+        float norm(const Matrix3& b) const;
+
+        /** @return TRUE if this matrix looks like a rotation matrix */
+        bool isRotationMatrix() const;
+
+        /** Assuming this is a rotation matrix, returns Euler XYZ angles in DEGREES */
+        Vector3 toEulerAngles() const;
+        Vector3 toEulerRadians() const;
+
+        /**
+         * Initializes this Matrix3 with euler angles
+         * @param eulerAngles Euler XYZ rotation in degrees
+         */
+        Matrix3& fromRotationAngles(const Vector3& eulerAngles)
+        {
+            return fromRotationRadians({radf(eulerAngles.x), radf(eulerAngles.y), radf(eulerAngles.z)});
+        }
+        Matrix3& fromRotationRadians(const Vector3& eulerRadians);
+
+        static Matrix3 createRotationFromAngles(const Vector3& eulerAngles)
+        {
+            return createRotationFromRadians({radf(eulerAngles.x), radf(eulerAngles.y), radf(eulerAngles.z)});
+        }
+        static Matrix3 createRotationFromRadians(const Vector3& eulerRadians);
+
+        /** Print the matrix */
+        void print() const;
+    
+        /** @return Temporary static string from this */
+        const char* toString() const;
+    
+        char* toString(char* buffer) const;
+        char* toString(char* buffer, int size) const;
+        template<int SIZE> char* toString(char (&buffer)[SIZE]) const {
+            return toString(buffer, SIZE);
+        }
+    };
+
+    
     struct RPPAPI _Matrix4RowVis
     {
         float x, y, z, w;
     };
+
 
     /**
      * 4x4 Affine Matrix for OpenGL in row-major order, which is best suitable for MODERN OPENGL development
@@ -1182,9 +1296,7 @@ namespace rpp
             m30(m30), m31(m31), m32(m32), m33(m33) { }
 
         inline constexpr Matrix4(Vector4 r0, Vector4 r1, Vector4 r2, Vector4 r3)
-            : r0(r0), r1(r1), r2(r2), r3(r3)
-        {
-        }
+            : r0(r0), r1(r1), r2(r2), r3(r3) { }
 
         /** @brief Loads identity matrix */
         Matrix4& loadIdentity();

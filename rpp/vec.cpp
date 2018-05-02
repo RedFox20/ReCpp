@@ -665,33 +665,60 @@ namespace rpp
         return buffer;
     }
 
-    Vector4 Vector4::fromAngleAxis(float angle, const Vector3& axis)
+    Vector3 Vector4::quatToEulerAngles() const
     {
-        return fromAngleAxis(angle, axis.x, axis.y, axis.z);
+        Vector3 angles = quatToEulerRadians();
+        angles.x = degf(angles.x);
+        angles.y = degf(angles.y);
+        angles.z = degf(angles.z);
+        return angles;
     }
 
-    Vector4 Vector4::fromAngleAxis(float angle, float x, float y, float z)
+    Vector3 Vector4::quatToEulerRadians() const
     {
-        const float r = radf(angle) * 0.5f;
+        return {
+            atan2(2 * (x*y + z*w), 1 - 2 * (y*y + z*z)),
+            asin( 2 * (x*z - w*y)),
+            atan2(2 * (x*w + y*z), 1 - 2 * (z*z + w*w))
+        };
+    }
+
+    Vector4 Vector4::fromAngleAxis(float degrees, float x, float y, float z)
+    {
+        const float r = radf(degrees) * 0.5f;
         const float s = sinf(r);
         return Vector4(x*s, y*s, z*s, cosf(r));
     }
 
-    Vector4 Vector4::fromRotation(const Vector3& rotation)
+    Vector4 Vector4::fromRadianAxis(float radians, float x, float y, float z)
     {
-        Vector4 q = fromAngleAxis(rotation.x, 1.0f, 0.0f, 0.0f);
-                q = fromAngleAxis(rotation.y, 0.0f, 1.0f, 0.0f) * q;
-        return      fromAngleAxis(rotation.z, 0.0f, 0.0f, 1.0f) * q;
+        const float r = radians * 0.5f;
+        const float s = sinf(r);
+        return Vector4(x*s, y*s, z*s, cosf(r));
+    }
+
+    Vector4 Vector4::fromRotationAngles(const Vector3& rotationDegrees)
+    {
+        Vector4 q = fromAngleAxis(rotationDegrees.x, 1.0f, 0.0f, 0.0f);
+                q = fromAngleAxis(rotationDegrees.y, 0.0f, 1.0f, 0.0f) * q;
+        return      fromAngleAxis(rotationDegrees.z, 0.0f, 0.0f, 1.0f) * q;
+    }
+
+    Vector4 Vector4::fromRotationRadians(const Vector3& rotationRadians)
+    {
+        Vector4 q = fromRadianAxis(rotationRadians.x, 1.0f, 0.0f, 0.0f);
+                q = fromRadianAxis(rotationRadians.y, 0.0f, 1.0f, 0.0f) * q;
+        return      fromRadianAxis(rotationRadians.z, 0.0f, 0.0f, 1.0f) * q;
     }
 
     Vector4 Vector4::rotate(const Vector4& q) const
     {
-        return Vector4(
-                q.w*w - q.x*x - q.y*y - q.z*z,
-                q.w*x + q.x*w + q.y*z - q.z*y,
-                q.w*y + q.y*w + q.z*x - q.x*z,
-                q.w*z + q.z*w + q.x*y - q.y*x
-        );
+        return {
+            q.w*w - q.x*x - q.y*y - q.z*z,
+            q.w*x + q.x*w + q.y*z - q.z*y,
+            q.w*y + q.y*w + q.z*x - q.x*z,
+            q.w*z + q.z*w + q.x*y - q.y*x
+        };
     }
     
     Vector4 Vector4::HEX(const strview& s) noexcept
@@ -757,9 +784,226 @@ namespace rpp
         return NUMBER(s);
     }
 
+
     /////////////////////////////////////////////////////////////////////////////////////
 
-    static const Matrix4 IDENTITY = {
+
+    static const Matrix3 IDENTITY3x3 = {
+        { 1, 0, 0 },
+        { 0, 1, 0 },
+        { 0, 0, 1 },
+    };
+
+    const Matrix3& Matrix3::Identity()
+    {
+        return IDENTITY3x3;
+    }
+
+    Matrix3& Matrix3::loadIdentity()
+    {
+        return (*this = IDENTITY3x3);
+    }
+
+    Matrix3& Matrix3::multiply(const Matrix3& mb)
+    {
+        float a00 = m00, a01 = m01, a02 = m02;
+        float a10 = m10, a11 = m11, a12 = m12;
+        float a20 = m20, a21 = m21, a22 = m22;
+        float B00 = m00, B01 = m01, B02 = m02;
+        float B10 = m10, B11 = m11, B12 = m12;
+        float B20 = m20, B21 = m21, B22 = m22;
+        m00 = a00 * B00 + a10 * B01 + a20 * B02;
+        m01 = a01 * B00 + a11 * B01 + a21 * B02;
+        m02 = a02 * B00 + a12 * B01 + a22 * B02;
+        m10 = a00 * B10 + a10 * B11 + a20 * B12;
+        m11 = a01 * B10 + a11 * B11 + a21 * B12;
+        m12 = a02 * B10 + a12 * B11 + a22 * B12;
+        m20 = a00 * B20 + a10 * B21 + a20 * B22;
+        m21 = a01 * B20 + a11 * B21 + a21 * B22;
+        m22 = a02 * B20 + a12 * B21 + a22 * B22;
+        return *this;
+    }
+
+    Matrix3 Matrix3::operator*(const Matrix3& mb) const
+    {
+        float a00 = m00, a01 = m01, a02 = m02;
+        float a10 = m10, a11 = m11, a12 = m12;
+        float a20 = m20, a21 = m21, a22 = m22;
+        float B00 = m00, B01 = m01, B02 = m02;
+        float B10 = m10, B11 = m11, B12 = m12;
+        float B20 = m20, B21 = m21, B22 = m22;
+        return {
+            a00 * B00 + a10 * B01 + a20 * B02,
+            a01 * B00 + a11 * B01 + a21 * B02,
+            a02 * B00 + a12 * B01 + a22 * B02,
+            a00 * B10 + a10 * B11 + a20 * B12,
+            a01 * B10 + a11 * B11 + a21 * B12,
+            a02 * B10 + a12 * B11 + a22 * B12,
+            a00 * B20 + a10 * B21 + a20 * B22,
+            a01 * B20 + a11 * B21 + a21 * B22,
+            a02 * B20 + a12 * B21 + a22 * B22,
+        };
+    }
+
+    Vector3 Matrix3::operator*(const Vector3& v) const
+    {
+        return {
+            m00 * v.x + m10 * v.y + m20 * v.z,
+            m01 * v.x + m11 * v.y + m21 * v.z,
+            m02 * v.x + m12 * v.y + m22 * v.z
+        };
+    }
+
+    Matrix3& Matrix3::transpose()
+    {
+        swap(m01, m10);
+        swap(m02, m20);
+        swap(m12, m21);
+        return *this;
+    }
+
+    Matrix3 Matrix3::transposed() const
+    {
+        return {
+            m00, m10, m20,
+            m01, m11, m21,
+            m02, m12, m22,
+        };
+    }
+
+    template<typename _Tp, typename _AccTp> static inline
+    _AccTp normL2Sqr(const _Tp* a, int n)
+    {
+        float s = 0.0f;
+        for (int i = 0 ; i < n; i++ )
+        {
+            _AccTp v = a[i];
+            s += v*v;
+        }
+        return s;
+    }
+
+    float Matrix3::norm() const
+    {
+        float s = m00*m00 + m10*m10 + m20*m20 
+                + m01*m01 + m11*m11 + m21*m21
+                + m02*m02 + m12*m12 + m22*m22;
+        return sqrtf(s);
+    }
+
+    float Matrix3::norm(const Matrix3& b) const
+    {
+        float f0 = m00-b.m00, f1 = m10-b.m10, f2 = m20-b.m20;
+        float f3 = m01-b.m01, f4 = m11-b.m11, f5 = m21-b.m21;
+        float f6 = m02-b.m02, f7 = m12-b.m12, f8 = m22-b.m22;
+        float s = f0*f0 + f1*f1 + f2*f2 
+                + f3*f3 + f4*f4 + f5*f5
+                + f6*f6 + f7*f7 + f8*f8;
+        return sqrtf(s);
+    }
+
+    bool Matrix3::isRotationMatrix() const
+    {
+        Matrix3 shouldBeIdentity = transposed() * (*this);
+        return IDENTITY3x3.norm(shouldBeIdentity) < 1e-6;
+    }
+
+    Vector3 Matrix3::toEulerAngles() const
+    {
+        Vector3 angles = toEulerRadians();
+        angles.x = degf(angles.x);
+        angles.y = degf(angles.y);
+        angles.z = degf(angles.z);
+        return angles;
+    }
+
+    // https://www.learnopencv.com/rotation-matrix-to-euler-angles/
+    Vector3 Matrix3::toEulerRadians() const
+    {
+        float sy = sqrtf(m00*m00 + m10*m10);
+        Vector3 angles;
+        if (sy < 1e-6) // if singular
+        {
+            angles.x = atan2(-m12, m11);
+            angles.y = atan2(-m20, sy);
+            angles.z = 0.0f;
+        }
+        else
+        {
+            angles.x = atan2(m21, m22);
+            angles.y = atan2(-m20, sy);
+            angles.z = atan2(m10, m00);
+        }
+        return angles;
+    }
+
+    Matrix3& Matrix3::fromRotationRadians(const Vector3& eulerRadians)
+    {
+        return (*this = createRotationFromRadians(eulerRadians));
+    }
+
+    Matrix3 Matrix3::createRotationFromRadians(const Vector3& eulerRadians)
+    {
+        float sinx = sin(eulerRadians.x);
+        float cosx = cos(eulerRadians.x);
+        float siny = sin(eulerRadians.y);
+        float cosy = cos(eulerRadians.y);
+        float sinz = sin(eulerRadians.z);
+        float cosz = cos(eulerRadians.z);
+
+        Matrix3 R_x {
+            1,  0,     0,
+            0,  cosx, -sinx,
+            0,  sinx,  cosx
+        };
+        Matrix3 R_y {
+            cosy,  0,  siny,
+            0,     1,  0,
+           -siny,  0,  cosy
+        };
+        Matrix3 R_z {
+            cosz,  -sinz,  0,
+            sinz,   cosz,  0,
+            0,      0,     1
+        };
+        // Combined rotation matrix
+        R_z.multiply(R_y);
+        R_z.multiply(R_x);
+        return R_z;
+    }
+
+    void Matrix3::print() const
+    {
+        char buffer[256];
+        puts(toString(buffer));
+    }
+
+    const char* Matrix3::toString() const
+    {
+        static char buffer[256];
+        return toString(buffer, sizeof(buffer));
+    }
+
+    char* Matrix3::toString(char* buffer) const
+    {
+        return toString(buffer, 256);
+    }
+
+    char* Matrix3::toString(char* buffer, int size) const
+    {
+        int len = snprintf(buffer, size_t(size), "{\n");
+        for (auto v : r)
+            len += snprintf(buffer+len, size_t(size-len), " %8.3f,%8.3f,%8.3f\n",
+                                                            v.x  , v.y , v.z);
+        snprintf(buffer+len, size_t(size-len), "}");
+        return buffer;
+    }
+
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
+
+    static const Matrix4 IDENTITY4x4 = {
         { 1, 0, 0, 0 },
         { 0, 1, 0, 0 },
         { 0, 0, 1, 0 },
@@ -768,12 +1012,12 @@ namespace rpp
 
     const Matrix4& Matrix4::Identity()
     {
-        return IDENTITY;
+        return IDENTITY4x4;
     }
 
     Matrix4& Matrix4::loadIdentity()
     {
-        return (*this = IDENTITY);
+        return (*this = IDENTITY4x4);
     }
 
     Matrix4& Matrix4::multiply(const Matrix4& mb)
@@ -945,7 +1189,7 @@ namespace rpp
 
     Matrix4& Matrix4::fromPosition(const Vector3& position)
     {
-        *this = IDENTITY;
+        *this = IDENTITY4x4;
         return translate(position);
     }
 

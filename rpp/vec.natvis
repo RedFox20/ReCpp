@@ -42,9 +42,25 @@
     </Expand>
   </Type>
   
+  <Type Name="rpp::_Matrix3RowVis">
+    <DisplayString>{x,g} {y,g} {z,g}</DisplayString>
+  </Type>
+
   <Type Name="rpp::_Matrix4RowVis">
     <DisplayString>{x,g} {y,g} {z,g} {w,g}</DisplayString>
   </Type>
+    
+  <Type Name="rpp::Matrix3">
+    <DisplayString>mat3 {vis0} ||| {vis1} ||| {vis2} ||| {vis3}</DisplayString>
+    <Expand>
+      <Item Name="[m00 m01 m02]">vis0</Item>
+      <Item Name="[m10 m11 m12]">vis1</Item>
+      <Item Name="[m20 m21 m22]">vis2</Item>
+      <Item Name="[scalex]">m00</Item>
+      <Item Name="[scaley]">m11</Item>
+    </Expand>
+  </Type>
+
   <Type Name="rpp::Matrix4">
     <DisplayString>mat4 {vis0} ||| {vis1} ||| {vis2} ||| {vis3}</DisplayString>
     <Expand>
@@ -55,6 +71,7 @@
       <Item Name="[pos]">r3.xyz</Item>
       <Item Name="[scalex]">m00</Item>
       <Item Name="[scaley]">m11</Item>
+      <Item Name="[scalez]">m22</Item>
     </Expand>
   </Type>
 
