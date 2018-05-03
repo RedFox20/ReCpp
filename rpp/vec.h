@@ -958,7 +958,28 @@ namespace rpp
     
     inline Vector3::operator Vector3d() const { return { double(x), double(y), double(z) }; }
 
+
     ////////////////////////////////////////////////////////////////////////////////
+
+
+    /**
+     * @note This is meant for use along with Matrix4
+     *       It has no intrinsic value as stand-alone
+     */
+    struct RPPAPI AngleAxis
+    {
+        Vector3 axis = Vector3::ZERO; // rotation axis
+        float angle = 0.0f;  // rotation angle in DEGREES
+
+        /**
+         * @return The rotation axis and angle between two vectors
+         */
+        static AngleAxis fromVectors(Vector3 a, Vector3 b);
+    };
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
 
     /** @brief 4D Vector for matrix calculations and quaternion rotations */
     struct RPPAPI Vector4
@@ -1204,6 +1225,25 @@ namespace rpp
 
         /** @brief Transforms 3D vector v with this matrix and return the resulting vec3 */
         Vector3 operator*(const Vector3& v) const;
+
+        /** @brief Creates ROTATION MATRIX from angle DEGREES around AXIS */
+        Matrix3& fromAngleAxis(float angle, Vector3 axis)
+        {
+            return fromAngleAxis(angle, axis.x, axis.y, axis.z);
+        }
+        Matrix3& fromAngleAxis(float angle, float x, float y, float z);
+        static Matrix3 createAngleAxis(float angle, Vector3 axis)
+        {
+            Matrix3 rot;
+            rot.fromAngleAxis(angle, axis.x, axis.y, axis.z);
+            return rot;
+        }
+
+        /** @brief Rotates this Matrix3 by angle DEGREES around AXIS */
+        Matrix3& rotate(float angle, Vector3 axis)
+        {
+            return multiply(createAngleAxis(angle, axis));
+        }
 
         // Transposes THIS Matrix4
         Matrix3& transpose();

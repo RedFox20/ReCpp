@@ -619,8 +619,28 @@ namespace rpp
     {
         return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
     }
-    
+
+
     /////////////////////////////////////////////////////////////////////////////////////
+
+
+    AngleAxis AngleAxis::fromVectors(Vector3 a, Vector3 b)
+    {
+        if (a.almostZero() || b.almostZero())
+            return { Vector3::ZERO, 0.0f };
+        a.normalize();
+        b.normalize();
+        float cosTheta = a.dot(b);
+        if (rpp::almostEqual(cosTheta, 1.0f))
+            return { Vector3::ZERO, 0.0f };
+        float theta = rpp::degf(std::acos(cosTheta));
+        Vector3 axis = a.cross(b).normalized();
+        return { axis, -theta };
+    }
+
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
 
     bool Vector4::almostZero() const
     {
@@ -853,6 +873,19 @@ namespace rpp
             m02 * v.x + m12 * v.y + m22 * v.z
         };
     }
+    
+    // https://en.wikipedia.org/wiki/Rotation_matrix#Rotation_matrix_from_axis_and_angle
+    Matrix3& Matrix3::fromAngleAxis(float angle, float x, float y, float z)
+    {
+        float radians = radf(angle);
+        float c = cosf(radians);
+        float s = sinf(radians);
+        float c1 = 1 - c;
+        m00 = c + x*x*c1;   m01 = x*y*c1 - z*s; m02 = x*z*c1 + y*s;
+        m10 = y*x*c1 + z*s; m11 = c + y*y*c1;   m12 = y*z*c1 - x*s;
+        m20 = z*x*c1 - y*s; m21 = z*y*c1 + x*s; m22 = c + z*z*c1;
+        return *this;
+    }
 
     Matrix3& Matrix3::transpose()
     {
@@ -869,18 +902,6 @@ namespace rpp
             m01, m11, m21,
             m02, m12, m22,
         };
-    }
-
-    template<typename _Tp, typename _AccTp> static inline
-    _AccTp normL2Sqr(const _Tp* a, int n)
-    {
-        float s = 0.0f;
-        for (int i = 0 ; i < n; i++ )
-        {
-            _AccTp v = a[i];
-            s += v*v;
-        }
-        return s;
     }
 
     float Matrix3::norm() const

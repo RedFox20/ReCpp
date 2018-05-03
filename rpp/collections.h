@@ -23,6 +23,9 @@ namespace rpp
         element_range(T* ptr, int n)         noexcept : first{ptr},   sentinel{ptr+n}    {}
         element_range(T* ptr, size_t n)      noexcept : first{ptr},   sentinel{ptr+n}    {}
 
+        template<class A>
+        element_range(std::vector<T, A>& v) noexcept : first{v.data()}, sentinel{v.data()+v.size()} {}
+
         template<class Container, typename = enable_if_iterable_t<Container>>
         element_range(Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
 
