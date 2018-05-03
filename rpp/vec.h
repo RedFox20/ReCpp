@@ -1069,10 +1069,10 @@ namespace rpp
         static Vector4 fromRotationAngles(const Vector3& rotationDegrees);
         static Vector4 fromRotationRadians(const Vector3& rotationRadians);
 
-        /** @return A 3-component float color from integer RGBA color */
-        static constexpr Vector3 RGB(int r, int g, int b)
+        /** @return A 4-component float color from integer RGB color, with A being 1.0f */
+        static constexpr Vector4 RGB(int r, int g, int b)
         {
-            return { r / 255.0f, g / 255.0f, b / 255.0f};
+            return { r / 255.0f, g / 255.0f, b / 255.0f, 1.0f };
         }
         /** @return A 4-component float color from integer RGBA color */
         static constexpr Vector4 RGB(int r, int g, int b, int a)
