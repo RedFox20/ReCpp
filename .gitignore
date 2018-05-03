@@ -8,3 +8,4 @@ ipch/
 cmake-build-debug/
 cmake-build-release/
 windows/
+build/

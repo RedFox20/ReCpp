@@ -1,0 +1,25 @@
+language: cpp
+compiler:
+  - clang
+  - gcc
+matrix:
+  include:
+    # works on Trusty
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-trusty-4.0
+          packages:
+            - clang-4.0
+      env:
+        - MATRIX_EVAL="CC=clang-4.0 && CXX=clang++-4.0"
+before_install:
+    - eval "${MATRIX_EVAL}"
+
+before_script:
+  - mkdir build
+
+script: cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j4
+
+after_success: cd build && ./Tests
