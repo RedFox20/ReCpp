@@ -22,7 +22,7 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
-if(CLANG or GCC)
+if(CLANG OR GCC)
     add_compile_options(-Wall -std=c++1z)
     if(LINUX)
         add_compile_options(-march=native)
