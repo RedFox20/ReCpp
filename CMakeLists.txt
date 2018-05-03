@@ -12,6 +12,8 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CLANG TRUE)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    set(GCC TRUE)
 elseif(MSVC)
 else()
     message(FATAL_ERROR "Unsupported CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
@@ -20,7 +22,7 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
-if(CLANG)
+if(CLANG or GCC)
     add_compile_options(-Wall -std=c++1z)
     if(LINUX)
         add_compile_options(-march=native)
