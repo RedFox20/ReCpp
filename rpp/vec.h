@@ -1079,6 +1079,11 @@ namespace rpp
         {
             return { r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
         }
+        /** @return A 4-component float color with Alpha override */
+        static constexpr Vector4 RGB(Vector4 color, float newAlpha)
+        {
+            return { color.r, color.g, color.b, newAlpha };
+        }
     
         /**
          * Parses a HEX color string, example: #rrggbb or #rrggbbaa
