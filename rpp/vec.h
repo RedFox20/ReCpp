@@ -1612,6 +1612,9 @@ namespace rpp
         // get the bounding radius: (max-min).length() / 2
         float radius() const noexcept;
 
+        // get the bounding diagonal length (enclosing diameter): (max-min).length()
+        float diagonal() const noexcept;
+
         Vector3 compare(const BoundingBox& bb) const noexcept;
 
         // joins a vector into this bounding box, possibly increasing the volume

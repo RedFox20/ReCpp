@@ -21,6 +21,9 @@
   <Type Name="rpp::Vector3">
     <DisplayString>x={x,g} y={y,g} z={z,g}</DisplayString>
     <Expand>
+      <Item Name="[x]">x,g</Item>
+      <Item Name="[y]">y,g</Item>
+      <Item Name="[z]">z,g</Item>
       <Item Name="[sqlength]">x*x + y*y + z*z</Item>
     </Expand>
   </Type>
@@ -28,6 +31,10 @@
   <Type Name="rpp::Vector4">
     <DisplayString>x={x,g} y={y,g} z={z,g} w={w,g}</DisplayString>
     <Expand>
+      <Item Name="[x]">x,g</Item>
+      <Item Name="[y]">y,g</Item>
+      <Item Name="[z]">z,g</Item>
+      <Item Name="[w]">w,g</Item>
       <Item Name="[sqlength]">x*x + y*y + z*z + w*w</Item>
     </Expand>
   </Type>

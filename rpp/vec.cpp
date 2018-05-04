@@ -1636,6 +1636,11 @@ namespace rpp
         return (max - min).length() * 0.5f;
     }
 
+    float BoundingBox::diagonal() const noexcept
+    {
+        return (max - min).length();
+    }
+
     Vector3 BoundingBox::compare(const BoundingBox& bb) const noexcept
     {
         //// local delta based

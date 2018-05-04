@@ -48,13 +48,13 @@ namespace rpp
     template<class T, size_t N> element_range<T> range(std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
     template<class T, class A>  element_range<T> range(std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
 
-    template<class T>           element_range<const T> range(const T* data, const T* end)noexcept { return { data, end  }; }
-    template<class T>           element_range<const T> range(const T* data, int size)    noexcept { return { data, size }; }
-    template<class T>           element_range<const T> range(const T* data, size_t size) noexcept { return { data, size }; }
-    template<class T, size_t N> element_range<const T> range(const std::array<T, N>&  v) noexcept { return { v.data(), v.size() }; }
-    template<class T, class A>  element_range<const T> range(const std::vector<T, A>& v) noexcept { return { v.data(), v.size() }; }
-    template<class T, size_t N> element_range<const T> range(const std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
-    template<class T, class A>  element_range<const T> range(const std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
+    template<class T>           element_range<const T> constrange(const T* data, const T* end)noexcept { return { data, end  }; }
+    template<class T>           element_range<const T> constrange(const T* data, int size)    noexcept { return { data, size }; }
+    template<class T>           element_range<const T> constrange(const T* data, size_t size) noexcept { return { data, size }; }
+    template<class T, size_t N> element_range<const T> constrange(const std::array<T, N>&  v) noexcept { return { v.data(), v.size() }; }
+    template<class T, class A>  element_range<const T> constrange(const std::vector<T, A>& v) noexcept { return { v.data(), v.size() }; }
+    template<class T, size_t N> element_range<const T> constrange(const std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
+    template<class T, class A>  element_range<const T> constrange(const std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
 
     template<class C, typename = enable_if_iterable_t<C>>
     auto range(C& container) -> element_range<std::remove_reference_t<decltype(*container.begin())>>
