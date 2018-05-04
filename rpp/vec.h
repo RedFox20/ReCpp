@@ -1709,6 +1709,14 @@ namespace rpp
         // @return Distance from rayStart to intersection OR 0.0f if no solutions
         float intersectSphere(Vector3 sphereCenter, float sphereRadius) const noexcept;
 
+        // Exactly the same as Ray-Sphere intersection. Only difference is usage
+        // semantics, where the intent is to Raycast using a cylindrical ray.
+        // @return Distance from rayStart to intersection OR 0.0f if no solutions
+        float intersectPoint(Vector3 point, float rayRadius) const noexcept
+        {
+            return intersectSphere(point, rayRadius);
+        }
+
         // Ray-Triangle intersection
         // @return Distance from rayStart to intersection OR 0.0f if no solutions 
         float intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept;

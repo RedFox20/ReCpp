@@ -114,7 +114,7 @@ TestImpl(test_collections)
     {
         vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
-        erase_item(v, "1337"s);
+        erase_item(v, "nonexisting"s);
         AssertThat(v.size(), 5ul);
 
         erase_item(v, "5");
@@ -125,6 +125,43 @@ TestImpl(test_collections)
 
         erase_item(v, "1");
         AssertThat(v.size(), 2ul);
+    }
+
+    TestCase(erase_first_if)
+    {
+        vector<string> v { "1"s, "2"s, "2"s, "4"s, "5"s };
+
+        erase_first_if(v, [](auto& s){ return s == "nonexisting"s; });
+        AssertThat(v.size(), 5ul);
+
+        erase_first_if(v, [](auto& s){ return s == "1"s; });
+        AssertThat(v, vector<string>({"2", "2", "4", "5"}));
+
+        erase_first_if(v, [](auto& s){ return s == "2"s; });
+        AssertThat(v, vector<string>({"2", "4", "5"}));
+
+        erase_first_if(v, [](auto& s){ return s == "5"s; });
+        AssertThat(v, vector<string>({"2", "4"}));
+
+        erase_first_if(v, [](auto& s){ return s == "2"s; });
+        AssertThat(v, vector<string>({"4"s}));
+    }
+
+    TestCase(erase_if)
+    {
+        vector<string> v { "1"s, "2"s, "3"s, "2"s, "1"s, "2"s };
+
+        erase_if(v, [](auto& s){ return s == "nonexisting"s; });
+        AssertThat(v.size(), 6ul);
+
+        erase_if(v, [](auto& s){ return s == "2"s; });
+        AssertThat(v, vector<string>({"1", "3", "1"}));
+
+        erase_if(v, [](auto& s){ return s == "3"s; });
+        AssertThat(v, vector<string>({"1", "1"}));
+        
+        erase_if(v, [](auto& s){ return s == "1"s; });
+        AssertThat(v, vector<string>());
     }
 
     TestCase(erase_back_swap)
@@ -145,7 +182,7 @@ TestImpl(test_collections)
     {
         vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
-        erase_item_back_swap(v, "1337"s);
+        erase_item_back_swap(v, "nonexisting"s);
         AssertThat(v.size(), 5ul);
 
         erase_item_back_swap(v, "5"s);
@@ -162,7 +199,7 @@ TestImpl(test_collections)
     {
         vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
-        erase_back_swap_first_if(v, [](auto& s) { return s == "1337"; });
+        erase_back_swap_first_if(v, [](auto& s) { return s == "nonexisting"; });
         AssertThat(v.size(), 5ul);
 
         erase_back_swap_first_if(v, [](auto& s) { return s == "5"; });
@@ -179,7 +216,7 @@ TestImpl(test_collections)
     {
         vector<string> v { "1"s, "1"s, "2"s, "3"s, "3"s, "4"s, "5"s, "5"s };
 
-        erase_back_swap_all_if(v, [](auto& s) { return s == "1337"; });
+        erase_back_swap_all_if(v, [](auto& s) { return s == "nonexisting"; });
         AssertThat(v.size(), 8ul);
 
         erase_back_swap_all_if(v, [](auto& s) { return s == "5"; });

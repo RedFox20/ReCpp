@@ -175,6 +175,31 @@ namespace rpp
         }
     }
 
+    // short-hand for the erase-remove-if idiom
+    // erases ALL items that match the predicate
+    template<class T, class Pred> void erase_if(std::vector<T>& v, const Pred& pred)
+    {
+        T* first = v.data();
+        T* end   = first + v.size();
+        for (;; ++first) {
+            if (first == end)
+                return; // nothing to erase
+            if (pred(*first))
+                break;
+        }
+
+        T* next = first;
+        while (++first != end) {
+            if (!pred(*first)) {
+                *next = std::move(*first);
+                ++next;
+            }
+        }
+
+        size_t pop = (end - next);
+        v.resize(v.size() - pop);
+    }
+
     // erases item at index i by moving the last item to [i]
     // and then popping the last element
     template<class T> void erase_back_swap(std::vector<T>& v, int i)

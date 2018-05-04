@@ -167,6 +167,16 @@ namespace rpp
         }
     };
 
+    
+    template<class T>
+    bool operator==(const vector<T>& a, const vector<T>& b)
+    {
+        size_t len = a.size();
+        if (len != b.size()) return false;
+        for (size_t i = 0; i < len; ++i)
+            if (a[i] != b[i]) return false;
+        return true;
+    }
 
 
 #undef Assert
@@ -185,9 +195,9 @@ namespace rpp
 #define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
 #define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
 #define AssertThat(expr, expected) do { \
-    const auto& __expr     = expr;           \
-    const auto& __expected = expected;       \
-    if (__expr != __expected) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expected); } \
+    const auto& __expr   = expr;           \
+    const auto& __expect = expected;       \
+    if (!(__expr == __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
 } while (false)
 #define AssertEqual AssertThat
 #define AssertNotEqual(expr, mustNotEqual) do { \
