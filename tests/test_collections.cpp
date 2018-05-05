@@ -32,11 +32,11 @@ TestImpl(test_collections)
         const vector<int> v = { 1, 1, 1, 1, 1 };
 
         int n = 0;
-        for (auto& i : constrange(v)) n += i;
+        for (auto& i : range(v)) n += i;
         AssertThat(n, 5);
 
         int m = 0;
-        for (auto& i : constrange(v, 4)) m += i;
+        for (auto& i : range(v, 4)) m += i;
         AssertThat(m, 4);
 
         int k = 0;

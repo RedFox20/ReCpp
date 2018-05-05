@@ -40,6 +40,28 @@ namespace rpp
         const T* data() const { return first; }
     };
 
+    template<class T> struct element_range<const T>
+    {
+        const T* first;
+        const T* sentinel;
+        element_range() noexcept : first{nullptr}, sentinel{nullptr} {}
+        element_range(const T* first, const T* sentinel) noexcept : first{first}, sentinel{sentinel} {}
+        element_range(const T* ptr, int n)               noexcept : first{ptr},   sentinel{ptr+n}    {}
+        element_range(const T* ptr, size_t n)            noexcept : first{ptr},   sentinel{ptr+n}    {}
+
+        template<class A>
+        element_range(const std::vector<T, A>& v) noexcept : first{v.data()}, sentinel{v.data()+v.size()} {}
+
+        template<class Container, typename = enable_if_iterable_t<Container>>
+        element_range(const Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
+
+        const T* begin() const { return first;    }
+        const T* end()   const { return sentinel; }
+        int size() const { return int(sentinel-first); }
+        const T& operator[](int index) const { return first[index]; }
+        const T* data() const { return first; }
+    };
+
     template<class T>           element_range<T> range(T* data, T* end)      noexcept { return { data, end  }; }
     template<class T>           element_range<T> range(T* data, int size)    noexcept { return { data, size }; }
     template<class T>           element_range<T> range(T* data, size_t size) noexcept { return { data, size }; }
@@ -48,13 +70,13 @@ namespace rpp
     template<class T, size_t N> element_range<T> range(std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
     template<class T, class A>  element_range<T> range(std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
 
-    template<class T>           element_range<const T> constrange(const T* data, const T* end)noexcept { return { data, end  }; }
-    template<class T>           element_range<const T> constrange(const T* data, int size)    noexcept { return { data, size }; }
-    template<class T>           element_range<const T> constrange(const T* data, size_t size) noexcept { return { data, size }; }
-    template<class T, size_t N> element_range<const T> constrange(const std::array<T, N>&  v) noexcept { return { v.data(), v.size() }; }
-    template<class T, class A>  element_range<const T> constrange(const std::vector<T, A>& v) noexcept { return { v.data(), v.size() }; }
-    template<class T, size_t N> element_range<const T> constrange(const std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
-    template<class T, class A>  element_range<const T> constrange(const std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
+    template<class T>           element_range<const T> range(const T* data, const T* end)noexcept { return { data, end  }; }
+    template<class T>           element_range<const T> range(const T* data, int size)    noexcept { return { data, size }; }
+    template<class T>           element_range<const T> range(const T* data, size_t size) noexcept { return { data, size }; }
+    template<class T, size_t N> element_range<const T> range(const std::array<T, N>&  v) noexcept { return { v.data(), v.size() }; }
+    template<class T, class A>  element_range<const T> range(const std::vector<T, A>& v) noexcept { return { v.data(), v.size() }; }
+    template<class T, size_t N> element_range<const T> range(const std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
+    template<class T, class A>  element_range<const T> range(const std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
 
     template<class C, typename = enable_if_iterable_t<C>>
     auto range(C& container) -> element_range<std::remove_reference_t<decltype(*container.begin())>>
