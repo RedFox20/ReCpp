@@ -44,6 +44,17 @@ TestImpl(test_collections)
         AssertThat(k, 5);
     }
 
+    TestCase(rvalue_element_range)
+    {
+        auto sumRange = [](element_range<const int> range) {
+            int n = 0;
+            for (auto& i : range) n += i;
+            return n;
+        };
+        int n = sumRange(range(vector<int>{ 1, 1, 1, 1, 1 }));
+        AssertThat(n, 5);
+    }
+
     struct StringCollection
     {
         std::vector<std::string> items;

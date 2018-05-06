@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+    <Type Name="rpp::element_range&lt;*&gt;">
+        <DisplayString Condition="first != sentinel">[{sentinel-first}] {first}</DisplayString>
+        <DisplayString Condition="first == sentinel">empty</DisplayString>
+        <Expand>
+            <Item Name="[length]">sentinel-first</Item>
+            <Item Name="[first]">first</Item>
+            <Item Name="[sentinel]">sentinel</Item>
+            <ArrayItems>
+                <Size>sentinel-first</Size>
+                <ValuePointer>first</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type> 
+
+</AutoVisualizer>

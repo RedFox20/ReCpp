@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <cstdlib>
+#include <rpp/collections.h>
 
 #ifndef NODISCARD
     #if __clang__
@@ -30,19 +31,10 @@ namespace rpp
             return reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
         }
 
-        template<class T> NODISCARD T* construct()
-        {
-            Pool* pool = static_cast<Pool*>(this);
-            T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
-
-            return new (obj) T{};
-        }
-
         template<class T, class... Args> NODISCARD T* construct(Args&&...args)
         {
             Pool* pool = static_cast<Pool*>(this);
             T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
-
             return new (obj) T{std::forward<Args>(args)...};
         }
 
@@ -60,15 +52,6 @@ namespace rpp
             return reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
         }
 
-        template<class T> NODISCARD T* construct_array(int count)
-        {
-            Pool* pool = static_cast<Pool*>(this);
-            T* arr = reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
-            for (int i = 0; i < count; ++i)
-                new (&arr[i]) T {};
-            return arr;
-        }
-
         template<class T, class... Args> NODISCARD T* construct_array(int count, const Args&...args)
         {
             Pool* pool = static_cast<Pool*>(this);
@@ -76,6 +59,22 @@ namespace rpp
             for (int i = 0; i < count; ++i)
                 new (&arr[i]) T {args...};
             return arr;
+        }
+
+        template<class T, class... Args> NODISCARD element_range<T> allocate_range(int count)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            T* arr = reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
+            return { arr, count };
+        }
+
+        template<class T, class... Args> NODISCARD element_range<T> construct_range(int count, const Args&...args)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            T* arr = reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
+            for (int i = 0; i < count; ++i)
+                new (&arr[i]) T {args...};
+            return { arr, count };
         }
     };
 
