@@ -102,12 +102,51 @@ TestImpl(memory_pool)
         AssertThat(obj->Name, "TestObject");
         AssertThat(obj->Value, 10.0f);
 
-        pool.allocate(57);
-        pool.allocate(17);
-        pool.allocate(45);
-        pool.allocate(33);
+        (void)pool.allocate(57);
+        (void)pool.allocate(17);
+        (void)pool.allocate(45);
+        (void)pool.allocate(33);
 
         AssertThat(obj->Name, "TestObject");
         AssertThat(obj->Value, 10.0f);
+    }
+
+    TestCase(allocate_array)
+    {
+        rpp::linear_static_pool pool { 16 };
+
+        float* floats = pool.allocate_array<float>(5);
+        AssertThat(floats, nullptr);
+
+        floats = pool.allocate_array<float>(2);
+        AssertNotEqual(floats, nullptr);
+
+        floats = pool.allocate_array<float>(2);
+        AssertNotEqual(floats, nullptr);
+
+        floats = pool.allocate_array<float>(2);
+        AssertThat(floats, nullptr);
+    }
+
+    TestCase(construct_array_pod)
+    {
+        rpp::linear_dynamic_pool pool { 1024 };
+
+        float* floats = pool.construct_array<float>(10, 42.0f);
+        for (int i = 0; i < 10; ++i)
+            AssertThat(floats[i], 42.0f);
+        
+        AssertNotEqual(floats[-1], 42.0f); // check out of range
+        AssertNotEqual(floats[10], 42.0f);
+    }
+
+    TestCase(construct_array_nonpod)
+    {
+        rpp::linear_dynamic_pool pool { 1024 };
+
+        // this works thanks to C++11 Small String Optimization
+        std::string* strings = pool.construct_array<std::string>(10, "hello");
+        for (int i = 0; i < 10; ++i)
+            AssertThat(strings[i], "hello");
     }
 };

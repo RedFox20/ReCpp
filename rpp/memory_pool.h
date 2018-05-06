@@ -2,6 +2,18 @@
 #include <vector>
 #include <cstdlib>
 
+#ifndef NODISCARD
+    #if __clang__
+        #if __clang_major__ >= 4 || (__clang_major__ == 3 && __clang_minor__ == 9) // since 3.9
+            #define NODISCARD [[nodiscard]]
+        #else
+            #define NODISCARD // not supported in clang <= 3.8
+        #endif
+    #else
+        #define NODISCARD [[nodiscard]]
+    #endif
+#endif
+
 namespace rpp
 {
     /**
@@ -12,13 +24,13 @@ namespace rpp
     template<class Pool>
     struct pool_types_constructor
     {
-        template<class T> T* allocate()
+        template<class T> NODISCARD T* allocate()
         {
             Pool* pool = static_cast<Pool*>(this);
             return reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
         }
 
-        template<class T> T* construct()
+        template<class T> NODISCARD T* construct()
         {
             Pool* pool = static_cast<Pool*>(this);
             T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
@@ -26,7 +38,7 @@ namespace rpp
             return new (obj) T{};
         }
 
-        template<class T, class... Args> T* construct(Args&&...args)
+        template<class T, class... Args> NODISCARD T* construct(Args&&...args)
         {
             Pool* pool = static_cast<Pool*>(this);
             T* obj = reinterpret_cast<T*>(pool->allocate(sizeof(T), alignof(T)));
@@ -40,6 +52,30 @@ namespace rpp
             Pool* pool = static_cast<Pool*>(this);
             obj->~T();
             pool->deallocate(obj);
+        }
+
+        template<class T> NODISCARD T* allocate_array(int count)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            return reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
+        }
+
+        template<class T> NODISCARD T* construct_array(int count)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            T* arr = reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
+            for (int i = 0; i < count; ++i)
+                new (&arr[i]) T {};
+            return arr;
+        }
+
+        template<class T, class... Args> NODISCARD T* construct_array(int count, const Args&...args)
+        {
+            Pool* pool = static_cast<Pool*>(this);
+            T* arr = reinterpret_cast<T*>(pool->allocate(sizeof(T) * count, alignof(T)));
+            for (int i = 0; i < count; ++i)
+                new (&arr[i]) T {args...};
+            return arr;
         }
     };
 
@@ -91,7 +127,7 @@ namespace rpp
         int capacity()  const { return int(Ptr - Buffer) + Remaining; }
         int available() const { return Remaining; }
 
-        void* allocate(int size, int align = 8)
+        NODISCARD void* allocate(int size, int align = 8)
         {
             int alignOffset = 0;
             int alignedSize = size;
@@ -147,7 +183,7 @@ namespace rpp
             return Pools.back().available();
         }
 
-        void* allocate(int size, int align = 8)
+        NODISCARD void* allocate(int size, int align = 8)
         {
             linear_static_pool* pool = &Pools.back();
             int available = pool->available();
