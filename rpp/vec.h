@@ -648,7 +648,10 @@ namespace rpp
         float sqlength() const;
 
         /** @return Absolute distance from this vec3 to target vec3 */
-        float distanceTo(const Vector3& v) const;
+        float distanceTo(Vector3 v) const;
+
+        /** @return Squared distance from this vec3 to target vec3 */
+        float sqDistanceTo(Vector3 v) const;
     
         /** @brief Normalize this vector */
         void normalize();
@@ -659,10 +662,10 @@ namespace rpp
         Vector3 normalized(const float magnitude) const;
     
         /** @return Cross product with another vector */
-        Vector3 cross(const Vector3& b) const;
+        Vector3 cross(Vector3 b) const;
     
         /** @return Dot product with another vector */
-        float dot(const Vector3& b) const;
+        float dot(Vector3 b) const;
 
         /**
          * Creates a mask vector for each component
@@ -707,7 +710,7 @@ namespace rpp
         bool almostZero() const;
 
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
-        bool almostEqual(const Vector3& b) const;
+        bool almostEqual(Vector3 b) const;
 
         Vector3& operator+=(float f) { x+=f; y+=f; z+=f; return *this; }
         Vector3& operator-=(float f) { x-=f; y-=f; z-=f; return *this; }
@@ -726,7 +729,7 @@ namespace rpp
         bool operator==(const Vector3& v) const { return x == v.x && y == v.y && z == v.z; }
         bool operator!=(const Vector3& v) const { return x != v.x || y != v.y || z != v.z; }
 
-        static Vector3 smoothColor(const Vector3& src, const Vector3& dst, float ratio);
+        static Vector3 smoothColor(Vector3 src, Vector3 dst, float ratio);
 
         // don't use macros plz :)
         #undef RGB
@@ -1084,7 +1087,9 @@ namespace rpp
         {
             return { color.r, color.g, color.b, newAlpha };
         }
-    
+
+        static Vector4 smoothColor(Vector4 src, Vector4 dst, float ratio);
+
         /**
          * Parses a HEX color string, example: #rrggbb or #rrggbbaa
          * @warning The string must start with '#', otherwise WHITE is returned

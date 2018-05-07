@@ -417,12 +417,20 @@ namespace rpp
         return x*x + y*y + z*z;
     }
 
-    float Vector3::distanceTo(const Vector3& v) const
+    float Vector3::distanceTo(Vector3 v) const
     {
         float dx = x - v.x;
         float dy = y - v.y;
         float dz = z - v.z;
         return sqrt(dx*dx + dy*dy + dz*dz);
+    }
+
+    float Vector3::sqDistanceTo(Vector3 v) const
+    {
+        float dx = x - v.x;
+        float dy = y - v.y;
+        float dz = z - v.z;
+        return dx*dx + dy*dy + dz*dz;
     }
 
     void Vector3::normalize()
@@ -448,12 +456,12 @@ namespace rpp
         return { x*inv, y*inv, z*inv };
     }
 
-    Vector3 Vector3::cross(const Vector3& v) const
+    Vector3 Vector3::cross(Vector3 v) const
     {
         return { y*v.z - v.y*z, z*v.x - v.z*x, x*v.y - v.x*y };
     }
 
-    float Vector3::dot(const Vector3& v) const
+    float Vector3::dot(Vector3 v) const
     {
         return x*v.x + y*v.y + z*v.z;
     }
@@ -503,12 +511,12 @@ namespace rpp
         return nearlyZero(x) && nearlyZero(y) && nearlyZero(z);
     }
 
-    bool Vector3::almostEqual(const Vector3& v) const
+    bool Vector3::almostEqual(Vector3 v) const
     {
         return nearlyZero(x - v.x) && nearlyZero(y - v.y) && nearlyZero(z - v.z);
     }
 
-    Vector3 Vector3::smoothColor(const Vector3& src, const Vector3& dst, float ratio)
+    Vector3 Vector3::smoothColor(Vector3 src, Vector3 dst, float ratio)
     {
         return { src.x * (1 - ratio) + dst.x * ratio,
                  src.y * (1 - ratio) + dst.y * ratio,
@@ -740,7 +748,17 @@ namespace rpp
             q.w*z + q.z*w + q.x*y - q.y*x
         };
     }
-    
+
+    Vector4 Vector4::smoothColor(Vector4 src, Vector4 dst, float ratio)
+    {
+        return {
+            src.x * (1 - ratio) + dst.x * ratio,
+            src.y * (1 - ratio) + dst.y * ratio,
+            src.z * (1 - ratio) + dst.z * ratio,
+            src.w * (1 - ratio) + dst.w * ratio
+        };
+    }
+
     Vector4 Vector4::HEX(const strview& s) noexcept
     {
         Color c = WHITE;
