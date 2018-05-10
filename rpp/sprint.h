@@ -377,7 +377,7 @@ namespace rpp
             int count = (int)container.size();
             pretty_cont_start(count, newlines);
             int i = 0;
-            for (const T& item : container) {
+            for (const auto& item : container) {
 
                 pretty_cont_item_start(newlines);
                 prettyprint(item);
@@ -385,7 +385,7 @@ namespace rpp
             }
             pretty_cont_end(count);
         }
-        
+
         /**
          * Similar to write(...), but performs prettyprint formatting to each argument
          */
