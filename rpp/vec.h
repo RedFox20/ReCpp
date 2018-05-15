@@ -1595,7 +1595,7 @@ namespace rpp
         Vector3 max;
     
         BoundingBox() : min(0.0f,0.0f,0.0f), max(0.0f,0.0f,0.0f) {}
-        BoundingBox(const Vector3& bbMinMax) : min(bbMinMax), max(bbMinMax) {}
+        explicit BoundingBox(const Vector3& bbMinMax) : min(bbMinMax), max(bbMinMax) {}
         BoundingBox(const Vector3& bbMin, const Vector3& bbMax) : min(bbMin), max(bbMax) {}
 
         explicit operator bool()  const { return min.notZero() && max.notZero(); }
@@ -1636,6 +1636,9 @@ namespace rpp
 
         // grow the bounding box by the given value across all axes
         void grow(float growth) noexcept;
+
+        // creates a new bounding box with a specific radius
+        static BoundingBox create(float radius) noexcept;
 
         // calculates the bounding box of the given point cloud
         static BoundingBox create(const std::vector<Vector3>& points) noexcept;
