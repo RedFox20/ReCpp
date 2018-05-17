@@ -8,7 +8,10 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
+            - build-essential
             - clang-5.0
+            - libc++-dev
+            - libc++abi-dev
             - libdw-dev
       env:
         - MATRIX_EVAL="CC=clang-5.0 && CXX=clang++-5.0"
@@ -19,7 +22,9 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
+            - build-essential
             - g++-6
+            - libstdc++-6-dev
             - libdw-dev
       env:
         - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
