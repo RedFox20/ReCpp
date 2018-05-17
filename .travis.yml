@@ -43,8 +43,8 @@ before_install:
   - eval "export CC=${CC}; export CXX=${CXX}"
 
 install:
-  - eval "sudo update-alternatives --install ${ALTERNATIVES_CC} 90
-  - eval "sudo update-alternatives --install ${ALTERNATIVES_CXX} 90
+  - eval "sudo update-alternatives --install ${ALTERNATIVES_CC} 90"
+  - eval "sudo update-alternatives --install ${ALTERNATIVES_CXX} 90"
 
 before_script:
   - echo update-alternatives --list clang++
