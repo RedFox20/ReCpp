@@ -65,12 +65,18 @@ namespace rpp
         bool operator!=(const jstring& other) const { return view() != other.view(); }
         template<class Str> bool operator==(const Str& s) const { return view() == s; }
         template<class Str> bool operator!=(const Str& s) const { return view() != s; }
-        struct hash {
-            size_t operator()(const jstring& s) const {
-                return std::hash<rpp::strview>{}(s.view());
-            }
-        };
+
     };
+
+    struct RPPAPI jstring_hash
+    {
+        size_t operator()(const jstring& s) const
+        {
+            return std::hash<rpp::strview>{}(s.view());
+        }
+    };
+
+    class RPPAPI json;
 
     class RPPAPI json
     {
@@ -87,8 +93,8 @@ namespace rpp
         
 
 
-        typedef unordered_map<jstring, json, jstring::hash> object_t;
-        typedef vector<json>                  array_t;
+        using object_t = unordered_map<jstring, json, jstring_hash>;
+        using array_t  = vector<json>;
 
     private:
         type Type = null;
