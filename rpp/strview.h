@@ -92,7 +92,7 @@ namespace rpp
 
     // This is same as memchr, but optimized for very small control strings
     // Retains string literal array length information
-    template<int N> FINLINE bool strcontains(const char(&str)[N], char ch) {
+    template<int N> inline bool strcontains(const char(&str)[N], char ch) {
         for (int i = 0; i < N; ++i)
             if (str[i] == ch) return true;
         return false;
@@ -102,18 +102,18 @@ namespace rpp
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      * @note Retains string literal array length information
      */
-    template<int N> FINLINE const char* strcontains(const char* str, int nstr, const char(&control)[N]) {
+    template<int N> inline const char* strcontains(const char* str, int nstr, const char(&control)[N]) {
         for (; nstr; --nstr, ++str)
             if (strcontains<N>(control, *str))
                 return str; // done
         return nullptr; // not found
     }
-    template<int N> NOINLINE bool strequals(const char* s1, const char(&s2)[N]) {
+    template<int N> inline bool strequals(const char* s1, const char(&s2)[N]) {
         for (int i = 0; i < (N - 1); ++i)
             if (s1[i] != s2[i]) return false; // not equal.
         return true;
     }
-    template<int N> NOINLINE bool strequalsi(const char* s1, const char(&s2)[N]) {
+    template<int N> inline bool strequalsi(const char* s1, const char(&s2)[N]) {
         for (int i = 0; i < (N - 1); ++i)
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;

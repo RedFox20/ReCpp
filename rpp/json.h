@@ -7,6 +7,8 @@
 #  pragma warning(disable: 4251)
 #endif
 #include "file_io.h"
+#include <unordered_map>
+#include <vector>
 
 #ifndef RPPAPI
 #  if _MSC_VER
@@ -20,6 +22,8 @@ namespace rpp
 {
     using std::tuple;
     using std::move;
+    using std::vector;
+    using std::unordered_map;
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     class RPPAPI json

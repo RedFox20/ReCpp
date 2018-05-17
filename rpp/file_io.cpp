@@ -1,6 +1,7 @@
 #include "file_io.h"
 #include <cstdlib>
 #include <cstdio>
+#include <cstdarg>
 #include <cerrno>
 #include <array>
 #include <locale>  // wstring_convert
@@ -452,7 +453,7 @@ namespace rpp /* ReCpp */
     #elif _MSC_VER
         _chsize_s(fileno((FILE*)Handle), newLength);
     #else
-        ftruncate(fileno((FILE*)Handle), (off_t)newLength);
+        (void)ftruncate(fileno((FILE*)Handle), (off_t)newLength);
     #endif
     }
 
