@@ -453,7 +453,8 @@ namespace rpp /* ReCpp */
     #elif _MSC_VER
         _chsize_s(fileno((FILE*)Handle), newLength);
     #else
-        (void)ftruncate(fileno((FILE*)Handle), (off_t)newLength);
+        int result = ftruncate(fileno((FILE*)Handle), (off_t)newLength);
+        (void)result;
     #endif
     }
 

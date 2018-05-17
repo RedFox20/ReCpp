@@ -9,8 +9,6 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    using string_t = json::string_t;
-
     json::json() noexcept
     {
     }
@@ -28,7 +26,7 @@ namespace rpp
             case array:   new (&Array)  array_t {move(fwd.Array)};  break;
             case boolean: Bool   = fwd.Bool;   break;
             case number:  Number = fwd.Number; break;
-            case string:  new (&String) string_t{move(fwd.String)}; break;
+            case string:  new (&String) jstring{move(fwd.String)}; break;
         }
         fwd.Type = null;
     }
@@ -41,7 +39,7 @@ namespace rpp
             case array:   new (&Array)  array_t {copy.Array};  break;
             case boolean: Bool   = copy.Bool;   break;
             case number:  Number = copy.Number; break;
-            case string:  new (&String) string_t{copy.String}; break;
+            case string:  new (&String) jstring{copy.String}; break;
         }
     }
 
@@ -96,7 +94,7 @@ namespace rpp
             case array:   Array.~array_t();   break;
             case boolean: break;
             case number:  break;
-            case string:  String.~string_t(); break;
+            case string:  String.~jstring(); break;
         }
     }
 
@@ -129,7 +127,7 @@ namespace rpp
             case array:   new (&Array)  array_t{};  break;
             case boolean: Bool   = false;           break;
             case number:  Number = 0.0;             break;
-            case string:  new (&String) string_t{}; break;
+            case string:  new (&String) jstring{}; break;
         }
     }
 
@@ -224,12 +222,12 @@ namespace rpp
         RPP_JSON_CHECK_IS_TYPE("as_integer()", number);
         return (int)Number;
     }
-    string_t& json::as_string()
+    jstring& json::as_string()
     {
         RPP_JSON_CHECK_IS_TYPE("as_string()", string);
         return String;
     }
-    const string_t& json::as_string() const
+    const jstring& json::as_string() const
     {
         RPP_JSON_CHECK_IS_TYPE("as_string()", string);
         return String;
@@ -247,7 +245,7 @@ namespace rpp
     {
         return is_number() ? (int)Number : defaultValue;
     }
-    string_t json::as_string(string_t defaultValue) const noexcept
+    jstring json::as_string(jstring defaultValue) const noexcept
     {
         return is_string() ? String : defaultValue;
     }
@@ -267,7 +265,7 @@ namespace rpp
         auto* item = find(key);
         return item ? item->as_integer(defaultValue) : defaultValue;
     }
-    string_t json::find_string(const strview &key, string_t defaultValue) const
+    jstring json::find_string(const strview &key, jstring defaultValue) const
     {
         auto* item = find(key);
         return item ? item->as_string(move(defaultValue)) : defaultValue;
@@ -275,58 +273,58 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    string_t::string_t(string_t&& fwd) noexcept : owns(fwd.owns)
+    jstring::jstring(jstring&& fwd) noexcept : owns(fwd.owns)
     {
         if (owns) { str = move(fwd.str); fwd.owns = false; }
         else sv = fwd.sv;
     }
 
-    string_t::string_t(const string_t& copy) : owns(copy.owns) {
+    jstring::jstring(const jstring& copy) : owns(copy.owns) {
         if (owns) str = copy.str; else sv = copy.sv;
     }
 
-    json::string_t& string_t::operator=(string_t&& fwd) noexcept
+    jstring& jstring::operator=(jstring&& fwd) noexcept
     {
-        string_t temp { move(fwd) };
-        new (&fwd) string_t{move(*this)};
-        new (this) string_t{move(temp)};
+        jstring temp { move(fwd) };
+        new (&fwd) jstring{move(*this)};
+        new (this) jstring{move(temp)};
         return *this;
     }
 
-    string_t& string_t::operator=(const string_t& copy) noexcept
+    jstring& jstring::operator=(const jstring& copy) noexcept
     {
         if (this == &copy) return *this;
         if (copy.owns)     return *this = copy.str;
         else               return *this = copy.sv;
     }
 
-    string_t& string_t::operator=(std::string&& s) noexcept
+    jstring& jstring::operator=(std::string&& s) noexcept
     {
         if (owns) str = move(s);
         else { new (&str) std::string{move(s)}; owns = true; }
         return *this;
     }
 
-    string_t& string_t::operator=(const std::string& s) noexcept
+    jstring& jstring::operator=(const std::string& s) noexcept
     {
         if (owns) str = s;
         else { new (&str) std::string{move(s)}; owns = true; }
         return *this;
     }
 
-    string_t& string_t::operator=(const strview& s) noexcept
+    jstring& jstring::operator=(const strview& s) noexcept
     {
         if (owns) { str.~basic_string(); owns = false; }
         sv = s;
         return *this;
     }
 
-    string_t::~string_t() noexcept
+    jstring::~jstring() noexcept
     {
         if (owns) { str.~basic_string(); }
     }
 
-    void string_t::clear()
+    void jstring::clear()
     {
         if (owns) { str.~basic_string(); owns = false; }
         else sv.clear();
