@@ -15,8 +15,9 @@ matrix:
             - libc++abi-dev
             - libdw-dev
       env:
-        - CC_AND_CXX="CC=clang && CXX=clang++"
-        - ALTERNATIVES_CC ="/usr/bin/clang   clang   /usr/bin/clang-5.0"
+        - CC=clang
+        - CXX=clang++
+        - ALTERNATIVES_CC="/usr/bin/clang clang /usr/bin/clang-5.0"
         - ALTERNATIVES_CXX="/usr/bin/clang++ clang++ /usr/bin/clang++-5.0"
     # works on Precise and Trusty
     - os: linux
@@ -31,14 +32,12 @@ matrix:
             - libstdc++-7-dev
             - libdw-dev
       env:
-        - CC_AND_CXX="CC=gcc && CXX=g++"
-        - ALTERNATIVES_CC ="/usr/bin/gcc gcc /usr/bin/gcc-7"
+        - CC=gcc
+        - CXX=g++
+        - ALTERNATIVES_CC="/usr/bin/gcc gcc /usr/bin/gcc-7"
         - ALTERNATIVES_CXX="/usr/bin/g++ g++ /usr/bin/g++-7"
-before_install:
-  - eval "${CC_AND_CXX}"
-
 install: 
-  - eval "sudo update-alternatives --install ${ALTERNATIVES_CC} 100 --slave ${ALTERNATIVES_CXX}"
+  - eval "sudo update-alternatives --install ${ALTERNATIVES_CC} 90 --slave ${ALTERNATIVES_CXX}"
 
 before_script:
   - echo update-alternatives --list clang++
