@@ -22,7 +22,6 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
-set(STDLIB "")
 if(CLANG OR GCC)
     add_compile_options(-Wall -std=c++1z)
     if(CLANG)
@@ -30,7 +29,6 @@ if(CLANG OR GCC)
     endif()
     if(LINUX)
         add_compile_options(-march=native)
-        set(STDLIB "-lc++")
     endif()
 elseif(MSVC)
     # /MD - MultiThreaded Dynamic CRT
@@ -67,14 +65,14 @@ message("ReCpp DEFINES: ${CURRENT_DEFINES}")
 find_package(Threads REQUIRED)
 if(LINUX)
     find_package(DWARF)
-    message("DWARF LIBS: ${DWARF_LIBRARY}")
+    message("DWARF: ${DWARF_LIBRARY}")
 else()
     set(DWARF_LIBRARY "")
 endif()
 if(ANDROID)
     set(RUNTIME android log)
-else()
-    set(RUNTIME "")
+elseif(LINUX)
+    set(RUNTIME "-lcxxrt")
 endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
@@ -85,7 +83,11 @@ set_target_properties(ReCpp PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
-target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME} ${STDLIB})
+target_link_libraries(ReCpp
+    PUBLIC Threads::Threads
+    PUBLIC ${DWARF_LIBRARY}
+    PUBLIC ${RUNTIME}
+)
 
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
