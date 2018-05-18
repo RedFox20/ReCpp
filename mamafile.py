@@ -6,5 +6,5 @@ class ReCpp(mama.BuildTarget):
         pass
 
     def package(self):
-        self.export_libs('.', ['ReCpp']) # ReCpp.lib / libReCpp.a
+        self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
         self.export_includes('.') # #include <rpp/strview.h> 
