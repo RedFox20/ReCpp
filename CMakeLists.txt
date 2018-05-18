@@ -70,9 +70,9 @@ else()
     set(DWARF_LIBRARY "")
 endif()
 if(ANDROID)
-    set(RUNTIME android log)
+    set(RUNTIME "android log")
 elseif(LINUX)
-    set(RUNTIME "-lc++")
+    set(RUNTIME "-lc++ -lc++abi")
 endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
@@ -84,9 +84,9 @@ set_target_properties(ReCpp PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_link_libraries(ReCpp
-    PUBLIC Threads::Threads
     PUBLIC ${DWARF_LIBRARY}
     PUBLIC ${RUNTIME}
+    PUBLIC Threads::Threads
 )
 
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
