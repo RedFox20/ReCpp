@@ -23,12 +23,14 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
 if(CLANG OR GCC)
-    add_compile_options(-Wall -std=c++1z)
+    add_compile_options(-Wall)
     if(CLANG)
         add_compile_options(-stdlib=libc++)
     endif()
     if(LINUX)
-        add_compile_options(-march=native)
+        add_compile_options(-std=c++17 -march=native)
+    else()
+        add_compile_options(-std=c++1z)
     endif()
 elseif(MSVC)
     # /MD - MultiThreaded Dynamic CRT
