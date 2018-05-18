@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(ReCpp)
 
+option(BUILD_TESTS "Build RppTests executable for unit testing?" ON)
+
 if(ANDROID OR ANDROID_NDK)
 elseif(WIN32 OR MSVC)
 elseif(APPLE)
@@ -95,7 +97,7 @@ install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################
 
-if (NOT APPLE)
+if (BUILD_TESTS AND NOT APPLE)
     file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
     add_executable(RppTests ${RPP_TESTS})
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
