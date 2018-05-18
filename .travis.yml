@@ -8,12 +8,8 @@ matrix:
           update: false
           sources:
             - llvm-toolchain-trusty-5.0
-            - ubuntu-toolchain-r-test
           packages:
             - build-essential
-            - software-properties-common
-            - g++-7
-            - libstdc++-7-dev
             - clang-5.0
             - libc++-dev
             - libc++abi-dev
@@ -31,7 +27,6 @@ matrix:
     #         - ubuntu-toolchain-r-test
     #       packages:
     #         - build-essential
-    #         - software-properties-common
     #         - g++-7
     #         - libstdc++-7-dev
     #         - libdw-dev
@@ -48,6 +43,7 @@ install:
   - eval "sudo update-alternatives --install ${ALTERNATIVES_CXX} 90"
 
 before_script:
+  - strings /usr/lib/x86_64-linux-gnu/libc++.so.1 | grep shared_timed_mutex
   - mkdir build
 
 script: cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j4
