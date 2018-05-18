@@ -99,7 +99,7 @@ if (NOT APPLE)
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 
     target_include_directories(RppTests PUBLIC ".")
-    target_link_libraries(RppTests ReCpp)
+    target_link_libraries(RppTests ReCpp ${RUNTIME})
 
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()
