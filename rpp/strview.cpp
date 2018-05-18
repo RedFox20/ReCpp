@@ -2,7 +2,7 @@
  * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
  */
 #include "strview.h"
-#include <cmath>
+#include <math.h> // use math.h for GCC compatibility
 #include <cstdlib>
 
 namespace rpp
@@ -636,7 +636,7 @@ namespace rpp
             buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
             return 3;
         }
-        int64 value = (int64)f;
+        auto value = (int64)f;
         f -= value; // -1.2 -= -1 --> -0.2
         char* end = buffer;
         if (f < 0.0) {

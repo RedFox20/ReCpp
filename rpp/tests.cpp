@@ -3,6 +3,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_set>
+#include <cstdarg>
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN 1
     #include <Windows.h>
@@ -10,7 +11,6 @@
 #elif __ANDROID__
     #include <unistd.h> // usleep
     #include <android/log.h>
-    #include <stdarg.h>
 #else
     #include <unistd.h>
     #include <termios.h>

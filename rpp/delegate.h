@@ -102,7 +102,7 @@ namespace rpp
         #elif __clang__
             using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
-        #elif __GNUG__ // G++
+        #else
             using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(void*, Args...);
         #endif
@@ -375,8 +375,10 @@ namespace rpp
         using enable_if_callable_t = std::enable_if_t<!std::is_same_v<std::decay_t<Functor>, delegate> // not const delegate& or delegate&&
                                                 #if _MSC_VER
                                                     && std::is_invocable_r_v<Ret, Functor, Args...>>; // matches `Ret(Args...)`
-                                                #else
+                                                #elif __clang__
                                                     && std::__invokable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                                #else
+                                                    && std::is_invocable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
                                                 #endif
 
         /**
