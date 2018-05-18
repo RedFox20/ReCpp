@@ -11,6 +11,8 @@ matrix:
           packages:
             - build-essential
             - software-properties-common
+            - g++-7
+            - libstdc++-7-dev
             - clang-5.0
             - libc++-dev
             - libc++abi-dev
