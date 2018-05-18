@@ -2,6 +2,7 @@
 #include <cstdarg> // va_list
 #include <csignal> // SIGSEGV
 #include <cstdio>  // fprintf
+#include <cstring> // strlen
 
 #if _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -30,6 +31,7 @@
 #  include <vector>
 #  include <unordered_map>
 #  include <mutex>
+#  include <algorithm> // std::sort
 # else
 #  include <dlfcn.h>
 # endif

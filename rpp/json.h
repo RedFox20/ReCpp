@@ -76,8 +76,6 @@ namespace rpp
         }
     };
 
-    class RPPAPI json;
-
     class RPPAPI json
     {
     public:
@@ -90,11 +88,9 @@ namespace rpp
             number,
             string,
         };
-        
-
 
         using object_t = unordered_map<jstring, json, jstring_hash>;
-        using array_t  = vector<json>;
+        using array_t = vector<json>;
 
     private:
         type Type = null;
@@ -103,7 +99,7 @@ namespace rpp
             array_t  Array;
             bool     Bool;
             double   Number;
-            jstring String;
+            jstring  String;
         };
 
     public:
