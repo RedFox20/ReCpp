@@ -18,7 +18,7 @@ matrix:
       env:
         - CC_AND_CXX="CC=clang && CXX=clang++"
         - ALTERNATIVES_CC="/usr/bin/clang clang /usr/bin/clang-5.0"
-        - ALTERNATIVES_CXX="/usr/bin/clang++ clang++ /usr/bin/clang++-5.0"
+        - ALTERNATIVES_CXX="/usr/bin/clang++ clang++ /usr/bin/clang++-libc++"
     # works on Precise and Trusty
     # - os: linux
     #   addons:
@@ -45,6 +45,8 @@ install:
   - eval "sudo update-alternatives --install ${ALTERNATIVES_CXX} 90"
 
 before_script:
+  - clang++ --version
+  - clang++-libc++ --version
   - mkdir build
 
 script: cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j4
