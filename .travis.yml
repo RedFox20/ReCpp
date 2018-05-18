@@ -1,7 +1,6 @@
 language: cpp
 matrix:
   include:
-    # works on Trusty
     - os: linux
       addons:
         apt:
@@ -15,10 +14,7 @@ matrix:
             - libc++abi-dev
             - libdw-dev
       env:
-        - CC_AND_CXX="CC=clang && CXX=clang++"
-        - ALTERNATIVES_CC="/usr/bin/clang clang /usr/bin/clang-5.0"
-        - ALTERNATIVES_CXX="/usr/bin/clang++ clang++ /usr/bin/clang++-5.0"
-    # works on Precise and Trusty
+        - COMPILER=clang
     # - os: linux
     #   addons:
     #     apt:
@@ -31,21 +27,11 @@ matrix:
     #         - libstdc++-7-dev
     #         - libdw-dev
     #   env:
-    #     - CC_AND_CXX="CC=gcc && CXX=g++"
-    #     - ALTERNATIVES_CC="/usr/bin/gcc gcc /usr/bin/gcc-7"
-    #     - ALTERNATIVES_CXX="/usr/bin/g++ g++ /usr/bin/g++-7"
-
-before_install:
-  - eval "${CC_AND_CXX}"
+    #     - COMPILER=clang
 
 install:
-  - eval "sudo update-alternatives --install ${ALTERNATIVES_CC} 90"
-  - eval "sudo update-alternatives --install ${ALTERNATIVES_CXX} 90"
+  - make configure-${COMPILER}
 
-before_script:
-  - strings /usr/lib/x86_64-linux-gnu/libc++.so.1 | grep shared_timed_mutex
-  - mkdir build
-
-script: cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j4
+script: make ${COMPILER}
 
 after_success: cd build && ./Tests
