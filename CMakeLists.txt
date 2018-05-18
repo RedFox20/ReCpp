@@ -22,6 +22,7 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
+set(STDLIB "")
 if(CLANG OR GCC)
     add_compile_options(-Wall -std=c++1z)
     if(CLANG)
@@ -29,6 +30,7 @@ if(CLANG OR GCC)
     endif()
     if(LINUX)
         add_compile_options(-march=native)
+        set(STDLIB "-lc++")
     endif()
 elseif(MSVC)
     # /MD - MultiThreaded Dynamic CRT
@@ -83,7 +85,7 @@ set_target_properties(ReCpp PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
-target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME})
+target_link_libraries(ReCpp PUBLIC Threads::Threads ${DWARF_LIBRARY} ${RUNTIME} ${STDLIB})
 
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
