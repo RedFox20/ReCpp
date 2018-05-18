@@ -72,7 +72,7 @@ endif()
 if(ANDROID)
     set(RUNTIME android log)
 elseif(LINUX)
-    set(RUNTIME "-lcxxrt")
+    set(RUNTIME "-lc++")
 endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
