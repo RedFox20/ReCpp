@@ -23,9 +23,9 @@ TestImpl(test_vec)
     {
         BoundingBox unitbox = { Vector3::ZERO, Vector3::ONE };
 
-        AssertThat(unitbox.center(), Vector3(0.5f));
+        AssertThat(unitbox.center(), vec3(0.5f));
         AssertThat(unitbox.volume(), 1.0f);
-        AssertThat(unitbox.radius(), Vector3(0.5f).length());
+        AssertThat(unitbox.radius(), vec3(0.5f).length());
         AssertThat(unitbox.distanceTo({ 2.0f,1.0f,1.0f }), 1.0f);
         AssertThat(unitbox.contains({ 0.5f,0.5f,0.5f }), true);
 

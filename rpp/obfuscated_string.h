@@ -111,7 +111,7 @@ namespace rpp
 #if __GNUC__ && !__clang__
     template<class T, T... chars> constexpr auto operator""_obfuscated()
     {
-        return obfuscated_string<integer_sequence<char, chars...>>{};
+        return obfuscated_string<std::integer_sequence<char, chars...>>{};
     }
 #endif
 
@@ -121,7 +121,7 @@ namespace rpp
 
     //template<char... chars> constexpr auto operator"" _obfuscated()
     //{
-    //    return obfuscated_string<integer_sequence<char, chars...>>{};
+    //    return rpp::obfuscated_string<std::integer_sequence<char, chars...>>{};
     //}
 
     #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>{str}

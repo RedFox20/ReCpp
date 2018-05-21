@@ -328,6 +328,16 @@ TestImpl(test_collections)
         AssertEqual(*find(v, "3"s), "x3"s);
     }
 
+    TestCase(any_of)
+    {
+        vector<string> empty;
+        AssertThat(any_of(empty, [](auto s){ return true; }), false);
+
+        vector<string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
+        AssertThat(any_of(v, [](auto s){ return s == "xxx"s; }), false);
+        AssertThat(any_of(v, [](auto s){ return s == "ccc"s; }), true);
+    }
+
     TestCase(sum_all)
     {
         vector<string> v { "a"s, "bb"s, "ccc"s, "dddd"s };

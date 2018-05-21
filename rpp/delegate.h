@@ -55,6 +55,7 @@
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
 #include <cassert>
+#include <utility> // std::forward
 
 namespace rpp
 {

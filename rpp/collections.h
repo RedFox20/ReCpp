@@ -360,8 +360,10 @@ namespace rpp
 
     template<class T, class Pred> bool any_of(const std::vector<T>& v, const Pred& predicate)
     {
-        auto* ptr = v.data();
-        return std::any_of(ptr, ptr + v.size(), predicate);
+        auto* it = v.data();
+        for (auto* end = it + v.size(); it != end; ++it)
+            if (predicate(*it)) return true;
+        return false;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
