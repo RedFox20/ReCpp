@@ -14,8 +14,6 @@ matrix:
             - libc++-dev
             - libc++abi-dev
             - libdw-dev
-            - python3.6
-            - python-pip
       env:
         - COMPILER=clang
     # - os: linux
