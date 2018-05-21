@@ -14,6 +14,8 @@ matrix:
             - libc++-dev
             - libc++abi-dev
             - libdw-dev
+            - python3.6
+            - python-pip
       env:
         - COMPILER=clang
     # - os: linux
@@ -32,7 +34,8 @@ matrix:
 
 install:
   - make configure-${COMPILER}
+  - pip install mama
 
-script: make ${COMPILER}
+script: mama build linux
 
 after_success: cd build && ./Tests
