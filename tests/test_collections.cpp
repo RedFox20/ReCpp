@@ -333,7 +333,15 @@ TestImpl(test_collections)
         vector<string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
 
         AssertThat(sum_all(v), "abbcccdddd"s);
-        AssertThat(sum_all(v, &string::length), 10ul);
+
+        // we cannot grab address of C++ stdlib methods, so we need a dummy wrapper
+        struct custom : public string {
+            using string::string;
+            custom(string&& s) : string(move(s)) {}
+            int len() const { return (int)this->length(); }
+        };
+        vector<custom> u { "a"s, "bb"s, "ccc"s, "dddd"s };
+        AssertThat(sum_all(u, &custom::len), 10);
     }
 
     static int string_to_int(const string& s)

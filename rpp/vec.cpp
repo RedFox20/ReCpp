@@ -641,7 +641,7 @@ namespace rpp
         float cosTheta = a.dot(b);
         if (rpp::almostEqual(cosTheta, 1.0f))
             return { Vector3::ZERO, 0.0f };
-        float theta = rpp::degf(std::acos(cosTheta));
+        float theta = rpp::degf(acos(cosTheta));
         Vector3 axis = a.cross(b).normalized();
         return { axis, -theta };
     }
