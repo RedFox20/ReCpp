@@ -8,10 +8,10 @@ matrix:
         apt:
           update: false
           sources:
-            - llvm-toolchain-trusty-6.0
+            - llvm-toolchain-trusty-4.0
           packages:
             - build-essential
-            - clang-5.0
+            - clang-4.0
             - libc++-dev
             - libc++abi-dev
             - libdw-dev
