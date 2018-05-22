@@ -7,6 +7,8 @@
 #include <vector>
 #include <unordered_map>
 #include <numeric>
+#include <algorithm> // std::sort
+
 namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////////
