@@ -6,9 +6,9 @@ matrix:
     - os: linux
       addons:
         apt:
-          update: true
+          update: false
           sources:
-            - llvm-toolchain-trusty-5.0 main
+            - llvm-toolchain-trusty-5.0
           packages:
             - clang-5.0
             - llmv-5.0-dev
