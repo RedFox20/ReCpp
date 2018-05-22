@@ -236,13 +236,18 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if USE_WINAPI_IO
         return GetFileSize((HANDLE)Handle, nullptr);
-    #else
+    #elif __ANDROID__ || __APPLE__
         struct stat s;
         if (fstat(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
             return 0;
         }
         return (int)s.st_size;
+    #else // Linux version is more complicated. It won't report correct size unless file is flushed:
+        int pos = tell();
+        int size = const_cast<file*>(this)->seek(0, SEEK_END);
+        const_cast<file*>(this)->seek(pos, SEEK_SET);
+        return size;
     #endif
     }
     int64 file::sizel() const noexcept
@@ -255,13 +260,18 @@ namespace rpp /* ReCpp */
             return 0ull;
         }
         return (int64)size.QuadPart;
-    #else
+    #elif __ANDROID__ || __APPLE__
         struct stat64 s;
         if (_fstat64(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));
             return 0ull;
         }
         return (int64)s.st_size;
+    #else // Linux version is more complicated. It won't report correct size unless file is flushed:
+        int64 pos = tell64();
+        int64 size = const_cast<file*>(this)->seekl(0LL, SEEK_END);
+        const_cast<file*>(this)->seekl(pos, SEEK_SET);
+        return size;
     #endif
     }
     // ReSharper disable once CppMemberFunctionMayBeConst

@@ -26,7 +26,7 @@ TestImpl(test_strview)
 
         strview str2 = stdstr;
         AssertThat(str2, stdstr);
-        AssertThat(str2.length(), stdstr.length());
+        AssertThat(str2.length(), (int)stdstr.length());
 
         string stdstr3 = str2;
         AssertThat(stdstr3, str2);
@@ -148,8 +148,8 @@ TestImpl(test_strview)
     {
         strview input = "hello,,strview,1556,true\n";
         strview a, b, c;
-        int x;
-        bool y;
+        int x = 0;
+        bool y = false;
         input.decompose(',', a, b, c, x, y);
         AssertThat(a, "hello");
         AssertThat(b, "");

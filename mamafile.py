@@ -7,4 +7,7 @@ class ReCpp(mama.BuildTarget):
 
     def package(self):
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
-        self.export_includes('.') # #include <rpp/strview.h> 
+        self.export_includes('.') # #include <rpp/strview.h>
+
+    def test(self):
+        self.gdb('./RppTests')

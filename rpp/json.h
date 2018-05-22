@@ -1,4 +1,5 @@
 #pragma once
+#if false
 /**
  * Basic JSON serialize/deserialize, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
@@ -277,3 +278,4 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 }
+#endif

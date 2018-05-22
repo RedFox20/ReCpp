@@ -146,26 +146,15 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
-    /** @brief Proxy to allow constexpr initialization inside Vector2 */
-    struct RPPAPI float2
-    {
-        float x, y;
-        constexpr float2(float x, float y) : x(x), y(y) {}
-    };
 
     /** @brief 2D Vector for UI calculations */
     struct RPPAPI Vector2
     {
         float x, y;
-        static constexpr float2 ZERO  = { 0.0f, 0.0f }; // 0 0
-        static constexpr float2 ONE   = { 1.0f, 1.0f }; // 1 1
-        static constexpr float2 RIGHT = { 1.0f, 0.0f }; // X-axis
-        static constexpr float2 UP    = { 0.0f, 1.0f }; // Y-axis, OpenGL UP
-    
-        Vector2() {}
-        explicit constexpr Vector2(float xy) : x(xy),  y(xy)  {}
-        constexpr Vector2(float x, float y)  : x(x),   y(y)   {}
-        constexpr Vector2(const float2& v)   : x(v.x), y(v.y) {}
+        static const Vector2 ZERO; // 0 0
+        static const Vector2 ONE; // 1 1
+        static const Vector2 RIGHT; // X-axis
+        static const Vector2 UP; // Y-axis, OpenGL UP
     
         /** Print the Vector2 */
         void print() const;
@@ -258,6 +247,8 @@ namespace rpp
         bool operator!=(const Vector2& b) const { return x != b.x || y != b.y; }
     };
 
+    constexpr Vector2 vec2(float xy) { return { xy, xy }; }
+
     inline Vector2 operator+(const Vector2& a, float f) { return { a.x+f, a.y+f }; }
     inline Vector2 operator-(const Vector2& a, float f) { return { a.x-f, a.y-f }; }
     inline Vector2 operator*(const Vector2& a, float f) { return { a.x*f, a.y*f }; }
@@ -281,27 +272,15 @@ namespace rpp
     
     ///////////////////////////////////////////////////////////////////////////////
 
-    /** @brief Proxy to allow constexpr initialization inside Vector2d */
-    struct RPPAPI double2
-    {
-        double x, y;
-        constexpr double2(double x, double y) : x(x), y(y) {}
-    };
-
     /** @brief 2D Vector for UI calculations */
     struct RPPAPI Vector2d
     {
         double x, y;
-        static constexpr double2 ZERO  = { 0.0, 0.0 }; // 0 0
-        static constexpr double2 ONE   = { 1.0, 1.0 }; // 1 1
-        static constexpr double2 RIGHT = { 1.0, 0.0 }; // X-axis
-        static constexpr double2 UP    = { 0.0, 1.0 }; // Y-axis, OpenGL UP
-    
-        Vector2d() {}
-        explicit constexpr Vector2d(double xy) : x(xy),  y(xy)  {}
-        constexpr Vector2d(double x, double y) : x(x),   y(y)   {}
-        constexpr Vector2d(const double2& v)   : x(v.x), y(v.y) {}
-    
+        static const Vector2d ZERO;  // 0 0
+        static const Vector2d ONE;   // 1 1
+        static const Vector2d RIGHT; // X-axis
+        static const Vector2d UP;    // Y-axis, OpenGL UP
+
         /** Print the Vector2 */
         void print() const;
     
@@ -339,11 +318,11 @@ namespace rpp
         void normalize();
 
         /** @brief Normalize this vector to the given magnitude */
-        void normalize(const double magnitude);
+        void normalize(double magnitude);
     
         /** @return A normalized copy of this vector */
         Vector2d normalized() const;
-        Vector2d normalized(const double magnitude) const;
+        Vector2d normalized(double magnitude) const;
 
         /** @return Dot product of two vectors */
         double dot(const Vector2d& v) const;
@@ -393,6 +372,8 @@ namespace rpp
         bool operator!=(const Vector2d& b) const { return x != b.x || y != b.y; }
     };
 
+    constexpr Vector2d vec2d(double xy) { return { xy, xy }; }
+
     inline Vector2d operator+(const Vector2d& a, double f) { return { a.x+f, a.y+f }; }
     inline Vector2d operator-(const Vector2d& a, double f) { return { a.x-f, a.y-f }; }
     inline Vector2d operator*(const Vector2d& a, double f) { return { a.x*f, a.y*f }; }
@@ -416,25 +397,13 @@ namespace rpp
     
     ////////////////////////////////////////////////////////////////////////////////
 
-    /** @brief Proxy to allow constexpr initialization inside Point */
-    struct RPPAPI int2
-    {
-        int x, y;
-        constexpr int2(int x, int y) : x(x), y(y) {}
-    };
-
     /**
      * @brief Utility for dealing with integer-only points. Pretty rare, but useful.
      */
     struct RPPAPI Point
     {
         int x, y;
-
-        static constexpr int2 ZERO = { 0, 0 };
-
-        Point() {}
-        constexpr Point(int x, int y) : x(x), y(y) {}
-        explicit constexpr Point(int xy) : x(xy), y(xy) {}
+        static const Point ZERO;
 
         explicit operator bool()  const { return  x || y;  }
         bool operator!() const { return !x && !y; }
@@ -470,6 +439,8 @@ namespace rpp
         bool operator!=(const Point& b) const { return x != b.x || y != b.y; }
     };
 
+    constexpr Point point2(int xy) { return { xy, xy }; }
+
     inline Point operator+(const Point& a, int i) { return { a.x+i, a.y+i }; }
     inline Point operator-(const Point& a, int i) { return { a.x-i, a.y-i }; }
     inline Point operator*(const Point& a, int i) { return { a.x*i, a.y*i }; }
@@ -481,12 +452,6 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    /** @brief Proxy to allow constexpr initialization inside Vector4 and Rect */
-    struct RPPAPI float4
-    {
-        float x, y, z, w;
-        constexpr float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
-    };
 
     /** @brief Utility for dealing with 2D Rects */
     struct RPPAPI Rect
@@ -494,17 +459,12 @@ namespace rpp
         union {
             struct { float x, y, w, h; };
             struct { Vector2 pos; Vector2 size; };
-            float4 xywh;
         };
 
-        static constexpr float4 ZERO = { 0.0f, 0.0f, 0.0f, 0.0f };
+        static const Rect ZERO;
 
-        Rect() {}
-        constexpr Rect(float x, float y, float w, float h)      : x(x), y(y), w(w), h(h) {}
-        constexpr Rect(const Vector2& pos, const Vector2& size) : pos(pos),   size(size) {}
-        constexpr Rect(const float4& xywh)            : xywh(xywh) {}
-        Rect(float x, float y, const Vector2& size)   : x(x), y(y), w(size.x), h(size.y) {}
-        Rect(const Vector2& pos, float w, float h)    : x(pos.x), y(pos.y), w(w), h(h)   {}
+        constexpr Rect(float x, float y, float w, float h) : x{x}, y{y}, w{w}, h{h} {}
+        constexpr Rect(Vector2 pos, Vector2 size) : pos{pos}, size{size} {}
 
         /** Print the Rect */
         void print() const;
@@ -528,7 +488,7 @@ namespace rpp
         bool isZero() const { return !x && !y && !w && !h; }
         /** @return TRUE if this Rect is NOT equal to Rect::ZERO */
         bool notZero() const { return w || h || x || y; }
-    
+
         /** @return True if point is inside this Rect */
         bool hitTest(const Vector2& position) const;
         bool hitTest(const float xPos, const float yPos) const;
@@ -542,10 +502,10 @@ namespace rpp
         void extrude(float extrude);
         void extrude(const Vector2& extrude);
 
-        Rect extruded(float extrude) const { 
-            Rect r = *this; 
-            r.extrude(extrude); 
-            return *this; 
+        Rect extruded(float extrude) const {
+            Rect r = *this;
+            r.extrude(extrude);
+            return *this;
         }
 
         Rect& operator+=(const Rect& b) { join(b); return *this; }
@@ -561,10 +521,14 @@ namespace rpp
         void clip(const Rect& frame);
 
         Rect operator+(const Rect& b) const { return joined(b); }
-    
+
         bool operator==(const Rect& r) const { return x == r.x && y == r.y && w == r.w && h == r.h; }
         bool operator!=(const Rect& r) const { return x != r.x || y != r.y || w != r.w || h != r.h; }
     };
+
+    constexpr Rect rect(Vector2 pos, Vector2 size) { return { pos.x, pos.y, size.x, size.y }; }
+    constexpr Rect rect(float x, float y, Vector2 size)      { return { x, y, size.x, size.y }; }
+    constexpr Rect rect(Vector2 pos, float w, float h)       { return { pos.x, pos.y, w, h }; }
 
     inline Rect operator+(const Rect& a, float f) { return{ a.x+f, a.y+f, a.w, a.h }; }
     inline Rect operator-(const Rect& a, float f) { return{ a.x-f, a.y-f, a.w, a.h }; }
@@ -574,15 +538,8 @@ namespace rpp
     inline Rect operator-(float f, const Rect& a) { return{ f-a.x, f-a.y, a.w, a.h }; }
     inline Rect operator*(float f, const Rect& a) { return{ a.x, a.y, f*a.w, f*a.h }; }
     inline Rect operator/(float f, const Rect& a) { return{ a.x, a.y, f/a.w, f/a.h }; }
-    
-    ///////////////////////////////////////////////////////////////////////////////
 
-    /** @brief Proxy to allow constexpr initialization inside Vector3 */
-    struct RPPAPI float3
-    { 
-        float x, y, z;
-        constexpr float3(float x, float y, float z) : x(x), y(y), z(z) {}
-    };
+    ///////////////////////////////////////////////////////////////////////////////
 
     struct Vector3d;
 
@@ -598,44 +555,39 @@ namespace rpp
         union {
             struct { float x, y, z; };
             struct { float r, g, b; };
-            //struct { Vector2 xy; };
-            //struct { float _x; Vector2 yz; };
-            float3 xyz;
         };
 
-        static constexpr float3 ZERO           = { 0.0f, 0.0f, 0.0f };      // 0 0 0
-        static constexpr float3 ONE            = { 1.0f, 1.0f, 1.0f };      // 1 1 1
+        static const Vector3 ZERO;      // 0 0 0
+        static const Vector3 ONE;       // 1 1 1
 
-        static constexpr float3 LEFT           = { -1.0f,  0.0f,  0.0f };   // -X axis
-        static constexpr float3 RIGHT          = { +1.0f,  0.0f,  0.0f };   // +X axis
-        static constexpr float3 UP             = {  0.0f, +1.0f,  0.0f };   // +Y axis
-        static constexpr float3 DOWN           = {  0.0f, -1.0f,  0.0f };   // -Y axis
-        static constexpr float3 FORWARD        = {  0.0f,  0.0f, +1.0f };   // +Z axis
-        static constexpr float3 BACKWARD       = {  0.0f,  0.0f, -1.0f };   // -Z axis
+        static const Vector3 LEFT;      // -X axis
+        static const Vector3 RIGHT;     // +X axis
+        static const Vector3 UP;        // +Y axis
+        static const Vector3 DOWN;      // -Y axis
+        static const Vector3 FORWARD;   // +Z axis
+        static const Vector3 BACKWARD;  // -Z axis
 
-        static constexpr float3 XAXIS          = { +1.0f,  0.0f,  0.0f };   // +X axis
-        static constexpr float3 YAXIS          = {  0.0f, +1.0f,  0.0f };   // +Y axis
-        static constexpr float3 ZAXIS          = {  0.0f,  0.0f, +1.0f };   // +Z axis
+        static const Vector3 XAXIS;   // +X axis
+        static const Vector3 YAXIS;   // +Y axis
+        static const Vector3 ZAXIS;   // +Z axis
         
-        static constexpr float3 WHITE          = { 1.0f, 1.0f, 1.0f };       // RGB 1 1 1
-        static constexpr float3 BLACK          = { 0.0f, 0.0f, 0.0f };       // RGB 0 0 0
-        static constexpr float3 RED            = { 1.0f, 0.0f, 0.0f };       // RGB 1 0 0
-        static constexpr float3 GREEN          = { 0.0f, 1.0f, 0.0f };       // RGB 0 1 0
-        static constexpr float3 BLUE           = { 0.0f, 0.0f, 1.0f };       // RGB 0 0 1
-        static constexpr float3 YELLOW         = { 1.0f, 1.0f, 0.0f };       // 1 1 0
-        static constexpr float3 ORANGE         = { 1.0f, 0.50196f, 0.0f };   // 1 0.502 0; 255 128 0
-        static constexpr float3 MAGENTA        = { 1.0f, 0.0f, 1.0f };       // 1 0 1
-        static constexpr float3 CYAN           = { 0.0f, 1.0f, 1.0f };       // 0 1 1
-        static constexpr float3 SWEETGREEN     = { 0.337f, 0.737f, 0.223f }; // 86, 188, 57
-        static constexpr float3 CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f };     // #55AAFF  85, 170, 255
+        static const Vector3 WHITE;         // RGB 1 1 1
+        static const Vector3 BLACK;         // RGB 0 0 0
+        static const Vector3 RED;           // RGB 1 0 0
+        static const Vector3 GREEN;         // RGB 0 1 0
+        static const Vector3 BLUE;          // RGB 0 0 1
+        static const Vector3 YELLOW;        // 1 1 0
+        static const Vector3 ORANGE;        // 1 0.502 0; 255 128 0
+        static const Vector3 MAGENTA;       // 1 0 1
+        static const Vector3 CYAN;          // 0 1 1
+        static const Vector3 SWEETGREEN;    // 86, 188, 57
+        static const Vector3 CORNFLOWERBLUE;// #55AAFF  85, 170, 255
 
-        Vector3() {}
-        constexpr Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
-        constexpr Vector3(const float3& v) : xyz(v) {}
-        constexpr Vector3(const Vector2& xy, float z) : x(xy.x), y(xy.y), z(z) {}
-        constexpr Vector3(float x, const Vector2& yz) : x(x), y(yz.x), z(yz.y) {}
-        explicit constexpr Vector3(float xyz) : x(xyz), y(xyz), z(xyz) {}
-        
+    #if __clang__
+        Vector3() = default;
+        constexpr Vector3(float x, float y, float z) : x{x}, y{y}, z{z} {}
+    #endif
+
         explicit operator Vector3d() const;
 
         /** @brief Set new XYZ values */
@@ -812,6 +764,10 @@ namespace rpp
 
     };
 
+    constexpr Vector3 vec3(Vector2 xy, float z) { return { xy.x, xy.y, z }; }
+    constexpr Vector3 vec3(float x, Vector2 yz) { return { x, yz.x, yz.y }; }
+    constexpr Vector3 vec3(float xyz) { return { xyz, xyz, xyz }; }
+
     inline Vector3 operator+(const Vector3& a, float f) { return { a.x+f, a.y+f, a.z+f }; }
     inline Vector3 operator-(const Vector3& a, float f) { return { a.x-f, a.y-f, a.z-f }; }
     inline Vector3 operator*(const Vector3& a, float f) { return { a.x*f, a.y*f, a.z*f }; }
@@ -837,23 +793,11 @@ namespace rpp
     
     ////////////////////////////////////////////////////////////////////////////////
 
-    struct RPPAPI double3
-    {
-        double x, y, z;
-    };
 
     struct RPPAPI Vector3d
     {
-        union {
-            struct { double x, y, z; };
-            struct { double3 xyz; };
-        };
-        static constexpr double3 ZERO = { 0.0, 0.0, 0.0 };
-        
-        Vector3d() {}
-        constexpr Vector3d(double x, double y, double z) : x(x),   y(y),   z(z)   {}
-        constexpr Vector3d(const double3& v) : x(v.x), y(v.y), z(v.z) {}
-        
+        double x, y, z;
+        static const Vector3d ZERO;
         explicit operator Vector3() const { return {float(x), float(y), float(z)}; }
         
         /** @brief Set new XYZ values */
@@ -935,7 +879,9 @@ namespace rpp
         Vector3d convertCV2GL() const noexcept { return { x, -y, z }; }
 
     };
-    
+
+    constexpr Vector3d vec3d(double xyz) { return { xyz, xyz, xyz }; }
+
     inline Vector3d operator+(const Vector3d& a, double f) { return { a.x+f, a.y+f, a.z+f }; }
     inline Vector3d operator-(const Vector3d& a, double f) { return { a.x-f, a.y-f, a.z-f }; }
     inline Vector3d operator*(const Vector3d& a, double f) { return { a.x*f, a.y*f, a.z*f }; }
@@ -991,41 +937,32 @@ namespace rpp
             struct { float x, y, z, w; };
             struct { float r, g, b, a; };
             struct { Vector2 xy; Vector2 zw; };
-            struct { Vector2 rg; Vector2 ba; };
-            struct { Vector3 xyz; float _w; };
-            struct { float3  rgb; float _a; };
-            struct { float _x; Vector3 yzw; };
-            struct { float _r; Vector3 gba; };
-            float4 xyzw;
+            struct { Vector3 xyz; };
+            struct { Vector3 rgb; };
         };
 
-        static constexpr float4 ZERO           = { 0.0f, 0.0f, 0.0f, 0.0f };   // XYZW 0 0 0 0
-        static constexpr float4 ONE            = { 1.0f, 1.0f, 1.0f, 1.0f };   // XYZW 1 1 1 1
-        
-        static constexpr float4 WHITE          = { 1.0f, 1.0f, 1.0f, 1.0f };   // RGBA 1 1 1 1
-        static constexpr float4 BLACK          = { 0.0f, 0.0f, 0.0f, 1.0f };   // RGBA 0 0 0 1
-        static constexpr float4 RED            = { 1.0f, 0.0f, 0.0f, 1.0f };   // RGBA 1 0 0 1
-        static constexpr float4 GREEN          = { 0.0f, 1.0f, 0.0f, 1.0f };   // RGBA 0 1 0 1
-        static constexpr float4 BLUE           = { 0.0f, 0.0f, 1.0f, 1.0f };   // RGBA 0 0 1 1
-        static constexpr float4 YELLOW         = { 1.0f, 1.0f, 0.0f, 1.0f };       // 1 1 0 1
-        static constexpr float4 ORANGE         = { 1.0f, 0.50196f, 0.0f, 1.0f };   // 1 0.502 0 1; 255 128 0 255
-        static constexpr float4 MAGENTA        = { 1.0f, 0.0f, 1.0f, 1.0f };       // 1 0 1 1
-        static constexpr float4 CYAN           = { 0.0f, 1.0f, 1.0f, 1.0f };       // 0 1 1 1
-        static constexpr float4 SWEETGREEN     = { 0.337f, 0.737f, 0.223f, 1.0f }; // 86, 188, 57
-        static constexpr float4 CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f, 1.0f };     // #55AAFF  85, 170, 255
-    
-        Vector4() {}
-        constexpr Vector4(float x, float y, float z,float w=1.f): x(x), y(y), z(z), w(w) {}
-        constexpr Vector4(const float4& v)            : xyzw(v) {}
-        Vector4(const Vector2& xy, const Vector2& zw) : xy(xy), zw(zw) {}
-        Vector4(const Vector2& xy, float z, float w)  : x(xy.x), y(xy.y), z(z),    w(w)    {}
-        Vector4(float x, float y, const Vector2& zw)  : x(x),    y(y),    z(zw.x), w(zw.y) {}
-        Vector4(const Vector3& xyz, float w)          : xyz(xyz), _w(w) {}
-        Vector4(float x, const Vector3& yzw)          : _x(x), yzw(yzw) {}
-        
+        static const Vector4 ZERO;  // XYZW 0 0 0 0
+        static const Vector4 ONE;   // XYZW 1 1 1 1
+
+        static const Vector4 WHITE; // RGBA 1 1 1 1
+        static const Vector4 BLACK; // RGBA 0 0 0 1
+        static const Vector4 RED;   // RGBA 1 0 0 1
+        static const Vector4 GREEN; // RGBA 0 1 0 1
+        static const Vector4 BLUE;  // RGBA 0 0 1 1
+        static const Vector4 YELLOW;         // 1 1 0 1
+        static const Vector4 ORANGE;         // 1 0.502 0 1; 255 128 0 255
+        static const Vector4 MAGENTA;        // 1 0 1 1
+        static const Vector4 CYAN;           // 0 1 1 1
+        static const Vector4 SWEETGREEN;     // 86, 188, 57
+        static const Vector4 CORNFLOWERBLUE; // #55AAFF  85, 170, 255
+
+    #if __clang__
+        constexpr Vector4(Vector2 xy, Vector2 zw) : xy{xy}, zw{zw} {}
+        constexpr Vector4(float x, float y, float z, float w) : x{x}, y{y}, z{z}, w{w} {}
+    #endif
 
         /** @return TRUE if all elements are exactly 0.0f, which implies default initialized.
-        * To avoid FP errors, use almostZero() if you performed calculations */
+         * To avoid FP errors, use almostZero() if you performed calculations */
         bool isZero()  const { return x == 0.0f && y == 0.0f && z == 0.0f && w == 0.0f; }
         bool notZero() const { return x != 0.0f || y != 0.0f || z != 0.0f || w != 0.0f; }
         bool hasNaN() const { return isnan(x) || isnan(y) || isnan(z) || isnan(w); }
@@ -1151,6 +1088,15 @@ namespace rpp
         bool operator==(const Vector4& v) const { return x == v.x && y == v.y && z == v.z && w == v.w; }
         bool operator!=(const Vector4& v) const { return x != v.x || y != v.y || z != v.z || w != v.w; }
     };
+
+    constexpr Vector4 vec4(float x, float y, float z, float w = 1.0f)  { return { x, y, z, w }; }
+    constexpr Vector4 vec4(Vector2 xy, Vector2 zw)           { return { xy.x, xy.y, zw.x, zw.y }; }
+    constexpr Vector4 vec4(Vector2 xy, float z, float w)     { return { xy.x, xy.y, z,    w    }; }
+    constexpr Vector4 vec4(float x, float y, Vector2 zw)     { return { x,    y,    zw.x, zw.y }; }
+    constexpr Vector4 vec4(Vector3 xyz, float w)             { return { xyz.x, xyz.y, xyz.z, w }; }
+    constexpr Vector4 vec4(float x, Vector3 yzw)             { return { x, yzw.x, yzw.y, yzw.z }; }
+
+    constexpr Rect rect(Vector4 xywh) { return { xywh.x, xywh.y, xywh.x, xywh.y }; }
 
     inline Vector4 operator+(const Vector4& a, float f) { return { a.x+f, a.y+f, a.z+f, a.w+f }; }
     inline Vector4 operator-(const Vector4& a, float f) { return { a.x-f, a.y-f, a.z-f, a.w-f }; }
@@ -1594,7 +1540,7 @@ namespace rpp
         Vector3 min;
         Vector3 max;
     
-        BoundingBox() : min(0.0f,0.0f,0.0f), max(0.0f,0.0f,0.0f) {}
+        BoundingBox() : min{0.0f,0.0f,0.0f}, max{0.0f,0.0f,0.0f} {}
         explicit BoundingBox(const Vector3& bbMinMax) : min(bbMinMax), max(bbMinMax) {}
         BoundingBox(const Vector3& bbMin, const Vector3& bbMax) : min(bbMin), max(bbMax) {}
 
@@ -1690,9 +1636,9 @@ namespace rpp
     {
         Vector3 center;
         float radius;
-        BoundingSphere() : center(0.0f, 0.0f, 0.0f), radius(0.0f) {}
-        BoundingSphere(const Vector3& center, float radius) : center(center), radius(radius) {}
-        BoundingSphere(const BoundingBox& bbox) : center(bbox.center()), radius(bbox.radius()) {}
+        BoundingSphere() : center{0.0f, 0.0f, 0.0f}, radius{0.0f} {}
+        BoundingSphere(const Vector3& center, float radius) : center{center}, radius{radius} {}
+        BoundingSphere(const BoundingBox& bbox) : center{bbox.center()}, radius{bbox.radius()} {}
 
         // calculates the bounding sphere from basic bounding box of the point cloud
         static BoundingSphere create(const std::vector<Vector3>& points) noexcept

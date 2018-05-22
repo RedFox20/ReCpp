@@ -8,66 +8,60 @@ namespace rpp
 {
     using std::swap;
 
-    // Clang doesn't support C++17 ODR-used constexpr simplifications
-    // so we still require an out-of-class definition for them:
-    #if __clang__
-        const float2 Vector2::ZERO;
-        const float2 Vector2::ONE;
-        const float2 Vector2::RIGHT;
-        const float2 Vector2::UP;
-        // ----
-        const double2 Vector2d::ZERO;
-        const double2 Vector2d::ONE;
-        const double2 Vector2d::RIGHT;
-        const double2 Vector2d::UP;
-        // ----
-        const int2 Point::ZERO; // Outer declaration required
-        // ----
-        const float4 Rect::ZERO; // Outer declaration required
-        // ----
-        const float3 Vector3::ZERO;
-        const float3 Vector3::ONE;
-        
-        const float3 Vector3::LEFT;
-        const float3 Vector3::RIGHT;
-        const float3 Vector3::UP;
-        const float3 Vector3::DOWN;
-        const float3 Vector3::FORWARD;
-        const float3 Vector3::BACKWARD;
-
-        const float3 Vector3::XAXIS;
-        const float3 Vector3::YAXIS;
-        const float3 Vector3::ZAXIS;
-        
-        const float3 Vector3::WHITE;
-        const float3 Vector3::BLACK;
-        const float3 Vector3::RED;
-        const float3 Vector3::GREEN;
-        const float3 Vector3::BLUE;
-        const float3 Vector3::YELLOW;
-        const float3 Vector3::ORANGE;
-        const float3 Vector3::MAGENTA;
-        const float3 Vector3::CYAN;
-        const float3 Vector3::SWEETGREEN;
-        const float3 Vector3::CORNFLOWERBLUE;
-        // ----
-        const double3 Vector3d::ZERO;
-        // ----
-        const float4 Vector4::ZERO;
-        const float4 Vector4::ONE;
-        
-        const float4 Vector4::WHITE;
-        const float4 Vector4::BLACK;
-        const float4 Vector4::RED;
-        const float4 Vector4::GREEN;
-        const float4 Vector4::BLUE;
-        const float4 Vector4::YELLOW;
-        const float4 Vector4::ORANGE;
-        const float4 Vector4::MAGENTA;
-        const float4 Vector4::CYAN;
-        const float4 Vector4::SWEETGREEN;
-        const float4 Vector4::CORNFLOWERBLUE;
-    #endif
+    // ----
+    const Vector2 Vector2::ZERO  = { 0.0f, 0.0f }; // 0 0
+    const Vector2 Vector2::ONE   = { 1.0f, 1.0f }; // 1 1
+    const Vector2 Vector2::RIGHT = { 1.0f, 0.0f }; // X-axis
+    const Vector2 Vector2::UP    = { 0.0f, 1.0f }; // Y-axis, OpenGL UP
+    // ----
+    const Vector2d Vector2d::ZERO  = { 0.0, 0.0 }; // 0 0
+    const Vector2d Vector2d::ONE   = { 1.0, 1.0 }; // 1 1
+    const Vector2d Vector2d::RIGHT = { 1.0, 0.0 }; // X-axis
+    const Vector2d Vector2d::UP    = { 0.0, 1.0 }; // Y-axis, OpenGL UP
+    // ----
+    const Point Point::ZERO = { 0, 0 };
+    // ----
+    const Rect Rect::ZERO = { 0.0f, 0.0f, 0.0f, 0.0f };
+    // ----
+    const Vector3 Vector3::ZERO           = { 0.0f, 0.0f, 0.0f };      // 0 0 0
+    const Vector3 Vector3::ONE            = { 1.0f, 1.0f, 1.0f };      // 1 1 1
+    const Vector3 Vector3::LEFT           = { -1.0f,  0.0f,  0.0f };   // -X axis
+    const Vector3 Vector3::RIGHT          = { +1.0f,  0.0f,  0.0f };   // +X axis
+    const Vector3 Vector3::UP             = {  0.0f, +1.0f,  0.0f };   // +Y axis
+    const Vector3 Vector3::DOWN           = {  0.0f, -1.0f,  0.0f };   // -Y axis
+    const Vector3 Vector3::FORWARD        = {  0.0f,  0.0f, +1.0f };   // +Z axis
+    const Vector3 Vector3::BACKWARD       = {  0.0f,  0.0f, -1.0f };   // -Z axis
+    const Vector3 Vector3::XAXIS          = { +1.0f,  0.0f,  0.0f };   // +X axis
+    const Vector3 Vector3::YAXIS          = {  0.0f, +1.0f,  0.0f };   // +Y axis
+    const Vector3 Vector3::ZAXIS          = {  0.0f,  0.0f, +1.0f };   // +Z axis
+    const Vector3 Vector3::WHITE          = { 1.0f, 1.0f, 1.0f };       // RGB 1 1 1
+    const Vector3 Vector3::BLACK          = { 0.0f, 0.0f, 0.0f };       // RGB 0 0 0
+    const Vector3 Vector3::RED            = { 1.0f, 0.0f, 0.0f };       // RGB 1 0 0
+    const Vector3 Vector3::GREEN          = { 0.0f, 1.0f, 0.0f };       // RGB 0 1 0
+    const Vector3 Vector3::BLUE           = { 0.0f, 0.0f, 1.0f };       // RGB 0 0 1
+    const Vector3 Vector3::YELLOW         = { 1.0f, 1.0f, 0.0f };       // 1 1 0
+    const Vector3 Vector3::ORANGE         = { 1.0f, 0.50196f, 0.0f };   // 1 0.502 0; 255 128 0
+    const Vector3 Vector3::MAGENTA        = { 1.0f, 0.0f, 1.0f };       // 1 0 1
+    const Vector3 Vector3::CYAN           = { 0.0f, 1.0f, 1.0f };       // 0 1 1
+    const Vector3 Vector3::SWEETGREEN     = { 0.337f, 0.737f, 0.223f }; // 86, 188, 57
+    const Vector3 Vector3::CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f };     // #55AAFF  85, 170, 255
+    // ----
+    const Vector3d Vector3d::ZERO = { 0.0, 0.0, 0.0 };
+    // ----
+    const Vector4 Vector4::ZERO           = { 0.0f, 0.0f, 0.0f, 0.0f };   // XYZW 0 0 0 0
+    const Vector4 Vector4::ONE            = { 1.0f, 1.0f, 1.0f, 1.0f };   // XYZW 1 1 1 1
+    const Vector4 Vector4::WHITE          = { 1.0f, 1.0f, 1.0f, 1.0f };   // RGBA 1 1 1 1
+    const Vector4 Vector4::BLACK          = { 0.0f, 0.0f, 0.0f, 1.0f };   // RGBA 0 0 0 1
+    const Vector4 Vector4::RED            = { 1.0f, 0.0f, 0.0f, 1.0f };   // RGBA 1 0 0 1
+    const Vector4 Vector4::GREEN          = { 0.0f, 1.0f, 0.0f, 1.0f };   // RGBA 0 1 0 1
+    const Vector4 Vector4::BLUE           = { 0.0f, 0.0f, 1.0f, 1.0f };   // RGBA 0 0 1 1
+    const Vector4 Vector4::YELLOW         = { 1.0f, 1.0f, 0.0f, 1.0f };       // 1 1 0 1
+    const Vector4 Vector4::ORANGE         = { 1.0f, 0.50196f, 0.0f, 1.0f };   // 1 0.502 0 1; 255 128 0 255
+    const Vector4 Vector4::MAGENTA        = { 1.0f, 0.0f, 1.0f, 1.0f };       // 1 0 1 1
+    const Vector4 Vector4::CYAN           = { 0.0f, 1.0f, 1.0f, 1.0f };       // 0 1 1 1
+    const Vector4 Vector4::SWEETGREEN     = { 0.337f, 0.737f, 0.223f, 1.0f }; // 86, 188, 57
+    const Vector4 Vector4::CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f, 1.0f };     // #55AAFF  85, 170, 255
+    // ----
 
     /////////////////////////////////////////////////////////////////////////////////////
 
@@ -715,14 +709,14 @@ namespace rpp
     {
         const float r = radf(degrees) * 0.5f;
         const float s = sinf(r);
-        return Vector4(x*s, y*s, z*s, cosf(r));
+        return {x*s, y*s, z*s, cosf(r)};
     }
 
     Vector4 Vector4::fromRadianAxis(float radians, float x, float y, float z)
     {
         const float r = radians * 0.5f;
         const float s = sinf(r);
-        return Vector4(x*s, y*s, z*s, cosf(r));
+        return {x*s, y*s, z*s, cosf(r)};
     }
 
     Vector4 Vector4::fromRotationAngles(const Vector3& rotationDegrees)
@@ -1723,7 +1717,7 @@ namespace rpp
     BoundingBox BoundingBox::create(float radius) noexcept
     {
         float r2 = abs(radius * 0.5f);
-        return { Vector3{-r2}, Vector3{r2} };
+        return { vec3(-r2), vec3(r2) };
     }
 
     BoundingBox BoundingBox::create(const std::vector<Vector3>& points) noexcept

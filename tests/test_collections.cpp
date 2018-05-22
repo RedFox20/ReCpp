@@ -77,7 +77,7 @@ TestImpl(test_collections)
         StringCollection collection { { "a", "b", "c", "d" } };
         element_range<std::string> stringRange = rpp::range(collection);
 
-        AssertThat(stringRange.size(), collection.items.size());
+        AssertThat(stringRange.size(), (int)collection.items.size());
         AssertThat(stringRange[0], "a");
     }
 
@@ -326,6 +326,16 @@ TestImpl(test_collections)
         AssertEqual(*find(v, "1"s), "x1"s);
         AssertEqual(*find(v, "2"s), "x2"s);
         AssertEqual(*find(v, "3"s), "x3"s);
+    }
+
+    TestCase(any_of)
+    {
+        vector<string> empty;
+        AssertThat(any_of(empty, [](auto s){ return true; }), false);
+
+        vector<string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
+        AssertThat(any_of(v, [](auto s){ return s == "xxx"s; }), false);
+        AssertThat(any_of(v, [](auto s){ return s == "ccc"s; }), true);
     }
 
     TestCase(sum_all)
