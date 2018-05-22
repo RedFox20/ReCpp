@@ -34,7 +34,7 @@ matrix:
         - COMPILER=gcc
 
 install:
-  #- make configure-${COMPILER}-travis
+  - make configure-${COMPILER}-travis
   - pip install mama
   - alias mama=~/.local/bin/mama
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
