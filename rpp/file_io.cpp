@@ -1241,19 +1241,14 @@ namespace rpp /* ReCpp */
         #elif TARGET_OS_IPHONE
             return getenv("TMPDIR");
         #elif __ANDROID__
-
             // return getContext().getExternalFilesDir(null).getPath();
-
-
             return "/data/local/tmp";
         #else
-            const char* path;
-            (path = getenv("TMP")) ||
-            (path = getenv("TEMP")) ||
-            (path = getenv("TMPDIR")) ||
-            (path = getenv("TEMPDIR")) ||
-            (path = "/tmp");
-            return path;
+            if (auto path = getenv("TMP"))     return path;
+            if (auto path = getenv("TEMP"))    return path;
+            if (auto path = getenv("TMPDIR"))  return path;
+            if (auto path = getenv("TEMPDIR")) return path;
+            return "/tmp/";
         #endif
     }
     
