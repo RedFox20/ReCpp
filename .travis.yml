@@ -10,8 +10,8 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
-            - clang-5.0
-            - llvm-5.0-dev
+            #- clang-5.0
+            #- llvm-5.0-dev
             # - libc++-dev
             # - libc++abi-dev
             - libdw-dev
@@ -38,4 +38,4 @@ install:
   - pip install mama
   - alias mama=~/.local/bin/mama
 
-script: mama build ${COMPILER} flags="-v" test
+script: mama build ${COMPILER} flags="-v --sysroot=/usr/local/clang-5.0.0" test
