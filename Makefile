@@ -11,14 +11,12 @@ configure-clang:
 	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 1000
 
 configure-clang-travis:
-	sudo update-alternatives --remove-all cc
-	sudo update-alternatives --remove-all c++
-	sudo update-alternatives --install /usr/bin/clang   clang   /usr/lib/llvm-5.0/bin/clang   1000
-	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/lib/llvm-5.0/bin/clang++ 1000
-	sudo update-alternatives --install /usr/bin/cc  cc  /usr/bin/clang   90
-	sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 90
-	sudo update-alternatives --set cc  /usr/bin/clang
-	sudo update-alternatives --set c++ /usr/bin/clang++
+	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-5.0   1000
+	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 1000
+	sudo update-alternatives --install /usr/bin/cc  cc  /usr/bin/clang-5.0   90
+	sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-5.0 90
+	sudo update-alternatives --set cc  /usr/bin/clang-5.0
+	sudo update-alternatives --set c++ /usr/bin/clang++-5.0
 	clang --version
 
 configure-gcc-travis: configure-gcc

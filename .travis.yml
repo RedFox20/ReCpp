@@ -10,9 +10,6 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
-            - libc++abi-dev
-            - libc++-dev
-            - lld-5.0
             - clang-5.0
             - libdw-dev
             - gdb
@@ -25,9 +22,7 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - build-essential
             - g++-7
-            - libstdc++-7-dev
             - libdw-dev
             - gdb
       env:
@@ -36,10 +31,7 @@ matrix:
 install:
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
   - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
-  - ls -l /usr/lib/llvm-5.0
-  - ls -l /usr/lib/llvm-5.0/lib
-  - ls -l /usr/lib/llvm-5.0/bin
-  - ls -l /usr/bin | grep ll
+  - ls -l /usr/bin | grep clang
   - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so.1.0 | grep shared_mutex
   - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so.1.0 | grep shared_mutex
   - make configure-${COMPILER}-travis
