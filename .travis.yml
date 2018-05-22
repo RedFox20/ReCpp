@@ -12,8 +12,8 @@ matrix:
           packages:
             - libc++abi-dev
             - libc++-dev
-            - lld-5.0
-            - clang-5.0
+            #- lld-5.0
+            #- clang-5.0
             - libdw-dev
             - gdb
       env:
@@ -34,11 +34,12 @@ matrix:
         - COMPILER=gcc
 
 install:
-  - make configure-${COMPILER}-travis
+  #- make configure-${COMPILER}-travis
   - pip install mama
   - alias mama=~/.local/bin/mama
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
   - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
+  - ls -l /usr/lib/llvm-5.0/lib | grep libc++
   - ls -l /usr/bin | grep ll
   - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so.1.0 | grep shared_mutex
   - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so.1.0 | grep shared_mutex
