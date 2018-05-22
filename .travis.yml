@@ -39,9 +39,13 @@ install:
   - alias mama=~/.local/bin/mama
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
   - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
-  - ls -l /usr/lib/llvm-5.0/lib | grep libc++
+  - ls -l /usr/lib/llvm-5.0
+  - ls -l /usr/lib/llvm-5.0/lib
+  - ls -l /usr/lib/llvm-5.0/bin
   - ls -l /usr/bin | grep ll
   - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so.1.0 | grep shared_mutex
   - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so.1.0 | grep shared_mutex
 
-script: mama build ${COMPILER} test
+script:
+  - export LD=/usr/bin/lld-link-5.0
+  - mama build ${COMPILER} test
