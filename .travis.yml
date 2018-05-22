@@ -17,24 +17,23 @@ matrix:
             - libdw-dev
       env:
         - COMPILER=clang
-    # - os: linux
-    #   addons:
-    #     apt:
-    #       update: false
-    #       sources:
-    #         - ubuntu-toolchain-r-test
-    #       packages:
-    #         - build-essential
-    #         - g++-7
-    #         - libstdc++-7-dev
-    #         - libdw-dev
-    #   env:
-    #     - COMPILER=clang
+    - os: linux
+      addons:
+        apt:
+          update: false
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - build-essential
+            - g++-7
+            - libstdc++-7-dev
+            - libdw-dev
+      env:
+        - COMPILER=gcc
 
 install:
   - make configure-${COMPILER}
   - pip install mama
+  - alias mama=~/.local/bin/mama  
 
-script: mama build linux
-
-after_success: cd build && ./Tests
+script: mama build ${COMPILER} test
