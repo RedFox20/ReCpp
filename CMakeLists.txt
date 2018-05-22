@@ -120,7 +120,9 @@ endif()
 if(ANDROID)
     set(RUNTIME "android log")
 elseif(LINUX)
-    set(RUNTIME "-lc++ -lc++abi")
+    if (CLANG)
+        set(RUNTIME "-lc++ -lc++abi")
+    endif()
 endif()
 
 
