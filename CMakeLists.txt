@@ -128,11 +128,8 @@ else()
     set(DWARF_LIBRARY "")
 endif()
 if(ANDROID)
-    set(RPP_RUNTIME "android log")
+    set(RPP_RUNTIME android log)
 elseif(LINUX)
-    # if (CLANG)
-    #     set(RPP_RUNTIME "-lc++ -lc++abi")
-    # endif()
 endif()
 
 
