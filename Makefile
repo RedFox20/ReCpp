@@ -5,8 +5,8 @@ GCC_FLAGS := -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++
 all: clang
 
 configure-clang:
-	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-5.0   1000
-	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 1000
+#	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-5.0   1000
+#	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 1000
 
 configure-gcc:
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60
