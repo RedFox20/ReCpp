@@ -21,7 +21,7 @@ TestImpl(test_vec)
 
     TestCase(bounding_box)
     {
-        BoundingBox unitbox = { Vector3::ZERO, Vector3::ONE };
+        BoundingBox unitbox = { Vector3::Zero(), Vector3::One() };
 
         AssertThat(unitbox.center(), vec3(0.5f));
         AssertThat(unitbox.volume(), 1.0f);

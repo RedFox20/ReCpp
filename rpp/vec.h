@@ -146,15 +146,15 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
-
     /** @brief 2D Vector for UI calculations */
     struct RPPAPI Vector2
     {
         float x, y;
-        static const Vector2 ZERO; // 0 0
-        static const Vector2 ONE; // 1 1
-        static const Vector2 RIGHT; // X-axis
-        static const Vector2 UP; // Y-axis, OpenGL UP
+
+        static constexpr Vector2 Zero()  { return { 0.0f, 0.0f }; } // 0 0
+        static constexpr Vector2 One()   { return { 1.0f, 1.0f }; } // 1 1
+        static constexpr Vector2 Right() { return { 1.0f, 0.0f }; } // 1, 0 (X-axis)
+        static constexpr Vector2 Up()    { return { 0.0f, 1.0f }; } // 0, 1 (Y-axis=OpenGL UP)
     
         /** Print the Vector2 */
         void print() const;
@@ -193,11 +193,11 @@ namespace rpp
         void normalize();
 
         /** @brief Normalize this vector to the given magnitude */
-        void normalize(const float magnitude);
+        void normalize(float magnitude);
     
         /** @return A normalized copy of this vector */
         Vector2 normalized() const;
-        Vector2 normalized(const float magnitude) const;
+        Vector2 normalized(float magnitude) const;
 
         /** @return Dot product of two vectors */
         float dot(const Vector2& v) const;
@@ -258,13 +258,13 @@ namespace rpp
     inline Vector2 operator*(float f, const Vector2& a) { return { f*a.x, f*a.y }; }
     inline Vector2 operator/(float f, const Vector2& a) { return { f/a.x, f/a.y }; }
 
-    inline constexpr Vector2 clamp(const Vector2& value, const Vector2& min, const Vector2& max)
+    constexpr Vector2 clamp(const Vector2& value, const Vector2& min, const Vector2& max)
     {
         return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y) };
     }
 
-    inline constexpr Vector2 lerp(float position, const Vector2& start, const Vector2& end)
+    constexpr Vector2 lerp(float position, const Vector2& start, const Vector2& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position };
@@ -276,10 +276,11 @@ namespace rpp
     struct RPPAPI Vector2d
     {
         double x, y;
-        static const Vector2d ZERO;  // 0 0
-        static const Vector2d ONE;   // 1 1
-        static const Vector2d RIGHT; // X-axis
-        static const Vector2d UP;    // Y-axis, OpenGL UP
+
+        static constexpr Vector2d Zero()  { return { 0.0, 0.0 }; } // 0 0
+        static constexpr Vector2d One()   { return { 1.0, 1.0 }; } // 1 1
+        static constexpr Vector2d Right() { return { 1.0, 0.0 }; } // 1, 0 (X-axis)
+        static constexpr Vector2d Up()    { return { 0.0, 1.0 }; } // 0, 1 (Y-axis=OpenGL UP)
 
         /** Print the Vector2 */
         void print() const;
@@ -383,13 +384,13 @@ namespace rpp
     inline Vector2d operator*(double f, const Vector2d& a) { return { f*a.x, f*a.y }; }
     inline Vector2d operator/(double f, const Vector2d& a) { return { f/a.x, f/a.y }; }
 
-    inline constexpr Vector2d clamp(const Vector2d& value, const Vector2d& min, const Vector2d& max)
+    constexpr Vector2d clamp(const Vector2d& value, const Vector2d& min, const Vector2d& max)
     {
         return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y) };
     }
 
-    inline constexpr Vector2d lerp(double position, const Vector2d& start, const Vector2d& end)
+    constexpr Vector2d lerp(double position, const Vector2d& start, const Vector2d& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position };
@@ -403,7 +404,8 @@ namespace rpp
     struct RPPAPI Point
     {
         int x, y;
-        static const Point ZERO;
+
+        static constexpr Vector2d Zero() { return { 0, 0 }; } // 0 0
 
         explicit operator bool()  const { return  x || y;  }
         bool operator!() const { return !x && !y; }
@@ -439,7 +441,7 @@ namespace rpp
         bool operator!=(const Point& b) const { return x != b.x || y != b.y; }
     };
 
-    constexpr Point point2(int xy) { return { xy, xy }; }
+    constexpr RPPAPI Point point2(int xy) { return { xy, xy }; }
 
     inline Point operator+(const Point& a, int i) { return { a.x+i, a.y+i }; }
     inline Point operator-(const Point& a, int i) { return { a.x-i, a.y-i }; }
@@ -461,7 +463,7 @@ namespace rpp
             struct { Vector2 pos; Vector2 size; };
         };
 
-        static const Rect ZERO;
+        static constexpr Rect Zero() { return { 0, 0, 0, 0 }; } // 0 0 0 0
 
         constexpr Rect(float x, float y, float w, float h) : x{x}, y{y}, w{w}, h{h} {}
         constexpr Rect(Vector2 pos, Vector2 size) : pos{pos}, size{size} {}
@@ -484,14 +486,14 @@ namespace rpp
         const Vector2& topleft()  const { return pos; }
         Vector2        botright() const { return { x+w, y+h }; }
 
-        /** @return TRUE if this Rect is equal to Rect::ZERO */
+        /** @return TRUE if this Rect is equal to Rect::Zero */
         bool isZero() const { return !x && !y && !w && !h; }
-        /** @return TRUE if this Rect is NOT equal to Rect::ZERO */
+        /** @return TRUE if this Rect is NOT equal to Rect::Zero */
         bool notZero() const { return w || h || x || y; }
 
         /** @return True if point is inside this Rect */
         bool hitTest(const Vector2& position) const;
-        bool hitTest(const float xPos, const float yPos) const;
+        bool hitTest(float xPos, float yPos) const;
         /** @return TRUE if r is completely inside this Rect */
         bool hitTest(const Rect& r) const;
 
@@ -557,33 +559,30 @@ namespace rpp
             struct { float r, g, b; };
         };
 
-        static const Vector3 ZERO;      // 0 0 0
-        static const Vector3 ONE;       // 1 1 1
+        static constexpr Vector3 Zero() { return { 0.0f, 0.0f, 0.0f }; }      // 0 0 0
+        static constexpr Vector3 One() { return { 1.0f, 1.0f, 1.0f }; }      // 1 1 1
+        static constexpr Vector3 Left() { return { -1.0f,  0.0f,  0.0f }; }   // -X axis
+        static constexpr Vector3 Right() { return { +1.0f,  0.0f,  0.0f }; }   // +X axis
+        static constexpr Vector3 Up() { return {  0.0f, +1.0f,  0.0f }; }   // +Y axis
+        static constexpr Vector3 Down() { return {  0.0f, -1.0f,  0.0f }; }   // -Y axis
+        static constexpr Vector3 Forward() { return {  0.0f,  0.0f, +1.0f }; }   // +Z axis
+        static constexpr Vector3 Backward() { return {  0.0f,  0.0f, -1.0f }; }   // -Z axis
+        static constexpr Vector3 XAxis() { return { +1.0f,  0.0f,  0.0f }; }   // +X axis
+        static constexpr Vector3 YAxis() { return {  0.0f, +1.0f,  0.0f }; }   // +Y axis
+        static constexpr Vector3 ZAxis() { return {  0.0f,  0.0f, +1.0f }; }   // +Z axis
+        static constexpr Vector3 White() { return { 1.0f, 1.0f, 1.0f }; }       // RGB 1 1 1
+        static constexpr Vector3 Black() { return { 0.0f, 0.0f, 0.0f }; }       // RGB 0 0 0
+        static constexpr Vector3 Red() { return { 1.0f, 0.0f, 0.0f }; }       // RGB 1 0 0
+        static constexpr Vector3 Green() { return { 0.0f, 1.0f, 0.0f }; }       // RGB 0 1 0
+        static constexpr Vector3 Blue() { return { 0.0f, 0.0f, 1.0f }; }       // RGB 0 0 1
+        static constexpr Vector3 Yellow() { return { 1.0f, 1.0f, 0.0f }; }       // 1 1 0
+        static constexpr Vector3 Orange() { return { 1.0f, 0.50196f, 0.0f }; }   // 1 0.502 0; 255 128 0
+        static constexpr Vector3 Magenta() { return { 1.0f, 0.0f, 1.0f }; }       // 1 0 1
+        static constexpr Vector3 Cyan() { return  { 0.0f, 1.0f, 1.0f }; }       // 0 1 1
+        static constexpr Vector3 SweetGreen() { return { 0.337f, 0.737f, 0.223f }; } // 86, 188, 57
+        static constexpr Vector3 CornflowerBlue() { return { 0.33f, 0.66f, 1.0f }; }     // #55AAFF  85, 170, 255
 
-        static const Vector3 LEFT;      // -X axis
-        static const Vector3 RIGHT;     // +X axis
-        static const Vector3 UP;        // +Y axis
-        static const Vector3 DOWN;      // -Y axis
-        static const Vector3 FORWARD;   // +Z axis
-        static const Vector3 BACKWARD;  // -Z axis
-
-        static const Vector3 XAXIS;   // +X axis
-        static const Vector3 YAXIS;   // +Y axis
-        static const Vector3 ZAXIS;   // +Z axis
-        
-        static const Vector3 WHITE;         // RGB 1 1 1
-        static const Vector3 BLACK;         // RGB 0 0 0
-        static const Vector3 RED;           // RGB 1 0 0
-        static const Vector3 GREEN;         // RGB 0 1 0
-        static const Vector3 BLUE;          // RGB 0 0 1
-        static const Vector3 YELLOW;        // 1 1 0
-        static const Vector3 ORANGE;        // 1 0.502 0; 255 128 0
-        static const Vector3 MAGENTA;       // 1 0 1
-        static const Vector3 CYAN;          // 0 1 1
-        static const Vector3 SWEETGREEN;    // 86, 188, 57
-        static const Vector3 CORNFLOWERBLUE;// #55AAFF  85, 170, 255
-
-    #if __clang__
+    #if __clang__ || _MSC_VER
         Vector3() = default;
         constexpr Vector3(float x, float y, float z) : x{x}, y{y}, z{z} {}
     #endif
@@ -591,7 +590,7 @@ namespace rpp
         explicit operator Vector3d() const;
 
         /** @brief Set new XYZ values */
-        void set(float x, float y, float z);
+        void set(float newX, float newY, float newZ);
     
         /** @return Length of the vector */
         float length() const;
@@ -607,17 +606,17 @@ namespace rpp
     
         /** @brief Normalize this vector */
         void normalize();
-        void normalize(const float magnitude);
+        void normalize(float magnitude);
     
         /** @return A normalized copy of this vector */
         Vector3 normalized() const;
-        Vector3 normalized(const float magnitude) const;
+        Vector3 normalized(float magnitude) const;
     
         /** @return Cross product with another vector */
-        Vector3 cross(Vector3 b) const;
+        Vector3 cross(Vector3 v) const;
     
         /** @return Dot product with another vector */
-        float dot(Vector3 b) const;
+        float dot(Vector3 v) const;
 
         /**
          * Creates a mask vector for each component
@@ -662,7 +661,7 @@ namespace rpp
         bool almostZero() const;
 
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
-        bool almostEqual(Vector3 b) const;
+        bool almostEqual(Vector3 v) const;
 
         Vector3& operator+=(float f) { x+=f; y+=f; z+=f; return *this; }
         Vector3& operator-=(float f) { x-=f; y-=f; z-=f; return *this; }
@@ -700,7 +699,7 @@ namespace rpp
          * @note All HEX and NUMBER color fields are optional. 
          *       Color channel default is 0
          *       Example '#aa' would give 170 0 0  and '0.1' would give 25 0 0
-         * @return Default color WHITE or parsed color in normalized float value range [0.0 ... 1.0]
+         * @return Default color White or parsed color in normalized float value range [0.0 ... 1.0]
          */
         static Vector3 parseColor(const strview& s) noexcept;
 
@@ -777,14 +776,14 @@ namespace rpp
     inline Vector3 operator*(float f, const Vector3& a) { return { f*a.x, f*a.y, f*a.z }; }
     inline Vector3 operator/(float f, const Vector3& a) { return { f/a.x, f/a.y, f/a.z }; }
 
-    inline constexpr Vector3 clamp(const Vector3& value, const Vector3& min, const Vector3& max)
+    constexpr Vector3 clamp(const Vector3& value, const Vector3& min, const Vector3& max)
     {
         return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y),
                  value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z) };
     }
 
-    inline constexpr Vector3 lerp(float position, const Vector3& start, const Vector3& end)
+    constexpr Vector3 lerp(float position, const Vector3& start, const Vector3& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
@@ -797,11 +796,12 @@ namespace rpp
     struct RPPAPI Vector3d
     {
         double x, y, z;
-        static const Vector3d ZERO;
+
+        static constexpr Vector3d Zero() { return { 0.0f, 0.0f, 0.0f }; }
         explicit operator Vector3() const { return {float(x), float(y), float(z)}; }
         
         /** @brief Set new XYZ values */
-        void set(double x, double y, double z);
+        void set(double newX, double newY, double newZ);
     
         /** @return Length of the vector */
         double length() const;
@@ -844,7 +844,7 @@ namespace rpp
         bool almostZero() const;
 
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
-        bool almostEqual(const Vector3d& b) const;
+        bool almostEqual(const Vector3d& v) const;
 
         Vector3d& operator+=(double f) { x+=f; y+=f; z+=f; return *this; }
         Vector3d& operator-=(double f) { x-=f; y-=f; z-=f; return *this; }
@@ -891,14 +891,14 @@ namespace rpp
     inline Vector3d operator*(double f, const Vector3d& a) { return { f*a.x, f*a.y, f*a.z }; }
     inline Vector3d operator/(double f, const Vector3d& a) { return { f/a.x, f/a.y, f/a.z }; }
 
-    inline constexpr Vector3d clamp(const Vector3d& value, const Vector3d& min, const Vector3d& max)
+    constexpr Vector3d clamp(const Vector3d& value, const Vector3d& min, const Vector3d& max)
     {
         return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y),
                  value.z < min.z ? min.z : (value.z < max.z ? value.z : max.z) };
     }
 
-    inline constexpr Vector3d lerp(double position, const Vector3d& start, const Vector3d& end)
+    constexpr Vector3d lerp(double position, const Vector3d& start, const Vector3d& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
@@ -917,7 +917,7 @@ namespace rpp
      */
     struct RPPAPI AngleAxis
     {
-        Vector3 axis = Vector3::ZERO; // rotation axis
+        Vector3 axis = Vector3::Zero(); // rotation axis
         float angle = 0.0f;  // rotation angle in DEGREES
 
         /**
@@ -941,22 +941,21 @@ namespace rpp
             struct { Vector3 rgb; };
         };
 
-        static const Vector4 ZERO;  // XYZW 0 0 0 0
-        static const Vector4 ONE;   // XYZW 1 1 1 1
+        static constexpr Vector4 Zero() { return { 0.0f, 0.0f, 0.0f, 0.0f }; }   // XYZW 0 0 0 0
+        static constexpr Vector4 One() { return { 1.0f, 1.0f, 1.0f, 1.0f }; }   // XYZW 1 1 1 1
+        static constexpr Vector4 White() { return { 1.0f, 1.0f, 1.0f, 1.0f }; }   // RGBA 1 1 1 1
+        static constexpr Vector4 Black() { return { 0.0f, 0.0f, 0.0f, 1.0f }; }   // RGBA 0 0 0 1
+        static constexpr Vector4 Red() { return { 1.0f, 0.0f, 0.0f, 1.0f }; }   // RGBA 1 0 0 1
+        static constexpr Vector4 Green() { return { 0.0f, 1.0f, 0.0f, 1.0f }; }   // RGBA 0 1 0 1
+        static constexpr Vector4 Blue() { return { 0.0f, 0.0f, 1.0f, 1.0f }; }   // RGBA 0 0 1 1
+        static constexpr Vector4 Yellow() { return { 1.0f, 1.0f, 0.0f, 1.0f }; }       // 1 1 0 1
+        static constexpr Vector4 Orange() { return { 1.0f, 0.50196f, 0.0f, 1.0f }; }   // 1 0.502 0 1; 255 128 0 255
+        static constexpr Vector4 Magenta() { return { 1.0f, 0.0f, 1.0f, 1.0f }; }       // 1 0 1 1
+        static constexpr Vector4 Cyan() { return { 0.0f, 1.0f, 1.0f, 1.0f }; }       // 0 1 1 1
+        static constexpr Vector4 SweetGreen() { return { 0.337f, 0.737f, 0.223f, 1.0f }; } // 86, 188, 57
+        static constexpr Vector4 CornflowerBlue() { return { 0.33f, 0.66f, 1.0f, 1.0f }; }     // #55AAFF  85, 170, 255
 
-        static const Vector4 WHITE; // RGBA 1 1 1 1
-        static const Vector4 BLACK; // RGBA 0 0 0 1
-        static const Vector4 RED;   // RGBA 1 0 0 1
-        static const Vector4 GREEN; // RGBA 0 1 0 1
-        static const Vector4 BLUE;  // RGBA 0 0 1 1
-        static const Vector4 YELLOW;         // 1 1 0 1
-        static const Vector4 ORANGE;         // 1 0.502 0 1; 255 128 0 255
-        static const Vector4 MAGENTA;        // 1 0 1 1
-        static const Vector4 CYAN;           // 0 1 1 1
-        static const Vector4 SWEETGREEN;     // 86, 188, 57
-        static const Vector4 CORNFLOWERBLUE; // #55AAFF  85, 170, 255
-
-    #if __clang__
+    #if __clang__ || _MSC_VER
         constexpr Vector4(Vector2 xy, Vector2 zw) : xy{xy}, zw{zw} {}
         constexpr Vector4(float x, float y, float z, float w) : x{x}, y{y}, z{z}, w{w} {}
     #endif
@@ -971,12 +970,12 @@ namespace rpp
         bool almostZero() const;
 
         /** @return TRUE if the vectors are almost equal, with a difference of < 0.0001 */
-        bool almostEqual(const Vector4& b) const;
+        bool almostEqual(const Vector4& v) const;
 
-        void set(float x, float y, float z, float w);
+        void set(float newX, float newY, float newZ, float newW);
     
         /** @return Dot product with another vector */
-        float dot(const Vector4& b) const;
+        float dot(const Vector4& v) const;
 
         /** Print the matrix */
         void print() const;
@@ -1029,7 +1028,7 @@ namespace rpp
 
         /**
          * Parses a HEX color string, example: #rrggbb or #rrggbbaa
-         * @warning The string must start with '#', otherwise WHITE is returned
+         * @warning The string must start with '#', otherwise White is returned
          * @return Parsed color value
          */
         static Vector4 HEX(const strview& s) noexcept;
@@ -1060,7 +1059,7 @@ namespace rpp
          * @note All HEX and NUMBER color fields are optional. 
          *       Color channel default is 0 and Alpha channel default is 255
          *       Example '#aa' would give 170 0 0 255  and '0.1' would give 25 0 0 255
-         * @return Default color WHITE or parsed color in normalized float value range [0.0 ... 1.0]
+         * @return Default color White or parsed color in normalized float value range [0.0 ... 1.0]
          */
         static Vector4 parseColor(const strview& s) noexcept;
 
@@ -1107,7 +1106,7 @@ namespace rpp
     inline Vector4 operator*(float f, const Vector4& a) { return { f*a.x, f*a.y, f*a.z, f*a.w }; }
     inline Vector4 operator/(float f, const Vector4& a) { return { f/a.x, f/a.y, f/a.z, f/a.w }; }
 
-    inline constexpr Vector4 clamp(const Vector4& value, const Vector4& min, const Vector4& max)
+    constexpr Vector4 clamp(const Vector4& value, const Vector4& min, const Vector4& max)
     {
         return { value.x < min.x ? min.x : (value.x < max.x ? value.x : max.x),
                  value.y < min.y ? min.y : (value.y < max.y ? value.y : max.y),
@@ -1115,7 +1114,7 @@ namespace rpp
                  value.w < min.w ? min.w : (value.w < max.w ? value.w : max.w) };
     }
 
-    inline constexpr Vector4 lerp(float position, const Vector4& start, const Vector4& end)
+    constexpr Vector4 lerp(float position, const Vector4& start, const Vector4& end)
     {
         return { start.x + (end.x - start.x)*position,
                  start.y + (end.y - start.y)*position,
@@ -1323,7 +1322,7 @@ namespace rpp
     
         /** @brief Loads an Ortographic projection matrix */
         Matrix4& setOrtho(float left, float right, float bottom, float top);
-        static inline Matrix4 createOrtho(float left, float right, float bottom, float top)
+        static Matrix4 createOrtho(float left, float right, float bottom, float top)
         {
             Matrix4 view = {};
             view.setOrtho(left, right, bottom, top);
@@ -1332,20 +1331,20 @@ namespace rpp
         // create a classical GUI friendly ortho: 0,0 is topleft
         // left [0, width]  right
         // top  [0, height] bottom
-        static inline Matrix4 createOrtho(int width, int height)
+        static Matrix4 createOrtho(int width, int height)
         {
             return createOrtho(0.0f, float(width), float(height), 0.0f);
         }
     
         /** @brief Loads a perspective projection matrix */
         Matrix4& setPerspective(float fov, float width, float height, float zNear, float zFar);
-        static inline Matrix4 createPerspective(float fov, float width, float height, float zNear, float zFar)
+        static Matrix4 createPerspective(float fov, float width, float height, float zNear, float zFar)
         {
             Matrix4 view = {};
             view.setPerspective(fov, width, height, zNear, zFar);
             return view;
         }
-        static inline Matrix4 createPerspective(float fov, int width, int height, float zNear, float zFar)
+        static Matrix4 createPerspective(float fov, int width, int height, float zNear, float zFar)
         {
             Matrix4 view = {};
             view.setPerspective(fov, float(width), float(height), zNear, zFar);
@@ -1354,7 +1353,7 @@ namespace rpp
 
         /** @brief Loads a lookAt view/camera matrix */
         Matrix4& setLookAt(const Vector3& eye, const Vector3& center, const Vector3& up);
-        static inline Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
+        static Matrix4 createLookAt(const Vector3& eye, const Vector3& center, const Vector3& up)
         {
             Matrix4 view = {};
             view.setLookAt(eye, center, up);
@@ -1363,7 +1362,7 @@ namespace rpp
     
         /** @brief Creates a translated matrix from XYZ position */
         Matrix4& fromPosition(const Vector3& position);
-        static inline Matrix4 createTranslation(const Vector3& position)
+        static Matrix4 createTranslation(const Vector3& position)
         {
             Matrix4 mat = Identity();
             mat.translate(position);
@@ -1372,7 +1371,7 @@ namespace rpp
     
         /** @brief Creates a rotated matrix from euler XYZ rotation */
         Matrix4& fromRotation(const Vector3& rotationDegrees);
-        static inline Matrix4 createRotation(const Vector3& rotationDegrees)
+        static Matrix4 createRotation(const Vector3& rotationDegrees)
         {
             Matrix4 mat = {};
             mat.fromRotation(rotationDegrees);
@@ -1380,8 +1379,8 @@ namespace rpp
         }
     
         /** @brief Creates a scaled matrix from XYZ scale */
-        Matrix4& fromScale(const Vector3& scale);
-        static inline Matrix4 createScale(const Vector3& scale)
+        Matrix4& fromScale(const Vector3& sc);
+        static Matrix4 createScale(const Vector3& scale)
         {
             Matrix4 mat = {};
             mat.fromScale(scale);
@@ -1422,9 +1421,9 @@ namespace rpp
          * @brief Creates an affine 3D transformation matrix. Rotation is in Euler XYZ degrees.
          */
         Matrix4& setAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees);
-        static inline Matrix4 createAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees)
+        static Matrix4 createAffine3D(const Vector3& pos, const Vector3& scale, const Vector3& rotationDegrees)
         {
-            Matrix4 affine = Matrix4::Identity();
+            Matrix4 affine = Identity();
             affine.setAffine3D(pos, scale, rotationDegrees);
             return affine;
         }
