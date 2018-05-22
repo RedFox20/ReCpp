@@ -8,11 +8,12 @@ matrix:
         apt:
           update: true
           sources:
-            - llvm-toolchain-trusty-5.0
+            - llvm-toolchain-trusty-5.0 main
           packages:
-            - build-essential
-            - libc++-dev
-            - libc++abi-dev
+            - clang-5.0
+            - llmv-5.0-dev
+            # - libc++-dev
+            # - libc++abi-dev
             - libdw-dev
             - gdb
       env:
@@ -36,6 +37,5 @@ install:
   - make configure-${COMPILER}
   - pip install mama
   - alias mama=~/.local/bin/mama
-  - llvm-config --cxxflags --ldflags --system-libs
 
-script: mama build ${COMPILER} test
+script: mama build ${COMPILER} flags="-v" test

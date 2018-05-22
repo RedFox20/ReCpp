@@ -11,3 +11,4 @@ windows/
 build/
 
 mama\.cmake
+.vscode/
