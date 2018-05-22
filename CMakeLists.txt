@@ -24,6 +24,9 @@ else()
 endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+if(LINUX AND CLANG)
+set(CMAKE_LINKER /usr/bin/lld)
+endif()
 
 ############## RPP Compilation Flags ##############
 
@@ -133,9 +136,8 @@ elseif(LINUX)
 endif()
 
 if(LINUX AND CLANG)
-    add_compile_options(-v)
+    #add_compile_options(-v)
     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} --verbose)
-    include_directories(/usr/local/clang-5.0.0/lib)
 endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
