@@ -11,9 +11,8 @@ matrix:
             - llvm-toolchain-trusty-5.0
           packages:
             #- clang-5.0
-            #- llvm-5.0-dev
             - libc++-dev
-            # - libc++abi-dev
+            - libc++abi-dev
             - libdw-dev
             - gdb
       env:
