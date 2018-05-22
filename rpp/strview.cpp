@@ -4,6 +4,8 @@
 #include "strview.h"
 #include <math.h> // use math.h for GCC compatibility
 #include <cstdlib>
+#include <cstring> // memcpy
+#include <locale> // toupper
 
 namespace rpp
 {
@@ -21,12 +23,12 @@ namespace rpp
             if (strcontains(control, ncontrol, *s)) return s; // done
         return nullptr; // not found
     }
-    NOINLINE bool strequals(const char* s1, const char* s2, int len) {
+    bool strequals(const char* s1, const char* s2, int len) {
         for (int i = 0; i < len; ++i) 
             if (s1[i] != s2[i]) return false; // not equal.
         return true;
     }
-    NOINLINE bool strequalsi(const char* s1, const char* s2, int len) {
+    bool strequalsi(const char* s1, const char* s2, int len) {
         for (int i = 0; i < len; ++i) 
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;
@@ -59,10 +61,11 @@ namespace rpp
             if (rem < n) {
                 pos = 0;
                 rem = max;
+				if (rem < n) n = rem;
             }
             char* ptr = buf+pos;
             pos += n;
-            return { ptr, rem };
+            return { ptr, n };
         }
     };
 
