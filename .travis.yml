@@ -12,7 +12,7 @@ matrix:
           packages:
             #- clang-5.0
             #- llvm-5.0-dev
-            # - libc++-dev
+            - libc++-dev
             # - libc++abi-dev
             - libdw-dev
             - gdb
