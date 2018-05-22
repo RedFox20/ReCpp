@@ -37,4 +37,4 @@ install:
   - pip install mama
   - alias mama=~/.local/bin/mama
 
-script: mama build ${COMPILER} flags="-v" test
+script: mama build ${COMPILER} test

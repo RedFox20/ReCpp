@@ -130,11 +130,12 @@ endif()
 if(ANDROID)
     set(RPP_RUNTIME android log)
 elseif(LINUX)
-    if(CLANG)
-        set(RPP_RUNTIME -lc++abi)
-    endif()
 endif()
 
+if(LINUX AND CLANG)
+    add_compile_options(-v)
+    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -v)
+endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
 
