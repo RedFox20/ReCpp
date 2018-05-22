@@ -1717,7 +1717,7 @@ namespace rpp
     BoundingBox BoundingBox::create(float radius) noexcept
     {
         float r2 = abs(radius * 0.5f);
-        return { Vector3{-r2}, Vector3{r2} };
+        return { vec3(-r2), vec3(r2) };
     }
 
     BoundingBox BoundingBox::create(const std::vector<Vector3>& points) noexcept

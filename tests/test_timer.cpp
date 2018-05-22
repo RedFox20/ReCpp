@@ -6,7 +6,7 @@ using namespace std::literals;
 
 TestImpl(test_timer)
 {
-    static constexpr double sigma_s = 0.002;
+    static constexpr double sigma_s = 0.009;
     static constexpr double sigma_ms = sigma_s * 1000.0;
     TestInit(test_timer)
     {

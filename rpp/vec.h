@@ -463,6 +463,9 @@ namespace rpp
 
         static const Rect ZERO;
 
+        constexpr Rect(float x, float y, float w, float h) : x{x}, y{y}, w{w}, h{h} {}
+        constexpr Rect(Vector2 pos, Vector2 size) : pos{pos}, size{size} {}
+
         /** Print the Rect */
         void print() const;
 
@@ -485,7 +488,7 @@ namespace rpp
         bool isZero() const { return !x && !y && !w && !h; }
         /** @return TRUE if this Rect is NOT equal to Rect::ZERO */
         bool notZero() const { return w || h || x || y; }
-    
+
         /** @return True if point is inside this Rect */
         bool hitTest(const Vector2& position) const;
         bool hitTest(const float xPos, const float yPos) const;
@@ -499,10 +502,10 @@ namespace rpp
         void extrude(float extrude);
         void extrude(const Vector2& extrude);
 
-        Rect extruded(float extrude) const { 
-            Rect r = *this; 
-            r.extrude(extrude); 
-            return *this; 
+        Rect extruded(float extrude) const {
+            Rect r = *this;
+            r.extrude(extrude);
+            return *this;
         }
 
         Rect& operator+=(const Rect& b) { join(b); return *this; }
@@ -518,7 +521,7 @@ namespace rpp
         void clip(const Rect& frame);
 
         Rect operator+(const Rect& b) const { return joined(b); }
-    
+
         bool operator==(const Rect& r) const { return x == r.x && y == r.y && w == r.w && h == r.h; }
         bool operator!=(const Rect& r) const { return x != r.x || y != r.y || w != r.w || h != r.h; }
     };
@@ -535,7 +538,7 @@ namespace rpp
     inline Rect operator-(float f, const Rect& a) { return{ f-a.x, f-a.y, a.w, a.h }; }
     inline Rect operator*(float f, const Rect& a) { return{ a.x, a.y, f*a.w, f*a.h }; }
     inline Rect operator/(float f, const Rect& a) { return{ a.x, a.y, f/a.w, f/a.h }; }
-    
+
     ///////////////////////////////////////////////////////////////////////////////
 
     struct Vector3d;
@@ -579,7 +582,12 @@ namespace rpp
         static const Vector3 CYAN;          // 0 1 1
         static const Vector3 SWEETGREEN;    // 86, 188, 57
         static const Vector3 CORNFLOWERBLUE;// #55AAFF  85, 170, 255
-        
+
+    #if __clang__
+        Vector3() = default;
+        constexpr Vector3(float x, float y, float z) : x{x}, y{y}, z{z} {}
+    #endif
+
         explicit operator Vector3d() const;
 
         /** @brief Set new XYZ values */
@@ -929,16 +937,13 @@ namespace rpp
             struct { float x, y, z, w; };
             struct { float r, g, b, a; };
             struct { Vector2 xy; Vector2 zw; };
-            struct { Vector2 rg; Vector2 ba; };
-            struct { Vector3 xyz; float _w; };
-            struct { Vector3  rgb; float _a; };
-            struct { float _x; Vector3 yzw; };
-            struct { float _r; Vector3 gba; };
+            struct { Vector3 xyz; };
+            struct { Vector3 rgb; };
         };
 
         static const Vector4 ZERO;  // XYZW 0 0 0 0
         static const Vector4 ONE;   // XYZW 1 1 1 1
-        
+
         static const Vector4 WHITE; // RGBA 1 1 1 1
         static const Vector4 BLACK; // RGBA 0 0 0 1
         static const Vector4 RED;   // RGBA 1 0 0 1
@@ -950,6 +955,11 @@ namespace rpp
         static const Vector4 CYAN;           // 0 1 1 1
         static const Vector4 SWEETGREEN;     // 86, 188, 57
         static const Vector4 CORNFLOWERBLUE; // #55AAFF  85, 170, 255
+
+    #if __clang__
+        constexpr Vector4(Vector2 xy, Vector2 zw) : xy{xy}, zw{zw} {}
+        constexpr Vector4(float x, float y, float z, float w) : x{x}, y{y}, z{z}, w{w} {}
+    #endif
 
         /** @return TRUE if all elements are exactly 0.0f, which implies default initialized.
          * To avoid FP errors, use almostZero() if you performed calculations */

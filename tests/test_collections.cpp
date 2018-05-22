@@ -77,7 +77,7 @@ TestImpl(test_collections)
         StringCollection collection { { "a", "b", "c", "d" } };
         element_range<std::string> stringRange = rpp::range(collection);
 
-        AssertThat(stringRange.size(), collection.items.size());
+        AssertThat(stringRange.size(), (int)collection.items.size());
         AssertThat(stringRange[0], "a");
     }
 

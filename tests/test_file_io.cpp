@@ -82,7 +82,7 @@ TestImpl(test_file_io)
             AssertThat(written, randCount);
             expectedSize += randCount;
         }
-        
+
         int fileSize = f.size();
         AssertThat(fileSize, expectedSize);
         f.close();
@@ -219,27 +219,31 @@ TestImpl(test_file_io)
         file::write_new(TestDir+"/folder/path/dummy.obj", "dummy");
 
         vector<string> relpaths = list_files(TestDir+"/folder/path", ".txt");
-        AssertThat(relpaths.size(), 2);
+        sort(relpaths.begin(), relpaths.end());
+        AssertThat(relpaths.size(), 2u);
         AssertThat(relpaths.front(), "test2.txt");
         AssertThat(relpaths.back(),  "test3.txt");
 
         vector<string> relpaths2 = list_files_recursive(TestDir, ".txt");
-        AssertThat(relpaths2.size(), 3);
-        AssertThat(relpaths2[0], "folder/path/test2.txt");
-        AssertThat(relpaths2[1], "folder/path/test3.txt");
-        AssertThat(relpaths2[2], "folder/test1.txt");
+        sort(relpaths.begin(), relpaths.end());
+        AssertThat(relpaths2.size(), 3u);
+        AssertThat(relpaths2[0], "folder/test1.txt");
+        AssertThat(relpaths2[1], "folder/path/test2.txt");
+        AssertThat(relpaths2[2], "folder/path/test3.txt");
 
         string fullpath = full_path(TestDir);
         vector<string> fullpaths = list_files_fullpath(TestDir+"/folder/path", ".txt");
-        AssertThat(fullpaths.size(), 2);
+        sort(relpaths.begin(), relpaths.end());
+        AssertThat(fullpaths.size(), 2u);
         AssertThat(fullpaths[0], path_combine(fullpath,"folder/path/test2.txt"));
         AssertThat(fullpaths[1], path_combine(fullpath,"folder/path/test3.txt"));
 
         vector<string> fullpaths2 = list_files_fullpath_recursive(TestDir, ".txt");
-        AssertThat(fullpaths2.size(), 3);
-        AssertThat(fullpaths2[0], path_combine(fullpath,"folder/path/test2.txt"));
-        AssertThat(fullpaths2[1], path_combine(fullpath,"folder/path/test3.txt"));
-        AssertThat(fullpaths2[2], path_combine(fullpath,"folder/test1.txt"));
+        sort(relpaths.begin(), relpaths.end());
+        AssertThat(fullpaths2.size(), 3u);
+        AssertThat(fullpaths2[0], path_combine(fullpath,"folder/test1.txt"));
+        AssertThat(fullpaths2[1], path_combine(fullpath,"folder/path/test2.txt"));
+        AssertThat(fullpaths2[2], path_combine(fullpath,"folder/path/test3.txt"));
 
         vector<string> dirs, files;
         list_alldir(dirs, files, TestDir+"", true);
