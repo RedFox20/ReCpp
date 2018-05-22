@@ -110,7 +110,6 @@ TestImpl(test_threadpool)
         }
     }
 
-
     TestCaseExpectedEx(parallel_task_exception, std::logic_error)
     {
         int times_launched = 0; // this makes sure the threadpool loop doesn't retrigger our task

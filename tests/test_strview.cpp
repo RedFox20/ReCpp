@@ -37,7 +37,7 @@ TestImpl(test_strview)
     {
 		string buffer(1023, 'a'); // this should be the same length as strview to_cstr thread_local buffer
 	    vector<char> input(2048, 'a'); // this should be anything bigger and NOT null terminated
-		strview view = { input.data(), input.size() };
+		strview view = { input.data(), input.size()-1 };
 		const char* cview = view.to_cstr();
 
 		AssertThat(strlen(cview), buffer.size());
