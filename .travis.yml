@@ -34,6 +34,7 @@ matrix:
 install:
   - make configure-${COMPILER}
   - pip install mama
-  - alias mama=~/.local/bin/mama  
+  - alias mama=~/.local/bin/mama
+  - llvm-config --cxxflags --ldflags --system-libs
 
 script: mama build ${COMPILER} test
