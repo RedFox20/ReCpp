@@ -33,13 +33,12 @@ matrix:
         - COMPILER=gcc
 
 install:
-  - make configure-${COMPILER}
+  - make configure-${COMPILER}-travis
   - pip install mama
   - alias mama=~/.local/bin/mama
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
   - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
   - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so.1.0 | grep shared_mutex
   - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so.1.0 | grep shared_mutex
-  - echo $LD_LIBRARY_PATH
-  - export LD_LIBRARY_PATH=/usr/local/clang-5.0.0/lib
+
 script: mama build ${COMPILER} test
