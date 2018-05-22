@@ -11,7 +11,7 @@ matrix:
             - llvm-toolchain-trusty-5.0
           packages:
             #- clang-5.0
-            - llvm-5.0
+            - lld
             - libc++-dev
             - libc++abi-dev
             - libdw-dev
@@ -39,8 +39,7 @@ install:
   - alias mama=~/.local/bin/mama
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
   - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
-  - ls -l /usr/bin | grep lld
-  - ls -l /usr/bin | grep llvm
+  - ls -l /usr/bin | grep ll
   - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so.1.0 | grep shared_mutex
   - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so.1.0 | grep shared_mutex
 

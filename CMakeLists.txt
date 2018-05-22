@@ -25,7 +25,7 @@ endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(LINUX AND CLANG)
-set(CMAKE_LINKER /usr/bin/lld)
+set(CMAKE_LINKER /usr/bin/lld-link-5.0)
 endif()
 
 ############## RPP Compilation Flags ##############
