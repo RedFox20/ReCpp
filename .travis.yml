@@ -6,12 +6,11 @@ matrix:
     - os: linux
       addons:
         apt:
-          update: false
+          update: true
           sources:
-            - llvm-toolchain-trusty-4.0
+            - llvm-toolchain-trusty-5.0
           packages:
             - build-essential
-            - clang-4.0
             - libc++-dev
             - libc++abi-dev
             - libdw-dev
