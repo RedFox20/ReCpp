@@ -36,5 +36,7 @@ install:
   - make configure-${COMPILER}
   - pip install mama
   - alias mama=~/.local/bin/mama
+  - ls -l /usr/local/clang-5.0.0/lib
+  - ls -l /usr/lib/x86_64-linux-gnu
 
 script: mama build ${COMPILER} test
