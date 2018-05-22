@@ -10,4 +10,4 @@ class ReCpp(mama.BuildTarget):
         self.export_includes('.') # #include <rpp/strview.h>
 
     def test(self):
-        self.run('./RppTests')
+        self.gdb('./RppTests')
