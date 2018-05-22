@@ -11,7 +11,7 @@ matrix:
             - llvm-toolchain-trusty-5.0
           packages:
             - clang-5.0
-            - llmv-5.0-dev
+            - llvm-5.0-dev
             # - libc++-dev
             # - libc++abi-dev
             - libdw-dev
