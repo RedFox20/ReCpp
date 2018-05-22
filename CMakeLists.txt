@@ -135,6 +135,7 @@ endif()
 if(LINUX AND CLANG)
     add_compile_options(-v)
     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} --verbose)
+    include_directories(/usr/local/clang-5.0.0/lib)
 endif()
 
 file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)

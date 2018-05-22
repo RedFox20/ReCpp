@@ -40,6 +40,6 @@ install:
   - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
   - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so.1.0 | grep shared_mutex
   - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so.1.0 | grep shared_mutex
-  - export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/clang-5.0.0/lib
+  - export LIBRARY_PATH=/usr/local/clang-5.0.0/lib:$LIBRARY_PATH
 
 script: mama build ${COMPILER} test
