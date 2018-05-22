@@ -36,7 +36,9 @@ install:
   - make configure-${COMPILER}
   - pip install mama
   - alias mama=~/.local/bin/mama
-  - objdump -TC /usr/local/clang-5.0.0/lib/libc++.so | grep shared_mutex
-  - objdump -TC /usr/lib/x86_64-linux-gnu/libc++.so | grep shared_mutex
+  - ls -l /usr/local/clang-5.0.0/lib | grep libc++
+  - ls -l /usr/lib/x86_64-linux-gnu | grep libc++
+  - readelf -Ws /usr/local/clang-5.0.0/lib/libc++.so | grep shared_mutex
+  - readelf -Ws /usr/lib/x86_64-linux-gnu/libc++.so | grep shared_mutex
 
 script: mama build ${COMPILER} test
