@@ -15,6 +15,7 @@ matrix:
             - libc++-dev
             - libc++abi-dev
             - libdw-dev
+            - gdb
       env:
         - COMPILER=clang
     - os: linux
@@ -28,6 +29,7 @@ matrix:
             - g++-7
             - libstdc++-7-dev
             - libdw-dev
+            - gdb
       env:
         - COMPILER=gcc
 
