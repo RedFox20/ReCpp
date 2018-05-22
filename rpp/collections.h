@@ -404,6 +404,15 @@ namespace rpp
         return t;
     }
 
+	/////////////////////////////////////////////////////////////////////////////////////
+
+	template<class T, class A> void sort(std::vector<T, A>& v)
+    {
+		T* begin = v.data();
+		T* end = begin + v.size();
+		std::sort(begin, end);    
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////
 
     //// std::reduce available in C++17, this is for C++14
