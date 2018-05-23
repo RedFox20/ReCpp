@@ -29,6 +29,13 @@ configure-gcc-semaphore:
 	sudo ln -sf /usr/bin/gcc-7 /usr/bin/gcc
 	sudo ln -sf /usr/bin/g++-7 /usr/bin/g++
 
+configure-clang5:
+	sudo wget -qO- http://releases.llvm.org/5.0.2/clang+llvm-5.0.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz | tar xvz -C /usr/local/clang+llvm-5.0
+	sudo ln -sf /usr/local/clang+llvm-5.0/lib/libc++.so.1    /usr/lib
+	sudo ln -sf /usr/local/clang+llvm-5.0/lib/libc++abi.so.1 /usr/lib
+	sudo ln -sf /usr/local/clang+llvm-5.0/bin/clang   /usr/bin/clang
+	sudo ln -sf /usr/local/clang+llvm-5.0/bin/clang++ /usr/bin/clang++
+
 configure-python:
 	sudo mkdir -p /opt/pip
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
@@ -40,9 +47,10 @@ configure-cmake:
 	sudo sh /opt/cmake/cmake-3.11.2-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
 	sudo ln -sf /opt/cmake/bin/cmake /usr/bin/cmake
 
+/usr/local/clang+llvm-5.0: configure-clang5
 /opt/pip: configure-python
 /opt/cmake: configure-cmake
-configure-mama: /opt/pip /opt/cmake
+configure-mama: /opt/pip /opt/cmake /usr/local/clang+llvm-5.0
 	sudo pip install mama
 
 clang: build
