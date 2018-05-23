@@ -20,7 +20,7 @@ configure-gcc:
 	sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 60
 
 configure-gcc-7:
-	sudo apt -y --force-yes install g++-7-dev
+	sudo apt -y --force-yes install g++-7
 	sudo ln -sf /usr/bin/gcc-7 /usr/bin/gcc
 	sudo ln -sf /usr/bin/g++-7 /usr/bin/g++
 
