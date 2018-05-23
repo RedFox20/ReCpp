@@ -10,6 +10,7 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
+            - libc++-dev
             - clang-5.0
             - libdw-dev
             - gdb
