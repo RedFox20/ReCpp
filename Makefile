@@ -30,12 +30,12 @@ configure-gcc-semaphore:
 	sudo ln -sf /usr/bin/g++-7 /usr/bin/g++
 
 configure-python:
-	sudo mkdir /opt/pip
+	sudo mkdir -p /opt/pip
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
 	sudo python3.6 /opt/pip/get-pip.py
 
 configure-cmake:
-	sudo mkdir /opt/cmake
+	sudo mkdir -p /opt/cmake
 	sudo wget https://cmake.org/files/v3.11/cmake-3.11.2-Linux-x86_64.sh -P /opt/cmake
 	sudo sh /opt/cmake/cmake-3.11.2-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
 	sudo ln -sf /opt/cmake/bin/cmake /usr/bin/cmake
