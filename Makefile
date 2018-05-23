@@ -15,6 +15,8 @@ configure-clang-travis:
 	sudo ln -sf /usr/bin/clang++-5.0 /usr/bin/clang++
 
 configure-clang-semaphore:
+	sudo ln -sf /usr/lib/x86_64-linux-gnu/libc++.so.1    /usr/lib
+	sudo ln -sf /usr/lib/x86_64-linux-gnu/libc++abi.so.1 /usr/lib
 	sudo ln -sf /usr/bin/clang-5.0   /usr/bin/clang
 	sudo ln -sf /usr/bin/clang++-5.0 /usr/bin/clang++
 
