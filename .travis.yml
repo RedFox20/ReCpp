@@ -30,7 +30,6 @@ matrix:
 
 install:
   - ls -l /usr/local/clang-5.0.0/lib | grep libc++
-  - ls -l /usr/lib | grep libc++
   - ls -l /usr/bin | grep -e clang -e gcc -e c++ -e g++
   - make configure-${COMPILER}-travis
   - pip install mama
