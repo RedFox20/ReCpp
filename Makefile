@@ -13,10 +13,6 @@ configure-clang-travis:
 	sudo ln -sf /usr/local/clang-5.0.0/lib/libc++abi.so.1 /usr/lib
 	sudo ln -sf /usr/bin/clang-5.0   /usr/bin/clang
 	sudo ln -sf /usr/bin/clang++-5.0 /usr/bin/clang++
-	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-5.0   1000
-	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 1000
-	sudo update-alternatives --set clang   /usr/bin/clang-5.0
-	sudo update-alternatives --set clang++ /usr/bin/clang++-5.0
 
 configure-gcc-travis: configure-gcc
 configure-gcc:
