@@ -8,61 +8,6 @@ namespace rpp
 {
     using std::swap;
 
-    // ----
-    const Vector2 Vector2::ZERO  = { 0.0f, 0.0f }; // 0 0
-    const Vector2 Vector2::ONE   = { 1.0f, 1.0f }; // 1 1
-    const Vector2 Vector2::RIGHT = { 1.0f, 0.0f }; // X-axis
-    const Vector2 Vector2::UP    = { 0.0f, 1.0f }; // Y-axis, OpenGL UP
-    // ----
-    const Vector2d Vector2d::ZERO  = { 0.0, 0.0 }; // 0 0
-    const Vector2d Vector2d::ONE   = { 1.0, 1.0 }; // 1 1
-    const Vector2d Vector2d::RIGHT = { 1.0, 0.0 }; // X-axis
-    const Vector2d Vector2d::UP    = { 0.0, 1.0 }; // Y-axis, OpenGL UP
-    // ----
-    const Point Point::ZERO = { 0, 0 };
-    // ----
-    const Rect Rect::ZERO = { 0.0f, 0.0f, 0.0f, 0.0f };
-    // ----
-    const Vector3 Vector3::ZERO           = { 0.0f, 0.0f, 0.0f };      // 0 0 0
-    const Vector3 Vector3::ONE            = { 1.0f, 1.0f, 1.0f };      // 1 1 1
-    const Vector3 Vector3::LEFT           = { -1.0f,  0.0f,  0.0f };   // -X axis
-    const Vector3 Vector3::RIGHT          = { +1.0f,  0.0f,  0.0f };   // +X axis
-    const Vector3 Vector3::UP             = {  0.0f, +1.0f,  0.0f };   // +Y axis
-    const Vector3 Vector3::DOWN           = {  0.0f, -1.0f,  0.0f };   // -Y axis
-    const Vector3 Vector3::FORWARD        = {  0.0f,  0.0f, +1.0f };   // +Z axis
-    const Vector3 Vector3::BACKWARD       = {  0.0f,  0.0f, -1.0f };   // -Z axis
-    const Vector3 Vector3::XAXIS          = { +1.0f,  0.0f,  0.0f };   // +X axis
-    const Vector3 Vector3::YAXIS          = {  0.0f, +1.0f,  0.0f };   // +Y axis
-    const Vector3 Vector3::ZAXIS          = {  0.0f,  0.0f, +1.0f };   // +Z axis
-    const Vector3 Vector3::WHITE          = { 1.0f, 1.0f, 1.0f };       // RGB 1 1 1
-    const Vector3 Vector3::BLACK          = { 0.0f, 0.0f, 0.0f };       // RGB 0 0 0
-    const Vector3 Vector3::RED            = { 1.0f, 0.0f, 0.0f };       // RGB 1 0 0
-    const Vector3 Vector3::GREEN          = { 0.0f, 1.0f, 0.0f };       // RGB 0 1 0
-    const Vector3 Vector3::BLUE           = { 0.0f, 0.0f, 1.0f };       // RGB 0 0 1
-    const Vector3 Vector3::YELLOW         = { 1.0f, 1.0f, 0.0f };       // 1 1 0
-    const Vector3 Vector3::ORANGE         = { 1.0f, 0.50196f, 0.0f };   // 1 0.502 0; 255 128 0
-    const Vector3 Vector3::MAGENTA        = { 1.0f, 0.0f, 1.0f };       // 1 0 1
-    const Vector3 Vector3::CYAN           = { 0.0f, 1.0f, 1.0f };       // 0 1 1
-    const Vector3 Vector3::SWEETGREEN     = { 0.337f, 0.737f, 0.223f }; // 86, 188, 57
-    const Vector3 Vector3::CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f };     // #55AAFF  85, 170, 255
-    // ----
-    const Vector3d Vector3d::ZERO = { 0.0, 0.0, 0.0 };
-    // ----
-    const Vector4 Vector4::ZERO           = { 0.0f, 0.0f, 0.0f, 0.0f };   // XYZW 0 0 0 0
-    const Vector4 Vector4::ONE            = { 1.0f, 1.0f, 1.0f, 1.0f };   // XYZW 1 1 1 1
-    const Vector4 Vector4::WHITE          = { 1.0f, 1.0f, 1.0f, 1.0f };   // RGBA 1 1 1 1
-    const Vector4 Vector4::BLACK          = { 0.0f, 0.0f, 0.0f, 1.0f };   // RGBA 0 0 0 1
-    const Vector4 Vector4::RED            = { 1.0f, 0.0f, 0.0f, 1.0f };   // RGBA 1 0 0 1
-    const Vector4 Vector4::GREEN          = { 0.0f, 1.0f, 0.0f, 1.0f };   // RGBA 0 1 0 1
-    const Vector4 Vector4::BLUE           = { 0.0f, 0.0f, 1.0f, 1.0f };   // RGBA 0 0 1 1
-    const Vector4 Vector4::YELLOW         = { 1.0f, 1.0f, 0.0f, 1.0f };       // 1 1 0 1
-    const Vector4 Vector4::ORANGE         = { 1.0f, 0.50196f, 0.0f, 1.0f };   // 1 0.502 0 1; 255 128 0 255
-    const Vector4 Vector4::MAGENTA        = { 1.0f, 0.0f, 1.0f, 1.0f };       // 1 0 1 1
-    const Vector4 Vector4::CYAN           = { 0.0f, 1.0f, 1.0f, 1.0f };       // 0 1 1 1
-    const Vector4 Vector4::SWEETGREEN     = { 0.337f, 0.737f, 0.223f, 1.0f }; // 86, 188, 57
-    const Vector4 Vector4::CORNFLOWERBLUE = { 0.33f, 0.66f, 1.0f, 1.0f };     // #55AAFF  85, 170, 255
-    // ----
-
     /////////////////////////////////////////////////////////////////////////////////////
 
     template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y)
@@ -520,7 +465,7 @@ namespace rpp
     Vector3 Vector3::parseColor(const strview& s) noexcept
     {
         if (!s)
-            return WHITE;
+            return White();
 
         if (s[0] == '#')
             return Vector4::HEX(s).rgb;
@@ -629,12 +574,12 @@ namespace rpp
     AngleAxis AngleAxis::fromVectors(Vector3 a, Vector3 b)
     {
         if (a.almostZero() || b.almostZero())
-            return { Vector3::ZERO, 0.0f };
+            return { Vector3::Zero(), 0.0f };
         a.normalize();
         b.normalize();
         float cosTheta = a.dot(b);
         if (rpp::almostEqual(cosTheta, 1.0f))
-            return { Vector3::ZERO, 0.0f };
+            return { Vector3::Zero(), 0.0f };
         float theta = rpp::degf(acos(cosTheta));
         Vector3 axis = a.cross(b).normalized();
         return { axis, -theta };
@@ -755,7 +700,7 @@ namespace rpp
 
     Vector4 Vector4::HEX(const strview& s) noexcept
     {
-        Color c = WHITE;
+        Color c = White();
         if (s[0] == '#')
         {
             strview r = s.substr(1, 2);
@@ -772,14 +717,14 @@ namespace rpp
 
     Vector4 Vector4::NAME(const strview& s) noexcept
     {
-        if (s.equalsi("white"))  return WHITE;
-        if (s.equalsi("black"))  return BLACK;
-        if (s.equalsi("red"))    return RED;
-        if (s.equalsi("green"))  return GREEN;
-        if (s.equalsi("blue"))   return BLUE;
-        if (s.equalsi("yellow")) return YELLOW;
-        if (s.equalsi("orange")) return ORANGE;
-        return WHITE;
+        if (s.equalsi("white"))  return White();
+        if (s.equalsi("black"))  return Black();
+        if (s.equalsi("red"))    return Red();
+        if (s.equalsi("green"))  return Green();
+        if (s.equalsi("blue"))   return Blue();
+        if (s.equalsi("yellow")) return Yellow();
+        if (s.equalsi("orange")) return Orange();
+        return White();
     }
 
     Vector4 Vector4::NUMBER(strview s) noexcept
@@ -805,7 +750,7 @@ namespace rpp
     Vector4 Vector4::parseColor(const strview& s) noexcept
     {
         if (!s)
-            return WHITE;
+            return White();
 
         if (s[0] == '#')
             return HEX(s);
@@ -1229,9 +1174,9 @@ namespace rpp
     Matrix4& Matrix4::fromRotation(const Vector3& rotationDegrees)
     {
         loadIdentity();
-        rotate(rotationDegrees.x, Vector3::XAXIS);
-        rotate(rotationDegrees.y, Vector3::YAXIS);
-        rotate(rotationDegrees.z, Vector3::ZAXIS);
+        rotate(rotationDegrees.x, Vector3::XAxis());
+        rotate(rotationDegrees.y, Vector3::YAxis());
+        rotate(rotationDegrees.z, Vector3::ZAxis());
 
         //Matrix4 rotX = Identity();
         //Matrix4 rotY = Identity();
@@ -1279,7 +1224,7 @@ namespace rpp
     {
         fromPosition({ pos.x, pos.y, zOrder });
         this->scale({scale.x, scale.y, 1.0f});
-        this->rotate(rotDegrees, Vector3::UP);
+        this->rotate(rotDegrees, Vector3::Up());
         return *this;
     }
 
@@ -1289,7 +1234,7 @@ namespace rpp
         fromPosition({ pos.x,pos.y,zOrder });
         this->scale({scale.x, scale.y, 1.0f});
         this->translate({ rotAxis.x, rotAxis.y, 0.0f }); // setup rotation axis
-        this->rotate(rotDegrees, Vector3::UP);
+        this->rotate(rotDegrees, Vector3::Up());
         this->translate({ -rotAxis.x, -rotAxis.y, 0.0f }); // undo rotation axis for final transform
         return *this;
     }
@@ -1723,7 +1668,7 @@ namespace rpp
     BoundingBox BoundingBox::create(const std::vector<Vector3>& points) noexcept
     {
         if (points.empty())
-            return { Vector3::ZERO, Vector3::ZERO };
+            return { Vector3::Zero(), Vector3::Zero() };
 
         auto* verts = points.data(); // better debug iteration performance
         size_t size = points.size();
@@ -1746,7 +1691,7 @@ namespace rpp
     BoundingBox BoundingBox::create(const std::vector<Vector3>& points, const std::vector<IdVector3>& ids) noexcept
     {
         if (points.empty() || ids.empty())
-            return { Vector3::ZERO, Vector3::ZERO };
+            return { Vector3::Zero(), Vector3::Zero() };
 
         auto* verts = points.data(); // better debug iteration performance
         auto*  data = ids.data();
@@ -1770,7 +1715,7 @@ namespace rpp
     BoundingBox BoundingBox::create(const std::vector<Vector3>& points, const std::vector<int>& ids) noexcept
     {
         if (points.empty() || ids.empty())
-            return { Vector3::ZERO, Vector3::ZERO };
+            return { Vector3::Zero(), Vector3::Zero() };
 
         auto* verts = points.data(); // better debug iteration performance
         auto*  data = ids.data();
@@ -1794,7 +1739,7 @@ namespace rpp
     BoundingBox BoundingBox::create(const Vector3* vertexData, int vertexCount, int stride) noexcept
     {
         if (vertexCount == 0)
-            return { Vector3::ZERO, Vector3::ZERO };
+            return { Vector3::Zero(), Vector3::Zero() };
 
         Vector3 min = vertexData[0];
         Vector3 max = min;

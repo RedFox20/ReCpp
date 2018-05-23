@@ -78,14 +78,27 @@ elseif(MSVC)
     # /Oi - Intrinsics Enabled
     # /MP - MultiProcess build
     add_compile_options(/std:c++latest /arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP)
+    # /MD - MultiThreaded Dynamic CRT
+    # /MT - MultiThreaded Static CRT
+    if (MSVC_DYNAMIC)
+        message("Using Dynamic CRT")
+        set(MSVC_CRT /MD)
+    else()
+        message("Using Static CRT")
+        set(MSVC_CRT /MT)
+        # switch from dynamic to static linking of msvcrt
+        foreach(flag_var
+            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+            if(${flag_var} MATCHES "/MD")
+                string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+            endif(${flag_var} MATCHES "/MD")
+        endforeach(flag_var)
+    endif()
     if(MSVC_NOCRTDBG)
-        # /MD - MultiThreaded Dynamic CRT
-        # /MT - MultiThreaded Static CRT
-        if (MSVC_DYNAMIC)
-            set(MSVC_CRT /MD)
-        else()
-            set(MSVC_CRT /MT)
-        endif()
+        message("Disabling Debug CRT")
         add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
         foreach(MODE "_DEBUG" "_MINSIZEREL" "_RELEASE" "_RELWITHDEBINFO")
             string(REPLACE "${MSVC_CRT}d" "${MSVC_CRT}" TMP "${CMAKE_C_FLAGS${MODE}}")
@@ -118,9 +131,8 @@ else()
     set(DWARF_LIBRARY "")
 endif()
 if(ANDROID)
-    set(RUNTIME "android log")
+    set(RPP_RUNTIME android log)
 elseif(LINUX)
-    set(RUNTIME "-lc++ -lc++abi")
 endif()
 
 
@@ -134,7 +146,7 @@ target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_link_libraries(ReCpp
     PUBLIC ${DWARF_LIBRARY}
-    PUBLIC ${RUNTIME}
+    PUBLIC ${RPP_RUNTIME}
     PUBLIC Threads::Threads
 )
 
@@ -148,7 +160,7 @@ if (BUILD_TESTS AND NOT APPLE)
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 
     target_include_directories(RppTests PUBLIC ".")
-    target_link_libraries(RppTests ReCpp ${RUNTIME})
+    target_link_libraries(RppTests ReCpp ${RPP_RUNTIME})
 
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()

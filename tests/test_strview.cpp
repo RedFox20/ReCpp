@@ -33,6 +33,17 @@ TestImpl(test_strview)
         AssertThat(str2, stdstr3);
     }
 
+	TestCase(thread_local_buffer)
+    {
+		string buffer(1023, 'a'); // this should be the same length as strview to_cstr thread_local buffer
+	    vector<char> input(2048, 'a'); // this should be anything bigger and NOT null terminated
+		strview view = { input.data(), input.size()-1 };
+		const char* cview = view.to_cstr();
+
+		AssertThat(strlen(cview), buffer.size());
+		AssertThat(cview, buffer);
+    }
+
 
     TestCase(next_token_single_element)
     {

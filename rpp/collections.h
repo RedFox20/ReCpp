@@ -7,6 +7,8 @@
 #include <vector>
 #include <unordered_map>
 #include <numeric>
+#include <algorithm> // std::sort
+
 namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////////
@@ -402,6 +404,15 @@ namespace rpp
         for (auto& item : v)
             t.emplace_back(transform(item));
         return t;
+    }
+
+	/////////////////////////////////////////////////////////////////////////////////////
+
+	template<class T, class A> void sort(std::vector<T, A>& v)
+    {
+		T* begin = v.data();
+		T* end = begin + v.size();
+		std::sort(begin, end);    
     }
 
     /////////////////////////////////////////////////////////////////////////////////////

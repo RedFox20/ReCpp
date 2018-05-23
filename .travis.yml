@@ -10,11 +10,9 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
-            - build-essential
             - clang-5.0
-            - libc++-dev
-            - libc++abi-dev
             - libdw-dev
+            - gdb
       env:
         - COMPILER=clang
     - os: linux
@@ -24,16 +22,17 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - build-essential
             - g++-7
-            - libstdc++-7-dev
             - libdw-dev
+            - gdb
       env:
         - COMPILER=gcc
 
 install:
-  - make configure-${COMPILER}
+  - make configure-${COMPILER}-travis
   - pip install mama
-  - alias mama=~/.local/bin/mama  
+  - alias mama=~/.local/bin/mama
 
-script: mama build ${COMPILER} test
+script:
+  #- export LD_LIBRARY_PATH=/usr/bin/:$LD_LIBRARY_PATH
+  - mama build ${COMPILER} test
