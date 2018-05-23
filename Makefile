@@ -27,7 +27,7 @@ configure-gcc-7:
 /usr/local/clang++5: configure-clang5
 configure-clang5:
 	sudo wget http://ateh10.net/dev/clang++5.zip -P /tmp
-	sudo unzip -o -u /tmp/clang++5.zip -d /usr/local
+	sudo unzip -quo /tmp/clang++5.zip -d /usr/local
 	sudo rm -f /tmp/clang++5.zip
 	sudo ln -sf /usr/local/clang++5/lib/libc++.so.1    /usr/lib
 	sudo ln -sf /usr/local/clang++5/lib/libc++abi.so.1 /usr/lib
