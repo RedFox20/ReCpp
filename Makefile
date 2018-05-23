@@ -25,6 +25,10 @@ configure-gcc:
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60
 	sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 60
 
+configure-gcc-semaphore:
+	sudo ln -sf /usr/bin/gcc-7 /usr/bin/gcc
+	sudo ln -sf /usr/bin/g++-7 /usr/bin/g++
+
 clang: build
 	cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo $(CLANG_FLAGS) && make -j4
 
