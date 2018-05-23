@@ -850,9 +850,9 @@ namespace rpp /* ReCpp */
 
     string full_path(const char* path) noexcept
     {
-        char buf[512];
+        char buf[4096];
         #if _WIN32
-            size_t len = GetFullPathNameA(path, 512, buf, nullptr);
+            size_t len = GetFullPathNameA(path, sizeof(buf), buf, nullptr);
             if (len) normalize(buf);
             return len ? string{ buf,len } : string{};
         #else
