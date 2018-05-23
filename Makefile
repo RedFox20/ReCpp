@@ -14,6 +14,10 @@ configure-clang-travis:
 	sudo ln -sf /usr/bin/clang-5.0   /usr/bin/clang
 	sudo ln -sf /usr/bin/clang++-5.0 /usr/bin/clang++
 
+configure-clang-semaphore:
+	sudo ln -sf /usr/bin/clang-5.0   /usr/bin/clang
+	sudo ln -sf /usr/bin/clang++-5.0 /usr/bin/clang++
+
 configure-gcc-travis: configure-gcc
 configure-gcc:
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60
