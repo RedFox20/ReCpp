@@ -40,7 +40,9 @@ configure-cmake:
 	sudo sh /opt/cmake/cmake-3.11.2-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
 	sudo ln -sf /opt/cmake/bin/cmake /usr/bin/cmake
 
-configure-mama:
+/opt/pip: configure-python
+/opt/cmake: configure-cmake
+configure-mama: /opt/pip /opt/cmake
 	sudo pip install mama
 
 clang: build
