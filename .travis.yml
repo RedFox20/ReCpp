@@ -10,7 +10,6 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
-            - libc++-dev
             - clang-5.0
             - libdw-dev
             - gdb
@@ -34,7 +33,7 @@ install:
   - make configure-${COMPILER}-travis
   - pip install mama
   - alias mama=~/.local/bin/mama
+  - whereis libc++.so
 
 script:
-  - export LD=/usr/bin/lld-link-5.0
   - mama build ${COMPILER} test
