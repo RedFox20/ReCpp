@@ -31,7 +31,7 @@ configure-gcc-semaphore:
 
 configure-clang5:
 	sudo wget http://ateh10.net/dev/clang++5.zip -P /tmp
-	sudo tar -xf /tmp/clang++5.zip -C /usr/local/clang++5
+	unzip /tmp/clang++5.zip -d /usr/local/clang++5
 	sudo rm -f /tmp/clang++5.zip
 	sudo ln -sf /usr/local/clang++5/lib/libc++.so.1    /usr/lib
 	sudo ln -sf /usr/local/clang++5/lib/libc++abi.so.1 /usr/lib
