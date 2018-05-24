@@ -29,10 +29,12 @@ download-clang6-1404:
 	sudo wget -O /tmp/clang++6.zip http://ateh10.net/dev/clang++6-1404.zip
 	sudo unzip -quo /tmp/clang++6.zip -d /usr/local
 	sudo rm -f /tmp/clang++6.zip
+	sudo ls -l /usr/local/clang++6
 download-clang6-1604:
 	sudo wget -O /tmp/clang++6.zip http://ateh10.net/dev/clang++6-1604.zip
 	sudo unzip -quo /tmp/clang++6.zip -d /usr/local
 	sudo rm -f /tmp/clang++6.zip
+	sudo ls -l /usr/local/clang++6
 install-clang6:
 	sudo ln -sf /usr/local/clang++6/lib/libc++.so.1    /usr/lib
 	sudo ln -sf /usr/local/clang++6/lib/libc++abi.so.1 /usr/lib
@@ -44,16 +46,23 @@ configure-clang6-1404: download-clang6-1404 install-clang6
 
 
 download-clang5-1404:
-	sudo wget http://ateh10.net/dev/clang++5.zip -P /tmp
+	sudo wget -O /tmp/clang++5.zip http://ateh10.net/dev/clang++5-1404.zip
 	sudo unzip -quo /tmp/clang++5.zip -d /usr/local
 	sudo rm -f /tmp/clang++5.zip
+	sudo ls -l /usr/local/clang++5
+download-clang5-1604:
+	sudo wget -O /tmp/clang++5.zip http://ateh10.net/dev/clang++5-1604.zip
+	sudo unzip -quo /tmp/clang++5.zip -d /usr/local
+	sudo rm -f /tmp/clang++5.zip
+	sudo ls -l /usr/local/clang++5
 install-clang5:
 	sudo ln -sf /usr/local/clang++5/lib/libc++.so.1    /usr/lib
 	sudo ln -sf /usr/local/clang++5/lib/libc++abi.so.1 /usr/lib
 	sudo ln -sf /usr/local/clang++5/bin/clang      /usr/bin/clang
 	sudo ln -sf /usr/local/clang++5/bin/clang++    /usr/bin/clang++
 	sudo ln -sf /usr/local/clang++5/include/c++/v1 /usr/include/c++/v1
-configure-clang5: download-clang5-1404 install-clang5
+configure-clang5-1404: download-clang5-1404 install-clang5
+configure-clang5-1604: download-clang5-1604 install-clang5
 
 
 /opt/pip: configure-python
