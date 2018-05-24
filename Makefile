@@ -29,11 +29,11 @@ install-clang6:
 	sudo ln -sf /usr/local/clang++6/lib/libc++abi.so.1 /usr/lib
 	sudo ln -sf /usr/local/clang++6/bin/clang      /usr/bin/clang-6.0
 	sudo ln -sf /usr/local/clang++6/bin/clang++    /usr/bin/clang++-6.0
-	sudo ln -sf /usr/local/clang++6/bin/clang      /usr/bin/clang
-	sudo ln -sf /usr/local/clang++6/bin/clang++    /usr/bin/clang++
+	sudo ln -sf /usr/bin/clang-6.0      /usr/bin/clang
+	sudo ln -sf /usr/bin/clang++-6.0    /usr/bin/clang++
 	sudo ln -sf /usr/local/clang++6/include/c++/v1 /usr/include/c++/v1
 	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-6.0   100
-    sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-6.0 100
+	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-6.0 100
 configure-clang6-1604: download-clang6-1604 install-clang6
 configure-clang6-1404: download-clang6-1404 install-clang6
 
@@ -51,9 +51,13 @@ download-clang5-1604:
 install-clang5:
 	sudo ln -sf /usr/local/clang++5/lib/libc++.so.1    /usr/lib
 	sudo ln -sf /usr/local/clang++5/lib/libc++abi.so.1 /usr/lib
-	sudo ln -sf /usr/local/clang++5/bin/clang      /usr/bin/clang
-	sudo ln -sf /usr/local/clang++5/bin/clang++    /usr/bin/clang++
+	sudo ln -sf /usr/local/clang++5/bin/clang      /usr/bin/clang-5.0
+	sudo ln -sf /usr/local/clang++5/bin/clang++    /usr/bin/clang++-5.0
+	sudo ln -sf /usr/bin/clang-5.0      /usr/bin/clang
+	sudo ln -sf /usr/bin/clang++-5.0    /usr/bin/clang++
 	sudo ln -sf /usr/local/clang++5/include/c++/v1 /usr/include/c++/v1
+	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-5.0   100
+	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 100
 configure-clang5-1404: download-clang5-1404 install-clang5
 configure-clang5-1604: download-clang5-1604 install-clang5
 
