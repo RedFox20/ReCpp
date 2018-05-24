@@ -6,11 +6,7 @@ matrix:
     - os: linux
       addons:
         apt:
-          update: false
-          sources:
-            - llvm-toolchain-trusty-5.0
           packages:
-            - clang-5.0
             - libdw-dev
             - gdb
       env:
@@ -22,7 +18,6 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - g++-7
             - libdw-dev
             - gdb
       env:
