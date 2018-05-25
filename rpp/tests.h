@@ -63,7 +63,7 @@ namespace rpp
             bool autorun = true;
         };
 
-        static int asserts_failed;
+        static int total_asserts_failed;
         strview name;
     private:
         // @note Need to use raw array because std::vector cannot be exported on MSVC
@@ -86,9 +86,10 @@ namespace rpp
          * Runs all the registered tests on this test impl.
          * If a non-empty methodFilter is provided, then only test methods that contain
          * the methodFilter substring are run
+         * @return TRUE if ALL tests passed, FALSE if any failure
          */
-        void run_test(strview methodFilter = {});
-        void run_test(test_func& test);
+        bool run_test(strview methodFilter = {});
+        bool run_test(test_func& test);
 
         // generic sleep for testing purposes
         static void sleep(int millis);

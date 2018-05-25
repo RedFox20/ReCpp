@@ -24,7 +24,7 @@ namespace rpp
     using std::defer_lock;
     ///////////////////////////////////////////////////////////////////////////
 
-    int test::asserts_failed;
+    int test::total_asserts_failed;
 
     vector<test_info>& get_rpp_tests()
     {
@@ -124,11 +124,11 @@ namespace rpp
         va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        ++asserts_failed;
+        ++total_asserts_failed;
         consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
     }
 
-    void test::run_test(strview methodFilter)
+    bool test::run_test(strview methodFilter)
     {
         char title[256];
         int len = methodFilter
@@ -138,26 +138,38 @@ namespace rpp
         consolef(Yellow, "%s\n", title);
         run_init();
 
+        int numTests = 0;
+        bool allSuccess = true;
         if (methodFilter)
         {
-            for (int i = 0; i < test_count; ++i)
+            for (int i = 0; i < test_count; ++i) {
                 if (test_funcs[i].name.find(methodFilter)) {
                     consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
-                    run_test(test_funcs[i]);
+                    allSuccess &= run_test(test_funcs[i]);
+                    ++numTests;
                 }
+            }
+            if (!numTests) {
+                consolef(Yellow, "No tests matching '%.*s' in %s\n", methodFilter.len, methodFilter.str, name.str);
+            }
         }
         else
         {
             for (int i = 0; i < test_count; ++i) {
                 if (test_funcs[i].autorun) {
                     consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
-                    run_test(test_funcs[i]);
+                    allSuccess &= run_test(test_funcs[i]);
+                    ++numTests;
                 }
+            }
+            if (!numTests) {
+                consolef(Yellow, "No autorun tests discovered in %s\n", name.str);
             }
         }
 
         run_cleanup();
         consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)len)); // "-------------"
+        return allSuccess && numTests > 0;
     }
 
     bool test::run_init()
@@ -170,7 +182,7 @@ namespace rpp
         catch (const std::exception& e)
         {
             consolef(Red, "FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
-            ++asserts_failed;
+            ++total_asserts_failed;
             return false;
         }
     }
@@ -184,12 +196,13 @@ namespace rpp
         catch (const std::exception& e)
         {
             consolef(Red, "FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
-            ++asserts_failed;
+            ++total_asserts_failed;
         }
     }
 
-    void test::run_test(test_func& test)
+    bool test::run_test(test_func& test)
     {
+        int before = total_asserts_failed;
         try
         {
             (test.lambda.*test.func)();
@@ -197,25 +210,25 @@ namespace rpp
             {
                 consolef(Red, "FAILED with expected EXCEPTION NOT THROWN in %s::%s\n", 
                          name.str, test.name.str);
-                ++asserts_failed;
+                ++total_asserts_failed;
             }
         }
         catch (const std::exception& e)
         {
-            if (test.expectedExType)
+            if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
-                size_t hash = typeid(e).hash_code();
-                if (test.expectedExType == hash)
-                {
-                    consolef(Yellow, "Caught Expected Exception in %s::%s:\n  %s\n", 
-                             name.str, test.name.str, e.what());
-                    return;
-                }
+                consolef(Yellow, "Caught Expected Exception in %s::%s:\n  %s\n", 
+                         name.str, test.name.str, e.what());
             }
-            consolef(Red, "FAILED with EXCEPTION in %s::%s:\n  %s\n", 
-                     name.str, test.name.str, e.what());
-            ++asserts_failed;
+            else
+            {
+                consolef(Red, "FAILED with EXCEPTION in %s::%s:\n  %s\n",
+                    name.str, test.name.str, e.what());
+                ++total_asserts_failed;
+            }
         }
+        int totalFailures = total_asserts_failed - before;
+        return totalFailures <= 0;
     }
 
     void test::sleep(int millis)
@@ -336,14 +349,12 @@ namespace rpp
             if (!t.auto_run) t.test_enabled = false;
         }
 
-        int numTest = 0;
         if (argc > 1)
         {
             // if arg is provided, we assume they are:
             // test_testname or testname or -test_testname or -testname
             // OR to run a specific test:  testname.specifictest
             std::unordered_set<strview> enabled, disabled;
-
             for (int iarg = 1; iarg < argc; ++iarg)
             {
                 rpp::strview arg = argv[iarg];
@@ -362,7 +373,8 @@ namespace rpp
                 const bool exactMatch = testName.starts_with("test_");
                 if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", argv[iarg]);
                 else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
-                
+
+                bool match = false;
                 for (test_info& t : all_tests)
                 {
                     if (( exactMatch && t.name == testName) ||
@@ -371,12 +383,23 @@ namespace rpp
                         t.case_filter = specific;
                         if (enableTest) enabled.insert(t.name);
                         else            disabled.insert(t.name);
+                        match = true;
                         break;
                     }
                 }
+                if (!match) {
+                    consolef(Red, "  No matching test for '%.*s'\n", testName.len, testName.str);
+                }
             }
 
-            if (!disabled.empty())
+            if (argc > 1 && enabled.empty() && disabled.empty())
+            {
+                consolef(Red, "  No matching tests found for provided arguments!\n");
+                for (test_info& t : all_tests) { // disable all tests to trigger warnings
+                    t.test_enabled = false;
+                }
+            }
+            else if (!disabled.empty())
             {
                 for (test_info& t : all_tests) {
                     if (t.auto_run) { // only consider disabling auto_run tests
@@ -397,34 +420,44 @@ namespace rpp
         }
         else
         {
-            consolef(Green, "Running all auto-run tests\n");
+            consolef(Green, "Running all AutoRun tests\n");
             for (test_info& t : all_tests)
                 if (!t.auto_run && !t.test_enabled)
                     consolef(Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
         }
 
         // run all the marked tests
+        int numTestsRun = 0;
+        int numTestsFailed = 0;
         for (test_info& t : all_tests) {
             if (t.test_enabled) {
                 auto test = t.factory(t.name);
-                test->run_test(t.case_filter);
-                ++numTest;
+                if (!test->run_test(t.case_filter))
+                    ++numTestsFailed;
+                ++numTestsRun;
             }
         }
 
         int result = 0;
-        if (asserts_failed)
+        if (total_asserts_failed)
         {
-            consolef(Red, "\nWARNING: %d assertions failed!\n", asserts_failed);
+            if (numTestsRun == 1)
+                consolef(Red, "\nWARNING: Test failed with %d assertions!\n", total_asserts_failed);
+            else
+                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions!\n", 
+                                numTestsFailed, numTestsRun, total_asserts_failed);
             result = -1;
         }
-        else if (numTest > 0)
+        else if (numTestsRun > 0)
         {
-            consolef(Green, "\nSUCCESS: All test runs passed!\n");
+            if (numTestsRun == 1)
+                consolef(Green, "\nSUCCESS: Test passed!\n", numTestsRun);
+            else
+                consolef(Green, "\nSUCCESS: All %d tests passed!\n", numTestsRun);
         }
         else
         {
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d)\n", (int)all_tests.size());
+            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)all_tests.size());
         }
 
         #if _WIN32 && _MSC_VER
