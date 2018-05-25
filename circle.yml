@@ -4,7 +4,7 @@ machine:
 dependencies:
   override:
     - sudo apt -y install libdw-dev
-    - sudo pip install mama
+    - sudo pip3 install mama
     - make configure-clang6-1404
 compile:
   override:
