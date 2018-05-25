@@ -10,10 +10,8 @@ configure-gcc-travis: configure-gcc-7
 
 configure-gcc-7:
 	sudo apt -y --force-yes install g++-7
-	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100
-	sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 100
+	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
 	sudo update-alternatives --set gcc /usr/bin/gcc-7
-	sudo update-alternatives --set g++ /usr/bin/g++-7
 
 
 download-clang6-1404:
@@ -63,8 +61,8 @@ configure-clang5-1404: download-clang5-1404 install-clang5
 configure-clang5-1604: download-clang5-1604 install-clang5
 
 
-/opt/pip: configure-python
-configure-python:
+/opt/pip: configure-pip
+configure-pip:
 	sudo mkdir -p /opt/pip
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
 	sudo python3.6 /opt/pip/get-pip.py
