@@ -1,17 +1,15 @@
-machine:
-  python:
-    version: 3.6.2
-dependencies:
-  override:
-    - sudo find /usr -name "python*"
-    - sudo ls -l /usr/bin | grep python
-    - make configure-pip
-    - sudo -H python3 -m pip install mama
-    - make configure-clang6-1404
-    - sudo apt -y install libdw-dev
-compile:
-  override:
-    - mama build clang
-test:
-  override:
-    - mama test
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/python:3.6.2
+    steps:
+      - checkout
+      - run: sudo find /usr -name "python*"
+      - run: sudo ls -l /usr/bin | grep python
+      - run: make configure-pip
+      - run: sudo python3 -m pip install mama
+      - run: make configure-clang6-1404
+      - run: sudo apt -y install libdw-dev
+      - run: mama build clang
+      - run: mama test
