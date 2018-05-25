@@ -29,7 +29,7 @@ install:
   - alias mama=~/.local/bin/mama
   - ls -l /usr/bin/clang
   - ls -l /usr/bin/clang++
+  - whereis clang++ clang
 
 script:
-  #- export LD_LIBRARY_PATH=/usr/bin/:$LD_LIBRARY_PATH
   - mama build ${COMPILER} test
