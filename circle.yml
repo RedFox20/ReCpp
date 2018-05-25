@@ -3,9 +3,10 @@ machine:
     version: 3.6.2
 dependencies:
   override:
+    - sudo find /usr -name "python*"
     - sudo ls -l /usr/bin | grep python
     - make configure-pip
-    - sudo python3 -m pip install mama
+    - sudo -H python3 -m pip install mama
     - make configure-clang6-1404
     - sudo apt -y install libdw-dev
 compile:
