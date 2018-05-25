@@ -1,0 +1,14 @@
+machine:
+  python:
+    version: 3.6
+dependencies:
+  override:
+    - sudo apt -y install libdw-dev
+    - sudo pip install mama
+    - make configure-clang6-1404
+compile:
+  override:
+    - mama build clang
+test:
+  override:
+    - mama test
