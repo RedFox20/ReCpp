@@ -27,10 +27,7 @@ install:
   - make configure-${COMPILER}-travis
   - pip install mama
   - alias mama=~/.local/bin/mama
-  - whereis clang++ clang
-  - ls -l /etc/alternatives/clang /etc/alternatives/clang++
-  - ls -l /usr/local
-  - rm /usr/local/clang
+  - sudo rm /usr/local/clang
 
 script:
   - mama build ${COMPILER} test
