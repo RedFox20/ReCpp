@@ -65,7 +65,7 @@ configure-clang5-1604: download-clang5-1604 install-clang5
 configure-pip:
 	sudo mkdir -p /opt/pip
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
-	sudo python3.6 /opt/pip/get-pip.py
+	sudo python /opt/pip/get-pip.py
 
 /opt/cmake: configure-cmake
 configure-cmake:
