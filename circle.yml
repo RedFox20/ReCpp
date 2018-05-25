@@ -12,3 +12,8 @@ jobs:
       - run: sudo apt -y install libdw-dev gdb
       - run: mama build clang
       - run: mama test
+workflows:
+  version: 2
+  build_all:
+    jobs:
+      - clang
