@@ -10,8 +10,10 @@ configure-gcc-travis: configure-gcc-7
 
 configure-gcc-7:
 	sudo apt -y --force-yes install g++-7
-	sudo ln -sf /usr/bin/gcc-7 /usr/bin/gcc
-	sudo ln -sf /usr/bin/g++-7 /usr/bin/g++
+	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100
+	sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 100
+	sudo update-alternatives --set gcc /usr/bin/gcc-7
+	sudo update-alternatives --set g++ /usr/bin/g++-7
 
 
 download-clang6-1404:
