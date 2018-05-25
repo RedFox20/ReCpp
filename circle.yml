@@ -17,8 +17,9 @@ jobs:
       - image: circleci/python:3.6.2
     steps:
       - checkout
+      - run: sudo apt -y install add-apt-repository
       - run: sudo add-apt-repository ppa:ubuntu-toolchain-r-test
-      - run: sudo apt-get update
+      - run: sudo apt update
       - run: make configure-gcc-7
       - run: make configure-pip
       - run: make configure-cmake
