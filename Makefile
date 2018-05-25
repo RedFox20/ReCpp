@@ -18,12 +18,14 @@ configure-gcc-7:
 	sudo apt -y --force-yes install g++-7
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
 	sudo update-alternatives --set gcc /usr/bin/gcc-7
-
-
 configure-gcc-6:
 	sudo apt -y --force-yes install g++-6
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 100 --slave /usr/bin/g++ g++ /usr/bin/g++-6
 	sudo update-alternatives --set gcc /usr/bin/gcc-6
+configure-gcc-5:
+	sudo apt -y --force-yes install g++-5
+	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5 100 --slave /usr/bin/g++ g++ /usr/bin/g++-5
+	sudo update-alternatives --set gcc /usr/bin/gcc-5
 
 
 download-clang6-1404:
