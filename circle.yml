@@ -17,7 +17,7 @@ jobs:
       - image: circleci/python:3.6.2
     steps:
       - checkout
-      - run: make configure-gcc-7
+      - run: make configure-gcc-6
       - run: make configure-pip
       - run: make configure-cmake
       - run: sudo python3.6 -m pip install mama

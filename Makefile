@@ -1,8 +1,14 @@
-
 CLANG_FLAGS := -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
 GCC_FLAGS := -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++
 
 all: clang
+clang: build
+	cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo $(CLANG_FLAGS) && make -j4
+gcc: build
+	cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo $(GCC_FLAGS) && make -j4
+build:
+	mkdir build
+
 
 configure-clang-travis: configure-clang6-1404
 configure-gcc-travis: configure-gcc-7
@@ -12,6 +18,12 @@ configure-gcc-7:
 	sudo apt -y --force-yes install g++-7
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
 	sudo update-alternatives --set gcc /usr/bin/gcc-7
+
+
+configure-gcc-6:
+	sudo apt -y --force-yes install g++-6
+	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 100 --slave /usr/bin/g++ g++ /usr/bin/g++-6
+	sudo update-alternatives --set gcc /usr/bin/gcc-6
 
 
 download-clang6-1404:
@@ -73,13 +85,4 @@ configure-cmake:
 	sudo wget https://cmake.org/files/v3.11/cmake-3.11.2-Linux-x86_64.sh -P /opt/cmake
 	sudo sh /opt/cmake/cmake-3.11.2-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
 	sudo ln -sf /opt/cmake/bin/cmake /usr/bin/cmake
-
-clang: build
-	cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo $(CLANG_FLAGS) && make -j4
-
-gcc: build
-	cd build && cmake ../ -DCMAKE_BUILD_TYPE=RelWithDebInfo $(GCC_FLAGS) && make -j4
-
-build:
-	mkdir build
 
