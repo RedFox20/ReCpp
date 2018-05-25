@@ -33,9 +33,6 @@ install-clang6:
 	sudo ln -sf /usr/local/clang++6/include/c++/v1 /usr/include/c++/v1
 	sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-6.0   100
 	sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-6.0 100
-	sudo update-alternatives --list clang++
-	sudo update-alternatives --set clang   /usr/bin/clang-6.0
-	sudo update-alternatives --set clang++ /usr/bin/clang++-6.0
 configure-clang6-1604: download-clang6-1604 install-clang6
 configure-clang6-1404: download-clang6-1404 install-clang6
 
