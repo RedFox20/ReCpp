@@ -5,12 +5,10 @@ jobs:
       - image: circleci/python:3.6.2
     steps:
       - checkout
-      - run: sudo ls -l /usr/bin | grep python
-      - run: sudo ls -l /usr/local/bin | grep python
       - run: make configure-pip
       - run: make configure-cmake
       - run: make configure-clang6-1404
-      - run: sudo python3 -m pip install mama
-      - run: sudo apt -y install libdw-dev
+      - run: sudo python3.6 -m pip install mama
+      - run: sudo apt -y install libdw-dev gdb
       - run: mama build clang
       - run: mama test
