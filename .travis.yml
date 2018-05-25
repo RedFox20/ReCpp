@@ -27,6 +27,8 @@ install:
   - make configure-${COMPILER}-travis
   - pip install mama
   - alias mama=~/.local/bin/mama
+  - ls -l /usr/bin/clang
+  - ls -l /usr/bin/clang++
 
 script:
   #- export LD_LIBRARY_PATH=/usr/bin/:$LD_LIBRARY_PATH
