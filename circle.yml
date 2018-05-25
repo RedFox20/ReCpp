@@ -1,13 +1,13 @@
 machine:
   python:
-    version: 3.6.1
+    version: 3.6.2
 dependencies:
   override:
-    - sudo apt -y install libdw-dev
-    - pip install --upgrade pip
-    - sudo whereis python python3 python3.6.1
+    - sudo ls -l /usr/bin | grep python
+    - make configure-pip
     - sudo python3 -m pip install mama
     - make configure-clang6-1404
+    - sudo apt -y install libdw-dev
 compile:
   override:
     - mama build clang
