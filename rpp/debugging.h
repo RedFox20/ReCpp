@@ -105,6 +105,10 @@ namespace rpp
     inline const char* __wrap_arg(const std::string& arg)  { return arg.c_str();   }
     // __wrap_arg(const rpp::strview& arg) defined in "strview.h"
     inline int __wrap_arg() { return 0; } // default expansion case if no varargs
+    
+#if __APPLE__ && __OBJC__
+    inline const char* __wrap_arg(NSString* arg) { return arg.UTF8String; }
+#endif
 }
 
 #define __get_nth_wrap_arg(_unused, _12, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
