@@ -22,6 +22,7 @@ namespace rpp
     using std::mutex;
     using std::unique_lock;
     using std::defer_lock;
+    using std::unordered_set;
     ///////////////////////////////////////////////////////////////////////////
 
     int test::total_asserts_failed;
@@ -42,7 +43,16 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////
 
-    test::test(strview name) : name{name}
+    struct test_results
+    {
+        int tests_run = 0;
+        int tests_failed = 0;
+        vector<string> failures;
+    };
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    test::test(strview name) : name{ name }
     {
     }
 
@@ -52,7 +62,7 @@ namespace rpp
     {
         va_list ap;
         va_start(ap, fmt);
-    #if _WIN32
+#if _WIN32
         static HANDLE winstd = GetStdHandle(STD_OUTPUT_HANDLE);
         static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
         static const WORD colormap[] = {
@@ -70,7 +80,7 @@ namespace rpp
         }
 
         HANDLE winout = color == Red ? winerr : winstd;
-        FILE*  cout   = color == Red ? stderr : stdout;
+        FILE*  cout = color == Red ? stderr : stdout;
 
         static mutex consoleSync;
         {
@@ -82,16 +92,16 @@ namespace rpp
             SetConsoleTextAttribute(winout, colormap[Default]);
         }
         fflush(cout); // flush needed for proper sync with unix-like shells
-    #elif __ANDROID__
+#elif __ANDROID__
         int priority = 0;
         switch (color) {
-            case Default: priority = ANDROID_LOG_DEBUG; break;
-            case Green:   priority = ANDROID_LOG_INFO;  break;
-            case Yellow:  priority = ANDROID_LOG_WARN;  break;
-            case Red:     priority = ANDROID_LOG_ERROR; break;
+        case Default: priority = ANDROID_LOG_DEBUG; break;
+        case Green:   priority = ANDROID_LOG_INFO;  break;
+        case Yellow:  priority = ANDROID_LOG_WARN;  break;
+        case Red:     priority = ANDROID_LOG_ERROR; break;
         }
         __android_log_vprint(priority, "rpp", fmt, ap);
-    #elif __linux
+#elif __linux
         FILE* cout = color == Red ? stderr : stdout;
         static const char* colors[] = {
                 "\33[0m",  // clears all formatting
@@ -109,11 +119,11 @@ namespace rpp
             fwrite(colors[Default], strlen(colors[Default]), 1, cout);
         }
         fflush(cout); // flush needed for proper sync with different shells
-    #else
+#else
         FILE* cout = color == Red ? stderr : stdout;
         vfprintf(cout, fmt, ap);
         fflush(cout); // flush needed for proper sync with different shells
-    #endif
+#endif
     }
 
     void test::assert_failed(const char* file, int line, const char* fmt, ...)
@@ -126,6 +136,16 @@ namespace rpp
 
         ++total_asserts_failed;
         consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
+    }
+
+    void test::assert_failed_custom(const char* fmt, ...)
+    {
+        char message[8192];
+        va_list ap; va_start(ap, fmt);
+        vsnprintf(message, 8192, fmt, ap);
+
+        ++total_asserts_failed;
+        consolef(Red, message);
     }
 
     bool test::run_test(strview methodFilter)
@@ -181,8 +201,7 @@ namespace rpp
         }
         catch (const std::exception& e)
         {
-            consolef(Red, "FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
-            ++total_asserts_failed;
+            assert_failed_custom("FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
             return false;
         }
     }
@@ -195,8 +214,7 @@ namespace rpp
         }
         catch (const std::exception& e)
         {
-            consolef(Red, "FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
-            ++total_asserts_failed;
+            assert_failed_custom("FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
         }
     }
 
@@ -208,23 +226,21 @@ namespace rpp
             (test.lambda.*test.func)();
             if (test.expectedExType) // we expected an exception, but none happened?!
             {
-                consolef(Red, "FAILED with expected EXCEPTION NOT THROWN in %s::%s\n", 
-                         name.str, test.name.str);
-                ++total_asserts_failed;
+                assert_failed_custom("FAILED with expected EXCEPTION NOT THROWN in %s::%s\n",
+                                     name.str, test.name.str);
             }
         }
         catch (const std::exception& e)
         {
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
-                consolef(Yellow, "Caught Expected Exception in %s::%s:\n  %s\n", 
-                         name.str, test.name.str, e.what());
+                consolef(Yellow, "Caught Expected Exception in %s::%s:\n  %s\n",
+                    name.str, test.name.str, e.what());
             }
             else
             {
-                consolef(Red, "FAILED with EXCEPTION in %s::%s:\n  %s\n",
-                    name.str, test.name.str, e.what());
-                ++total_asserts_failed;
+                assert_failed_custom("FAILED with EXCEPTION in %s::%s:\n  %s\n",
+                                     name.str, test.name.str, e.what());
             }
         }
         int totalFailures = total_asserts_failed - before;
@@ -233,13 +249,13 @@ namespace rpp
 
     void test::sleep(int millis)
     {
-        #if _WIN32
-            Sleep(millis);
-        #elif __ANDROID__
-            usleep(useconds_t(millis) * 1000);
-        #else
-            usleep(millis * 1000);
-        #endif
+#if _WIN32
+        Sleep(millis);
+#elif __ANDROID__
+        usleep(useconds_t(millis) * 1000);
+#else
+        usleep(millis * 1000);
+#endif
     }
 
     int test::run_tests(const char* testNamePattern)
@@ -259,11 +275,9 @@ namespace rpp
     {
         vector<const char*> names;
         names.push_back("");
-        names.insert(names.end(), testNamePatterns, testNamePatterns+numPatterns);
+        names.insert(names.end(), testNamePatterns, testNamePatterns + numPatterns);
         return run_tests((int)names.size(), (char**)names.data());
     }
-
-
 
     int test::run_tests()
     {
@@ -319,15 +333,15 @@ namespace rpp
 
             RECT consoleRect; GetWindowRect(GetConsoleWindow(), &consoleRect);
             HMONITOR consoleMon = MonitorFromRect(&consoleRect, MONITOR_DEFAULTTONEAREST);
-            HMONITOR otherMon   = consoleMon != mon[0] ? mon[0] : mon[1];
+            HMONITOR otherMon = consoleMon != mon[0] ? mon[0] : mon[1];
 
-            MONITORINFO consoleMI = { sizeof(MONITORINFO) };
-            MONITORINFO otherMI   = { sizeof(MONITORINFO) };
+            MONITORINFO consoleMI = { sizeof(MONITORINFO), {}, {}, 0 };
+            MONITORINFO otherMI   = { sizeof(MONITORINFO), {}, {}, 0 };
             GetMonitorInfo(consoleMon, &consoleMI);
-            GetMonitorInfo(otherMon, &otherMI);
+            GetMonitorInfo(otherMon,   &otherMI);
 
             int x = consoleMI.rcMonitor.left > otherMI.rcMonitor.left // moveLeft ?
-                ? otherMI.rcMonitor.right - (consoleRect.left - consoleMI.rcMonitor.left) - (consoleRect.right-consoleRect.left)
+                ? otherMI.rcMonitor.right - (consoleRect.left - consoleMI.rcMonitor.left) - (consoleRect.right - consoleRect.left)
                 : otherMI.rcMonitor.left  + (consoleRect.left - consoleMI.rcMonitor.left);
             int y = otherMI.rcMonitor.top + (consoleRect.top - consoleMI.rcMonitor.top);
             SetWindowPos(GetConsoleWindow(), nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
@@ -335,138 +349,160 @@ namespace rpp
     }
 #endif
 
+    static void set_test_defaults()
+    {
+        for (test_info& t : all_tests)
+        {
+            if (!t.auto_run)
+                t.test_enabled = false;
+        }
+    }
+
+    static void enable_disable_tests(unordered_set<strview>& enabled,
+                                     unordered_set<strview>& disabled)
+    {
+        if (enabled.empty() && disabled.empty())
+        {
+            test::consolef(test::Red, "  No matching tests found for provided arguments!\n");
+            for (test_info& t : all_tests) // disable all tests to trigger test report warnings
+                t.test_enabled = false;
+        }
+        else if (!disabled.empty())
+        {
+            for (test_info& t : all_tests) {
+                if (t.auto_run) { // only consider disabling auto_run tests
+                    t.test_enabled = disabled.find(t.name) == disabled.end();
+                    if (!t.test_enabled)
+                        test::consolef(test::Red, "  Disabled %s\n", t.name.to_cstr());
+                }
+            }
+        }
+        else if (!enabled.empty())
+        {
+            for (test_info& t : all_tests) { // enable whatever was requested
+                t.test_enabled = enabled.find(t.name) != enabled.end();
+                if (t.test_enabled)
+                    test::consolef(test::Green, "  Enabled %s\n", t.name.to_cstr());
+            }
+        }
+    }
+
+    static void select_tests_from_args(int argc, char* argv[])
+    {
+        // if arg is provided, we assume they are:
+        // test_testname or testname or -test_testname or -testname
+        // OR to run a specific test:  testname.specifictest
+        std::unordered_set<strview> enabled, disabled;
+        for (int iarg = 1; iarg < argc; ++iarg)
+        {
+            strview arg = argv[iarg];
+            strview testName = arg.next('.');
+            strview specific = arg.next('.');
+
+            bool enableTest = testName[0] != '-';
+            if (!enableTest) {
+                testName.chomp_first();
+            }
+            else {
+                enableTest = !testName.starts_with("no:");
+                if (!enableTest) testName.skip(3);
+            }
+
+            const bool exactMatch = testName.starts_with("test_");
+            if (exactMatch) test::consolef(test::Yellow, "Filtering exact  tests '%s'\n\n", argv[iarg]);
+            else            test::consolef(test::Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
+
+            bool match = false;
+            for (test_info& t : all_tests)
+            {
+                if ((exactMatch && t.name == testName) ||
+                    (!exactMatch && t.name.find(testName)))
+                {
+                    t.case_filter = specific;
+                    if (enableTest) enabled.insert(t.name);
+                    else            disabled.insert(t.name);
+                    match = true;
+                    break;
+                }
+            }
+            if (!match) {
+                test::consolef(test::Red, "  No matching test for '%.*s'\n", testName.len, testName.str);
+            }
+        }
+        enable_disable_tests(enabled, disabled);
+    }
+
+    static void enable_all_autorun_tests()
+    {
+        test::consolef(test::Green, "Running all AutoRun tests\n");
+        for (test_info& t : all_tests)
+            if (!t.auto_run && !t.test_enabled)
+                test::consolef(test::Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
+    }
+
+    test_results run_all_marked_tests()
+    {
+        test_results results;
+        for (test_info& t : all_tests)
+        {
+            if (t.test_enabled)
+            {
+                auto test = t.factory(t.name);
+                if (!test->run_test(t.case_filter))
+                {
+                    ++results.tests_failed;
+                }
+                ++results.tests_run;
+            }
+        }
+        return results;
+    }
+
+    static int print_final_summary(const test_results& results)
+    {
+        int numTests = results.tests_run;
+        if (test::total_asserts_failed)
+        {
+            if (numTests == 1)
+                test::consolef(test::Red, "\nWARNING: Test failed with %d assertions!\n", test::total_asserts_failed);
+            else
+                test::consolef(test::Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
+                               results.tests_failed, numTests, test::total_asserts_failed);
+            return -1;
+        }
+        if (numTests <= 0)
+        {
+            test::consolef(test::Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)all_tests.size());
+            return -1;
+        }
+        if (numTests == 1) test::consolef(test::Green, "\nSUCCESS: Test passed!\n");
+        else               test::consolef(test::Green, "\nSUCCESS: All %d tests passed!\n", numTests);
+        return 0;
+    }
+
     int test::run_tests(int argc, char* argv[])
     {
     #if _WIN32 && _MSC_VER
         #if _CRTDBG_MAP_ALLOC  
-            _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+            _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
             _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
         #endif
         move_console_window();
     #endif
 
-        for (test_info& t : all_tests) { // set the defaults
-            if (!t.auto_run) t.test_enabled = false;
-        }
+        set_test_defaults();
+        if (argc > 1) select_tests_from_args(argc, argv);
+        else          enable_all_autorun_tests();
 
-        if (argc > 1)
-        {
-            // if arg is provided, we assume they are:
-            // test_testname or testname or -test_testname or -testname
-            // OR to run a specific test:  testname.specifictest
-            std::unordered_set<strview> enabled, disabled;
-            for (int iarg = 1; iarg < argc; ++iarg)
-            {
-                rpp::strview arg = argv[iarg];
-                rpp::strview testName = arg.next('.');
-                rpp::strview specific = arg.next('.');
-
-                bool enableTest = testName[0] != '-';
-                if (!enableTest) {
-                    testName.chomp_first();
-                }
-                else {
-                    enableTest = !testName.starts_with("no:");
-                    if (!enableTest) testName.skip(3);
-                }
-
-                const bool exactMatch = testName.starts_with("test_");
-                if (exactMatch) consolef(Yellow, "Filtering exact tests '%s'\n\n", argv[iarg]);
-                else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
-
-                bool match = false;
-                for (test_info& t : all_tests)
-                {
-                    if (( exactMatch && t.name == testName) ||
-                        (!exactMatch && t.name.find(testName)))
-                    {
-                        t.case_filter = specific;
-                        if (enableTest) enabled.insert(t.name);
-                        else            disabled.insert(t.name);
-                        match = true;
-                        break;
-                    }
-                }
-                if (!match) {
-                    consolef(Red, "  No matching test for '%.*s'\n", testName.len, testName.str);
-                }
-            }
-
-            if (argc > 1 && enabled.empty() && disabled.empty())
-            {
-                consolef(Red, "  No matching tests found for provided arguments!\n");
-                for (test_info& t : all_tests) { // disable all tests to trigger warnings
-                    t.test_enabled = false;
-                }
-            }
-            else if (!disabled.empty())
-            {
-                for (test_info& t : all_tests) {
-                    if (t.auto_run) { // only consider disabling auto_run tests
-                        t.test_enabled = disabled.find(t.name) == disabled.end();
-                        if (!t.test_enabled)
-                            consolef(Red, "  Disabled %s\n", t.name.to_cstr());
-                    }
-                }
-            }
-            else if (!enabled.empty())
-            {
-                for (test_info& t : all_tests) { // enable whatever was requested
-                    t.test_enabled = enabled.find(t.name) != enabled.end();
-                    if (t.test_enabled)
-                        consolef(Green, "  Enabled %s\n", t.name.to_cstr());
-                }
-            }
-        }
-        else
-        {
-            consolef(Green, "Running all AutoRun tests\n");
-            for (test_info& t : all_tests)
-                if (!t.auto_run && !t.test_enabled)
-                    consolef(Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
-        }
-
-        // run all the marked tests
-        int numTestsRun = 0;
-        int numTestsFailed = 0;
-        for (test_info& t : all_tests) {
-            if (t.test_enabled) {
-                auto test = t.factory(t.name);
-                if (!test->run_test(t.case_filter))
-                    ++numTestsFailed;
-                ++numTestsRun;
-            }
-        }
-
-        int result = 0;
-        if (total_asserts_failed)
-        {
-            if (numTestsRun == 1)
-                consolef(Red, "\nWARNING: Test failed with %d assertions!\n", total_asserts_failed);
-            else
-                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions!\n", 
-                                numTestsFailed, numTestsRun, total_asserts_failed);
-            result = -1;
-        }
-        else if (numTestsRun > 0)
-        {
-            if (numTestsRun == 1)
-                consolef(Green, "\nSUCCESS: Test passed!\n", numTestsRun);
-            else
-                consolef(Green, "\nSUCCESS: All %d tests passed!\n", numTestsRun);
-        }
-        else
-        {
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)all_tests.size());
-        }
-
+        test_results testResults = run_all_marked_tests();
+        int returnCode = print_final_summary(testResults);
         #if _WIN32 && _MSC_VER
             #if _CRTDBG_MAP_ALLOC
                 _CrtDumpMemoryLeaks();
             #endif
             pause();
         #endif
-        return result;
+        return returnCode;
     }
 
 } // namespace rpp

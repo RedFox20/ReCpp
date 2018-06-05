@@ -76,6 +76,7 @@ namespace rpp
         explicit test(strview name);
         virtual ~test();
         static void assert_failed(const char* file, int line, const char* fmt, ...);
+        static void assert_failed_custom(const char* fmt, ...);
 
         enum ConsoleColor { Default, Green, Yellow, Red, };
 
