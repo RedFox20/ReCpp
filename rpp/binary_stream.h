@@ -296,8 +296,8 @@ namespace rpp /* ReCpp */
         binary_stream& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
 
         template<class T>
-        static constexpr bool is_trivial_type = std::is_default_constructible_v<T>
-                                             && std::is_trivially_destructible_v<T>;
+        static constexpr bool is_trivial_type = std::is_default_constructible<T>::value
+                                             && std::is_trivially_destructible<T>::value;
 
         template<class T, class A>
         binary_stream& write(const std::vector<T, A>& v)

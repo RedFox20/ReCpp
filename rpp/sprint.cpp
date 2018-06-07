@@ -115,7 +115,7 @@ namespace rpp
 
     void string_buffer::write_ptr(const void* p, format_opt opt)
     {
-        static_assert(sizeof(p) == 8 || sizeof(p) == 4);
+        static_assert(sizeof(p) == 8 || sizeof(p) == 4, "sizeof(ptr) expected as 8 or 4");
         reserve(sizeof(p)*2 + 2);
         ptr[len++] = '0';
         ptr[len++] = 'x';

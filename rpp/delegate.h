@@ -57,6 +57,14 @@
 #include <cassert>
 #include <utility> // std::forward
 
+#ifndef RPP_HAS_CXX17
+#  if _MSC_VER
+#    define RPP_HAS_CXX17 _HAS_CXX17
+#  else
+#    define RPP_HAS_CXX17 __cplusplus >= 201703L
+#  endif
+#endif
+
 namespace rpp
 {
     #if INTPTR_MAX == INT64_MAX
@@ -373,15 +381,24 @@ namespace rpp
          * 2) Functor matches `Ret(Args...)`
          */
         template<class Functor>
-        using enable_if_callable_t = std::enable_if_t<!std::is_same_v<std::decay_t<Functor>, delegate> // not const delegate& or delegate&&
-                                                #if _MSC_VER
-                                                    && std::is_invocable_r_v<Ret, Functor, Args...>>; // matches `Ret(Args...)`
-                                                #elif __clang__
-                                                    && std::__invokable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
-                                                #else
-                                                    && std::is_invocable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
-                                                #endif
-
+        using enable_if_callable_t = std::enable_if_t<!std::is_same<std::decay_t<Functor>, delegate>::value // not const delegate& or delegate&&
+                                #if RPP_HAS_CXX17
+                                    #if _MSC_VER
+                                        && std::is_invocable_r_v<Ret, Functor, Args...>>; // matches `Ret(Args...)`
+                                    #elif __clang__
+                                        && std::__invokable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                    #else
+                                        && std::is_invocable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                    #endif
+                                #else
+                                    #if _MSC_VER
+                                        && std::_Is_invocable_r_<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                    #elif __clang__
+                                        && std::__invokable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                    #else
+                                        && std::is_invocable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                    #endif
+                                #endif
         /**
          * @brief Functor type constructor for lambdas and old-style functors
          * @code

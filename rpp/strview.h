@@ -43,6 +43,14 @@
 #  endif
 #endif
 
+#ifndef RPP_HAS_CXX17
+#  if _MSC_VER
+#    define RPP_HAS_CXX17 _HAS_CXX17
+#  else
+#    define RPP_HAS_CXX17 __cplusplus >= 201703L
+#  endif
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE
@@ -232,7 +240,7 @@ namespace rpp
         FINLINE strview(const string& s)                       : str(s.c_str()), len((int)s.length()) {}
 
         template<class StringT>
-        using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer_v<decltype(&StringT::c_str)>>;
+        using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
 
         template<class StringT, typename = enable_if_string_like_t<StringT>>
         FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}

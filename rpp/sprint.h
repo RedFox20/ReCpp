@@ -81,18 +81,21 @@ namespace rpp
 
     namespace detail
     {
+        template< class... >
+        using void_t = void;
+
         template<typename, template<typename...> class, typename...>
         struct is_detected : std::false_type {};
 
         template<template<class...> class Operation, typename... Arguments>
-        struct is_detected<std::void_t<Operation<Arguments...>>, Operation, Arguments...> : std::true_type {};
+        struct is_detected<void_t<Operation<Arguments...>>, Operation, Arguments...> : std::true_type {};
     }
 
     template<template<class...> class Operation, typename... Arguments>
-    using is_detected = detail::is_detected<std::void_t<>, Operation, Arguments...>;
+    using is_detected = detail::is_detected<detail::void_t<>, Operation, Arguments...>;
 
     template<template<class...> class Operation, typename... Arguments>
-    constexpr bool is_detected_v = detail::is_detected<std::void_t<>, Operation, Arguments...>::value;
+    constexpr bool is_detected_v = detail::is_detected<detail::void_t<>, Operation, Arguments...>::value;
 
 
     template<class T> using std_to_string_expression  = decltype(std::to_string(std::declval<T>()));
@@ -103,8 +106,8 @@ namespace rpp
     template<class T> constexpr bool has_to_string_memb  = is_detected_v<to_string_memb_expression, T>;
     template<class T> constexpr bool is_to_stringable = has_to_string<T> || has_to_string_memb<T>;
 
-    template<class T> constexpr bool is_byte_array_type = std::is_same_v<T, void>
-                                                       || std::is_same_v<T, uint8_t>;
+    template<class T> constexpr bool is_byte_array_type = std::is_same<T, void>::value
+                                                       || std::is_same<T, uint8_t>::value;
 
     enum format_opt
     {
@@ -329,8 +332,12 @@ namespace rpp
         template<class T, class... Args> FINLINE void write(const T& first, const Args&... args)
         {
             write(first);
+
+        #if RPP_HAS_CXX17
             (..., write_with_separator(args)); // C++17 Fold Expressions
-            //write_separator(); write(args...);
+        #else
+            write_separator(); write(args...);
+        #endif
         }
         template<class T> FINLINE void writeln(const T& value)
         {

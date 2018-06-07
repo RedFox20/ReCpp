@@ -27,6 +27,10 @@ namespace rpp
 
     int test::total_asserts_failed;
 
+#if !RPP_HAS_CXX17
+    vector<test_info>* _rpp_tests;
+#endif
+
     vector<test_info>& get_rpp_tests()
     {
         if (!_rpp_tests)

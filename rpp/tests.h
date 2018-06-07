@@ -18,6 +18,12 @@
 #define RPP_TESTS_DEFINE_MAIN 0
 #endif
 
+#if RPP_HAS_CXX17
+#  define INLINE_STATIC inline static
+#else
+#  define INLINE_STATIC static
+#endif
+
 namespace rpp
 {
     using std::string;
@@ -47,7 +53,12 @@ namespace rpp
 
     // C++17 feature: inline global variable guarantees
     // one instance across all modules
-    inline RPPAPI vector<test_info>* _rpp_tests;
+#if RPP_HAS_CXX17
+    inline
+#else
+    extern
+#endif
+    RPPAPI vector<test_info>* _rpp_tests;
 
     RPPAPI void register_test(strview name, test_factory factory, bool autorun);
 
@@ -214,7 +225,7 @@ namespace rpp
     explicit testclass(rpp::strview name) : rpp::test{name} {}        \
     static std::unique_ptr<test> __create(rpp::strview name)          \
     { return std::unique_ptr<test>( new testclass{name} ); }          \
-    inline static bool __registered = [] {                            \
+    INLINE_STATIC bool __registered = [] {                            \
         rpp::register_test(#testclass, &__create, autorun);           \
         return true;                                                  \
     }();                                                              \
