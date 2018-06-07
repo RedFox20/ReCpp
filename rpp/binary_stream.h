@@ -30,16 +30,7 @@ namespace rpp /* ReCpp */
 
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
     #define RPP_BASIC_INTEGER_TYPEDEFS
-        #ifdef _LIBCPP_STD_VER
-        #  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
-        #elif !defined(_HAS_STD_BYTE)
-        #  define _HAS_STD_BYTE 0
-        #endif
-        #if !_HAS_STD_BYTE
-            using byte = unsigned char;
-        #else
-            using byte = std::byte;
-        #endif
+        using byte   = unsigned char;
         using ushort = unsigned short;
         using uint   = unsigned int;
         using ulong  = unsigned long;

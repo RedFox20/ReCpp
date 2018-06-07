@@ -57,7 +57,7 @@ namespace rpp
     /**
      * Simple and fast locale-agnostic to_string utilities:
      */
-    RPPAPI string to_string(byte v)   noexcept;
+    RPPAPI string to_string(rpp::byte v) noexcept;
     RPPAPI string to_string(short v)  noexcept;
     RPPAPI string to_string(ushort v) noexcept;
     RPPAPI string to_string(int v)    noexcept;
