@@ -388,6 +388,16 @@ namespace rpp
             }
         }
     }
+    
+    // ignore empty args
+    static bool has_filter_args(int argc, char* argv[])
+    {
+        for (int iarg = 1; iarg < argc; ++iarg) {
+            strview arg = strview{argv[iarg]}.trim();
+            if (arg) return true;
+        }
+        return false;
+    }
 
     static void select_tests_from_args(int argc, char* argv[])
     {
@@ -397,7 +407,9 @@ namespace rpp
         std::unordered_set<strview> enabled, disabled;
         for (int iarg = 1; iarg < argc; ++iarg)
         {
-            strview arg = argv[iarg];
+            strview arg = strview{argv[iarg]}.trim();
+            if (!arg) continue;
+            
             strview testName = arg.next('.');
             strview specific = arg.next('.');
 
@@ -494,8 +506,10 @@ namespace rpp
     #endif
 
         set_test_defaults();
-        if (argc > 1) select_tests_from_args(argc, argv);
-        else          enable_all_autorun_tests();
+        if (has_filter_args(argc, argv))
+            select_tests_from_args(argc, argv);
+        else
+            enable_all_autorun_tests();
 
         test_results testResults = run_all_marked_tests();
         int returnCode = print_final_summary(testResults);
