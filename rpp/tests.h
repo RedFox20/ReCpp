@@ -74,7 +74,6 @@ namespace rpp
             bool autorun = true;
         };
 
-        static int total_asserts_failed;
         strview name;
     private:
         // @note Need to use raw array because std::vector cannot be exported on MSVC

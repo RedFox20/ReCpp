@@ -25,8 +25,6 @@ namespace rpp
     using std::unordered_set;
     ///////////////////////////////////////////////////////////////////////////
 
-    int test::total_asserts_failed;
-
 #if !RPP_HAS_CXX17
     vector<test_info>* _rpp_tests;
 #endif
@@ -38,6 +36,7 @@ namespace rpp
         return *_rpp_tests;
     }
 
+    static int total_asserts_failed;
     static vector<test_info>& all_tests = get_rpp_tests();
 
     void register_test(strview name, test_factory factory, bool autorun)
@@ -465,13 +464,14 @@ namespace rpp
     static int print_final_summary(const test_results& results)
     {
         int numTests = results.tests_run;
-        if (test::total_asserts_failed)
+        int failed = (int)total_asserts_failed;
+        if (failed > 0)
         {
             if (numTests == 1)
-                test::consolef(test::Red, "\nWARNING: Test failed with %d assertions!\n", test::total_asserts_failed);
+                test::consolef(test::Red, "\nWARNING: Test failed with %d assertions!\n", failed);
             else
                 test::consolef(test::Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
-                               results.tests_failed, numTests, test::total_asserts_failed);
+                               results.tests_failed, numTests, failed);
             return -1;
         }
         if (numTests <= 0)
