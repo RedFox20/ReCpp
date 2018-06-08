@@ -10,6 +10,43 @@
 namespace rpp
 {
     /**
+     * Wrapper that allows copying readonly locks
+     */
+    class readonly_lock
+    {
+        std::shared_lock<std::shared_mutex> lock;
+    public:
+        readonly_lock(std::shared_mutex& m) noexcept : lock{m, std::try_to_lock}
+        {
+        }
+        readonly_lock(const readonly_lock& r) noexcept : lock{*r.lock.mutex(), std::try_to_lock}
+        {
+        }
+        readonly_lock(readonly_lock&& r) noexcept : lock{std::move(r.lock)}
+        {
+        }
+        ~readonly_lock() = default;
+        readonly_lock& operator=(const readonly_lock& r) noexcept
+        {
+            if (this != &r && lock.mutex() != r.lock.mutex()) {
+                lock = {*r.lock.mutex(), std::try_to_lock};
+            }
+            return *this;
+        }
+        readonly_lock& operator=(readonly_lock&& r) noexcept
+        {
+            lock = std::move(r.lock);
+            return *this;
+        }
+        explicit operator bool() const { return lock.owns_lock(); }
+        bool owns_lock() const { return lock.owns_lock(); }
+    };
+
+
+    using exclusive_lock = std::unique_lock<std::shared_mutex>;
+
+
+    /**
      * This helper attempts to ease the problem of async programming where the owning
      * class is destroyed while an async operation is in progress. Consider the following
      * example:
@@ -91,9 +128,6 @@ namespace rpp
         close_sync& operator=(close_sync&&) = delete;
         close_sync& operator=(const close_sync&) = delete;
 
-        using readonly_lock  = std::shared_lock<std::shared_mutex>;
-        using exclusive_lock = std::unique_lock<std::shared_mutex>;
-
         close_sync() = default;
         ~close_sync()
         {
@@ -104,18 +138,27 @@ namespace rpp
                 exclusive_lock exclusiveLock{ mut };
             }
         }
+        /**
+         * Acquires exclusive lock during destruction of the owning class.
+         * It holds the lock until all fields declared after this are destroyed,
+         * since fields are destructed in reverse order.
+         * @note This should only be called in the destructor of the owning class.
+         * @see acquire_exclusive_lock()
+         */
         void lock_for_close()
         {
             assert(!explicitLock && "close_sync::lock_for_close called twice! This will deadlock.");
             explicitLock = true;
             mut.lock();
         }
-
         readonly_lock try_lock() noexcept
         {
-            return readonly_lock{ mut, std::try_to_lock };
+            return { mut };
         }
-
+        readonly_lock try_readonly_lock() noexcept
+        {
+            return { mut };
+        }
         exclusive_lock acquire_exclusive_lock() noexcept
         {
             return exclusive_lock{ mut };
@@ -148,7 +191,7 @@ namespace rpp
      * @endcode
      */
     #define try_lock_or_return(closeSync, ...) \
-        auto RPP_CONCAT(lock_,__LINE__) { closeSync.try_lock() }; \
+        auto RPP_CONCAT(lock_,__LINE__) { closeSync.try_readonly_lock() }; \
         if (!RPP_CONCAT(lock_,__LINE__)) return ##__VA_ARGS__;
 
 }
