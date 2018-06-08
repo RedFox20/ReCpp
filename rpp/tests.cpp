@@ -55,13 +55,12 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////
 
-    test::test(strview name) : name{ name }
-    {
-    }
-
+    test::test(strview name) : name{ name } {}
     test::~test() = default;
 
-    void test::consolef(ConsoleColor color, const char* fmt, ...)
+    enum ConsoleColor { Default, Green, Yellow, Red, };
+
+    static void consolef(ConsoleColor color, const char* fmt, ...)
     {
         va_list ap;
         va_start(ap, fmt);
@@ -366,7 +365,7 @@ namespace rpp
     {
         if (enabled.empty() && disabled.empty())
         {
-            test::consolef(test::Red, "  No matching tests found for provided arguments!\n");
+            consolef(Red, "  No matching tests found for provided arguments!\n");
             for (test_info& t : all_tests) // disable all tests to trigger test report warnings
                 t.test_enabled = false;
         }
@@ -376,7 +375,7 @@ namespace rpp
                 if (t.auto_run) { // only consider disabling auto_run tests
                     t.test_enabled = disabled.find(t.name) == disabled.end();
                     if (!t.test_enabled)
-                        test::consolef(test::Red, "  Disabled %s\n", t.name.to_cstr());
+                        consolef(Red, "  Disabled %s\n", t.name.to_cstr());
                 }
             }
         }
@@ -385,7 +384,7 @@ namespace rpp
             for (test_info& t : all_tests) { // enable whatever was requested
                 t.test_enabled = enabled.find(t.name) != enabled.end();
                 if (t.test_enabled)
-                    test::consolef(test::Green, "  Enabled %s\n", t.name.to_cstr());
+                    consolef(Green, "  Enabled %s\n", t.name.to_cstr());
             }
         }
     }
@@ -412,8 +411,8 @@ namespace rpp
             }
 
             const bool exactMatch = testName.starts_with("test_");
-            if (exactMatch) test::consolef(test::Yellow, "Filtering exact  tests '%s'\n\n", argv[iarg]);
-            else            test::consolef(test::Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
+            if (exactMatch) consolef(Yellow, "Filtering exact  tests '%s'\n\n", argv[iarg]);
+            else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
 
             bool match = false;
             for (test_info& t : all_tests)
@@ -429,7 +428,7 @@ namespace rpp
                 }
             }
             if (!match) {
-                test::consolef(test::Red, "  No matching test for '%.*s'\n", testName.len, testName.str);
+                consolef(Red, "  No matching test for '%.*s'\n", testName.len, testName.str);
             }
         }
         enable_disable_tests(enabled, disabled);
@@ -437,10 +436,10 @@ namespace rpp
 
     static void enable_all_autorun_tests()
     {
-        test::consolef(test::Green, "Running all AutoRun tests\n");
+        consolef(Green, "Running all AutoRun tests\n");
         for (test_info& t : all_tests)
             if (!t.auto_run && !t.test_enabled)
-                test::consolef(test::Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
+                consolef(Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
     }
 
     test_results run_all_marked_tests()
@@ -468,19 +467,19 @@ namespace rpp
         if (failed > 0)
         {
             if (numTests == 1)
-                test::consolef(test::Red, "\nWARNING: Test failed with %d assertions!\n", failed);
+                consolef(Red, "\nWARNING: Test failed with %d assertions!\n", failed);
             else
-                test::consolef(test::Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
+                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
                                results.tests_failed, numTests, failed);
             return -1;
         }
         if (numTests <= 0)
         {
-            test::consolef(test::Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)all_tests.size());
+            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)all_tests.size());
             return -1;
         }
-        if (numTests == 1) test::consolef(test::Green, "\nSUCCESS: Test passed!\n");
-        else               test::consolef(test::Green, "\nSUCCESS: All %d tests passed!\n", numTests);
+        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed!\n");
+        else               consolef(Green, "\nSUCCESS: All %d tests passed!\n", numTests);
         return 0;
     }
 

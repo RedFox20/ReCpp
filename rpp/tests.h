@@ -88,11 +88,6 @@ namespace rpp
         static void assert_failed(const char* file, int line, const char* fmt, ...);
         static void assert_failed_custom(const char* fmt, ...);
 
-        enum ConsoleColor { Default, Green, Yellow, Red, };
-
-        // colored printing to stdout and stderr if color == Red
-        static void consolef(ConsoleColor color, const char* fmt, ...);
-
         /**
          * Runs all the registered tests on this test impl.
          * If a non-empty methodFilter is provided, then only test methods that contain
