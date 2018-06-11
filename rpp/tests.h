@@ -116,10 +116,17 @@ namespace rpp
          *   run_tests("strview");               -- All test modules that contain "strview"
          *   run_tests("test_strview.compare")   -- Only runs specific 'compare' test under "test_strview"
          *   run_tests("strview.compare")        -- All test modules that contain "strview" and have "compare" subtest
+         *   run_tests("strview file future")    -- All tests that contain "strview" or "file" or "future"
          *   run_tests("-test_strview -strview") -- All tests except these;
          * @return 0 on success, -1 on failure
          */
-        static int run_tests(const char* testNamePattern);
+        static int run_tests(strview testNamePatterns);
+        static int run_tests(const char* testNamePatterns) {
+            return run_tests(strview{testNamePatterns});
+        }
+        static int run_tests(const string& testNamePatterns) {
+            return run_tests(strview{testNamePatterns});
+        }
 
         /**
          * Pass multiple patterns for enabling multiple different tests

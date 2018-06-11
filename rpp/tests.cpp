@@ -260,9 +260,12 @@ namespace rpp
 #endif
     }
 
-    int test::run_tests(const char* testNamePattern)
+    int test::run_tests(strview testNamePatterns)
     {
-        return run_tests(&testNamePattern, 1);
+        vector<string> names;
+        while (strview pattern = testNamePatterns.next(" \t"))
+            names.emplace_back(pattern);
+        return run_tests(names);
     }
 
     int test::run_tests(const vector<string>& testNamePatterns)
@@ -423,8 +426,8 @@ namespace rpp
             }
 
             const bool exactMatch = testName.starts_with("test_");
-            if (exactMatch) consolef(Yellow, "Filtering exact  tests '%s'\n\n", argv[iarg]);
-            else            consolef(Yellow, "Filtering substr tests '%s'\n\n", argv[iarg]);
+            if (exactMatch) consolef(Yellow, "Filtering exact  tests '%s'\n", argv[iarg]);
+            else            consolef(Yellow, "Filtering substr tests '%s'\n", argv[iarg]);
 
             bool match = false;
             for (test_info& t : all_tests)
