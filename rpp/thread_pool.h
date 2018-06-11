@@ -254,6 +254,8 @@ namespace rpp
     using pool_trace_provider = string (*)();
 
 
+    RPPAPI void set_this_thread_name(const char* name);
+
     /**
      * A simple thread-pool task. Can run owning generic tasks using standard function<> and
      * also range non-owning tasks which use the impossibly fast delegate callback system.

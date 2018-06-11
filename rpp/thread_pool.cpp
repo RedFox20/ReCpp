@@ -14,10 +14,45 @@
 
 namespace rpp
 {
-
     ///////////////////////////////////////////////////////////////////////////////
 
     static pool_trace_provider TraceProvider;
+    
+#if _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+    #  define WIN32_LEAN_AND_MEAN 1
+    #endif
+    #include <Windows.h>
+    #pragma pack(push,8)
+    struct THREADNAME_INFO
+    {
+        DWORD dwType; // Must be 0x1000.
+        LPCSTR szName; // Pointer to name (in user addr space).
+        DWORD dwThreadID; // Thread ID (-1=caller thread).
+        DWORD dwFlags; // Reserved for future use, must be zero.
+    };
+    #pragma pack(pop)
+#endif
+
+    void set_this_thread_name(const char* name)
+    {
+        #if __APPLE__
+            pthread_setname_np(name);
+        #elif __linux__
+            pthread_setname_np(pthread_self(), name);
+        #elif _WIN32
+            THREADNAME_INFO info { 0x1000, name, DWORD(-1), 0 };
+            #pragma warning(push)
+            #pragma warning(disable: 6320 6322)
+                const DWORD MS_VC_EXCEPTION = 0x406D1388;
+                __try {
+                    RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+                } __except (1){}
+            #pragma warning(pop)
+        #endif
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
 
 #if POOL_TASK_DEBUG
 #  ifdef LogWarning
@@ -34,7 +69,7 @@ namespace rpp
 #else
 #  define UnhandledEx(fmt, ...) fprintf(stderr, "pool_task::unhandled_exception $ " fmt "\n", ##__VA_ARGS__)
 #endif
-    
+
     pool_task::pool_task()
     {
         // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
@@ -154,52 +189,12 @@ namespace rpp
         return result;
     }
 
-#if _WIN32
-    #ifndef WIN32_LEAN_AND_MEAN
-    #  define WIN32_LEAN_AND_MEAN 1
-    #endif
-    #include <Windows.h>
-    #pragma pack(push,8)
-    struct THREADNAME_INFO
-    {
-        DWORD dwType; // Must be 0x1000.
-        LPCSTR szName; // Pointer to name (in user addr space).
-        DWORD dwThreadID; // Thread ID (-1=caller thread).
-        DWORD dwFlags; // Reserved for future use, must be zero.
-    };
-    #pragma pack(pop)
-    void SetThreadName(const char* threadName)
-    {
-        THREADNAME_INFO info;
-        info.dwType     = 0x1000;
-        info.szName     = threadName;
-        info.dwThreadID = (DWORD)-1;
-        info.dwFlags    = 0;
-
-        #pragma warning(push)
-        #pragma warning(disable: 6320 6322)
-            const DWORD MS_VC_EXCEPTION = 0x406D1388;
-            __try {
-                RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
-            } __except (1){}
-        #pragma warning(pop)
-    }
-#endif
-
     void pool_task::run() noexcept
     {
         static int pool_task_id;
         char name[32];
         snprintf(name, sizeof(name), "rpp_task_%d", pool_task_id++);
-
-        #if __APPLE__
-            pthread_setname_np(name);
-        #elif __linux__
-            pthread_setname_np(pthread_self(), name);
-        #elif _WIN32
-            SetThreadName(name);
-        #endif
-        
+        set_this_thread_name(name);
         //TaskDebug("%s start", name);
         for (;;)
         {
