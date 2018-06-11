@@ -191,7 +191,7 @@ namespace rpp
      * @endcode
      */
     #define try_lock_or_return(closeSync, ...) \
-        auto RPP_CONCAT(lock_,__LINE__) { closeSync.try_readonly_lock() }; \
+        auto RPP_CONCAT(lock_,__LINE__) { (closeSync).try_readonly_lock() }; \
         if (!RPP_CONCAT(lock_,__LINE__)) return ##__VA_ARGS__;
 
 }
