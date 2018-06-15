@@ -195,30 +195,17 @@ namespace rpp
         }
         
         /**
-         * @param timeoutSeconds Maximum number of seconds to wait for this semaphore to be notified
+         * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signalled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        wait_result wait(double timeoutSeconds)
+        template<class Rep, class Period>
+        wait_result wait(std::chrono::duration<Rep, Period> timeout)
         {
-            duration_t<double> dur(timeoutSeconds);
             unique_lock<mutex> lock{ m };
             while (value <= 0)
             {
-                if (cv.wait_for(lock, dur) == cv_status::timeout)
-                    return timeout;
-            }
-            --value;
-            return notified;
-        }
-
-        wait_result wait(int timeoutMillis)
-        {
-            milliseconds_t dur(timeoutMillis);
-            unique_lock<mutex> lock{ m };
-            while (value <= 0)
-            {
-                if (cv.wait_for(lock, dur) == cv_status::timeout)
-                    return timeout;
+                if (cv.wait_for(lock, timeout) == cv_status::timeout)
+                    return semaphore::timeout;
             }
             --value;
             return notified;
