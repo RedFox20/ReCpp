@@ -9,40 +9,7 @@
 
 namespace rpp
 {
-    /**
-     * Wrapper that allows copying readonly locks
-     */
-    class readonly_lock
-    {
-        std::shared_lock<std::shared_mutex> lock;
-    public:
-        readonly_lock(std::shared_mutex& m) noexcept : lock{m, std::try_to_lock}
-        {
-        }
-        readonly_lock(const readonly_lock& r) noexcept : lock{*r.lock.mutex(), std::try_to_lock}
-        {
-        }
-        readonly_lock(readonly_lock&& r) noexcept : lock{std::move(r.lock)}
-        {
-        }
-        ~readonly_lock() = default;
-        readonly_lock& operator=(const readonly_lock& r) noexcept
-        {
-            if (this != &r && lock.mutex() != r.lock.mutex()) {
-                lock = {*r.lock.mutex(), std::try_to_lock};
-            }
-            return *this;
-        }
-        readonly_lock& operator=(readonly_lock&& r) noexcept
-        {
-            lock = std::move(r.lock);
-            return *this;
-        }
-        explicit operator bool() const { return lock.owns_lock(); }
-        bool owns_lock() const { return lock.owns_lock(); }
-    };
-
-
+    using readonly_lock  = std::shared_lock<std::shared_mutex>;
     using exclusive_lock = std::unique_lock<std::shared_mutex>;
 
 
@@ -118,6 +85,9 @@ namespace rpp
     {
         std::shared_mutex mut;
         bool explicitLock{ false };
+        
+        static constexpr short StillAlive = 0xB5C4;
+        short aliveToken = StillAlive; // for validating if this object is still alive
 
     public:
 
@@ -132,12 +102,17 @@ namespace rpp
         ~close_sync()
         {
             if (explicitLock) { // already explicitly locked for close
+                aliveToken = 0;
                 mut.unlock();
             }
             else { // no explicit locking used, so simply block until async tasks finish
                 exclusive_lock exclusiveLock{ mut };
+                aliveToken = 0;
             }
         }
+        
+        bool is_alive() const { return aliveToken == StillAlive; }
+        
         /**
          * Acquires exclusive lock during destruction of the owning class.
          * It holds the lock until all fields declared after this are destroyed,
@@ -151,13 +126,16 @@ namespace rpp
             explicitLock = true;
             mut.lock();
         }
+        [[deprecated("try_lock has been replaced by try_readonly_lock")]]
         readonly_lock try_lock() noexcept
         {
-            return { mut };
+            return { mut, std::try_to_lock };
         }
         readonly_lock try_readonly_lock() noexcept
         {
-            return { mut };
+            if (!is_alive())
+                return {};
+            return { mut, std::try_to_lock };
         }
         exclusive_lock acquire_exclusive_lock() noexcept
         {
