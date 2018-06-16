@@ -86,8 +86,8 @@ namespace rpp
         std::shared_mutex mut;
         bool explicitLock{ false };
         
-        static constexpr short StillAlive = 0xB5C4;
-        short aliveToken = StillAlive; // for validating if this object is still alive
+        static constexpr unsigned short StillAlive = (unsigned short)0xB5C4;
+        unsigned short aliveToken = StillAlive; // for validating if this object is still alive
 
     public:
 
