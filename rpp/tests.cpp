@@ -15,6 +15,9 @@
     #include <unistd.h>
     #include <termios.h>
 #endif
+#if __APPLE__
+    #include <TargetConditionals.h>
+#endif
 
 
 namespace rpp
@@ -103,22 +106,29 @@ namespace rpp
         case Red:     priority = ANDROID_LOG_ERROR; break;
         }
         __android_log_vprint(priority, "rpp", fmt, ap);
-#elif __linux
+#elif __linux || TARGET_OS_MAC
         FILE* cout = color == Red ? stderr : stdout;
-        static const char* colors[] = {
-                "\33[0m",  // clears all formatting
-                "\33[32m", // green
-                "\33[33m", // yellow
-                "\33[31m", // red
-        };
-        static mutex consoleSync;
+        if (isatty(fileno(cout))) // is terminal?
         {
-            unique_lock<mutex> guard{ consoleSync, defer_lock };
-            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
+            static const char* colors[] = {
+                "\x1b[0m",  // clears all formatting
+                "\x1b[32m", // green
+                "\x1b[33m", // yellow
+                "\x1b[31m", // red
+            };
+            static mutex consoleSync;
+            {
+                unique_lock<mutex> guard{ consoleSync, defer_lock };
+                if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
-            fwrite(colors[color], strlen(colors[color]), 1, cout);
+                fwrite(colors[color], strlen(colors[color]), 1, cout);
+                vfprintf(cout, fmt, ap);
+                fwrite(colors[Default], strlen(colors[Default]), 1, cout);
+            }
+        }
+        else // it's a file descriptor
+        {
             vfprintf(cout, fmt, ap);
-            fwrite(colors[Default], strlen(colors[Default]), 1, cout);
         }
         fflush(cout); // flush needed for proper sync with different shells
 #else

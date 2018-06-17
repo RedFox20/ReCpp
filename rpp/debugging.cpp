@@ -6,9 +6,18 @@
 #if __ANDROID__
 # include <android/log.h>
 #endif
+
 #if _WIN32
-#define WIN32_LEAN_AND_MEAN 1
-#include <Windows.h>
+# define WIN32_LEAN_AND_MEAN 1
+# include <Windows.h>
+#endif
+
+#if __APPLE__
+# include <TargetConditionals.h>
+#endif
+
+#if __linux || TARGET_OS_MAC
+# include <unistd.h>
 #endif
 
 #ifdef QUIETLOG
@@ -112,23 +121,30 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
             SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
         }
         fflush(fout); // flush needed for proper sync with unix-like shells
-    #elif __linux
+    #elif __linux || TARGET_OS_MAC
         AllocaPrintlineBuf(err, len);
         FILE* fout = severity == LogSeverityError ? stderr : stdout;
-        static const char clearColor[] = "\33[0m"; // Default: clear all formatting
-        static const char* colors[] = {
-                "\33[0m",  // Default: white
-                "\33[93m", // Warning: bright yellow
-                "\33[91m", // Error  : bright red
-        };
-        static mutex consoleSync;
+        if (isatty(fileno(fout))) // is terminal?
         {
-            unique_lock<mutex> guard{ consoleSync, std::defer_lock };
-            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
+            static const char clearColor[] = "\33[0m"; // Default: clear all formatting
+            static const char* colors[] = {
+                    "\x1b[0m",  // Default
+                    "\x1b[93m", // Warning: bright yellow
+                    "\x1b[91m", // Error  : bright red
+            };
+            static mutex consoleSync;
+            {
+                unique_lock<mutex> guard{ consoleSync, std::defer_lock };
+                if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
-            fwrite(colors[severity], strlen(colors[severity]), 1, fout);
+                fwrite(colors[severity], strlen(colors[severity]), 1, fout);
+                fwrite(buf, size_t(len) + 1, 1, fout);
+                fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
+            }
+        }
+        else
+        {
             fwrite(buf, size_t(len) + 1, 1, fout);
-            fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
         }
         fflush(fout); // flush needed for proper sync with different shells
     #else
