@@ -106,7 +106,7 @@ namespace rpp
         case Red:     priority = ANDROID_LOG_ERROR; break;
         }
         __android_log_vprint(priority, "rpp", fmt, ap);
-#elif __linux || TARGET_OS_MAC
+#elif __linux || TARGET_OS_OSX
         FILE* cout = color == Red ? stderr : stdout;
         if (isatty(fileno(cout))) // is terminal?
         {

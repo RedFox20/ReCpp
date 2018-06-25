@@ -98,6 +98,9 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 
 #if __cplusplus
 #include <string>
+#if __APPLE__ && __OBJC__
+#import <Foundation/NSString.h>
+#endif
 namespace rpp
 {
     template<class T>

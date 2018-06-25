@@ -16,7 +16,7 @@
 # include <TargetConditionals.h>
 #endif
 
-#if __linux || TARGET_OS_MAC
+#if __linux || TARGET_OS_OSX
 # include <unistd.h>
 #endif
 
@@ -121,7 +121,7 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
             SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
         }
         fflush(fout); // flush needed for proper sync with unix-like shells
-    #elif __linux || TARGET_OS_MAC
+    #elif __linux || TARGET_OS_OSX
         AllocaPrintlineBuf(err, len);
         FILE* fout = severity == LogSeverityError ? stderr : stdout;
         if (isatty(fileno(fout))) // is terminal?
