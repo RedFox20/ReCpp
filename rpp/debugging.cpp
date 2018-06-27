@@ -126,20 +126,25 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         FILE* fout = severity == LogSeverityError ? stderr : stdout;
         if (isatty(fileno(fout))) // is terminal?
         {
-            static const char clearColor[] = "\x1b[0m"; // Default: clear all formatting
-            static const char* colors[] = {
-                    "\x1b[0m",  // Default
-                    "\x1b[93m", // Warning: bright yellow
-                    "\x1b[91m", // Error  : bright red
-            };
-            static mutex consoleSync;
+            if (severity)
             {
+                static const char clearColor[] = "\x1b[0m"; // Default: clear all formatting
+                static const char* colors[] = {
+                        "\x1b[0m",  // Default
+                        "\x1b[93m", // Warning: bright yellow
+                        "\x1b[91m", // Error  : bright red
+                };
+                static mutex consoleSync;
                 unique_lock<mutex> guard{ consoleSync, std::defer_lock };
                 if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
-                
-                if (severity) fwrite(colors[severity], strlen(colors[severity]), 1, fout);
+            
+                fwrite(colors[severity], strlen(colors[severity]), 1, fout);
                 fwrite(buf, size_t(len) + 1, 1, fout);
-                if (severity) fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
+                fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
+            }
+            else
+            {
+                fwrite(buf, size_t(len) + 1, 1, fout);
             }
         }
         else
