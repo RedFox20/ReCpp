@@ -359,13 +359,32 @@ namespace rpp
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
-
+    
+    /** @return TRUE if any predicate(element) yields true */
     template<class T, class Pred> bool any_of(const std::vector<T>& v, const Pred& predicate)
     {
         auto* it = v.data();
         for (auto* end = it + v.size(); it != end; ++it)
             if (predicate(*it)) return true;
         return false;
+    }
+    
+    /** @return TRUE if ALL predicate(element) yield true */
+    template<class T, class Pred> bool all_of(const std::vector<T>& v, const Pred& predicate)
+    {
+        auto* it = v.data();
+        for (auto* end = it + v.size(); it != end; ++it)
+            if (!predicate(*it)) return false;
+        return true;
+    }
+
+    /** @return TRUE if NONE of predicate(element) yield true */
+    template<class T, class Pred> bool none_of(const std::vector<T>& v, const Pred& predicate)
+    {
+        auto* it = v.data();
+        for (auto* end = it + v.size(); it != end; ++it)
+            if (predicate(*it)) return false;
+        return true;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
