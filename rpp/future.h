@@ -39,6 +39,7 @@ namespace rpp
     using std::promise;
     using std::exception;
     using std::move;
+    using std::vector;
 
     template<class T> class NODISCARD cfuture;
 
@@ -526,5 +527,69 @@ namespace rpp
         promise<T> p;
         p.set_exception(std::make_exception_ptr(std::forward<E>(e)));
         return p.get_future();
+    }
+    
+    template<class T> void wait_all(const vector<cfuture<T>>& vf)
+    {
+        for (const cfuture<T>& f : vf)
+            f.wait();
+    }
+    
+    template<class T> vector<T> get_all(const vector<cfuture<T>>& vf)
+    {
+        vector<T> all;
+        all.reserve(vf.size());
+        for (const cfuture<T>& f : vf)
+            all.emplace_back(f.get());
+        return all;
+    }
+    
+    /**
+     * Used to launch multiple parallel tasks and then gather
+     * the results. It assumes that launcher already started its
+     * own future task, which makes it more flexible.
+     * @code
+     * vector<Result> results = rpp::get_tasks(DataList,
+     *     [&](SomeData& data) {
+     *         return rpp::async_task([&]{
+     *             return HeavyComputation(data);
+     *         };
+     *     });
+     * @endcode
+     */
+    template<class T, class U, class Launcher>
+    vector<T> get_tasks(vector<U>& items, const Launcher& futureLauncher)
+    {
+        vector<cfuture<T>> futures;
+        futures.reserve(items.size());
+        
+        for (U& item : items)
+            futures.emplace_back(futureLauncher(item));
+        
+        return get_all(futures);
+    }
+    
+    /**
+     * Used to launch multiple parallel tasks and then wait for
+     * the results. It assumes that launcher already started its
+     * own future task, which makes it more flexible.
+     * @code
+     * rpp::run_tasks(DataList, [&](SomeData& data) {
+     *      return rpp::async_task([&]{
+     *          HeavyComputation(data);
+     *      };
+     *  });
+     * @endcode
+     */
+    template<class U, class Launcher>
+    void run_tasks(vector<U>& items, const Launcher& futureLauncher)
+    {
+        vector<cfuture<void>> futures;
+        futures.reserve(items.size());
+        
+        for (U& item : items)
+            futures.emplace_back(futureLauncher(item));
+        
+        return wait_all(futures);
     }
 }
