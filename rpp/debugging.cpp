@@ -30,27 +30,27 @@ static LogEventCallback EventHandler;
 static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
 
-EXTERNC void SetLogErrorHandler(LogErrorCallback errorHandler)
+RPPCAPI void SetLogErrorHandler(LogErrorCallback errorHandler)
 {
     ErrorHandler = errorHandler;
 }
-EXTERNC void SetLogEventHandler(LogEventCallback eventHandler)
+RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler)
 {
     EventHandler = eventHandler;
 }
-EXTERNC void SetLogExceptHandler(LogExceptCallback exceptFunc)
+RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptFunc)
 {
     ExceptHandler = exceptFunc;
 }
-EXTERNC void LogDisableFunctionNames()
+RPPCAPI void LogDisableFunctionNames()
 {
     DisableFunctionNames = true;
 }
-EXTERNC void SetLogSeverityFilter(LogSeverity filter)
+RPPCAPI void SetLogSeverityFilter(LogSeverity filter)
 {
     Filter = filter;
 }
-EXTERNC LogSeverity GetLogSeverityFilter()
+RPPCAPI LogSeverity GetLogSeverityFilter()
 {
     return Filter;
 }
@@ -90,7 +90,7 @@ static void ShortFilePathMessage(char*& ptr, int& len)
     buf[len] = '\n'; \
     buf[(len)+1] = '\0';
 
-EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
+RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
 {
     using std::mutex;
     using std::unique_lock;
@@ -161,7 +161,7 @@ EXTERNC void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
     (void)tag;
 }
 
-EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len)
+RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len)
 {
     #if __ANDROID__
         __android_log_print(ANDROID_LOG_INFO, tag, "EVT %s: %.*s", eventName, len, message);
@@ -171,7 +171,7 @@ EXTERNC void LogEventToDefaultOutput(const char* tag, const char* eventName, con
     (void)tag;
 }
 
-EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
+RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
 {
     if (severity < Filter)
         return;
@@ -197,17 +197,17 @@ EXTERNC void LogFormatv(LogSeverity severity, const char* format, va_list ap)
     va_list ap; va_start(ap, format); \
     LogFormatv(severity, format, ap); \
     va_end(ap);
-EXTERNC void _LogInfo(const char* format, ...) {
+RPPCAPI void _LogInfo(const char* format, ...) {
     WrappedLogFormatv(LogSeverityInfo, format);
 }
-EXTERNC void _LogWarning(const char* format, ...) {
+RPPCAPI void _LogWarning(const char* format, ...) {
     WrappedLogFormatv(LogSeverityWarn, format);
 }
-EXTERNC void _LogError(const char* format, ...) {
+RPPCAPI void _LogError(const char* format, ...) {
     WrappedLogFormatv(LogSeverityError, format);
 }
 
-EXTERNC void LogEvent(const char* eventName, const char* format, ...)
+RPPCAPI void LogEvent(const char* eventName, const char* format, ...)
 {
 #if __clang__
 #if __has_feature(address_sanitizer)
@@ -254,7 +254,7 @@ void _LogExcept(const char* exceptionWhat, const char* format, ...)
     }
 }
 
-EXTERNC const char* _FmtString(const char* format, ...)
+RPPCAPI const char* _FmtString(const char* format, ...)
 {
     static thread_local char errBuf[4096];
     va_list ap; va_start(ap, format);
@@ -263,7 +263,7 @@ EXTERNC const char* _FmtString(const char* format, ...)
     return errBuf;
 }
 
-EXTERNC const char* _LogFilename(const char* longFilePath)
+RPPCAPI const char* _LogFilename(const char* longFilePath)
 {
     if (longFilePath == nullptr) return "(null)";
     const char* eptr = longFilePath + strlen(longFilePath);
@@ -309,7 +309,7 @@ struct funcname_builder
     void append(char ch) { buffer[len++] = ch; }
 };
 
-EXTERNC const char* _LogFuncname(const char* longFuncName)
+RPPCAPI const char* _LogFuncname(const char* longFuncName)
 {
     if (DisableFunctionNames) return "";
     if (longFuncName == nullptr) return "(null)";
