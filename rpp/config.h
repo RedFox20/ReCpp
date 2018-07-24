@@ -8,23 +8,31 @@
 #  endif
 #endif
 
+#ifndef RPP_EXTERNC
+#  ifdef __cplusplus
+#    define RPP_EXTERNC extern "C"
+#  else
+#    define RPP_EXTERNC
+#  endif
+#endif
+
+#ifndef RPPCAPI
+#  define RPPCAPI RPP_EXTERNC RPPAPI
+#endif
+
 #if __cplusplus
-#  ifndef RPP_HAS_CXX17
-#    if _MSC_VER
-#      define RPP_HAS_CXX17 _HAS_CXX17
-#    else
-#      define RPP_HAS_CXX17 __cplusplus >= 201703L
-#    endif
+#  if _MSC_VER
+#    define RPP_HAS_CXX17 _MSVC_LANG > 201402
+#  else
+#    define RPP_HAS_CXX17 __cplusplus >= 201703L
 #  endif
 #endif
 
 #if __cplusplus
-#  ifndef RPP_INLINE_STATIC
-#    if RPP_HAS_CXX17
-#      define RPP_INLINE_STATIC inline static
-#    else
-#      define RPP_INLINE_STATIC static
-#    endif
+#  if RPP_HAS_CXX17
+#    define RPP_INLINE_STATIC inline static
+#  else
+#    define RPP_INLINE_STATIC static
 #  endif
 #endif
 

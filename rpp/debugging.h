@@ -6,26 +6,7 @@
 #include <assert.h> // platform specific assert stuff
 #include <stdarg.h>
 #include <stdio.h> // fprintf
-
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI //__declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
-
-#ifndef RPP_EXTERNC
-#  ifdef __cplusplus
-#    define RPP_EXTERNC extern "C"
-#  else
-#    define RPP_EXTERNC
-#  endif
-#endif
-
-#ifndef RPPCAPI
-#  define RPPCAPI RPP_EXTERNC RPPAPI
-#endif
+#include "config.h"
 
 #ifdef _MSC_VER
 #  include <crtdbg.h>
