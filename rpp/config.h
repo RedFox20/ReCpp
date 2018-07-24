@@ -20,19 +20,23 @@
 #  define RPPCAPI EXTERNC RPPAPI
 #endif
 
-#ifndef RPP_HAS_CXX17
-#  if _MSC_VER
-#    define RPP_HAS_CXX17 _HAS_CXX17
-#  else
-#    define RPP_HAS_CXX17 __cplusplus >= 201703L
+#if __cplusplus
+#  ifndef RPP_HAS_CXX17
+#    if _MSC_VER
+#      define RPP_HAS_CXX17 _HAS_CXX17
+#    else
+#      define RPP_HAS_CXX17 __cplusplus >= 201703L
+#    endif
 #  endif
 #endif
 
-#ifndef INLINE_STATIC
-#  if RPP_HAS_CXX17
-#    define INLINE_STATIC inline static
-#  else
-#    define INLINE_STATIC static
+#if __cplusplus
+#  ifndef RPP_INLINE_STATIC
+#    if RPP_HAS_CXX17
+#      define RPP_INLINE_STATIC inline static
+#    else
+#      define RPP_INLINE_STATIC static
+#    endif
 #  endif
 #endif
 

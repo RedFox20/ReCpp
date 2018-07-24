@@ -537,9 +537,3 @@ namespace rpp
 
 } // namespace rpp
 
-#if RPP_TESTS_DEFINE_MAIN
-int main(int argc, char* argv[])
-{
-    return rpp::test::run_tests(argc, argv);
-}
-#endif
