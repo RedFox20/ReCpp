@@ -8,18 +8,6 @@
 #  endif
 #endif
 
-#ifndef EXTERNC
-#  ifdef __cplusplus
-#    define EXTERNC extern "C"
-#  else
-#    define EXTERNC
-#  endif
-#endif
-
-#ifndef RPPCAPI
-#  define RPPCAPI EXTERNC RPPAPI
-#endif
-
 #if __cplusplus
 #  ifndef RPP_HAS_CXX17
 #    if _MSC_VER

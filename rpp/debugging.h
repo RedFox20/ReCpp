@@ -6,7 +6,26 @@
 #include <assert.h> // platform specific assert stuff
 #include <stdarg.h>
 #include <stdio.h> // fprintf
-#include "config.h"
+
+#ifndef RPPAPI
+#  if _MSC_VER
+#    define RPPAPI //__declspec(dllexport)
+#  else // clang/gcc
+#    define RPPAPI __attribute__((visibility("default")))
+#  endif
+#endif
+
+#ifndef RPP_EXTERNC
+#  ifdef __cplusplus
+#    define RPP_EXTERNC extern "C"
+#  else
+#    define RPP_EXTERNC
+#  endif
+#endif
+
+#ifndef RPPCAPI
+#  define RPPCAPI RPP_EXTERNC RPPAPI
+#endif
 
 #ifdef _MSC_VER
 #  include <crtdbg.h>
@@ -154,11 +173,11 @@ namespace rpp
 #    define __assertion_failure(fmt,...) \
     __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), __assert_format(fmt, ##__VA_ARGS__))
 #  elif __APPLE__
-EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __dead2 __disable_tail_calls;
+RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __dead2 __disable_tail_calls;
 #    define __assertion_failure(fmt,...) \
     __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, __assert_format(fmt, ##__VA_ARGS__))
 #  else
-EXTERNC void __assert_fail(const char *__assertion, const char *__file,
+RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
                            unsigned int __line, const char *__function) __THROW __attribute__ ((__noreturn__));
 #    define __assertion_failure(fmt,...) \
     __assert_fail(__assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
