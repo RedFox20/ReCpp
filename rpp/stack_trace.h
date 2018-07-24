@@ -5,14 +5,7 @@
  */
 #include <stdexcept>
 #include <string>
-
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
+#include "config.h"
 
 namespace rpp
 {

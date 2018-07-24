@@ -14,35 +14,6 @@
 #define RPP_SPRINT_H 1
 #endif
 
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
-
-//// @note Some functions get inlined too aggressively, leading to some serious code bloat
-////       Need to hint the compiler to take it easy ^_^'
-#ifndef NOINLINE
-#  ifdef _MSC_VER
-#    define NOINLINE __declspec(noinline)
-#  else
-#    define NOINLINE __attribute__((noinline))
-#  endif
-#endif
-
-//// @note Some strong hints that some functions are merely wrappers, so should be forced inline
-#ifndef FINLINE
-#  ifdef _MSC_VER
-#    define FINLINE __forceinline
-#  elif __APPLE__
-#    define FINLINE inline __attribute__((always_inline))
-#  else
-#    define FINLINE __attribute__((always_inline))
-#  endif
-#endif
-
 namespace rpp
 {
     using std::string;

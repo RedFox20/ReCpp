@@ -9,6 +9,7 @@
 #include <cstring>    // C string utilities
 #include <string>     // compatibility with std::string
 #include <functional> // std::hash
+#include "config.h"
 
 #ifndef RPP_STRVIEW_H
 #define RPP_STRVIEW_H 1
@@ -34,58 +35,9 @@
 #  pragma warning(disable:4201) // nameless struct/union warning
 #endif
 
-
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
-
-#ifndef RPP_HAS_CXX17
-#  if _MSC_VER
-#    define RPP_HAS_CXX17 _HAS_CXX17
-#  else
-#    define RPP_HAS_CXX17 __cplusplus >= 201703L
-#  endif
-#endif
-
-//// @note Some functions get inlined too aggressively, leading to some serious code bloat
-////       Need to hint the compiler to take it easy ^_^'
-#ifndef NOINLINE
-#  ifdef _MSC_VER
-#    define NOINLINE __declspec(noinline)
-#  else
-#    define NOINLINE __attribute__((noinline))
-#  endif
-#endif
-
-//// @note Some strong hints that some functions are merely wrappers, so should be forced inline
-#ifndef FINLINE
-#  ifdef _MSC_VER
-#    define FINLINE __forceinline
-#  elif __APPLE__
-#    define FINLINE inline __attribute__((always_inline))
-#  else
-#    define FINLINE __attribute__((always_inline))
-#  endif
-#endif
-
-
 namespace rpp
 {
     using std::string;
-
-    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
-    #define RPP_BASIC_INTEGER_TYPEDEFS
-        using byte   = unsigned char;
-        using ushort = unsigned short;
-        using uint   = unsigned int;
-        using ulong  = unsigned long;
-        using int64  = long long;
-        using uint64 = unsigned long long;
-    #endif
 
     /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 

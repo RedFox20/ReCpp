@@ -9,21 +9,6 @@
 #include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
 #include <typeinfo>
 
-/**
- * If you want the tests framework to define the main function, then
- * set this to 1 in PROJECT BUILD SETTINGS,
- * otherwise you have to call rpp::run_tests(...) manually to run any of the tests
- */
-#ifndef RPP_TESTS_DEFINE_MAIN
-#define RPP_TESTS_DEFINE_MAIN 0
-#endif
-
-#if RPP_HAS_CXX17
-#  define INLINE_STATIC inline static
-#else
-#  define INLINE_STATIC static
-#endif
-
 namespace rpp
 {
     using std::string;

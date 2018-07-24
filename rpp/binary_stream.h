@@ -16,44 +16,8 @@
 #  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
 #endif
 
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
-
-namespace rpp /* ReCpp */ 
+namespace rpp
 {
-    ////////////////////////////////////////////////////////////////////////////
-
-    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
-    #define RPP_BASIC_INTEGER_TYPEDEFS
-        using byte   = unsigned char;
-        using ushort = unsigned short;
-        using uint   = unsigned int;
-        using ulong  = unsigned long;
-        using int64  = long long;
-        using uint64 = unsigned long long;
-    #endif
-    
-    #ifndef NOCOPY_NOMOVE
-    #define NOCOPY_NOMOVE(T) \
-            T(T&& fwd)             = delete; \
-            T& operator=(T&& fwd)  = delete; \
-            T(const T&)            = delete; \
-            T& operator=(const T&) = delete;
-    #endif
-    
-    #ifndef RPP_MINMAX_DEFINED
-    #define RPP_MINMAX_DEFINED
-        template<class T> T max(T a, T b) { return a > b ? a : b; }
-        template<class T> T min(T a, T b) { return a < b ? a : b; }
-        template<class T> T min3(T a, T b, T c) { return a < b ? (a<c?a:c) : (b<c?b:c); }
-    #endif
-    
-
     ////////////////////////////////////////////////////////////////////////////
 
 

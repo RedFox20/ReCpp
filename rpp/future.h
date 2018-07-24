@@ -9,29 +9,6 @@
 #include "thread_pool.h"
 #include <type_traits>
 
-
-#ifndef NODISCARD
-    #if __clang__
-        #if __clang_major__ >= 4 || (__clang_major__ == 3 && __clang_minor__ == 9) // since 3.9
-            #define NODISCARD [[nodiscard]]
-        #else
-            #define NODISCARD // not supported in clang <= 3.8
-        #endif
-    #else
-        #define NODISCARD [[nodiscard]]
-    #endif
-#endif
-
-#ifndef FINLINE
-#  ifdef _MSC_VER
-#    define FINLINE __forceinline
-#  elif __APPLE__
-#    define FINLINE inline __attribute__((always_inline))
-#  else
-#    define FINLINE __attribute__((always_inline))
-#  endif
-#endif
-
 namespace rpp
 {
     using std::future;

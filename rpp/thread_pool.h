@@ -14,14 +14,6 @@
 #include <condition_variable>
 #include "delegate.h"
 
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
-
 namespace rpp
 {
     using std::mutex;

@@ -6,6 +6,7 @@
 #include <assert.h> // platform specific assert stuff
 #include <stdarg.h>
 #include <stdio.h> // fprintf
+#include "config.h"
 
 #ifdef _MSC_VER
 #  include <crtdbg.h>
@@ -16,24 +17,6 @@
 #  define PRINTF_CHECKFMT __attribute__((__format__ (__printf__, 1, 2)))
 #  define PRINTF_CHECKFMT2 __attribute__((__format__ (__printf__, 2, 3)))
 #  define PRINTF_FMTSTR
-#endif
-
-#ifdef __cplusplus
-#  define EXTERNC extern "C"
-#else
-#  define EXTERNC
-#endif
-
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
-
-#ifndef RPPCAPI
-#  define RPPCAPI EXTERNC RPPAPI
 #endif
 
 typedef enum {

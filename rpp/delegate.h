@@ -56,21 +56,10 @@
 #include <type_traits> // std::decay_t<>
 #include <cassert>
 #include <utility> // std::forward
-
-#ifndef RPP_HAS_CXX17
-#  if _MSC_VER
-#    define RPP_HAS_CXX17 _HAS_CXX17
-#  else
-#    define RPP_HAS_CXX17 __cplusplus >= 201703L
-#  endif
-#endif
+#include "strview.h"
 
 namespace rpp
 {
-    #if INTPTR_MAX == INT64_MAX
-        #define RPP_64BIT 1
-    #endif
-
     /**
      * @brief Function delegate to encapsulate global functions,
      *        instance member functions, lambdas and functors

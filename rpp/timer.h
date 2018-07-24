@@ -4,14 +4,7 @@
  * Distributed under MIT Software License
  */
 #include <stdint.h>
-
-#ifndef RPPAPI
-#  if _MSC_VER
-#    define RPPAPI __declspec(dllexport)
-#  else // clang/gcc
-#    define RPPAPI __attribute__((visibility("default")))
-#  endif
-#endif
+#include "config.h"
 
 #if __cplusplus
 namespace rpp
