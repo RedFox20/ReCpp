@@ -87,7 +87,7 @@
 #  endif
 #endif
 
-#ifndef __cplusplus
+#ifdef __cplusplus
 namespace rpp
 {
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
