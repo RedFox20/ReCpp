@@ -87,6 +87,7 @@
 #  endif
 #endif
 
+#ifndef __cplusplus
 namespace rpp
 {
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
@@ -106,3 +107,4 @@ namespace rpp
         template<class T> T min3(T a, T b, T c) { return a < b ? (a<c?a:c) : (b<c?b:c); }
     #endif
 }
+#endif
