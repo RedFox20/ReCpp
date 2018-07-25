@@ -630,14 +630,23 @@ namespace rpp
     class RPPAPI file_writer : public binary_stream, protected stream_source
     {
         rpp::file* File = nullptr;
+        rpp::file Owned;
     public:
         file_writer() noexcept : binary_stream{this} {}
-        explicit file_writer(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
+        explicit file_writer(rpp::file& file)      noexcept : binary_stream{this},           File(&file) {}
         file_writer(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
+
+        explicit file_writer(const string& pathToFile) noexcept
+            : binary_stream{this}, File{&Owned}, Owned{pathToFile, IOFlags::CREATENEW} {}
+
+        file_writer(const string& pathToFile, int capacity) noexcept
+            : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, IOFlags::CREATENEW} {}
+
         ~file_writer() noexcept;
+
         void set_file(rpp::file& file) noexcept { File = &file; }
         NOCOPY_NOMOVE(file_writer)
-
+        
         bool stream_good() const noexcept override { return File && File->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
         void stream_flush() noexcept override;
@@ -654,11 +663,20 @@ namespace rpp
     class RPPAPI file_reader : public binary_stream, protected stream_source
     {
         rpp::file* File = nullptr;
+        rpp::file Owned;
     public:
         file_reader() noexcept : binary_stream{this} {}
-        explicit file_reader(rpp::file& file)      noexcept : binary_stream{this}, File(&file) {}
+        explicit file_reader(rpp::file& file)      noexcept : binary_stream{this},           File(&file) {}
         file_reader(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
+        
+        explicit file_reader(const string& pathToFile) noexcept
+            : binary_stream{this}, File{&Owned}, Owned{pathToFile, IOFlags::READONLY} {}
+        
+        file_reader(const string& pathToFile, int capacity) noexcept
+            : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, IOFlags::READONLY} {}
+        
         ~file_reader() noexcept;
+
         void set_file(rpp::file& file) noexcept { File = &file; }
         NOCOPY_NOMOVE(file_reader)
 
