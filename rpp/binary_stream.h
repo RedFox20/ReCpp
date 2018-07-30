@@ -653,10 +653,12 @@ namespace rpp
         // Currently flushed size of the file stream
         int stream_size() const { return File->size(); }
 
-        void seek(int filepos, int seekmode = 0)
+        // Flushes any write buffers and seeks to the given position in the stream
+        // @return The new position in the stream
+        int seek(int filepos, int seekmode = 0)
         {
             flush_write_buffer();
-            File->seek(filepos, seekmode);
+            return File->seek(filepos, seekmode);
         }
 
         void set_file(rpp::file& file) noexcept { File = &file; }
@@ -695,10 +697,12 @@ namespace rpp
         // Tells the current virtual read position of the stream
         int tell() const { return File->tell() - size(); }
 
-        void seek(int filepos, int seekmode = 0)
+        // Clears any read buffers and seeks to the given position in the stream
+        // @return The new position in the stream
+        int seek(int filepos, int seekmode = 0)
         {
             clear();
-            File->seek(filepos, seekmode);
+            return File->seek(filepos, seekmode);
         }
 
         void set_file(rpp::file& file) noexcept { File = &file; }

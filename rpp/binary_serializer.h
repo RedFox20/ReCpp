@@ -41,12 +41,12 @@ namespace rpp
         template<class U> static void binary_serialize(const T* inst, int offset, binary_stream& w)
         {
             U& var = *(U*)((byte*)inst + offset);
-            w << var;
+            operator<<(w, var);
         }
         template<class U> static void binary_deserialize(T* inst, int offset, binary_stream& r)
         {
             U& var = *(U*)((byte*)inst + offset);
-            r >> var;
+            operator>>(r, var);
         }
 
         template<class U> static void string_serialize(const T* inst, int offset, string_buffer& w)
@@ -72,7 +72,7 @@ namespace rpp
             m.bdeserialize = &serializable::template binary_deserialize<U>;
             m.sserialize   = &serializable::template string_serialize<U>;
             m.sdeserialize = &serializable::template string_deserialize<U>;
-            members.emplace_back(move(m));
+            members.emplace_back(std::move(m));
         }
 
         template<class U> void bind_name(strview name, U& elem) noexcept
