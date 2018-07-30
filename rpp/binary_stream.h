@@ -650,6 +650,9 @@ namespace rpp
         // Tells the current virtual write position of the stream
         int tell() const { return File->tell() + writepos(); }
 
+        // Currently flushed size of the file stream
+        int stream_size() const { return File->size(); }
+
         void seek(int filepos, int seekmode = 0)
         {
             flush_write_buffer();
