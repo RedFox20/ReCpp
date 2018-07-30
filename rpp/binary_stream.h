@@ -636,11 +636,14 @@ namespace rpp
         explicit file_writer(rpp::file& file)      noexcept : binary_stream{this},           File(&file) {}
         file_writer(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
 
-        explicit file_writer(const string& pathToFile) noexcept
-            : binary_stream{this}, File{&Owned}, Owned{pathToFile, IOFlags::CREATENEW} {}
+        /**
+         * Valid flags: READWRITE, CREATENEW, APPEND
+         */
+        explicit file_writer(const string& pathToFile, IOFlags flags = CREATENEW) noexcept
+            : binary_stream{this}, File{&Owned}, Owned{pathToFile, flags} {}
 
-        file_writer(const string& pathToFile, int capacity) noexcept
-            : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, IOFlags::CREATENEW} {}
+        file_writer(const string& pathToFile, int capacity, IOFlags flags = CREATENEW) noexcept
+            : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, flags} {}
 
         ~file_writer() noexcept;
 
