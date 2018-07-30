@@ -207,7 +207,7 @@ namespace rpp
         /**
          * @brief Flush write buffer only. Underlying stream will take care of its own things.
          */
-        void flush_buffer();
+        void flush_write_buffer();
 
     private:
         NOINLINE void ensure_space(int numBytes);
@@ -647,6 +647,15 @@ namespace rpp
 
         ~file_writer() noexcept;
 
+        // Tells the current virtual write position of the stream
+        int tell() const { return File->tell() + writepos(); }
+
+        void seek(int filepos, int seekmode = 0)
+        {
+            flush_write_buffer();
+            File->seek(filepos, seekmode);
+        }
+
         void set_file(rpp::file& file) noexcept { File = &file; }
         NOCOPY_NOMOVE(file_writer)
         
@@ -679,6 +688,15 @@ namespace rpp
             : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, IOFlags::READONLY} {}
         
         ~file_reader() noexcept;
+
+        // Tells the current virtual read position of the stream
+        int tell() const { return File->tell() - size(); }
+
+        void seek(int filepos, int seekmode = 0)
+        {
+            clear();
+            File->seek(filepos, seekmode);
+        }
 
         void set_file(rpp::file& file) noexcept { File = &file; }
         NOCOPY_NOMOVE(file_reader)

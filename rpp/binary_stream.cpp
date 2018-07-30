@@ -86,11 +86,11 @@ namespace rpp
     void binary_stream::flush() 
     {
         if (!Src) return;
-        flush_buffer();
+        flush_write_buffer();
         Src->stream_flush(); // now ask the source itself to flush the stuff
     }
 
-    void binary_stream::flush_buffer()
+    void binary_stream::flush_write_buffer()
     {
         if (WritePos) // were we writing something?
         {
