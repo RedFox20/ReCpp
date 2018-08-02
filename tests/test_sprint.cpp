@@ -1,4 +1,5 @@
 #include <rpp/sprint.h>
+#include <cfloat> // DBL_MAX
 #include <rpp/tests.h>
 using namespace rpp;
 
