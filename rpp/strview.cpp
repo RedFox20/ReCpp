@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring> // memcpy
 #include <locale> // toupper
+#include <cfloat> // DBL_MAX
 //#include <charconv> // to_chars, C++17, not implemented yet
 
 namespace rpp

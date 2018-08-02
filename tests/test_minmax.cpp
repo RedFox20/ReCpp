@@ -1,4 +1,6 @@
 #include <rpp/minmax.h>
+#include <cfloat>  // FLT_MIN
+#include <climits> // INT_MIN
 #include <rpp/tests.h>
 
 TestImpl(test_minmax)
