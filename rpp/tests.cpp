@@ -246,8 +246,8 @@ namespace rpp
         {
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
-                consolef(Yellow, "Caught Expected Exception in %s::%s:\n  %s\n",
-                    name.str, test.name.str, e.what());
+                consolef(Yellow, "Caught Expected Exception in %s::%s\n",
+                                 name.str, test.name.str);
             }
             else
             {

@@ -46,7 +46,7 @@ TestImpl(test_threadpool)
         string s = "Data";
         rpp::task_delegate<void()> fun = [x=s, &s, &sync]()
         {
-            printf("generic_task: %s\n", x.c_str());
+            //printf("generic_task: %s\n", x.c_str());
             s = "completed";
             sync.notify();
         };
@@ -61,7 +61,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_performance)
     {
-        auto numbers = vector<int>(133333337);
+        auto numbers = vector<int>(13333337);
         int* ptr = numbers.data();
         int  len = (int)numbers.size();
 
@@ -126,14 +126,14 @@ TestImpl(test_threadpool)
         int times_launched = 0;
         auto* task = rpp::parallel_task([&] {
             ++times_launched;
-            ::sleep_for(100ms);
+            ::sleep_for(10ms);
         });
         task->wait();
         AssertThat(times_launched, 1);
 
         task = rpp::parallel_task([&] {
             ++times_launched;
-            ::sleep_for(100ms);
+            ::sleep_for(10ms);
         });
         task->wait();
         AssertThat(times_launched, 2);
@@ -141,20 +141,20 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_resurrection)
     {
-        thread_pool::global().max_task_idle_time(1);
+        thread_pool::global().max_task_idle_time(0.25f);
         thread_pool::global().clear_idle_tasks();
         AssertThat(thread_pool::global().active_tasks(), 0);
 
         atomic_int times_launched {0};
-        rpp::parallel_task([&] { times_launched += 1; })->wait(2000);
+        rpp::parallel_task([&] { times_launched += 1; })->wait(1000);
         AssertThat((int)times_launched, 1);
 
         printf("Waiting for pool tasks to die naturally...\n");
-        ::sleep_for(1s);
+        ::sleep_for(0.3s);
         printf("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 
-        })->wait(2000);
+        })->wait(1000);
         AssertThat((int)times_launched, 2);
 
         thread_pool::global().max_task_idle_time(2);
@@ -166,25 +166,25 @@ TestImpl(test_threadpool)
         auto func = [&]() {
             times_launched += 1;
             pool_task* subtasks[5] = {
-                rpp::parallel_task([&]() { times_launched += 1; }),
-                rpp::parallel_task([&]() { times_launched += 1; }),
-                rpp::parallel_task([&]() { times_launched += 1; }),
-                rpp::parallel_task([&]() { times_launched += 1; }),
-                rpp::parallel_task([&]() { times_launched += 1; }),
+                parallel_task([&]() { times_launched += 1; }),
+                parallel_task([&]() { times_launched += 1; }),
+                parallel_task([&]() { times_launched += 1; }),
+                parallel_task([&]() { times_launched += 1; }),
+                parallel_task([&]() { times_launched += 1; }),
             };
 
             for (auto* task : subtasks)
-                AssertThat(task->wait(2000), pool_task::finished);
+                AssertThat(task->wait(1000), pool_task::finished);
         };
         pool_task* tasks[4] = {
-            rpp::parallel_task(func),
-            rpp::parallel_task(func),
-            rpp::parallel_task(func),
-            rpp::parallel_task(func),
+            parallel_task(func),
+            parallel_task(func),
+            parallel_task(func),
+            parallel_task(func),
         };
 
         for (auto* task : tasks)
-            AssertThat(task->wait(2000), pool_task::finished);
+            AssertThat(task->wait(1000), pool_task::finished);
 
         int expected = 4 * 6;
         AssertThat((int)times_launched, expected);

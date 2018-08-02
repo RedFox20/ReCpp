@@ -1,4 +1,5 @@
 #include <rpp/binary_stream.h>
+#include <rpp/minmax.h>
 #include <rpp/tests.h>
 
 TestImpl(test_binary_stream)

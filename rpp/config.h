@@ -99,12 +99,5 @@ namespace rpp
         using int64  = long long;
         using uint64 = unsigned long long;
     #endif
-
-    #ifndef RPP_MINMAX_DEFINED
-    #define RPP_MINMAX_DEFINED
-        template<class T> T max(T a, T b) { return a > b ? a : b; }
-        template<class T> T min(T a, T b) { return a < b ? a : b; }
-        template<class T> T min3(T a, T b, T c) { return a < b ? (a<c?a:c) : (b<c?b:c); }
-    #endif
 }
 #endif

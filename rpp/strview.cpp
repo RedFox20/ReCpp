@@ -1,11 +1,12 @@
 /**
- * String Tokenizer/View, Copyright (c) 2014 - Jorma Rebane
+ * String Tokenizer/View, Copyright (c) 2014 - 2018, Jorma Rebane
  */
 #include "strview.h"
 #include <math.h> // use math.h for GCC compatibility
 #include <cstdlib>
 #include <cstring> // memcpy
 #include <locale> // toupper
+//#include <charconv> // to_chars, C++17, not implemented yet
 
 namespace rpp
 {
@@ -601,7 +602,7 @@ namespace rpp
         char ch       = *s;
 
         if (ch == '-')
-            { negative = true; ++s; } // change sign and skip '-'
+        { negative = true; ++s; } // change sign and skip '-'
         else if (ch == '+')  ++s; // ignore '+'
 
         for (; s < e && '0' <= (ch = *s) && ch <= '9'; ++s) {
@@ -623,9 +624,10 @@ namespace rpp
         if (s[0] == '0' && s[1] == 'x') s += 2;
         for (char ch; s < e; ++s) {
             int digit;
-            if ('0' <= (ch = *s) && ch <= '9') digit = ch - '0';
-            else if ('A' <= ch && ch <= 'F')   digit = ch - '7'; // hack 'A'-10 == '7'
-            else if ('a' <= ch && ch <= 'f')   digit = ch - 'W'; // hack 'a'-10 == 'W'
+            ch = *s;
+            if      ('0' <= ch && ch <= '9') digit = ch - '0';
+            else if ('A' <= ch && ch <= 'F') digit = ch - '7'; // hack 'A'-10 == '7'
+            else if ('a' <= ch && ch <= 'f') digit = ch - 'W'; // hack 'a'-10 == 'W'
             else break; // invalid ch
             intPart = (intPart << 4) + digit; // intPart = intPart*16 + digit
         }
@@ -635,29 +637,38 @@ namespace rpp
 
     int _tostring(char* buffer, double f)
     {
+        //// @todo Implement scientific notation?
         if (isnan(f)) {
             buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
             return 3;
         }
-        auto value = (int64)f;
-        f -= value; // -1.2 -= -1 --> -0.2
+        double g;
+        uint64 absIntegral;
+        // we need ceil and floor for handling -DBL_MAX edge cases
+        if (f <= -DBL_MAX || +DBL_MAX <= f) {
+            double i = f <= -DBL_MAX ? ceil(f) : floor(f);
+            g = abs(f - i);
+            absIntegral = (int64)abs(i);
+        } else {
+            int64 i = (uint64)f;
+            g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
+            absIntegral = abs(i);
+        }
         char* end = buffer;
-        if (f < 0.0) {
-            f = -f;
-            value = -value;
+        if (f < -0.0) {
             *end++ = '-';
         }
-        end += _tostring(end, value);
-
-        if (f != 0.0) { // do we have a fraction ?
+        end += _tostring(end, absIntegral);
+        
+        if (g != 0.0) { // do we have a fraction ?
             double cmp = 0.00001; // 6 decimal places max
             *end++ = '.'; // place the fraction mark
-            double x = f; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
+            double x = g; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
             for (;;) {
                 x *= 10;
-                value = (int64)x;
-                *end++ = '0' + (value % 10);
-                x -= value;
+                int64 ix = (int64)x;
+                *end++ = '0' + (ix % 10);
+                x -= ix;
                 if (x < cmp) // break from 0.750000011 cases
                     break;
                 cmp *= 10.0;
@@ -670,11 +681,17 @@ namespace rpp
     template<class T> static int _tostring(char* buffer, char* end, T value)
     {
         char* start = end; // mark start for strrev after:
-
-        do { // write out remainder of 10 + '0' while we still have value
-            *end++ = '0' + (value % 10);
-            value /= 10;
-        } while (value != 0);
+        if (value >= 0) {
+            do { // write out remainder of 10 + '0' while we still have value
+                *end++ = '0' + (value % 10);
+                value /= 10;
+            } while (value != 0);
+        } else {
+            do { // negative numbers require a special case because of INT64_MIN
+                *end++ = '0' - (value % 10);
+                value /= 10;
+            } while (value != 0);
+        }
         *end = '\0'; // always null-terminate
 
         char* rev = end; // for strrev, we'll need a helper pointer
@@ -686,13 +703,11 @@ namespace rpp
         return (int)(end - buffer); // length of the string
     }
 
-    template<class T> static char* _write_sign(char* buffer, T& value)
+    template<class T> static char* _write_sign(char* buffer, const T& value)
     {
         char* end = buffer;
-        if (value < 0) { // if neg, abs and writeout '-'
-            value = -value;	// flip sign
-            *end++ = '-';	// neg
-        }
+        if (value < 0) // if neg, abs and writeout '-'
+            *end++ = '-'; // neg
         return end;
     }
 
@@ -713,8 +728,6 @@ namespace rpp
     {
         return _tostring(buffer, buffer, value);
     }
-
-
 
 
     ///////////// line_parser

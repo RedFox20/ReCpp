@@ -4,22 +4,9 @@
  * Distributed under MIT Software License
  */
 #include "strview.h"
+#include "minmax.h"
 #include <math.h>  // fabsf, fabs
 #include <vector> // for vector<Vector3> and vector<int>
-
-// You can disable RPP SSE intrinsics by declaring #define RPP_SSE_INTRINSICS 0 before including <rpp/vec.h>
-#ifndef RPP_SSE_INTRINSICS
-#  if _M_IX86_FP || _M_AMD64 || _M_X64 || __SSE2__
-#    define RPP_SSE_INTRINSICS 1
-#  endif
-#endif
-
-#if RPP_SSE_INTRINSICS
-#  include <emmintrin.h>
-#endif
-
-#undef min
-#undef max
 
 #if _MSC_VER
 #pragma warning(push)
@@ -90,40 +77,6 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
-#if RPP_SSE_INTRINSICS && !__clang__ // disabled for now due to __clang__ always picking std::sqrt etc.
-    static inline double sqrt(const double& d) noexcept
-    { auto m = _mm_set_sd(d); return _mm_cvtsd_f64(_mm_sqrt_sd(m, m)); }
-    static inline float sqrt(const float& f) noexcept
-    { return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(f))); }
-
-    static inline float min(const float& a, const float& b) noexcept
-    { return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(a), _mm_set_ss(b))); }
-    static inline double min(const double& a, const double& b) noexcept
-    { return _mm_cvtsd_f64(_mm_min_sd(_mm_set_sd(a), _mm_set_sd(b))); }
-
-    static inline float max(const float& a, const float& b) noexcept
-    { return _mm_cvtss_f32(_mm_max_ss(_mm_set_ss(a), _mm_set_ss(b))); }
-    static inline double max(const double& a, const double& b) noexcept
-    { return _mm_cvtsd_f64(_mm_max_sd(_mm_set_sd(a), _mm_set_sd(b))); }
-
-    static inline float abs(const float& a) noexcept
-    { return _mm_cvtss_f32(_mm_andnot_ps(_mm_castsi128_ps(_mm_set1_epi32(0x80000000)), _mm_set_ss(a))); }
-    static inline double abs(const double& a) noexcept
-    { return _mm_cvtsd_f64(_mm_andnot_pd(_mm_castsi128_pd(_mm_set1_epi64x(0x8000000000000000UL)), _mm_set_sd(a))); }
-#endif
-
-#ifndef RPP_MINMAX_DEFINED
-#define RPP_MINMAX_DEFINED
-    template<class T> static constexpr const T& min(const T& a, const T& b) { return a < b ? a : b; }
-    template<class T> static constexpr const T& max(const T& a, const T& b) { return a > b ? a : b; }
-    template<class T> static constexpr const T& min3(const T& a, const T& b, const T& c)
-    { return a < b ? (a<c?a:c) : (b<c?b:c); }
-    template<class T> static constexpr const T& max3(const T& a, const T& b, const T& c)
-    { return a > b ? (a>c?a:c) : (b>c?b:c); }
-#endif
-
-    ///////////////////////////////////////////////////////////////////////////////
-
     /** @return TRUE if abs(value) is very close to 0.0, epsilon controls the threshold */
     template<class T> static constexpr bool nearlyZero(const T& value, const T epsilon = (T)0.001)
     {
@@ -173,7 +126,7 @@ namespace rpp
         bool almostEqual(const Vector2& b) const;
 
         /** @brief Set new XY values */
-        void set(float x, float y);
+        void set(float newX, float newY);
     
         /** @return Length of the vector */
         float length() const;
@@ -299,7 +252,7 @@ namespace rpp
         bool almostEqual(const Vector2d& b) const;
 
         /** @brief Set new XY values */
-        void set(double x, double y);
+        void set(double newX, double newY);
     
         /** @return Length of the vector */
         double length() const;

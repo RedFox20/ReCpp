@@ -30,7 +30,9 @@ namespace rpp
     using std::cv_status;
     using std::exception;
     using std::exception_ptr;
-    using seconds_t = std::chrono::seconds;
+    using seconds_t  = std::chrono::seconds;
+    using fseconds_t = std::chrono::duration<float>;
+    using dseconds_t = std::chrono::duration<double>;
     using milliseconds_t = std::chrono::milliseconds;
     template<class T> using duration_t = std::chrono::duration<T>;
 
@@ -126,7 +128,7 @@ namespace rpp
 
         bool notify_once() // only notify if count <= 0
         {
-            bool shouldNotify = false;
+            bool shouldNotify;
             { lock_guard<mutex> lock{ m };
                 shouldNotify = value <= 0;
                 if (shouldNotify)
@@ -248,7 +250,7 @@ namespace rpp
         action<int, int> rangeTask;
         int rangeStart  = 0;
         int rangeEnd    = 0;
-        int maxIdleTime = 15;
+        float maxIdleTime = 15;
         string trace;
         exception_ptr error;
         volatile bool taskRunning = false; // an active task is being executed
@@ -265,10 +267,11 @@ namespace rpp
 
         pool_task();
         ~pool_task() noexcept;
+        NOCOPY_NOMOVE(pool_task)
 
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param maxIdleSeconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
-        void max_idle_time(int maxIdleSeconds = 15);
+        void max_idle_time(float maxIdleSeconds = 15);
 
         // assigns a new parallel for task to run
         // @warning This range task does not retain any resources, so you must ensure
@@ -312,7 +315,7 @@ namespace rpp
     {
         mutex tasksMutex;
         vector<unique_ptr<pool_task>> tasks;
-        int taskMaxIdleTime = 15; // new task timeout in seconds
+        float taskMaxIdleTime = 15; // new task timeout in seconds
         int coreCount = 0;
         atomic_bool rangeRunning { false }; // whether parallel range is running or not
 
@@ -323,6 +326,7 @@ namespace rpp
 
         thread_pool();
         ~thread_pool() noexcept;
+        NOCOPY_NOMOVE(thread_pool)
 
         // number of thread pool tasks that are currently running
         int active_tasks() noexcept;
@@ -345,7 +349,7 @@ namespace rpp
         // this does not notify already idle tasks
         // @param maxIdleSeconds Maximum idle seconds before tasks are abandoned and thread handle is released
         //                       Setting this to 0 keeps pool tasks alive forever
-        void max_task_idle_time(int maxIdleSeconds = 15) noexcept;
+        void max_task_idle_time(float maxIdleSeconds = 15) noexcept;
 
         /**
          * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of

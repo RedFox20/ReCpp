@@ -99,7 +99,19 @@ TestImpl(test_sprint)
 
         println("float_format:", sb.view());
         AssertThat(sb.view(), "-0.1708;-2.001199;0.995899");
+    }
 
+    TestCase(float_edge_cases)
+    {
+        double x = +DBL_MAX;
+        double y = -DBL_MAX;
+        double z = +DBL_MIN;
+        double w = -DBL_MIN;
+        rpp::string_buffer sb;
+        sb.separator = ";";
+        sb.write(x, y, z, w);
+        println("float_edge_case:", sb.view());
+        AssertThat(sb.view(), "9223372036854775808;-9223372036854775808;0.0;-0.0");
     }
 
     TestCase(write_hex)

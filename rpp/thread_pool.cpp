@@ -81,7 +81,7 @@ namespace rpp
         kill();
     }
 
-    void pool_task::max_idle_time(int maxIdleSeconds) { maxIdleTime = maxIdleSeconds; }
+    void pool_task::max_idle_time(float maxIdleSeconds) { maxIdleTime = maxIdleSeconds; }
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
@@ -148,7 +148,7 @@ namespace rpp
         {
             if (timeoutMillis)
             {
-                if (cv.wait_for(lock, std::chrono::milliseconds(timeoutMillis)) == std::cv_status::timeout)
+                if (cv.wait_for(lock, milliseconds_t(timeoutMillis)) == std::cv_status::timeout)
                     return timeout;
             }
             else
@@ -213,7 +213,7 @@ namespace rpp
                         cv.notify_all();
                         return;
                     }
-                    range   = move(rangeTask);
+                    range   = rangeTask;
                     generic = move(genericTask);
                     rangeTask   = {};
                     genericTask = {};
@@ -261,9 +261,9 @@ namespace rpp
                 return false;
             if (got_task())
                 return true;
-            if (maxIdleTime)
+            if (maxIdleTime > 0.000001f)
             {
-                if (cv.wait_for(lock, seconds_t(maxIdleTime)) == cv_status::timeout)
+                if (cv.wait_for(lock, fseconds_t(maxIdleTime)) == cv_status::timeout)
                     return got_task(); // make sure to check for task even if it timeouts
             }
             else
@@ -393,7 +393,7 @@ namespace rpp
         return task;
     }
 
-    void thread_pool::max_task_idle_time(int maxIdleSeconds) noexcept
+    void thread_pool::max_task_idle_time(float maxIdleSeconds) noexcept
     {
         lock_guard<mutex> lock{tasksMutex};
         taskMaxIdleTime = maxIdleSeconds;

@@ -4,6 +4,7 @@
  * Distributed under MIT Software License
  */
 #include "strview.h"
+#include "minmax.h"
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 #  include <mutex>
 #  include "sockets.h"
