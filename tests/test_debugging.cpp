@@ -16,8 +16,6 @@ TestImpl(test_debugging)
         float d = 42.0f;
         char  e = '4';
 
-        printf("aaabs" __wrap_args());
-
         LogInfo("Log(0)");
         LogInfo("Log(1): '%s'", a);
         LogInfo("Log(2): '%s' '%s'", a, b);
