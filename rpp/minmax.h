@@ -3,7 +3,7 @@
 // You can disable RPP SSE intrinsics by declaring 
 // #define RPP_SSE_INTRINSICS 0 before including <rpp/minmax.h>
 #ifndef RPP_SSE_INTRINSICS
-#  if _M_IX86_FP || _M_AMD64 || _M_X64 || __SSE2__
+#  if (_M_IX86_FP || _M_AMD64 || _M_X64 || __SSE2__)
 #    define RPP_SSE_INTRINSICS 1
 #  endif
 #endif
@@ -62,15 +62,15 @@ namespace rpp
     inline double sqrt(const double& f) noexcept { return ::sqrt(f);  }
 #endif
 
-    template<class T> static constexpr const T& min(const T& a, const T& b) { return a < b ?  a : b; }
-    template<class T> static constexpr const T& max(const T& a, const T& b) { return a > b ?  a : b; }
-    template<class T> static constexpr T abs(const T& a)                    { return a < 0 ? -a : a; }
+    template<class T> constexpr T min(const T& a, const T& b) { return a < b ?  a : b; }
+    template<class T> constexpr T max(const T& a, const T& b) { return a > b ?  a : b; }
+    template<class T> constexpr T abs(const T& a)             { return a < 0 ? -a : a; }
 
-    template<class T> static constexpr const T& min3(const T& a, const T& b, const T& c)
+    template<class T> constexpr T min3(const T& a, const T& b, const T& c)
     {
         return a < b ? (a<c ? a : c) : (b<c ? b : c);
     }
-    template<class T> static constexpr const T& max3(const T& a, const T& b, const T& c)
+    template<class T> constexpr T max3(const T& a, const T& b, const T& c)
     {
         return a > b ? (a>c ? a : c) : (b>c ? b : c);
     }

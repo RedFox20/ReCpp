@@ -44,7 +44,7 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} CURRENT_BUILD_TYPE)
 
 # Add compiler specific flags
 if(CLANG OR GCC)
-    add_compile_options(-Wall)
+    add_compile_options(-Wall -fPIC)
     if(CLANG)
         message("Configure for Clang++ ${CMAKE_CXX_COMPILER_VERSION}")
         add_compile_options(-stdlib=libc++)

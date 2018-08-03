@@ -2,6 +2,7 @@
 #include <cfloat>  // FLT_MIN
 #include <climits> // INT_MIN
 #include <rpp/tests.h>
+using namespace std::literals;
 
 TestImpl(test_minmax)
 {
@@ -22,6 +23,8 @@ TestImpl(test_minmax)
         AssertThat(rpp::min(5.0, 9.0), 5.0);
         AssertThat(rpp::min(-DBL_MAX, DBL_MAX), -DBL_MAX);
         AssertThat(rpp::min(-10.0, -5.0), -10.0);
+
+        AssertThat(rpp::min("aaa"s, "bbb"s), "aaa"s);
     }
 
     TestCase(max)
@@ -37,6 +40,8 @@ TestImpl(test_minmax)
         AssertThat(rpp::max(5.0, 9.0), 9.0);
         AssertThat(rpp::max(-DBL_MAX, DBL_MAX), DBL_MAX);
         AssertThat(rpp::max(-10.0, -5.0), -5.0);
+
+        AssertThat(rpp::max("aaa"s, "bbb"s), "bbb"s);
     }
 
     TestCase(abs)
@@ -79,6 +84,8 @@ TestImpl(test_minmax)
         AssertThat(rpp::min3(+5.0, -5.0, +9.0), -5.0);
         AssertThat(rpp::min3(+9.0, +5.0, -5.0), -5.0);
         AssertThat(rpp::min3(-DBL_MAX, 0.0, DBL_MAX), -DBL_MAX);
+
+        AssertThat(rpp::min3("xxx"s, "yyy"s, "zzz"s), "xxx"s);
     }
 
     TestCase(max3)
@@ -97,6 +104,8 @@ TestImpl(test_minmax)
         AssertThat(rpp::max3(+5.0, -5.0, +9.0), +9.0);
         AssertThat(rpp::max3(+9.0, +5.0, -5.0), +9.0);
         AssertThat(rpp::max3(-DBL_MAX, 0.0, DBL_MAX), DBL_MAX);
+
+        AssertThat(rpp::max3("xxx"s, "yyy"s, "zzz"s), "zzz"s);
     }
 
 };
