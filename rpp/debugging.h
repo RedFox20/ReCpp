@@ -8,8 +8,6 @@
 #include <stdio.h> // fprintf
 #include "config.h"
 
-#pragma GCC diagnostic ignored "-Wformat-extra-args"
-
 #ifdef _MSC_VER
 #  include <crtdbg.h>
 #  define PRINTF_CHECKFMT
@@ -19,6 +17,9 @@
 #  define PRINTF_CHECKFMT __attribute__((__format__ (__printf__, 1, 2)))
 #  define PRINTF_CHECKFMT2 __attribute__((__format__ (__printf__, 2, 3)))
 #  define PRINTF_FMTSTR
+#endif
+#if __GNUG__
+#  pragma GCC diagnostic ignored "-Wformat-extra-args"
 #endif
 
 typedef enum {
