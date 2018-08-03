@@ -8,6 +8,8 @@
 #include <stdio.h> // fprintf
 #include "config.h"
 
+#pragma GCC diagnostic ignored "-Wformat-extra-args"
+
 #ifdef _MSC_VER
 #  include <crtdbg.h>
 #  define PRINTF_CHECKFMT
@@ -74,9 +76,9 @@ RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened 
 RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func name
 
 #ifndef QUIETLOG
-#define __log_format(format, file, line, func) ("%s:%d %s $ " format), _LogFilename(file), line, _LogFuncname(func)
+#define __log_format(format, file, line, func) "%s:%d %s $ " format, _LogFilename(file), line, _LogFuncname(func)
 #else
-#define __log_format(format, file, line, func) ("$ " format)
+#define __log_format(format, file, line, func) "$ " format
 #endif
 
 #if __cplusplus
@@ -97,7 +99,7 @@ namespace rpp
 #endif
 }
 
-#define __get_nth_wrap_arg(_unused, _12, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
+#define __get_nth_wrap_arg(_zero, _12, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
 #define __wrap_args0(...)
 
 // MSVC needs a proxy macro to properly expand __VA_ARGS__
@@ -146,7 +148,7 @@ namespace rpp
 
 
 // wraps and formats message string for assertions, std::string and rpp::strview are wrapped and .c_str() called
-#define __assert_format(fmt, ...) _FmtString((fmt) __wrap_args(__VA_ARGS__) )
+#define __assert_format(fmt, ...) _FmtString(fmt __wrap_args(__VA_ARGS__) )
 
 
 #if defined __APPLE__ || defined __clang__ // iOS or just clang
@@ -189,7 +191,7 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
  * No assertions are triggered.
  * NO FILE:LINE information is given. Info logs don't need it.
  */
-#define LogInfo(format, ...) _LogInfo(("$ " format) __wrap_args( __VA_ARGS__ ) )
+#define LogInfo(format, ...) _LogInfo("$ " format __wrap_args( __VA_ARGS__ ) )
 /**
  * Logs a warning to the backing error mechanism (Crashlytics on iOS)
  * No assertions are triggered.
