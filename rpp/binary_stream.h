@@ -476,7 +476,7 @@ namespace rpp
     template<class T, class A>
     binary_stream& operator>>(binary_stream& r, std::vector<T, A>& out)
     {
-        return r.read_vector(out);
+        return r.read(out);
     }
     inline binary_stream& operator>>(binary_stream& r, binary_stream& m(binary_stream&)) { return m(r); }
 
