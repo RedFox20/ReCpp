@@ -400,7 +400,7 @@ namespace rpp
         strview      peek_strview(); /** @brief Peeks a length specified [strlen_t len][data] string view */
     
         template<class T, class A>
-        binary_stream& read_vector(std::vector<T, A>& out)
+        binary_stream& read(std::vector<T, A>& out)
         {
             int n = read_int();
             out.clear();
@@ -425,7 +425,7 @@ namespace rpp
         }
 
         template<class T, class A, class Reader>
-        binary_stream& read_vector(std::vector<T, A>& out, const Reader& reader)
+        binary_stream& read(std::vector<T, A>& out, const Reader& reader)
         {
             int n = read_int();
             out.clear();

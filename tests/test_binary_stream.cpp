@@ -24,7 +24,7 @@ TestImpl(test_binary_stream)
         AssertThat(buf.read_string(), "");
 
         std::vector<std::string> noStrings;
-        buf.read_vector(noStrings);
+        buf.read(noStrings);
         AssertThat(noStrings.empty(), true);
     }
 
@@ -93,7 +93,7 @@ TestImpl(test_binary_stream)
         AssertThat(buf.available(), 4 + 4 * n);
 
         std::vector<int> intvec2;
-        buf.read_vector(intvec2);
+        buf.read(intvec2);
         AssertThat(intvec2.size(), intvec.size());
         AssertThat(buf.available(), 0);
         for (size_t i = 0; i < intvec.size(); ++i)
@@ -105,7 +105,7 @@ TestImpl(test_binary_stream)
         AssertNotEqual(buf.available(), 4);
 
         std::vector<std::string> strvec2;
-        buf.read_vector(strvec2);
+        buf.read(strvec2);
         AssertThat(strvec2.size(), strvec.size());
         AssertThat(buf.available(), 0);
         for (size_t i = 0; i < strvec.size(); ++i)
