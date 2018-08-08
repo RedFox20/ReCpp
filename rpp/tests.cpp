@@ -315,10 +315,17 @@ namespace rpp
         return test_count - 1;
     }
 
+    static bool pausing_disabled;
+
+    void test::disable_pause()
+    {
+        pausing_disabled = true;
+    }
+
 #if _WIN32 && _MSC_VER
     static void pause(int millis = -1/*forever*/)
     {
-        if (!IsDebuggerPresent()) { // only pause if we launched from Visual Studio
+        if (!IsDebuggerPresent() || pausing_disabled) { // only pause if we launched from Visual Studio
             return;
         }
         printf("\nPress any key to continue...\n");
@@ -363,6 +370,7 @@ namespace rpp
         }
     }
 #endif
+
 
     static void set_test_defaults()
     {
