@@ -698,6 +698,9 @@ namespace rpp
         // Tells the current virtual read position of the stream
         int tell() const { return File->tell() - size(); }
 
+        // Currently flushed size of the file stream
+        int stream_size() const { return File->size(); }
+
         // Clears any read buffers and seeks to the given position in the stream
         // @return The new position in the stream
         int seek(int filepos, int seekmode = 0)
