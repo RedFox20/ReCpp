@@ -648,17 +648,34 @@ namespace rpp
 
         ~file_writer() noexcept;
 
-        // Tells the current virtual write position of the stream
+        /** @return Tells the current virtual write position of the stream */
         int tell() const { return File->tell() + writepos(); }
 
-        // Currently flushed size of the file stream
+        /** @return Currently flushed size of the file stream */
         int stream_size() const { return File->size(); }
 
-        // Flushes any write buffers and seeks to the given position in the stream
-        // @return The new position in the stream
+        /**
+         * Close the file stream. Any seek, write, etc. Operations are not valid after this call.
+         * stream_good() and good() will return false
+         * @warning This will flush the write buffer!
+         * @note This will also clear the read buffer!
+         */
+        void close()
+        {
+            flush_write_buffer();
+            clear();
+            File->close();
+        }
+
+        /**
+         * Flushes any write buffers and seeks to the given position in the stream
+         * @return The new position in the stream
+         * @note This will also clear the read buffer!
+         */
         int seek(int filepos, int seekmode = 0)
         {
             flush_write_buffer();
+            clear();
             return File->seek(filepos, seekmode);
         }
 
@@ -695,14 +712,28 @@ namespace rpp
         
         ~file_reader() noexcept;
 
-        // Tells the current virtual read position of the stream
+        /** @return Tells the current virtual read position of the stream */
         int tell() const { return File->tell() - size(); }
 
-        // Currently flushed size of the file stream
+        /** @return Currently flushed size of the file stream */
         int stream_size() const { return File->size(); }
 
-        // Clears any read buffers and seeks to the given position in the stream
-        // @return The new position in the stream
+        /**
+         * Close the file stream. Any seek, read, etc. Operations are not valid after this call.
+         * stream_good() and good() will return false
+         * @note This will also clear the read buffer!
+         */
+        void close()
+        {
+            clear();
+            File->close();
+        }
+
+        /**
+         * Clears any read buffers and seeks to the given position in the stream
+         * @return The new position in the stream
+         * @note This will clear the read buffer!
+         */
         int seek(int filepos, int seekmode = 0)
         {
             clear();
