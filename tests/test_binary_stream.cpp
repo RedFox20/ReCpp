@@ -1,6 +1,8 @@
 #include <rpp/binary_stream.h>
 #include <rpp/minmax.h>
 #include <rpp/tests.h>
+using std::string;
+using namespace std::literals;
 
 TestImpl(test_binary_stream)
 {
@@ -156,4 +158,36 @@ TestImpl(test_binary_stream)
             AssertThat(tmp[i], (uint8_t)(i + 1));
     }
 
+    TestCase(file_read_write)
+    {
+        int count = 512;
+        string file = rpp::temp_dir() + "/test.rpp.binary_stream.tmp";
+        {
+            rpp::file_writer out { file };
+            for (int i = 0; i < count; ++i)
+            {
+                out.write_ushort(10);
+                out.write(20.0f);
+                out.write("test_string"s);
+            }
+        }
+
+        rpp::file_reader in { file };
+        for (int i = 0; i < count; ++i)
+        {
+            #define FileReaderAssertThat(expr, expected) do { \
+                const auto& __expr   = expr;           \
+                const auto& __expect = expected;       \
+                if (!(__expr == __expect)) {           \
+                    print_error("file_reader failed at index=%d  %s\n", i, #expr); \
+                    assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); \
+                } \
+            } while (false)
+
+            FileReaderAssertThat(in.read_ushort(), 10);
+            FileReaderAssertThat(in.read_float(), 20.0f);
+            FileReaderAssertThat(in.read_string(), "test_string"s);
+        }
+        rpp::delete_file(file);
+    }
 };

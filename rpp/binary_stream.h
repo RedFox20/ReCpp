@@ -249,6 +249,9 @@ namespace rpp
         binary_stream& write_uint(uint value)     { return write(value); } /** @brief Writes a 32-bit unsigned integer into the buffer */
         binary_stream& write_int64(int64 value)   { return write(value); } /** @brief Writes a 64-bit signed integer into the buffer */
         binary_stream& write_uint64(uint64 value) { return write(value); } /** @brief Writes a 64-bit unsigned integer into the buffer */
+        binary_stream& write_float(float value)   { return write(value); } /** @brief Writes a 32-bit float into the buffer */
+        binary_stream& write_double(double value) { return write(value); } /** @brief Writes a 64-bit double into the buffer */
+
 
         using strlen_t = int32_t;
 
@@ -355,6 +358,8 @@ namespace rpp
         uint    read_uint()   { return read<uint>();   } /** @brief Reads a 32-bit unsigned integer */
         int64   read_int64()  { return read<int64>();  } /** @brief Reads a 64-bit signed integer   */
         uint64  read_uint64() { return read<uint64>(); } /** @brief Reads a 64-bit unsigned integer */
+        float   read_float()  { return read<float>();  } /** @brief Reads a 32-bit float */
+        double  read_double() { return read<double>(); } /** @brief Reads a 64-bit float */
 
         uint8_t peek_byte()   { return peek<uint8_t>();}/** @brief Peeks a 8-bit unsigned byte without advancing the streampos   */
         short   peek_short()  { return peek<short>();  } /** @brief Peeks a 16-bit signed short without advancing the streampos   */
@@ -363,23 +368,34 @@ namespace rpp
         uint    peek_uint()   { return peek<uint>();   } /** @brief Peeks a 32-bit unsigned integer without advancing the streampos */
         int64   peek_int64()  { return peek<int64>();  } /** @brief Peeks a 64-bit signed integer without advancing the streampos   */
         uint64  peek_uint64() { return peek<uint64>(); } /** @brief Peeks a 64-bit unsigned integer without advancing the streampos */
+        float   peek_float()  { return peek<float>();  } /** @brief Peeks a 32-bit float */
+        double  peek_double() { return peek<double>(); } /** @brief Peeks a 64-bit float */
 
         /** @brief Reads a length specified string to the std::string in the form of [strlen_t len][data] */
         template<class Char> binary_stream& read(std::basic_string<Char>& str) {
-            int n = min<strlen_t>(read<strlen_t>(), available());
+            strlen_t n = read<strlen_t>();
             str.resize(size_t(n));
             read((void*)str.data(), (int)sizeof(Char) * n);
             return *this;
         }
         /** @brief Reads a length specified string to the dst buffer in the form of [strlen_t len][data] and returns actual length */
         template<class Char> int read_nstr(Char* dst, int maxLen) {
-            int n = min3<strlen_t>(read<strlen_t>(), size(), maxLen);
-            read((void*)dst, (int)sizeof(Char) * n);
-            return n;
+            strlen_t n = read<strlen_t>();
+            strlen_t m = min<strlen_t>(n, maxLen);
+            int actual = read((void*)dst, (int)sizeof(Char) * m);
+            if (n > actual) // we must skip over any unread bytes to keep stream consistency
+                skip(n - actual);
+            return actual;
         }
         /** @brief Peeks a length specified string to the std::string in the form of [strlen_t len][data] */
         template<class Char> binary_stream& peek(std::basic_string<Char>& str) {
-            int n = min<int>(read<strlen_t>(), size());
+            // we cannot peek, because read<T>() causes side effects and read buffer is too small
+            if (size() < (int)sizeof(strlen_t)) {
+                str.clear();
+                return *this;
+            }
+            strlen_t n = read<strlen_t>(); // @warning Buffer change side effect
+            n = min<int>(n, size());
             str.resize(size_t(n));
             peek((void*)str.data(), (int)sizeof(Char) * n);
             undo(sizeof(strlen_t)); // undo read_int
@@ -387,7 +403,13 @@ namespace rpp
         }
         /** @brief Peeks a length specified string to the dst buffer in the form of [strlen_t len][data] and returns actual length */
         template<class Char> int peek_nstr(Char* dst, int maxLen) {
-            int n = min3<int>(read<strlen_t>(), size(), maxLen);
+            // we cannot peek, because read<T>() causes side effects and read buffer is too small
+            if (size() < (int)sizeof(strlen_t)) {
+                dst[0] = Char('\0');
+                return 0;
+            }
+            strlen_t n = read<strlen_t>();  // @warning Buffer change side effect
+            n = min3<int>(n, size(), maxLen);
             n = peek((void*)dst, (int)sizeof(Char) * n) / (int)sizeof(Char);
             undo(sizeof(strlen_t)); // undo read_int
             return n;

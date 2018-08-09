@@ -142,8 +142,7 @@ namespace rpp
     {
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
 
-        char message[8192];
-        va_list ap; va_start(ap, fmt);
+        char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
         ++total_asserts_failed;
@@ -152,12 +151,25 @@ namespace rpp
 
     void test::assert_failed_custom(const char* fmt, ...)
     {
-        char message[8192];
-        va_list ap; va_start(ap, fmt);
+        char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
         ++total_asserts_failed;
         consolef(Red, message);
+    }
+
+    void test::print_error(const char* fmt, ...)
+    {
+        char message[8192]; va_list ap; va_start(ap, fmt);
+        vsnprintf(message, 8192, fmt, ap);
+        consolef(Red, message);
+    }
+
+    void test::print_warning(const char* fmt, ...)
+    {
+        char message[8192]; va_list ap; va_start(ap, fmt);
+        vsnprintf(message, 8192, fmt, ap);
+        consolef(Yellow, message);
     }
 
     bool test::run_test(strview methodFilter)

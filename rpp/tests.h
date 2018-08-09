@@ -72,6 +72,8 @@ namespace rpp
         virtual ~test();
         static void assert_failed(const char* file, int line, const char* fmt, ...);
         static void assert_failed_custom(const char* fmt, ...);
+        static void print_error(const char* fmt, ...);
+        static void print_warning(const char* fmt, ...);
 
         /**
          * Runs all the registered tests on this test impl.

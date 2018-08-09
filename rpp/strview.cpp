@@ -650,6 +650,10 @@ namespace rpp
             double i = f <= -DBL_MAX ? ceil(f) : floor(f);
             g = abs(f - i);
             absIntegral = (int64)abs(i);
+        } else if (f <= INT64_MIN || INT64_MAX <= f) {
+            double i = f <= INT64_MIN ? ceil(f) : floor(f);
+            g = abs(f - i);
+            absIntegral = (int64)abs(i);
         } else {
             int64 i = (uint64)f;
             g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2

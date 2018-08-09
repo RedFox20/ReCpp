@@ -102,6 +102,17 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "-0.1708;-2.001199;0.995899");
     }
 
+    TestCase(big_doubles)
+    {
+        double x = +4.8418443193907041e+30;
+        double y = -4.8418443193907041e+30;
+        rpp::string_buffer sb;
+        sb.separator = ";";
+        sb.write(x, y);
+        println("big_doubles:", sb.view());
+        AssertThat(sb.view(), "9223372036854775808;-9223372036854775808");
+    }
+
     TestCase(float_edge_cases)
     {
         double x = +DBL_MAX;
