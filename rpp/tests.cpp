@@ -4,6 +4,8 @@
 #include <mutex>
 #include <unordered_set>
 #include <cstdarg>
+#include <cassert>
+
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN 1
 #  include <Windows.h>
@@ -18,10 +20,9 @@
 #if __APPLE__
 #  include <TargetConditionals.h>
 #endif
-#if !_WIN32
+#if !_WIN32 // mmap, shm_open
 #  include <sys/mman.h>
 #  include <fcntl.h>
-#  include <cassert>
 #endif
 
 
@@ -48,40 +49,52 @@ namespace rpp
     {
         struct shared
         {
-            T stored_object;
-            int initialized; // MMAP will also set this to 0
+            T stored_object {};
+            int initialized {}; // MMAP will also set this to 0
         };
         shared* shared_mem = nullptr;
     #if _MSC_VER
-
+        HANDLE handle = INVALID_HANDLE_VALUE;
     #else
         int shm_fd = 0;
     #endif
-
     public:
-
         T& get()
         {
-            if (shared_mem)
-                return shared_mem->stored_object;
-
-    #if _MSC_VER
-            shared_mem = new shared();
-    #else
-            shm_fd = shm_open("/rpp_tests_state", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-            if (shm_fd == -1) {
-                fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
+            if (!shared_mem)
+            {
+            #if _MSC_VER
+                handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, "Local\\RppTestsState");
+                if (!handle)
+                {
+                    handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+                                               0, sizeof(shared), "Local\\RppTestsState");
+                    if (handle == nullptr)
+                    {
+                        char error[1024];
+                        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, GetLastError(), 0, error, 1024, nullptr);
+                        fprintf(stderr, "CreateFileMapping failed: %s\n", error);
+                    }
+                    assert(handle != nullptr);
+                }
+                shared_mem = (shared*)MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(shared));
+            #else
+                shm_fd = shm_open("/rpp_tests_state", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+                if (shm_fd == -1) {
+                    fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
+                }
+                assert(shm_fd != -1);
+                (void)ftruncate(shm_fd, sizeof(shared));
+                shared_mem = (shared*)mmap(nullptr, sizeof(shared),
+                                      PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+            #endif
             }
-            assert(shm_fd != -1);
-            (void)ftruncate(shm_fd, sizeof(shared));
-            shared_mem = (shared*)mmap(nullptr, sizeof(shared),
-                                  PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
             assert(shared_mem != nullptr);
-
             if (!shared_mem->initialized)
+            {
+                shared_mem->initialized = true;
                 new (&shared_mem->stored_object) T();
-
-    #endif
+            }
             return shared_mem->stored_object;
         }
     };
