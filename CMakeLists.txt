@@ -133,6 +133,7 @@ endif()
 if(ANDROID)
     set(RPP_RUNTIME android log)
 elseif(LINUX)
+    set(RPP_RUNTIME rt)
 endif()
 
 

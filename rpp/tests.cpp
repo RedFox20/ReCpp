@@ -5,18 +5,22 @@
 #include <unordered_set>
 #include <cstdarg>
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN 1
-    #include <Windows.h>
-    #include <conio.h> // _kbhit
+#  define WIN32_LEAN_AND_MEAN 1
+#  include <Windows.h>
+#  include <conio.h> // _kbhit
 #elif __ANDROID__
-    #include <unistd.h> // usleep
-    #include <android/log.h>
+#  include <unistd.h> // usleep
+#  include <android/log.h>
 #else
-    #include <unistd.h>
-    #include <termios.h>
+#  include <unistd.h>
+#  include <termios.h>
 #endif
 #if __APPLE__
-    #include <TargetConditionals.h>
+#  include <TargetConditionals.h>
+#endif
+#if !_WIN32
+#  include <sys/mman.h>
+#  include <fcntl.h>
 #endif
 
 
@@ -28,23 +32,69 @@ namespace rpp
     using std::unordered_set;
     ///////////////////////////////////////////////////////////////////////////
 
-#if !RPP_HAS_CXX17
-    vector<test_info>* _rpp_tests;
-#endif
 
-    vector<test_info>& get_rpp_tests()
+    struct mapped_state
     {
-        if (!_rpp_tests)
-            _rpp_tests = new vector<test_info>();
-        return *_rpp_tests;
-    }
+        std::vector<test_info> global_tests;
+        int total_asserts_failed;
+    };
 
-    static int total_asserts_failed;
-    static vector<test_info>& all_tests = get_rpp_tests();
+    /**
+     * Utility for memory mapping a global rpp::test state,
+     * so the tests can be run across dll/so/dylib boundaries.
+     */
+    template<class T> class shared_memory_view
+    {
+        struct shared
+        {
+            T stored_object;
+            int initialized; // MMAP will also set this to 0
+        };
+        shared* shared_mem = nullptr;
+    #if _MSC_VER
+
+    #else
+        int shm_fd = 0;
+    #endif
+
+    public:
+
+        T& get()
+        {
+            if (shared_mem)
+                return shared_mem->stored_object;
+
+    #if _MSC_VER
+            shared_mem = new shared();
+    #else
+            shm_fd = shm_open("/rpp_tests_state", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+            if (shm_fd == -1) {
+                fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
+            }
+            assert(shm_fd != -1);
+            ftruncate(shm_fd, sizeof(shared));
+            shared_mem = (shared*)mmap(nullptr, sizeof(shared),
+                                  PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+            assert(shared_mem != nullptr);
+
+            if (!shared_mem->initialized)
+                new (&shared_mem->stored_object) T();
+
+    #endif
+            return shared_mem->stored_object;
+        }
+    };
+
+
+    static mapped_state& state()
+    {
+        static shared_memory_view<mapped_state> s;
+        return s.get();
+    }
 
     void register_test(strview name, test_factory factory, bool autorun)
     {
-        get_rpp_tests().emplace_back(test_info{ name, factory, {}, true, autorun });
+        state().global_tests.emplace_back(test_info{ name, factory, {}, true, autorun });
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -53,7 +103,7 @@ namespace rpp
     {
         int tests_run = 0;
         int tests_failed = 0;
-        vector<string> failures;
+        std::vector<string> failures;
     };
 
     ///////////////////////////////////////////////////////////////////////////
@@ -145,7 +195,7 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        ++total_asserts_failed;
+        state().total_asserts_failed++;
         consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
     }
 
@@ -154,7 +204,7 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        ++total_asserts_failed;
+        state().total_asserts_failed++;
         consolef(Red, message);
     }
 
@@ -244,7 +294,7 @@ namespace rpp
 
     bool test::run_test(test_func& test)
     {
-        int before = total_asserts_failed;
+        int before = state().total_asserts_failed;
         try
         {
             (test.lambda.*test.func)();
@@ -267,7 +317,7 @@ namespace rpp
                                      name.str, test.name.str, e.what());
             }
         }
-        int totalFailures = total_asserts_failed - before;
+        int totalFailures = state().total_asserts_failed - before;
         return totalFailures <= 0;
     }
 
@@ -284,15 +334,15 @@ namespace rpp
 
     int test::run_tests(strview testNamePatterns)
     {
-        vector<string> names;
+        std::vector<string> names;
         while (strview pattern = testNamePatterns.next(" \t"))
             names.emplace_back(pattern);
         return run_tests(names);
     }
 
-    int test::run_tests(const vector<string>& testNamePatterns)
+    int test::run_tests(const std::vector<string>& testNamePatterns)
     {
-        vector<const char*> names;
+        std::vector<const char*> names;
         names.push_back("");
         for (const string& name : testNamePatterns) names.push_back(name.c_str());
         return run_tests((int)names.size(), (char**)names.data());
@@ -300,7 +350,7 @@ namespace rpp
 
     int test::run_tests(const char** testNamePatterns, int numPatterns)
     {
-        vector<const char*> names;
+        std::vector<const char*> names;
         names.push_back("");
         names.insert(names.end(), testNamePatterns, testNamePatterns + numPatterns);
         return run_tests((int)names.size(), (char**)names.data());
@@ -386,7 +436,7 @@ namespace rpp
 
     static void set_test_defaults()
     {
-        for (test_info& t : all_tests)
+        for (test_info& t : state().global_tests)
         {
             if (!t.auto_run)
                 t.test_enabled = false;
@@ -399,12 +449,12 @@ namespace rpp
         if (enabled.empty() && disabled.empty())
         {
             consolef(Red, "  No matching tests found for provided arguments!\n");
-            for (test_info& t : all_tests) // disable all tests to trigger test report warnings
+            for (test_info& t : state().global_tests) // disable all tests to trigger test report warnings
                 t.test_enabled = false;
         }
         else if (!disabled.empty())
         {
-            for (test_info& t : all_tests) {
+            for (test_info& t : state().global_tests) {
                 if (t.auto_run) { // only consider disabling auto_run tests
                     t.test_enabled = disabled.find(t.name) == disabled.end();
                     if (!t.test_enabled)
@@ -414,7 +464,7 @@ namespace rpp
         }
         else if (!enabled.empty())
         {
-            for (test_info& t : all_tests) { // enable whatever was requested
+            for (test_info& t : state().global_tests) { // enable whatever was requested
                 t.test_enabled = enabled.find(t.name) != enabled.end();
                 if (t.test_enabled)
                     consolef(Green, "  Enabled %s\n", t.name.to_cstr());
@@ -460,7 +510,7 @@ namespace rpp
             else            consolef(Yellow, "Filtering substr tests '%s'\n", argv[iarg]);
 
             bool match = false;
-            for (test_info& t : all_tests)
+            for (test_info& t : state().global_tests)
             {
                 if ((exactMatch && t.name == testName) ||
                     (!exactMatch && t.name.find(testName)))
@@ -482,7 +532,7 @@ namespace rpp
     static void enable_all_autorun_tests()
     {
         consolef(Green, "Running all AutoRun tests\n");
-        for (test_info& t : all_tests)
+        for (test_info& t : state().global_tests)
             if (!t.auto_run && !t.test_enabled)
                 consolef(Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
     }
@@ -490,7 +540,7 @@ namespace rpp
     test_results run_all_marked_tests()
     {
         test_results results;
-        for (test_info& t : all_tests)
+        for (test_info& t : state().global_tests)
         {
             if (t.test_enabled)
             {
@@ -508,7 +558,7 @@ namespace rpp
     static int print_final_summary(const test_results& results)
     {
         int numTests = results.tests_run;
-        int failed = (int)total_asserts_failed;
+        int failed = state().total_asserts_failed;
         if (failed > 0)
         {
             if (numTests == 1)
@@ -520,7 +570,7 @@ namespace rpp
         }
         if (numTests <= 0)
         {
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)all_tests.size());
+            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)state().global_tests.size());
             return -1;
         }
         if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed!\n");

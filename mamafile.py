@@ -11,6 +11,7 @@ class ReCpp(mama.BuildTarget):
         if self.linux:
             self.export_syslib('dl')
             self.export_syslib('dw')
+            self.export_syslib('rt')
 
     def test(self, args):
         self.gdb('./RppTests')

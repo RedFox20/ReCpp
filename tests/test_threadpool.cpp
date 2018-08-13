@@ -141,7 +141,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_resurrection)
     {
-        thread_pool::global().max_task_idle_time(0.25f);
+        thread_pool::global().max_task_idle_time(0.3f);
         thread_pool::global().clear_idle_tasks();
         AssertThat(thread_pool::global().active_tasks(), 0);
 
@@ -150,7 +150,7 @@ TestImpl(test_threadpool)
         AssertThat((int)times_launched, 1);
 
         printf("Waiting for pool tasks to die naturally...\n");
-        ::sleep_for(0.3s);
+        ::sleep_for(0.5s);
         printf("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 

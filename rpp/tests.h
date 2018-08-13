@@ -36,15 +36,6 @@ namespace rpp
         bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
     };
 
-    // C++17 feature: inline global variable guarantees
-    // one instance across all modules
-#if RPP_HAS_CXX17
-    inline
-#else
-    extern
-#endif
-    RPPAPI vector<test_info>* _rpp_tests;
-
     RPPAPI void register_test(strview name, test_factory factory, bool autorun);
 
     struct RPPAPI test
