@@ -21,6 +21,7 @@
 #if !_WIN32
 #  include <sys/mman.h>
 #  include <fcntl.h>
+#  include <cassert>
 #endif
 
 
@@ -72,7 +73,7 @@ namespace rpp
                 fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
             }
             assert(shm_fd != -1);
-            ftruncate(shm_fd, sizeof(shared));
+            (void)ftruncate(shm_fd, sizeof(shared));
             shared_mem = (shared*)mmap(nullptr, sizeof(shared),
                                   PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
             assert(shared_mem != nullptr);
