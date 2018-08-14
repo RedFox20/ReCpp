@@ -64,11 +64,12 @@ namespace rpp
             if (!shared_mem)
             {
             #if _MSC_VER
-                handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, "Local\\RppTestsState");
+                string name = "Local\\RppTestsState_"s + to_string(GetCurrentProcessId());
+                handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
                 if (!handle)
                 {
                     handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
-                                               0, sizeof(shared), "Local\\RppTestsState");
+                                               0, sizeof(shared), name.c_str());
                     if (handle == nullptr)
                     {
                         char error[1024];
@@ -79,7 +80,8 @@ namespace rpp
                 }
                 shared_mem = (shared*)MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(shared));
             #else
-                shm_fd = shm_open("/rpp_tests_state", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+                string name = "/rpp_tests_state_"s + to_string(getpid());
+                shm_fd = shm_open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                 if (shm_fd == -1) {
                     fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
                 }
