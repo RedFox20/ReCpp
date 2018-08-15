@@ -1,11 +1,8 @@
-language: c
-compiler:
-  - gcc
-  - clang
+language: python
 
 build:
   ci:
-    - sudo apt install python3.6
+    - sudo apt-get install python3.6 cmake
     - make configure-pip
     - pip3 install mama --upgrade
     - mama build
