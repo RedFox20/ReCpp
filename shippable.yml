@@ -1,20 +1,9 @@
 language: python
-python:
-  - 3.6
 
 build:
   ci:
+    - sudo apt install python3.6
+    - make configure-pip
     - make configure-clang6-1604
-    - pip install --upgrade mama
+    - pip3 install mama --upgrade
     - mama build
-
-# language: python
-
-# python:
-#   - 3.6
-
-# build:
-#   ci:
-#     - pip install --upgrade mama
-#     - make configure-clang6-1604
-  
