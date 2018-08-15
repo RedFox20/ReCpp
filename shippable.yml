@@ -2,7 +2,8 @@ language: python
 
 build:
   ci:
-    - sudo apt-get install python3.6 cmake
+    - sudo apt-get install python3.6 -y
+    - sudo apt-get install cmake -y
     - make configure-pip
     - pip3 install mama --upgrade
     - mama build
