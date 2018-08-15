@@ -3,8 +3,8 @@ language: python
 build:
   ci:
     - sudo apt-get install python3.6 -y
-    - sudo apt-get install cmake -y
     - make configure-pip
+    - make configure-cmake
     - pip3 install mama --upgrade
     - mama build
 #    - make configure-clang6-1604

@@ -84,7 +84,7 @@ configure-pip:
 /opt/cmake: configure-cmake
 configure-cmake:
 	sudo mkdir -p /opt/cmake
-	sudo wget https://cmake.org/files/v3.11/cmake-3.11.2-Linux-x86_64.sh -P /opt/cmake
-	sudo sh /opt/cmake/cmake-3.11.2-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
+	sudo wget https://cmake.org/files/v3.12/cmake-3.12.1-Linux-x86_64.sh -P /opt/cmake
+	sudo sh /opt/cmake/cmake-3.12.1-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
 	sudo ln -sf /opt/cmake/bin/cmake /usr/bin/cmake
 
