@@ -5,6 +5,6 @@ build:
     - sudo apt-get install python3.6 -y
     - make configure-pip
     - make configure-cmake
+    - make configure-clang6-1604
     - pip3 install mama --upgrade
     - mama build
-#    - make configure-clang6-1604
