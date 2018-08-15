@@ -1,4 +1,4 @@
-language: c python
+language: c
 python:
   - 3.6
 compiler:
