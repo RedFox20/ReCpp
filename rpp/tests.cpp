@@ -13,6 +13,7 @@
 #elif __ANDROID__
 #  include <unistd.h> // usleep
 #  include <android/log.h>
+// #  include <linux/memfd.h>
 #else
 #  include <unistd.h>
 #  include <termios.h>
@@ -79,23 +80,36 @@ namespace rpp
                     assert(handle != nullptr);
                 }
                 shared_mem = (shared*)MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(shared));
+            #elif __ANDROID__
+                // @todo Properly implement Process-Wide shared variables
+                shared_mem = new shared();
+                shared_mem->initialized = 1;
+                return shared_mem->stored_object;
             #else
                 string name = "/rpp_tests_state_"s + to_string(getpid());
-                shm_fd = shm_open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-                if (shm_fd == -1) {
-                    fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
-                }
+                #if __ANDROID__
+                    // shm_fd = open(name.c_str(), O_RDWR);
+                    // if (shm_fd == -1) {
+                    //     shm_fd = memfd_create(name.c_str(), MFD_ALLOW_SEALING | MFD_CLOEXEC);
+                    //     if (shm_fd == -1)
+                    //         fprintf(stderr, "memfd_create failed: %s\n", strerror(errno));
+                    // }
+                #else
+                    shm_fd = shm_open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+                    if (shm_fd == -1)
+                        fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
+                #endif
                 assert(shm_fd != -1);
                 (void)ftruncate(shm_fd, sizeof(shared));
                 shared_mem = (shared*)mmap(nullptr, sizeof(shared),
                                       PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
             #endif
-            }
-            assert(shared_mem != nullptr);
-            if (!shared_mem->initialized)
-            {
-                shared_mem->initialized = true;
-                new (&shared_mem->stored_object) T();
+                assert(shared_mem != nullptr);
+                if (!shared_mem->initialized)
+                {
+                    shared_mem->initialized = true;
+                    new (&shared_mem->stored_object) T();
+                }
             }
             return shared_mem->stored_object;
         }
