@@ -1,0 +1,22 @@
+language: c python
+python:
+  - 3.6
+compiler:
+  - gcc
+  - clang
+
+build:
+  ci:
+    - pip install --upgrade mama
+    - mama build
+
+# language: python
+
+# python:
+#   - 3.6
+
+# build:
+#   ci:
+#     - pip install --upgrade mama
+#     - make configure-clang6-1604
+  
