@@ -476,7 +476,7 @@ namespace rpp /* ReCpp */
     {
         load_buffer dataOwner;
 
-        buffer_parser(load_buffer&& buf) noexcept : line_parser(buf.str, buf.len), dataOwner(std::move(buf)) {}
+        buffer_parser(load_buffer&& buf) noexcept : parser(buf.str, buf.len), dataOwner(std::move(buf)) {}
 
         // resets the parser state
         void reset() noexcept { parser::buffer = (strview)dataOwner; }

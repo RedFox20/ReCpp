@@ -330,6 +330,8 @@ namespace rpp
 
         /** @return TRUE if the strview contains this char */
         FINLINE bool contains(char c) const { return memchr(str, c, (size_t)len) != nullptr; }
+        /** @return TRUE if the strview contains this char */
+        FINLINE bool contains(const strview& s) const { return find(s) != nullptr; }
         /** @return TRUE if the strview contains any of the chars */
         NOINLINE bool contains_any(const char* chars, int nchars) const {
             return strcontains(str, len, chars, nchars) != nullptr;
@@ -348,7 +350,6 @@ namespace rpp
         template<int N> FINLINE const char* find(const char (&substr)[N]) const { 
             return find(substr, N - 1); 
         }
-
 
         /** @return Pointer to char if found using reverse search, NULL otherwise */
         NOINLINE const char* rfind(char c) const;
