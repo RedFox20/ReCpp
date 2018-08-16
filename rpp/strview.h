@@ -328,6 +328,18 @@ namespace rpp
             return *this; 
         }
 
+        /** 
+         * UNSAFE view of a new string AFTER this one
+         * @code
+         * strview content = "key:true";
+         * strview value = content.find_sv("key:").after(4); // "true"
+         * @endcode
+         */
+        FINLINE strview after(int len) const { return { end(), len }; }
+
+        /** Similar to after(int), but the end is calculated via @param limit */
+        FINLINE strview after_until(const strview& limit) const { return { end(), limit.end() }; }
+
         /** @return TRUE if the strview contains this char */
         FINLINE bool contains(char c) const { return memchr(str, c, (size_t)len) != nullptr; }
         /** @return TRUE if the strview contains this char */
