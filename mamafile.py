@@ -12,6 +12,9 @@ class ReCpp(mama.BuildTarget):
             self.export_syslib('dl')
             self.export_syslib('dw')
             self.export_syslib('rt')
+        if self.android:
+            self.export_syslib('android')
+            self.export_syslib('log')
 
     def test(self, args):
         self.gdb('./RppTests')
