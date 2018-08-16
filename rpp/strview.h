@@ -351,6 +351,17 @@ namespace rpp
             return find(substr, N - 1); 
         }
 
+
+        strview find_sv(const strview& substr) const {
+            const char* s = find(substr);
+            return s ? strview{s, substr.len} : strview{};
+        }
+        template<int N> strview find_sv(const char (&substr)[N]) const { 
+            const char* s = find<N>(substr);
+            return s ? strview{s, N - 1} : strview{};
+        }
+
+
         /** @return Pointer to char if found using reverse search, NULL otherwise */
         NOINLINE const char* rfind(char c) const;
 
