@@ -125,6 +125,7 @@ message("ReCpp ${CMAKE_BUILD_TYPE} DEFINES:  ${CURRENT_DEFINES}")
 # Configure platform specific system dependencies
 find_package(Threads REQUIRED)
 if(RASPI)
+    set(DWARF_LIBRARY "")
 elseif(LINUX)
     find_package(DWARF)
     message("DWARF: ${DWARF_LIBRARY}")
