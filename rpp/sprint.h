@@ -157,13 +157,16 @@ namespace rpp
         template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
         template<class T> static constexpr bool has_ostrm_op = is_detected_v<ostrm_op, T>;
 
-        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        template<class T, std::enable_if_t<has_to_string<T>, int> = 0>
         FINLINE void write(const T& value)
         {
-            if constexpr(has_to_string<T>)
-                this->write(to_string(value));
-            else if constexpr(has_to_string_memb<T>)
-                this->write(value.to_string());
+            this->write(to_string(value));
+        }
+
+        template<class T, std::enable_if_t<has_to_string_memb<T>, int> = 0>
+        FINLINE void write(const T& value)
+        {
+            this->write(value.to_string());
         }
 
         template<class T, std::enable_if_t<!is_to_stringable<T> && has_sbuf_op<T>, int> = 0>

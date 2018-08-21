@@ -36,6 +36,14 @@
 #  endif
 #endif
 
+#if __cplusplus
+#  if RPP_HAS_CXX17
+#    define RPP_CXX17_IF_CONSTEXPR if constexpr
+#  else
+#    define RPP_CXX17_IF_CONSTEXPR if
+#  endif
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE

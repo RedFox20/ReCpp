@@ -60,6 +60,21 @@
 
 namespace rpp
 {
+    
+    namespace detail {
+        //  from: http://en.cppreference.com/w/cpp/types/result_of, CC-BY-SA
+        template <typename F, typename... Args> using invoke_result_ = decltype(invoke(std::declval<F>(), std::declval<Args>()...));
+        template <typename Void, typename F, typename... Args> struct invoke_result {};
+        template <typename F, typename... Args> struct invoke_result<std::void_t<invoke_result_<F, Args...>>, F, Args...> { using type = invoke_result_<F, Args...>; };
+        template <typename Void, typename F, typename... Args> struct is_invocable : std::false_type {};
+        template <typename F, typename... Args> struct is_invocable<std::void_t<invoke_result_<F, Args...>>, F, Args...> : std::true_type {};
+        template <typename Void, typename R, typename F, typename... Args>
+        struct is_invocable_r : std::false_type {};
+        template <typename R, typename F, typename... Args>
+        struct is_invocable_r<std::void_t<invoke_result_<F, Args...>>, R, F, Args...>
+            : std::is_convertible<invoke_result_<F, Args...>, R> {};
+    }
+
     /**
      * @brief Function delegate to encapsulate global functions,
      *        instance member functions, lambdas and functors
@@ -385,7 +400,7 @@ namespace rpp
                                     #elif __clang__
                                         && std::__invokable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
                                     #else
-                                        && std::is_invocable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
+                                        && detail::is_invocable_r<Ret, Functor, Args...>::value>; // matches `Ret(Args...)`
                                     #endif
                                 #endif
         /**
