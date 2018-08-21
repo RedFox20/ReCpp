@@ -29,8 +29,8 @@ typedef enum {
 } LogSeverity;
 
 /** Error message callback */
-typedef void (*LogErrorCallback)(LogSeverity severity, const char* err, int len);
-typedef void (*LogEventCallback)(const char* eventName, const char* message, int len);
+typedef void (*LogErrorCallback) (LogSeverity severity, const char* err, int len);
+typedef void (*LogEventCallback) (const char* eventName, const char* message, int len);
 typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 
@@ -66,11 +66,11 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
 RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
 
 /** Logs an error to the backing error mechanism */
-RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap);
+RPPCAPI void  LogFormatv (LogSeverity severity, const char* format, va_list ap);
 RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-RPPCAPI void LogEvent    (const char* eventName,     PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
+RPPCAPI void  LogEvent   (const char* eventName,     PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 RPPCAPI void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
@@ -242,5 +242,14 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 
 // logs error message, triggers an assertion and throws an std::runtime_error
 #define ThrowErr(format, ...) ThrowErrType(std::runtime_error, format, ##__VA_ARGS__)
+
+// Asserts an expression and throws if the expression fails
+// A custom message must be provided
+#define AssertEx(expression, format, ...) do { \
+    if (!(expression)) { \
+        auto* __formatted_error__ = _FmtString(format __wrap_args(__VA_ARGS__) ); \
+        throw std::runtime_error(__formatted_error__); \
+    } \
+} while(0)
 
 #endif // __cplusplus
