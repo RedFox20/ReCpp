@@ -17,4 +17,4 @@ class ReCpp(mama.BuildTarget):
             self.export_syslib('log')
 
     def test(self, args):
-        self.gdb('./RppTests')
+        self.gdb('RppTests', src_dir=False)
