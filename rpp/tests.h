@@ -78,9 +78,6 @@ namespace rpp
         // generic sleep for testing purposes
         static void sleep(int millis);
 
-        // disable pause after end of tests
-        static void disable_pause();
-
         // main entry/initialization point for the test class
         virtual void init_test() {}
 

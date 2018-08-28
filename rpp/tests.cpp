@@ -407,34 +407,7 @@ namespace rpp
         return test_count - 1;
     }
 
-    static bool pausing_disabled;
-
-    void test::disable_pause()
-    {
-        pausing_disabled = true;
-    }
-
 #if _WIN32 && _MSC_VER
-    static void pause(int millis = -1/*forever*/)
-    {
-        if (!IsDebuggerPresent() || pausing_disabled) { // only pause if we launched from Visual Studio
-            return;
-        }
-        printf("\nPress any key to continue...\n");
-
-        using namespace std::chrono;
-        auto start = system_clock::now();
-        while (!_kbhit())
-        {
-            if (millis != -1)
-            {
-                auto elapsed = duration_cast<milliseconds>(system_clock::now() - start);
-                if (elapsed.count() >= millis)
-                    break;
-            }
-            test::sleep(50);
-        }
-    }
     static void move_console_window()
     {
         // move console window to the other monitor to make test debugging more seamless
@@ -630,7 +603,6 @@ namespace rpp
             #if _CRTDBG_MAP_ALLOC
                 _CrtDumpMemoryLeaks();
             #endif
-            pause();
         #endif
         return returnCode;
     }
