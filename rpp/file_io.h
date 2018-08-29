@@ -1042,23 +1042,48 @@ namespace rpp /* ReCpp */
     }
 
     /**
-     * @return The current working directory of the application
-     * @example "/Projects/ReCpp"
-     * @example "C:\\Projects\\ReCpp"
+     * @return The current working directory of the application.
+     *         An extra slash is always appended.
+     *         Path is always normalized to forward slashes /
+     * @example Linux:   "/home/jorma/Projects/ReCpp/"
+     * @example Windows: "C:/Projects/ReCpp/"
      */
     RPPAPI string working_dir() noexcept;
 
 
     /**
-     * @return Directory where the current module in which Rpp was linked to
-     *         is located.
-     *         For DLL-s which link RPP statically, this is the folder where
-     *         the DLL is located.
+     * @return Directory where the current module in which Rpp was linked to is located.
+     *         For DLL-s which link RPP statically, this is the folder where the DLL is located.
      * @param moduleObject [null] If RPP is a DLL then a platform specific
      *                            object must be passed for identification to work.
-     *                            macOs/iOS: `MyLibraryObject.class`
-     */ 
+     *                            This is only if the dynamic module is not in the same binary
+     *                            as RPP, such as external dynamic libaries.
+     * 
+     * An extra slash is always appended.
+     * Path is always normalized to forward slashes /
+     * 
+     * @code
+     * string modulePath = rpp::module_dir(); //   "/path/to/project/bin/"
+     * @endcode
+     * 
+     * Specifying external dynamic modules:
+     * @code
+     * // macOS/iOS
+     * string modulePath = rpp::module_dir(MyLibraryObject.class);
+     * 
+     * // Win32
+     * string modulePath = rpp::module_dir(GetModuleHandle("fbxsdk"));
+     * @endcode
+     */
     RPPAPI string module_dir(void* moduleObject = nullptr) noexcept;
+
+
+    /**
+     * Identical to `module_dir` but also includes the DLL/EXE name,
+     * resulting in a full path to enclosing binary.
+     * Path is always normalized to forward slashes /
+     */
+    RPPAPI string module_path(void* moduleObject = nullptr) noexcept;
 
 
     /**
@@ -1071,14 +1096,18 @@ namespace rpp /* ReCpp */
 
     /**
      * @return The system temporary directory for storing misc files
-     * @note For windows this is: %USERPROFILE%/AppData/Local/Temp
-     * @note for iOS this is $TMPDIR: %APPSTORAGE%/tmp
+     * @note For windows this is: %USERPROFILE%/AppData/Local/Temp/
+     * @note for iOS this is $TMPDIR: %APPSTORAGE%/tmp/
+     * A trailing slash is always appended to the path
+     * Path is always normalized to forward slashes /
      */
     RPPAPI string temp_dir() noexcept;
     
     /**
      * @return The system home directory for this user
      * @note ENV $HOME is used
+     * A trailing slash is always appended to the path.
+     * Path is always normalized to forward slashes /
      */
     RPPAPI string home_dir() noexcept;
 

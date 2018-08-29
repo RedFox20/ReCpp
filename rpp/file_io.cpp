@@ -1213,11 +1213,23 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    static void win32_fixup_path(char* path, int& len)
+    {
+        normalize(path);
+        if (path[len-1] != '/')
+            path[len++] = '/';
+    }
+
     string working_dir() noexcept
     {
         char path[512];
         #if _WIN32
-            return string(_getcwd(path, sizeof(path)) ? path : "");
+            if (char* p = _getcwd(path, sizeof(path))) {
+                int len = (int)strlen(p);
+                win32_fixup_path(p, len);
+                return string{p, p + len};
+            }
+            return string{};
         #else
             return string(getcwd(path, sizeof(path)) ? path : "");
         #endif
@@ -1225,14 +1237,35 @@ namespace rpp /* ReCpp */
 
     string module_dir(void* moduleObject) noexcept
     {
-        #if __APPLE__
+        #if _WIN32
+            char path[512];
+            int len = (int)GetModuleFileNameA((HMODULE)moduleObject, path, 512);
+            normalize(path);
+            return folder_path(strview{path, len});
+        #elif __APPLE__
             extern string apple_module_dir() noexcept;
             return apple_module_dir(moduleObject);
         #else
+            // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
             return working_dir();
         #endif
     }
 
+    string module_path(void* moduleObject) noexcept
+    {
+        #if _WIN32
+            char path[512];
+            int len = (int)GetModuleFileNameA((HMODULE)moduleObject, path, 512);
+            normalize(path);
+            return { path, path+len };
+        #elif __APPLE__
+            extern string apple_module_dir() noexcept;
+            return apple_module_dir(moduleObject);
+        #else
+            // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
+            return working_dir();
+        #endif
+    }
 
     bool change_dir(const char* new_wd) noexcept
     {
@@ -1247,8 +1280,8 @@ namespace rpp /* ReCpp */
     {
         #if _WIN32
             char path[512];
-            DWORD len = GetTempPathA(sizeof(path), path);
-            normalize(path);
+            int len = (int)GetTempPathA(sizeof(path), path);
+            win32_fixup_path(path, len);
             return { path, path + len };
         #elif __APPLE__
             extern string apple_temp_dir() noexcept;
@@ -1267,14 +1300,18 @@ namespace rpp /* ReCpp */
     
     string home_dir() noexcept
     {
-    #if _MSC_VER
-        size_t len = 0;
-        char buf[512];
-        getenv_s(&len, buf, sizeof(buf), "HOME");
-        return { buf, buf + len };
-    #else
-        return getenv("HOME");
-    #endif
+        #if _MSC_VER
+            size_t len = 0;
+            char path[512];
+            getenv_s(&len, path, sizeof(path), "USERPROFILE");
+            if (len == 0)
+                return {};
+            int slen = (int)len - 1;
+            win32_fixup_path(path, slen);
+            return { path, path + len };
+        #else
+            return getenv("HOME");
+        #endif
     }
     
     ////////////////////////////////////////////////////////////////////////////////

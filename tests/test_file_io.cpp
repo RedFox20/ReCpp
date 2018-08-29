@@ -1,5 +1,6 @@
 #include <fstream> // use fstream as a baseline
 #include <rpp/file_io.h>
+#include <rpp/debugging.h>
 #include <rpp/tests.h>
 using namespace rpp;
 
@@ -252,6 +253,20 @@ TestImpl(test_file_io)
         Assert(contains(files, "folder/path/dummy.obj"));
 
         Assert(delete_folder(TestDir+"/", recursive));
+    }
+
+    TestCase(system_dirs)
+    {
+        LogInfo("working_dir: \"%s\"", working_dir());
+        LogInfo("module_dir:  \"%s\"", module_dir());
+        LogInfo("module_path: \"%s\"", module_path());
+        LogInfo("temp_dir:    \"%s\"", temp_dir());
+        LogInfo("home_dir:    \"%s\"", home_dir());
+
+        AssertThat(working_dir().back(), '/');
+        AssertThat(module_dir().back(), '/');
+        AssertThat(temp_dir().back(), '/');
+        AssertThat(home_dir().back(), '/');
     }
 
 };

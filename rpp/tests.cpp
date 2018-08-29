@@ -590,7 +590,7 @@ namespace rpp
         #endif
         move_console_window();
     #endif
-
+    
         set_test_defaults();
         if (has_filter_args(argc, argv))
             select_tests_from_args(argc, argv);
