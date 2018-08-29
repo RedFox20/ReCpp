@@ -328,6 +328,36 @@ TestImpl(test_collections)
         AssertEqual(*find(v, "3"s), "x3"s);
     }
 
+    TestCase(vector_find_if)
+    {
+        vector<string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
+
+        AssertThat(find_if(range(v), [](const string& s) { return s == "x"s; }), nullptr);
+        AssertThat(find_if(range(v), [](const string& s) { return s == "1"s; }), &v[0]  );
+        AssertThat(find_if(range(v), [](const string& s) { return s == "2"s; }), &v[1]  );
+    }
+
+    TestCase(vector_find_last_if)
+    {
+        vector<string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
+
+        AssertThat(find_if(range(v), [](const string& s) { return s == "x"s; }), nullptr);
+        AssertThat(find_if(range(v), [](const string& s) { return s == "1"s; }), &v[0]  );
+        AssertThat(find_if(range(v), [](const string& s) { return s == "2"s; }), &v[1]  );
+    }
+
+    TestCase(vector_find_smallest)
+    {
+        vector<string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
+        AssertThat(find_smallest(v, [](const string& s) { return s.size(); }), &v[3]);
+    }
+
+    TestCase(vector_find_largest)
+    {
+        vector<string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
+        AssertThat(find_largest(v, [](const string& s) { return s.size(); }), &v[0]);
+    }
+
     TestCase(any_of)
     {
         vector<string> empty;

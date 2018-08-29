@@ -25,8 +25,7 @@ namespace rpp
         element_range(T* ptr, int n)         noexcept : first{ptr},   sentinel{ptr+n}    {}
         element_range(T* ptr, size_t n)      noexcept : first{ptr},   sentinel{ptr+n}    {}
 
-        template<class A>
-        element_range(std::vector<T, A>& v) noexcept : first{v.data()}, sentinel{v.data()+v.size()} {}
+        element_range(std::vector<T>& v) noexcept : first{v.data()}, sentinel{v.data()+v.size()} {}
 
         template<class Container, typename = enable_if_iterable_t<Container>>
         element_range(Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
@@ -35,7 +34,8 @@ namespace rpp
         T* end()   { return sentinel; }
         const T* begin() const { return first;    }
         const T* end()   const { return sentinel; }
-        int size() const { return int(sentinel-first); }
+        bool empty() const { return first == sentinel; }
+        int  size()  const { return int(sentinel-first); }
               T& operator[](int index)       { return first[index]; }
         const T& operator[](int index) const { return first[index]; }
               T* data()       { return first; }
@@ -51,15 +51,15 @@ namespace rpp
         element_range(const T* ptr, int n)               noexcept : first{ptr},   sentinel{ptr+n}    {}
         element_range(const T* ptr, size_t n)            noexcept : first{ptr},   sentinel{ptr+n}    {}
 
-        template<class A>
-        element_range(const std::vector<T, A>& v) noexcept : first{v.data()}, sentinel{v.data()+v.size()} {}
+        element_range(const std::vector<T>& v) noexcept : first{v.data()}, sentinel{v.data()+v.size()} {}
 
         template<class Container, typename = enable_if_iterable_t<Container>>
         element_range(const Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
 
         const T* begin() const { return first;    }
         const T* end()   const { return sentinel; }
-        int size() const { return int(sentinel-first); }
+        bool empty() const { return first == sentinel; }
+        int  size()  const { return int(sentinel-first); }
         const T& operator[](int index) const { return first[index]; }
         const T* data() const { return first; }
     };
@@ -356,6 +356,52 @@ namespace rpp
             --last;
         }
         return nullptr;
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    template<class T, class Selector> T* find_smallest(element_range<T> v, const Selector& selector) noexcept
+    {
+        int count = v.size();
+        if (count == 0)
+            return nullptr;
+        T* selected = &v[0];
+        auto currentValue = selector(*selected);
+        for (int i = 1; i < count; ++i) {
+            auto value = selector(v[i]);
+            if (value < currentValue) {
+                currentValue = value;
+                selected = &v[i];
+            }
+        }
+        return selected;
+    }
+
+    template<class T, class Selector> T* find_smallest(std::vector<T>& v, const Selector& selector) noexcept
+    {
+        return find_smallest(range(v), selector);
+    }
+
+    template<class T, class Selector> T* find_largest(element_range<T> v, const Selector& selector) noexcept
+    {
+        int count = v.size();
+        if (count == 0)
+            return nullptr;
+        T* selected = &v[0];
+        auto currentValue = selector(*selected);
+        for (int i = 1; i < count; ++i) {
+            auto value = selector(v[i]);
+            if (value > currentValue) {
+                currentValue = value;
+                selected = &v[i];
+            }
+        }
+        return selected;
+    }
+
+    template<class T, class Selector> T* find_largest(std::vector<T>& v, const Selector& selector) noexcept
+    {
+        return find_largest(range(v), selector);
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
