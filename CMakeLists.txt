@@ -140,8 +140,11 @@ elseif(LINUX)
     set(RPP_RUNTIME rt)
 endif()
 
-
-file(GLOB_RECURSE RPP_SRC rpp/*.cpp rpp/*.h rpp/*.natvis)
+set(SRC_PATTERN rpp/*.cpp rpp/*.h rpp/*.natvis)
+if(APPLE)
+    set(SRC_PATTERN SRC_PATTERN rpp/*.mm)
+endif()
+file(GLOB_RECURSE RPP_SRC ${SRC_PATTERN})
 
 source_group(rpp FILES ${RPP_SRC})
 add_library(ReCpp ${RPP_SRC})

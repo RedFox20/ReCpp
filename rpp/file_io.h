@@ -1048,6 +1048,19 @@ namespace rpp /* ReCpp */
      */
     RPPAPI string working_dir() noexcept;
 
+
+    /**
+     * @return Directory where the current module in which Rpp was linked to
+     *         is located.
+     *         For DLL-s which link RPP statically, this is the folder where
+     *         the DLL is located.
+     * @param moduleObject [null] If RPP is a DLL then a platform specific
+     *                            object must be passed for identification to work.
+     *                            macOs/iOS: `MyLibraryObject.class`
+     */ 
+    RPPAPI string module_dir(void* moduleObject = nullptr) noexcept;
+
+
     /**
      * Calls chdir() to set the working directory of the application to a new value
      * @return TRUE if chdir() is successful

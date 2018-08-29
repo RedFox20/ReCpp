@@ -1222,6 +1222,18 @@ namespace rpp /* ReCpp */
             return string(getcwd(path, sizeof(path)) ? path : "");
         #endif
     }
+
+    string module_dir(void* moduleObject) noexcept
+    {
+        #if __APPLE__
+            extern string apple_module_dir() noexcept;
+            return apple_module_dir(moduleObject);
+        #else
+            return working_dir();
+        #endif
+    }
+
+
     bool change_dir(const char* new_wd) noexcept
     {
         #if _WIN32
@@ -1238,8 +1250,9 @@ namespace rpp /* ReCpp */
             DWORD len = GetTempPathA(sizeof(path), path);
             normalize(path);
             return { path, path + len };
-        #elif TARGET_OS_IPHONE
-            return getenv("TMPDIR");
+        #elif __APPLE__
+            extern string apple_temp_dir() noexcept;
+            return apple_temp_dir();
         #elif __ANDROID__
             // return getContext().getExternalFilesDir(null).getPath();
             return "/data/local/tmp";
