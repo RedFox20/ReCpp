@@ -15,7 +15,8 @@ class ReCpp(mama.BuildTarget):
         if self.android:
             self.export_syslib('android')
             self.export_syslib('log')
+        if self.macos or self.ios:
+            self.export_syslib('-framework Foundation')
 
     def test(self, args):
-        print(f'RPPTESTS={args}')
         self.gdb(f'RppTests {args}', src_dir=False)

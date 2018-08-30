@@ -138,13 +138,16 @@ if(ANDROID)
     set(RPP_RUNTIME android log)
 elseif(LINUX)
     set(RPP_RUNTIME rt)
+elseif(APPLE)
+    set(RPP_RUNTIME "-framework Foundation")
 endif()
 
 set(SRC_PATTERN rpp/*.cpp rpp/*.h rpp/*.natvis)
 if(APPLE)
-    set(SRC_PATTERN SRC_PATTERN rpp/*.mm)
+    set(SRC_PATTERN ${SRC_PATTERN} rpp/*.mm)
 endif()
 file(GLOB_RECURSE RPP_SRC ${SRC_PATTERN})
+
 
 source_group(rpp FILES ${RPP_SRC})
 add_library(ReCpp ${RPP_SRC})
@@ -162,7 +165,7 @@ install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################
 
-if (BUILD_TESTS AND NOT APPLE)
+if (BUILD_TESTS)
     file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
     add_executable(RppTests ${RPP_TESTS})
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")

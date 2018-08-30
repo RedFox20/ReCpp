@@ -30,8 +30,20 @@ namespace rpp
 
     string apple_module_dir(void* moduleObject) noexcept
     {
-        NSBundle* bundle = [NSBundle bundleForClass:RppBundleLocator.class];
+        Class clazz = RppBundleLocator.class;
+        if (moduleObject)
+            clazz = (Class)moduleObject;
+        NSBundle* bundle = [NSBundle bundleForClass:clazz];
         return to_string(bundle.bundlePath) + "/";
+    }
+
+    string apple_module_path(void* moduleObject) noexcept
+    {
+        Class clazz = RppBundleLocator.class;
+        if (moduleObject)
+            clazz = (Class)moduleObject;
+        NSBundle* bundle = [NSBundle bundleForClass:clazz];
+        return to_string(bundle.executableURL.path);
     }
 
     ////////////////////////////////////////////////////////////////////////////////

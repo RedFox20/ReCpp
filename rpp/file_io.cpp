@@ -236,7 +236,7 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if USE_WINAPI_IO
         return GetFileSize((HANDLE)Handle, nullptr);
-    #elif __ANDROID__ || __APPLE__
+    #elif __ANDROID__ || TARGET_OS_IPHONE
         struct stat s;
         if (fstat(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
@@ -1213,26 +1213,39 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    static void win32_fixup_path(char* path, int& len)
+    static void append_slash(char* path, int& len)
     {
-        normalize(path);
         if (path[len-1] != '/')
             path[len++] = '/';
     }
+
+    #if _WIN32
+    static void win32_fixup_path(char* path, int& len)
+    {
+        normalize(path);
+        append_slash(path, len);
+    }
+    #endif
 
     string working_dir() noexcept
     {
         char path[512];
         #if _WIN32
-            if (char* p = _getcwd(path, sizeof(path))) {
-                int len = (int)strlen(p);
-                win32_fixup_path(p, len);
-                return string{p, p + len};
-            }
-            return string{};
+            char* p = _getcwd(path, sizeof(path));
         #else
-            return string(getcwd(path, sizeof(path)) ? path : "");
+            char* p = getcwd(path, sizeof(path));
         #endif
+
+        if (p) {
+            int len = (int)strlen(p);
+            #if _WIN32
+                win32_fixup_path(p, len);
+            #else
+                append_slash(p, len);
+            #endif
+            return {p, p + len};
+        }
+        return {};
     }
 
     string module_dir(void* moduleObject) noexcept
@@ -1243,7 +1256,7 @@ namespace rpp /* ReCpp */
             normalize(path);
             return folder_path(strview{path, len});
         #elif __APPLE__
-            extern string apple_module_dir() noexcept;
+            extern string apple_module_dir(void* moduleObject) noexcept;
             return apple_module_dir(moduleObject);
         #else
             // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
@@ -1259,8 +1272,8 @@ namespace rpp /* ReCpp */
             normalize(path);
             return { path, path+len };
         #elif __APPLE__
-            extern string apple_module_dir() noexcept;
-            return apple_module_dir(moduleObject);
+            extern string apple_module_path(void* moduleObject) noexcept;
+            return apple_module_path(moduleObject);
         #else
             // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
             return working_dir();
@@ -1310,7 +1323,13 @@ namespace rpp /* ReCpp */
             win32_fixup_path(path, slen);
             return { path, path + len };
         #else
-            return getenv("HOME");
+            char* p = getenv("HOME");
+            if (p) {
+                int len = (int)strlen(p);
+                append_slash(p, len);
+                return { p, p + len };
+            }
+            return {};
         #endif
     }
     
