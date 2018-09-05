@@ -184,19 +184,27 @@ namespace rpp
 #undef TestCase
 #undef TestCaseExpectedEx
 
-#define Assert(expr) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); }
-#define AssertMsg(expr, fmt, ...) if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); }
-#define AssertThat(expr, expected) do { \
+#define Assert(expr) [&]() -> bool { \
+    if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); return false; } \
+    return true; \
+}()
+#define AssertMsg(expr, fmt, ...) [&]() -> bool { \
+    if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); return false; } \
+    return true; \
+}()
+#define AssertThat(expr, expected) [&]() -> bool { \
     const auto& __expr   = expr;           \
     const auto& __expect = expected;       \
-    if (!(__expr == __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
-} while (false)
+    if (!(__expr == __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); return false; } \
+    return true; \
+}()
 #define AssertEqual AssertThat
-#define AssertNotEqual(expr, mustNotEqual) do { \
+#define AssertNotEqual(expr, mustNotEqual) [&]() -> bool { \
     const auto& __expr    = expr;                    \
     const auto& __mustnot = mustNotEqual;            \
-    if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
-} while (false)
+    if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); return false; } \
+    return true; \
+}()
 
 #define TestImpl(testclass) struct testclass : public rpp::test
 

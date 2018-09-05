@@ -48,7 +48,8 @@ TestImpl(test_sockets)
         sleep(500);
 
         string resp = client.recv_str();
-        Assert(resp != "") else printf("%s\n", resp.c_str());
+        if (!Assert(resp != ""))
+            printf("%s\n", resp.c_str());
         sleep(500);
 
         printf("server: closing down\n");
