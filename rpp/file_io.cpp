@@ -737,6 +737,13 @@ namespace rpp /* ReCpp */
         return copy_file(sourceFile.to_cstr(buf1), destinationFile.to_cstr(buf2));
     }
 
+    bool copy_file_if_needed(const strview sourceFile, const strview destinationFile) noexcept
+    {
+        if (file_exists(destinationFile))
+            return true;
+        return copy_file(sourceFile, destinationFile);
+    }
+
     bool copy_file_into_folder(const strview sourceFile, const strview destinationFolder) noexcept
     {
         char buf1[1024];

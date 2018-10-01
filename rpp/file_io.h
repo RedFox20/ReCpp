@@ -613,6 +613,12 @@ namespace rpp /* ReCpp */
     RPPAPI bool copy_file(const strview sourceFile, const strview destinationFile) noexcept;
 
     /**
+     * @brief Copies sourceFile to destinationFile IF destinationFile doesn't exist
+     * @return TRUE if destinationFile exists or copy_file return true
+     */
+    RPPAPI bool copy_file_if_needed(const strview sourceFile, const strview destinationFile) noexcept;
+
+    /**
      * @brief Copies sourceFile into destinationFolder, overwriting the previous file!
      * @return TRUE if sourceFile was opened && destinationFolder was created && copied successfully
      */
