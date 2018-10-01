@@ -219,8 +219,13 @@ namespace rpp
         /** @brief Writes raw data into the buffer */
         binary_stream& write(const void* data, int numBytes);
 
+        template<class T>
+        static constexpr bool is_trivial_type = std::is_default_constructible<T>::value
+                                             && std::is_trivially_destructible<T>::value;
+
         /** @brief Writes object of type T into the buffer */
-        template<class T> binary_stream& write(const T& data)
+        template<class T, typename = std::enable_if_t<is_trivial_type<T>>> 
+        binary_stream& write(const T& data)
         {
             ensure_space((int)sizeof(T));
             *(T*)&Ptr[WritePos] = data;
@@ -262,10 +267,6 @@ namespace rpp
         binary_stream& write(const strview& str)      { return write_nstr(str.str, str.len); }
         binary_stream& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }
         binary_stream& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
-
-        template<class T>
-        static constexpr bool is_trivial_type = std::is_default_constructible<T>::value
-                                             && std::is_trivially_destructible<T>::value;
 
         template<class T, class A>
         binary_stream& write(const std::vector<T, A>& v)
