@@ -214,8 +214,14 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 // Logs an error with custom file, line, func sources
 #define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
 
-// Asserts for a condition with message in all types of builds
+// LogError for a condition with message in all types of builds
+// @warning This is not a fatal assert!
 #define Assert(expression, format, ...) do { if (!(expression)) LogError(format, ##__VA_ARGS__ ); } while(0)
+
+
+// LogError for a condition with no message formatting
+// @warning This is not a fatal assert!
+#define AssertExpr(expression) do { if (!(expression)) LogError("Assert failed: %s", #expression); } while(0)
 
 #if defined(DEBUG) || defined(_DEBUG) || defined(BETA)
 // Asserts for a condition with message only in DEBUG builds
