@@ -223,7 +223,7 @@ namespace rpp
 #define TestInit(testclass)          __TestInit(testclass, true)
 #define TestInitNoAutorun(testclass) __TestInit(testclass, false)
 
-#define TestCleanup(testclass) void cleanup_test() override
+#define TestCleanup() void cleanup_test() override
 
 
 #if _MSC_VER

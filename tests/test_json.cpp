@@ -9,7 +9,7 @@ TestImpl(test_json)
 
     }
 
-    TestCleanup(test_json)
+    TestCleanup()
     {
 
     }

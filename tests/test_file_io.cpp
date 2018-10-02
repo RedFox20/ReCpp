@@ -15,7 +15,7 @@ TestImpl(test_file_io)
         TestDir  = path_combine(temp_dir(), "_rpp_test_tmp");
         TestFile = path_combine(temp_dir(), "_rpp_test.txt");
     }
-    TestCleanup(test_file_io)
+    TestCleanup()
     {
         if (folder_exists(TestDir))
             Assert(delete_folder(TestDir, recursive));
