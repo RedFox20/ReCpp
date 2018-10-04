@@ -257,7 +257,7 @@ namespace rpp
         template<typename T, template<class, class...> class C, class... Args>
         FINLINE string_buffer& operator<<(const C<T, Args...>& container)
         {
-            this->prettyprint(container);
+            this->write(container, /*newlines:*/true);
             return *this;
         }
 
@@ -286,7 +286,7 @@ namespace rpp
 
         void write_ptr(const void* p, format_opt opt = lowercase);
 
-        void writeln(); // \n
+        void writeln();     // \n
         void write_quote(); // <">
         void write_apos();  // <'>
         void write_colon(); // <: >
@@ -306,19 +306,26 @@ namespace rpp
         template<class T, class... Args> FINLINE void write(const T& first, const Args&... args)
         {
             write(first);
-        #if RPP_HAS_CXX17
-            (..., write_with_separator(args)); // C++17 Fold Expressions
-        #else
-            write_separator(); write(args...);
-        #endif
+            #if RPP_HAS_CXX17
+                (..., write_with_separator(args)); // C++17 Fold Expressions
+            #else
+                write_separator(); write(args...);
+            #endif
         }
         template<class T> FINLINE void writeln(const T& value)
         {
-            write(value); writeln();
+            write(value);
+            writeln();
         }
         template<class T, class... Args> FINLINE void writeln(const T& first, const Args&... args)
         {
-            write(first, args...); writeln();
+            write(first);
+            #if RPP_HAS_CXX17
+                (..., write_with_separator(args)); // C++17 Fold Expressions
+            #else
+                write_separator(); write(args...);
+            #endif
+            writeln();
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////
@@ -352,7 +359,7 @@ namespace rpp
         void pretty_cont_end(int count);
 
         template<typename T, template<class, class...> class C, class... Args>
-        NOINLINE void prettyprint(const C<T, Args...>& container, bool newlines = true)
+        NOINLINE void write(const C<T, Args...>& container, bool newlines = true)
         {
             int count = (int)container.size();
             pretty_cont_start(count, newlines);
@@ -364,6 +371,12 @@ namespace rpp
                 pretty_cont_item_end(++i, count, newlines);
             }
             pretty_cont_end(count);
+        }
+
+        template<typename T, template<class, class...> class C, class... Args>
+        NOINLINE void prettyprint(const C<T, Args...>& container, bool newlines = true)
+        {
+            this->write(container, newlines);
         }
 
         /**
@@ -415,11 +428,13 @@ namespace rpp
 
     template<class T> int println(FILE* file, const T& value)
     {
-        return print(value) + println(file);
+        string_buffer buf; buf.writeln(value);
+        return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T> FINLINE int println(const T& value)
     {
-        return println(stdout, value);
+        string_buffer buf; buf.writeln(value);
+        return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);
     }
 
     /**
@@ -428,13 +443,13 @@ namespace rpp
      */
     template<class T, class... Args> int print(FILE* file, const T& first, const Args&... args)
     {
-        string_buffer buf;
-        buf.write(first, args...);
+        string_buffer buf; buf.write(first, args...);
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int print(const T& first, const Args&... args)
     {
-        return print(stdout, first, args...);
+        string_buffer buf; buf.write(first, args...);
+        return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);
     }
 
     /**
@@ -443,13 +458,13 @@ namespace rpp
      */
     template<class T, class... Args> int println(FILE* file, const T& first, const Args&... args)
     {
-        string_buffer buf;
-        buf.writeln(first, args...);
+        string_buffer buf; buf.writeln(first, args...);
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int println(const T& first, const Args&... args)
     {
-        return println(stdout, first, args...);
+        string_buffer buf; buf.writeln(first, args...);
+        return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);
     }
     
     #if DEBUG
@@ -462,26 +477,24 @@ namespace rpp
      * Stringifies and appends the input arguments one by one, filling gaps with spaces, similar to Python print()
      * Ex: sprint("test:", 10, 20.1f);  --> "test: 10 20.1"
      */
-    template<class T, class... Args> inline string sprint(const T& first, const Args&... args)
+    template<class T, class... Args> string sprint(const T& first, const Args&... args)
     {
-        string_buffer buf;
-        buf.write(first, args...);
+        string_buffer buf; buf.write(first, args...);
         return buf.str();
     }
-    template<class T, class... Args> inline string sprintln(const T& first, const Args&... args)
+    template<class T, class... Args> string sprintln(const T& first, const Args&... args)
     {
-        string_buffer buf;
-        buf.writeln(first, args...);
+        string_buffer buf; buf.writeln(first, args...);
         return buf.str();
     }
 
     inline const char* __format_wrap(const string& s)  { return s.c_str();    }
     inline const char* __format_wrap(const strview& s) { return s.to_cstr();  }
-    template<class T> inline const T& __format_wrap(const T& t) { return t; }
+    template<class T> const T& __format_wrap(const T& t) { return t; }
 
     RPPAPI string __format(const char* format, ...); 
 
-    template<class... Args> inline string format(const char* format, const Args&... args)
+    template<class... Args> string format(const char* format, const Args&... args)
     {
         return __format(format, __format_wrap(args)...);
     }

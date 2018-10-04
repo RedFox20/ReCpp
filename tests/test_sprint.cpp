@@ -1,7 +1,9 @@
 #include <rpp/sprint.h>
 #include <cfloat> // DBL_MAX
 #include <rpp/tests.h>
+#include <unordered_map>
 using namespace rpp;
+using std::unordered_map;
 
 struct external_to_string { };
 std::string to_string(external_to_string) { return "external_to_string"; }
@@ -60,9 +62,7 @@ TestImpl(test_sprint)
         // ensure it won't crash with random input loop
         string_buffer buf;
         for (int i = 0; i < 100; ++i)
-        {
             buf.writeln("str", 10, 20.1, "2132"_sv, "abcd"s);
-        }
 
         string str;
         for (int i = 0; i < 100; ++i)
@@ -81,6 +81,26 @@ TestImpl(test_sprint)
     TestCase(println)
     {
         println("hello", 10, "println", 20);
+    }
+
+    TestCase(println_vector_strings)
+    {
+        vector<string> names = { "Bob", "Marley", "Mick", "Jagger", "Bruce" };
+        println(names);
+    }
+
+    TestCase(println_vector_shared_ptrs)
+    {
+        vector<std::shared_ptr<double>> ptrs = { std::make_shared<double>(1.1), 
+                                                 std::make_shared<double>(2.2), 
+                                                 std::make_shared<double>(3.3) };
+        println(ptrs);
+    }
+
+    TestCase(println_unordered_map)
+    {
+        unordered_map<int, string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
+        println(map);
     }
 
     TestCase(format)
@@ -140,7 +160,6 @@ TestImpl(test_sprint)
         string ashex = sb.str();
         AssertThat(ashex, referenceHex(input));
     }
-
     
     TestCase(to_stringable)
     {
@@ -219,7 +238,6 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "*{external_to_string}");
         sb.clear();
     }
-
     
     TestCase(sprint_to_stringable)
     {
@@ -233,7 +251,6 @@ TestImpl(test_sprint)
         external_to_string ext;
         AssertThat(rpp::sprint(&ext), "*{external_to_string}");
         AssertThat(rpp::sprint((const external_to_string*)&ext), "*{external_to_string}");
-
     }
 
 
