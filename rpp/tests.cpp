@@ -407,36 +407,6 @@ namespace rpp
         return test_count - 1;
     }
 
-#if _WIN32 && _MSC_VER
-    static void move_console_window()
-    {
-        // move console window to the other monitor to make test debugging more seamless
-        // if debugger is attached with Visual Studio
-        if (IsDebuggerPresent() && GetSystemMetrics(SM_CMONITORS) > 1)
-        {
-            vector<HMONITOR> mon;
-            EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR monitor, HDC, RECT*, LPARAM data) {
-                ((vector<HMONITOR>*)data)->push_back(monitor); return 1; }, (LPARAM)&mon);
-
-            RECT consoleRect; GetWindowRect(GetConsoleWindow(), &consoleRect);
-            HMONITOR consoleMon = MonitorFromRect(&consoleRect, MONITOR_DEFAULTTONEAREST);
-            HMONITOR otherMon = consoleMon != mon[0] ? mon[0] : mon[1];
-
-            MONITORINFO consoleMI = { sizeof(MONITORINFO), {}, {}, 0 };
-            MONITORINFO otherMI   = { sizeof(MONITORINFO), {}, {}, 0 };
-            GetMonitorInfo(consoleMon, &consoleMI);
-            GetMonitorInfo(otherMon,   &otherMI);
-
-            int x = consoleMI.rcMonitor.left > otherMI.rcMonitor.left // moveLeft ?
-                ? otherMI.rcMonitor.right - (consoleRect.left - consoleMI.rcMonitor.left) - (consoleRect.right - consoleRect.left)
-                : otherMI.rcMonitor.left  + (consoleRect.left - consoleMI.rcMonitor.left);
-            int y = otherMI.rcMonitor.top + (consoleRect.top - consoleMI.rcMonitor.top);
-            SetWindowPos(GetConsoleWindow(), nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-        }
-    }
-#endif
-
-
     static void set_test_defaults()
     {
         for (test_info& t : state().global_tests)
@@ -588,7 +558,6 @@ namespace rpp
             _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
             _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
         #endif
-        move_console_window();
     #endif
     
         set_test_defaults();
