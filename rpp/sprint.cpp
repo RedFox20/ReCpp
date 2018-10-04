@@ -63,9 +63,9 @@ namespace rpp
 
 
     void string_buffer::write(const string_buffer& sb) { write(sb.view()); }
-    void string_buffer::write_ptr_begin() { write("*{");   }
+    void string_buffer::write_ptr_begin()      { write("*{");   }
     void string_buffer::write(std::nullptr_t)  { write("null"); }
-    void string_buffer::write_ptr_end()   { write('}');    }
+    void string_buffer::write_ptr_end()        { write('}');    }
 
     void string_buffer::write(const strview& s)
     {
@@ -98,7 +98,7 @@ namespace rpp
 
     static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };
     static const char HEXUP[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-
+    
     void string_buffer::write_hex(const void* data, int numBytes, format_opt opt)
     {
         const char* hex = opt == uppercase ? HEXUP : HEX;

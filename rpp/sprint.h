@@ -306,7 +306,6 @@ namespace rpp
         template<class T, class... Args> FINLINE void write(const T& first, const Args&... args)
         {
             write(first);
-
         #if RPP_HAS_CXX17
             (..., write_with_separator(args)); // C++17 Fold Expressions
         #else

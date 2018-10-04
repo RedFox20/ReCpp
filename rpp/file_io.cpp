@@ -21,11 +21,10 @@
     #include <unistd.h>
     #include <dirent.h> // opendir()
 
-    #define fseeki64 fseeko
-    #define ftelli64 ftello
-
     #define _fstat64 fstat
     #define stat64   stat
+    #define fseeki64 fseeko
+    #define ftelli64 ftello
 #endif
 #if !_WIN32
     #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
