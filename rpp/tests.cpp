@@ -567,15 +567,16 @@ namespace rpp
                 if (f.line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
                 else        consolef(Red, "    %s::%s: %s\n",    f.testname.data(), f.testcase.data(), f.message.data());
             }
+            consolef(Default, "\n");
             return -1;
         }
         if (numTests <= 0)
         {
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n", (int)state().global_tests.size());
+            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n\n", (int)state().global_tests.size());
             return -1;
         }
-        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed!\n");
-        else               consolef(Green, "\nSUCCESS: All %d tests passed!\n", numTests);
+        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed!\n\n");
+        else               consolef(Green, "\nSUCCESS: All %d tests passed!\n\n", numTests);
         return 0;
     }
 

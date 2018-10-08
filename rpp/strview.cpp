@@ -643,22 +643,12 @@ namespace rpp
             buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
             return 3;
         }
-        double g;
-        uint64 absIntegral;
-        // we need ceil and floor for handling -DBL_MAX edge cases
-        if (f <= -DBL_MAX || +DBL_MAX <= f) {
-            double i = f <= -DBL_MAX ? ceil(f) : floor(f);
-            g = abs(f - i);
-            absIntegral = (int64)abs(i);
-        } else if (f <= INT64_MIN || INT64_MAX <= f) {
-            double i = f <= INT64_MIN ? ceil(f) : floor(f);
-            g = abs(f - i);
-            absIntegral = (int64)abs(i);
-        } else {
-            int64 i = (uint64)f;
-            g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
-            absIntegral = abs(i);
-        }
+        
+        // we need ceil and floor for handling -DBL_MAX edge case, or -2.0119 edge case
+        double i = f < -0.0 ? ceil(f) : floor(f);
+        double g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
+        uint64 absIntegral = (int64)abs(i);
+
         char* end = buffer;
         if (f < -0.0) {
             *end++ = '-';
