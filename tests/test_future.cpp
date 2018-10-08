@@ -110,7 +110,7 @@ TestImpl(test_future)
         });
 
         bool exceptHandlerCalled = false;
-        int result = f.then([] {
+        int result = f.then([&] {
             AssertMsg(false, "This callback should never be executed");
             return 0;
         }, [&](const exception& e) {
@@ -130,7 +130,7 @@ TestImpl(test_future)
         });
 
         bool exceptHandlerCalled = false;
-        int result = f.then([] {
+        int result = f.then([&] {
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
@@ -154,7 +154,7 @@ TestImpl(test_future)
         });
 
         bool exceptHandlerCalled = false;
-        int result = f.then([] {
+        int result = f.then([&] {
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
@@ -183,7 +183,7 @@ TestImpl(test_future)
         });
 
         bool exceptHandlerCalled = false;
-        int result = f.then([] {
+        int result = f.then([&] {
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },

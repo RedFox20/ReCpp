@@ -129,11 +129,21 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////
 
+    struct test_failure
+    {
+        string testname; // major test name
+        string testcase; // failed case name
+        string message;
+        string file;
+        int line;
+    };
+
     struct test_results
     {
         int tests_run = 0;
         int tests_failed = 0;
-        std::vector<string> failures;
+        int asserts_failed = 0;
+        std::vector<test_failure> failures;
     };
 
     ///////////////////////////////////////////////////////////////////////////
@@ -227,6 +237,11 @@ namespace rpp
 
         state().total_asserts_failed++;
         consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
+
+        if (current_results) {
+            current_results->asserts_failed++;
+            current_results->failures.emplace_back(test_failure{name, current_func->name, string{message}, string{filename}, line });
+        }
     }
 
     void test::assert_failed_custom(const char* fmt, ...)
@@ -236,6 +251,11 @@ namespace rpp
 
         state().total_asserts_failed++;
         consolef(Red, message);
+
+        if (current_results) {
+            current_results->asserts_failed++;
+            current_results->failures.emplace_back(test_failure{name, current_func->name, string{message}, string{}, 0 });
+        }
     }
 
     void test::print_error(const char* fmt, ...)
@@ -250,50 +270,6 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
         consolef(Yellow, message);
-    }
-
-    bool test::run_test(strview methodFilter)
-    {
-        char title[256];
-        int len = methodFilter
-            ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
-            : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
-
-        consolef(Yellow, "%s\n", title);
-        run_init();
-
-        int numTests = 0;
-        bool allSuccess = true;
-        if (methodFilter)
-        {
-            for (int i = 0; i < test_count; ++i) {
-                if (test_funcs[i].name.find(methodFilter)) {
-                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
-                    allSuccess &= run_test(test_funcs[i]);
-                    ++numTests;
-                }
-            }
-            if (!numTests) {
-                consolef(Yellow, "No tests matching '%.*s' in %s\n", methodFilter.len, methodFilter.str, name.str);
-            }
-        }
-        else
-        {
-            for (int i = 0; i < test_count; ++i) {
-                if (test_funcs[i].autorun) {
-                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
-                    allSuccess &= run_test(test_funcs[i]);
-                    ++numTests;
-                }
-            }
-            if (!numTests) {
-                consolef(Yellow, "No autorun tests discovered in %s\n", name.str);
-            }
-        }
-
-        run_cleanup();
-        consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)len)); // "-------------"
-        return allSuccess && numTests > 0;
     }
 
     bool test::run_init()
@@ -322,9 +298,58 @@ namespace rpp
         }
     }
 
-    bool test::run_test(test_func& test)
+    bool test::run_test(test_results& results, strview methodFilter)
     {
-        int before = state().total_asserts_failed;
+        current_results = &results; // TODO: thread safety?
+
+        char title[256];
+        int len = methodFilter
+            ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
+            : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
+
+        consolef(Yellow, "%s\n", title);
+        run_init();
+
+        int numTests = 0;
+        bool allSuccess = true;
+        if (methodFilter)
+        {
+            for (int i = 0; i < test_count; ++i) {
+                if (test_funcs[i].name.find(methodFilter)) {
+                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
+                    allSuccess &= run_test_func(results, test_funcs[i]);
+                    ++numTests;
+                }
+            }
+            if (!numTests) {
+                consolef(Yellow, "No tests matching '%.*s' in %s\n", methodFilter.len, methodFilter.str, name.str);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < test_count; ++i) {
+                if (test_funcs[i].autorun) {
+                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
+                    allSuccess &= run_test_func(results, test_funcs[i]);
+                    ++numTests;
+                }
+            }
+            if (!numTests) {
+                consolef(Yellow, "No autorun tests discovered in %s\n", name.str);
+            }
+        }
+
+        run_cleanup();
+        consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)len)); // "-------------"
+        current_results = nullptr; // TODO: thread safety?
+
+        return allSuccess && numTests > 0;
+    }
+
+    bool test::run_test_func(test_results& results, test_func& test)
+    {
+        current_func = &test; // TODO: thread safety?
+        int before = results.tests_failed;
         try
         {
             (test.lambda.*test.func)();
@@ -347,7 +372,8 @@ namespace rpp
                                      name.str, test.name.str, e.what());
             }
         }
-        int totalFailures = state().total_asserts_failed - before;
+        current_func = nullptr; // TODO: thread safety?
+        int totalFailures = results.tests_failed - before;
         return totalFailures <= 0;
     }
 
@@ -518,7 +544,7 @@ namespace rpp
             if (t.test_enabled)
             {
                 auto test = t.factory(t.name);
-                if (!test->run_test(t.case_filter))
+                if (!test->run_test(results, t.case_filter))
                 {
                     ++results.tests_failed;
                 }
@@ -539,6 +565,11 @@ namespace rpp
             else
                 consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
                                results.tests_failed, numTests, failed);
+            for (const test_failure& f : results.failures)
+            {
+                if (f.line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
+                else        consolef(Red, "    %s::%s: %s\n",    f.testname.data(), f.testcase.data(), f.message.data());
+            }
             return -1;
         }
         if (numTests <= 0)

@@ -16,10 +16,11 @@ TestImpl(test_close_sync)
         close_sync CloseSync;
         string data = "xxxxyyyyzzzzaaaabbbbcccc";
 
-        ~ImportantState()
+        ~ImportantState() noexcept(false)
         {
             CloseSync.lock_for_close();
-            AssertThat(data, "aaaabbbbcccc");
+            if (data != "aaaabbbbcccc")
+                throw std::runtime_error("~ImportantState: data != \"aaaabbbbcccc\"");
             data = "???????????";
         }
 
@@ -29,10 +30,12 @@ TestImpl(test_close_sync)
             {
                 try_lock_or_return(CloseSync);
                 ::sleep_for(30ms);
-                AssertThat(data, "xxxxyyyyzzzzaaaabbbbcccc");
+                //AssertThat(data, "xxxxyyyyzzzzaaaabbbbcccc");
+                if (data != "xxxxyyyyzzzzaaaabbbbcccc")
+                    throw std::runtime_error("SomeAsyncOperation: data != \"xxxxyyyyzzzzaaaabbbbcccc\"");
                 data = "aaaabbbbcccc";
             });
-            ::sleep_for(1ms);
+            ::sleep_for(15ms);
         }
     };
 

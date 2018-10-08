@@ -12,21 +12,21 @@ TestImpl(test_sockets)
     {
     }
 
-    static Socket create(const char* msg, Socket&& s)
+    Socket create(const char* msg, Socket&& s)
     {
         Assert(s.good() && s.connected());
         printf("%s %s\n", msg, s.name().c_str());
         return std::move(s);
     }
-    static Socket listen(int port)
+    Socket listen(int port)
     {
         return create("server: listening on", Socket::listen_to(port));
     }
-    static Socket accept(const Socket& server)
+    Socket accept(const Socket& server)
     {
         return create("server: accepted client", server.accept(5000/*ms*/));
     }
-    static Socket connect(const char* ip, int port)
+    Socket connect(const char* ip, int port)
     {
         return create("remote: connected to", Socket::connect_to(ip, port, 5000/*ms*/, AF_IPv4));
     }
@@ -37,7 +37,7 @@ TestImpl(test_sockets)
     TestCase(nonblocking_sockets)
     {
         Socket server = listen(1337); // this is our server
-        thread remote(nonblocking_remote); // spawn remote client
+        thread remote([=] { nonblocking_remote(); }); // spawn remote client
         Socket client = accept(server);
 
         // wait 1ms for a client that will never come
@@ -57,7 +57,7 @@ TestImpl(test_sockets)
         server.close();
         remote.join(); // wait for remote thread to finish
     }
-    static void nonblocking_remote() // simulated remote endpoint
+    void nonblocking_remote() // simulated remote endpoint
     {
         Socket server = connect("127.0.0.1", 1337);
         while (server.connected())
@@ -79,7 +79,7 @@ TestImpl(test_sockets)
         printf("========= TRANSMIT DATA =========\n");
 
         Socket server = listen(1337);
-        thread remote(transmitting_remote);
+        thread remote([=] { this->transmitting_remote(); });
         Socket client = accept(server);
 
         for (int i = 0; i < 10; ++i)
@@ -113,7 +113,7 @@ TestImpl(test_sockets)
         remote.join();
     }
 
-    static void transmitting_remote()
+    void transmitting_remote()
     {
         char sendBuffer[80000];
         memset(sendBuffer, '$', sizeof sendBuffer);

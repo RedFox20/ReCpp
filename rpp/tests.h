@@ -23,6 +23,7 @@ namespace rpp
 
     struct test;
     struct test_info;
+    struct test_results;
 
     using test_factory = unique_ptr<test> (*)(strview name);
 
@@ -57,12 +58,14 @@ namespace rpp
         int test_count = 0;
         int test_cap = 0;
 
+        test_results* current_results = nullptr;
+        test_func* current_func = nullptr;
     
     public:
         explicit test(strview name);
         virtual ~test();
-        static void assert_failed(const char* file, int line, const char* fmt, ...);
-        static void assert_failed_custom(const char* fmt, ...);
+        void assert_failed(const char* file, int line, const char* fmt, ...);
+        void assert_failed_custom(const char* fmt, ...);
         static void print_error(const char* fmt, ...);
         static void print_warning(const char* fmt, ...);
 
@@ -72,9 +75,11 @@ namespace rpp
          * the methodFilter substring are run
          * @return TRUE if ALL tests passed, FALSE if any failure
          */
-        bool run_test(strview methodFilter = {});
-        bool run_test(test_func& test);
+        bool run_test(test_results& results, strview methodFilter = {});
+    private:
+        bool run_test_func(test_results& results, test_func& test);
 
+    public:
         // generic sleep for testing purposes
         static void sleep(int millis);
 
@@ -139,7 +144,7 @@ namespace rpp
         }
 
         template<class Actual, class Expected>
-        static void assumption_failed(const char* file, int line, 
+        void assumption_failed(const char* file, int line,
             const char* expr, const Actual& actual, const char* why, const Expected& expected)
         {
             string sActual = as_short_string(actual);
@@ -180,7 +185,7 @@ namespace rpp
 #undef TestInit
 #undef TestInitNoAutorun
 #undef TestCleanup
-#undef TestLambda
+#undef __TestLambda
 #undef TestCase
 #undef TestCaseExpectedEx
 
@@ -227,21 +232,21 @@ namespace rpp
 
 
 #if _MSC_VER
-#  define TestLambda(testname) [=]{ this->test_##testname(); }
+#  define __TestLambda(testname) [&](){ this->test_##testname(); }
 #else
-#  define TestLambda(testname) [=]{ self()->test_##testname(); }
+#  define __TestLambda(testname) [&](){ self()->test_##testname(); }
 #endif
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname) ); \
+    const int _test_##testname = add_test_func(self(), #testname, __TestLambda(testname) ); \
     void test_##testname()
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
-    const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname), &typeid(expectedExceptionType)); \
+    const int _test_##testname = add_test_func(self(), #testname, __TestLambda(testname), &typeid(expectedExceptionType)); \
     void test_##testname()
 
 #define TestCaseNoAutorun(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, TestLambda(testname), nullptr, false); \
+    const int _test_##testname = add_test_func(self(), #testname, __TestLambda(testname), nullptr, false); \
     void test_##testname()
 
 }
