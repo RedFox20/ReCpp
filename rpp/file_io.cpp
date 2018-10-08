@@ -1109,8 +1109,14 @@ namespace rpp /* ReCpp */
 
 #if _WIN32
     // ReSharper disable CppSomeObjectMembersMightNotBeInitialized
-    dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {  // NOLINT
-        char path[512]; snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());
+    dir_iterator::dir_iterator(string&& dir) : dir{std::move(dir)} {  // NOLINT
+        char path[512];
+        if (this->dir.empty()) { // handle dir=="" special case
+            strncpy(path, "./*", 512);
+        }
+        else {
+            snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());
+        }
         if ((s->hFind = FindFirstFileA(path, &s->ffd)) == INVALID_HANDLE_VALUE)
             s->hFind = nullptr;
     // ReSharper restore CppSomeObjectMembersMightNotBeInitialized
@@ -1165,7 +1171,7 @@ namespace rpp /* ReCpp */
     {
         if (abs)
         {
-            string fullpath = full_path(dir);
+            string fullpath = full_path(dir.empty() ? "." : dir);
             if (fullpath.empty())
                 return; // folder does not exist
             
@@ -1180,7 +1186,15 @@ namespace rpp /* ReCpp */
     int list_dirs(vector<string>& out, strview dir, bool recursive, bool fullpath) noexcept
     {
         traverse_dir(dir, true, false, recursive, fullpath, [&](string&& path, bool) {
-            out.emplace_back(move(path));
+            out.emplace_back(std::move(path));
+        });
+        return (int)out.size();
+    }
+
+    int list_dirs_relpath(vector<string>& out, strview dir, bool recursive) noexcept
+    {
+        traverse_dir(dir, true, false, recursive, false, [&](string&& path, bool) {
+            out.emplace_back(path_combine(dir, path));
         });
         return (int)out.size();
     }
@@ -1189,7 +1203,16 @@ namespace rpp /* ReCpp */
     {
         traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
             if (suffix.empty() || strview{path}.ends_withi(suffix))
-                out.emplace_back(move(path));
+                out.emplace_back(std::move(path));
+        });
+        return (int)out.size();
+    }
+
+    int list_files_relpath(vector<string>& out, strview dir, strview suffix, bool recursive) noexcept
+    {
+        traverse_dir(dir, false, true, recursive, false, [&](string&& path, bool) {
+            if (suffix.empty() || strview{path}.ends_withi(suffix))
+                out.emplace_back(path_combine(dir, path));
         });
         return (int)out.size();
     }
@@ -1198,7 +1221,16 @@ namespace rpp /* ReCpp */
     {
         traverse_dir(dir, true, true, recursive, fullpath, [&](string&& path, bool isDir) {
             auto& out = isDir ? outDirs : outFiles;
-            out.emplace_back(move(path));
+            out.emplace_back(std::move(path));
+        });
+        return (int)outDirs.size() + (int)outFiles.size();
+    }
+
+    int list_alldir_relpath(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive) noexcept
+    {
+        traverse_dir(dir, true, true, recursive, false, [&](string&& path, bool isDir) {
+            auto& out = isDir ? outDirs : outFiles;
+            out.emplace_back(path_combine(dir, path));
         });
         return (int)outDirs.size() + (int)outFiles.size();
     }
@@ -1209,7 +1241,7 @@ namespace rpp /* ReCpp */
         traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
             for (const strview& suffix : suffixes) {
                 if (strview{ path }.ends_withi(suffix)) {
-                    out.emplace_back(move(path));
+                    out.emplace_back(std::move(path));
                     return;
                 }
             }

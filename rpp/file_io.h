@@ -900,7 +900,8 @@ namespace rpp /* ReCpp */
      * @param recursive (default: false) If true, will perform a recursive search
      * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
      * @return Number of folders found
-     *
+     * 
+     * @code
      * @example [recursive=false] [fullpath=false] vector<string> {
      *     "bin",
      *     "src",
@@ -927,11 +928,14 @@ namespace rpp /* ReCpp */
      *     "/projects/ReCpp/src/mesh",
      *     "/projects/ReCpp/lib",
      * };
+     * @endcode
      */
     RPPAPI int list_dirs(vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
 
     inline vector<string> list_dirs(strview dir, bool recursive = false, bool fullpath = false) noexcept {
-        vector<string> out; list_dirs(out, dir, recursive, fullpath); return out;
+        vector<string> out;
+        list_dirs(out, dir, recursive, fullpath);
+        return out;
     }
     inline int list_dirs_fullpath(vector<string>& out, strview dir, bool recursive = false) noexcept {
         return list_dirs(out, dir, recursive, true);
@@ -942,6 +946,45 @@ namespace rpp /* ReCpp */
     inline vector<string> list_dirs_fullpath_recursive(strview dir) noexcept {
         return list_dirs(dir, true, true);
     }
+
+
+    /**
+     * Lists all folders inside this directory as relative paths including input dir
+     * @note By default: not recursive
+     * @param out Destination vector for result folder names (not full folder paths!)
+     * @param dir Relative or full path of this directory
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @return Number of folders found
+     * 
+     * @code
+     * @example [dir="test/ReCpp/"] [recursive=false] vector<string> {
+     *     "test/ReCpp/bin",
+     *     "test/ReCpp/src",
+     *     "test/ReCpp/lib",
+     * };
+     * @example [dir="test/ReCpp/"] [recursive=true] vector<string> {
+     *     "test/ReCpp/bin",
+     *     "test/ReCpp/bin/data",
+     *     "test/ReCpp/bin/data/models",
+     *     "test/ReCpp/src",
+     *     "test/ReCpp/src/mesh",
+     *     "test/ReCpp/lib",
+     * };
+     * @endcode
+     */
+    RPPAPI int list_dirs_relpath(vector<string>& out, strview dir, bool recursive = false) noexcept;
+
+    inline vector<string> list_dirs_relpath(strview dir, bool recursive = false) noexcept {
+        vector<string> out;
+        list_dirs_relpath(out, dir, recursive);
+        return out;
+    }
+    inline vector<string> list_dirs_relpath_recursive(strview dir) noexcept {
+        vector<string> out;
+        list_dirs_relpath(out, dir, true);
+        return out;
+    }
+
 
     /**
      * Lists all files inside this directory that have the specified extension (default: all files)
@@ -957,6 +1000,7 @@ namespace rpp /* ReCpp */
      *     vector<string> relativePaths          = list_files(folder);
      *     vector<string> recursiveRelativePaths = list_files_recursive(folder);
      * @endcode
+     * @code
      * @example [recursive=false] [fullpath=false] vector<string> {
      *     "main.cpp",
      *     "file_io.h",
@@ -985,10 +1029,13 @@ namespace rpp /* ReCpp */
      *     "/projects/ReCpp/mesh/mesh_obj.cpp",
      *     "/projects/ReCpp/mesh/mesh_fbx.cpp",
      * };
+     * @endcode
      */
     RPPAPI int list_files(vector<string>& out, strview dir, strview suffix = {}, bool recursive = false, bool fullpath = false) noexcept;
     inline vector<string> list_files(strview dir, strview suffix = {}, bool recursive = false, bool fullpath = false) noexcept {
-        vector<string> out; list_files(out, dir, suffix, recursive, fullpath); return out;
+        vector<string> out;
+        list_files(out, dir, suffix, recursive, fullpath);
+        return out;
     }
 
     inline int list_files_fullpath(vector<string>& out, strview dir, strview suffix = {}, bool recursive = false) noexcept {
@@ -1011,6 +1058,66 @@ namespace rpp /* ReCpp */
         return list_files(dir, suffix, true, true);
     }
 
+
+    /**
+     * Lists all files inside this directory that have the specified extension (default: all files)
+     * as relative paths including input dir
+     * @note By default: not recursive
+     * @param out Destination vector for result folder names (not full folder paths!)
+     * @param dir Relative or full path of this directory
+     * @param suffix Filter files by suffix, ex: ".txt" or "_mask.jpg", default ("") lists all files
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @return Number of files found that match the extension
+     * @code
+     *     vector<string> relativePaths          = list_files_relpath(folder);
+     *     vector<string> recursiveRelativePaths = list_files_relpath_recursive(folder);
+     * @endcode
+     * @code
+     * @example [dir="test/ReCpp/"] [recursive=false] vector<string> {
+     *     "test/ReCpp/main.cpp",
+     *     "test/ReCpp/file_io.h",
+     *     "test/ReCpp/file_io.cpp",
+     * };
+     * @example [dir="test/ReCpp/"] [recursive=true] vector<string> {
+     *     "test/ReCpp/main.cpp",
+     *     "test/ReCpp/file_io.h",
+     *     "test/ReCpp/file_io.cpp",
+     *     "test/ReCpp/mesh/mesh.h",
+     *     "test/ReCpp/mesh/mesh.cpp",
+     *     "test/ReCpp/mesh/mesh_obj.cpp",
+     *     "test/ReCpp/mesh/mesh_fbx.cpp",
+     * };
+     * @endcode
+     */
+    RPPAPI int list_files_relpath(vector<string>& out, strview dir, strview suffix = {}, bool recursive = false) noexcept;
+
+    inline vector<string> list_files_relpath(strview dir, strview suffix = {}, bool recursive = false) noexcept {
+        vector<string> out;
+        list_files_relpath(out, dir, suffix, recursive);
+        return out;
+    }
+    inline vector<string> list_files_relpath_recursive(strview dir, strview suffix = {}) noexcept {
+        vector<string> out;
+        list_files_relpath(out, dir, suffix, true);
+        return out;
+    }
+
+
+    /**
+     * Recursively lists all files under this directory and its subdirectories 
+     * that match the list of suffixex
+     * @param dir Relative or full path of root directory
+     * @param suffixes Filter files by suffixes, ex: {"txt","_old.cfg","_mask.jpg"}
+     * @param recursive [false] If true, the listing is done recursively
+     * @param fullpath  [false] If true, full paths will be resolved
+     * @return vector of resulting relative file paths
+     */
+    RPPAPI vector<string> list_files(strview dir, const vector<strview>& suffixes, bool recursive = false, bool fullpath = false) noexcept;
+    inline vector<string> list_files_recursive(strview dir, const vector<strview>& suffixes, bool fullpath = false) noexcept {
+        return list_files(dir, suffixes, true, fullpath);
+    }
+
+
     /**
      * Lists all files and folders inside a dir
      * @note By default: not recursive
@@ -1030,22 +1137,31 @@ namespace rpp /* ReCpp */
      * @endcode
      */
     RPPAPI int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir,
-                    bool recursive = false, bool fullpath = false) noexcept;
+                           bool recursive = false, bool fullpath = false) noexcept;
 
 
     /**
-     * Recursively lists all files under this directory and its subdirectories 
-     * that match the list of suffixex
-     * @param dir Relative or full path of root directory
-     * @param suffixes Filter files by suffixes, ex: {"txt","_old.cfg","_mask.jpg"}
-     * @param recursive [false] If true, the listing is done recursively
-     * @param fullpath  [false] If true, full paths will be resolved
-     * @return vector of resulting relative file paths
+     * Lists all files and folders inside a dir as relative paths to input dir
+     * @note By default: not recursive
+     * @param outDirs All found directories relative to input dir
+     * @param outFiles All found files
+     * @param dir Directory to search in
+     * @param recursive (default: false) If true, will perform a recursive search
+     * @return Number of files and folders found that match the extension
+     * Example:
+     * @code
+     *     string dir = "ReCpp";
+     *     vector<string> dirs, files;
+     *     list_alldir_relpath_recursive(dirs, files, dir);
+     *     // dirs:  { "ReCpp/.git", "ReCpp/.git/logs", ... }
+     *     // files: { "ReCpp/.git/config", ..., "ReCpp/.gitignore", ... }
+     * @endcode
      */
-    RPPAPI vector<string> list_files(strview dir, const vector<strview>& suffixes, bool recursive = false , bool fullpath = false) noexcept;
-    inline vector<string> list_files_recursive(strview dir, const vector<strview>& suffixes, bool fullpath = false) noexcept {
-        return list_files(dir, suffixes, true, fullpath);
+    RPPAPI int list_alldir_relpath(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive = false) noexcept;
+    inline int list_alldir_relpath_recursive(vector<string>& outDirs, vector<string>& outFiles, strview dir) noexcept {
+        return list_alldir_relpath(outDirs, outFiles, dir, true);
     }
+
 
     /**
      * @return The current working directory of the application.

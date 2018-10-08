@@ -213,45 +213,62 @@ TestImpl(test_file_io)
 
     TestCase(file_and_folder_listing)
     {
+        string originalDir = rpp::working_dir();
         Assert(create_folder(TestDir+"/folder/path"));
-        file::write_new(TestDir+"/folder/test1.txt",      "text1");
-        file::write_new(TestDir+"/folder/path/test2.txt", "text2");
-        file::write_new(TestDir+"/folder/path/test3.txt", "text3");
-        file::write_new(TestDir+"/folder/path/dummy.obj", "dummy");
+        Assert(rpp::change_dir(TestDir));
+        file::write_new("folder/test1.txt",      "text1");
+        file::write_new("folder/path/test2.txt", "text2");
+        file::write_new("folder/path/test3.txt", "text3");
+        file::write_new("folder/path/dummy.obj", "dummy");
 
-        vector<string> relpaths = list_files(TestDir+"/folder/path", ".txt");
+        // TEST: list_files (names only)
+        vector<string> relpaths = list_files("folder/path", ".txt");
         AssertThat(relpaths.size(), 2u);
         Assert(contains(relpaths, "test2.txt"));
-        Assert(contains(relpaths,  "test3.txt"));
+        Assert(contains(relpaths, "test3.txt"));
 
-        vector<string> relpaths2 = list_files_recursive(TestDir, ".txt");
+        // TEST: list_files_relpath (relative to folder/path)
+        vector<string> relpaths_r = list_files_relpath("folder/path", ".txt");
+        AssertThat(relpaths_r.size(), 2u);
+        Assert(contains(relpaths_r, "folder/path/test2.txt"));
+        Assert(contains(relpaths_r, "folder/path/test3.txt"));
+
+        // TEST: list_files_recursive
+        vector<string> relpaths2 = list_files_recursive("", ".txt");
         AssertThat(relpaths2.size(), 3u);
         Assert(contains(relpaths2, "folder/test1.txt"));
         Assert(contains(relpaths2, "folder/path/test2.txt"));
         Assert(contains(relpaths2, "folder/path/test3.txt"));
 
+        // TEST: list_files_fullpath
         string fullpath = full_path(TestDir);
-        vector<string> fullpaths = list_files_fullpath(TestDir+"/folder/path", ".txt");
+        vector<string> fullpaths = list_files_fullpath("folder/path", ".txt");
         AssertThat(fullpaths.size(), 2u);
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test2.txt")));
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test3.txt")));
 
-        vector<string> fullpaths2 = list_files_fullpath_recursive(TestDir, ".txt");
+        // TEST: list_files_fullpath_recursive
+        vector<string> fullpaths2 = list_files_fullpath_recursive("", ".txt");
         AssertThat(fullpaths2.size(), 3u);
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/test1.txt")));
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/path/test2.txt")));
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/path/test3.txt")));
 
+        // TEST: list_dirs_relpath (relative to folder)
+        vector<string> dirs_r = list_dirs_relpath_recursive("folder");
+        Assert(contains(dirs_r, "folder/path"));
+
+        // TEST: list_alldir
         vector<string> dirs, files;
-        list_alldir(dirs, files, TestDir+"", true);
+        list_alldir(dirs, files, "", true);
         Assert(contains(dirs, "folder"));
         Assert(contains(dirs, "folder/path"));
-
         Assert(contains(files, "folder/test1.txt"));
         Assert(contains(files, "folder/path/test2.txt"));
         Assert(contains(files, "folder/path/test3.txt"));
         Assert(contains(files, "folder/path/dummy.obj"));
 
+        Assert(rpp::change_dir(originalDir));
         Assert(delete_folder(TestDir+"/", recursive));
     }
 
