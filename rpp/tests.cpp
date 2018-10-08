@@ -39,7 +39,6 @@ namespace rpp
     struct mapped_state
     {
         std::vector<test_info> global_tests;
-        int total_asserts_failed;
     };
 
     /**
@@ -235,7 +234,6 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        state().total_asserts_failed++;
         consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
 
         if (current_results) {
@@ -249,7 +247,6 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        state().total_asserts_failed++;
         consolef(Red, message);
 
         if (current_results) {
@@ -349,7 +346,7 @@ namespace rpp
     bool test::run_test_func(test_results& results, test_func& test)
     {
         current_func = &test; // TODO: thread safety?
-        int before = results.tests_failed;
+        int before = results.asserts_failed;
         try
         {
             (test.lambda.*test.func)();
@@ -373,7 +370,7 @@ namespace rpp
             }
         }
         current_func = nullptr; // TODO: thread safety?
-        int totalFailures = results.tests_failed - before;
+        int totalFailures = results.asserts_failed - before;
         return totalFailures <= 0;
     }
 
@@ -546,9 +543,9 @@ namespace rpp
                 auto test = t.factory(t.name);
                 if (!test->run_test(results, t.case_filter))
                 {
-                    ++results.tests_failed;
+                    results.tests_failed++;
                 }
-                ++results.tests_run;
+                results.tests_run++;
             }
         }
         return results;
@@ -557,7 +554,7 @@ namespace rpp
     static int print_final_summary(const test_results& results)
     {
         int numTests = results.tests_run;
-        int failed = state().total_asserts_failed;
+        int failed = results.asserts_failed;
         if (failed > 0)
         {
             if (numTests == 1)

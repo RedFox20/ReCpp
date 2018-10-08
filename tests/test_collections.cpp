@@ -18,6 +18,8 @@ TestImpl(test_collections)
         for (auto& i : range(v)) n += i;
         AssertThat(n, 5);
 
+        AssertThat(n, 4);
+
         int m = 0;
         for (auto& i : range(v, 4)) m += i;
         AssertThat(m, 4);
