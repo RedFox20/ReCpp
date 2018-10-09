@@ -271,6 +271,8 @@ namespace rpp
 
     bool test::run_init()
     {
+        test_func init; init.name = "init";
+        current_func = &init;
         try
         {
             init_test();
@@ -281,10 +283,13 @@ namespace rpp
             assert_failed_custom("FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
             return false;
         }
+        current_func = nullptr;
     }
 
     void test::run_cleanup()
     {
+        test_func cleanup; cleanup.name = "cleanup";
+        current_func = &cleanup;
         try
         {
             cleanup_test();
@@ -293,6 +298,7 @@ namespace rpp
         {
             assert_failed_custom("FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
         }
+        current_func = nullptr;
     }
 
     bool test::run_test(test_results& results, strview methodFilter)
