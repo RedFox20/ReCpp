@@ -16,6 +16,7 @@ TestImpl(test_threadpool)
 {
     TestInit(test_threadpool)
     {
+        printf("physical_cores: %d\n", thread_pool::physical_cores());
     }
 
     static int parallelism_count(int numIterations)
@@ -35,7 +36,6 @@ TestImpl(test_threadpool)
 
     TestCase(threadpool_concurrency)
     {
-        printf("physical_cores: %d\n", thread_pool::physical_cores());
         AssertThat(parallelism_count(1), 1);
         AssertThat(parallelism_count(128), thread_pool::physical_cores());
     }
@@ -98,6 +98,18 @@ TestImpl(test_threadpool)
         for (int i = 0; i < len; ++i)
             sum2 += ptr[i];
         printf("Singlethread elapsed: %.3fs  result: %lld\n", timer.elapsed(), (long long)sum2);
+    }
+
+    TestCase(parallel_foreach)
+    {
+        auto numbers = vector<int>(1337);
+        parallel_foreach(numbers, [](int& n) {
+            n = 1;
+        });
+
+        int checksum = 0;
+        for (int i : numbers) checksum += i;
+        AssertThat(checksum, 1337);
     }
 
     TestCase(repeat_tests)

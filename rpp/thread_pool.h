@@ -393,10 +393,21 @@ namespace rpp
      * parallel nesting is forbidden. This prevents quadratic thread explosion.
      *
      * This function will block until all parallel tasks have finished running
-     *
+     * 
+     * The callback function parameters [start, end) provide a range to iterate over,
+     * which yields better loop performance. If your callback tasks are heavy, then
+     * consider `rpp::parallel_foreach`
+     * 
+     * @code
+     * rpp::parallel_for(0, images.size(), [&](int start, int end) {
+     *     for (int i = start; i < end; ++i) {
+     *         ProcessImage(images[i]);
+     *     }
+     * });
+     * @endcode
      * @param rangeStart Usually 0
      * @param rangeEnd Usually vec.size()
-     * @param func Non-owning callback action.
+     * @param func Non-owning callback action:  void(int start, int end)
      */
     template<class Func>
     inline void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
@@ -404,6 +415,35 @@ namespace rpp
         thread_pool::global().parallel_for(rangeStart, rangeEnd,
             action<int, int>::from_function<Func, &Func::operator()>(&func));
     }
+
+
+    /**
+     * @brief Runs parallel_foreach on the default global thread pool
+     * 
+     * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
+     * parallel nesting is forbidden. This prevents quadratic thread explosion.
+     * 
+     * This function will block until all parallel tasks have finished running
+     * 
+     * @code
+     * std::vector<string> images = ... ;
+     * rpp::parallel_foreach(images, [](string& image) {
+     *     ProcessImage(image);
+     * });
+     * @endcode
+     * @param items A random access container with an operator[](int index) and size()
+     * @param foreach Non-owning foreach callback action:  void(auto item)
+     */
+    template<class Container, class ForeachFunc>
+    inline void parallel_foreach(Container& items, const ForeachFunc& foreach) noexcept
+    {
+        thread_pool::global().parallel_for(0, (int)items.size(), [&](int start, int end) {
+            for (int i = start; i < end; ++i) {
+                foreach(items[i]);
+            }
+        });
+    }
+
 
     /**
      * Runs a generic parallel task with no arguments on the default global thread pool
