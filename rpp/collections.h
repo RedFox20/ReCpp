@@ -471,13 +471,13 @@ namespace rpp
         return t;
     }
 
-	/////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
 
-	template<class T, class A> void sort(std::vector<T, A>& v)
+    template<class T, class A> void sort(std::vector<T, A>& v)
     {
-		T* begin = v.data();
-		T* end = begin + v.size();
-		std::sort(begin, end);    
+        T* begin = v.data();
+        T* end = begin + v.size();
+        std::sort(begin, end);    
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
