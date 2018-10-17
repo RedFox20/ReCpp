@@ -10,7 +10,7 @@ class ReCpp(mama.BuildTarget):
         self.export_includes('.')  # So: #include <rpp/strview.h>
         if self.linux:
             self.export_syslib('dl')
-            self.export_syslib('dw')
+            self.export_syslib('dw', 'libdw-dev')
             self.export_syslib('rt')
         if self.android:
             self.export_syslib('android')
