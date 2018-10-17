@@ -289,4 +289,37 @@ TestImpl(test_future)
         f2.get(); // already OK if this doesn't throw exception
     }
 
+    TestCase(get_tasks_string)
+    {
+        vector<string> items = {
+            "stringA",
+            "stringB",
+            "stringC"
+        };
+        vector<string> tasks = rpp::get_tasks(items, [&](string& s) {
+            return rpp::async_task([&] {
+                return "future " + s;
+            });
+        });
+        AssertThat(tasks.size(), 3);
+        AssertThat(tasks[0], "future stringA"s);
+        AssertThat(tasks[1], "future stringB"s);
+        AssertThat(tasks[2], "future stringC"s);
+    }
+
+    TestCase(get_async_tasks)
+    {
+        vector<string> items = {
+            "stringA",
+            "stringB",
+            "stringC"
+        };
+        vector<string> tasks = rpp::get_async_tasks(items, [&](string& s) {
+            return "future " + s;
+        });
+        AssertThat(tasks.size(), 3);
+        AssertThat(tasks[0], "future stringA"s);
+        AssertThat(tasks[1], "future stringB"s);
+        AssertThat(tasks[2], "future stringC"s);
+    }
 };

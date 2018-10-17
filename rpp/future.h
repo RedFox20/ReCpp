@@ -116,6 +116,9 @@ namespace rpp
 
         template<class T>
         using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
+    
+        template<class Future>
+        using future_type = std::decay_t<decltype(std::declval<Future>().get())>;
     }
 
 
@@ -534,14 +537,42 @@ namespace rpp
      *     });
      * @endcode
      */
-    template<class T, class U, class Launcher>
-    vector<T> get_tasks(vector<U>& items, const Launcher& futureLauncher)
+    template<class U, class Launcher>
+    auto get_tasks(vector<U>& items, const Launcher& futureLauncher)
+        -> vector< future_type<ret_type<Launcher>> >
     {
+        using T = future_type<ret_type<Launcher>>;
         vector<cfuture<T>> futures;
         futures.reserve(items.size());
         
         for (U& item : items)
             futures.emplace_back(futureLauncher(item));
+        
+        return get_all(futures);
+    }
+
+    /**
+     * Used to launch multiple parallel tasks and then gather
+     * the results. It uses rpp::async_task to launch the futures.
+     * @code
+     * vector<Result> results = rpp::get_async_tasks(DataList,
+     *     [&](SomeData& data) {
+     *          return HeavyComputation(data);
+     *     });
+     * @endcode
+     */
+    template<class U, class Callback>
+    auto get_async_tasks(vector<U>& items, const Callback& futureCallback)
+        -> vector< ret_type<Callback> >
+    {
+        using T = ret_type<Callback>;
+        vector<cfuture<T>> futures;
+        futures.reserve(items.size());
+        
+        for (U& item : items)
+            futures.emplace_back(rpp::async_task([&] {
+                return futureCallback(item);
+            }));
         
         return get_all(futures);
     }
