@@ -1142,7 +1142,7 @@ namespace rpp
 
     Matrix4& Matrix4::setPerspective(float fov, float width, float height, float zNear, float zFar)
     {
-        const float rad2 = radf(fov) * 0.5f;
+        const float rad2 = radf(fov * 0.5f) * 0.5f;
         const float h = cosf(rad2) / sinf(rad2);
         const float w = (h * height) / width;
         const float range = zFar - zNear;
