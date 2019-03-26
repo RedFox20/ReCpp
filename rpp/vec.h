@@ -901,6 +901,7 @@ namespace rpp
         static constexpr Vector4 CornflowerBlue() { return { 0.33f, 0.66f, 1.0f, 1.0f }; }     // #55AAFF  85, 170, 255
 
     #if __clang__ || _MSC_VER
+        Vector4() = default;
         constexpr Vector4(Vector2 xy, Vector2 zw) : xy{xy}, zw{zw} {}
         constexpr Vector4(float x, float y, float z, float w) : x{x}, y{y}, z{z}, w{w} {}
     #endif
