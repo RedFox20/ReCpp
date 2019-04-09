@@ -29,11 +29,11 @@ configure-gcc-5:
 
 
 download-clang6-1404:
-	sudo wget -O /tmp/clang++6.zip http://ateh10.net/dev/clang++6-1404.zip
+	sudo wget --retry-connrefused -O /tmp/clang++6.zip http://ateh10.net/dev/clang++6-1404.zip
 	sudo unzip -quo /tmp/clang++6.zip -d /usr/local
 	sudo rm -f /tmp/clang++6.zip
 download-clang6-1604:
-	sudo wget -O /tmp/clang++6.zip http://ateh10.net/dev/clang++6-1604.zip
+	sudo wget --retry-connrefused -O /tmp/clang++6.zip http://ateh10.net/dev/clang++6-1604.zip
 	sudo unzip -quo /tmp/clang++6.zip -d /usr/local
 	sudo rm -f /tmp/clang++6.zip
 	sudo ls -l /usr/local/clang++6
@@ -52,12 +52,12 @@ configure-clang6-1404: download-clang6-1404 install-clang6
 
 
 download-clang5-1404:
-	sudo wget -O /tmp/clang++5.zip http://ateh10.net/dev/clang++5-1404.zip
+	sudo wget --retry-connrefused -O /tmp/clang++5.zip http://ateh10.net/dev/clang++5-1404.zip
 	sudo unzip -quo /tmp/clang++5.zip -d /usr/local
 	sudo rm -f /tmp/clang++5.zip
 	sudo ls -l /usr/local/clang++5
 download-clang5-1604:
-	sudo wget -O /tmp/clang++5.zip http://ateh10.net/dev/clang++5-1604.zip
+	sudo wget --retry-connrefused -O /tmp/clang++5.zip http://ateh10.net/dev/clang++5-1604.zip
 	sudo unzip -quo /tmp/clang++5.zip -d /usr/local
 	sudo rm -f /tmp/clang++5.zip
 	sudo ls -l /usr/local/clang++5
