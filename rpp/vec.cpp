@@ -678,6 +678,16 @@ namespace rpp
         return      fromRadianAxis(rotationRadians.z, 0.0f, 0.0f, 1.0f) * q;
     }
 
+    Vector4 Vector4::fromRotationMatrix(const Matrix4& rotation)
+    {
+        return fromRotationRadians(rotation.getRotationRadians());
+    }
+
+    Vector4 Vector4::fromRotationMatrix(const Matrix3& rotation)
+    {
+        return fromRotationRadians(rotation.toEulerRadians());
+    }
+
     Vector4 Vector4::rotate(const Vector4& q) const
     {
         return {
@@ -996,6 +1006,50 @@ namespace rpp
     Matrix4& Matrix4::loadIdentity()
     {
         return (*this = IDENTITY4x4);
+    }
+
+    Vector3 Matrix4::getTranslation() const
+    {
+        return r3.xyz;
+    }
+
+    Vector3 Matrix4::getScale() const
+    {
+        float scaleX = r0.xyz.length();
+        float scaleY = r1.xyz.length();
+        float scaleZ = r2.xyz.length();
+
+        Vector3 tempZ = r0.xyz.cross(r1.xyz);
+        if (tempZ.dot(r2.xyz) < 0)
+        {
+            scaleX = -scaleX;
+        }
+        return { scaleX, scaleY, scaleZ };
+    }
+
+    Matrix3 Matrix4::getRotationMatrix() const
+    {
+        Vector3 r0v = r0.xyz, r1v = r1.xyz, r2v = r2.xyz;
+        Vector3 tempZ = r0v.cross(r1v);
+        if (tempZ.dot(r2v) < 0)
+        {
+            r0v = -r0v;
+        }
+        Matrix3 r;
+        r.r0 = r0v.normalized();
+        r.r1 = r1v.normalized();
+        r.r2 = r2v.normalized();
+        return r;
+    }
+
+    Vector3 Matrix4::getRotationAngles() const
+    {
+        return getRotationMatrix().toEulerAngles();
+    }
+
+    Vector3 Matrix4::getRotationRadians() const
+    {
+        return getRotationMatrix().toEulerRadians();
     }
 
     Matrix4& Matrix4::multiply(const Matrix4& mb)

@@ -874,6 +874,8 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    struct RPPAPI Matrix3;
+    struct RPPAPI Matrix4;
 
     /** @brief 4D Vector for matrix calculations and quaternion rotations */
     struct RPPAPI Vector4
@@ -947,12 +949,18 @@ namespace rpp
 
 
         /** @brief Creates a quaternion rotation from an Euler angle (degrees), rotation axis must be specified */
-        static Vector4 fromAngleAxis(float angle, float x, float y, float z);
+        static Vector4 fromAngleAxis(float degrees, float x, float y, float z);
         static Vector4 fromRadianAxis(float radians, float x, float y, float z);
     
         /** @brief Creates a quaternion rotation from Euler XYZ (degrees) rotation */
         static Vector4 fromRotationAngles(const Vector3& rotationDegrees);
         static Vector4 fromRotationRadians(const Vector3& rotationRadians);
+
+        /** @brief Creates a quaternion rotation from a 4x4 affine matrix */
+        static Vector4 fromRotationMatrix(const Matrix4& rotation);
+
+        /** @brief Creates a quaternion rotation from a 3x3 rotation matrix */
+        static Vector4 fromRotationMatrix(const Matrix3& rotation);
 
         /** @return A 4-component float color from integer RGB color, with A being 1.0f */
         static constexpr Vector4 RGB(int r, int g, int b)
@@ -1241,7 +1249,22 @@ namespace rpp
 
         /** @brief Loads identity matrix */
         Matrix4& loadIdentity();
-    
+
+        /** @return The translation component of this 4x4 matrix */
+        Vector3 getTranslation() const;
+
+        /** @return The scale component of this 4x4 matrix */
+        Vector3 getScale() const;
+
+        /** @return The 3x3 normalized Rotation Matrix of this 4x4 affine matrix */
+        Matrix3 getRotationMatrix() const;
+
+        /** @return The Euler Angle DEGREES of this 4x4 matrix */
+        Vector3 getRotationAngles() const;
+
+        /** @return The Euler Angle RADIANS of this 4x4 matrix */
+        Vector3 getRotationRadians() const;
+
         /** @brief Multiplies this matrix: this = this * mb */
         Matrix4& multiply(const Matrix4& mb);
 
@@ -1266,7 +1289,7 @@ namespace rpp
         /** @brief Scales an object transformation matrix by a given scale factor */
         Matrix4& scale(const Vector3& scale);
     
-        /** @brief Loads an Ortographic projection matrix */
+        /** @brief Loads an Orthographic projection matrix */
         Matrix4& setOrtho(float left, float right, float bottom, float top);
         static Matrix4 createOrtho(float left, float right, float bottom, float top)
         {
