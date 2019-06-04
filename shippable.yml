@@ -3,7 +3,6 @@ python:
   - 3.7
 build:
   ci:
-#    - sudo apt -y install python3.7
     - make configure-pip
     - make configure-cmake
     - make configure-clang6-1604
