@@ -1,7 +1,7 @@
 import mama
 
 class ReCpp(mama.BuildTarget):
-    local_workspace = 'build'
+
     def dependencies(self):
         pass
 
