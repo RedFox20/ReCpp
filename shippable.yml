@@ -3,7 +3,7 @@ python:
   - 3.7
 build:
   ci:
-    - make configure-pip
+    - make configure-pip37
     - make configure-cmake
     - make configure-clang6-1604
     - pip3 install mama --upgrade
