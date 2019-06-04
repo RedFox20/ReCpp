@@ -9,7 +9,7 @@ jobs:
       - run: make configure-pip
       - run: make configure-cmake
       - run: sudo python3.6 -m pip install mama
-      - run: sudo apt -y install libdw-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: mama build clang
       - run: mama test
 workflows:
