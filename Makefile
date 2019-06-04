@@ -13,7 +13,10 @@ build:
 configure-clang-travis: configure-clang6-1404
 configure-gcc-travis: configure-gcc-7
 
-
+configure-gcc-8:
+	sudo apt -y --force-yes --allow-unauthenticated --fix-missing install g++-8
+	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 100 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+	sudo update-alternatives --set gcc /usr/bin/gcc-8
 configure-gcc-7:
 	sudo apt -y --force-yes --allow-unauthenticated --fix-missing install g++-7
 	sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
