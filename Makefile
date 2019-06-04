@@ -89,6 +89,7 @@ configure-pip36:
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
 	sudo python3.6 /opt/pip/get-pip.py
 
+
 /opt/cmake: configure-cmake
 configure-cmake:
 	sudo mkdir -p /opt/cmake
