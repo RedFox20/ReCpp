@@ -30,6 +30,11 @@ namespace rpp
         
         bool empty() const { return Queue.empty(); }
         int  size()  const { return (int)Queue.size(); }
+        int safe_size() const
+        {
+            lock_guard<mutex> lock {Mutex};
+            return (int)Queue.size();
+        }
         
         mutex& sync() const { return Mutex; }
         void notify() { Waiter.notify_all(); }
@@ -126,7 +131,7 @@ namespace rpp
     private:
         inline void pop_unlocked(T& outItem)
         {
-            outItem = move(Queue.front());
+            outItem = std::move(Queue.front());
             Queue.pop_front();
         }
     };
