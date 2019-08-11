@@ -87,61 +87,46 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 #if __APPLE__ && __OBJC__
 #import <Foundation/NSString.h>
 #endif
+
 namespace rpp
 {
     template<class T>
     inline const T&    __wrap_arg(const T& arg)            { return arg; }
     inline const char* __wrap_arg(const std::string& arg)  { return arg.c_str();   }
-    // __wrap_arg(const rpp::strview& arg) defined in "strview.h"
-    inline int __wrap_arg() { return 0; } // default expansion case if no varargs
-    
-#if __APPLE__ && __OBJC__
+
+    #if __APPLE__ && __OBJC__
     inline const char* __wrap_arg(NSString* arg) { return arg.UTF8String; }
-#endif
+    #endif
 }
 
-#define __get_nth_wrap_arg(_zero, _12, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N_0, ...) N_0
+#define __get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
 #define __wrap_args0(...)
-
-// MSVC needs a proxy macro to properly expand __VA_ARGS__
-#if _MSC_VER
 #define __wrap_exp(x) x
-#define __wrap_args1(...)    , rpp::__wrap_arg(__VA_ARGS__)
-#define __wrap_args2(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args1(__VA_ARGS__))
-#define __wrap_args3(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args2(__VA_ARGS__))
-#define __wrap_args4(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args3(__VA_ARGS__))
-#define __wrap_args5(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args4(__VA_ARGS__))
-#define __wrap_args6(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args5(__VA_ARGS__))
-#define __wrap_args7(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args6(__VA_ARGS__))
-#define __wrap_args8(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args7(__VA_ARGS__))
-#define __wrap_args9(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args8(__VA_ARGS__))
-#define __wrap_args10(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args9(__VA_ARGS__))
-#define __wrap_args11(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args10(__VA_ARGS__))
-#define __wrap_args12(x, ...) , rpp::__wrap_arg(x) __wrap_exp(__wrap_args11(__VA_ARGS__))
 
-#define __wrap_args(...) __wrap_exp(__get_nth_wrap_arg(0, ##__VA_ARGS__, \
-                                    __wrap_args12, __wrap_args11, __wrap_args10, __wrap_args9, \
-                                    __wrap_args8, __wrap_args7, __wrap_args6, __wrap_args5, \
-                                    __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)(__VA_ARGS__))
-#else
-#define __wrap_args1(x)      , rpp::__wrap_arg(x)
-#define __wrap_args2(x, ...) , rpp::__wrap_arg(x) __wrap_args1(__VA_ARGS__)
-#define __wrap_args3(x, ...) , rpp::__wrap_arg(x) __wrap_args2(__VA_ARGS__)
-#define __wrap_args4(x, ...) , rpp::__wrap_arg(x) __wrap_args3(__VA_ARGS__)
-#define __wrap_args5(x, ...) , rpp::__wrap_arg(x) __wrap_args4(__VA_ARGS__)
-#define __wrap_args6(x, ...) , rpp::__wrap_arg(x) __wrap_args5(__VA_ARGS__)
-#define __wrap_args7(x, ...) , rpp::__wrap_arg(x) __wrap_args6(__VA_ARGS__)
-#define __wrap_args8(x, ...) , rpp::__wrap_arg(x) __wrap_args7(__VA_ARGS__)
-#define __wrap_args9(x, ...) , rpp::__wrap_arg(x) __wrap_args8(__VA_ARGS__)
-#define __wrap_args10(x, ...) , rpp::__wrap_arg(x) __wrap_args9(__VA_ARGS__)
-#define __wrap_args11(x, ...) , rpp::__wrap_arg(x) __wrap_args10(__VA_ARGS__)
-#define __wrap_args12(x, ...) , rpp::__wrap_arg(x) __wrap_args11(__VA_ARGS__)
+#define __z
+#define __c ,
+#define __spaces_on_empty_token(...) ,,,, ,,,, ,,,,
+#define __get_nth_comma(_12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
+#define __va_comma2(...) __wrap_exp(__get_nth_comma(__VA_ARGS__, __c,__c,__c,__c,  __c,__c,__c,__c,  __c,__c,__c,__c, __z) )
+#define __va_comma(...) __va_comma2(__spaces_on_empty_token __VA_ARGS__ (/*empty*/))
 
-#define __wrap_args(...) __get_nth_wrap_arg(0, ##__VA_ARGS__, \
-                            __wrap_args12, __wrap_args11, __wrap_args10, __wrap_args9, \
-                            __wrap_args8, __wrap_args7, __wrap_args6, __wrap_args5, \
-                            __wrap_args4, __wrap_args3, __wrap_args2, __wrap_args1, __wrap_args0)(__VA_ARGS__)
-#endif
+#define __a0(...)
+#define __a1(z, x)       , rpp::__wrap_arg(x)
+#define __a2(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a1(z, __VA_ARGS__))
+#define __a3(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a2(z, __VA_ARGS__))
+#define __a4(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a3(z, __VA_ARGS__))
+#define __a5(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a4(z, __VA_ARGS__))
+#define __a6(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a5(z, __VA_ARGS__))
+#define __a7(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a6(z, __VA_ARGS__))
+#define __a8(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a7(z, __VA_ARGS__))
+#define __a9(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a8(z, __VA_ARGS__))
+#define __a10(z, x, ...) , rpp::__wrap_arg(x) __wrap_exp(__a9(z, __VA_ARGS__))
+#define __a11(z, x, ...) , rpp::__wrap_arg(x) __wrap_exp(__a10(z, __VA_ARGS__))
+#define __a12(z, x, ...) , rpp::__wrap_arg(x) __wrap_exp(__a11(z, __VA_ARGS__))
+
+#define __wrap_args_2(...) __wrap_exp( __get_nth_wrap_arg(__VA_ARGS__, \
+        __a12,__a11,__a10,__a9,  __a8,__a7,__a6,__a5,  __a4,__a3,__a2,__a1,  __a0)(__VA_ARGS__) )
+#define __wrap_args(...) __wrap_exp( __wrap_args_2(0 __va_comma(__VA_ARGS__) __VA_ARGS__) )
 
 #else // C:
   #define __wrap_args(...) , ##__VA_ARGS__
@@ -171,7 +156,7 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 #    define __assertion_failure(fmt,...) do { __debugbreak(); } while (0)
 #  else // MSVC++ debug assert is quite unique since it supports Format strings. Wish all toolchains did that:
 #    define __assertion_failure(fmt,...) do { \
-    _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt __wrap_args(##__VA_ARGS__) ); } while (0)
+    _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt __wrap_args(__VA_ARGS__) ); } while (0)
 #  endif
 #elif defined __GNUC__ // other clang, mingw or linux gcc
 #  define  __assertion_failure(fmt,...) \
@@ -188,31 +173,33 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 
 
 /**
- * Logs an info message to the backing error mechanism (Crashlytics on iOS)
+ * Logs an info message to the backing error mechanism
  * No assertions are triggered.
  * NO FILE:LINE information is given. Info logs don't need it.
  */
-#define LogInfo(format, ...) _LogInfo("$ " format __wrap_args( __VA_ARGS__ ) )
+#define LogInfo(format, ...) _LogInfo("$ " format __wrap_args(__VA_ARGS__) )
+
 /**
- * Logs a warning to the backing error mechanism (Crashlytics on iOS)
+ * Logs a warning to the backing error mechanism
  * No assertions are triggered.
  */
-#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args( __VA_ARGS__ ) )
+#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) )
+
 /**
- * Logs an error to the backing error mechanism (Crashlytics on iOS)
+ * Logs an error to the backing error mechanism
  * An ASSERT is triggered during DEBUG runs.
  */
 #define LogError(format, ...) do { \
-    _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args( __VA_ARGS__ ) ); \
+    _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
     __debug_assert(format, ##__VA_ARGS__); \
 } while(0)
 
 // Logs an info message with custom file, line, func sources
-#define LogInfoFL(file, line, func, format, ...) _LogInfo(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
+#define LogInfoFL(file, line, func, format, ...) _LogInfo(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
 // Logs a warning with custom file, line, func sources
-#define LogWarningFL(file, line, func, format, ...) _LogWarning(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
+#define LogWarningFL(file, line, func, format, ...) _LogWarning(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
 // Logs an error with custom file, line, func sources
-#define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args( __VA_ARGS__ ) )
+#define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
 
 // LogError for a condition with message in all types of builds
 // @warning This is not a fatal assert!
