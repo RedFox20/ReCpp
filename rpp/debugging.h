@@ -35,13 +35,13 @@ typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 
 /** Sets the callback handler for any error messages */
-RPPCAPI void SetLogErrorHandler(LogErrorCallback errfunc);
+RPPCAPI void SetLogErrorHandler(LogErrorCallback errorHandler);
 
 /** Sets the callback handler for event messages  */
-RPPCAPI void SetLogEventHandler(LogEventCallback eventFunc);
+RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler);
 
 /** Sets the callback handler for C++ messages. You can even intercept these in C. */
-RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptFunc);
+RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler);
 
 /** This will remove function and lambda name information from the logs */
 RPPCAPI void LogDisableFunctionNames();
@@ -99,76 +99,76 @@ namespace rpp
     #endif
 }
 
-#define __get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
-#define __wrap_args0(...)
-#define __wrap_exp(x) x
+#define _rpp_get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
+#define _rpp_wrap(x) x
 
-#define __z
-#define __c ,
-#define __spaces_on_empty_token(...) ,,,, ,,,, ,,,,
-#define __get_nth_comma(_12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
-#define __va_comma2(...) __wrap_exp(__get_nth_comma(__VA_ARGS__, __c,__c,__c,__c,  __c,__c,__c,__c,  __c,__c,__c,__c, __z) )
-#define __va_comma(...) __va_comma2(__spaces_on_empty_token __VA_ARGS__ (/*empty*/))
+#define _rpp_z
+#define _rpp_c ,
+#define _spaces_on_empty_token(...) ,,,, ,,,, ,,,,
+#define _get_nth_comma(_12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
+#define _va_comma2(...) _rpp_wrap(_get_nth_comma(__VA_ARGS__,  _rpp_c,_rpp_c,_rpp_c,_rpp_c, \
+                                  _rpp_c,_rpp_c,_rpp_c,_rpp_c, _rpp_c,_rpp_c,_rpp_c,_rpp_c, _rpp_z) )
+#define _va_comma(...) _va_comma2(_spaces_on_empty_token __VA_ARGS__ (/*empty*/))
 
-#define __a0(...)
-#define __a1(z, x)       , rpp::__wrap_arg(x)
-#define __a2(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a1(z, __VA_ARGS__))
-#define __a3(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a2(z, __VA_ARGS__))
-#define __a4(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a3(z, __VA_ARGS__))
-#define __a5(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a4(z, __VA_ARGS__))
-#define __a6(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a5(z, __VA_ARGS__))
-#define __a7(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a6(z, __VA_ARGS__))
-#define __a8(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a7(z, __VA_ARGS__))
-#define __a9(z, x, ...)  , rpp::__wrap_arg(x) __wrap_exp(__a8(z, __VA_ARGS__))
-#define __a10(z, x, ...) , rpp::__wrap_arg(x) __wrap_exp(__a9(z, __VA_ARGS__))
-#define __a11(z, x, ...) , rpp::__wrap_arg(x) __wrap_exp(__a10(z, __VA_ARGS__))
-#define __a12(z, x, ...) , rpp::__wrap_arg(x) __wrap_exp(__a11(z, __VA_ARGS__))
+#define _wa0(...)
+#define _wa1(z, x)       , rpp::__wrap_arg(x)
+#define _wa2(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa1(z, __VA_ARGS__))
+#define _wa3(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa2(z, __VA_ARGS__))
+#define _wa4(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa3(z, __VA_ARGS__))
+#define _wa5(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa4(z, __VA_ARGS__))
+#define _wa6(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa5(z, __VA_ARGS__))
+#define _wa7(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa6(z, __VA_ARGS__))
+#define _wa8(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa7(z, __VA_ARGS__))
+#define _wa9(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa8(z, __VA_ARGS__))
+#define _wa10(z, x, ...) , rpp::__wrap_arg(x) _rpp_wrap(_wa9(z, __VA_ARGS__))
+#define _wa11(z, x, ...) , rpp::__wrap_arg(x) _rpp_wrap(_wa10(z, __VA_ARGS__))
+#define _wa12(z, x, ...) , rpp::__wrap_arg(x) _rpp_wrap(_wa11(z, __VA_ARGS__))
 
-#define __wrap_args_2(...) __wrap_exp( __get_nth_wrap_arg(__VA_ARGS__, \
-        __a12,__a11,__a10,__a9,  __a8,__a7,__a6,__a5,  __a4,__a3,__a2,__a1,  __a0)(__VA_ARGS__) )
-#define __wrap_args(...) __wrap_exp( __wrap_args_2(0 __va_comma(__VA_ARGS__) __VA_ARGS__) )
+#define _rpp_wrap_args_2(...) _rpp_wrap( _rpp_get_nth_wrap_arg(__VA_ARGS__,  _wa12,_wa11,_wa10,_wa9, \
+                                                       _wa8,_wa7,_wa6,_wa5,  _wa4,_wa3,_wa2,_wa1,  _wa0)(__VA_ARGS__) )
+#define _rpp_wrap_args(...) _rpp_wrap( _rpp_wrap_args_2(0 _va_comma(__VA_ARGS__) __VA_ARGS__) )
 
 #else // C:
-  #define __wrap_args(...) , ##__VA_ARGS__
+  #define _rpp_wrap_args(...) , ##__VA_ARGS__
 #endif
 
 
 // wraps and formats message string for assertions, std::string and rpp::strview are wrapped and .c_str() called
-#define __assert_format(fmt, ...) _FmtString(fmt __wrap_args(__VA_ARGS__) )
+#define _rpp_assert_format(fmt, ...) _FmtString(fmt _rpp_wrap_args(__VA_ARGS__) )
 
 
 #if defined __APPLE__ || defined __clang__ // iOS or just clang
 #  if __ANDROID__
 #    define __assertion_failure(fmt,...) \
-    __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), __assert_format(fmt, ##__VA_ARGS__))
+    __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  elif __APPLE__
 RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __dead2 __disable_tail_calls;
 #    define __assertion_failure(fmt,...) \
-    __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, __assert_format(fmt, ##__VA_ARGS__))
+    __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  else
 RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
                            unsigned int __line, const char *__function) __THROW __attribute__ ((__noreturn__));
 #    define __assertion_failure(fmt,...) \
-    __assert_fail(__assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
+    __assert_fail(_rpp_assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
 #  endif
 #elif _MSC_VER // Windows VC++
 #  ifndef _DEBUG
 #    define __assertion_failure(fmt,...) do { __debugbreak(); } while (0)
 #  else // MSVC++ debug assert is quite unique since it supports Format strings. Wish all toolchains did that:
 #    define __assertion_failure(fmt,...) do { \
-    _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt __wrap_args(__VA_ARGS__) ); } while (0)
+    _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt _rpp_wrap_args(__VA_ARGS__) ); } while (0)
 #  endif
 #elif defined __GNUC__ // other clang, mingw or linux gcc
 #  define  __assertion_failure(fmt,...) \
-    __assert_fail(__assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
+    __assert_fail(_rpp_assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
 #else
 #  error Debugging Assert not defined for this compiler toolkit!
 #endif
 
 #if defined(DEBUG) || defined(_DEBUG) || defined(BETA) || defined(RPP_DEBUG)
-#  define __debug_assert __assertion_failure
+#  define _rpp_debug_assert __assertion_failure
 #else
-#  define __debug_assert(...) /*nothing in release builds*/
+#  define _rpp_debug_assert(...) /*nothing in release builds*/
 #endif
 
 
@@ -177,29 +177,29 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
  * No assertions are triggered.
  * NO FILE:LINE information is given. Info logs don't need it.
  */
-#define LogInfo(format, ...) _LogInfo("$ " format __wrap_args(__VA_ARGS__) )
+#define LogInfo(format, ...) _LogInfo("$ " format _rpp_wrap_args(__VA_ARGS__) )
 
 /**
  * Logs a warning to the backing error mechanism
  * No assertions are triggered.
  */
-#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) )
+#define LogWarning(format, ...) _LogWarning(__log_format(format, __FILE__, __LINE__, __FUNCTION__) _rpp_wrap_args(__VA_ARGS__) )
 
 /**
  * Logs an error to the backing error mechanism
  * An ASSERT is triggered during DEBUG runs.
  */
 #define LogError(format, ...) do { \
-    _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
-    __debug_assert(format, ##__VA_ARGS__); \
+    _LogError(__log_format(format, __FILE__, __LINE__, __FUNCTION__) _rpp_wrap_args(__VA_ARGS__) ); \
+    _rpp_debug_assert(format, ##__VA_ARGS__); \
 } while(0)
 
 // Logs an info message with custom file, line, func sources
-#define LogInfoFL(file, line, func, format, ...) _LogInfo(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
+#define LogInfoFL(file, line, func, format, ...) _LogInfo(__log_format(format, file, line, func) _rpp_wrap_args(__VA_ARGS__) )
 // Logs a warning with custom file, line, func sources
-#define LogWarningFL(file, line, func, format, ...) _LogWarning(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
+#define LogWarningFL(file, line, func, format, ...) _LogWarning(__log_format(format, file, line, func) _rpp_wrap_args(__VA_ARGS__) )
 // Logs an error with custom file, line, func sources
-#define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) __wrap_args(__VA_ARGS__) )
+#define LogErrorFL(file, line, func, format, ...) _LogError(__log_format(format, file, line, func) _rpp_wrap_args(__VA_ARGS__) )
 
 // LogError for a condition with message in all types of builds
 // @warning This is not a fatal assert!
@@ -223,13 +223,13 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 // logs an std::exception; this is piped into the special exception handler @see SetLogExceptHandler()
 // triggers an assertion in debug builds
 #define LogExcept(std_except, format, ...) do { \
-    _LogExcept(std_except.what(), __log_format(format, __FILE__, __LINE__, __FUNCTION__) __wrap_args(__VA_ARGS__) ); \
-    __debug_assert(format ": %s", ##__VA_ARGS__, std_except.what() ); \
+    _LogExcept(std_except.what(), __log_format(format, __FILE__, __LINE__, __FUNCTION__) _rpp_wrap_args(__VA_ARGS__) ); \
+    _rpp_debug_assert(format ": %s", ##__VA_ARGS__, std_except.what() ); \
 } while(0)
 
 // uses printf style formatting to build an exception message
 #define ThrowErrType(exceptionClass, format, ...) do { \
-    auto* __formatted_error__ = _FmtString(format __wrap_args(__VA_ARGS__) ); \
+    auto* __formatted_error__ = _FmtString(format _rpp_wrap_args(__VA_ARGS__) ); \
     throw exceptionClass(__formatted_error__); \
 } while(0)
 
@@ -240,7 +240,7 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
 // A custom message must be provided
 #define AssertEx(expression, format, ...) do { \
     if (!(expression)) { \
-        auto* __formatted_error__ = _FmtString(format __wrap_args(__VA_ARGS__) ); \
+        auto* __formatted_error__ = _FmtString(format _rpp_wrap_args(__VA_ARGS__) ); \
         throw std::runtime_error(__formatted_error__); \
     } \
 } while(0)

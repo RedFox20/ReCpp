@@ -7,6 +7,6 @@ build:
     - make configure-cmake
     - make configure-clang6-1604
     - pip3 install mama --upgrade
-    - sudo apt -y --allow-unauthenticated install libdw-dev gdb
+    - sudo apt -y --allow-unauthenticated --fix-missing install libdw-dev gdb
     - mama build clang
     - mama test

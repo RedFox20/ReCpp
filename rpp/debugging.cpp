@@ -38,9 +38,9 @@ RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler)
 {
     EventHandler = eventHandler;
 }
-RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptFunc)
+RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler)
 {
-    ExceptHandler = exceptFunc;
+    ExceptHandler = exceptHandler;
 }
 RPPCAPI void LogDisableFunctionNames()
 {
