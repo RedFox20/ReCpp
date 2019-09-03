@@ -15,6 +15,9 @@
 #define RPP_STRVIEW_H 1
 #endif
 
+// ReSharper disable IdentifierTypo
+// ReSharper disable CommentTypo
+
 /**
  * This is a simplified string tokenizer class.
  *
@@ -38,9 +41,6 @@
 namespace rpp
 {
     using std::string;
-
-    // ReSharper disable IdentifierTypo
-    // ReSharper disable CommentTypo
 
     /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
