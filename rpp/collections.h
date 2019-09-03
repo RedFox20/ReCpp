@@ -5,6 +5,7 @@
  */
 #include <array>
 #include <vector>
+#include <deque>
 #include <unordered_map>
 #include <numeric>
 #include <algorithm> // std::sort
@@ -167,6 +168,13 @@ namespace rpp
     {
         T item = std::move(v.back());
         v.pop_back();
+        return item;
+    }
+
+    template<class T> T pop_front(std::deque<T>& d)
+    {
+        T item = std::move(d.front());
+        d.pop_front();
         return item;
     }
 
