@@ -15,6 +15,9 @@
 #define RPP_STRVIEW_H 1
 #endif
 
+// ReSharper disable IdentifierTypo
+// ReSharper disable CommentTypo
+
 /**
  * This is a simplified string tokenizer class.
  *
@@ -43,7 +46,7 @@ namespace rpp
 
     // This is same as memchr, but optimized for very small control strings
     // Retains string literal array length information
-    template<int N> inline bool strcontains(const char(&str)[N], char ch) {
+    template<int N> bool strcontains(const char(&str)[N], char ch) noexcept {
         for (int i = 0; i < N; ++i)
             if (str[i] == ch) return true;
         return false;
@@ -53,18 +56,18 @@ namespace rpp
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      * @note Retains string literal array length information
      */
-    template<int N> inline const char* strcontains(const char* str, int nstr, const char(&control)[N]) {
+    template<int N> const char* strcontains(const char* str, int nstr, const char(&control)[N]) noexcept {
         for (; nstr; --nstr, ++str)
             if (strcontains<N>(control, *str))
                 return str; // done
         return nullptr; // not found
     }
-    template<int N> inline bool strequals(const char* s1, const char(&s2)[N]) {
+    template<int N> bool strequals(const char* s1, const char(&s2)[N]) noexcept {
         for (int i = 0; i < (N - 1); ++i)
             if (s1[i] != s2[i]) return false; // not equal.
         return true;
     }
-    template<int N> inline bool strequalsi(const char* s1, const char(&s2)[N]) {
+    template<int N> bool strequalsi(const char* s1, const char(&s2)[N]) noexcept {
         for (int i = 0; i < (N - 1); ++i)
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;
@@ -72,14 +75,14 @@ namespace rpp
 
 
     // This is same as memchr, but optimized for very small control strings
-    RPPAPI bool strcontains(const char* str, int len, char ch);
+    RPPAPI bool strcontains(const char* str, int len, char ch) noexcept;
     /**
      * @note Same as strpbrk, except we're not dealing with 0-term strings
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      */
-    RPPAPI const char* strcontains(const char* str, int nstr, const char* control, int ncontrol);
-    RPPAPI NOINLINE bool strequals(const char* s1, const char* s2, int len);
-    RPPAPI NOINLINE bool strequalsi(const char* s1, const char* s2, int len);
+    RPPAPI const char* strcontains(const char* str, int nstr, const char* control, int ncontrol) noexcept;
+    RPPAPI NOINLINE bool strequals(const char* s1, const char* s2, int len) noexcept;
+    RPPAPI NOINLINE bool strequalsi(const char* s1, const char* s2, int len) noexcept;
 
 
 
@@ -93,8 +96,8 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed float
      */
-    RPPAPI double to_double(const char* str, int len, const char** end = nullptr);
-    inline double to_double(const char* str, const char** end = nullptr) { return to_double(str, 64, end); }
+    RPPAPI double to_double(const char* str, int len, const char** end = nullptr) noexcept;
+    inline double to_double(const char* str, const char** end = nullptr) noexcept { return to_double(str, 64, end); }
 
     /**
      * Fast locale agnostic atoi
@@ -103,8 +106,8 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
-    RPPAPI int to_int(const char* str, int len, const char** end = nullptr);
-    inline int to_int(const char* str, const char** end = nullptr) { return to_int(str, 32, end); }
+    RPPAPI int to_int(const char* str, int len, const char** end = nullptr) noexcept;
+    inline int to_int(const char* str, const char** end = nullptr) noexcept { return to_int(str, 32, end); }
 
     /**
      * Fast locale agnostic atoi
@@ -114,8 +117,8 @@ namespace rpp
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
      * @return Parsed int
      */
-    RPPAPI int to_inthx(const char* str, int len, const char** end = nullptr);
-    inline int to_inthx(const char* str, const char** end = nullptr) { return to_inthx(str, 32, end); }
+    RPPAPI int to_inthx(const char* str, int len, const char** end = nullptr) noexcept;
+    inline int to_inthx(const char* str, const char** end = nullptr) noexcept { return to_inthx(str, 32, end); }
 
 
     /**
@@ -124,8 +127,8 @@ namespace rpp
      * @param f Float value to convert to string
      * @return Length of the string
      */
-    RPPAPI int _tostring(char* buffer, double f);
-    inline int _tostring(char* buffer, float f) { return _tostring(buffer, (double)f); }
+    RPPAPI int _tostring(char* buffer, double f) noexcept;
+    inline int _tostring(char* buffer, float f) noexcept { return _tostring(buffer, (double)f); }
 
 
     /**
@@ -134,16 +137,16 @@ namespace rpp
      * @param value Integer value to convert to string
      * @return Length of the string
      */
-    RPPAPI int _tostring(char* buffer, int    value);
-    RPPAPI int _tostring(char* buffer, int64  value);
-    RPPAPI int _tostring(char* buffer, uint   value);
-    RPPAPI int _tostring(char* buffer, uint64 value);
+    RPPAPI int _tostring(char* buffer, int    value) noexcept;
+    RPPAPI int _tostring(char* buffer, int64  value) noexcept;
+    RPPAPI int _tostring(char* buffer, uint   value) noexcept;
+    RPPAPI int _tostring(char* buffer, uint64 value) noexcept;
 
-    inline int _tostring(char* buffer, rpp::byte value) { return _tostring(buffer, (uint)value); }
-    inline int _tostring(char* buffer, short value)     { return _tostring(buffer, (int)value);  }
-    inline int _tostring(char* buffer, ushort value)    { return _tostring(buffer, (uint)value); }
-    inline int _tostring(char* buffer, long value)      { return _tostring(buffer, (int)value);  }
-    inline int _tostring(char* buffer, ulong value)     { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, rpp::byte value) noexcept { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, short value)     noexcept { return _tostring(buffer, (int)value);  }
+    inline int _tostring(char* buffer, ushort value)    noexcept { return _tostring(buffer, (uint)value); }
+    inline int _tostring(char* buffer, long value)      noexcept { return _tostring(buffer, (int)value);  }
+    inline int _tostring(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint)value); }
 
 
 
@@ -182,21 +185,21 @@ namespace rpp
         int len;         // length of string
     #endif
 
-        FINLINE constexpr strview()                            : str(""),  len(0) {}
-        FINLINE strview(char* str)                             : str(str), len((int)strlen(str)) {}
-        FINLINE strview(const char* str)                       : str(str), len((int)strlen(str)) {}
-        FINLINE constexpr strview(const char* str, int len)    : str(str), len(len)              {}
-        FINLINE constexpr strview(const char* str, size_t len) : str(str), len((int)len)         {}
-        FINLINE strview(const char* str, const char* end)      : str(str), len(int(end-str))     {}
-        FINLINE strview(const void* str, const void* end)      : strview((const char*)str, (const char*)end) {}
-        FINLINE strview(const string& s)                       : str(s.c_str()), len((int)s.length()) {}
+        FINLINE constexpr strview()                            noexcept : str(""),  len(0) {}
+        FINLINE strview(char* str)                             noexcept : str(str), len((int)strlen(str)) {}
+        FINLINE strview(const char* str)                       noexcept : str(str), len((int)strlen(str)) {}
+        FINLINE constexpr strview(const char* str, int len)    noexcept : str(str), len(len)              {}
+        FINLINE constexpr strview(const char* str, size_t len) noexcept : str(str), len((int)len)         {}
+        FINLINE strview(const char* str, const char* end)      noexcept : str(str), len(int(end-str))     {}
+        FINLINE strview(const void* str, const void* end)      noexcept : strview{(const char*)str, (const char*)end} {}
+        FINLINE strview(const string& s)                       noexcept : str(s.c_str()), len((int)s.length()) {}
 
         template<class StringT>
         using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
 
         template<class StringT, typename = enable_if_string_like_t<StringT>>
-        FINLINE strview(const StringT& str) : str(str.c_str()), len((int)str.length()) {}
-        FINLINE const char& operator[](int index) const { return str[index]; }
+        FINLINE strview(const StringT& str) noexcept : str(str.c_str()), len((int)str.length()) {}
+        FINLINE const char& operator[](int index) const noexcept { return str[index]; }
         
         // disallow accidental init from char or bool
         strview(char) = delete;
@@ -214,7 +217,7 @@ namespace rpp
          * Copies this str[len] string into a C-string array
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
          */
-        NOINLINE const char* to_cstr(char* buf, int max) const;
+        NOINLINE const char* to_cstr(char* buf, int max) const noexcept;
         template<int N> 
         FINLINE const char* to_cstr(char (&buf)[N]) const { return to_cstr(buf, N); }
         /** 
@@ -222,7 +225,7 @@ namespace rpp
          * Result is only valid until next call to this method
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
          */
-        NOINLINE const char* to_cstr() const;
+        NOINLINE const char* to_cstr() const noexcept;
 
         /** Parses this strview as an integer */
         FINLINE int to_int() const { return rpp::to_int(str, len); }
@@ -240,7 +243,7 @@ namespace rpp
         // strings such as "true\n" will be parsed as true; same for "trueStatement" --> true,
         // because the conversion is relaxed, not strict.
         // For strict parsing, you should use strview::equalsi("true")
-        bool to_bool() const;
+        bool to_bool() const noexcept;
 
         /** Clears the strview */
         FINLINE void clear() { str = ""; len = 0; }
@@ -259,17 +262,17 @@ namespace rpp
         FINLINE char front() const { return *str; }
         FINLINE char back()  const { return str[len - 1]; }
         /** @return TRUE if the strview is only whitespace: " \t\r\n"  */
-        NOINLINE bool is_whitespace() const;
+        NOINLINE bool is_whitespace() const noexcept;
         /** @return TRUE if the strview ends with a null terminator */
         FINLINE bool is_nullterm() const { return str[len] == '\0'; }
 
         /** Trims the start of the string from any whitespace */
-        NOINLINE strview& trim_start();
+        NOINLINE strview& trim_start() noexcept;
         /** Trims start from this char */
-        NOINLINE strview& trim_start(const char ch);
-        NOINLINE strview& trim_start(const char* chars, int nchars);
+        NOINLINE strview& trim_start(const char ch) noexcept;
+        NOINLINE strview& trim_start(const char* chars, int nchars) noexcept;
         /* Optimized noinline version for specific character sequences */
-        template<int N> NOINLINE strview& trim_start(const char (&chars)[N]) { 
+        template<int N> NOINLINE strview& trim_start(const char (&chars)[N]) noexcept { 
             auto s = str;
             auto n = len;
             for (; n && strcontains<N>(chars, *s); ++s, --n)
@@ -277,13 +280,13 @@ namespace rpp
             str = s; len = n; // write result
             return *this;
         }
-        inline strview& trim_start(strview s) { return trim_start(s.str, s.len); }
+        inline strview& trim_start(strview s) noexcept { return trim_start(s.str, s.len); }
 
         /** Trims end from this char */
-        NOINLINE strview& trim_end(const char ch);
+        NOINLINE strview& trim_end(char ch) noexcept;
         /** Trims the end of the string from any whitespace */
         NOINLINE strview& trim_end();
-        NOINLINE strview& trim_end(const char* chars, int nchars);
+        NOINLINE strview& trim_end(const char* chars, int nchars) noexcept;
         /* Optimized noinline version for specific character sequences */
         template<int N> NOINLINE strview& trim_end(const char (&chars)[N]) {
             auto n = len;
@@ -353,36 +356,38 @@ namespace rpp
         }
 
         /** @return Pointer to char if found, NULL otherwise */
-        FINLINE const char* find(char c) const { return (const char*)memchr(str, c, (size_t)len); }
+        FINLINE const char* find(char c) const noexcept {
+            return (const char*)memchr(str, c, (size_t)len);
+        }
         /** @return Pointer to start of substring if found, NULL otherwise */
-        NOINLINE const char* find(const char* substr, int sublen) const;
-        FINLINE const char* find(const strview& substr) const { 
+        NOINLINE const char* find(const char* substr, int sublen) const noexcept;
+        FINLINE const char* find(const strview& substr) const noexcept { 
             return find(substr.str, substr.len); 
         }
-        template<int N> FINLINE const char* find(const char (&substr)[N]) const { 
+        template<int N> FINLINE const char* find(const char (&substr)[N]) const noexcept { 
             return find(substr, N - 1); 
         }
 
 
-        strview find_sv(const strview& substr) const {
+        strview find_sv(const strview& substr) const noexcept {
             const char* s = find(substr);
             return s ? strview{s, substr.len} : strview{};
         }
-        template<int N> strview find_sv(const char (&substr)[N]) const { 
+        template<int N> strview find_sv(const char (&substr)[N]) const noexcept { 
             const char* s = find<N>(substr);
             return s ? strview{s, N - 1} : strview{};
         }
 
 
         /** @return Pointer to char if found using reverse search, NULL otherwise */
-        NOINLINE const char* rfind(char c) const;
+        NOINLINE const char* rfind(char c) const noexcept;
 
         /** 
          * Forward searches for any of the specified chars
          * @return Pointer to char if found, NULL otherwise.
          */
-        const char* findany(const char* chars, int n) const;
-        template<int N> FINLINE const char* findany(const char (&chars)[N]) const {
+        const char* findany(const char* chars, int n) const noexcept;
+        template<int N> FINLINE const char* findany(const char (&chars)[N]) const noexcept {
             return findany(chars, N - 1);
         }
 
@@ -390,8 +395,8 @@ namespace rpp
          * Reverse searches for any of the specified chars
          * @return Pointer to char if found, NULL otherwise.
          */
-        const char* rfindany(const char* chars, int n) const;
-        template<int N> FINLINE const char* rfindany(const char (&chars)[N]) const {
+        const char* rfindany(const char* chars, int n) const noexcept;
+        template<int N> FINLINE const char* rfindany(const char (&chars)[N]) const noexcept {
             return rfindany(chars, N - 1);
         }
 
@@ -399,110 +404,112 @@ namespace rpp
         /**
          * Count number of occurrances of this character inside the strview bounds
          */
-        int count(char ch) const;
-        int indexof(char ch) const;
+        int count(char ch) const noexcept;
+        int indexof(char ch) const noexcept;
         
         // reverse iterating indexof
-        int rindexof(char ch) const;
+        int rindexof(char ch) const noexcept;
         
-        int indexofany(const char* chars, int n) const;
-        template<int N> FINLINE int indexofany(const char (&chars)[N]) const {
+        int indexofany(const char* chars, int n) const noexcept;
+        template<int N> FINLINE int indexofany(const char (&chars)[N]) const noexcept {
             return indexofany(chars, N - 1);
         }
 
         /** @return TRUE if this strview starts with the specified string */
-        FINLINE bool starts_with(const char* s, int length) const {
+        FINLINE bool starts_with(const char* s, int length) const noexcept {
             return len >= length && strequals(str, s, length);
         }
-        template<int N> FINLINE bool starts_with(const char (&s)[N]) const { 
+        template<int N> FINLINE bool starts_with(const char (&s)[N]) const noexcept { 
             return len >= (N - 1) && strequals<N>(str, s);
         }
-        FINLINE bool starts_with(const strview& s)  const { return starts_with(s.str, s.len); }
-        FINLINE bool starts_with(char ch) const { return len && *str == ch; }
+        FINLINE bool starts_with(const strview& s) const noexcept { return starts_with(s.str, s.len); }
+        FINLINE bool starts_with(char ch) const noexcept { return len && *str == ch; }
 
 
         /** @return TRUE if this strview starts with IGNORECASE of the specified string */
-        FINLINE bool starts_withi(const char* s, int length) const {
+        FINLINE bool starts_withi(const char* s, int length) const noexcept {
             return len >= length && strequalsi(str, s, length);
         }
-        template<int N> FINLINE bool starts_withi(const char (&s)[N]) const { 
+        template<int N> FINLINE bool starts_withi(const char (&s)[N]) const noexcept { 
             return len >= (N - 1) && strequalsi<N>(str, s);
         }
-        FINLINE bool starts_withi(const strview& s) const { return starts_withi(s.str, s.len); }
-        FINLINE bool starts_withi(char ch) const { return len && ::toupper(*str) == ::toupper(ch); }
+        FINLINE bool starts_withi(const strview& s) const noexcept { return starts_withi(s.str, s.len); }
+        FINLINE bool starts_withi(char ch) const noexcept { return len && ::toupper(*str) == ::toupper(ch); }
 
 
         /** @return TRUE if the strview ends with the specified string */
-        FINLINE bool ends_with(const char* s, int slen) const {
+        FINLINE bool ends_with(const char* s, int slen) const noexcept {
             return len >= slen && strequals(str + len - slen, s, slen);
         }
-        template<int N> FINLINE bool ends_with(const char (&s)[N]) const { 
+        template<int N> FINLINE bool ends_with(const char (&s)[N]) const noexcept { 
             return len >= (N - 1) && strequals<N>(str + len - (N - 1), s);
         }
-        FINLINE bool ends_with(const strview s)  const { return ends_with(s.str, s.len); }
-        FINLINE bool ends_with(char ch)          const { return len && str[len-1] == ch; }
+        FINLINE bool ends_with(const strview s) const noexcept { return ends_with(s.str, s.len); }
+        FINLINE bool ends_with(char ch)         const noexcept { return len && str[len-1] == ch; }
 
 
         /** @return TRUE if this strview ends with IGNORECASE of the specified string */
-        FINLINE bool ends_withi(const char* s, int slen) const {
+        FINLINE bool ends_withi(const char* s, int slen) const noexcept {
             return len >= slen && strequalsi(str + len - slen, s, slen);
         }
-        template<int N> FINLINE bool ends_withi(const char (&s)[N]) const { 
+        template<int N> FINLINE bool ends_withi(const char (&s)[N]) const noexcept { 
             return len >= (N - 1) && strequalsi<N>(str + len - (N - 1), s);
         }
-        FINLINE bool ends_withi(const strview s) const { return ends_withi(s.str, s.len); }
-        FINLINE bool ends_withi(char ch) const { return len && ::toupper(str[len-1]) == ::toupper(ch); }
+        FINLINE bool ends_withi(const strview s) const noexcept { return ends_withi(s.str, s.len); }
+        FINLINE bool ends_withi(char ch) const noexcept { return len && ::toupper(str[len-1]) == ::toupper(ch); }
 
 
         /** @return TRUE if this strview equals the specified string */
-        FINLINE bool equals(const char* s, int length) const { return len == length && strequals(str, s, length); }
+        FINLINE bool equals(const char* s, int length) const noexcept { return len == length && strequals(str, s, length); }
         template<int N>
-        FINLINE bool equals(const char (&s)[N]) const { return len == (N-1) && strequals<N>(str, s); }
-        FINLINE bool equals(const strview& s)   const { return equals(s.str, s.len);                 }
+        FINLINE bool equals(const char (&s)[N]) const noexcept { return len == (N-1) && strequals<N>(str, s); }
+        FINLINE bool equals(const strview& s)   const noexcept { return equals(s.str, s.len);                 }
 
         /** @return TRUE if this strview equals IGNORECASE the specified string */
-        FINLINE bool equalsi(const char* s, int length) const { return len == length && strequalsi(str, s, length); }
+        FINLINE bool equalsi(const char* s, int length) const noexcept {
+            return len == length && strequalsi(str, s, length);
+        }
         template<int N>
-        FINLINE bool equalsi(const char (&s)[N]) const { return len == (N-1) && strequalsi<N>(str, s); }
-        FINLINE bool equalsi(const strview& s)   const { return equalsi(s.str, s.len);                 }
+        FINLINE bool equalsi(const char (&s)[N]) const noexcept { return len == (N-1) && strequalsi<N>(str, s); }
+        FINLINE bool equalsi(const strview& s)   const noexcept { return equalsi(s.str, s.len);                 }
 
-        template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const { return equals<SIZE>(s); }
-        template<int SIZE> FINLINE bool operator!=(const char(&s)[SIZE]) const { return !equals<SIZE>(s); }
-        FINLINE bool operator==(const string& s)  const { return  equals(s); }
-        FINLINE bool operator!=(const string& s)  const { return !equals(s); }
-        FINLINE bool operator==(const strview& s) const { return  equals(s.str, s.len); }
-        FINLINE bool operator!=(const strview& s) const { return !equals(s.str, s.len); }
-        FINLINE bool operator==(char* s) const { return  strequals(s, str, len); }
-        FINLINE bool operator!=(char* s) const { return !strequals(s, str, len); }
-        FINLINE bool operator==(char ch) const { return len == 1 && *str == ch; }
-        FINLINE bool operator!=(char ch) const { return len != 1 || *str != ch; }
+        template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const noexcept { return equals<SIZE>(s); }
+        template<int SIZE> FINLINE bool operator!=(const char(&s)[SIZE]) const noexcept { return !equals<SIZE>(s); }
+        FINLINE bool operator==(const string& s)  const noexcept { return  equals(s); }
+        FINLINE bool operator!=(const string& s)  const noexcept { return !equals(s); }
+        FINLINE bool operator==(const strview& s) const noexcept { return  equals(s.str, s.len); }
+        FINLINE bool operator!=(const strview& s) const noexcept { return !equals(s.str, s.len); }
+        FINLINE bool operator==(char* s) const noexcept { return  strequals(s, str, len); }
+        FINLINE bool operator!=(char* s) const noexcept { return !strequals(s, str, len); }
+        FINLINE bool operator==(char ch) const noexcept { return len == 1 && *str == ch; }
+        FINLINE bool operator!=(char ch) const noexcept { return len != 1 || *str != ch; }
 
         /** @brief Compares this strview to string data */
-        NOINLINE int compare(const char* s, int n) const;
-        NOINLINE int compare(const char* s) const;
-        FINLINE int compare(const strview& b) const { return compare(b.str, b.len); }
-        FINLINE int compare(const string& b)  const { return compare(b.c_str(),(int)b.size()); }
+        NOINLINE int compare(const char* s, int n) const noexcept;
+        NOINLINE int compare(const char* s) const noexcept;
+        FINLINE int compare(const strview& b) const noexcept { return compare(b.str, b.len); }
+        FINLINE int compare(const string& b)  const noexcept { return compare(b.c_str(),(int)b.size()); }
         
-        FINLINE bool operator<(const strview& s) const { return compare(s.str, s.len) < 0; }
-        FINLINE bool operator>(const strview& s) const { return compare(s.str, s.len) > 0; }
-        FINLINE bool operator<(const string& s)  const { return compare(s.c_str(),(int)s.size()) < 0; }
-        FINLINE bool operator>(const string& s)  const { return compare(s.c_str(),(int)s.size()) > 0; }
-        template<int SIZE> FINLINE bool operator<(const char(&s)[SIZE]) const {return compare(s,SIZE-1)<0;}
-        template<int SIZE> FINLINE bool operator>(const char(&s)[SIZE]) const {return compare(s,SIZE-1)>0;}
+        FINLINE bool operator<(const strview& s) const noexcept { return compare(s.str, s.len) < 0; }
+        FINLINE bool operator>(const strview& s) const noexcept { return compare(s.str, s.len) > 0; }
+        FINLINE bool operator<(const string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
+        FINLINE bool operator>(const string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
+        template<int SIZE> FINLINE bool operator<(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)<0;}
+        template<int SIZE> FINLINE bool operator>(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)>0;}
         
         /**
          * Splits the string into TWO and returns strview to the first one
          * @param delim Delimiter char to split on
          */
-        NOINLINE strview split_first(char delim) const;
+        NOINLINE strview split_first(char delim) const noexcept;
 
         /**
          * Splits the string into TWO and returns strview to the first one
          * @param substr Substring to split with
          * @param sublen Length of the substring
          */
-        NOINLINE strview split_first(const char* substr, int sublen) const;
-        template<int N> FINLINE strview split_first(const char(&substr)[N]) {
+        NOINLINE strview split_first(const char* substr, int sublen) const noexcept;
+        template<int N> FINLINE strview split_first(const char(&substr)[N]) noexcept {
             return split_first(substr, N-1);
         }
 
@@ -510,7 +517,7 @@ namespace rpp
          * Splits the string into TWO and returns strview to the second one
          * @param delim Delimiter char to split on
          */
-        NOINLINE strview split_second(char delim) const;
+        NOINLINE strview split_second(char delim) const noexcept;
 
         /**
          * Gets the next strview; also advances the ptr to next token.
@@ -518,7 +525,7 @@ namespace rpp
          * @param delim Delimiter char between string tokens
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
-        NOINLINE bool next(strview& out, char delim);
+        NOINLINE bool next(strview& out, char delim) noexcept;
         /**
          * Gets the next string token; also advances the ptr to next token.
          * @param out Resulting string token. Only valid if result is TRUE.
@@ -526,7 +533,7 @@ namespace rpp
          * @param ndelims Number of delimiters in the delims string to consider
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
-        NOINLINE bool next(strview& out, const char* delims, int ndelims);
+        NOINLINE bool next(strview& out, const char* delims, int ndelims) noexcept;
         /**
          * Gets the next string token; also advances the ptr to next token.
          * @param out Resulting string token. Only valid if result is TRUE.
@@ -557,7 +564,7 @@ namespace rpp
          * @param delim Delimiter char between string tokens
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
-        NOINLINE bool next_notrim(strview& out, char delim);
+        NOINLINE bool next_notrim(strview& out, char delim) noexcept;
         /**
          * Gets the next string token; stops buffer on the identified delimiter.
          * @param out Resulting string token. Only valid if result is TRUE.
@@ -565,14 +572,14 @@ namespace rpp
          * @param ndelims Number of delimiters in the delims string to consider
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
-        NOINLINE bool next_notrim(strview& out, const char* delims, int ndelims);
+        NOINLINE bool next_notrim(strview& out, const char* delims, int ndelims) noexcept;
         /**
          * Gets the next string token; stops buffer on the identified delimiter.
          * @param out Resulting string token. Only valid if result is TRUE.
          * @param delims Delimiter characters between string tokens
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
-        template<int N> NOINLINE bool next_notrim(strview& out, const char (&delims)[N]) {
+        template<int N> NOINLINE bool next_notrim(strview& out, const char (&delims)[N]) noexcept {
             return _next_notrim(out, [&delims](const char* s, int n) {
                 return strcontains<N>(s, n, delims);
             });
@@ -580,13 +587,13 @@ namespace rpp
         /**
          * Same as bool next(strview& out, char delim), but returns a token instead
          */
-        FINLINE strview next_notrim(char delim) {
+        FINLINE strview next_notrim(char delim) noexcept {
             strview out; next_notrim(out, delim); return out;
         }
-        FINLINE strview next_notrim(const char* delim, int ndelims) {
+        FINLINE strview next_notrim(const char* delim, int ndelims) noexcept {
             strview out; next_notrim(out, delim, ndelims); return out;
         }
-        template<int N> FINLINE strview next_notrim(const char (&delims)[N]) {
+        template<int N> FINLINE strview next_notrim(const char (&delims)[N]) noexcept {
             strview out;
             _next_notrim(out, [&delims](const char* s, int n) {
                 return strcontains<N>(s, n, delims);
@@ -596,7 +603,7 @@ namespace rpp
 
 
         // don't forget to mark NOINLINE in the function where you call this...
-        template<class SearchFn> FINLINE bool _next_notrim(strview& out, SearchFn searchFn)
+        template<class SearchFn> FINLINE bool _next_notrim(strview& out, SearchFn searchFn) noexcept
         {
             auto s = str, end = s + len;
             for (;;) { // using a loop to skip empty tokens
@@ -617,7 +624,7 @@ namespace rpp
             }
         }
 
-        template<class SearchFn> FINLINE bool _next_trim(strview& out, SearchFn searchFn)
+        template<class SearchFn> FINLINE bool _next_trim(strview& out, SearchFn searchFn) noexcept
         {
             auto s = str, end = s + len;
             for (;;) { // using a loop to skip empty tokens
@@ -642,16 +649,16 @@ namespace rpp
         /**
          * Template friendly conversions
          */
-        inline void convertTo(bool& outValue)    const { outValue = to_bool();   }
-        inline void convertTo(int& outValue)     const { outValue = to_int();    }
-        inline void convertTo(float& outValue)   const { outValue = to_float();  }
-        inline void convertTo(double& outValue)  const { outValue = to_double(); }
-        inline void convertTo(string& outValue)  const { (void)to_string(outValue); }
-        inline void convertTo(strview& outValue) const { outValue = *this;          }
+        void convertTo(bool& outValue)    const noexcept { outValue = to_bool();   }
+        void convertTo(int& outValue)     const noexcept { outValue = to_int();    }
+        void convertTo(float& outValue)   const noexcept { outValue = to_float();  }
+        void convertTo(double& outValue)  const noexcept { outValue = to_double(); }
+        void convertTo(string& outValue)  const noexcept { to_string(outValue);    }
+        void convertTo(strview& outValue) const noexcept { outValue = *this;       }
         
     private:
-        inline void skipByLength(strview text) { skip(text.len); }
-        inline void skipByLength(char)         { skip(1); }
+        void skipByLength(strview text) noexcept { skip(text.len); }
+        void skipByLength(char)         noexcept { skip(1); }
     public:
         /**
          * Calls strview::next(char delim) for each argument and calls strview::convertTo to
@@ -669,7 +676,7 @@ namespace rpp
          * @endcode
          */
         template<class Delim, class T, class... Rest>
-        void decompose(const Delim& delim, T& outFirst, Rest&... outRest)
+        void decompose(const Delim& delim, T& outFirst, Rest&... outRest) noexcept
         {
             if (starts_with(delim)) // this is an empty entry, just skip it;
                 skipByLength(delim);
@@ -678,7 +685,7 @@ namespace rpp
             decompose(delim, outRest...);
         }
         template<class Delim, class T>
-        void decompose(const Delim& delim, T& outFirst)
+        void decompose(const Delim& delim, T& outFirst) noexcept
         {
             next(delim).convertTo(outFirst);
         }
@@ -687,51 +694,51 @@ namespace rpp
          * Tries to create a substring from specified index with given length.
          * The substring will be clamped to a valid range [0 .. len-1]
          */
-        NOINLINE strview substr(int index, int length) const;
+        NOINLINE strview substr(int index, int length) const noexcept;
 
         /**
          * Tries to create a substring from specified index until the end of string.
          * Substring will be empty if invalid index is given
          */
-        NOINLINE strview substr(int index) const;
+        NOINLINE strview substr(int index) const noexcept;
 
 
         /**
          * Parses next float from current strview, example: "1.0;sad0.0,'as;2.0" will parse [1.0] [0.0] [2.0]
          * @return 0.0f if there's nothing to parse or a parsed float
          */
-        NOINLINE double next_double();
-        float next_float() { return (float)next_double(); }
+        NOINLINE double next_double() noexcept;
+        float next_float() noexcept { return (float)next_double(); }
 
         /** 
          * Parses next int from current Token, example: "1,asvc2,x*3" will parse [1] [2] [3]
          * @return 0 if there's nothing to parse or a parsed int
          */
-        NOINLINE int next_int();
+        NOINLINE int next_int() noexcept;
 
         /**
          * Safely chomps N chars while there is something to chomp
          */
-        NOINLINE strview& skip(int nchars);
+        NOINLINE strview& skip(int nchars) noexcept;
 
         /**
          * Skips start of the string until the specified character is found or end of string is reached.
          * @param ch Character to skip until
          */
-        NOINLINE strview& skip_until(char ch);
+        NOINLINE strview& skip_until(char ch) noexcept;
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * @param substr Substring to skip until
          * @param sublen Length of the substring
          */
-        NOINLINE strview& skip_until(const char* substr, int sublen);
+        NOINLINE strview& skip_until(const char* substr, int sublen) noexcept;
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * @param substr Substring to skip until
          */
-        template<int SIZE> FINLINE strview& skip_until(const char (&substr)[SIZE])
+        template<int SIZE> FINLINE strview& skip_until(const char (&substr)[SIZE]) noexcept
         {
             return skip_until(substr, SIZE-1);
         }
@@ -742,7 +749,7 @@ namespace rpp
          * The specified character itself is consumed.
          * @param ch Character to skip after
          */
-        NOINLINE strview& skip_after(char ch);
+        NOINLINE strview& skip_after(char ch) noexcept;
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
@@ -750,14 +757,14 @@ namespace rpp
          * @param substr Substring to skip after
          * @param sublen Length of the substring
          */
-        NOINLINE strview& skip_after(const char* substr, int sublen);
+        NOINLINE strview& skip_after(const char* substr, int sublen) noexcept;
 
         /**
          * Skips start of the string until the specified substring is found or end of string is reached.
          * The specified substring itself is consumed.
          * @param substr Substring to skip after
          */
-        template<int SIZE> FINLINE strview& skip_after(const char (&substr)[SIZE])
+        template<int SIZE> FINLINE strview& skip_after(const char (&substr)[SIZE]) noexcept
         {
             return skip_after(substr, SIZE-1);
         }
@@ -766,33 +773,33 @@ namespace rpp
          * Modifies the target string to lowercase
          * @warning The const char* will be recasted and modified!
          */
-        NOINLINE strview& to_lower();
+        NOINLINE strview& to_lower() noexcept;
 
         /**
          * Creates a copy of this strview that is in lowercase
          */
-        NOINLINE string as_lower() const;
+        NOINLINE string as_lower() const noexcept;
 
         /**
          * Creates a copy of this strview that is in lowercase
          */
-        NOINLINE char* as_lower(char* dst) const;
+        NOINLINE char* as_lower(char* dst) const noexcept;
 
         /**
          * Modifies the target string to be UPPERCASE
          * @warning The const char* will be recasted and modified!
          */
-        NOINLINE strview& to_upper();
+        NOINLINE strview& to_upper() noexcept;
 
         /**
          * Creates a copy of this strview that is in UPPERCASE
          */
-        NOINLINE string as_upper() const;
+        NOINLINE string as_upper() const noexcept;
 
         /**
          * Creates a copy of this strview that is in UPPERCASE
          */
-        NOINLINE char* as_upper(char* dst) const;
+        NOINLINE char* as_upper(char* dst) const noexcept;
 
         /**
          * Modifies the target string by replacing all chOld
@@ -801,7 +808,7 @@ namespace rpp
          * @param chOld The old character to replace
          * @param chNew The new character
          */
-        NOINLINE strview& replace(char chOld, char chNew);
+        NOINLINE strview& replace(char chOld, char chNew) noexcept;
     };
 
     //////////////// strview literal operator ///////////////
@@ -925,32 +932,32 @@ namespace rpp
     /**
      * Converts a string into its lowercase form
      */
-    RPPAPI char* to_lower(char* str, int len);
+    RPPAPI char* to_lower(char* str, int len) noexcept;
 
     /**
      * Converts a string into its uppercase form
      */
-    RPPAPI char* to_upper(char* str, int len);
+    RPPAPI char* to_upper(char* str, int len) noexcept;
 
     /**
      * Converts an std::string into its lowercase form
      */
-    RPPAPI string& to_lower(string& str);
+    RPPAPI string& to_lower(string& str) noexcept;
 
     /**
      * Converts an std::string into its uppercase form
      */
-    RPPAPI string& to_upper(string& str);
+    RPPAPI string& to_upper(string& str) noexcept;
 
     /**
      * Replaces characters of 'chOld' with 'chNew' inside the specified string
      */
-    RPPAPI char* replace(char* str, int len, char chOld, char chNew);
+    RPPAPI char* replace(char* str, int len, char chOld, char chNew) noexcept;
 
     /**
      * Replaces characters of 'chOld' with 'chNew' inside this std::string
      */
-    RPPAPI string& replace(string& str, char chOld, char chNew);
+    RPPAPI string& replace(string& str, char chOld, char chNew) noexcept;
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -978,10 +985,10 @@ namespace rpp
          * @param out The output line that is read. Only valid if TRUE is returned.
          * @return Reads the next line. If no more lines, FALSE is returned.
          **/
-        NOINLINE bool read_line(strview& out);
+        NOINLINE bool read_line(strview& out) noexcept;
 
         // same as read_line(strview&), but returns a strview object instead of a bool
-        NOINLINE strview read_line();
+        NOINLINE strview read_line() noexcept;
     };
 
 
@@ -1019,7 +1026,7 @@ namespace rpp
          * @param out The output line that is read. Only valid if TRUE is returned.
          * @return Reads the next line. If no more lines, FALSE is returned.
          */
-        NOINLINE bool read_line(strview& out);
+        NOINLINE bool read_line(strview& out) noexcept;
 
         /**
          * Reads the next key-value pair from the buffer and advances its position
@@ -1027,7 +1034,7 @@ namespace rpp
          * @param value Resulting value (only valid if return value is TRUE)
          * @return TRUE if a Key-Value pair was parsed
          */
-        NOINLINE bool read_next(strview& key, strview& value);
+        NOINLINE bool read_next(strview& key, strview& value) noexcept;
     };
 
 
@@ -1067,14 +1074,14 @@ namespace rpp
          * @param value Resulting line value (only valid if return value != -1)
          * @return Resulting depth of the parser. Default top-level depth is 0.
          */
-        NOINLINE int read_keyval(strview& key, strview& value);
+        NOINLINE int read_keyval(strview& key, strview& value) noexcept;
         
         /** 
          * @brief Peeks at the next interesting token and returns its value
          * @note Whitespace and comments will be skipped
          * @note If buffer is empty, '\0' is returned.
          */
-        NOINLINE char peek_next() const;
+        NOINLINE char peek_next() const noexcept;
     };
 
     // support for "debugging.h"
