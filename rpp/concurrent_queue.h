@@ -57,7 +57,14 @@ namespace rpp
         void push(T&& item)
         {
             { lock_guard<mutex> lock {Mutex};
-                Queue.emplace_back(std::forward<T>(item)); }
+                Queue.emplace_back(std::move(item)); }
+            Waiter.notify_all();
+        }
+
+        void push(const T& item)
+        {
+            { lock_guard<mutex> lock {Mutex};
+                Queue.push_back(item); }
             Waiter.notify_all();
         }
 
