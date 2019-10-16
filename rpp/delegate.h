@@ -56,7 +56,7 @@
 #include <type_traits> // std::decay_t<>
 #include <cassert>
 #include <utility> // std::forward
-#include "strview.h"
+#include "config.h"
 
 namespace rpp
 {
@@ -78,11 +78,9 @@ namespace rpp
     /**
      * @brief Function delegate to encapsulate global functions,
      *        instance member functions, lambdas and functors
-     * @note Lambda capture has optimizations for small captures,
-     *       but big lambda captures allocate a dynamic copy
      *
-     * @note All delegate calls result in 2 virtual calls:
-     *       callable_proxy(...) => myfuncptr(...)
+     * @note All delegate calls result in a single virtual call:
+     *       caller -> delegate::operator() -> target
      *       Which is the same as fastest possible delegates and
      *       inlining results are rather good thanks to this.
      *
@@ -134,12 +132,12 @@ namespace rpp
         //////////////////////////////////////////////////////////////////////////////////////
 
         /** @brief Default constructor */
-        delegate() noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
+        delegate() noexcept : func{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
         }
 
         /** @brief Default constructor from nullptr */
-        explicit delegate(std::nullptr_t) noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
+        explicit delegate(std::nullptr_t) noexcept : func{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
         }
 
@@ -167,7 +165,7 @@ namespace rpp
         }
 
         /** @brief Creates a copy of the delegate */
-        delegate(const delegate& d) noexcept : func(nullptr), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
+        delegate(const delegate& d) noexcept : func{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
             d.copy(*this);
         }
@@ -214,7 +212,7 @@ namespace rpp
         //////////////////////////////////////////////////////////////////////////////////////
 
         /** @brief Regular function constructor */
-        delegate(func_type function) noexcept : func(function), obj(nullptr), destructor(nullptr), proxy_copy(nullptr)
+        delegate(func_type function) noexcept : func{function}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
         }
 
@@ -233,8 +231,8 @@ namespace rpp
             };
             static dummy_type devirtualize(const void* instance, dummy_type method) // resolve Thunks into method pointer
             {
-                VCallThunk& t = *(struct VCallThunk*)&method;
-                if (size_t(t.method) & 1) { // is_thunk?
+                auto& t = *(struct VCallThunk*)&method;
+                if (size_t(t.method) & 1u) { // is_thunk?
                     VTable* vtable = (struct VTable*) *(void**)instance;
                     size_t voffset = (t.vtable_index-1)/8;
                     union {
@@ -256,7 +254,12 @@ namespace rpp
             #elif __clang__
                 dfunc =  devirtualize(&inst, (dummy_type)method);
             #elif __GNUG__ // G++
-                mfunc = (memb_type)(inst.*method);
+                // G++ PFM-Conversion/devirtualize extension requires a special warning to be disabled
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                mfunc = (memb_type)(inst.*method); // devirtualize / pfm-conversion
+                #pragma GCC diagnostic pop
             #endif
             destructor = nullptr;
             proxy_copy = nullptr;
@@ -269,7 +272,11 @@ namespace rpp
             #elif __clang__
                 dfunc = devirtualize(&inst, (dummy_type)method);
             #elif __GNUG__ // G++
-                mfunc = (memb_type)(inst.*method);
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                mfunc = (memb_type)(inst.*method); // devirtualize / pfm-conversion
+                #pragma GCC diagnostic pop
             #endif
             destructor = nullptr;
             proxy_copy = nullptr;
@@ -290,7 +297,11 @@ namespace rpp
             #elif __clang__
                 u.dfunc = devirtualize(&inst, (dummy_type)method);
             #elif __GNUG__ // G++
-                u.mfunc = (memb_type)(inst.*method);
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                u.mfunc = (memb_type)(inst.*method); // devirtualize / pfm-conversion
+                #pragma GCC diagnostic pop
             #endif
             return func == u.func;
         }
@@ -303,7 +314,11 @@ namespace rpp
             #elif __clang__
                 u.dfunc = devirtualize(&inst, (dummy_type)method);
             #elif __GNUG__ // G++
-                u.mfunc = (memb_type)(inst.*method);
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                u.mfunc = (memb_type)(inst.*method); // devirtualize / pfm-conversion
+                #pragma GCC diagnostic pop
             #endif
             return func == u.func;
         }
