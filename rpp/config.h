@@ -22,9 +22,9 @@
 
 #if __cplusplus
 #  if _MSC_VER
-#    define RPP_HAS_CXX17 _MSVC_LANG > 201402
+#    define RPP_HAS_CXX17 (_MSVC_LANG > 201402)
 #  else
-#    define RPP_HAS_CXX17 __cplusplus >= 201703L
+#    define RPP_HAS_CXX17 (__cplusplus >= 201703L)
 #  endif
 #endif
 
@@ -37,7 +37,7 @@
 #endif
 
 #if __cplusplus
-#  if RPP_HAS_CXX17
+#  if __cpp_if_constexpr
 #    define RPP_CXX17_IF_CONSTEXPR if constexpr
 #  else
 #    define RPP_CXX17_IF_CONSTEXPR if
@@ -84,14 +84,10 @@
 #endif
 
 #ifndef NODISCARD
-#  if __clang__
-#    if __clang_major__ >= 4 || (__clang_major__ == 3 && __clang_minor__ == 9) // since 3.9
-#      define NODISCARD [[nodiscard]]
-#    else
-#      define NODISCARD // not supported in clang <= 3.8
-#    endif
-#  else
+#  if __has_cpp_attribute(nodiscard)
 #    define NODISCARD [[nodiscard]]
+#  else
+#    define NODISCARD
 #  endif
 #endif
 

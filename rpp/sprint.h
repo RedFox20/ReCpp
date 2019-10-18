@@ -141,14 +141,23 @@ namespace rpp
         void write(const T* ptr)
         {
             if (ptr == nullptr) return write(nullptr);
-            write_ptr_begin(); this->write(*ptr); write_ptr_end();
+            RPP_CXX17_IF_CONSTEXPR(std::is_function<T>::value)
+            {
+                this->write_ptr(ptr);
+            }
+            else
+            {
+                write_ptr_begin();
+                this->write(*ptr); 
+                write_ptr_end();
+            }
         }
 
         template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
         void write(T* ptr)
         {
             if (ptr == nullptr) return write(nullptr);
-            write_ptr_begin(); this->write(*ptr); write_ptr_end();
+            write_ptr_begin();this->write(*ptr); write_ptr_end();
         }
 
         template<class T> using sbuf_op = decltype(std::declval<string_buffer&>() << std::declval<T>());
