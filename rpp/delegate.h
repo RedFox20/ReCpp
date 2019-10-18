@@ -1,9 +1,10 @@
 #pragma once
 /**
- * Copyright (c) 2015-2017, Jorma Rebane
+ * Copyright (c) 2015-2019, Jorma Rebane
  * Distributed under MIT Software License
  *
- * Optimized delegate and event class for VC++ 2013/2015/...
+ * Optimized delegate and multicast delegate classes
+ * designed as a faster alternative for std::function
  *
  *
  * Usage examples:
@@ -113,12 +114,13 @@ namespace rpp
      *       inlining results are rather good thanks to this.
      *
      * @example
-     *
+     * @code
      *        delegate<int(int,int)> callback = &my_func;
      *        int result = callback(10, 20);
      *
      *        delegate<void(float)> on_move(MyActor, &Actor::update);
      *        on_move(DeltaTime);
+     * @endcode
      */
     template<class Func> class delegate;
     template<class Ret, class... Args> class delegate<Ret(Args...)>
@@ -145,15 +147,12 @@ namespace rpp
                 using memb_type = Ret (*)(void*, Args...);
             #endif
             using dummy_type = Ret (dummy::*)(Args...);
-            using func_proxy_type = Ret (*)(void*, Args...);
         #elif __clang__
             using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
-            using func_proxy_type = Ret (*)(void*, Args...);
         #else
             using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(void*, Args...);
-            using func_proxy_type = Ret (*)(void*, Args...);
         #endif
     private:
 
@@ -387,23 +386,27 @@ namespace rpp
             return fun == u.func;
         }
 
+        template<class FunctorType> static void functor_delete(void* self)
+        {
+            auto* instance = static_cast<FunctorType*>(self);
+            delete instance;
+        }
+
+        template<class FunctorType> static void functor_copy(void* self, delegate& dest)
+        {
+            auto* instance = static_cast<FunctorType*>(self);
+            dest.reset(*instance);
+        }
+
         template<class Functor> void init_functor(Functor&& functor) noexcept
         {
             using FunctorType = typename std::decay<Functor>::type;
 
-            dfunc = reinterpret_cast<dummy_type>(&FunctorType::operator());
+            dfunc = reinterpret_cast<dummy_type>( &FunctorType::operator() );
 
-            obj = new FunctorType(std::forward<Functor>(functor));
-            destructor = [](void* self)
-            {
-                auto* instance = static_cast<FunctorType*>(self);
-                delete instance;
-            };
-            proxy_copy = [](void* self, delegate& dest)
-            {
-                auto* instance = static_cast<FunctorType*>(self);
-                dest.reset(*instance);
-            };
+            obj = new FunctorType{ std::forward<Functor>(functor) };
+            destructor = &functor_delete<FunctorType>;
+            proxy_copy = &functor_copy<FunctorType>;
         }
 
         void init_clear()

@@ -143,7 +143,7 @@ namespace rpp
             if (ptr == nullptr) return write(nullptr);
             RPP_CXX17_IF_CONSTEXPR(std::is_function<T>::value)
             {
-                this->write_ptr(ptr);
+                this->write_ptr(reinterpret_cast<void*>(ptr));
             }
             else
             {
