@@ -1107,18 +1107,18 @@ namespace rpp
             Vector3 r[3]; // rows 0-2
         };
 
-        inline Matrix3() {}
+        Matrix3() noexcept = default; // NOLINT
 
-        inline constexpr Matrix3(
+        constexpr Matrix3( // NOLINT
             float m00, float m01, float m02,
             float m10, float m11, float m12,
-            float m20, float m21, float m22) :
-            m00(m00), m01(m01), m02(m02),
-            m10(m10), m11(m11), m12(m12),
-            m20(m20), m21(m21), m22(m22) { }
+            float m20, float m21, float m22) noexcept :
+            m00{m00}, m01{m01}, m02{m02},
+            m10{m10}, m11{m11}, m12{m12},
+            m20{m20}, m21{m21}, m22{m22} { }
 
-        inline constexpr Matrix3(Vector3 r0, Vector3 r1, Vector3 r2)
-            : r0(r0), r1(r1), r2(r2) { }
+        constexpr Matrix3(Vector3 r0, Vector3 r1, Vector3 r2) noexcept // NOLINT
+            : r0{r0}, r1{r1}, r2{r2} { }
 
         /** @brief Global identity matrix for easy initialization */
         static const Matrix3& Identity();
@@ -1232,19 +1232,19 @@ namespace rpp
         /** @brief Global identity matrix for easy initialization */
         static const Matrix4& Identity();
 
-        inline Matrix4() {}
+        Matrix4() noexcept = default;
 
-        inline constexpr Matrix4(
+        constexpr Matrix4( // NOLINT
             float m00, float m01, float m02, float m03,
             float m10, float m11, float m12, float m13,
             float m20, float m21, float m22, float m23,
-            float m30, float m31, float m32, float m33) :
-            m00(m00), m01(m01), m02(m02), m03(m03),
-            m10(m10), m11(m11), m12(m12), m13(m13),
-            m20(m20), m21(m21), m22(m22), m23(m23),
-            m30(m30), m31(m31), m32(m32), m33(m33) { }
+            float m30, float m31, float m32, float m33) noexcept :
+            m00{m00}, m01{m01}, m02{m02}, m03{m03},
+            m10{m10}, m11{m11}, m12{m12}, m13{m13},
+            m20{m20}, m21{m21}, m22{m22}, m23{m23},
+            m30{m30}, m31{m31}, m32{m32}, m33{m33} { }
 
-        inline constexpr Matrix4(Vector4 r0, Vector4 r1, Vector4 r2, Vector4 r3)
+        constexpr Matrix4(Vector4 r0, Vector4 r1, Vector4 r2, Vector4 r3) noexcept // NOLINT
             : r0(r0), r1(r1), r2(r2), r3(r3) { }
 
         /** @brief Loads identity matrix */

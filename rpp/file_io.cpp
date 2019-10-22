@@ -85,7 +85,7 @@ namespace rpp /* ReCpp */
     static void* OpenF(const wchar_t* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
     { return CreateFileW(f, a, s, sa, c, o, nullptr); }
 #else
-    static void* OpenF(const char* f, IOFlags mode) {
+    static void* OpenF(const char* f, mode mode) {
         if (mode == READWRITE) {
             if (FILE* file = fopen(f, "rb+")) // open existing file for read/write
                 return file;
@@ -94,7 +94,7 @@ namespace rpp /* ReCpp */
         const char* modes[] = { "rb", "", "wb+", "ab" };
         return fopen(f, modes[mode]);
     }
-    static void* OpenF(const wchar_t* f, IOFlags mode) {
+    static void* OpenF(const wchar_t* f, mode mode) {
     #if _WIN32
         if (mode == READWRITE) {
             if (FILE* file = _wfopen(f, L"rb+")) // open existing file for read/write
@@ -109,7 +109,7 @@ namespace rpp /* ReCpp */
     }
 #endif
 
-    template<class TChar> static void* OpenFile(const TChar* filename, IOFlags mode) noexcept
+    template<class TChar> static void* OpenFile(const TChar* filename, file::mode mode) noexcept
     {
     #if USE_WINAPI_IO
         int access, sharing;        // FILE_SHARE_READ, FILE_SHARE_WRITE
@@ -117,25 +117,25 @@ namespace rpp /* ReCpp */
         switch (mode)
         {
             default:
-            case READONLY:
+            case file::mode::READONLY:
                 access     = FILE_GENERIC_READ;
                 sharing    = FILE_SHARE_READ | FILE_SHARE_WRITE;
                 createmode = OPEN_EXISTING;
                 openFlags  = FILE_ATTRIBUTE_NORMAL|FILE_FLAG_SEQUENTIAL_SCAN;
                 break;
-            case READWRITE:
+            case file::mode::READWRITE:
                 access     = FILE_GENERIC_READ|FILE_GENERIC_WRITE;
                 sharing    = FILE_SHARE_READ;
                 createmode = OPEN_ALWAYS; // create file if it doesn't exist
                 openFlags  = FILE_ATTRIBUTE_NORMAL;
                 break;
-            case CREATENEW:
+            case file::mode::CREATENEW:
                 access     = FILE_GENERIC_READ|FILE_GENERIC_WRITE|DELETE;
                 sharing    = FILE_SHARE_READ;
                 createmode = CREATE_ALWAYS;
                 openFlags  = FILE_ATTRIBUTE_NORMAL;
                 break;
-            case APPEND:
+            case file::mode::APPEND:
                 access     = FILE_APPEND_DATA;
                 sharing    = FILE_SHARE_READ;
                 createmode = OPEN_ALWAYS;
@@ -150,10 +150,10 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    template<class TChar> static void* OpenOrCreate(const TChar* filename, IOFlags mode) noexcept
+    template<class TChar> static void* OpenOrCreate(const TChar* filename, file::mode mode) noexcept
     {
         void* handle = OpenFile(filename, mode);
-        if (!handle && (mode == CREATENEW || mode == APPEND))
+        if (!handle && (mode == file::CREATENEW || mode == file::APPEND))
         {
             // assume the directory doesn't exist
             if (create_folder(folder_path(filename))) {
@@ -162,19 +162,19 @@ namespace rpp /* ReCpp */
         }
         return handle;
     }
-    static void* OpenOrCreate(const strview& filename, IOFlags mode) noexcept
+    static void* OpenOrCreate(const strview& filename, file::mode mode) noexcept
     {
         char buf[512];
         return OpenOrCreate(filename.to_cstr(buf), mode);
     }
 
-    file::file(const char* filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode)
+    file::file(const char* filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
-    file::file(const strview& filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode)
+    file::file(const strview& filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
-    file::file(const wchar_t* filename, IOFlags mode) noexcept : Handle(OpenOrCreate(filename, mode)), Mode(mode)
+    file::file(const wchar_t* filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
     file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
@@ -193,18 +193,18 @@ namespace rpp /* ReCpp */
         f.Handle = nullptr;
         return *this;
     }
-    bool file::open(const char* filename, IOFlags mode) noexcept
+    bool file::open(const char* filename, mode mode) noexcept
     {
         close();
         Mode = mode;
         return (Handle = OpenOrCreate(filename, mode)) != nullptr;
     }
-    bool file::open(strview filename, IOFlags mode) noexcept
+    bool file::open(strview filename, mode mode) noexcept
     {
         char buf[512];
         return open(filename.to_cstr(buf), mode);
     }
-    bool file::open(const wchar_t* filename, IOFlags mode) noexcept
+    bool file::open(const wchar_t* filename, mode mode) noexcept
     {
         close();
         Mode = mode;
@@ -279,7 +279,7 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if USE_WINAPI_IO
         DWORD bytesRead;
-        ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
+        (void)ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
         return bytesRead;
     #else
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
@@ -288,13 +288,17 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (!fileSize) return load_buffer{nullptr, 0};
-
-        // allocate +1 bytes for null terminator; this is for legacy API-s
-        auto buffer = (char*)malloc(size_t(fileSize + 1));
-        int bytesRead = read(buffer, fileSize);
-        buffer[bytesRead] = '\0';
-        return load_buffer{buffer, bytesRead};
+        if (fileSize > 0)
+        {
+            // allocate +1 bytes for null terminator; this is for legacy API-s
+            if (auto buffer = (char*)malloc(size_t(fileSize + 1)))
+            {
+                int bytesRead = read(buffer, fileSize);
+                buffer[bytesRead] = '\0';
+                return load_buffer{ buffer, bytesRead };
+            }
+        }
+        return load_buffer{ nullptr, 0 };
     }
     string file::read_text() noexcept
     {
@@ -304,6 +308,7 @@ namespace rpp /* ReCpp */
         if (count <= 0) return out;
 
         out.resize(size_t(count));
+
         int n = read((void*)out.data(), count);
         if (n != count) {
             out.resize(size_t(n));
@@ -313,13 +318,13 @@ namespace rpp /* ReCpp */
     }
     bool file::save_as(const strview& filename) noexcept
     {
-        file dst{filename, CREATENEW};
+        file dst { filename, CREATENEW };
         if (!dst) return false;
 
         int64 size = sizel();
         if (size == 0) return true;
 
-        int64 startpos = tell64();
+        int64 startPos = tell64();
         seek(0);
 
         constexpr int64 blockSize = 64*1024;
@@ -338,7 +343,7 @@ namespace rpp /* ReCpp */
             totalBytesWritten += dst.write(buf, bytesRead);
         }
         
-        seekl(startpos);
+        seekl(startPos);
         return totalBytesRead == totalBytesWritten;
     }
     load_buffer file::read_all(const char* filename) noexcept
@@ -407,7 +412,7 @@ namespace rpp /* ReCpp */
         {
             const int n2 = n + 1;
             const bool heap = (n2 > 64 * 1024);
-            auto b2 = (char*)(heap ? malloc(n2) : _alloca(n2));
+            auto b2 = (char*)(heap ? malloc(n2) : _alloca(n2)); // NOLINT
             n = write(b2, vsnprintf(b2, n2, format, ap));
             if (heap) free(b2);
             return n;
@@ -479,7 +484,7 @@ namespace rpp /* ReCpp */
     }
     int file::write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept
     {
-        file f{ filename, IOFlags::CREATENEW };
+        file f{ filename, mode::CREATENEW };
         return f.write(buffer, bytesToWrite);
     }
     int file::write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept
@@ -831,7 +836,7 @@ namespace rpp /* ReCpp */
         // these would delete the root dir...
         if (foldername.empty() || foldername == "/"_sv)
             return false;
-        if (mode == non_recursive)
+        if (mode == delete_mode::non_recursive)
             return sys_rmdir(foldername); // easy path, just gently try to delete...
 
         vector<string> folders;
@@ -841,7 +846,7 @@ namespace rpp /* ReCpp */
         if (list_alldir(folders, files, foldername))
         {
             for (const string& folder : folders)
-                deletedChildren |= delete_folder(path_combine(foldername, folder), recursive);
+                deletedChildren |= delete_folder(path_combine(foldername, folder), delete_mode::recursive);
 
             for (const string& file : files)
                 deletedChildren |= delete_file(path_combine(foldername, file));
@@ -1112,7 +1117,7 @@ namespace rpp /* ReCpp */
     dir_iterator::dir_iterator(string&& dir) : dir{std::move(dir)} {  // NOLINT
         char path[512];
         if (this->dir.empty()) { // handle dir=="" special case
-            strncpy(path, "./*", 512);
+            snprintf(path, 512, "./*");
         }
         else {
             snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());

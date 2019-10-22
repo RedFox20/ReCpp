@@ -104,7 +104,7 @@ namespace rpp
         // setting it to "..." will turn write("brown", "fox"); into "brown...fox"
         rpp::strview separator = " "_sv;
 
-        FINLINE string_buffer() noexcept { ptr = buf; buf[0] = '\0'; }
+        FINLINE string_buffer() noexcept { ptr = buf; buf[0] = '\0'; } // NOLINT
         FINLINE explicit string_buffer(strview text) noexcept : string_buffer{} {
             write(text);
         }
@@ -272,7 +272,7 @@ namespace rpp
             write_hex(str.str, str.len, opt);
         }
         void write_hex(const string& str, format_opt opt = lowercase) {
-            write_hex(str.c_str(), (int)str.size(), opt);
+            write_hex(str.c_str(), static_cast<int>(str.size()), opt);
         }
 
         /**
