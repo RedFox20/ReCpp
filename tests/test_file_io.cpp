@@ -18,7 +18,7 @@ TestImpl(test_file_io)
     TestCleanup()
     {
         if (folder_exists(TestDir))
-            Assert(delete_folder(TestDir, recursive));
+            Assert(delete_folder(TestDir, delete_mode::recursive));
         if (file_exists(TestFile))
             Assert(delete_file(TestFile));
     }
@@ -44,7 +44,7 @@ TestImpl(test_file_io)
 
     TestCase(if_initializer)
     {
-        if (file f = { TestFile, READONLY })
+        if (file f = { TestFile, file::READONLY })
         {
             Assert(f.good() && !f.bad());
         }
@@ -71,7 +71,7 @@ TestImpl(test_file_io)
     TestCase(write_size_sanity)
     {
         Assert(create_folder(TestDir));
-        file f = { TestDir + "/_size_sanity_test.txt", CREATENEW };
+        file f = { TestDir + "/_size_sanity_test.txt", file::CREATENEW };
         Assert(f.good());
         int expectedSize = 0;
         srand((uint)time(nullptr));
@@ -104,17 +104,17 @@ TestImpl(test_file_io)
 
         Assert(create_folder(TestDir+"/folder/path"));
         Assert(folder_exists(TestDir+"/folder/path"));
-        Assert(delete_folder(TestDir+"/", recursive));
+        Assert(delete_folder(TestDir+"/", delete_mode::recursive));
         Assert(!folder_exists(TestDir));
 
         Assert(create_folder(TestDir+"/folder/path"));
         Assert(folder_exists(TestDir+"/folder/path"));
-        Assert(delete_folder(TestDir, recursive));
+        Assert(delete_folder(TestDir, delete_mode::recursive));
         Assert(!folder_exists(TestDir));
 
         Assert(create_folder(TestDir+"/folder/path/"));
         Assert(folder_exists(TestDir+"/folder/path/"));
-        Assert(delete_folder(TestDir, recursive));
+        Assert(delete_folder(TestDir, delete_mode::recursive));
         Assert(!folder_exists(TestDir));
     }
 
@@ -269,7 +269,7 @@ TestImpl(test_file_io)
         Assert(contains(files, "folder/path/dummy.obj"));
 
         Assert(rpp::change_dir(originalDir));
-        Assert(delete_folder(TestDir+"/", recursive));
+        Assert(delete_folder(TestDir+"/", delete_mode::recursive));
     }
 
     TestCase(system_dirs)

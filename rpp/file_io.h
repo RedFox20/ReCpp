@@ -25,14 +25,6 @@ namespace rpp /* ReCpp */
     using std::vector;
     using std::unordered_map;
 
-    enum IOFlags {
-        READONLY,   // opens an existing file for reading
-        READWRITE,  // opens or creates file for read/write
-        CREATENEW,  // always creates (overwrite) a new file for read/write
-        APPEND,     // opens or creates file for appending only, seek operations will not work
-    };
-
-
     #ifndef SEEK_SET
     #define SEEK_SET 0
     #define SEEK_CUR 1
@@ -119,12 +111,22 @@ namespace rpp /* ReCpp */
      */
     struct RPPAPI file
     {
-        void*	Handle;	// File handle
-        IOFlags	Mode;	// File openmode READWRITE or READONLY
+        enum class mode {
+            READONLY,   // opens an existing file for reading
+            READWRITE,  // opens or creates file for read/write
+            CREATENEW,  // always creates (overwrite) a new file for read/write
+            APPEND,     // opens or creates file for appending only, seek operations will not work
+        };
 
-        file() noexcept : Handle(nullptr), Mode(READONLY)
-        {
-        }
+        static constexpr mode READONLY  = mode::READONLY;  // opens an existing file for reading
+        static constexpr mode READWRITE = mode::READWRITE; // opens or creates file for read/write
+        static constexpr mode CREATENEW = mode::CREATENEW; // always creates (overwrite) a new file for read/write
+        static constexpr mode APPEND    = mode::APPEND;    // opens or creates file for appending only, seek operations will not work
+
+        void* Handle; // File handle
+        mode  Mode;	  // File open mode READWRITE or READONLY
+
+        file() noexcept : Handle{nullptr}, Mode{READONLY} {}
 
         /**
          * Opens an existing file for reading with mode = READONLY
@@ -132,15 +134,11 @@ namespace rpp /* ReCpp */
          * @param filename File name to open or create
          * @param mode File open mode
          */
-        file(const char* filename, IOFlags mode = READONLY) noexcept;
-        file(const string&  filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
-        {
-        }
-        file(const strview& filename, IOFlags mode = READONLY) noexcept;
-        file(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
-        file(const wstring& filename, IOFlags mode = READONLY) noexcept : file(filename.c_str(), mode)
-        {
-        }
+        file(const char* filename, mode mode = READONLY) noexcept;
+        file(const string&  filename, mode mode = READONLY) noexcept : file{ filename.c_str(), mode } { }
+        file(const strview& filename, mode mode = READONLY) noexcept;
+        file(const wchar_t* filename, mode mode = READONLY) noexcept;
+        file(const wstring& filename, mode mode = READONLY) noexcept : file{ filename.c_str(), mode } { }
         file(file&& f) noexcept;
         ~file();
 
@@ -156,14 +154,14 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
-        bool open(const char* filename, IOFlags mode = READONLY) noexcept;
-        bool open(const string& filename, IOFlags mode = READONLY) noexcept
+        bool open(const char* filename, mode mode = READONLY) noexcept;
+        bool open(const string& filename, mode mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
         }
-        bool open(strview filename, IOFlags mode = READONLY) noexcept;
-        bool open(const wchar_t* filename, IOFlags mode = READONLY) noexcept;
-        bool open(const wstring& filename, IOFlags mode = READONLY) noexcept
+        bool open(strview filename, mode mode = READONLY) noexcept;
+        bool open(const wchar_t* filename, mode mode = READONLY) noexcept;
+        bool open(const wstring& filename, mode mode = READONLY) noexcept
         {
             return open(filename.c_str(), mode);
         }
@@ -189,7 +187,7 @@ namespace rpp /* ReCpp */
         /**
          * @return 64-bit unsigned size of the file in bytes
          */
-        int64 sizel() const noexcept;
+        int64 sizel() const noexcept; // NOLINT
 
         /**
          * Reads a block of bytes from the file. Standard OS level
@@ -201,9 +199,13 @@ namespace rpp /* ReCpp */
          */
         int read(void* buffer, int bytesToRead) noexcept;
 
-        template<class T> int read(T* object) noexcept
+        /**
+         * Reads a POD struct sequentially
+         * @return Number of bytes actually read from the file
+         */
+        template<class POD> int read(POD* plainOldDataObject) noexcept
         {
-            return read(object, sizeof(T));
+            return read(plainOldDataObject, sizeof(POD));
         }
 
         /**
@@ -301,7 +303,7 @@ namespace rpp /* ReCpp */
          * For format string reference, check printf() documentation.
          * @return Number of bytes written to the file
          */
-        int writef(const char* format, ...) noexcept;
+        int writef(const char* format, ...) noexcept; // NOLINT
 
         /**
          * Writes a string to file and also appends a newline
@@ -357,7 +359,7 @@ namespace rpp /* ReCpp */
          * Creates a new file and fills it with the provided data.
          * Regular Windows IO buffering is ENABLED for WRITE.
          *
-         * Openmode is IOFlags::CREATENEW
+         * Openmode is mode::CREATENEW
          *
          * @param filename Name of the file to create and write to
          * @param buffer Buffer to write bytes from
@@ -633,7 +635,7 @@ namespace rpp /* ReCpp */
     RPPAPI bool create_folder(const wchar_t* foldername) noexcept;
     RPPAPI bool create_folder(const wstring& foldername) noexcept;
 
-    enum delete_mode
+    enum class delete_mode
     {
         non_recursive,
         recursive,
@@ -645,7 +647,7 @@ namespace rpp /* ReCpp */
      * @param mode If delete_mode::recursive, all subdirectories and files will also be deleted (permanently)
      * @return TRUE if the folder was deleted
      */
-    RPPAPI bool delete_folder(strview foldername, delete_mode mode = non_recursive) noexcept;
+    RPPAPI bool delete_folder(strview foldername, delete_mode mode = delete_mode::non_recursive) noexcept;
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
