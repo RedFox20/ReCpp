@@ -92,7 +92,7 @@ namespace rpp /* ReCpp */
             mode = file::CREATENEW;
         }
         const char* modes[] = { "rb", "", "wb+", "ab" };
-        return fopen(f, modes[mode]);
+        return fopen(f, modes[static_cast<int>(mode)]);
     }
     static void* OpenF(const wchar_t* f, file::mode mode) {
     #if _WIN32
@@ -706,10 +706,10 @@ namespace rpp /* ReCpp */
 #if USE_WINAPI_IO
         return CopyFileA(sourceFile, destinationFile, /*failIfExists:*/false) == TRUE;
 #else
-        file src{sourceFile, READONLY};
+        file src{sourceFile, file::READONLY};
         if (!src) return false;
 
-        file dst{destinationFile, CREATENEW};
+        file dst{destinationFile, file::CREATENEW};
         if (!dst) return false;
 
         int64 size = src.sizel();
