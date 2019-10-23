@@ -85,21 +85,21 @@ namespace rpp /* ReCpp */
     static void* OpenF(const wchar_t* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
     { return CreateFileW(f, a, s, sa, c, o, nullptr); }
 #else
-    static void* OpenF(const char* f, mode mode) {
-        if (mode == READWRITE) {
+    static void* OpenF(const char* f, file::mode mode) {
+        if (mode == file::READWRITE) {
             if (FILE* file = fopen(f, "rb+")) // open existing file for read/write
                 return file;
-            mode = CREATENEW;
+            mode = file::CREATENEW;
         }
         const char* modes[] = { "rb", "", "wb+", "ab" };
         return fopen(f, modes[mode]);
     }
-    static void* OpenF(const wchar_t* f, mode mode) {
+    static void* OpenF(const wchar_t* f, file::mode mode) {
     #if _WIN32
-        if (mode == READWRITE) {
+        if (mode == file::READWRITE) {
             if (FILE* file = _wfopen(f, L"rb+")) // open existing file for read/write
                 return file;
-            mode = CREATENEW;
+            mode = file::CREATENEW;
         }
         const wchar_t* modes[] = { L"rb", L"", L"wb+", L"ab" };
         return _wfopen(f, modes[mode]); 
@@ -215,7 +215,7 @@ namespace rpp /* ReCpp */
         if (Handle)
         {
         #if USE_WINAPI_IO
-            CloseHandle((HANDLE)Handle);
+            CloseHandle(reinterpret_cast<HANDLE>(Handle));
         #else
             fclose((FILE*)Handle);
         #endif
@@ -234,7 +234,7 @@ namespace rpp /* ReCpp */
     {
         if (!Handle) return 0;
     #if USE_WINAPI_IO
-        return GetFileSize((HANDLE)Handle, nullptr);
+        return GetFileSize(reinterpret_cast<HANDLE>(Handle), nullptr);
     #elif __ANDROID__ || TARGET_OS_IPHONE
         struct stat s;
         if (fstat(fileno((FILE*)Handle), &s)) {
@@ -254,11 +254,11 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if USE_WINAPI_IO
         LARGE_INTEGER size;
-        if (!GetFileSizeEx((HANDLE)Handle, &size)) {
+        if (!GetFileSizeEx(reinterpret_cast<HANDLE>(Handle), &size)) {
             //fprintf(stderr, "GetFileSizeEx error: [%d]\n", GetLastError());
             return 0ull;
         }
-        return (int64)size.QuadPart;
+        return static_cast<int64>(size.QuadPart);
     #elif __ANDROID__ || __APPLE__
         struct stat64 s;
         if (_fstat64(fileno((FILE*)Handle), &s)) {
@@ -279,7 +279,7 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if USE_WINAPI_IO
         DWORD bytesRead;
-        (void)ReadFile((HANDLE)Handle, buffer, bytesToRead, &bytesRead, nullptr);
+        (void)ReadFile(reinterpret_cast<HANDLE>(Handle), buffer, bytesToRead, &bytesRead, nullptr);
         return bytesRead;
     #else
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
@@ -291,7 +291,7 @@ namespace rpp /* ReCpp */
         if (fileSize > 0)
         {
             // allocate +1 bytes for null terminator; this is for legacy API-s
-            if (auto buffer = (char*)malloc(size_t(fileSize + 1)))
+            if (auto buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
             {
                 int bytesRead = read(buffer, fileSize);
                 buffer[bytesRead] = '\0';
@@ -309,7 +309,7 @@ namespace rpp /* ReCpp */
 
         out.resize(size_t(count));
 
-        int n = read((void*)out.data(), count);
+        int n = read(static_cast<void*>(out.data()), count);
         if (n != count) {
             out.resize(size_t(n));
             out.shrink_to_fit();
@@ -336,7 +336,7 @@ namespace rpp /* ReCpp */
             int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
             if (bytesToRead <= 0)
                 break;
-            int bytesRead = read(buf, (int)bytesToRead);
+            int bytesRead = read(buf, static_cast<int>(bytesToRead));
             if (bytesRead <= 0)
                 break;
             totalBytesRead    += bytesRead;
@@ -390,7 +390,7 @@ namespace rpp /* ReCpp */
         
     #if USE_WINAPI_IO
         DWORD bytesWritten;
-        WriteFile((HANDLE)Handle, buffer, bytesToWrite, &bytesWritten, nullptr);
+        WriteFile(reinterpret_cast<HANDLE>(Handle), buffer, bytesToWrite, &bytesWritten, nullptr);
         return bytesWritten;
     #elif WIN32
         // MSVC writes to buffer byte by byte, so to get decent performance, flip the count
@@ -408,11 +408,11 @@ namespace rpp /* ReCpp */
     #if USE_WINAPI_IO // @note This is heavily optimized
         char buf[4096];
         int n = vsnprintf(buf, sizeof(buf), format, ap);
-        if (n >= (int)sizeof(buf))
+        if (n >= static_cast<int>(sizeof(buf)))
         {
             const int n2 = n + 1;
             const bool heap = (n2 > 64 * 1024);
-            auto b2 = (char*)(heap ? malloc(n2) : _alloca(n2)); // NOLINT
+            auto b2 = static_cast<char*>(heap ? malloc(n2) : _alloca(n2)); // NOLINT
             n = write(b2, vsnprintf(b2, n2, format, ap));
             if (heap) free(b2);
             return n;
@@ -442,8 +442,8 @@ namespace rpp /* ReCpp */
         int64 bytesToTrunc = len - newLength;
         seekl(bytesToTrunc, SEEK_SET);
         
-        std::vector<char> buf; buf.resize((size_t)newLength);
-        int bytesRead = read(buf.data(), (int)newLength);
+        std::vector<char> buf; buf.resize(static_cast<size_t>(newLength));
+        int bytesRead = read(buf.data(), static_cast<int>(newLength));
 
         truncate(newLength);
         seek(0, SEEK_SET);
@@ -463,7 +463,7 @@ namespace rpp /* ReCpp */
         if (!Handle) return;
     #if USE_WINAPI_IO
         seekl(newLength, SEEK_SET);
-        SetEndOfFile((HANDLE)Handle);
+        SetEndOfFile(reinterpret_cast<HANDLE>(Handle));
     #elif _MSC_VER
         _chsize_s(fileno((FILE*)Handle), newLength);
     #else
@@ -477,7 +477,7 @@ namespace rpp /* ReCpp */
     {
         if (!Handle) return;
     #if USE_WINAPI_IO
-        FlushFileBuffers((HANDLE)Handle);
+        FlushFileBuffers(reinterpret_cast<HANDLE>(Handle));
     #else
         fflush((FILE*)Handle);
     #endif
@@ -499,7 +499,7 @@ namespace rpp /* ReCpp */
         if (!Handle)
             return 0;
     #if USE_WINAPI_IO
-        return SetFilePointer((HANDLE)Handle, filepos, nullptr, seekmode);
+        return SetFilePointer(reinterpret_cast<HANDLE>(Handle), filepos, nullptr, seekmode);
     #else
         fseek((FILE*)Handle, filepos, seekmode);
         return (int)ftell((FILE*)Handle);
@@ -514,7 +514,7 @@ namespace rpp /* ReCpp */
     #if USE_WINAPI_IO
         LARGE_INTEGER newpos, nseek;
         nseek.QuadPart = filepos;
-        SetFilePointerEx((HANDLE)Handle, nseek, &newpos, seekmode);
+        SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), nseek, &newpos, seekmode);
         return newpos.QuadPart;
     #else
         fseeki64((FILE*)Handle, filepos, seekmode);
@@ -526,7 +526,7 @@ namespace rpp /* ReCpp */
         if (!Handle)
             return 0;
     #if USE_WINAPI_IO
-        return SetFilePointer((HANDLE)Handle, 0, nullptr, FILE_CURRENT);
+        return SetFilePointer(reinterpret_cast<HANDLE>(Handle), 0, nullptr, FILE_CURRENT);
     #else
         return (int)ftell((FILE*)Handle);
     #endif
@@ -538,7 +538,7 @@ namespace rpp /* ReCpp */
             return 0LL;
     #if USE_WINAPI_IO
         LARGE_INTEGER current;
-        SetFilePointerEx((HANDLE)Handle, { {0, 0} }, &current, FILE_CURRENT);
+        SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), { {0, 0} }, &current, FILE_CURRENT);
         return current.QuadPart;
     #else
         return (int64)ftelli64((FILE*)Handle);
@@ -674,7 +674,7 @@ namespace rpp /* ReCpp */
     int file_size(const char* filename) noexcept
     {
         int64 s; 
-        return file_info(filename, &s, nullptr, nullptr, nullptr) ? (int)s : 0;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
     }
     int64 file_sizel(const char* filename) noexcept
     {
@@ -882,7 +882,7 @@ namespace rpp /* ReCpp */
             folders.push_back(folder);
         }
 
-        for (int i = 0; i < (int)folders.size(); ++i)
+        for (int i = 0; i < static_cast<int>(folders.size()); ++i)
         {
             if (i > 0 && folders[i] == ".." && folders[i-1] != "..") 
             {
@@ -1043,7 +1043,7 @@ namespace rpp /* ReCpp */
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
-            if (auto n = (size_t)args[i].size()) {
+            if (auto n = static_cast<size_t>(args[i].size())) {
                 if (res != 0)
                     res += 1;
                 res += n;
@@ -1054,7 +1054,7 @@ namespace rpp /* ReCpp */
         result.append(args[0].c_str(), args[0].size());
 
         for (size_t i = 1; i < N; ++i) {
-            if (auto n = (size_t)args[i].size()) {
+            if (auto n = static_cast<size_t>(args[i].size())) {
                 if (!result.empty())
                     result.append(1, '/');
                 result.append(args[i].c_str(), n);
@@ -1120,7 +1120,7 @@ namespace rpp /* ReCpp */
             snprintf(path, 512, "./*");
         }
         else {
-            snprintf(path, 512, "%.*s/*", (int)this->dir.length(), this->dir.c_str());
+            snprintf(path, 512, "%.*s/*", static_cast<int>(this->dir.length()), this->dir.c_str());
         }
         if ((s->hFind = FindFirstFileA(path, &s->ffd)) == INVALID_HANDLE_VALUE)
             s->hFind = nullptr;
@@ -1163,7 +1163,7 @@ namespace rpp /* ReCpp */
             bool validDir = e.is_dir && e.name != "." && e.name != "..";
             if ((validDir && dirs) || (!e.is_dir && files)) 
             {
-                strview dir = abs ? (strview)currentDir : relPath;
+                strview dir = abs ? strview{currentDir} : relPath;
                 func(path_combine(dir, e.name), e.is_dir);
             }
             if (validDir && rec)
@@ -1194,7 +1194,7 @@ namespace rpp /* ReCpp */
         traverse_dir(dir, true, false, recursive, fullpath, [&](string&& path, bool) {
             out.emplace_back(std::move(path));
         });
-        return (int)out.size();
+        return static_cast<int>(out.size());
     }
 
     int list_dirs_relpath(vector<string>& out, strview dir, bool recursive) noexcept
@@ -1202,7 +1202,7 @@ namespace rpp /* ReCpp */
         traverse_dir(dir, true, false, recursive, false, [&](string&& path, bool) {
             out.emplace_back(path_combine(dir, path));
         });
-        return (int)out.size();
+        return static_cast<int>(out.size());
     }
 
     int list_files(vector<string>& out, strview dir, strview suffix, bool recursive, bool fullpath) noexcept
@@ -1211,7 +1211,7 @@ namespace rpp /* ReCpp */
             if (suffix.empty() || strview{path}.ends_withi(suffix))
                 out.emplace_back(std::move(path));
         });
-        return (int)out.size();
+        return static_cast<int>(out.size());
     }
 
     int list_files_relpath(vector<string>& out, strview dir, strview suffix, bool recursive) noexcept
@@ -1220,7 +1220,7 @@ namespace rpp /* ReCpp */
             if (suffix.empty() || strview{path}.ends_withi(suffix))
                 out.emplace_back(path_combine(dir, path));
         });
-        return (int)out.size();
+        return static_cast<int>(out.size());
     }
 
     int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive, bool fullpath) noexcept
@@ -1229,7 +1229,7 @@ namespace rpp /* ReCpp */
             auto& out = isDir ? outDirs : outFiles;
             out.emplace_back(std::move(path));
         });
-        return (int)outDirs.size() + (int)outFiles.size();
+        return static_cast<int>(outDirs.size() + outFiles.size());
     }
 
     int list_alldir_relpath(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive) noexcept
@@ -1238,7 +1238,7 @@ namespace rpp /* ReCpp */
             auto& out = isDir ? outDirs : outFiles;
             out.emplace_back(path_combine(dir, path));
         });
-        return (int)outDirs.size() + (int)outFiles.size();
+        return static_cast<int>(outDirs.size() + outFiles.size());
     }
 
     vector<string> list_files(strview dir, const vector<strview>& suffixes, bool recursive, bool fullpath) noexcept
@@ -1281,7 +1281,7 @@ namespace rpp /* ReCpp */
         #endif
 
         if (p) {
-            int len = (int)strlen(p);
+            int len = static_cast<int>(strlen(p));
             #if _WIN32
                 win32_fixup_path(p, len);
             #else
@@ -1296,7 +1296,7 @@ namespace rpp /* ReCpp */
     {
         #if _WIN32
             char path[512];
-            int len = (int)GetModuleFileNameA((HMODULE)moduleObject, path, 512);
+            int len = (int)GetModuleFileNameA(reinterpret_cast<HMODULE>(moduleObject), path, 512);
             normalize(path);
             return folder_path(strview{path, len});
         #elif __APPLE__
@@ -1312,7 +1312,7 @@ namespace rpp /* ReCpp */
     {
         #if _WIN32
             char path[512];
-            int len = (int)GetModuleFileNameA((HMODULE)moduleObject, path, 512);
+            int len = (int)GetModuleFileNameA(reinterpret_cast<HMODULE>(moduleObject), path, 512);
             normalize(path);
             return { path, path+len };
         #elif __APPLE__
@@ -1363,7 +1363,7 @@ namespace rpp /* ReCpp */
             getenv_s(&len, path, sizeof(path), "USERPROFILE");
             if (len == 0)
                 return {};
-            int slen = (int)len - 1;
+            int slen = static_cast<int>(len) - 1;
             win32_fixup_path(path, slen);
             return { path, path + len };
         #else
