@@ -164,14 +164,18 @@ namespace rpp
             Base    base;
             Derived inst;
 
+            // bind base virtual method
             DataDelegate func1(base, &Base::virtual_method);
             AssertThat(func1(data), "virtual_method");
 
-            DataDelegate func2(static_cast<Base*>(&inst), &Base::virtual_method);
-            AssertThat(func2(data), "derived_method");
-
+            // bind virtual method directly
             DataDelegate func3(inst, &Derived::virtual_method);
             AssertThat(func3(data), "derived_method");
+
+            // bind virtual method through type erasure
+            Base& erased = inst;
+            DataDelegate func2(erased, &Base::virtual_method);
+            AssertThat(func2(data), "derived_method");
         }
 
         ////////////////////////////////////////////////////
@@ -227,6 +231,48 @@ namespace rpp
             AssertThat(init.good(), true);
             AssertThat(lambda.good(), false);
             AssertThat(init(data), "move_init");
+        }
+
+        TestCase(delegate_vector_push_back)
+        {
+            std::vector<DataDelegate> delegates;
+            delegates.push_back([](Data a) { return validate("vector_0", a); });
+            delegates.push_back([](Data a) { return validate("vector_1", a); });
+            delegates.push_back([](Data a) { return validate("vector_2", a); });
+            delegates.push_back([](Data a) { return validate("vector_3", a); });
+            delegates.push_back([](Data a) { return validate("vector_4", a); });
+            delegates.push_back([](Data a) { return validate("vector_5", a); });
+            delegates.push_back([](Data a) { return validate("vector_6", a); });
+            delegates.push_back([](Data a) { return validate("vector_7", a); });
+            AssertThat(delegates[0](data), "vector_0");
+            AssertThat(delegates[1](data), "vector_1");
+            AssertThat(delegates[2](data), "vector_2");
+            AssertThat(delegates[3](data), "vector_3");
+            AssertThat(delegates[4](data), "vector_4");
+            AssertThat(delegates[5](data), "vector_5");
+            AssertThat(delegates[6](data), "vector_6");
+            AssertThat(delegates[7](data), "vector_7");
+        }
+
+        TestCase(delegate_vector_emplace_back)
+        {
+            std::vector<DataDelegate> delegates;
+            delegates.emplace_back([](Data a) { return validate("vector_0", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_1", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_2", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_3", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_4", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_5", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_6", a); });
+            delegates.emplace_back([](Data a) { return validate("vector_7", a); });
+            AssertThat(delegates[0](data), "vector_0");
+            AssertThat(delegates[1](data), "vector_1");
+            AssertThat(delegates[2](data), "vector_2");
+            AssertThat(delegates[3](data), "vector_3");
+            AssertThat(delegates[4](data), "vector_4");
+            AssertThat(delegates[5](data), "vector_5");
+            AssertThat(delegates[6](data), "vector_6");
+            AssertThat(delegates[7](data), "vector_7");
         }
 
         TestCase(compare_empty)
