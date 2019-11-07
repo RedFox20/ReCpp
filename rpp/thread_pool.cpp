@@ -81,7 +81,7 @@ namespace rpp
         kill();
     }
 
-    void pool_task::max_idle_time(float maxIdleSeconds) { maxIdleTime = maxIdleSeconds; }
+    void pool_task::max_idle_time(float maxIdleSeconds) noexcept { maxIdleTime = maxIdleSeconds; }
 
     void pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
@@ -300,7 +300,7 @@ namespace rpp
 #else
     static int num_physical_cores()
     {
-        return (int)thread::hardware_concurrency();
+        return (int)thread::hardware_concurrency() / 2;
     }
 #endif
 
@@ -347,14 +347,14 @@ namespace rpp
 
     int thread_pool::total_tasks() const noexcept
     {
-        return (int)tasks.size();
+        return static_cast<int>(tasks.size());
     }
 
     int thread_pool::clear_idle_tasks() noexcept
     {
         lock_guard<mutex> lock{tasksMutex};
         int cleared = 0;
-        for (int i = 0; i < (int)tasks.size();)
+        for (size_t i = 0; i < tasks.size();)
         {
             if (!tasks[i]->running())
             {
@@ -421,18 +421,15 @@ namespace rpp
             return;
         }
 
-        auto active = (pool_task**)alloca(sizeof(pool_task*) * cores);
-        //vector<pool_task*> active(cores, nullptr);
-        {
-            rangeRunning = true;
+        auto active = static_cast<pool_task**>(alloca(sizeof(pool_task*) * cores));
+        rangeRunning = true;
 
-            size_t poolIndex = 0;
-            for (int i = 0; i < cores; ++i)
-            {
-                const int start = i * len;
-                const int end   = i == cores - 1 ? rangeEnd : start + len;
-                active[i] = start_range_task(poolIndex, start, end, rangeTask);
-            }
+        size_t poolIndex = 0;
+        for (int i = 0; i < cores; ++i)
+        {
+            int start = i * len;
+            int end   = i == cores - 1 ? rangeEnd : start + len;
+            active[i] = start_range_task(poolIndex, start, end, rangeTask);
         }
 
         for (int i = 0; i < cores; ++i)

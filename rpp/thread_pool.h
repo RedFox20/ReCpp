@@ -272,7 +272,7 @@ namespace rpp
 
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param maxIdleSeconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
-        void max_idle_time(float maxIdleSeconds = 15);
+        void max_idle_time(float maxIdleSeconds = 15) noexcept;
 
         // assigns a new parallel for task to run
         // @warning This range task does not retain any resources, so you must ensure
