@@ -310,7 +310,9 @@ namespace rpp
         cfuture(cfuture&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(const cfuture& f) noexcept = default;
+        cfuture(const cfuture& f) noexcept : super{f} // NOLINT
+        {
+        }
         cfuture& operator=(std::future<void>&& f) noexcept
         {
             super::operator=(std::move(f));
