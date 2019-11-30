@@ -309,7 +309,7 @@ namespace rpp /* ReCpp */
 
         out.resize(size_t(count));
 
-        int n = read(static_cast<void*>(out.data()), count);
+        int n = read(const_cast<char*>(out.data()), count);
         if (n != count) {
             out.resize(size_t(n));
             out.shrink_to_fit();

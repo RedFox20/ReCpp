@@ -11,6 +11,33 @@ namespace rpp
         if (cap > SIZE) free(ptr);
     }
 
+    string_buffer::string_buffer(string_buffer&& sb) noexcept
+    {
+        len = sb.len;
+        buf[0] = '\0';
+        if (sb.ptr == sb.buf)
+        {
+            ptr = buf;
+            memcpy(buf, sb.buf, len);
+        }
+        else
+        {
+            ptr = sb.ptr;
+            cap = sb.cap;
+        }
+        sb.ptr = nullptr;
+        sb.len = 0;
+        sb.cap = 0;
+    }
+    
+    string_buffer& string_buffer::operator=(string_buffer&& sb) noexcept
+    {
+        string_buffer tmp { std::move(*this) };
+        new (this) string_buffer{ std::move(sb)  }; // NOLINT
+        new (&sb)  string_buffer{ std::move(tmp) }; // NOLINT
+        return *this;
+    }
+
     void string_buffer::clear()
     {
         ptr[len = 0] = '\0';

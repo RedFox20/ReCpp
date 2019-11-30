@@ -110,10 +110,11 @@ namespace rpp
         }
         ~string_buffer() noexcept;
 
-        string_buffer(string_buffer&&)                 = delete;
         string_buffer(const string_buffer&)            = delete;
-        string_buffer& operator=(string_buffer&&)      = delete;
         string_buffer& operator=(const string_buffer&) = delete;
+
+        string_buffer(string_buffer&& sb) noexcept;
+        string_buffer& operator=(string_buffer&& sb) noexcept;
 
         FINLINE int size() const { return len; }
         FINLINE const char* c_str() const { return ptr; }
@@ -143,7 +144,7 @@ namespace rpp
             if (ptr == nullptr) return write(nullptr);
             RPP_CXX17_IF_CONSTEXPR(std::is_function<T>::value)
             {
-                this->write_ptr(reinterpret_cast<void*>(ptr));
+                this->write_ptr(reinterpret_cast<const void*>(ptr));
             }
             else
             {

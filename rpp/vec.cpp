@@ -415,8 +415,8 @@ namespace rpp
     Vector3 Vector3::toEulerAngles() const
     {
         float pitchAdjacent = sqrt(x*x + z*z); 
-        float pitch = atan2(pitchAdjacent, y);
-        float yaw   = atan2(x, z);
+        float pitch = atan2f(pitchAdjacent, y);
+        float yaw   = atan2f(x, z);
         return Vector3{/*roll:*/0.0f, pitch, yaw};
     }
 
@@ -580,7 +580,7 @@ namespace rpp
         float cosTheta = a.dot(b);
         if (rpp::almostEqual(cosTheta, 1.0f))
             return { Vector3::Zero(), 0.0f };
-        float theta = rpp::degf(acos(cosTheta));
+        float theta = rpp::degf(acosf(cosTheta));
         Vector3 axis = a.cross(b).normalized();
         return { axis, -theta };
     }
@@ -644,9 +644,9 @@ namespace rpp
     Vector3 Vector4::quatToEulerRadians() const
     {
         return {
-            atan2(2 * (x*y + z*w), 1 - 2 * (y*y + z*z)),
-            asin( 2 * (x*z - w*y)),
-            atan2(2 * (x*w + y*z), 1 - 2 * (z*z + w*w))
+            atan2f(2 * (x*y + z*w), 1 - 2 * (y*y + z*z)),
+            asinf( 2 * (x*z - w*y)),
+            atan2f(2 * (x*w + y*z), 1 - 2 * (z*z + w*w))
         };
     }
 
@@ -912,15 +912,15 @@ namespace rpp
         Vector3 angles;
         if (sy < 1e-6) // if singular
         {
-            angles.x = atan2(-m12, m11);
-            angles.y = atan2(-m20, sy);
+            angles.x = atan2f(-m12, m11);
+            angles.y = atan2f(-m20, sy);
             angles.z = 0.0f;
         }
         else
         {
-            angles.x = atan2(m21, m22);
-            angles.y = atan2(-m20, sy);
-            angles.z = atan2(m10, m00);
+            angles.x = atan2f(m21, m22);
+            angles.y = atan2f(-m20, sy);
+            angles.z = atan2f(m10, m00);
         }
         return angles;
     }
@@ -932,12 +932,12 @@ namespace rpp
 
     Matrix3 Matrix3::createRotationFromRadians(const Vector3& eulerRadians)
     {
-        float sinx = sin(eulerRadians.x);
-        float cosx = cos(eulerRadians.x);
-        float siny = sin(eulerRadians.y);
-        float cosy = cos(eulerRadians.y);
-        float sinz = sin(eulerRadians.z);
-        float cosz = cos(eulerRadians.z);
+        float sinx = sinf(eulerRadians.x);
+        float cosx = cosf(eulerRadians.x);
+        float siny = sinf(eulerRadians.y);
+        float cosy = cosf(eulerRadians.y);
+        float sinz = sinf(eulerRadians.z);
+        float cosz = cosf(eulerRadians.z);
 
         Matrix3 R_x {
             1,  0,     0,
@@ -1140,8 +1140,8 @@ namespace rpp
     Matrix4& Matrix4::rotate(float angleDegs, const Vector3& rotationAxis)
     {
         float a = radf(angleDegs);		
-        float c = cos(a);
-        float s = sin(a);
+        float c = cosf(a);
+        float s = sinf(a);
         Vector3 axis = rotationAxis.normalized();
         Vector3 temp = (1.0f - c) * axis;
 
@@ -1662,7 +1662,7 @@ namespace rpp
 
         // max distance from origin
         auto maxdist = [](float a, float b) {
-            return fmax(fabs(a), fabs(b));
+            return fmaxf(fabsf(a), fabsf(b));
         };
         float dx = maxdist(min.x, max.x) / maxdist(bb.min.x, bb.max.x);
         float dy = maxdist(min.y, max.y) / maxdist(bb.min.y, bb.max.y);

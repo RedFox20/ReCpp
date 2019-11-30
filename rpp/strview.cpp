@@ -65,7 +65,7 @@ namespace rpp
             if (rem < n) {
                 pos = 0;
                 rem = max;
-				if (rem < n) n = rem;
+                if (rem < n) n = rem;
             }
             char* ptr = buf+pos;
             pos += n;
@@ -520,11 +520,11 @@ namespace rpp
     }
     string& to_lower(string& str) noexcept
     {
-        foreach(str.data(), static_cast<int>(str.size()), ::tolower); return str;
+        foreach(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::tolower); return str;
     }
     string& to_upper(string& str) noexcept
     {
-        foreach(str.data(), static_cast<int>(str.size()), ::toupper); return str;
+        foreach(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::toupper); return str;
     }
 
     char* replace(char* str, int len, char chOld, char chNew) noexcept
@@ -534,7 +534,7 @@ namespace rpp
         return str;
     }
     string& replace(string& str, char chOld, char chNew) noexcept {
-        replace(str.data(), static_cast<int>(str.size()), chOld, chNew); return str;
+        replace(const_cast<char*>(str.data()), static_cast<int>(str.size()), chOld, chNew); return str;
     }
 
 
