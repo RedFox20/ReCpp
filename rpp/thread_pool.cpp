@@ -300,7 +300,7 @@ namespace rpp
 #else
     static int num_physical_cores()
     {
-        return (int)thread::hardware_concurrency() / 2;
+        return (int)std::thread::hardware_concurrency() / 2;
     }
 #endif
 
@@ -322,7 +322,7 @@ namespace rpp
 
     thread_pool::~thread_pool() noexcept
     {
-        // defined destructor to prevent agressive inlining and to manually control task destruction
+        // defined destructor to prevent aggressive inlining and to manually control task destruction
         std::lock_guard<std::mutex> lock{tasksMutex};
         tasks.clear();
     }

@@ -177,15 +177,15 @@ namespace rpp
         
         /**
          * @param timeout Maximum time to wait for this semaphore to be notified
-         * @return signalled if wait was successful or timeout if timeoutSeconds had elapsed
+         * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
         template<class Rep, class Period>
         wait_result wait(std::chrono::duration<Rep, Period> timeout)
         {
-            unique_lock<mutex> lock{ m };
+            std::unique_lock<std::mutex> lock{ m };
             while (value <= 0)
             {
-                if (cv.wait_for(lock, timeout) == cv_status::timeout)
+                if (cv.wait_for(lock, timeout) == std::cv_status::timeout)
                     return semaphore::timeout;
             }
             --value;
@@ -217,7 +217,7 @@ namespace rpp
 
 
     /**
-     * Provides a plain function which traces the current callstack
+     * Provides a plain function which traces the current call stack
      */
     using pool_trace_provider = std::string (*)();
 
