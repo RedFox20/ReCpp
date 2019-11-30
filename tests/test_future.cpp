@@ -113,7 +113,7 @@ TestImpl(test_future)
         int result = f.then([&] {
             AssertMsg(false, "This callback should never be executed");
             return 0;
-        }, [&](const exception& e) {
+        }, [&](const std::exception& e) {
            exceptHandlerCalled = true;
            AssertThat(e.what(), "background_thread_exception_msg"s);
            return 42;
@@ -215,7 +215,7 @@ TestImpl(test_future)
             return 0;
         }).then([](int x) { 
             return 5;
-        }, [&](const exception& e) {
+        }, [&](const std::exception& e) {
             secondExceptHandlerCalled = true;
             AssertThat(e.what(), "future_continuation_exception_msg"s);
             return 42;
@@ -240,7 +240,7 @@ TestImpl(test_future)
             auto future = make_exceptional_future<int>(runtime_error{"aargh!"s});
             future.get();
         }
-        catch (const exception& e)
+        catch (const std::exception& e)
         {
             exceptionWasThrown = true;
             AssertThat(e.what(), "aargh!"s);

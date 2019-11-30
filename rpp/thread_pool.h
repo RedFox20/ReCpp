@@ -17,20 +17,6 @@
 
 namespace rpp
 {
-    using std::mutex;
-    using std::condition_variable;
-    using std::lock_guard;
-    using std::unique_lock;
-    using std::atomic_bool;
-    using std::string;
-    using std::thread;
-    using std::vector;
-    using std::unique_ptr;
-    using std::move;
-    using std::nothrow_t;
-    using std::cv_status;
-    using std::exception;
-    using std::exception_ptr;
     using seconds_t  = std::chrono::seconds;
     using fseconds_t = std::chrono::duration<float>;
     using dseconds_t = std::chrono::duration<double>;
@@ -94,8 +80,8 @@ namespace rpp
      */
     class semaphore
     {
-        mutex m;
-        condition_variable cv;
+        std::mutex m;
+        std::condition_variable cv;
         int value = 0;
 
     public:
@@ -121,7 +107,7 @@ namespace rpp
 
         void notify()
         {
-            { lock_guard<mutex> lock{ m };
+            { std::lock_guard<std::mutex> lock{ m };
                 ++value;
             }
             cv.notify_one();
@@ -130,7 +116,7 @@ namespace rpp
         bool notify_once() // only notify if count <= 0
         {
             bool shouldNotify;
-            { lock_guard<mutex> lock{ m };
+            { std::lock_guard<std::mutex> lock{ m };
                 shouldNotify = value <= 0;
                 if (shouldNotify)
                     ++value;
@@ -141,7 +127,7 @@ namespace rpp
 
         void wait()
         {
-            unique_lock<mutex> lock{ m };
+           std::unique_lock<std::mutex> lock{ m };
             while (value <= 0) // wait until value is actually set
                 cv.wait(lock);
             --value; // consume the value
@@ -156,13 +142,13 @@ namespace rpp
          * @endcode
          * @param taskIsRunning Reference to atomic flag to wait on
          */
-        void wait_barrier_while(atomic_bool& taskIsRunning)
+        void wait_barrier_while(std::atomic_bool& taskIsRunning)
         {
             if (!taskIsRunning) {
                 taskIsRunning = true;
                 return;
             }
-            unique_lock<mutex> lock{ m };
+            std::unique_lock<std::mutex> lock{ m };
             while (taskIsRunning)
                 cv.wait(lock);
             taskIsRunning = true;
@@ -177,13 +163,13 @@ namespace rpp
          * @endcode
          * @param hasFinished Reference to atomic flag to wait on
          */
-        void wait_barrier_until(atomic_bool& hasFinished)
+        void wait_barrier_until(std::atomic_bool& hasFinished)
         {
             if (hasFinished) {
                 hasFinished = false;
                 return;
             }
-            unique_lock<mutex> lock{ m };
+            std::unique_lock<std::mutex> lock{ m };
             while (!hasFinished)
                 cv.wait(lock);
             hasFinished = false;
@@ -208,7 +194,7 @@ namespace rpp
 
         bool try_wait()
         {
-            unique_lock<mutex> lock{ m };
+            std::unique_lock<std::mutex> lock{ m };
             if (value > 0) {
                 --value;
                 return true;
@@ -233,7 +219,7 @@ namespace rpp
     /**
      * Provides a plain function which traces the current callstack
      */
-    using pool_trace_provider = string (*)();
+    using pool_trace_provider = std::string (*)();
 
 
     RPPAPI void set_this_thread_name(const char* name);
@@ -244,16 +230,16 @@ namespace rpp
      */
     class RPPAPI pool_task
     {
-        mutex m;
-        condition_variable cv;
-        thread th;
-        task_delegate<void()> genericTask;
-        action<int, int> rangeTask;
+        std::mutex m;
+        std::condition_variable cv;
+        std::thread th;
+        rpp::task_delegate<void()> genericTask;
+        rpp::action<int, int> rangeTask;
         int rangeStart  = 0;
         int rangeEnd    = 0;
         float maxIdleTime = 15;
-        string trace;
-        exception_ptr error;
+        std::string trace;
+        std::exception_ptr error;
         volatile bool taskRunning = false; // an active task is being executed
         volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
 
@@ -288,7 +274,7 @@ namespace rpp
         // @note Throws any unhandled exceptions from background thread
         //       This is similar to std::future behaviour
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/);
-        wait_result wait(int timeoutMillis, nothrow_t) noexcept;
+        wait_result wait(int timeoutMillis, std::nothrow_t) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -297,7 +283,7 @@ namespace rpp
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
         bool got_task() const noexcept;
-        bool wait_for_task(unique_lock<mutex>& lock) noexcept;
+        bool wait_for_task(std::unique_lock<std::mutex>& lock) noexcept;
         wait_result join_or_detach(wait_result result = finished) noexcept;
     };
 
@@ -314,11 +300,11 @@ namespace rpp
      */
     class RPPAPI thread_pool
     {
-        mutex tasksMutex;
-        vector<unique_ptr<pool_task>> tasks;
+        std::mutex tasksMutex;
+        std::vector<std::unique_ptr<pool_task>> tasks;
         float taskMaxIdleTime = 15; // new task timeout in seconds
         int coreCount = 0;
-        atomic_bool rangeRunning { false }; // whether parallel range is running or not
+        std::atomic_bool rangeRunning { false }; // whether parallel range is running or not
 
     public:
 
@@ -411,7 +397,7 @@ namespace rpp
      * @param func Non-owning callback action:  void(int start, int end)
      */
     template<class Func>
-    inline void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
+    void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
     {
         thread_pool::global().parallel_for(rangeStart, rangeEnd,
             action<int, int>::from_function<Func, &Func::operator()>(&func));
@@ -436,7 +422,7 @@ namespace rpp
      * @param foreach Non-owning foreach callback action:  void(auto item)
      */
     template<class Container, class ForeachFunc>
-    inline void parallel_foreach(Container& items, const ForeachFunc& foreach) noexcept
+    void parallel_foreach(Container& items, const ForeachFunc& foreach) noexcept
     {
         thread_pool::global().parallel_for(0, (int)items.size(), [&](int start, int end) {
             for (int i = start; i < end; ++i) {
@@ -539,28 +525,28 @@ namespace rpp
      * @endcode
      */
     template<class Func, class A>
-    inline pool_task* parallel_task(Func&& func, A&& a)
+    pool_task* parallel_task(Func&& func, A&& a)
     {
         return thread_pool::global().parallel_task([move_args(func, a)]() mutable {
             func(forward_args(a));
         });
     }
     template<class Func, class A, class B>
-    inline pool_task* parallel_task(Func&& func, A&& a, B&& b)
+    pool_task* parallel_task(Func&& func, A&& a, B&& b)
     {
         return thread_pool::global().parallel_task([move_args(func, a, b)]() mutable {
             func(forward_args(a, b));
         });
     }
     template<class Func, class A, class B, class C>
-    inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c)
+    pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c)
     {
         return thread_pool::global().parallel_task([move_args(func, a, b, c)]() mutable {
             func(forward_args(a, b, c));
         });
     }
     template<class Func, class A, class B, class C, class D>
-    inline pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
+    pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
     {
         return thread_pool::global().parallel_task([move_args(func, a, b, c, d)]() mutable {
             func(forward_args(a, b, c, d));
@@ -572,7 +558,7 @@ namespace rpp
     /**
      * @return TRUE if @flag == @expectedValue and atomically sets @flag to @newValue
      */
-    inline bool atomic_test_and_set(atomic_bool& flag, bool expectedValue = true, bool newValue = false)
+    inline bool atomic_test_and_set(std::atomic_bool& flag, bool expectedValue = true, bool newValue = false)
     {
         return flag.compare_exchange_weak(expectedValue, newValue);
     }

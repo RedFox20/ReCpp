@@ -73,7 +73,7 @@ namespace rpp
     pool_task::pool_task()
     {
         // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
-        th = thread{[this] { run(); }};
+        th = std::thread{[this] { run(); }};
     }
 
     pool_task::~pool_task() noexcept
@@ -87,7 +87,7 @@ namespace rpp
     {
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
-        { lock_guard<mutex> lock{m};
+        { std::lock_guard<std::mutex> lock{m};
             trace.clear();
             error = nullptr;
             if (auto tracer = TraceProvider)
@@ -101,7 +101,7 @@ namespace rpp
                 TaskDebug("resurrecting task");
                 killed = false;
                 (void)join_or_detach(finished);
-                th = thread{[this] { run(); }}; // restart thread if needed
+                th = std::thread{[this] { run(); }}; // restart thread if needed
             }
             taskRunning = true;
             cv.notify_one();
@@ -113,12 +113,12 @@ namespace rpp
         assert(!taskRunning && "rpp::pool_task already running! This can cause deadlocks due to abandoned tasks!");
 
         //TaskDebug("queue task");
-        { lock_guard<mutex> lock{m};
+        { std::lock_guard<std::mutex> lock{m};
             trace.clear();
             error = nullptr;
             if (auto tracer = TraceProvider)
                 trace = tracer();
-            genericTask  = move(newTask);
+            genericTask  = std::move(newTask);
             rangeTask    = {};
             rangeStart   = 0;
             rangeEnd     = 0;
@@ -127,7 +127,7 @@ namespace rpp
                 TaskDebug("resurrecting task");
                 killed = false;
                 (void)join_or_detach(finished);
-                th = thread{[this] { run(); }}; // restart thread if needed
+                th = std::thread{[this] { run(); }}; // restart thread if needed
             }
             taskRunning = true;
             cv.notify_one();
@@ -141,9 +141,9 @@ namespace rpp
         return result;
     }
 
-    pool_task::wait_result pool_task::wait(int timeoutMillis, nothrow_t) noexcept
+    pool_task::wait_result pool_task::wait(int timeoutMillis, std::nothrow_t) noexcept
     {
-        unique_lock<mutex> lock{m};
+        std::unique_lock<std::mutex> lock{m};
         while (taskRunning && !killed)
         {
             if (timeoutMillis)
@@ -164,7 +164,7 @@ namespace rpp
         if (killed) {
             return join_or_detach(finished);
         }
-        { unique_lock<mutex> lock{m};
+        { std::unique_lock<std::mutex> lock{m};
             TaskDebug("killing task");
             killed = true;
         }
@@ -204,7 +204,7 @@ namespace rpp
                 decltype(genericTask) generic;
                 
                 // consume the tasks atomically
-                { unique_lock<mutex> lock{m};
+                { std::unique_lock<std::mutex> lock{m};
                     //TaskDebug("%s wait for task", name);
                     if (!wait_for_task(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
@@ -214,7 +214,7 @@ namespace rpp
                         return;
                     }
                     range   = rangeTask;
-                    generic = move(genericTask);
+                    generic = std::move(genericTask);
                     rangeTask   = {};
                     genericTask = {};
                     taskRunning = true;
@@ -231,10 +231,10 @@ namespace rpp
                 }
             }
             // prevent failures that would terminate the thread
-            catch (const exception& e) { unhandled_exception(e.what()); }
-            catch (const char* e)      { unhandled_exception(e);        }
-            catch (...)                { unhandled_exception("");       }
-            { lock_guard<mutex> lock{m};
+            catch (const std::exception& e) { unhandled_exception(e.what()); }
+            catch (const char* e)           { unhandled_exception(e);        }
+            catch (...)                     { unhandled_exception("");       }
+            { std::lock_guard<std::mutex> lock{m};
                 taskRunning = false;
                 cv.notify_all();
             }
@@ -253,7 +253,7 @@ namespace rpp
         return (bool)rangeTask || (bool)genericTask;
     }
 
-    bool pool_task::wait_for_task(unique_lock<mutex>& lock) noexcept
+    bool pool_task::wait_for_task(std::unique_lock<std::mutex>& lock) noexcept
     {
         for (;;)
         {
@@ -263,7 +263,7 @@ namespace rpp
                 return true;
             if (maxIdleTime > 0.000001f)
             {
-                if (cv.wait_for(lock, fseconds_t(maxIdleTime)) == cv_status::timeout)
+                if (cv.wait_for(lock, fseconds_t(maxIdleTime)) == std::cv_status::timeout)
                     return got_task(); // make sure to check for task even if it timeouts
             }
             else
@@ -286,7 +286,7 @@ namespace rpp
     {
         DWORD bytes = 0;
         GetLogicalProcessorInformation(nullptr, &bytes);
-        vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> coreInfo(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+        std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> coreInfo(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
         GetLogicalProcessorInformation(coreInfo.data(), &bytes);
 
         int cores = 0;
@@ -311,7 +311,7 @@ namespace rpp
 
     void thread_pool::set_task_tracer(pool_trace_provider traceProvider)
     {
-        lock_guard<mutex> lock{ tasksMutex };
+        std::lock_guard<std::mutex> lock{ tasksMutex };
         TraceProvider = traceProvider;
     }
 
@@ -323,13 +323,13 @@ namespace rpp
     thread_pool::~thread_pool() noexcept
     {
         // defined destructor to prevent agressive inlining and to manually control task destruction
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         tasks.clear();
     }
 
     int thread_pool::active_tasks() noexcept
     {
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         int active = 0;
         for (auto& task : tasks) 
             if (task->running()) ++active;
@@ -338,7 +338,7 @@ namespace rpp
 
     int thread_pool::idle_tasks() noexcept
     {
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         int idle = 0;
         for (auto& task : tasks)
             if (!task->running()) ++idle;
@@ -352,7 +352,7 @@ namespace rpp
 
     int thread_pool::clear_idle_tasks() noexcept
     {
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         int cleared = 0;
         for (size_t i = 0; i < tasks.size();)
         {
@@ -370,7 +370,7 @@ namespace rpp
     pool_task* thread_pool::start_range_task(size_t& poolIndex, int rangeStart, int rangeEnd, 
                                              const action<int, int>& rangeTask) noexcept
     {
-        { lock_guard<mutex> lock{tasksMutex};
+        { std::lock_guard<std::mutex> lock{tasksMutex};
             for (; poolIndex < tasks.size(); ++poolIndex)
             {
                 pool_task* task = tasks[poolIndex].get();
@@ -388,14 +388,14 @@ namespace rpp
         task->max_idle_time(taskMaxIdleTime);
         task->run_range(rangeStart, rangeEnd, rangeTask);
 
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         tasks.emplace_back(move(t));
         return task;
     }
 
     void thread_pool::max_task_idle_time(float maxIdleSeconds) noexcept
     {
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         taskMaxIdleTime = maxIdleSeconds;
         for (auto& task : tasks)
             task->max_idle_time(taskMaxIdleTime);
@@ -440,13 +440,13 @@ namespace rpp
 
     pool_task* thread_pool::parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
-        { lock_guard<mutex> lock{tasksMutex};
-            for (unique_ptr<pool_task>& t : tasks)
+        { std::lock_guard<std::mutex> lock{tasksMutex};
+            for (std::unique_ptr<pool_task>& t : tasks)
             {
                 pool_task* task = t.get();
                 if (!task->running())
                 {
-                    task->run_generic(move(genericTask));
+                    task->run_generic(std::move(genericTask));
                     return task;
                 }
             }
@@ -456,9 +456,9 @@ namespace rpp
         auto t = std::make_unique<pool_task>();
         auto* task = t.get();
         task->max_idle_time(taskMaxIdleTime);
-        task->run_generic(move(genericTask));
+        task->run_generic(std::move(genericTask));
 
-        lock_guard<mutex> lock{tasksMutex};
+        std::lock_guard<std::mutex> lock{tasksMutex};
         tasks.emplace_back(move(t));
         return task;
     }

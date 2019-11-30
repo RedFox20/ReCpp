@@ -57,6 +57,22 @@ TestImpl(test_sprint)
         AssertEqual(buf2.view(), bigs);
     }
 
+    TestCase(string_buf_move)
+    {
+        string_buffer bigbuf;
+        for (int i = 0; i < 20; ++i)
+            bigbuf.writeln("str 10 20.1 2132 test this big string");
+        std::string content = bigbuf.str();
+        AssertGreaterOrEqual(content.size(), string_buffer::SIZE);
+
+        string_buffer move_init { std::move(bigbuf) };
+        AssertThat(move_init.view(), content);
+
+        string_buffer move_assign{ string(4096, 'z') };
+        move_assign = std::move(move_init);
+        AssertThat(move_assign.view(), content);
+    }
+
     TestCase(string_buf_loop)
     {
         // ensure it won't crash with random input loop

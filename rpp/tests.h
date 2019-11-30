@@ -181,6 +181,10 @@ namespace rpp
 #undef AssertThat
 #undef AssertEqual
 #undef AssertNotEqual
+#undef AssertGreater
+#undef AssertLess
+#undef AssertGreaterOrEqual
+#undef AssertLessOrEqual
 #undef TestImpl
 #undef TestInit
 #undef TestInitNoAutorun
@@ -205,9 +209,33 @@ namespace rpp
 }()
 #define AssertEqual AssertThat
 #define AssertNotEqual(expr, mustNotEqual) [&]() -> bool { \
-    const auto& __expr    = expr;                    \
-    const auto& __mustnot = mustNotEqual;            \
+    const auto& __expr    = expr;         \
+    const auto& __mustnot = mustNotEqual; \
     if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); return false; } \
+    return true; \
+}()
+#define AssertGreater(expr, than) [&]() -> bool { \
+    const auto& __expr = expr;            \
+    const auto& __than = than;            \
+    if (!(__expr > __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); return false; } \
+    return true; \
+}()
+#define AssertLess(expr, than) [&]() -> bool { \
+    const auto& __expr = expr;            \
+    const auto& __than = than;            \
+    if (!(__expr < __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); return false; } \
+    return true; \
+}()
+#define AssertGreaterOrEqual(expr, than) [&]() -> bool { \
+    const auto& __expr = expr;            \
+    const auto& __than = than;            \
+    if (!(__expr >= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); return false; } \
+    return true; \
+}()
+#define AssertLessOrEqual(expr, than) [&]() -> bool { \
+    const auto& __expr = expr;            \
+    const auto& __than = than;            \
+    if (!(__expr <= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); return false; } \
     return true; \
 }()
 

@@ -11,13 +11,6 @@
 
 namespace rpp
 {
-    using std::future;
-    using std::shared_future;
-    using std::promise;
-    using std::exception;
-    using std::move;
-    using std::vector;
-
     template<class T> class NODISCARD cfuture;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -31,10 +24,10 @@ namespace rpp
             // run task destructor before calling continuation
             // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
             if (!std::is_trivially_destructible_v<Task>) {
-                Task t = move(task);
+                Task t = std::move(task);
                 (void)t;
             }
-            std::promise<T>::set_value(move(value));
+            std::promise<T>::set_value(std::move(value));
         }
     };
 
@@ -46,7 +39,7 @@ namespace rpp
             // run task destructor before calling continuation
             // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
             if (!std::is_trivially_destructible_v<Task>) {
-                Task t = move(task);
+                Task t = std::move(task);
                 (void)t;
             }
             std::promise<void>::set_value();
@@ -59,7 +52,7 @@ namespace rpp
     {
         using T = decltype(task());
         cpromise<T> p;
-        shared_future<T> f = p.get_future().share();
+        std::shared_future<T> f = p.get_future().share();
         rpp::parallel_task([move_args(p, task)]() mutable
         {
             try {
@@ -125,36 +118,36 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    template<class T> class NODISCARD cfuture : public shared_future<T>
+    template<class T> class NODISCARD cfuture : public std::shared_future<T>
     {
-        using super = shared_future<T>;
+        using super = std::shared_future<T>;
     public:
         cfuture() noexcept = default;
-        cfuture(future<T>&& f) noexcept : super(move(f))
+        cfuture(std::future<T>&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(shared_future<T>&& f) noexcept : super(move(f))
+        cfuture(std::shared_future<T>&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(cfuture&& f) noexcept : super(move(f))
+        cfuture(cfuture&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(const cfuture& f) noexcept : super(f)
+        cfuture(const cfuture& f) noexcept : super{f}
         {
         }
-        cfuture& operator=(future<T>&& f) noexcept
+        cfuture& operator=(std::future<T>&& f) noexcept
         {
-            super::operator=(move(f));
+            super::operator=(std::move(f));
             return *this;
         }
-        cfuture& operator=(shared_future<T>&& f) noexcept
+        cfuture& operator=(std::shared_future<T>&& f) noexcept
         {
-            super::operator=(move(f));
+            super::operator=(std::move(f));
             return *this;
         }
         cfuture& operator=(cfuture&& f) noexcept
         {
-            super::operator=(move(f));
+            super::operator=(std::move(f));
             return *this;
         }
         cfuture& operator=(const cfuture& f) noexcept
@@ -174,7 +167,7 @@ namespace rpp
         template<class Task>
         cfuture<ret_type<Task>> then(Task&& task)
         {
-            return rpp::async_task([f=move(*this), move_args(task)]() mutable {
+            return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 return task(f.get());
             });
         }
@@ -183,7 +176,7 @@ namespace rpp
         cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA)
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            return async_task([f=move(*this), move_args(task, exhA)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { return task(f.get()); } 
                 catch (ExceptA& a) { return exhA(a); }
             });
@@ -194,7 +187,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            return async_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { return task(f.get()); }
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
@@ -207,7 +200,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            return async_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { return task(f.get()); }
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
@@ -222,7 +215,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            return async_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { return task(f.get()); }
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
@@ -235,7 +228,7 @@ namespace rpp
         template<class Task>
         void continue_with(Task&& task)
         {
-            rpp::parallel_task([f=move(*this), move_args(task)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task)]() mutable {
                 (void)task(f.get());
             });
         }
@@ -244,7 +237,7 @@ namespace rpp
         void continue_with(Task&& task, ExceptHA&& exhA)
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            rpp::parallel_task([f=move(*this), move_args(task, exhA)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
             });
@@ -255,7 +248,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -268,7 +261,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -283,7 +276,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            rpp::parallel_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -295,7 +288,7 @@ namespace rpp
         // abandons this future and prevents any waiting in destructor
         void detach()
         {
-            if (this->valid()) rpp::parallel_task([f = move(*this)]() mutable {
+            if (this->valid()) rpp::parallel_task([f=std::move(*this)]() mutable {
                 try { (void)f.get(); }
                 catch (...) {}
             });
@@ -303,41 +296,39 @@ namespace rpp
     };
 
 
-    template<> class NODISCARD cfuture<void> : public shared_future<void>
+    template<> class NODISCARD cfuture<void> : public std::shared_future<void>
     {
         using super = shared_future<void>;
     public:
         cfuture() noexcept = default;
-        cfuture(future<void>&& f) noexcept : super(move(f))
+        cfuture(std::future<void>&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(shared_future<void>&& f) noexcept : super(move(f))
+        cfuture(shared_future<void>&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(cfuture&& f) noexcept : super(move(f))
+        cfuture(cfuture&& f) noexcept : super{std::move(f)}
         {
         }
-        cfuture(const cfuture& f) noexcept : super(f)
+        cfuture(const cfuture& f) noexcept = default;
+        cfuture& operator=(std::future<void>&& f) noexcept
         {
-        }
-        cfuture& operator=(future<void>&& f) noexcept
-        {
-            super::operator=(move(f));
+            super::operator=(std::move(f));
             return *this;
         }
         cfuture& operator=(shared_future<void>&& f) noexcept
         {
-            super::operator=(move(f));
+            super::operator=(std::move(f));
             return *this;
         }
         cfuture& operator=(cfuture&& f) noexcept
         {
-            super::operator=(move(f));
+            super::operator=(std::move(f));
             return *this;
         }
         cfuture& operator=(const cfuture& f) noexcept
         {
-            super::operator=(move(f));
+            super::operator=(f);
             return *this;
         }
         ~cfuture() noexcept // always block if future is still incomplete
@@ -346,12 +337,12 @@ namespace rpp
                 this->wait();
         }
 
-        cfuture<void> then() { return { move(*this) }; }
+        cfuture<void> then() { return { std::move(*this) }; }
 
         template<class Task>
         cfuture<ret_type<Task>> then(Task&& task)
         {
-            return rpp::async_task([f=move(*this), move_args(task)]() mutable {
+            return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
                 return task();
             });
@@ -361,7 +352,7 @@ namespace rpp
         cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA)
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            return async_task([f=move(*this), move_args(task, exhA)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { f.get(); return task(); }
                 catch (ExceptA& a) { return exhA(a); }
             });
@@ -372,7 +363,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            return async_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { f.get(); return task(); }
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
@@ -385,7 +376,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            return async_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { f.get(); return task(); }
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
@@ -400,7 +391,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            return async_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            return async_task([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { f.get(); return task(); }
                 catch (ExceptA& a) { return exhA(a); }
                 catch (ExceptB& b) { return exhB(b); }
@@ -413,7 +404,7 @@ namespace rpp
         template<class Task>
         void continue_with(Task&& task)
         {
-            rpp::parallel_task([f=move(*this), move_args(task)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
                 (void)task();
             });
@@ -423,7 +414,7 @@ namespace rpp
         void continue_with(Task&& task, ExceptHA&& exhA)
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            rpp::parallel_task([f=move(*this), move_args(task, exhA)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
             });
@@ -434,7 +425,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -447,7 +438,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            rpp::parallel_task([f=move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -462,7 +453,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            rpp::parallel_task([f = move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -474,7 +465,7 @@ namespace rpp
         // abandons this future and prevents any waiting in destructor
         void detach()
         {
-            if (this->valid()) rpp::parallel_task([f = move(*this)]() mutable {
+            if (this->valid()) rpp::parallel_task([f=std::move(*this)]() mutable {
                 try { f.get(); } catch (...) {}
             });
         }
@@ -482,7 +473,7 @@ namespace rpp
 
     template<class T> cfuture<void> cfuture<T>::then()
     {
-        return rpp::async_task([f=move(*this)]() mutable {
+        return rpp::async_task([f=std::move(*this)]() mutable {
             (void)f.get();
         });
     }
@@ -490,34 +481,34 @@ namespace rpp
 
     template<class T> cfuture<T> make_ready_future(T&& value)
     {
-        promise<T> p;
-        p.set_value(move(value));
+        std::promise<T> p;
+        p.set_value(std::move(value));
         return p.get_future();
     }
 
     inline cfuture<void> make_ready_future()
     {
-        promise<void> p;
+        std::promise<void> p;
         p.set_value();
         return p.get_future();
     }
 
     template<class T, class E> cfuture<T> make_exceptional_future(E&& e)
     {
-        promise<T> p;
+        std::promise<T> p;
         p.set_exception(std::make_exception_ptr(std::forward<E>(e)));
         return p.get_future();
     }
     
-    template<class T> void wait_all(const vector<cfuture<T>>& vf)
+    template<class T> void wait_all(const std::vector<cfuture<T>>& vf)
     {
         for (const cfuture<T>& f : vf)
             f.wait();
     }
     
-    template<class T> vector<T> get_all(const vector<cfuture<T>>& vf)
+    template<class T> std::vector<T> get_all(const std::vector<cfuture<T>>& vf)
     {
-        vector<T> all;
+        std::vector<T> all;
         all.reserve(vf.size());
         for (const cfuture<T>& f : vf)
             all.emplace_back(f.get());
@@ -538,11 +529,11 @@ namespace rpp
      * @endcode
      */
     template<class U, class Launcher>
-    auto get_tasks(vector<U>& items, const Launcher& futureLauncher)
-        -> vector< future_type<ret_type<Launcher>> >
+    auto get_tasks(std::vector<U>& items, const Launcher& futureLauncher)
+        -> std::vector< future_type<ret_type<Launcher>> >
     {
         using T = future_type<ret_type<Launcher>>;
-        vector<cfuture<T>> futures;
+        std::vector<cfuture<T>> futures;
         futures.reserve(items.size());
         
         for (U& item : items)
@@ -562,11 +553,11 @@ namespace rpp
      * @endcode
      */
     template<class U, class Callback>
-    auto get_async_tasks(vector<U>& items, const Callback& futureCallback)
-        -> vector< ret_type<Callback> >
+    auto get_async_tasks(std::vector<U>& items, const Callback& futureCallback)
+        -> std::vector< ret_type<Callback> >
     {
         using T = ret_type<Callback>;
-        vector<cfuture<T>> futures;
+        std::vector<cfuture<T>> futures;
         futures.reserve(items.size());
         
         for (U& item : items)
@@ -590,9 +581,9 @@ namespace rpp
      * @endcode
      */
     template<class U, class Launcher>
-    void run_tasks(vector<U>& items, const Launcher& futureLauncher)
+    void run_tasks(std::vector<U>& items, const Launcher& futureLauncher)
     {
-        vector<cfuture<void>> futures;
+        std::vector<cfuture<void>> futures;
         futures.reserve(items.size());
         
         for (U& item : items)
