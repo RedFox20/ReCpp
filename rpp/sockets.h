@@ -355,7 +355,9 @@ namespace rpp
             int n = count < maxCount ? count : maxCount;
             T cont;
             cont.resize(n);
-            recv((void*)cont.data(), n * sizeof(typename T::value_type));
+            int received = recv((void*)cont.data(), n * sizeof(typename T::value_type));
+            if (n != received) // even though we had N+ bytes available, a single packet might be smaller
+                cont.resize(received);
             return cont;
         }
         string          recv_str (int maxChars = 0x7fffffff) noexcept { return recv_gen<string>(maxChars); }
