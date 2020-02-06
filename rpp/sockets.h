@@ -118,6 +118,7 @@ namespace rpp
         ipaddress(address_family af) noexcept;
         ipaddress(address_family af, int port) noexcept;
         ipaddress(address_family af, const char* hostname, int port) noexcept;
+        ipaddress(address_family af, const string& hostname, int port) noexcept;
         ipaddress(int socket) noexcept;
         ipaddress(address_family af, const string& ipAddressAndPort) noexcept;
 

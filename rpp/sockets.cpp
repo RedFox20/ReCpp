@@ -207,23 +207,27 @@ namespace rpp
         memset(this, 0, sizeof(*this));
     }
     ipaddress::ipaddress(address_family af) noexcept
-        : Family(af), Port(0), FlowInfo(0), ScopeId(0)
+        : Family{af}, Port{0}, FlowInfo{0}, ScopeId{0}
     {
         if (af == AF_IPv4) Addr4 = INADDR_ANY;
         else memset(Addr6, 0, sizeof Addr6);
     }
     ipaddress::ipaddress(address_family af, int port) noexcept
-        : Family(af), Port((uint16_t)port), FlowInfo(0), ScopeId(0)
+        : Family{af}, Port{uint16_t(port)}, FlowInfo{0}, ScopeId{0}
     {
         if (af == AF_IPv4) Addr4 = INADDR_ANY;
         else memset(Addr6, 0, sizeof Addr6);
     }
     ipaddress::ipaddress(address_family af, const char* hostname, int port) noexcept
-        : Family(af), Port((uint16_t)port), FlowInfo(0), ScopeId(0)
+        : Family{af}, Port{uint16_t(port)}, FlowInfo{0}, ScopeId{0}
     {
         resolve_addr(hostname);
     }
-    ipaddress::ipaddress(address_family af, const string& ipAddressAndPort) noexcept : ipaddress(af, 0)
+    ipaddress::ipaddress(address_family af, const string& hostname, int port) noexcept
+        : ipaddress{af, hostname.c_str(), port}
+    {
+    }
+    ipaddress::ipaddress(address_family af, const string& ipAddressAndPort) noexcept : ipaddress{af, 0}
     {
         if (ipAddressAndPort.empty()) {
             return;
