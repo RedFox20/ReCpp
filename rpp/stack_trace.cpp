@@ -20,7 +20,7 @@
 #include <cstdlib>  // malloc/free
 #include <cxxabi.h> // __cxa_demangle
 #include <unwind.h> // _Unwind_Backtrace
-# if __has_include(<elfutils/libdwfl.h>)
+# if RPP_LIBDW_ENABLED && __has_include(<elfutils/libdwfl.h>)
 #  define HAS_LIBDW 1
 # endif
 # if HAS_LIBDW
