@@ -257,7 +257,7 @@ namespace rpp
         int send(const wchar_t* str) noexcept;
         // Send a byte buffer
         int send(const vector<uint8_t>& bytes) noexcept {
-            return send(bytes.data(), bytes.size());
+            return send(bytes.data(), static_cast<int>(bytes.size()));
         }
         // Send a C++ string
         template<class T> int send(const basic_string<T>& str) noexcept { 
@@ -276,7 +276,7 @@ namespace rpp
         int sendto(const ipaddress& to, const wchar_t* str) noexcept;
         // Send a byte buffer
         int sendto(const ipaddress& to, const vector<uint8_t>& bytes) noexcept {
-            return sendto(to, bytes.data(), bytes.size());
+            return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
         // Send a C++ string
         template<class T> int sendto(const ipaddress& to, const basic_string<T>& str) noexcept {
