@@ -171,7 +171,7 @@ if (BUILD_TESTS)
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 
     target_include_directories(RppTests PUBLIC ".")
-    target_link_libraries(RppTests ReCpp ${RPP_RUNTIME})
+    target_link_libraries(RppTests ReCpp ${RPP_RUNTIME} ${DWARF_LIBRARY})
 
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()
