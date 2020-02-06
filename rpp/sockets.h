@@ -253,8 +253,12 @@ namespace rpp
         NOINLINE int send(const void* buffer, int numBytes) noexcept;
         // Send a null delimited C string
         int send(const char* str) noexcept;
-        // Send a null delimited C string
+        // Send a null delimited WIDE string (platform unsafe)
         int send(const wchar_t* str) noexcept;
+        // Send a byte buffer
+        int send(const vector<uint8_t>& bytes) noexcept {
+            return send(bytes.data(), bytes.size());
+        }
         // Send a C++ string
         template<class T> int send(const basic_string<T>& str) noexcept { 
             return send(str.data(), int(sizeof(T) * str.size())); 
@@ -266,8 +270,15 @@ namespace rpp
          * Automatically closes socket during critical failure
          */
         int sendto(const ipaddress& to, const void* buffer, int numBytes) noexcept;
+        // Send a null delimited C string
         int sendto(const ipaddress& to, const char* str) noexcept;
+        // Send a null delimited WIDE string (platform unsafe)
         int sendto(const ipaddress& to, const wchar_t* str) noexcept;
+        // Send a byte buffer
+        int sendto(const ipaddress& to, const vector<uint8_t>& bytes) noexcept {
+            return sendto(to, bytes.data(), bytes.size());
+        }
+        // Send a C++ string
         template<class T> int sendto(const ipaddress& to, const basic_string<T>& str) noexcept {
             return sendto(to, str.data(), int(sizeof(T) * str.size()));
         }
@@ -308,6 +319,19 @@ namespace rpp
          * If there is no data available, this function returns 0
          */
         NOINLINE int recvfrom(ipaddress& from, void* buffer, int maxBytes) noexcept;
+
+        /**
+         * Peeks available() bytes, resizes outBuffer and reads some data into it
+         * returns TRUE if outBuffer was written to, FALSE if no data or socket error
+         */
+        NOINLINE bool recv(vector<uint8_t>& outBuffer);
+        
+        /**
+         * UDP only. Peeks available() bytes, resizes outBuffer and reads a single packet into it
+         * returns TRUE if outBuffer was written to, FALSE if no data or socket error
+         */
+        NOINLINE bool recvfrom(ipaddress& from, vector<uint8_t>& outBuffer);
+        
 
     private: 
         int handle_errno(int err=0) noexcept;
@@ -356,15 +380,16 @@ namespace rpp
             T cont;
             cont.resize(n);
             int received = recv((void*)cont.data(), n * sizeof(typename T::value_type));
-            if (n != received) // even though we had N+ bytes available, a single packet might be smaller
-                cont.resize(received);
+            // even though we had N+ bytes available, a single packet might be smaller
+            if (received >= 0 && n != received)
+                cont.resize(received); // truncate
             return cont;
         }
         string          recv_str (int maxChars = 0x7fffffff) noexcept { return recv_gen<string>(maxChars); }
         wstring         recv_wstr(int maxChars = 0x7fffffff) noexcept { return recv_gen<wstring>(maxChars); }
         vector<uint8_t> recv_data(int maxCount = 0x7fffffff) noexcept { return recv_gen<vector<uint8_t>>(maxCount); }
 
-        
+
         /**
          * Waits up to timeout millis for data from remote end.
          * If no data available or critical failure, an empty vector is returned

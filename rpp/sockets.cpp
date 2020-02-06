@@ -650,6 +650,30 @@ namespace rpp
         return res;
     }
 
+    bool socket::recv(vector<uint8_t>& outBuffer)
+    {
+        int count = available();
+        if (count <= 0)
+            return 0;
+        outBuffer.resize(count);
+        int n = recv(outBuffer.data(), (int)outBuffer.size());
+        if (n >= 0 && n != count)
+            outBuffer.resize(n);
+        return n > 0;
+    }
+    
+    bool socket::recvfrom(ipaddress& from, vector<uint8_t>& outBuffer)
+    {
+        int count = available();
+        if (count <= 0)
+            return 0;
+        outBuffer.resize(count);
+        int n = recvfrom(from, outBuffer.data(), (int)outBuffer.size());
+        if (n >= 0 && n != count)
+            outBuffer.resize(n);
+        return n > 0;
+    }
+
     // properly handles the crazy responses given by the recv() and send() functions
     // returns -1 on critical failure, otherwise it returns bytesAvailable (0...N)
     int socket::handle_txres(long ret) noexcept
