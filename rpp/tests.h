@@ -180,6 +180,7 @@ namespace rpp
 #undef AssertMsg
 #undef AssertThat
 #undef AssertEqual
+#undef AssertThrows
 #undef AssertNotEqual
 #undef AssertGreater
 #undef AssertLess
@@ -208,6 +209,13 @@ namespace rpp
     return true; \
 }()
 #define AssertEqual AssertThat
+#define AssertThrows(expr, exceptionType) [&]() -> bool { \
+    try { \
+        expr; \
+        assert_failed(__FILE__, __LINE__, "%s => expected exception of type %s", #expr, #exceptionType); \
+        return false; \
+    } catch (const exceptionType&) { return true; } \
+}()
 #define AssertNotEqual(expr, mustNotEqual) [&]() -> bool { \
     const auto& __expr    = expr;         \
     const auto& __mustnot = mustNotEqual; \

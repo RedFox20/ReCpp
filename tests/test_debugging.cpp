@@ -50,4 +50,13 @@ TestImpl(test_debugging)
     //    }
     //}
 
+    TestCaseExpectedEx(must_throw, std::runtime_error)
+    {
+        throw std::runtime_error{"This error is expected"};
+    }
+
+    TestCase(assert_throws)
+    {
+        AssertThrows(throw std::runtime_error{"error!"}, std::runtime_error);
+    }
 };
