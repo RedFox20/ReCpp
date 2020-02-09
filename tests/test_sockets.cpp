@@ -1,6 +1,7 @@
 #include <rpp/sockets.h>
-#include <thread>
+#include <rpp/debugging.h>
 #include <rpp/tests.h>
+#include <thread>
 
 using std::thread;
 using namespace rpp;
@@ -160,6 +161,9 @@ TestImpl(test_sockets)
 
         sock.set_blocking(true);
         AssertThat(sock.is_blocking(), true);
+
+        LogInfo("default SO_RCVBUF: %zu", sock.get_rcv_buf_size());
+        LogInfo("default SO_SNDBUF: %zu", sock.get_snd_buf_size());
 
         AssertThat(sock.set_snd_buf_size(12000), true);
         AssertThat(sock.get_snd_buf_size(), 12000);
