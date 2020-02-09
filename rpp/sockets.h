@@ -505,14 +505,28 @@ namespace rpp
          */
         void set_blocking(bool socketsBlock = true) noexcept;
         /**
-         * Configure socket settings: Nagle off (TCP_NODELAY) or on (Nagle bandwidth opt.)
+         * Configure socket settings: Nagle off (TCP_NODELAY) 
+         * or on (Nagle bandwidth opt.)
+         * @note This only applies for TCP sockets
          * @param enableNagle (FALSE = TCP_NODELAY, TRUE = Nagle enabled)
          */
         void set_nagle(bool enableNagle = false) noexcept;
-        // @return TRUE if socket is set to blocking: set_blocking(true);
+        // @return TRUE if socket is set to blocking: set_blocking(true);, check socket::last_err() for error message
         bool is_blocking() const noexcept;
-        // @return TRUE if socket is set to nodelay: set_nagle(false);
+        // @return TRUE if socket is set to nodelay: set_nagle(false);, check socket::last_err() for error message
         bool is_nodelay() const noexcept;
+
+        // Sets the receive buffer size
+        // @return TRUE if set size was successful, check socket::last_err() for error message
+        bool set_rcv_buf_size(size_t size) noexcept;
+        // @return Receive buffer size
+        size_t get_rcv_buf_size() const noexcept;
+
+        // Sets the send buffer size
+        // @return TRUE if set size was successful, check socket::last_err() for error message
+        bool set_snd_buf_size(size_t size) noexcept;
+        // @return Send buffer size
+        size_t get_snd_buf_size() const noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
 

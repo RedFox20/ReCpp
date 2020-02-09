@@ -736,11 +736,11 @@ namespace rpp
     }
 
     int socket::get_opt(int optlevel, int socketopt) const noexcept {
-        int value; socklen_t len = sizeof(int);
+        int value = 0; socklen_t len = sizeof(int);
         return getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) ? os_getsockerr() : value;
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept {
-        return setsockopt(Sock, optlevel, socketopt, (char*)&value, 4) ? os_getsockerr() : 0;
+        return setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
     }
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept {
         return ioctlsocket(Sock, iocmd, (u_long*)&outValue) ? os_getsockerr() : 0;
@@ -826,6 +826,22 @@ namespace rpp
         return !!get_opt(IPPROTO_TCP, TCP_NODELAY);
     }
 
+    bool socket::set_rcv_buf_size(size_t size) noexcept
+    {
+        return set_opt(SOL_SOCKET, SO_RCVBUF, static_cast<int>(size)) == 0;
+    }
+    size_t socket::get_rcv_buf_size() const noexcept
+    {
+        return get_opt(SOL_SOCKET, SO_RCVBUF);
+    }
+    bool socket::set_snd_buf_size(size_t size) noexcept
+    {
+        return set_opt(SOL_SOCKET, SO_SNDBUF, static_cast<int>(size)) == 0;
+    }
+    size_t socket::get_snd_buf_size() const noexcept
+    {
+        return get_opt(SOL_SOCKET, SO_SNDBUF);
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 

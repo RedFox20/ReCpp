@@ -8,7 +8,7 @@ using Socket = rpp::socket;
 
 TestImpl(test_sockets)
 {
-    TestInitNoAutorun(test_sockets)
+    TestInit(test_sockets)
     {
     }
 
@@ -45,12 +45,12 @@ TestImpl(test_sockets)
         Assert(failClient.bad());
 
         client.send("Server says: Hello!");
-        sleep(500);
+        sleep(50);
 
         string resp = client.recv_str();
         if (!Assert(resp != ""))
             printf("%s\n", resp.c_str());
-        sleep(500);
+        sleep(2);
 
         printf("server: closing down\n");
         client.close();
@@ -68,7 +68,7 @@ TestImpl(test_sockets)
                 printf("%s\n", resp.c_str());
                 Assert(server.send("Client says: Thanks!") > 0);
             }
-            sleep(1);
+            sleep(0);
         }
         printf("remote: server disconnected\n");
         printf("remote: closing down\n");
@@ -104,7 +104,7 @@ TestImpl(test_sockets)
                     printf("(valid)\n");
                 }
             }
-            sleep(500);
+            sleep(1);
         }
 
         printf("server: closing down\n");
@@ -126,10 +126,45 @@ TestImpl(test_sockets)
                 printf("remote: sent %d bytes of data\n", sentBytes);
             else
                 printf("remote: failed to send data: %s\n", Socket::last_err().c_str());
-            sleep(1000);
+            sleep(1);
         }
         printf("remote: server disconnected\n");
         printf("remote: closing down\n");
     }
 
+    TestCase(socket_udp_send_receive)
+    {
+        vector<uint8_t> msg(4000, 'x');
+        Socket sender   = rpp::make_udp_randomport();
+        Socket receiver = rpp::make_udp_randomport();
+
+        auto send_to = ipaddress(AF_IPv4, "127.0.0.1", receiver.port());
+        sender.sendto(send_to, msg);
+
+        vector<uint8_t> buf;
+        AssertThat(receiver.recv(buf), true);
+
+        sender.sendto(send_to, msg);
+        sender.sendto(send_to, msg);
+        
+        AssertThat(receiver.recv(buf), true);
+        AssertThat(buf, msg);
+
+        AssertThat(receiver.recv(buf), true);
+        AssertThat(buf, msg);
+    }
+
+    TestCase(udp_socket_options)
+    {
+        Socket sock = rpp::make_udp_randomport();
+
+        sock.set_blocking(true);
+        AssertThat(sock.is_blocking(), true);
+
+        AssertThat(sock.set_snd_buf_size(12000), true);
+        AssertThat(sock.get_snd_buf_size(), 12000);
+
+        AssertThat(sock.set_rcv_buf_size(24000), true);
+        AssertThat(sock.get_rcv_buf_size(), 24000);
+    }
 };
