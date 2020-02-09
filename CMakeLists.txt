@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 project(ReCpp)
 
 option(BUILD_TESTS "Build RppTests executable for unit testing?" ON)
-option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" OFF)
+option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 
@@ -162,8 +162,8 @@ set_target_properties(ReCpp PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_link_libraries(ReCpp
-    PUBLIC ${DWARF_LIBRARY}
     PUBLIC ${RPP_RUNTIME}
+    PUBLIC ${DWARF_LIBRARY}
     PUBLIC Threads::Threads
 )
 
