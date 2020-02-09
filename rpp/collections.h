@@ -166,6 +166,7 @@ namespace rpp
 
     template<class T> T pop_back(std::vector<T>& v)
     {
+        if (v.empty()) throw std::runtime_error{"rpp::pop_back() failed: vector is empty"};
         T item = std::move(v.back());
         v.pop_back();
         return item;
@@ -173,6 +174,7 @@ namespace rpp
 
     template<class T> T pop_front(std::deque<T>& d)
     {
+        if (d.empty()) throw std::runtime_error{"rpp::pop_front() failed: deque is empty"};
         T item = std::move(d.front());
         d.pop_front();
         return item;
