@@ -780,7 +780,8 @@ namespace rpp
     void socket::set_noblock_nodelay() noexcept
     {
         set_blocking(false); // blocking: false
-        set_nagle(false);    // nagle:    false
+        if (type() == ST_Stream)
+            set_nagle(false);    // nagle:    false
     }
 
     bool socket::set_blocking(bool socketsBlock) noexcept
@@ -933,7 +934,8 @@ namespace rpp
             return false;
         }
 
-        set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
+        if (ipp == ST_Stream)
+            set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
         set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
 
         if (opt & SO_ReuseAddr) {
@@ -997,8 +999,11 @@ namespace rpp
         //// restore non-blocking IO
         //if (nonBlockingIO) set_blocking(false);
 
-        if (rescode == -1 || errcode != 0) {
-            printf("select res:%2d err:%2d\r\n", rescode, errcode);
+        if (rescode == -1 || errcode != 0)
+        {
+            #if RPP_SOCKETS_DBG
+                fprintf(stderr, "select() failed: %s\n", last_err().c_str());
+            #endif
             handle_errno(errcode);
             return false;
         }

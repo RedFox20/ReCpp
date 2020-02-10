@@ -52,7 +52,9 @@ namespace rpp
         SO_None,        // --
         SO_ReuseAddr = (1<<0),  // allows multiple sockets to bind to the same address
         SO_Blocking  = (1<<1),  // request a blocking socket instead of the default non-blocking
-        SO_Nagle     = (1<<2),  // enables socket load balancing and buffering Nagle algorithm. Will cause delays
+        // Enables socket load balancing and buffering Nagle algorithm.
+        // Will cause delays. Only applies to TCP sockets.
+        SO_Nagle     = (1<<2),  
     };
 
     // @return UNIX af => AddressFamily conversion
@@ -483,7 +485,8 @@ namespace rpp
         int set_ioctl(int iocmd, int value) noexcept;
 
         /**
-         * Configure socket settings: non-blocking I/O, Nagle disabled (TCP_NODELAY=TRUE)
+         * Configure socket settings: non-blocking I/O,
+         * Nagle disabled (TCP_NODELAY=TRUE), only applies to TCP sockets
          */
         void set_noblock_nodelay() noexcept;
         /**
