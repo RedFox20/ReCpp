@@ -1,4 +1,5 @@
 #include "sockets.h"
+#include <rpp/debugging.h>
 #include <stdlib.h>    // malloc
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
@@ -6,28 +7,6 @@
 
 #if DEBUG || _DEBUG || RPP_DEBUG
 #define RPP_SOCKETS_DBG 1
-#endif
-
-#if RPP_SOCKETS_DBG
-#  ifdef __APPLE__ // clang iOS
-#    define  __assertion_failure() __assert_rtn(__FUNCTION__, __FILE__, __LINE__, "")
-#  elif defined __ANDROID__
-#    define  __assertion_failure() __assert2(__FILE__, __LINE__, __PRETTY_FUNCTION__, "")
-#  elif defined __GNUC__ // other clang, mingw or linux gcc
-#    define  __assertion_failure() __assert_fail("", __FILE__, __LINE__, __FUNCTION__)
-#  elif _MSC_VER // windows VC++
-#    define __assertion_failure() __debugbreak()
-#  else
-#    error Debugging Assert not defined for this compiler toolkit!
-#  endif
-
-#  define Assert(expr, format, ...) /*Assert with message*/ do { if (!(expr)) { \
-        fprintf(stderr, ("%s:%d %s $ " format), __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
-        __assertion_failure(); \
-    } } while(0)
-#else
-#  define __assertion_failure(msg) /*nothing in release builds*/
-#  define Assert(expression, format, ...) /*do nothing in release builds*/
 #endif
 
 /**
@@ -795,11 +774,7 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &value) == 0)
             return 0;
     #endif
-        int err = os_getsockerr();
-        #if RPP_SOCKETS_DBG
-            fprintf(stderr, "set_ioctl(%d,%d) failed: %s\n", iocmd, value, last_err(err).c_str());
-        #endif
-        return err;
+        return -1;
     }
 
     void socket::set_noblock_nodelay() noexcept
@@ -813,12 +788,24 @@ namespace rpp
         #if !_WIN32 && defined(O_NONBLOCK)
             int flags = fcntl(Sock, F_GETFL, 0);
             if (flags == -1) flags = 0;
-            int err = fcntl(Sock, F_SETFL, flags | O_NONBLOCK);
+            if (fcntl(Sock, F_SETFL, flags | O_NONBLOCK) == 0)
+            {
+                Blocking = socketsBlock;
+                return true;
+            }
         #else
-            int err = set_ioctl(FIONBIO, socketsBlock?0:1); // FIONBIO: !=0 nonblock, 0 block
-            if (err == 0) Blocking = socketsBlock; // On Windows, there is no way to GET FIONBIO without setting it
+            u_long val = socketsBlock?0:1; // FIONBIO: !=0 nonblock, 0 block
+            if (ioctlsocket(Sock, FIONBIO, &val) == 0)
+            {
+                Blocking = socketsBlock; // On Windows, there is no way to GET FIONBIO without setting it
+                return true;
+            }
         #endif
-            return err == 0;
+        #if RPP_SOCKETS_DBG
+            fprintf(stderr, "set_blocking(%s) failed: %s\n",
+                    socketsBlock?"true":"false", last_err().c_str());
+        #endif
+            return false;
     }
     bool socket::is_blocking() const noexcept
     {
@@ -832,7 +819,14 @@ namespace rpp
 
     bool socket::set_nagle(bool enableNagle) noexcept
     {
-        return set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1) == 0; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
+        // TCP_NODELAY: 1 nodelay, 0 nagle enabled
+        if (set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1) == 0)
+            return true;
+        #if RPP_SOCKETS_DBG
+            fprintf(stderr, "set_nagle(%s) failed: %s\n",
+                    enableNagle?"true":"false", last_err().c_str());
+        #endif
+        return false;
     }
     bool socket::is_nodelay() const noexcept
     {
@@ -1086,7 +1080,8 @@ namespace rpp
             Category = SC_Client;
 
             // restore proper blocking flags
-            if (!(opt & SO_Blocking)) set_noblock_nodelay();
+            set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
+            set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
             return true;
         }
         return false;
