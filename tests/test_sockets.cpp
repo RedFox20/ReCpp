@@ -128,15 +128,14 @@ TestImpl(test_sockets)
 
     void transmitting_remote()
     {
-        char sendBuffer[TransmitSize];
-        memset(sendBuffer, '$', sizeof sendBuffer);
+        std::vector<char> sendBuffer(TransmitSize, '$');
 
         Socket server = connect("127.0.0.1", 1337);
         server.set_snd_buf_size(TransmitSize*2);
 
         while (server.connected())
         {
-            int sentBytes = server.send(sendBuffer, sizeof sendBuffer);
+            int sentBytes = server.send(sendBuffer.data(), (int)sendBuffer.size());
             if (sentBytes > 0)
                 print_info("remote: sent %d bytes of data\n", sentBytes);
             else

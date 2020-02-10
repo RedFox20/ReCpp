@@ -48,7 +48,7 @@ TestImpl(test_minmax)
     {
         AssertThat(rpp::abs(+5), 5);
         AssertThat(rpp::abs(-5), 5);
-        AssertThat(rpp::abs(INT_MIN), -INT_MIN);
+        AssertThat(rpp::abs(-2147483647), 2147483647);
 
         AssertThat(rpp::abs(+5.66f), 5.66f);
         AssertThat(rpp::abs(-5.66f), 5.66f);

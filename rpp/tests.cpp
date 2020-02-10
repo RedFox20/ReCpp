@@ -100,7 +100,7 @@ namespace rpp
                 assert(shm_fd != -1);
                 int fterr = ftruncate(shm_fd, sizeof(shared));
                 if (fterr != 0) fprintf(stderr, "ftruncate(%d,%d) failed: %s\n",
-                                                shm_fd, sizeof(shared), strerror(errno));
+                                                shm_fd, (int)sizeof(shared), strerror(errno));
                 shared_mem = (shared*)mmap(nullptr, sizeof(shared),
                                       PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
             #endif

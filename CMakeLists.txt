@@ -181,7 +181,7 @@ if (BUILD_TESTS)
     target_compile_definitions(RppTests PRIVATE -DRPP_DEBUG=1)
 
     target_include_directories(RppTests PUBLIC ".")
-    target_link_libraries(RppTests ${RPP_RUNTIME} ${DWARF_LIBRARY})
+    target_link_libraries(RppTests ${RPP_RUNTIME} ${DWARF_LIBRARY} Threads::Threads)
 
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()
