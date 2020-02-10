@@ -937,12 +937,8 @@ namespace rpp
             return false;
         }
 
-        if ((opt & SO_Nagle) == 0) {
-            set_nagle(false);
-        }
-        if ((opt & SO_Blocking) == 0) {
-            set_blocking(false);
-        }
+        set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
+        set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
 
         if (opt & SO_ReuseAddr) {
             if (set_opt(IPPROTO_IP, SO_REUSEADDR, 1)) {

@@ -491,7 +491,7 @@ namespace rpp
          * @param socketsBlock (FALSE = NOBLOCK, TRUE = BLOCK)
          * @return TRUE if set succeded, check socket::last_err() for error message 
          */
-        bool set_blocking(bool socketsBlock = true) noexcept;
+        bool set_blocking(bool socketsBlock) noexcept;
         // @return TRUE if socket is set to blocking: set_blocking(true);, check socket::last_err() for error message
         bool is_blocking() const noexcept;
 
@@ -501,7 +501,7 @@ namespace rpp
          * @note This only applies for TCP sockets
          * @param enableNagle (FALSE = TCP_NODELAY, TRUE = Nagle enabled)
          */
-        void set_nagle(bool enableNagle = false) noexcept;
+        void set_nagle(bool enableNagle) noexcept;
         // @return TRUE if socket is set to nodelay: set_nagle(false);, check socket::last_err() for error message
         bool is_nodelay() const noexcept;
 
