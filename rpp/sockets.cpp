@@ -569,7 +569,9 @@ namespace rpp
     string socket::last_err(int err) noexcept
     {
         char buf[2048];
-        int  errcode = err ? err : os_getsockerr();
+        int errcode = err ? err : os_getsockerr();
+        if (errcode == 0)
+            return {};
         #if _WIN32
             char* msg = buf + 1024;
             int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, errcode, 0, msg, 1024, nullptr);
