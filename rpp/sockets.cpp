@@ -733,7 +733,7 @@ namespace rpp
     int socket::get_opt(int optlevel, int socketopt) const noexcept
     {
         int value = 0; socklen_t len = sizeof(int);
-        return getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) ? os_getsockerr() : value;
+        return getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) ? -1 : value;
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept
     {
@@ -774,7 +774,7 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &value) == 0)
             return 0;
     #endif
-        return -1;
+        return os_getsockerr();
     }
 
     void socket::set_noblock_nodelay() noexcept
@@ -831,7 +831,10 @@ namespace rpp
     }
     bool socket::is_nodelay() const noexcept
     {
-        return get_opt(IPPROTO_TCP, TCP_NODELAY) == 1; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
+        int result = get_opt(IPPROTO_TCP, TCP_NODELAY);
+        if (result < 0)
+            return false;
+        return result == 1; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
     }
 
     bool socket::set_rcv_buf_size(size_t size) noexcept
@@ -843,7 +846,8 @@ namespace rpp
     }
     int socket::get_rcv_buf_size() const noexcept
     {
-        return get_opt(SOL_SOCKET, SO_RCVBUF);
+        int n = get_opt(SOL_SOCKET, SO_RCVBUF);
+        return n >= 0 ? n : 0;
     }
 
     bool socket::set_snd_buf_size(size_t size) noexcept
@@ -855,13 +859,17 @@ namespace rpp
     }
     int socket::get_snd_buf_size() const noexcept
     {
-        return get_opt(SOL_SOCKET, SO_SNDBUF);
+        int n = get_opt(SOL_SOCKET, SO_SNDBUF);
+        return n >= 0 ? n : 0;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    socket_type socket::type() const noexcept {
-        return to_socktype(get_opt(SOL_SOCKET, SO_TYPE));
+    socket_type socket::type() const noexcept
+    {
+        int type = get_opt(SOL_SOCKET, SO_TYPE);
+        if (type < 0) return ST_Unspecified;
+        return to_socktype(type);
     }
     address_family socket::family() const noexcept {
         return Addr.Family;
@@ -906,8 +914,9 @@ namespace rpp
     {
         if (Sock == -1) 
             return false;
-        if (int errcode = get_opt(SOL_SOCKET, SO_ERROR)) {
-            handle_errno(errcode);
+        int err = get_opt(SOL_SOCKET, SO_ERROR);
+        if (err != 0) {
+            handle_errno(err > 0 ? err : os_getsockerr());
             return false;
         }
         if (Category == SC_Client || Category == SC_Accept) {
@@ -926,7 +935,8 @@ namespace rpp
 
         // create a generic socket
         int family = addrfamily_int(af);
-        int type   = socktype_int(to_socktype(ipp));
+        auto stype = to_socktype(ipp);
+        int type   = socktype_int(stype);
         int proto  = ipproto_int(ipp);
         Sock = (int)::socket(family, type, proto);
         if (Sock == -1) {
@@ -934,7 +944,7 @@ namespace rpp
             return false;
         }
 
-        if (ipp == ST_Stream)
+        if (stype == ST_Stream)
             set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
         set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
 
@@ -986,18 +996,31 @@ namespace rpp
         timeout.tv_sec  = (millis / 1000);
         timeout.tv_usec = (millis % 1000) * 1000;
 
-        // select requires a blocking socket, so temporarily force blocking IO
-        bool nonBlockingIO = !is_blocking();
-        if (nonBlockingIO) set_blocking(true);
+        //// select requires a blocking socket, so temporarily force blocking IO
+        //bool nonBlockingIO = !is_blocking();
+        //if (nonBlockingIO) set_blocking(true);
 
         fd_set* readfds   = (selectFlags & SF_Read)   ? &set : nullptr;
         fd_set* writefds  = (selectFlags & SF_Write)  ? &set : nullptr;
         fd_set* exceptfds = (selectFlags & SF_Except) ? &set : nullptr;
-        int rescode = ::select(Sock + 1, readfds, writefds, exceptfds, &timeout);
-        int errcode = os_getsockerr();
+        errno = 0;
+        int rescode = ::select(Sock+1, readfds, writefds, exceptfds, &timeout);
+        int err = get_opt(SOL_SOCKET, SO_ERROR);
+        if (err != 0)
+        {
+            // select failed somehow
+            handle_errno(err > 0 ? err : os_getsockerr());
+            return false;
+        }
 
-        // restore non-blocking IO
-        if (nonBlockingIO) set_blocking(false);
+        int errcode = os_getsockerr();
+        if (rescode > 0 && errcode == ESOCK(EINPROGRESS))
+        {
+            printf("select(): EINPROGRESS\n");
+        }
+
+        //// restore non-blocking IO
+        //if (nonBlockingIO) set_blocking(false);
 
         if (rescode == -1 || errcode != 0)
         {

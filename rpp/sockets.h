@@ -459,14 +459,14 @@ namespace rpp
         /**
          * Get socket option from the specified optlevel with the specified opt key SO_xxxx
          * @note Reference Socket options: https://msdn.microsoft.com/en-us/library/windows/desktop/ms740525%28v=vs.85%29.aspx
-         * @return getsockopt result for the specified socketopt SO_xxxx or < 0 if error occurred (or check errno)
+         * @return getsockopt result for the specified socketopt SO_xxxx or -1 if error occurred (check last_error())
          */
         int get_opt(int optlevel, int socketopt) const noexcept;
         /**
          * Tries to set a socket option in the optlevel for the specified socketopt SO_xxxx
          * @note Reference Socket options: https://msdn.microsoft.com/en-us/library/windows/desktop/ms740525%28v=vs.85%29.aspx
          * @param optlevel Socket option level such as IPPROTO_IP or IPPROTO_TCP.
-         * @return 0 on success, error code otherwise (or check errno)
+         * @return 0 on success, error code otherwise (or check last_error())
          */
         int set_opt(int optlevel, int socketopt, int value) noexcept;
         /**
@@ -480,7 +480,7 @@ namespace rpp
          * Control IO handle with the specified IO command
          * @note This function designed for iocmd-s that SET values
          * @note Reference ioctlsocket: https://msdn.microsoft.com/en-us/library/windows/desktop/ms738573%28v=vs.85%29.aspx
-         * @return 0 on success, error code otherwise (or check errno)
+         * @return 0 on success, error code otherwise (or check last_error())
          */
         int set_ioctl(int iocmd, int value) noexcept;
 
