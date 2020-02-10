@@ -823,7 +823,9 @@ namespace rpp
     #else
         int flags = fcntl(Sock, F_GETFL, 0);
         if (flags < 0) flags = 0;
-        if (fcntl(Sock, F_SETFL, flags | O_NONBLOCK) == 0)
+
+        flags = socketsBlock ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+        if (fcntl(Sock, F_SETFL, flags) == 0)
         {
             Blocking = socketsBlock;
             return true;
@@ -850,6 +852,9 @@ namespace rpp
 
     bool socket::set_nagle(bool enableNagle) noexcept
     {
+        if (type() != ST_Stream)
+            return false; // cannot set nagle
+
         // TCP_NODELAY: 1 nodelay, 0 nagle enabled
         if (set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1) == 0)
             return true;
@@ -861,6 +866,9 @@ namespace rpp
     }
     bool socket::is_nodelay() const noexcept
     {
+        if (type() != ST_Stream)
+            return true; // non-TCP datagrams are assumed to have nagle off
+
         int result = get_opt(IPPROTO_TCP, TCP_NODELAY);
         if (result < 0)
             return false;

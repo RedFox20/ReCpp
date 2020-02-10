@@ -176,12 +176,16 @@ TestImpl(test_sockets)
     {
         Socket sock = rpp::make_udp_randomport();
         AssertFalse(sock.is_blocking()); // should be false by default
+        AssertTrue(sock.is_nodelay()); // should be nodelay by default
 
         Assert(sock.set_blocking(true));
         Assert(sock.is_blocking());
 
-        print_info("default SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
-        print_info("default SO_SNDBUF: %d\n", sock.get_snd_buf_size());
+        AssertFalse(sock.set_nagle(true)); // cannot set nagle on UDP socket
+        AssertTrue(sock.is_nodelay()); // UDP is always nodelay
+
+        print_info("default UDP SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
+        print_info("default UDP SO_SNDBUF: %d\n", sock.get_snd_buf_size());
 
         // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
         //       which is expected behaviour on non-windows platforms
@@ -190,5 +194,39 @@ TestImpl(test_sockets)
 
         Assert(sock.set_rcv_buf_size(32768));
         AssertThat(sock.get_rcv_buf_size(), 32768);
+
+        // check UDP noblock delay, it cannot affect NAGLE
+        sock.set_noblock_nodelay();
+        AssertFalse(sock.is_blocking());
+        AssertTrue(sock.is_nodelay());
+    }
+
+    TestCase(tcp_socket_options)
+    {
+        Socket sock = rpp::make_tcp_randomport();
+        AssertFalse(sock.is_blocking()); // should be false by default
+        AssertTrue(sock.is_nodelay()); // should be nodelay by default
+
+        Assert(sock.set_blocking(true));
+        Assert(sock.is_blocking());
+
+        Assert(sock.set_nagle(true));
+        AssertFalse(sock.is_nodelay());
+
+        print_info("default TCP SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
+        print_info("default TCP SO_SNDBUF: %d\n", sock.get_snd_buf_size());
+
+        // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
+        //       which is expected behaviour on non-windows platforms
+        Assert(sock.set_snd_buf_size(16384));
+        AssertThat(sock.get_snd_buf_size(), 16384);
+
+        Assert(sock.set_rcv_buf_size(32768));
+        AssertThat(sock.get_rcv_buf_size(), 32768);
+
+        // check TCP noblock delay, it cannot affect NAGLE
+        sock.set_noblock_nodelay();
+        AssertFalse(sock.is_blocking());
+        AssertTrue(sock.is_nodelay());
     }
 };
