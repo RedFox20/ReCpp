@@ -1,6 +1,6 @@
 #include "sockets.h"
 #include <rpp/debugging.h>
-#include <stdlib.h>    // malloc, itoa
+#include <stdlib.h>    // malloc
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
@@ -55,10 +55,10 @@
 
 #if RPP_SOCKETS_DBG
     #define indebug(...) __VA_ARGS__
-    #define logerror(err, msg, ...) do { \
+    #define logerror(err, fmt, ...) do { \
         static int prev_failure; \
         if ((err) != prev_failure) { \
-            fprintf(stderr, __FUNCTION__ msg "\n", ##__VA_ARGS__); \
+            fprintf(stderr, __log_format(fmt"\n", __FILE__, __LINE__, __FUNCTION__), ##__VA_ARGS__); \
         } \
     } while (0)
 #else
@@ -750,6 +750,7 @@ namespace rpp
         return setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
     }
 
+#if RPP_SOCKETS_DBG
     static const char* ioctl_string(int iocmd)
     {
         switch (iocmd)
@@ -759,8 +760,10 @@ namespace rpp
             case FIOASYNC: return "FIOASYNC";
         }
         static char buf[32];
-        return ::itoa(iocmd, buf, 10);
+        snprintf(buf, sizeof(buf), "%d", iocmd);
+        return buf;
     }
+#endif
 
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept
     {
