@@ -714,9 +714,11 @@ namespace rpp
                 Assert(false, "socket operation - unexpected failure");
                 return -1;
             }
-            case EAGAIN:             return 0; // request is in progress, you should call wait
             case ESOCK(EINPROGRESS): return 0; // request is in progress, you should call wait
             case ESOCK(EWOULDBLOCK): return 0; // no data available right now
+            #if EAGAIN != ESOCK(EWOULDBLOCK)
+            case EAGAIN:             return 0; // no data available right now
+            #endif
             case ESOCK(ENOTCONN):    return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
             case ESOCK(ECONNRESET):    // connection lost
             case ESOCK(ECONNREFUSED):  // connect failed
