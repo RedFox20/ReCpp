@@ -840,7 +840,7 @@ namespace rpp
         inunix(size /= 2);
         return set_opt(SOL_SOCKET, SO_RCVBUF, static_cast<int>(size)) == 0;
     }
-    size_t socket::get_rcv_buf_size() const noexcept
+    int socket::get_rcv_buf_size() const noexcept
     {
         return get_opt(SOL_SOCKET, SO_RCVBUF);
     }
@@ -852,7 +852,7 @@ namespace rpp
         inunix(size /= 2);
         return set_opt(SOL_SOCKET, SO_SNDBUF, static_cast<int>(size)) == 0;
     }
-    size_t socket::get_snd_buf_size() const noexcept
+    int socket::get_snd_buf_size() const noexcept
     {
         return get_opt(SOL_SOCKET, SO_SNDBUF);
     }

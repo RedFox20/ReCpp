@@ -441,7 +441,7 @@ namespace rpp
         string_buffer buf; buf.writeln(value);
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
-    template<class T> FINLINE int println(const T& value)
+    template<class T> int println(const T& value)
     {
         string_buffer buf; buf.writeln(value);
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);

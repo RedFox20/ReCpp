@@ -510,13 +510,13 @@ namespace rpp
         // @return TRUE if set size was successful, check socket::last_err() for error message
         bool set_rcv_buf_size(size_t size) noexcept;
         // @return Receive buffer size
-        size_t get_rcv_buf_size() const noexcept;
+        int get_rcv_buf_size() const noexcept;
 
         // Sets the send buffer size
         // @return TRUE if set size was successful, check socket::last_err() for error message
         bool set_snd_buf_size(size_t size) noexcept;
         // @return Send buffer size
-        size_t get_snd_buf_size() const noexcept;
+        int get_snd_buf_size() const noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
 

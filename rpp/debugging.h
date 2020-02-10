@@ -159,6 +159,9 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
     _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt _rpp_wrap_args(__VA_ARGS__) ); } while (0)
 #  endif
 #elif defined __GNUC__ // other clang, mingw or linux gcc
+    extern void __assert_fail (const char *__assertion, const char *__file,
+                               unsigned int __line, const char *__function)
+                               __THROW __attribute__ ((__noreturn__));
 #  define  __assertion_failure(fmt,...) \
     __assert_fail(_rpp_assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
 #else

@@ -156,13 +156,13 @@ TestImpl(test_sockets)
         Socket receiver = rpp::make_udp_randomport();
 
         auto send_to = ipaddress(AF_IPv4, "127.0.0.1", receiver.port());
-        AssertThat(sender.sendto(send_to, msg), msg.size());
+        AssertThat(sender.sendto(send_to, msg), (int)msg.size());
 
         vector<uint8_t> buf;
         Assert(receiver.recv(buf));
 
-        AssertThat(sender.sendto(send_to, msg), msg.size());
-        AssertThat(sender.sendto(send_to, msg), msg.size());
+        AssertThat(sender.sendto(send_to, msg), (int)msg.size());
+        AssertThat(sender.sendto(send_to, msg), (int)msg.size());
         
         Assert(receiver.recv(buf));
         AssertThat(buf, msg);
@@ -179,8 +179,8 @@ TestImpl(test_sockets)
         Assert(sock.set_blocking(true));
         Assert(sock.is_blocking());
 
-        print_info("default SO_RCVBUF: %zu\n", sock.get_rcv_buf_size());
-        print_info("default SO_SNDBUF: %zu\n", sock.get_snd_buf_size());
+        print_info("default SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
+        print_info("default SO_SNDBUF: %d\n", sock.get_snd_buf_size());
 
         // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
         //       which is expected behaviour on non-windows platforms

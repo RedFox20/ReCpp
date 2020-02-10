@@ -301,7 +301,7 @@ TestImpl(test_future)
                 return "future " + s;
             });
         });
-        AssertThat(tasks.size(), 3);
+        AssertThat(tasks.size(), 3u);
         AssertThat(tasks[0], "future stringA"s);
         AssertThat(tasks[1], "future stringB"s);
         AssertThat(tasks[2], "future stringC"s);
@@ -317,7 +317,7 @@ TestImpl(test_future)
         vector<string> tasks = rpp::get_async_tasks(items, [&](string& s) {
             return "future " + s;
         });
-        AssertThat(tasks.size(), 3);
+        AssertThat(tasks.size(), 3u);
         AssertThat(tasks[0], "future stringA"s);
         AssertThat(tasks[1], "future stringB"s);
         AssertThat(tasks[2], "future stringC"s);

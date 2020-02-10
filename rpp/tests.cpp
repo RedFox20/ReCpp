@@ -95,11 +95,12 @@ namespace rpp
                     // }
                 #else
                     shm_fd = shm_open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-                    if (shm_fd == -1)
-                        fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
+                    if (shm_fd == -1) fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
                 #endif
                 assert(shm_fd != -1);
-                (void)ftruncate(shm_fd, sizeof(shared));
+                int fterr = ftruncate(shm_fd, sizeof(shared));
+                if (fterr != 0) fprintf(stderr, "ftruncate(%d,%d) failed: %s\n",
+                                                shm_fd, sizeof(shared), strerror(errno));
                 shared_mem = (shared*)mmap(nullptr, sizeof(shared),
                                       PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
             #endif
