@@ -187,6 +187,7 @@ namespace rpp
         int       Sock;   // Socket handle
         ipaddress Addr;   // remote addr
         bool      Shared; // if true, Socket is shared and dtor won't call closesocket()
+        bool      Blocking; // only relevant on windows, if TRUE, the socket is blocking
         category  Category;
 
     public:
@@ -195,7 +196,10 @@ namespace rpp
         // WARNING: socket will take ownership of the handle, 
         //          unless you set shared=true, which is equivalent of
         //          set_shared(true) OR calling release_noclose()
-        socket(int handle, const ipaddress& addr, bool shared=false) noexcept;
+        // @param shared If TRUE, then this socket is not closed in socket destructor
+        // @param blocking Whether the socket is configured as blocking or not.
+        //                 On Windows, there is no way to query this from socket handle
+        socket(int handle, const ipaddress& addr, bool shared=false, bool blocking=true) noexcept;
 
         // Creates a default socket object
         socket() noexcept;
@@ -478,6 +482,42 @@ namespace rpp
          */
         int set_ioctl(int iocmd, int value) noexcept;
 
+        /**
+         * Configure socket settings: non-blocking I/O, Nagle disabled (TCP_NODELAY=TRUE)
+         */
+        void set_noblock_nodelay() noexcept;
+        /**
+         * Configure socket settings: I/O blocking mode off(0) or on(1)
+         * @param socketsBlock (FALSE = NOBLOCK, TRUE = BLOCK)
+         * @return TRUE if set succeded, check socket::last_err() for error message 
+         */
+        bool set_blocking(bool socketsBlock = true) noexcept;
+        // @return TRUE if socket is set to blocking: set_blocking(true);, check socket::last_err() for error message
+        bool is_blocking() const noexcept;
+
+        /**
+         * Configure socket settings: Nagle off (TCP_NODELAY) 
+         * or on (Nagle bandwidth opt.)
+         * @note This only applies for TCP sockets
+         * @param enableNagle (FALSE = TCP_NODELAY, TRUE = Nagle enabled)
+         */
+        void set_nagle(bool enableNagle = false) noexcept;
+        // @return TRUE if socket is set to nodelay: set_nagle(false);, check socket::last_err() for error message
+        bool is_nodelay() const noexcept;
+
+        // Sets the receive buffer size
+        // @return TRUE if set size was successful, check socket::last_err() for error message
+        bool set_rcv_buf_size(size_t size) noexcept;
+        // @return Receive buffer size
+        size_t get_rcv_buf_size() const noexcept;
+
+        // Sets the send buffer size
+        // @return TRUE if set size was successful, check socket::last_err() for error message
+        bool set_snd_buf_size(size_t size) noexcept;
+        // @return Send buffer size
+        size_t get_snd_buf_size() const noexcept;
+
+        ////////////////////////////////////////////////////////////////////////////
 
         // @return The SocketType of the socket
         socket_type type() const noexcept;
@@ -493,40 +533,6 @@ namespace rpp
          * @return TRUE if the socket is still valid and connected
          */
         bool connected() noexcept;
-
-
-        /**
-         * Configure socket settings: non-blocking I/O, Nagle disabled (TCP_NODELAY=TRUE)
-         */
-        void set_noblock_nodelay() noexcept;
-        /**
-         * Configure socket settings: I/O blocking mode off(0) or on(1)
-         * @param socketsBlock (FALSE = NOBLOCK, TRUE = BLOCK)
-         */
-        void set_blocking(bool socketsBlock = true) noexcept;
-        /**
-         * Configure socket settings: Nagle off (TCP_NODELAY) 
-         * or on (Nagle bandwidth opt.)
-         * @note This only applies for TCP sockets
-         * @param enableNagle (FALSE = TCP_NODELAY, TRUE = Nagle enabled)
-         */
-        void set_nagle(bool enableNagle = false) noexcept;
-        // @return TRUE if socket is set to blocking: set_blocking(true);, check socket::last_err() for error message
-        bool is_blocking() const noexcept;
-        // @return TRUE if socket is set to nodelay: set_nagle(false);, check socket::last_err() for error message
-        bool is_nodelay() const noexcept;
-
-        // Sets the receive buffer size
-        // @return TRUE if set size was successful, check socket::last_err() for error message
-        bool set_rcv_buf_size(size_t size) noexcept;
-        // @return Receive buffer size
-        size_t get_rcv_buf_size() const noexcept;
-
-        // Sets the send buffer size
-        // @return TRUE if set size was successful, check socket::last_err() for error message
-        bool set_snd_buf_size(size_t size) noexcept;
-        // @return Send buffer size
-        size_t get_snd_buf_size() const noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
 

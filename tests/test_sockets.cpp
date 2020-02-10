@@ -15,7 +15,8 @@ TestImpl(test_sockets)
 
     Socket create(const char* msg, Socket&& s)
     {
-        Assert(s.good() && s.connected());
+        AssertMsg(s.good(), "expected good() for '%s'", msg);
+        AssertMsg(s.connected(), "expected connected() for '%s'", msg);
         printf("%s %s\n", msg, s.name().c_str());
         return std::move(s);
     }
@@ -51,7 +52,7 @@ TestImpl(test_sockets)
         string resp = client.recv_str();
         if (!Assert(resp != ""))
             printf("%s\n", resp.c_str());
-        sleep(2);
+        sleep(50);
 
         printf("server: closing down\n");
         client.close();
@@ -143,32 +144,35 @@ TestImpl(test_sockets)
         sender.sendto(send_to, msg);
 
         vector<uint8_t> buf;
-        AssertThat(receiver.recv(buf), true);
+        Assert(receiver.recv(buf));
 
         sender.sendto(send_to, msg);
         sender.sendto(send_to, msg);
         
-        AssertThat(receiver.recv(buf), true);
+        Assert(receiver.recv(buf));
         AssertThat(buf, msg);
-
-        AssertThat(receiver.recv(buf), true);
+        
+        Assert(receiver.recv(buf));
         AssertThat(buf, msg);
     }
 
     TestCase(udp_socket_options)
     {
         Socket sock = rpp::make_udp_randomport();
+        AssertFalse(sock.is_blocking()); // should be false by default
 
-        sock.set_blocking(true);
-        AssertThat(sock.is_blocking(), true);
+        Assert(sock.set_blocking(true));
+        Assert(sock.is_blocking());
 
         LogInfo("default SO_RCVBUF: %zu", sock.get_rcv_buf_size());
         LogInfo("default SO_SNDBUF: %zu", sock.get_snd_buf_size());
 
-        AssertThat(sock.set_snd_buf_size(12000), true);
-        AssertThat(sock.get_snd_buf_size(), 12000);
+        // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
+        //       which is expected behaviour on non-windows platforms
+        Assert(sock.set_snd_buf_size(16384));
+        AssertThat(sock.get_snd_buf_size(), 16384);
 
-        AssertThat(sock.set_rcv_buf_size(24000), true);
-        AssertThat(sock.get_rcv_buf_size(), 24000);
+        Assert(sock.set_rcv_buf_size(32768));
+        AssertThat(sock.get_rcv_buf_size(), 32768);
     }
 };

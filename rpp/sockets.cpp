@@ -4,7 +4,11 @@
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
 
-#if DEBUG || _DEBUG
+#if DEBUG || _DEBUG || RPP_DEBUG
+#define RPP_SOCKETS_DBG 1
+#endif
+
+#if RPP_SOCKETS_DBG
 #  ifdef __APPLE__ // clang iOS
 #    define  __assertion_failure() __assert_rtn(__FUNCTION__, __FILE__, __LINE__, "")
 #  elif defined __ANDROID__
@@ -34,6 +38,7 @@
     #include <Windows.h>
     #include <WinSock2.h>
     #include <ws2tcpip.h>           // winsock2 and TCP/IP functions
+    #include <mstcpip.h>            // WSAIoctl Options
     #include <process.h>            // _beginthreadex
     #include <Iphlpapi.h>
     #ifdef _MSC_VER
@@ -43,6 +48,7 @@
     #endif
     #define sleep(milliSeconds) Sleep((milliSeconds))
     #define inwin32(...) __VA_ARGS__
+    #define inunix(...) /*do nothing*/
     #ifdef __MINGW32__
         extern "C" __declspec(dllimport) int WSAAPI inet_pton(int af, const char* src, void* dst);
         extern "C" const char* WSAAPI inet_ntop(int af, void* pAddr, char* pStringBuf, size_t StringBufSize);
@@ -63,11 +69,11 @@
     #include <ifaddrs.h>            // getifaddrs / freeifaddrs
     #define sleep(milliSeconds) ::usleep((milliSeconds) * 1000)
     #define inwin32(...) /*nothing*/ 
+    #define inunix(...) __VA_ARGS__
      // map linux socket calls to winsock calls via macros
     #define closesocket(fd) ::close(fd)
-    #define ioctlsocket(fd, request, arg) ::ioctl(fd, request, arg)
 #endif
-#if DEBUG || _DEBUG
+#if RPP_SOCKETS_DBG
     #define indebug(...) __VA_ARGS__
 #else
     #define indebug(...) /*NOP in release*/
@@ -298,7 +304,7 @@ namespace rpp
                 freeaddrinfo(infos);
             }
             else {
-            #if DEBUG || _DEBUG
+            #if RPP_SOCKETS_DBG
                 string errmsg = socket::last_err();
                 fprintf(stderr, "getaddrinfo failed: %s\n", errmsg.c_str());
             #endif
@@ -474,57 +480,65 @@ namespace rpp
     /////////        socket
     ///////////////////////////////////////////////////////////////////////////
 
-    socket::socket(int handle, const ipaddress& addr, bool shared) noexcept
-        : Sock(handle), Addr(addr), Shared(shared), Category(SC_Unknown)
+    socket::socket(int handle, const ipaddress& addr, bool shared, bool blocking) noexcept
+        : Sock{handle}, Addr{addr}, Shared{shared}, Blocking{blocking}, Category{SC_Unknown}
     {
     }
-    socket::socket() noexcept : Sock(-1), Shared(false), Category(SC_Unknown)
+    socket::socket() noexcept
+        : Sock{-1}, Addr{}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
     }
     socket::socket(int port, address_family af, ip_protocol ipp, socket_option opt) noexcept
-        : Sock(-1), Addr(af, port), Shared(false), Category(SC_Unknown)
+        : Sock{-1}, Addr{af, port}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
         listen(Addr, ipp, opt);
     }
     socket::socket(const ipaddress& address, socket_option opt) noexcept
-        : Sock(-1), Addr(address), Shared(false), Category(SC_Unknown)
+        : Sock{-1}, Addr{address}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
         connect(Addr, opt);
     }
     socket::socket(const ipaddress& address, int timeoutMillis, socket_option opt) noexcept
-        : Sock(-1), Addr(address), Shared(false), Category(SC_Unknown)
+        : Sock{-1}, Addr(address), Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
         connect(Addr, timeoutMillis, opt);
     }
     socket::socket(const char* hostname, int port, address_family af, socket_option opt) noexcept
-        : Sock(-1), Addr(af, hostname, port), Shared(false), Category(SC_Unknown)
+        : Sock{-1}, Addr{af, hostname, port}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
         connect(Addr, opt);
     }
     socket::socket(const char* hostname, int port, int timeoutMillis, address_family af, socket_option opt) noexcept
-        : Sock(-1), Addr(af, hostname, port), Shared(false), Category(SC_Unknown)
+        : Sock{-1}, Addr{af, hostname, port}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
         connect(Addr, timeoutMillis, opt);
     }
-    socket::socket(socket&& s) noexcept : Sock(s.Sock), Addr(s.Addr), Shared(s.Shared), Category(s.Category) {
+    socket::socket(socket&& s) noexcept
+        : Sock{s.Sock}, Addr{s.Addr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
+    {
         s.Sock = -1;
         s.Addr.clear();
         s.Shared = false;
+        s.Blocking = false;
         s.Category = SC_Unknown;
     }
-    socket& socket::operator=(socket&& s) noexcept {
+    socket& socket::operator=(socket&& s) noexcept
+    {
         close();
         Sock   = s.Sock;
         Addr   = s.Addr;
         Shared = s.Shared;
+        Blocking = s.Blocking;
         Category = s.Category;
         s.Sock = -1;
         s.Addr.clear();
         s.Shared   = false;
+        s.Blocking = false;
         s.Category = SC_Unknown;
         return *this;
     }
-    socket::~socket() noexcept {
+    socket::~socket() noexcept
+    {
         close();
     }
 
@@ -735,20 +749,119 @@ namespace rpp
         return available() > 0;
     }
 
-    int socket::get_opt(int optlevel, int socketopt) const noexcept {
+    int socket::get_opt(int optlevel, int socketopt) const noexcept
+    {
         int value = 0; socklen_t len = sizeof(int);
         return getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) ? os_getsockerr() : value;
     }
-    int socket::set_opt(int optlevel, int socketopt, int value) noexcept {
+    int socket::set_opt(int optlevel, int socketopt, int value) noexcept
+    {
         return setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
     }
-    int socket::get_ioctl(int iocmd, int& outValue) const noexcept {
-        return ioctlsocket(Sock, iocmd, (u_long*)&outValue) ? os_getsockerr() : 0;
-    }
-    int socket::set_ioctl(int iocmd, int value) noexcept {
-        return ioctlsocket(Sock, iocmd, (u_long*)&value) ? os_getsockerr() : 0;
+
+    int socket::get_ioctl(int iocmd, int& outValue) const noexcept
+    {
+    #if _WIN32 // on win32, ioctlsocket SETS FIONBIO, so we need this little helper
+        if (iocmd == FIONBIO)
+        {
+            outValue = Blocking ? 0 : 1; // FIONBIO: !=0 nonblock, 0 block
+            return 0;
+        }
+        u_long val = 0;
+        if (ioctlsocket(Sock, iocmd, &val) == 0)
+        {
+            outValue = (int)val;
+            return 0;
+        }
+    #else
+
+    #endif
+        int err = os_getsockerr();
+        #if RPP_SOCKETS_DBG
+            fprintf(stderr, "ioctl failed: %s\n", last_err(err).c_str());
+        #endif
+        return err;
     }
 
+    int socket::set_ioctl(int iocmd, int value) noexcept
+    {
+    #if _WIN32
+        u_long val = value;
+        if (ioctlsocket(Sock, iocmd, &val) == 0)
+            return 0;
+    #else
+        if (::ioctl(Sock, iocmd, &value) == 0)
+            return 0;
+    #endif
+        int err = os_getsockerr();
+        #if RPP_SOCKETS_DBG
+            fprintf(stderr, "ioctl failed: %s\n", last_err(err).c_str());
+        #endif
+        return err;
+    }
+
+    void socket::set_noblock_nodelay() noexcept
+    {
+        set_blocking(false); // blocking: false
+        set_nagle(false);    // nagle:    false
+    }
+
+    bool socket::set_blocking(bool socketsBlock) noexcept
+    {
+        #if !_WIN32 && defined(O_NONBLOCK)
+            int flags = fcntl(Sock, F_GETFL, 0);
+            if (flags == -1) flags = 0;
+            int err = fcntl(Sock, F_SETFL, flags | O_NONBLOCK);
+        #else
+            int err = set_ioctl(FIONBIO, socketsBlock?0:1); // FIONBIO: !=0 nonblock, 0 block
+            if (err == 0) Blocking = socketsBlock; // On Windows, there is no way to GET FIONBIO without setting it
+        #endif
+            return err == 0;
+    }
+    bool socket::is_blocking() const noexcept
+    {
+        #if !_WIN32 && defined(O_NONBLOCK)
+            int flags = fcntl(Sock, F_GETFL, 0);
+            return flags >= 0 && (flags & O_NONBLOCK) != 0;
+        #else
+            return Blocking; // On Windows, there is no way to GET FIONBIO without setting it
+        #endif
+    }
+
+    void socket::set_nagle(bool enableNagle) noexcept
+    {
+        set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1); // TCP_NODELAY: 1 nodelay, 0 nagle enabled
+    }
+    bool socket::is_nodelay() const noexcept
+    {
+        return get_opt(IPPROTO_TCP, TCP_NODELAY) == 1; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
+    }
+
+    bool socket::set_rcv_buf_size(size_t size) noexcept
+    {
+        // NOTE: on linux the kernel doubles SO_RCVBUF for internal bookkeeping
+        //       so to keep things consistent between platforms, we divide by 2 on linux:
+        inunix(size /= 2);
+        return set_opt(SOL_SOCKET, SO_RCVBUF, static_cast<int>(size)) == 0;
+    }
+    size_t socket::get_rcv_buf_size() const noexcept
+    {
+        return get_opt(SOL_SOCKET, SO_RCVBUF);
+    }
+
+    bool socket::set_snd_buf_size(size_t size) noexcept
+    {
+        // NOTE: on linux the kernel doubles SO_SNDBUF for internal bookkeeping
+        //       so to keep things consistent between platforms, we divide by 2 on linux:
+        inunix(size /= 2);
+        return set_opt(SOL_SOCKET, SO_SNDBUF, static_cast<int>(size)) == 0;
+    }
+    size_t socket::get_snd_buf_size() const noexcept
+    {
+        return get_opt(SOL_SOCKET, SO_SNDBUF);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
 
     socket_type socket::type() const noexcept {
         return to_socktype(get_opt(SOL_SOCKET, SO_TYPE));
@@ -807,44 +920,7 @@ namespace rpp
         return true;
     }
 
-
-    void socket::set_noblock_nodelay() noexcept {
-        set_blocking(false); // blocking: false
-        set_nagle(false);    // nagle:    false
-    }
-    void socket::set_blocking(bool socketsBlock) noexcept {
-        set_ioctl(FIONBIO, socketsBlock?0:1); // FIONBIO: 1 nonblock, 0 block
-    }
-    void socket::set_nagle(bool enableNagle) noexcept {
-        set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1); // TCP_NODELAY: 1 nodelay, 0 nagle enabled
-    }
-    bool socket::is_blocking() const noexcept {
-        int value; get_ioctl(FIONBIO, value);
-        return !!value;
-    }
-    bool socket::is_nodelay() const noexcept {
-        return !!get_opt(IPPROTO_TCP, TCP_NODELAY);
-    }
-
-    bool socket::set_rcv_buf_size(size_t size) noexcept
-    {
-        return set_opt(SOL_SOCKET, SO_RCVBUF, static_cast<int>(size)) == 0;
-    }
-    size_t socket::get_rcv_buf_size() const noexcept
-    {
-        return get_opt(SOL_SOCKET, SO_RCVBUF);
-    }
-    bool socket::set_snd_buf_size(size_t size) noexcept
-    {
-        return set_opt(SOL_SOCKET, SO_SNDBUF, static_cast<int>(size)) == 0;
-    }
-    size_t socket::get_snd_buf_size() const noexcept
-    {
-        return get_opt(SOL_SOCKET, SO_SNDBUF);
-    }
-
     ////////////////////////////////////////////////////////////////////////////////
-
 
     bool socket::create(address_family af, ip_protocol ipp, socket_option opt) noexcept
     {

@@ -177,6 +177,8 @@ namespace rpp
 
 
 #undef Assert
+#undef AssertTrue
+#undef AssertFalse
 #undef AssertMsg
 #undef AssertThat
 #undef AssertEqual
@@ -195,7 +197,12 @@ namespace rpp
 #undef TestCaseExpectedEx
 
 #define Assert(expr) [&]() -> bool { \
-    if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr); return false; } \
+    if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "but expected", true); return false; } \
+    return true; \
+}()
+#define AssertTrue Assert
+#define AssertFalse(expr) [&]() -> bool { \
+    if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "but expected", false); return false; } \
     return true; \
 }()
 #define AssertMsg(expr, fmt, ...) [&]() -> bool { \
