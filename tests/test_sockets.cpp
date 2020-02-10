@@ -12,27 +12,28 @@ TestImpl(test_sockets)
     {
     }
 
-    Socket create(const char* msg, Socket&& s)
+    Socket create(std::string msg, Socket&& s)
     {
-        AssertMsg(s.good(), "expected good() for '%s'", msg);
-        AssertMsg(s.connected(), "expected connected() for '%s'", msg);
+        AssertMsg(s.good(), "expected good() for '%s'", msg.c_str());
+        AssertMsg(s.connected(), "expected connected() for '%s'", msg.c_str());
         if (!s.good() || !s.connected())
-            print_error("%s %s socket error: %s\n", msg, s.name().c_str(), s.last_err().c_str());
+            print_error("%s %s socket error: %s\n", msg.c_str(), s.name().c_str(), s.last_err().c_str());
         else
-            print_info("%s %s\n", msg, s.name().c_str());
+            print_info("%s %s\n", msg.c_str(), s.name().c_str());
         return std::move(s);
     }
     Socket listen(int port)
     {
-        return create("server: listening on", Socket::listen_to(port));
+        return create("server: listening on " + std::to_string(port), Socket::listen_to(port));
     }
     Socket accept(const Socket& server)
     {
         return create("server: accepted client", server.accept(5000/*ms*/));
     }
-    Socket connect(const char* ip, int port)
+    Socket connect(std::string ip, int port)
     {
-        return create("remote: connected to", Socket::connect_to(ip, port, 5000/*ms*/, AF_IPv4));
+        return create("remote: connected to "+ip+":"+std::to_string(port),
+                      Socket::connect_to(ip.c_str(), port, 5000/*ms*/, AF_IPv4));
     }
 
     /**
@@ -40,8 +41,8 @@ TestImpl(test_sockets)
      */
     TestCase(nonblocking_sockets)
     {
-        Socket server = listen(1337); // this is our server
-        thread remote([=] { nonblocking_remote(); }); // spawn remote client
+        Socket server = listen(13337); // this is our server
+        thread remote([=] { nonblocking_remote(13337); }); // spawn remote client
         Socket client = accept(server);
 
         // wait 1ms for a client that will never come
@@ -63,10 +64,11 @@ TestImpl(test_sockets)
         server.close();
         remote.join(); // wait for remote thread to finish
     }
-    void nonblocking_remote() // simulated remote endpoint
+
+    void nonblocking_remote(int serverPort) // simulated remote endpoint
     {
         int receivedMessages = 0;
-        Socket server = connect("127.0.0.1", 1337);
+        Socket server = connect("127.0.0.1", serverPort);
         while (server.connected())
         {
             string resp = server.recv_str();
@@ -89,8 +91,8 @@ TestImpl(test_sockets)
     {
         print_info("========= TRANSMIT DATA =========\n");
 
-        Socket server = listen(1337);
-        thread remote([=] { this->transmitting_remote(); });
+        Socket server = listen(14447);
+        thread remote([=] { this->transmitting_remote(14447); });
         Socket client = accept(server);
         client.set_rcv_buf_size(TransmitSize*2);
 
@@ -126,11 +128,11 @@ TestImpl(test_sockets)
         remote.join();
     }
 
-    void transmitting_remote()
+    void transmitting_remote(int serverPort)
     {
         std::vector<char> sendBuffer(TransmitSize, '$');
 
-        Socket server = connect("127.0.0.1", 1337);
+        Socket server = connect("127.0.0.1", serverPort);
         server.set_snd_buf_size(TransmitSize*2);
 
         while (server.connected())
