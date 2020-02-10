@@ -815,7 +815,7 @@ namespace rpp
     {
         #if !_WIN32 && defined(O_NONBLOCK)
             int flags = fcntl(Sock, F_GETFL, 0);
-            if (flags == -1) flags = 0;
+            if (flags < 0) flags = 0;
             if (fcntl(Sock, F_SETFL, flags | O_NONBLOCK) == 0)
             {
                 Blocking = socketsBlock;
@@ -839,7 +839,9 @@ namespace rpp
     {
         #if !_WIN32 && defined(O_NONBLOCK)
             int flags = fcntl(Sock, F_GETFL, 0);
-            return flags >= 0 && (flags & O_NONBLOCK) != 0;
+            if (flags < 0) flags = 0;
+            bool nonBlocking = (flags & O_NONBLOCK) != 0;
+            return !nonBlocking;
         #else
             return Blocking; // On Windows, there is no way to GET FIONBIO without setting it
         #endif

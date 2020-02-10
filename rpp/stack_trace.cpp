@@ -820,7 +820,12 @@ namespace rpp
             {
                 cse.name = pSym->Name;
             }
-            else OnDebugError("SymGetSymFromAddr64", GetLastError(), s.AddrPC.Offset);
+            else
+            {
+                DWORD err = GetLastError();
+                if (err != ERROR_INVALID_ADDRESS)
+                    OnDebugError("SymGetSymFromAddr64", err, s.AddrPC.Offset);
+            }
 
             DWORD offsetFromLine = 0;
             IMAGEHLP_LINE64 lineInfo = { 0 };
