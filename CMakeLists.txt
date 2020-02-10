@@ -173,11 +173,15 @@ install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 if (BUILD_TESTS)
     file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
-    add_executable(RppTests ${RPP_TESTS})
+    source_group(tests FILES ${RPP_TESTS})
+    
+    # we build Rpp from source again so that RPP_DEBUG=1 has an effect in unit tests
+    add_executable(RppTests ${RPP_TESTS} ${RPP_SRC})
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
+    target_compile_definitions(RppTests PRIVATE -DRPP_DEBUG=1)
 
     target_include_directories(RppTests PUBLIC ".")
-    target_link_libraries(RppTests ReCpp ${RPP_RUNTIME} ${DWARF_LIBRARY})
+    target_link_libraries(RppTests ${RPP_RUNTIME} ${DWARF_LIBRARY})
 
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()

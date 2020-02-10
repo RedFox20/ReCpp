@@ -68,6 +68,7 @@ namespace rpp
         void assert_failed_custom(const char* fmt, ...);
         static void print_error(const char* fmt, ...);
         static void print_warning(const char* fmt, ...);
+        static void print_info(const char* fmt, ...);
 
         /**
          * Runs all the registered tests on this test impl.

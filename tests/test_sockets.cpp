@@ -1,5 +1,4 @@
 #include <rpp/sockets.h>
-#include <rpp/debugging.h>
 #include <rpp/tests.h>
 #include <thread>
 
@@ -18,9 +17,9 @@ TestImpl(test_sockets)
         AssertMsg(s.good(), "expected good() for '%s'", msg);
         AssertMsg(s.connected(), "expected connected() for '%s'", msg);
         if (!s.good() || !s.connected())
-            fprintf(stderr, "%s %s socket error: %s", msg, s.name().c_str(), s.last_err().c_str());
+            print_error("%s %s socket error: %s\n", msg, s.name().c_str(), s.last_err().c_str());
         else
-            printf("%s %s\n", msg, s.name().c_str());
+            print_info("%s %s\n", msg, s.name().c_str());
         return std::move(s);
     }
     Socket listen(int port)
@@ -50,16 +49,16 @@ TestImpl(test_sockets)
         Assert(failClient.bad());
 
         std::string msg = "Server says: Hello!";
-        printf("server: sending '%s'\n", msg.c_str());
+        print_info("server: sending '%s'\n", msg.c_str());
         client.send(msg);
         sleep(100);
 
         string resp = client.recv_str();
-        if (!Assert(resp != ""))
-            printf("%s\n", resp.c_str());
+        print_info("server: received '%s'\n", resp.c_str());
+        AssertNotEqual(resp, "");
         sleep(50);
 
-        printf("server: closing down\n");
+        print_info("server: closing down\n");
         client.close();
         server.close();
         remote.join(); // wait for remote thread to finish
@@ -73,21 +72,22 @@ TestImpl(test_sockets)
             string resp = server.recv_str();
             if (resp != "")
             {
-                printf("remote: received '%s'\n", resp.c_str());
+                print_info("remote: received '%s'\n", resp.c_str());
                 Assert(server.send("Client says: Thanks!") > 0);
                 ++receivedMessages;
+                sleep(10);
             }
             //sleep(0);
         }
         AssertThat(receivedMessages, 1);
-        printf("remote: server disconnected: %s\n", server.last_err().c_str());
-        printf("remote: closing down\n");
+        print_info("remote: server disconnected: %s\n", server.last_err().c_str());
+        print_info("remote: closing down\n");
     }
 
     static constexpr int TransmitSize = 80000;
     TestCase(transmit_data)
     {
-        printf("========= TRANSMIT DATA =========\n");
+        print_info("========= TRANSMIT DATA =========\n");
 
         Socket server = listen(1337);
         thread remote([=] { this->transmitting_remote(); });
@@ -99,7 +99,7 @@ TestImpl(test_sockets)
             string data = client.recv_str();
             if (data != "")
             {
-                printf("server: received %d bytes of data from client ", (int)data.length());
+                print_info("server: received %d bytes of data from client ", (int)data.length());
                 AssertThat(data.size(), TransmitSize);
 
                 size_t j = 0;
@@ -107,20 +107,20 @@ TestImpl(test_sockets)
                 {
                     if (data[j] != '$')
                     {
-                        printf("(corrupted at position %d):\n", (int)j);
-                        printf("%.*s\n", 10, &data[j]);
-                        printf("^\n");
+                        print_info("(corrupted at position %d):\n", (int)j);
+                        print_info("%.*s\n", 10, &data[j]);
+                        print_info("^\n");
                         break;
                     }
                 }
                 if (j == data.length()) {
-                    printf("(valid)\n");
+                    print_info("(valid)\n");
                 }
             }
             sleep(5);
         }
 
-        printf("server: closing down\n");
+        print_info("server: closing down\n");
         client.close();
         server.close();
         remote.join();
@@ -138,15 +138,15 @@ TestImpl(test_sockets)
         {
             int sentBytes = server.send(sendBuffer, sizeof sendBuffer);
             if (sentBytes > 0)
-                printf("remote: sent %d bytes of data\n", sentBytes);
+                print_info("remote: sent %d bytes of data\n", sentBytes);
             else
-                printf("remote: failed to send data: %s\n", Socket::last_err().c_str());
+                print_info("remote: failed to send data: %s\n", Socket::last_err().c_str());
 
             // we need to create a large gap in the data
             sleep(15);
         }
-        printf("remote: server disconnected\n");
-        printf("remote: closing down\n");
+        print_info("remote: server disconnected\n");
+        print_info("remote: closing down\n");
     }
 
     TestCase(socket_udp_send_receive)
@@ -179,8 +179,8 @@ TestImpl(test_sockets)
         Assert(sock.set_blocking(true));
         Assert(sock.is_blocking());
 
-        LogInfo("default SO_RCVBUF: %zu", sock.get_rcv_buf_size());
-        LogInfo("default SO_SNDBUF: %zu", sock.get_snd_buf_size());
+        print_info("default SO_RCVBUF: %zu\n", sock.get_rcv_buf_size());
+        print_info("default SO_SNDBUF: %zu\n", sock.get_snd_buf_size());
 
         // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
         //       which is expected behaviour on non-windows platforms

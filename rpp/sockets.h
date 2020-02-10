@@ -489,7 +489,7 @@ namespace rpp
         /**
          * Configure socket settings: I/O blocking mode off(0) or on(1)
          * @param socketsBlock (FALSE = NOBLOCK, TRUE = BLOCK)
-         * @return TRUE if set succeded, check socket::last_err() for error message 
+         * @return TRUE if set succeded, check socket::last_err() for error message
          */
         bool set_blocking(bool socketsBlock) noexcept;
         // @return TRUE if socket is set to blocking: set_blocking(true);, check socket::last_err() for error message
@@ -500,8 +500,9 @@ namespace rpp
          * or on (Nagle bandwidth opt.)
          * @note This only applies for TCP sockets
          * @param enableNagle (FALSE = TCP_NODELAY, TRUE = Nagle enabled)
+         * @return TRUE if set succeeded, check socket::last_err() for error message
          */
-        void set_nagle(bool enableNagle) noexcept;
+        bool set_nagle(bool enableNagle) noexcept;
         // @return TRUE if socket is set to nodelay: set_nagle(false);, check socket::last_err() for error message
         bool is_nodelay() const noexcept;
 

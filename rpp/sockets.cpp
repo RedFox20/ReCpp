@@ -780,7 +780,7 @@ namespace rpp
     #endif
         int err = os_getsockerr();
         #if RPP_SOCKETS_DBG
-            fprintf(stderr, "ioctl failed: %s\n", last_err(err).c_str());
+            fprintf(stderr, "get_ioctl(%d) failed: %s\n", iocmd, last_err(err).c_str());
         #endif
         return err;
     }
@@ -797,7 +797,7 @@ namespace rpp
     #endif
         int err = os_getsockerr();
         #if RPP_SOCKETS_DBG
-            fprintf(stderr, "ioctl failed: %s\n", last_err(err).c_str());
+            fprintf(stderr, "set_ioctl(%d,%d) failed: %s\n", iocmd, value, last_err(err).c_str());
         #endif
         return err;
     }
@@ -830,9 +830,9 @@ namespace rpp
         #endif
     }
 
-    void socket::set_nagle(bool enableNagle) noexcept
+    bool socket::set_nagle(bool enableNagle) noexcept
     {
-        set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1); // TCP_NODELAY: 1 nodelay, 0 nagle enabled
+        return set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1) == 0; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
     }
     bool socket::is_nodelay() const noexcept
     {

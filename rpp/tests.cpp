@@ -269,6 +269,13 @@ namespace rpp
         consolef(Yellow, message);
     }
 
+    void test::print_info(const char* fmt, ...)
+    {
+        char message[8192]; va_list ap; va_start(ap, fmt);
+        vsnprintf(message, 8192, fmt, ap);
+        consolef(Default, message);
+    }
+
     bool test::run_init()
     {
         test_func init; init.name = "init";
