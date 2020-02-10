@@ -714,6 +714,7 @@ namespace rpp
                 Assert(false, "socket operation - unexpected failure");
                 return -1;
             }
+            case EAGAIN:             return 0; // request is in progress, you should call wait
             case ESOCK(EINPROGRESS): return 0; // request is in progress, you should call wait
             case ESOCK(EWOULDBLOCK): return 0; // no data available right now
             case ESOCK(ENOTCONN):    return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
@@ -938,12 +939,18 @@ namespace rpp
     {
         if (Sock == -1) 
             return false;
+
         int err = get_opt(SOL_SOCKET, SO_ERROR);
-        if (err != 0) {
-            handle_errno(err > 0 ? err : os_getsockerr());
-            return false;
+        if (err != 0)
+        {
+            if (handle_errno(err > 0 ? err : os_getsockerr()) == 0)
+                return true; // still connected, but pending something
+
+            return false; // it was a fatal error
         }
-        if (Category == SC_Client || Category == SC_Accept) {
+
+        if (Category == SC_Client || Category == SC_Accept)
+        {
             char c;
             return peek(&c, 1) >= 0;
         }
