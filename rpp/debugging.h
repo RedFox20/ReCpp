@@ -146,10 +146,7 @@ RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __d
 #    define __assertion_failure(fmt,...) \
     __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  else
-RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
-                           unsigned int __line, const char *__function) __THROW __attribute__ ((__noreturn__));
-#    define __assertion_failure(fmt,...) \
-    __assert_fail(_rpp_assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__))
+#    define  __assertion_failure(fmt,...) assert(false)
 #  endif
 #elif _MSC_VER // Windows VC++
 #  ifndef _DEBUG
@@ -159,8 +156,7 @@ RPP_EXTERNC void __assert_fail(const char *__assertion, const char *__file,
     _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt _rpp_wrap_args(__VA_ARGS__) ); } while (0)
 #  endif
 #elif defined __GNUC__ // other clang, mingw or linux gcc
-#  define  __assertion_failure(fmt,...) \
-    __assert(_rpp_assert_format(fmt, ##__VA_ARGS__), _LogFilename(__FILE__), __LINE__)
+#  define  __assertion_failure(fmt,...) assert(false)
 #else
 #  error Debugging Assert not defined for this compiler toolkit!
 #endif

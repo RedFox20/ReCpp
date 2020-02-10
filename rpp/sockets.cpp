@@ -986,9 +986,9 @@ namespace rpp
         timeout.tv_sec  = (millis / 1000);
         timeout.tv_usec = (millis % 1000) * 1000;
 
-        //// select requires a blocking socket, so temporarily force blocking IO
-        //bool nonBlockingIO = !is_blocking();
-        //if (nonBlockingIO) set_blocking(true);
+        // select requires a blocking socket, so temporarily force blocking IO
+        bool nonBlockingIO = !is_blocking();
+        if (nonBlockingIO) set_blocking(true);
 
         fd_set* readfds   = (selectFlags & SF_Read)   ? &set : nullptr;
         fd_set* writefds  = (selectFlags & SF_Write)  ? &set : nullptr;
@@ -996,8 +996,8 @@ namespace rpp
         int rescode = ::select(Sock + 1, readfds, writefds, exceptfds, &timeout);
         int errcode = os_getsockerr();
 
-        //// restore non-blocking IO
-        //if (nonBlockingIO) set_blocking(false);
+        // restore non-blocking IO
+        if (nonBlockingIO) set_blocking(false);
 
         if (rescode == -1 || errcode != 0)
         {
@@ -1090,7 +1090,7 @@ namespace rpp
             return true;
         }
         return false;
-    }	
+    }
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
         // we need a non-blocking socket to do select right after connect
