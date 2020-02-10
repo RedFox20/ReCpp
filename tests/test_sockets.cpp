@@ -17,7 +17,10 @@ TestImpl(test_sockets)
     {
         AssertMsg(s.good(), "expected good() for '%s'", msg);
         AssertMsg(s.connected(), "expected connected() for '%s'", msg);
-        printf("%s %s\n", msg, s.name().c_str());
+        if (!s.good() || !s.connected())
+            fprintf(stderr, "%s %s socket error: %s", msg, s.name().c_str(), s.last_err().c_str());
+        else
+            printf("%s %s\n", msg, s.name().c_str());
         return std::move(s);
     }
     Socket listen(int port)
