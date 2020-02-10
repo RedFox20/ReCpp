@@ -813,38 +813,39 @@ namespace rpp
 
     bool socket::set_blocking(bool socketsBlock) noexcept
     {
-        #if !_WIN32 && defined(O_NONBLOCK)
-            int flags = fcntl(Sock, F_GETFL, 0);
-            if (flags < 0) flags = 0;
-            if (fcntl(Sock, F_SETFL, flags | O_NONBLOCK) == 0)
-            {
-                Blocking = socketsBlock;
-                return true;
-            }
-        #else
-            u_long val = socketsBlock?0:1; // FIONBIO: !=0 nonblock, 0 block
-            if (ioctlsocket(Sock, FIONBIO, &val) == 0)
-            {
-                Blocking = socketsBlock; // On Windows, there is no way to GET FIONBIO without setting it
-                return true;
-            }
-        #endif
-        #if RPP_SOCKETS_DBG
-            fprintf(stderr, "set_blocking(%s) failed: %s\n",
-                    socketsBlock?"true":"false", last_err().c_str());
-        #endif
-            return false;
+    #if _WIN32
+        u_long val = socketsBlock?0:1; // FIONBIO: !=0 nonblock, 0 block
+        if (ioctlsocket(Sock, FIONBIO, &val) == 0)
+        {
+            Blocking = socketsBlock; // On Windows, there is no way to GET FIONBIO without setting it
+            return true;
+        }
+    #else
+        int flags = fcntl(Sock, F_GETFL, 0);
+        if (flags < 0) flags = 0;
+        if (fcntl(Sock, F_SETFL, flags | O_NONBLOCK) == 0)
+        {
+            Blocking = socketsBlock;
+            return true;
+        }
+    #endif
+    #if RPP_SOCKETS_DBG
+        fprintf(stderr, "set_blocking(%s) failed: %s\n",
+                socketsBlock?"true":"false", last_err().c_str());
+    #endif
+        return false;
     }
+
     bool socket::is_blocking() const noexcept
     {
-        #if !_WIN32 && defined(O_NONBLOCK)
-            int flags = fcntl(Sock, F_GETFL, 0);
-            if (flags < 0) flags = 0;
-            bool nonBlocking = (flags & O_NONBLOCK) != 0;
-            return !nonBlocking;
-        #else
-            return Blocking; // On Windows, there is no way to GET FIONBIO without setting it
-        #endif
+    #if _WIN32
+        return Blocking; // On Windows, there is no way to GET FIONBIO without setting it
+    #else
+        int flags = fcntl(Sock, F_GETFL, 0);
+        if (flags < 0) return false;
+        bool nonBlocking = (flags & O_NONBLOCK) != 0;
+        return !nonBlocking;
+    #endif
     }
 
     bool socket::set_nagle(bool enableNagle) noexcept
@@ -985,13 +986,11 @@ namespace rpp
 
         if (opt & SO_ReuseAddr) {
             if (set_opt(IPPROTO_IP, SO_REUSEADDR, 1)) {
-                handle_errno();
-                return false;
+                return handle_errno() == 0;
             }
         #if !_WIN32
             if (set_opt(IPPROTO_IP, SO_REUSEPORT, 1)) {
-                handle_errno();
-                return false;
+                return handle_errno() == 0;
             }
         #endif
         }
@@ -1006,8 +1005,7 @@ namespace rpp
             Addr = addr;
             return true;
         }
-        handle_errno();
-        return false;
+        return handle_errno() == 0;
     }
 
     bool socket::listen() noexcept
@@ -1018,8 +1016,7 @@ namespace rpp
             Category = SC_Listen;
             return true;
         }
-        handle_errno();
-        return false;
+        return handle_errno() == 0;
     }
 
     bool socket::select(int millis, SelectFlag selectFlags) noexcept
@@ -1030,10 +1027,6 @@ namespace rpp
         timeval timeout;
         timeout.tv_sec  = (millis / 1000);
         timeout.tv_usec = (millis % 1000) * 1000;
-
-        //// select requires a blocking socket, so temporarily force blocking IO
-        //bool nonBlockingIO = !is_blocking();
-        //if (nonBlockingIO) set_blocking(true);
 
         fd_set* readfds   = (selectFlags & SF_Read)   ? &set : nullptr;
         fd_set* writefds  = (selectFlags & SF_Write)  ? &set : nullptr;
@@ -1049,19 +1042,13 @@ namespace rpp
         }
 
         int errcode = os_getsockerr();
-        if (rescode > 0 && errcode == ESOCK(EINPROGRESS))
-        {
-            printf("select(): EINPROGRESS\n");
-        }
-
-        //// restore non-blocking IO
-        //if (nonBlockingIO) set_blocking(false);
-
         if (rescode == -1 || errcode != 0)
         {
-            logerror(errcode, "select() failed: %s", last_err().c_str());
-            handle_errno(errcode);
-            return false;
+            if (handle_errno(errcode) != 0)
+            {
+                logerror(errcode, "select() failed: %s", last_err().c_str());
+                return false;
+            }
         }
         return rescode > 0; // success: > 0, timeout == 0
     }
