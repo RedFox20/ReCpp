@@ -52,10 +52,18 @@
      // map linux socket calls to winsock calls via macros
     #define closesocket(fd) ::close(fd)
 #endif
+
 #if RPP_SOCKETS_DBG
     #define indebug(...) __VA_ARGS__
+    #define logerror(err, msg, ...) do { \
+        static int prev_failure; \
+        if ((err) != prev_failure) { \
+            fprintf(stderr, __FUNCTION__ msg "\n", ##__VA_ARGS__); \
+        } \
+    } while (0)
 #else
     #define indebug(...) /*NOP in release*/
+    #define logerror(err, msg, ...) /*NOP in release*/
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -538,13 +546,15 @@ namespace rpp
         return sock;
     }
 
-    static int os_getsockerr() noexcept {
+    static int os_getsockerr() noexcept
+    {
         #if _WIN32
             return WSAGetLastError();
         #else
             return errno;
         #endif
     }
+
     string socket::last_err(int err) noexcept
     {
         char buf[2048];
@@ -718,7 +728,7 @@ namespace rpp
                 indebug(auto errmsg = socket::last_err(errcode));
                 indebug(fprintf(stderr, "%s\r\n", errmsg.c_str()));
                 close();
-                return -1; // you should call
+                return -1;
             }
         }
     }
@@ -740,6 +750,18 @@ namespace rpp
         return setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
     }
 
+    static const char* ioctl_string(int iocmd)
+    {
+        switch (iocmd)
+        {
+            case FIONREAD: return "FIONREAD";
+            case FIONBIO: return "FIONBIO";
+            case FIOASYNC: return "FIOASYNC";
+        }
+        static char buf[32];
+        return itoa(iocmd, buf, 10);
+    }
+
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept
     {
     #if _WIN32 // on win32, ioctlsocket SETS FIONBIO, so we need this little helper
@@ -755,12 +777,11 @@ namespace rpp
             return 0;
         }
     #else
-
+        if (::ioctl(Sock, iocmd, &outValue) == 0)
+            return 0;
     #endif
         int err = os_getsockerr();
-        #if RPP_SOCKETS_DBG
-            fprintf(stderr, "get_ioctl(%d) failed: %s\n", iocmd, last_err(err).c_str());
-        #endif
+        logerror(err, "(%s) failed: %s", ioctl_string(iocmd), last_err(err).c_str());
         return err;
     }
 
@@ -1024,9 +1045,7 @@ namespace rpp
 
         if (rescode == -1 || errcode != 0)
         {
-            #if RPP_SOCKETS_DBG
-                fprintf(stderr, "select() failed: %s\n", last_err().c_str());
-            #endif
+            logerror(errcode, "select() failed: %s", last_err().c_str());
             handle_errno(errcode);
             return false;
         }
