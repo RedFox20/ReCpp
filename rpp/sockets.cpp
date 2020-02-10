@@ -1,6 +1,6 @@
 #include "sockets.h"
 #include <rpp/debugging.h>
-#include <stdlib.h>    // malloc
+#include <stdlib.h>    // malloc, itoa
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
@@ -759,7 +759,7 @@ namespace rpp
             case FIOASYNC: return "FIOASYNC";
         }
         static char buf[32];
-        return itoa(iocmd, buf, 10);
+        return ::itoa(iocmd, buf, 10);
     }
 
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept
