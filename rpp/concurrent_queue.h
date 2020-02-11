@@ -68,6 +68,13 @@ namespace rpp
             Waiter.notify_all();
         }
 
+        // pushes an item without calling notify_all()
+        void push_no_notify(T&& item)
+        {
+            { lock_guard<mutex> lock {Mutex};
+                Queue.emplace_back(std::move(item)); }
+        }
+
         T pop()
         {
             T item;
@@ -110,8 +117,12 @@ namespace rpp
         {
             std::unique_lock<mutex> lock {Mutex};
             
-            while (Queue.empty() && !cancellationCondition())
+            while (Queue.empty())
+            {
+                if (cancellationCondition())
+                    break;
                 Waiter.wait(lock);
+            }
             
             if (Queue.empty())
                 return false;
