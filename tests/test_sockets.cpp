@@ -8,9 +8,114 @@ using Socket = rpp::socket;
 
 TestImpl(test_sockets)
 {
-    TestInit(test_sockets)
+    //////////////////////////////////////////////////////////////////
+
+    TestInit(test_sockets) {}
+
+    TestCase(udp_socket_options)
     {
+        Socket sock = rpp::make_udp_randomport();
+        AssertFalse(sock.is_blocking()); // should be false by default
+        AssertTrue(sock.is_nodelay()); // should be nodelay by default
+
+        Assert(sock.set_blocking(true));
+        Assert(sock.is_blocking());
+
+        AssertFalse(sock.set_nagle(true)); // cannot set nagle on UDP socket
+        AssertTrue(sock.is_nodelay()); // UDP is always nodelay
+
+        print_info("default UDP SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
+        print_info("default UDP SO_SNDBUF: %d\n", sock.get_snd_buf_size());
+
+        // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
+        //       which is expected behaviour on non-windows platforms
+        Assert(sock.set_snd_buf_size(16384));
+        AssertThat(sock.get_snd_buf_size(), 16384);
+
+        Assert(sock.set_rcv_buf_size(32768));
+        AssertThat(sock.get_rcv_buf_size(), 32768);
+
+        // check UDP noblock delay, it cannot affect NAGLE
+        sock.set_noblock_nodelay();
+        AssertFalse(sock.is_blocking());
+        AssertTrue(sock.is_nodelay());
     }
+
+    TestCase(tcp_socket_options)
+    {
+        Socket sock = rpp::make_tcp_randomport();
+        AssertFalse(sock.is_blocking()); // should be false by default
+        AssertTrue(sock.is_nodelay()); // should be nodelay by default
+
+        Assert(sock.set_blocking(true));
+        Assert(sock.is_blocking());
+
+        Assert(sock.set_nagle(true));
+        AssertFalse(sock.is_nodelay());
+
+        print_info("default TCP SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
+        print_info("default TCP SO_SNDBUF: %d\n", sock.get_snd_buf_size());
+
+        // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
+        //       which is expected behaviour on non-windows platforms
+        Assert(sock.set_snd_buf_size(16384));
+        AssertThat(sock.get_snd_buf_size(), 16384);
+
+        Assert(sock.set_rcv_buf_size(32768));
+        AssertThat(sock.get_rcv_buf_size(), 32768);
+
+        // check TCP noblock delay, it cannot affect NAGLE
+        sock.set_noblock_nodelay();
+        AssertFalse(sock.is_blocking());
+        AssertTrue(sock.is_nodelay());
+    }
+
+    
+    TestCase(socket_udp_send_receive)
+    {
+        vector<uint8_t> msg(4000, 'x');
+        Socket send = rpp::make_udp_randomport();
+        Socket recv = rpp::make_udp_randomport();
+        AssertFalse(send.is_blocking()); // should be false by default
+        AssertFalse(recv.is_blocking()); // should be false by default
+
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+        AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
+
+        vector<uint8_t> buf;
+        Assert(recv.recv(buf));
+
+        AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
+        AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
+        
+        Assert(recv.recv(buf));
+        AssertThat(buf, msg);
+        
+        Assert(recv.recv(buf));
+        AssertThat(buf, msg);
+    }
+    
+    TestCase(udp_select)
+    {
+        Socket send = rpp::make_udp_randomport();
+        Socket recv = rpp::make_udp_randomport();
+        AssertFalse(send.is_blocking()); // should be false by default
+        AssertFalse(recv.is_blocking()); // should be false by default
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+
+        // no data to receive, should return false
+        AssertFalse(recv.select(100, rpp::socket::SF_Read));
+        send.sendto(recv_addr, "udp_select");
+
+        // must be ready to receive
+        AssertTrue(recv.select(100, rpp::socket::SF_Read));
+        AssertThat(recv.recv_str(), "udp_select");
+
+        // no data to receive, should return false
+        AssertFalse(recv.select(100, rpp::socket::SF_Read));
+    }
+
+    //////////////////////////////////////////////////////////////////
 
     Socket create(std::string msg, Socket&& s)
     {
@@ -148,85 +253,5 @@ TestImpl(test_sockets)
         }
         print_info("remote: server disconnected\n");
         print_info("remote: closing down\n");
-    }
-
-    TestCase(socket_udp_send_receive)
-    {
-        vector<uint8_t> msg(4000, 'x');
-        Socket sender   = rpp::make_udp_randomport();
-        Socket receiver = rpp::make_udp_randomport();
-
-        auto send_to = ipaddress(AF_IPv4, "127.0.0.1", receiver.port());
-        AssertThat(sender.sendto(send_to, msg), (int)msg.size());
-
-        vector<uint8_t> buf;
-        Assert(receiver.recv(buf));
-
-        AssertThat(sender.sendto(send_to, msg), (int)msg.size());
-        AssertThat(sender.sendto(send_to, msg), (int)msg.size());
-        
-        Assert(receiver.recv(buf));
-        AssertThat(buf, msg);
-        
-        Assert(receiver.recv(buf));
-        AssertThat(buf, msg);
-    }
-
-    TestCase(udp_socket_options)
-    {
-        Socket sock = rpp::make_udp_randomport();
-        AssertFalse(sock.is_blocking()); // should be false by default
-        AssertTrue(sock.is_nodelay()); // should be nodelay by default
-
-        Assert(sock.set_blocking(true));
-        Assert(sock.is_blocking());
-
-        AssertFalse(sock.set_nagle(true)); // cannot set nagle on UDP socket
-        AssertTrue(sock.is_nodelay()); // UDP is always nodelay
-
-        print_info("default UDP SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
-        print_info("default UDP SO_SNDBUF: %d\n", sock.get_snd_buf_size());
-
-        // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
-        //       which is expected behaviour on non-windows platforms
-        Assert(sock.set_snd_buf_size(16384));
-        AssertThat(sock.get_snd_buf_size(), 16384);
-
-        Assert(sock.set_rcv_buf_size(32768));
-        AssertThat(sock.get_rcv_buf_size(), 32768);
-
-        // check UDP noblock delay, it cannot affect NAGLE
-        sock.set_noblock_nodelay();
-        AssertFalse(sock.is_blocking());
-        AssertTrue(sock.is_nodelay());
-    }
-
-    TestCase(tcp_socket_options)
-    {
-        Socket sock = rpp::make_tcp_randomport();
-        AssertFalse(sock.is_blocking()); // should be false by default
-        AssertTrue(sock.is_nodelay()); // should be nodelay by default
-
-        Assert(sock.set_blocking(true));
-        Assert(sock.is_blocking());
-
-        Assert(sock.set_nagle(true));
-        AssertFalse(sock.is_nodelay());
-
-        print_info("default TCP SO_RCVBUF: %d\n", sock.get_rcv_buf_size());
-        print_info("default TCP SO_SNDBUF: %d\n", sock.get_snd_buf_size());
-
-        // NOTE: if there is a mismatch here, then some unix-like kernel didn't double the buffer
-        //       which is expected behaviour on non-windows platforms
-        Assert(sock.set_snd_buf_size(16384));
-        AssertThat(sock.get_snd_buf_size(), 16384);
-
-        Assert(sock.set_rcv_buf_size(32768));
-        AssertThat(sock.get_rcv_buf_size(), 32768);
-
-        // check TCP noblock delay, it cannot affect NAGLE
-        sock.set_noblock_nodelay();
-        AssertFalse(sock.is_blocking());
-        AssertTrue(sock.is_nodelay());
     }
 };
