@@ -54,17 +54,38 @@
     #define closesocket(fd) ::close(fd)
 #endif
 
+// For MSVC we don't need to flush logs, but for LINUX, it's necessary for atomic-ish logging
+#if _MSC_VER
+#  define logflush(...)
+#else
+#  define logflush(file) fflush(file)
+#endif
+
 #if RPP_SOCKETS_DBG
     #define indebug(...) __VA_ARGS__
-    #define logerror(err, fmt, ...) do { \
+    // logs the error only if previous error was different
+    #define logerronce(err, fmt, ...) do { \
         static int prev_failure; \
         if ((err) != prev_failure) { \
             fprintf(stderr, __log_format(fmt"\n", __FILE__, __LINE__, __FUNCTION__), ##__VA_ARGS__); \
+            logflush(stderr); \
         } \
+    } while (0)
+    // log into stderr
+    #define logerror(fmt, ...) do { \
+        fprintf(stderr, __log_format(fmt"\n", __FILE__, __LINE__, __FUNCTION__), ##__VA_ARGS__); \
+        logflush(stderr); \
+    } while (0)
+    // log into stdout
+    #define logdebug(fmt, ...) do { \
+        fprintf(stdout, __log_format(fmt"\n", __FILE__, __LINE__, __FUNCTION__), ##__VA_ARGS__); \
+        logflush(stdout); \
     } while (0)
 #else
     #define indebug(...) /*NOP in release*/
-    #define logerror(err, msg, ...) /*NOP in release*/
+    #define logerronce(err, fmt, ...) /*NOP in release*/
+    #define logerror(fmt, ...) /*NOP in release*/
+    #define logdebug(fmt, ...) /*NOP in release*/
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -291,11 +312,9 @@ namespace rpp
                 }
                 freeaddrinfo(infos);
             }
-            else {
-            #if RPP_SOCKETS_DBG
-                string errmsg = socket::last_err();
-                fprintf(stderr, "getaddrinfo failed: %s\n", errmsg.c_str());
-            #endif
+            else
+            {
+                logerror("getaddrinfo failed: %s", socket::last_err().c_str());
             }
         //}
         //memset(addr, 0, addrLen);
@@ -653,21 +672,18 @@ namespace rpp
                 int len = recvfrom(from, dump, std::min<int>(sizeof(dump), max));
                 if (len < 0)
                 {
-                    printf("flush() recvfrom END: %d\n", len);
-                    fflush(stdout);
+                    logdebug("recvfrom END: %d", len);
                     break;
                 }
                 if (len == 0) // UDP packet was probably truncated, get available() again
                 {
                     max = std::min<int>(available(), max);
-                    printf("flush() recvfrom TRUNC: %d max: %d avail: %d\n", len, max, available());
-                    fflush(stdout);
+                    logdebug("recvfrom TRUNC: %d max: %d avail: %d", len, max, available());
                 }
                 else
                 {
                     max -= len;
-                    printf("flush() recvfrom OK: %d max: %d\n", len, max);
-                    fflush(stdout);
+                    logdebug("recvfrom OK: %d max: %d", len, max);
                 }
             }
         }
@@ -746,7 +762,7 @@ namespace rpp
         switch (errcode) {
             default: {
                 indebug(auto errmsg = socket::last_err(errcode));
-                indebug(fprintf(stderr, "socket %s\r\n", errmsg.c_str()));
+                logerror("socket %s", errmsg.c_str());
                 close();
                 Assert(false, "socket operation - unexpected failure");
                 return -1;
@@ -767,7 +783,7 @@ namespace rpp
                 return -1;
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_err(errcode));
-                indebug(fprintf(stderr, "%s\r\n", errmsg.c_str()));
+                logerror("%s", errmsg.c_str());
                 close();
                 return -1;
             }
@@ -825,7 +841,7 @@ namespace rpp
             return 0;
     #endif
         int err = os_getsockerr();
-        logerror(err, "(%s) failed: %s", ioctl_string(iocmd), last_err(err).c_str());
+        logerronce(err, "(%s) failed: %s", ioctl_string(iocmd), last_err(err).c_str());
         return err;
     }
 
@@ -869,10 +885,7 @@ namespace rpp
             return true;
         }
     #endif
-    #if RPP_SOCKETS_DBG
-        fprintf(stderr, "set_blocking(%s) failed: %s\n",
-                socketsBlock?"true":"false", last_err().c_str());
-    #endif
+        logerror("set_blocking(%s) failed: %s", socketsBlock?"true":"false", last_err().c_str());
         return false;
     }
 
@@ -896,10 +909,7 @@ namespace rpp
         // TCP_NODELAY: 1 nodelay, 0 nagle enabled
         if (set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1) == 0)
             return true;
-        #if RPP_SOCKETS_DBG
-            fprintf(stderr, "set_nagle(%s) failed: %s\n",
-                    enableNagle?"true":"false", last_err().c_str());
-        #endif
+        logerror("set_nagle(%s) failed: %s", enableNagle?"true":"false", last_err().c_str());
         return false;
     }
     bool socket::is_nodelay() const noexcept
@@ -1092,7 +1102,7 @@ namespace rpp
         {
             if (handle_errno(errcode) != 0)
             {
-                logerror(errcode, "select() failed: %s", last_err().c_str());
+                logerronce(errcode, "select() failed: %s", last_err().c_str());
                 return false;
             }
         }

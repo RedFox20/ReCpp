@@ -125,6 +125,7 @@ TestImpl(test_sockets)
 
         send.sendto(recv_addr, "udp_select");
         AssertNotEqual(recv.available(), 0);
+        sleep(1);
 
         recv.flush();
         AssertEqual(recv.available(), 0);
@@ -134,6 +135,7 @@ TestImpl(test_sockets)
         send.sendto(recv_addr, "udp_select2xxxxxxxxxx");
         send.sendto(recv_addr, "udp_select3xxxxxxxxxx");
         AssertNotEqual(recv.available(), 0);
+        sleep(1);
 
         recv.flush();
         AssertEqual(recv.available(), 0);
