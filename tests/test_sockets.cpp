@@ -1,4 +1,5 @@
 #include <rpp/sockets.h>
+#include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
 
@@ -120,6 +121,13 @@ TestImpl(test_sockets)
         AssertTrue(recv.select(100, rpp::socket::SF_Read));
         AssertThat(recv.recv_str(), "udp_select1"s);
         AssertThat(recv.recv_str(), "udp_select2"s);
+
+        // now test for timeout
+        AssertThat(recv.available(), 0);
+        rpp::Timer t;
+        AssertFalse(recv.select(250, rpp::socket::SF_Read));
+        AssertGreaterOrEqual(t.elapsed_ms(), 249.0);
+        AssertThat(recv.available(), 0);
     }
 
     TestCase(udp_flush)
