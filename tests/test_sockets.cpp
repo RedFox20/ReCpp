@@ -115,6 +115,30 @@ TestImpl(test_sockets)
         AssertFalse(recv.select(100, rpp::socket::SF_Read));
     }
 
+    TestCase(udp_flush)
+    {
+        Socket send = rpp::make_udp_randomport();
+        Socket recv = rpp::make_udp_randomport();
+        AssertFalse(send.is_blocking()); // should be false by default
+        AssertFalse(recv.is_blocking()); // should be false by default
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+
+        send.sendto(recv_addr, "udp_select");
+        AssertNotEqual(recv.available(), 0);
+
+        recv.flush();
+        AssertEqual(recv.available(), 0);
+
+        // send and flush multiple packets
+        send.sendto(recv_addr, "udp_select1xxxxxxxxxx");
+        send.sendto(recv_addr, "udp_select2xxxxxxxxxx");
+        send.sendto(recv_addr, "udp_select3xxxxxxxxxx");
+        AssertNotEqual(recv.available(), 0);
+
+        recv.flush();
+        AssertEqual(recv.available(), 0);
+    }
+
     //////////////////////////////////////////////////////////////////
 
     Socket create(std::string msg, Socket&& s)

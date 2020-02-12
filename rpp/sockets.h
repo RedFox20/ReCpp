@@ -317,8 +317,9 @@ namespace rpp
         /**
          * Skips a number of bytes from the read stream
          * This is a controlled flush of the OS socket read buffer
+         * @param maxBytes Maximum number of bytes to skip
          */
-        NOINLINE void skip(int n) noexcept;
+        NOINLINE void skip(int maxBytes) noexcept;
 
         /**
          * UDP only. Receives up to maxBytes from some ipaddress.

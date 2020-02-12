@@ -4,6 +4,7 @@
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
+#include <algorithm> // std::min
 
 #if DEBUG || _DEBUG || RPP_DEBUG
 #define RPP_SOCKETS_DBG 1
@@ -601,12 +602,15 @@ namespace rpp
 
     void socket::flush() noexcept
     {
-        // flush write buffer:
-        bool nodelay = is_nodelay();
-        if (!nodelay) set_nagle(true); // force only if needed
-        set_nagle(nodelay); // this must be called at least once
+        if (type() == ST_Stream)
+        {
+            // flush write buffer (hack only available for TCP sockets)
+            bool nodelay = is_nodelay();
+            if (!nodelay) set_nagle(true); // force only if needed
+            set_nagle(nodelay); // this must be called at least once
+        }
 
-        skip(available()); // flush read buffer
+        skip(INT_MAX); // flush read buffer
     }
 
     int socket::available() const noexcept
@@ -633,15 +637,36 @@ namespace rpp
         return handle_txres(::recvfrom(Sock, (char*)buffer, numBytes, MSG_PEEK, &a.sa, &len));
     }
 
-    void socket::skip(int count) noexcept
+    void socket::skip(int maxBytes) noexcept
     {
-        Assert(type() != ST_Datagram, "UDP datagrams cannot be skipped like a TCP stream");
+        int max = std::min<int>(available(), maxBytes);
+        if (max <= 0)
+            return;
 
-        char dump[128];
-        for (int i = 0; i < count;) {
-            int n = recv(dump, 128);
-            if (n <= 0) break;
-            i += n;
+        char dump[4096];
+
+        if (type() == ST_Datagram)
+        {
+            ipaddress from;
+            while (max > 0)
+            {
+                int len = recvfrom(from, dump, std::min<int>(sizeof(dump), max));
+                if (len < 0)
+                    break;
+                if (len == 0) // UDP packet was probably truncated, get available() again
+                    max = std::min<int>(available(), max);
+                else
+                    max -= len;
+            }
+        }
+        else
+        {
+            while (max > 0)
+            {
+                int len = recv(dump, std::min<int>(sizeof(dump), max));
+                if (len <= 0) break;
+                max -= len;
+            }
         }
     }
 
@@ -714,6 +739,7 @@ namespace rpp
                 Assert(false, "socket operation - unexpected failure");
                 return -1;
             }
+            case ESOCK(EMSGSIZE):    return 0; // message too large to fit into buffer and was truncated
             case ESOCK(EINPROGRESS): return 0; // request is in progress, you should call wait
             case ESOCK(EWOULDBLOCK): return 0; // no data available right now
             #if EAGAIN != ESOCK(EWOULDBLOCK)
