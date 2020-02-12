@@ -652,11 +652,20 @@ namespace rpp
             {
                 int len = recvfrom(from, dump, std::min<int>(sizeof(dump), max));
                 if (len < 0)
+                {
+                    printf("flush() recvfrom END: %d\n", len);
                     break;
+                }
                 if (len == 0) // UDP packet was probably truncated, get available() again
+                {
                     max = std::min<int>(available(), max);
+                    printf("flush() recvfrom TRUNC: %d max: %d avail: %d\n", len, max, available());
+                }
                 else
+                {
                     max -= len;
+                    printf("flush() recvfrom OK: %d max: %d\n", len, max);
+                }
             }
         }
         else
