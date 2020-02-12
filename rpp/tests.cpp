@@ -73,8 +73,10 @@ namespace rpp
                     if (handle == nullptr)
                     {
                         char error[1024];
-                        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, GetLastError(), 0, error, 1024, nullptr);
+                        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr,
+                                       GetLastError(), 0, error, 1024, nullptr);
                         fprintf(stderr, "CreateFileMapping failed: %s\n", error);
+                        fflush(stderr);
                     }
                     assert(handle != nullptr);
                 }
@@ -90,8 +92,10 @@ namespace rpp
                     // shm_fd = open(name.c_str(), O_RDWR);
                     // if (shm_fd == -1) {
                     //     shm_fd = memfd_create(name.c_str(), MFD_ALLOW_SEALING | MFD_CLOEXEC);
-                    //     if (shm_fd == -1)
+                    //     if (shm_fd == -1) {
                     //         fprintf(stderr, "memfd_create failed: %s\n", strerror(errno));
+                    //         fflush(stderr);
+                    //     }
                     // }
                 #else
                     shm_fd = shm_open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
@@ -99,8 +103,11 @@ namespace rpp
                 #endif
                 assert(shm_fd != -1);
                 int fterr = ftruncate(shm_fd, sizeof(shared));
-                if (fterr != 0) fprintf(stderr, "ftruncate(%d,%d) failed: %s\n",
-                                                shm_fd, (int)sizeof(shared), strerror(errno));
+                if (fterr != 0) {
+                    fprintf(stderr, "ftruncate(%d,%d) failed: %s\n",
+                                    shm_fd, (int)sizeof(shared), strerror(errno));
+                    fflush(stderr);
+                }
                 shared_mem = (shared*)mmap(nullptr, sizeof(shared),
                                       PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
             #endif
@@ -327,7 +334,6 @@ namespace rpp
         {
             for (int i = 0; i < test_count; ++i) {
                 if (test_funcs[i].name.find(methodFilter)) {
-                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
                     allSuccess &= run_test_func(results, test_funcs[i]);
                     ++numTests;
                 }
@@ -340,7 +346,6 @@ namespace rpp
         {
             for (int i = 0; i < test_count; ++i) {
                 if (test_funcs[i].autorun) {
-                    consolef(Yellow, "%s::%s\n", name.str, test_funcs[i].name.str);
                     allSuccess &= run_test_func(results, test_funcs[i]);
                     ++numTests;
                 }
@@ -359,6 +364,7 @@ namespace rpp
 
     bool test::run_test_func(test_results& results, test_func& test)
     {
+        consolef(Yellow, "%s::%s\n", name.str, test.name.str);
         current_func = &test; // TODO: thread safety?
         int before = results.asserts_failed;
         try
