@@ -191,7 +191,9 @@ TestImpl(test_sockets)
         print_info("remote: closing down\n");
     }
 
-    static constexpr int TransmitSize = 80000;
+    // 65536 is the typical localhost MTU for datagrams
+    static constexpr int TransmitSize = 65536;
+
     TestCase(transmit_data)
     {
         print_info("========= TRANSMIT DATA =========\n");
