@@ -68,11 +68,14 @@ namespace rpp
      *              !!Out of bounds values are not checked!! Use clamp(lerpInverse(min, max, value), 0, 1); instead
      * @param start Starting bound of the linear range
      * @param end Ending bound of the linear range
-     * @return Ratio between [0..1] or < 0 / > 1 if value is out of bounds
+     * @return [0..1] if in bounds
+     *         Less than 0 or Greater than 1 if out of bounds
+     *         0 if invalid span (end-start)==0
      */
     template<class T> static constexpr T lerpInverse(const T value, const T start, const T end)
     {
-        return (value - start) / (end - start);
+        T span = (end - start);
+        return span == 0 ? 0 : (value - start) / span;
     }
 
     ///////////////////////////////////////////////////////////////////////////////
