@@ -734,11 +734,20 @@ namespace rpp
         return skipped;
     }
 
-
     int socket::available() const noexcept
     {
         int bytesAvail;
         return get_ioctl(FIONREAD, bytesAvail) ? -1 : bytesAvail;
+    }
+
+    int socket::peek_datagram_size() noexcept
+    {
+    #if !_WIN32
+        return available();
+    #else
+        char buffer[4096];
+        return peek(buffer, sizeof(buffer));
+    #endif
     }
 
     int socket::recv(void* buffer, int maxBytes) noexcept
@@ -851,6 +860,21 @@ namespace rpp
         }
     }
     
+    string socket::peek_str(int maxCount) noexcept
+    {
+        int count = available();
+        int n = count < maxCount ? count : maxCount;
+        if (n <= 0) return {};
+
+        string cont; cont.resize(n);
+        int received = peek((void*)cont.data(), n);
+        if (received <= 0) return {};
+
+        // even though we had N+ bytes available, a single packet might be smaller
+        if (received < n) cont.resize(received); // truncate
+        return cont;
+    }
+
     bool socket::wait_available(int millis) noexcept
     {
         if (!connected()) return false;

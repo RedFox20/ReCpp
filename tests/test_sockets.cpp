@@ -95,7 +95,7 @@ TestImpl(test_sockets)
         AssertThat(buf, msg);
     }
     
-    TestCase(udp_select)
+    TestCase(udp_nonblocking_select)
     {
         Socket send = rpp::make_udp_randomport();
         Socket recv = rpp::make_udp_randomport();
@@ -109,38 +109,79 @@ TestImpl(test_sockets)
 
         // must be ready to receive
         AssertTrue(recv.select(100, rpp::socket::SF_Read));
-        AssertThat(recv.recv_str(), "udp_select");
+        AssertThat(recv.recv_str(), "udp_select"s);
 
         // no data to receive, should return false
         AssertFalse(recv.select(100, rpp::socket::SF_Read));
+
+        // now test two consecutive datagrams
+        send.sendto(recv_addr, "udp_select1");
+        send.sendto(recv_addr, "udp_select2");
+        AssertTrue(recv.select(100, rpp::socket::SF_Read));
+        AssertThat(recv.recv_str(), "udp_select1"s);
+        AssertThat(recv.recv_str(), "udp_select2"s);
     }
 
     TestCase(udp_flush)
     {
         Socket send = rpp::make_udp_randomport();
         Socket recv = rpp::make_udp_randomport();
-        AssertFalse(send.is_blocking()); // should be false by default
-        AssertFalse(recv.is_blocking()); // should be false by default
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
-        send.sendto(recv_addr, "udp_select");
+        send.sendto(recv_addr, "udp_flush");
         AssertNotEqual(recv.available(), 0);
-        sleep(1);
 
         recv.flush();
         AssertEqual(recv.available(), 0);
 
         // send and flush multiple packets
-        send.sendto(recv_addr, "udp_select1xxxxxxxxxx");
-        send.sendto(recv_addr, "udp_select2xxxxxxxxxx");
-        send.sendto(recv_addr, "udp_select3xxxxxxxxxx");
+        send.sendto(recv_addr, "udp_flush1xxxxxxxxxx");
+        send.sendto(recv_addr, "udp_flush2xxxxxxxxxx");
+        send.sendto(recv_addr, "udp_flush3xxxxxxxxxx");
         AssertNotEqual(recv.available(), 0);
         print_info("available after 3x sendto: %d\n", recv.available());
-        sleep(15);
         
         print_info("available before flush: %d\n", recv.available());
         recv.flush();
         AssertEqual(recv.available(), 0);
+    }
+
+    TestCase(udp_peek)
+    {
+        Socket send = rpp::make_udp_randomport();
+        Socket recv = rpp::make_udp_randomport();
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+
+        send.sendto(recv_addr, "udp_peek1");
+        send.sendto(recv_addr, "udp_peek22");
+
+        AssertThat(recv.peek_datagram_size(), "udp_peek1"s.size());
+        AssertThat(recv.peek_str(), "udp_peek1"s);
+        AssertThat(recv.peek_str(), "udp_peek1"s);
+        AssertThat(recv.recv_str(), "udp_peek1"s);
+
+        AssertThat(recv.peek_datagram_size(), "udp_peek22"s.size());
+        AssertThat(recv.peek_str(), "udp_peek22"s);
+        AssertThat(recv.peek_str(), "udp_peek22"s);
+        AssertThat(recv.recv_str(), "udp_peek22"s);
+
+        AssertThat(recv.peek_datagram_size(), 0);
+        AssertThat(recv.peek_str(), ""s);
+        AssertThat(recv.recv_str(), ""s);
+    }
+
+    TestCase(recv_vector_data)
+    {
+        Socket send = rpp::make_udp_randomport();
+        Socket recv = rpp::make_udp_randomport();
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+
+        std::vector<uint8_t> v1 {'a','b','c','d'};
+        std::vector<uint8_t> v2 {'e','f','g','h'};
+        send.sendto(recv_addr, v1);
+        send.sendto(recv_addr, v2);
+        
+        AssertThat(recv.recv_data(), v1);
     }
 
     //////////////////////////////////////////////////////////////////

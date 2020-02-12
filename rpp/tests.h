@@ -197,63 +197,63 @@ namespace rpp
 #undef TestCase
 #undef TestCaseExpectedEx
 
-#define Assert(expr) [&]() -> bool { \
-    if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "but expected", true); return false; } \
-    return true; \
-}()
+#define Assert(expr) do { \
+    if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "but expected", true); } \
+}while(0)
+
 #define AssertTrue Assert
-#define AssertFalse(expr) [&]() -> bool { \
-    if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "but expected", false); return false; } \
-    return true; \
-}()
-#define AssertMsg(expr, fmt, ...) [&]() -> bool { \
-    if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); return false; } \
-    return true; \
-}()
-#define AssertThat(expr, expected) [&]() -> bool { \
+#define AssertFalse(expr) do { \
+    if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "but expected", false); } \
+}while(0)
+
+#define AssertMsg(expr, fmt, ...) do { \
+    if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); } \
+}while(0)
+
+#define AssertThat(expr, expected) do { \
     const auto& __expr   = expr;           \
     const auto& __expect = expected;       \
-    if (!(__expr == __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); return false; } \
-    return true; \
-}()
+    if (!(__expr == __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
+}while(0)
+
 #define AssertEqual AssertThat
-#define AssertThrows(expr, exceptionType) [&]() -> bool { \
+
+#define AssertThrows(expr, exceptionType) do { \
     try { \
         expr; \
         assert_failed(__FILE__, __LINE__, "%s => expected exception of type %s", #expr, #exceptionType); \
-        return false; \
-    } catch (const exceptionType&) { return true; } \
-}()
-#define AssertNotEqual(expr, mustNotEqual) [&]() -> bool { \
+    } catch (const exceptionType&) {} \
+}while(0)
+
+#define AssertNotEqual(expr, mustNotEqual) do { \
     const auto& __expr    = expr;         \
     const auto& __mustnot = mustNotEqual; \
-    if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); return false; } \
-    return true; \
-}()
-#define AssertGreater(expr, than) [&]() -> bool { \
+    if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
+}while(0)
+
+#define AssertGreater(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr > __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); return false; } \
-    return true; \
-}()
-#define AssertLess(expr, than) [&]() -> bool { \
+    if (!(__expr > __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); } \
+}while(0)
+
+#define AssertLess(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr < __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); return false; } \
-    return true; \
-}()
-#define AssertGreaterOrEqual(expr, than) [&]() -> bool { \
+    if (!(__expr < __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); } \
+}while(0)
+
+#define AssertGreaterOrEqual(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr >= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); return false; } \
-    return true; \
-}()
-#define AssertLessOrEqual(expr, than) [&]() -> bool { \
+    if (!(__expr >= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); } \
+}while(0)
+
+#define AssertLessOrEqual(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr <= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); return false; } \
-    return true; \
-}()
+    if (!(__expr <= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); } \
+}while(0)
 
 #define TestImpl(testclass) struct testclass : public rpp::test
 

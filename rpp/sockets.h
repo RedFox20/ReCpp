@@ -285,6 +285,9 @@ namespace rpp
         int sendto(const ipaddress& to, const vector<uint8_t>& bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
+        int sendto(const ipaddress& to, const vector<char>& bytes) noexcept {
+            return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
+        }
         // Send a C++ string
         template<class T> int sendto(const ipaddress& to, const basic_string<T>& str) noexcept {
             return sendto(to, str.data(), int(sizeof(T) * str.size()));
@@ -331,6 +334,15 @@ namespace rpp
         NOINLINE int available() const noexcept;
 
         /**
+         * Attempts to only peek the size of a single datagram.
+         * On LINUX this is equivalent to available()
+         * On WINSOCK this is will peek up to 4096 byte-sized datagrams
+         * @warning The downside is that this will cause bytes to be read twice
+         *          from the recv buffer, so use at your own risk
+         */
+        NOINLINE int peek_datagram_size() noexcept;
+
+        /**
          * Receive data from remote socket, return number of bytes received
          * Automatically closes socket during critical failure and returns -1
          * If there is no data to receive, this function returns 0
@@ -368,26 +380,34 @@ namespace rpp
         int handle_errno(int err=0) noexcept;
         int handle_txres(long ret) noexcept;
 
-        template<class Action> static bool try_for_period(int millis, Action action) noexcept {
+        // TODO: rewrite or delete this
+        template<class Action> static bool try_for_period(int millis, Action action) noexcept
+        {
             const double timeout = millis / 1000.0; // millis to seconds
             const double start = timer_time();
-            do {
+            do
+            {
                 if (action())
                     return true; // success
                 thread_sleep(1); // suspend until next timeslice
-            } while (timeout > 0.0 && (timer_time() - start) < timeout);
+            }
+            while (timeout > 0.0 && (timer_time() - start) < timeout);
+
             return false; // timeout
         }
-        template<class Ret> Ret try_recv(Ret (socket::*recv)(int max), int millis) noexcept {
+        template<class Ret> Ret try_recv(Ret (socket::*recv)(int max), int millis) noexcept
+        {
             Ret res;
-            try_for_period(millis, [&]() {
+            this->try_for_period(millis, [&]() {
                 return available() != 0 ? (res = (this->*recv)(0x7fffffff)),true : false;
             });
             return res;
         }
-        template<class Ret> Ret try_recvfrom(Ret (socket::*recvfrom)(ipaddress& from, int max), ipaddress& from, int millis) noexcept {
+        template<class Ret> Ret try_recvfrom(Ret (socket::*recvfrom)(ipaddress& from, int max),
+                                             ipaddress& from, int millis) noexcept
+        {
             Ret res;
-            try_for_period(millis, [&]() {
+            this->try_for_period(millis, [&]() {
                 return available() != 0 ? (res = (this->*recvfrom)(from, 0x7fffffff)),true : false;
             });
             return res;
@@ -404,22 +424,46 @@ namespace rpp
          *     value_type* data();
          *     typedef ... value_type;
          */
-        template<class T> NOINLINE T recv_gen(int maxCount = 0x7fffffff) noexcept {
+        template<class T> NOINLINE T recv_gen(int maxCount = 0x7fffffff) noexcept
+        {
             int count = available() / sizeof(typename T::value_type);
-            if (count <= 0) return T{};
             int n = count < maxCount ? count : maxCount;
-            T cont;
-            cont.resize(n);
+            if (n <= 0) return T{};
+
+            T cont; cont.resize(n);
             int received = recv((void*)cont.data(), n * sizeof(typename T::value_type));
+            if (received <= 0) return T{};
+
             // even though we had N+ bytes available, a single packet might be smaller
-            if (received >= 0 && n != received)
-                cont.resize(received); // truncate
+            if (received < n) cont.resize(received); // truncate
             return cont;
         }
+
+        /** UDP version of recv_gen */
+        template<class T> NOINLINE T recvfrom_gen(ipaddress& from, int maxCount = 0x7fffffff) noexcept
+        {
+            int count = available() / sizeof(typename T::value_type);
+            int n = count < maxCount ? count : maxCount;
+            if (n <= 0) return T{};
+
+            T cont; cont.resize(n);
+            int received = recvfrom(from, (void*)cont.data(), n * sizeof(typename T::value_type));
+            if (received <= 0) return T{};
+
+            // even though we had N+ bytes available, a single packet might be smaller
+            if (received < n) cont.resize(received); // truncate
+            return cont;
+        }
+
         string          recv_str (int maxChars = 0x7fffffff) noexcept { return recv_gen<string>(maxChars); }
         wstring         recv_wstr(int maxChars = 0x7fffffff) noexcept { return recv_gen<wstring>(maxChars); }
         vector<uint8_t> recv_data(int maxCount = 0x7fffffff) noexcept { return recv_gen<vector<uint8_t>>(maxCount); }
 
+        string          recvfrom_str (ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<string>(from, maxChars); }
+        wstring         recvfrom_wstr(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<wstring>(from, maxChars); }
+        vector<uint8_t> recvfrom_data(ipaddress& from, int maxCount = 0x7fffffff) noexcept { return recvfrom_gen<vector<uint8_t>>(from, maxCount); }
+
+        string peek_str(int maxCount = 0x7fffffff) noexcept;
 
         /**
          * Waits up to timeout millis for data from remote end.
@@ -442,28 +486,13 @@ namespace rpp
 
 
         // Sends a request and waits until an answer is returned
-        template<class T, class U> T request(const U& request, int millis = 1000) noexcept {
+        template<class T, class U> T request(const U& request, int millis = 1000) noexcept
+        {
             return send(request) <= 0 ? T{} : wait_recv<T>(millis);
         }
         template<class U> auto request_str(const U& req, int millis = 1000)  noexcept { return request<string>(req, millis); }
         template<class U> auto request_wstr(const U& req, int millis = 1000) noexcept { return request<wstring>(req, millis); }
         template<class U> auto request_data(const U& req, int millis = 1000) noexcept { return request<vector<uint8_t>>(req, millis); }
-
-        /**
-         * UDP version of recv_gen
-         */
-        template<class T> NOINLINE T recvfrom_gen(ipaddress& from, int maxCount = 0x7fffffff) noexcept {
-            int count = available() / sizeof(typename T::value_type);
-            if (count <= 0) return T{};
-            int n = count < maxCount ? count : maxCount;
-            T cont;
-            cont.resize(n);
-            recvfrom(from, (void*)cont.data(), n * sizeof(typename T::value_type));
-            return cont;
-        }
-        string          recvfrom_str (ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<string>(from, maxChars); }
-        wstring         recvfrom_wstr(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<wstring>(from, maxChars); }
-        vector<uint8_t> recvfrom_data(ipaddress& from, int maxCount = 0x7fffffff) noexcept { return recvfrom_gen<vector<uint8_t>>(from, maxCount); }
 
 
         /**
