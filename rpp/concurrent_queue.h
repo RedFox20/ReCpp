@@ -102,8 +102,13 @@ namespace rpp
 
         /**
          * Waits until an item is ready to be popped.
-         * The cancellationCondition is used to terminate
-         * the wait:
+         * The cancellationCondition is used to terminate the wait:
+         * @param outItem [out] The popped item. Only valid if return value is TRUE
+         * @param timeoutMillis Maximum number of milliseconds to wait
+         * @param cancellationCondition Cancellation condition, CANCEL if cancellationCondition()==true
+         * @param cancellationInterval Interval in milliseconds for checking cancellation condition
+        * @return TRUE if an item was popped,
+         *        FALSE if no item popped due to: timeout or cancellation
          * @code
          *   string item;
          *   if (queue.wait_pop(item, [&]{ return Cancelled || Finished; })
@@ -113,15 +118,55 @@ namespace rpp
          * @endcode
          */
         template<class WaitUntil>
-        bool wait_pop(T& outItem, const WaitUntil& cancellationCondition)
+        bool wait_pop(T& outItem, const WaitUntil& cancellationCondition,
+                      int cancellationInterval = 1000)
         {
+            std::chrono::milliseconds interval {cancellationInterval};
             std::unique_lock<mutex> lock {Mutex};
             
             while (Queue.empty())
             {
                 if (cancellationCondition())
                     break;
-                Waiter.wait(lock);
+                Waiter.wait_for(lock, interval);
+            }
+            
+            if (Queue.empty())
+                return false;
+            pop_unlocked(outItem);
+            return true;
+        }
+
+        /**
+         * Waits up to N milliseconds until an item is ready to be popped.
+         * The cancellationCondition is used to terminate the wait:
+         * @param outItem [out] The popped item. Only valid if return value is TRUE
+         * @param timeoutMillis Maximum number of milliseconds to wait before returning FALSE
+         * @param cancellationCondition Cancellation condition, CANCEL if cancellationCondition()==true
+         * @return TRUE if an item was popped,
+         *         FALSE if no item popped due to: timeout or cancellation
+         * @code
+         *   string item;
+         *   if (queue.wait_pop(item, 1000, [&]{ return Cancelled || Finished; })
+         *   {
+         *       // item is valid
+         *   }
+         * @endcode
+         */
+        template<class WaitUntil>
+        bool wait_pop(T& outItem, int timeoutMillis, const WaitUntil& cancellationCondition)
+        {
+            auto end = std::chrono::system_clock::now()
+                     + std::chrono::milliseconds{timeoutMillis};
+            std::unique_lock<mutex> lock {Mutex};
+            
+            while (Queue.empty())
+            {
+                if (cancellationCondition())
+                    break;
+                std::cv_status status = Waiter.wait_until(lock, end);
+                if (status == std::cv_status::timeout)
+                    break;
             }
             
             if (Queue.empty())
