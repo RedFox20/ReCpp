@@ -135,8 +135,10 @@ TestImpl(test_sockets)
         send.sendto(recv_addr, "udp_select2xxxxxxxxxx");
         send.sendto(recv_addr, "udp_select3xxxxxxxxxx");
         AssertNotEqual(recv.available(), 0);
-        sleep(5);
-
+        print_info("available after 3x sendto: %d\n", recv.available());
+        sleep(15);
+        
+        print_info("available before flush: %d\n", recv.available());
         recv.flush();
         AssertEqual(recv.available(), 0);
     }

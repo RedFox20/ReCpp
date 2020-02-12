@@ -4,7 +4,6 @@
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
-#include <algorithm> // std::min
 
 #if DEBUG || _DEBUG || RPP_DEBUG
 #define RPP_SOCKETS_DBG 1
@@ -53,6 +52,8 @@
      // map linux socket calls to winsock calls via macros
     #define closesocket(fd) ::close(fd)
 #endif
+
+#include <algorithm> // std::min
 
 // For MSVC we don't need to flush logs, but for LINUX, it's necessary for atomic-ish logging
 #if _MSC_VER
@@ -621,6 +622,12 @@ namespace rpp
 
     void socket::flush() noexcept
     {
+        flush_send_buf();
+        flush_recv_buf();
+    }
+
+    void socket::flush_send_buf() noexcept
+    {
         if (type() == ST_Stream)
         {
             // flush write buffer (hack only available for TCP sockets)
@@ -629,8 +636,104 @@ namespace rpp
             set_nagle(nodelay); // this must be called at least once
         }
 
-        skip(INT_MAX); // flush read buffer
     }
+
+    void socket::flush_recv_buf() noexcept
+    {
+        if (type() == ST_Stream)
+        {
+            skip(available());
+        }
+        else
+        {
+        #if _WIN32
+            // On WINSOCK, this skips the total available bytes in recv buffer
+            skip(available());
+        #else
+            // On LINUX we need to dump all datagrams one-by-one
+            const int MAX_DATAGRAMS = 1000; // limit number of datagrams to flush
+            for (int i = 0; i < MAX_DATAGRAMS; ++i)
+            {
+                if (skip(available()) <= 0)
+                    break;
+            }
+        #endif
+        }
+    }
+    
+    int socket::skip(int bytesToSkip) noexcept
+    {
+        if (bytesToSkip <= 0)
+            return 0;
+
+        int remaining = bytesToSkip;
+        int skipped = 0;
+        char dump[4096];
+
+        if (type() == ST_Stream)
+        {
+            while (skipped < bytesToSkip)
+            {
+                int len = recv(dump, std::min<int>(sizeof(dump), remaining));
+                if (len <= 0)
+                    break;
+                skipped += len;
+                remaining -= len;
+            }
+        }
+        else
+        {
+            ipaddress from;
+            while (skipped < bytesToSkip)
+            {
+                // datagram flush is much more complicated because WINSOCK and LINUX
+                // sockets report available() differently
+                // WINSOCK: total number of available bytes in recv buffer
+                // LINUX: current datagram size
+                int avail = available();
+                if (avail <= 0)
+                    break;
+
+                logdebug("CHECK available %d", avail);
+
+                int max = std::min<int>(sizeof(dump), remaining);
+                int len = recvfrom(from, dump, max);
+                if (len < 0)
+                {
+                    logdebug("EOF skipped %d/%d", skipped, bytesToSkip);
+                    break;
+                }
+
+                if (len == 0) // UDP packet was probably truncated, get available() again
+                {
+                #if _WIN32 // on WINSOCK, we see the total available bytes
+                    int after = available();
+                    if (after <= 0) // at this point we can't really know the exact N
+                    {
+                        logdebug("TRUNC EOF skipped %d/%d", skipped+max, bytesToSkip);
+                        skipped += max;
+                        break;
+                    }
+
+                    len = std::max<int>(0, avail - after);
+                #else
+                    len = avail; // on LINUX, sockets report available() per datagram
+                #endif
+                    logdebug("TRUNC max: skipped %d/%d", skipped+len, bytesToSkip);
+                    skipped   += len;
+                    remaining -= len;
+                }
+                else
+                {
+                    logdebug("OK %d skipped %d/%d", len, skipped+len, bytesToSkip);
+                    skipped   += len;
+                    remaining -= len;
+                }
+            }
+        }
+        return skipped;
+    }
+
 
     int socket::available() const noexcept
     {
@@ -654,48 +757,6 @@ namespace rpp
         saddr a;
         socklen_t len = sizeof(a);
         return handle_txres(::recvfrom(Sock, (char*)buffer, numBytes, MSG_PEEK, &a.sa, &len));
-    }
-
-    void socket::skip(int maxBytes) noexcept
-    {
-        int max = std::min<int>(available(), maxBytes);
-        if (max <= 0)
-            return;
-
-        char dump[4096];
-
-        if (type() == ST_Datagram)
-        {
-            ipaddress from;
-            while (max > 0)
-            {
-                int len = recvfrom(from, dump, std::min<int>(sizeof(dump), max));
-                if (len < 0)
-                {
-                    logdebug("recvfrom END: %d", len);
-                    break;
-                }
-                if (len == 0) // UDP packet was probably truncated, get available() again
-                {
-                    max = std::min<int>(available(), max);
-                    logdebug("recvfrom TRUNC: %d max: %d avail: %d", len, max, available());
-                }
-                else
-                {
-                    max -= len;
-                    logdebug("recvfrom OK: %d max: %d", len, max);
-                }
-            }
-        }
-        else
-        {
-            while (max > 0)
-            {
-                int len = recv(dump, std::min<int>(sizeof(dump), max));
-                if (len <= 0) break;
-                max -= len;
-            }
-        }
     }
 
     NOINLINE int socket::recvfrom(ipaddress& from, void* buffer, int maxBytes) noexcept

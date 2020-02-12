@@ -290,13 +290,43 @@ namespace rpp
             return sendto(to, str.data(), int(sizeof(T) * str.size()));
         }
 
-        // Forces the socket object to flush any data in its buffers
+        /**
+         * Forces the socket flush both the recv and send buffers
+         * @warning Send buffer can only be flushed on TCP sockets, for UDP this is a no-op
+         */
         NOINLINE void flush() noexcept;
+
+        /**
+         * Flushes only the socket send buffer
+         * @warning Send buffer can only be flushed on TCP sockets, for UDP this is a no-op
+         */
+        NOINLINE void flush_send_buf() noexcept;
+
+        /**
+         * Flushes the socket receive buffer. Until available() reports 0.
+         */
+        NOINLINE void flush_recv_buf() noexcept;
+
+        /**
+         * Skips a number of bytes from the recv buffer
+         * This is a controlled flush of the OS socket read buffer
+         * @note This MAY block until bytesToSkip is achieved
+         * @warning `skip(available());` should be used with caution, since the
+         *          behaviour is different on WINSOCK vs LINUX.
+         *          If you want to flush recv buffer, call flush_recv_buf()
+         * @param bytesToSkip Number of bytes we want to skip
+         * @return Number of bytes actually skipped.
+         */
+        NOINLINE int skip(int bytesToSkip) noexcept;
 
         /**
          * Peeks the socket for currently available bytes to read
          * Automatically closes socket during critical failure and returns -1
          * If there is no data in recv buffer, this function returns 0
+         *
+         * @note There is a critical difference between WINSOCK and LINUX sockets.
+         *       WINSOCK UDP: reports total # of bytes in receive buffer
+         *       LINUX UDP: report size of the next datagram only
          */
         NOINLINE int available() const noexcept;
 
@@ -313,13 +343,6 @@ namespace rpp
          * If there is no data to peek, this function returns 0
          */
         NOINLINE int peek(void* buffer, int numBytes) noexcept;
-
-        /**
-         * Skips a number of bytes from the read stream
-         * This is a controlled flush of the OS socket read buffer
-         * @param maxBytes Maximum number of bytes to skip
-         */
-        NOINLINE void skip(int maxBytes) noexcept;
 
         /**
          * UDP only. Receives up to maxBytes from some ipaddress.
