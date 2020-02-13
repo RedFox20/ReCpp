@@ -76,7 +76,7 @@ TestImpl(test_threadpool)
         //    ptr[index] = index;
         //});
 
-        Timer timer;
+        Timer timer1;
 
         atomic<int64_t> sum { 0 };;
         parallel_for(0, (int)numbers.size(), [&](int start, int end) {
@@ -91,19 +91,24 @@ TestImpl(test_threadpool)
         //concurrency::parallel_for(size_t(0), numbers.size(), [&](int index) {
         //    sum += ptr[index];
         //});
-        double parallel_elapsed = timer.elapsed();
+        double parallel_elapsed = timer1.elapsed();
         print_info("ParallelFor  elapsed: %.3fs  result: %lld\n", parallel_elapsed, (long long)sum);
         AssertThat((long long)sum, 88888931111116LL);
 
-        timer.start();
+        Timer timer2;
         int64_t sum2 = 0;
         for (int i = 0; i < len; ++i)
             sum2 += ptr[i];
-        double serial_elapsed = timer.elapsed();
+        double serial_elapsed = timer2.elapsed();
 
         print_info("Singlethread elapsed: %.3fs  result: %lld\n", serial_elapsed, (long long)sum2);
         AssertThat((long long)sum2, 88888931111116LL);
-        AssertLessOrEqual(parallel_elapsed, serial_elapsed);
+
+        int cores = thread_pool::physical_cores();
+        if (cores > 2)
+            AssertLessOrEqual(parallel_elapsed, serial_elapsed);
+        else // if the system doesn't have enough cores, the overhead should be minimal
+            AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.001);
     }
 
     TestCase(parallel_foreach)
