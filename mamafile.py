@@ -19,4 +19,7 @@ class ReCpp(mama.BuildTarget):
             self.export_syslib('-framework Foundation')
 
     def test(self, args):
-        self.gdb(f'RppTests {args}', src_dir=False)
+        if 'nogdb' in args:
+            self.run_program(self.source_dir('bin'), self.source_dir('bin/RppTests'))
+        else:
+            self.gdb(f'RppTests {args}', src_dir=False)
