@@ -357,35 +357,46 @@ namespace rpp
 
         run_init();
 
-        int numTests = 0;
-        bool allSuccess = true;
+        int numTestsRun = 0;
+        int numTestsOk = 0;
+        int numTestsFailed = 0;
+
         if (methodFilter)
         {
-            for (int i = 0; i < test_count; ++i) {
-                if (test_funcs[i].name.find(methodFilter)) {
-                    allSuccess &= run_test_func(results, test_funcs[i]);
-                    ++numTests;
+            for (int i = 0; i < test_count; ++i)
+            {
+                if (test_funcs[i].name.find(methodFilter))
+                {
+                    if (run_test_func(results, test_funcs[i])) ++numTestsOk;
+                    else                                       ++numTestsFailed;
+                    ++numTestsRun;
                 }
             }
-            if (!numTests) {
+            if (numTestsRun == 0)
+            {
                 consolef(Yellow, "No tests matching '%.*s' in %s\n", methodFilter.len, methodFilter.str, name.str);
             }
         }
         else
         {
-            for (int i = 0; i < test_count; ++i) {
-                if (test_funcs[i].autorun) {
-                    allSuccess &= run_test_func(results, test_funcs[i]);
-                    ++numTests;
+            for (int i = 0; i < test_count; ++i)
+            {
+                if (test_funcs[i].autorun)
+                {
+                    if (run_test_func(results, test_funcs[i])) ++numTestsOk;
+                    else                                       ++numTestsFailed;
+                    ++numTestsRun;
                 }
             }
-            if (!numTests) {
+            if (numTestsRun == 0)
+            {
                 consolef(Yellow, "No autorun tests discovered in %s\n", name.str);
             }
         }
 
         run_cleanup();
 
+        bool allSuccess = (numTestsOk == numTestsRun);
         if (verb >= TestVerbosity::TestLabels)
         {
             consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)titleLength)); // "-------------"
@@ -393,14 +404,20 @@ namespace rpp
         else if (verb >= TestVerbosity::Summary)
         {
             if (allSuccess)
-                consolef(Green, "TEST %-32s  [OK]\n", name.str);
+            {
+                std::string run = std::to_string(numTestsOk) + "/" + std::to_string(numTestsRun);
+                consolef(Green, "TEST %-32s  %-5s  [OK]\n", name.str, run.c_str());
+            }
             else
-                consolef(Red,   "TEST %-32s  [FAILED]\n", name.str);
+            {
+                std::string run = std::to_string(numTestsFailed) + "/" + std::to_string(numTestsRun);
+                consolef(Red,   "TEST %-32s  %-5s  [FAILED]\n", name.str, run.c_str());
+            }
         }
 
         current_results = nullptr; // TODO: thread safety?
 
-        return allSuccess && numTests > 0;
+        return allSuccess && numTestsRun > 0;
     }
 
     bool test::run_test_func(test_results& results, test_func& test)

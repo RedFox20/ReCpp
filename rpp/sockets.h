@@ -181,7 +181,7 @@ namespace rpp
         enum category : unsigned char {
             SC_Unknown,
             SC_Listen,  // this socket is a LISTEN server socket via socket::listen
-            SC_Accept,  // this socket was accepted vie socket::accept as a server side client
+            SC_Accept,  // this socket was accepted via socket::accept as a server side client
             SC_Client,  // this is a Client side connection socket via socket::connect
         };
 
@@ -204,7 +204,8 @@ namespace rpp
          * @param blocking Whether the socket is configured as blocking or not.
          *                 On Windows, there is no way to query this from socket handle
          */
-        socket(int handle, const ipaddress& addr, bool shared=false, bool blocking=true);
+        static socket from_os_handle(int handle, const ipaddress& addr,
+                                     bool shared=false, bool blocking=true);
 
         // Creates a default socket object
         socket() noexcept;
@@ -667,13 +668,13 @@ namespace rpp
          * To wait for a new connection asynchronously use AcceptAsync()
          * @return Invalid socket if there are no pending connections, otherwise a valid socket handle
          */
-        socket accept() const noexcept;
+        socket accept() const;
         /**
          * Blocks until a new connection arrives or the specified timeout is reached.
          * To block forever, set timeoutMillis to -1
          * This function will fail automatically if the socket is closed
          */
-        socket accept(int millis) const noexcept;
+        socket accept(int millis) const;
 
 
         /**

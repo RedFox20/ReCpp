@@ -488,15 +488,21 @@ namespace rpp
     /////////        socket
     ///////////////////////////////////////////////////////////////////////////
 
-    socket::socket(int handle, const ipaddress& addr, bool shared, bool blocking)
-        : Sock{handle}, Addr{addr}, Shared{shared}, Blocking{blocking}, Category{SC_Unknown}
+    socket socket::from_os_handle(int handle, const ipaddress& addr,
+                                  bool shared, bool blocking)
     {
-        // validate the socket handle
-        if (type() == ST_Unspecified)
+        socket s;
+        s.Sock = handle;
+        s.Addr = addr;
+        s.Shared = shared;
+        s.Blocking = blocking;
+        s.Category = SC_Unknown;
+        if (s.type() == ST_Unspecified) // validate the socket handle
         {
-            std::string err = last_err();
-            throw std::invalid_argument{"rpp::socket(int handle): invalid os handle " + err};
+            std::string err = s.last_err();
+            throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + err};
         }
+        return s;
     }
     socket::socket() noexcept
         : Sock{-1}, Addr{}, Shared{false}, Blocking{true}, Category{SC_Unknown}
@@ -700,13 +706,13 @@ namespace rpp
                 if (avail <= 0)
                     break;
 
-                logdebug("CHECK available %d", avail);
+                //logdebug("CHECK available %d", avail);
 
                 int max = std::min<int>(sizeof(dump), remaining);
                 int len = recvfrom(from, dump, max);
                 if (len < 0)
                 {
-                    logdebug("EOF skipped %d/%d", skipped, bytesToSkip);
+                    //logdebug("EOF skipped %d/%d", skipped, bytesToSkip);
                     break;
                 }
 
@@ -716,7 +722,7 @@ namespace rpp
                     int after = available();
                     if (after <= 0) // at this point we can't really know the exact N
                     {
-                        logdebug("TRUNC EOF skipped %d/%d", skipped+max, bytesToSkip);
+                        //logdebug("TRUNC EOF skipped %d/%d", skipped+max, bytesToSkip);
                         skipped += max;
                         break;
                     }
@@ -725,13 +731,13 @@ namespace rpp
                 #else
                     len = avail; // on LINUX, sockets report available() per datagram
                 #endif
-                    logdebug("TRUNC max: skipped %d/%d", skipped+len, bytesToSkip);
+                    //logdebug("TRUNC max: skipped %d/%d", skipped+len, bytesToSkip);
                     skipped   += len;
                     remaining -= len;
                 }
                 else
                 {
-                    logdebug("OK %d skipped %d/%d", len, skipped+len, bytesToSkip);
+                    //logdebug("OK %d skipped %d/%d", len, skipped+len, bytesToSkip);
                     skipped   += len;
                     remaining -= len;
                 }
@@ -1228,23 +1234,22 @@ namespace rpp
     }
 
 
-    socket socket::accept() const noexcept
+    socket socket::accept() const
     {
         Assert(type() != socket_type::ST_Datagram, "Cannot use socket::accept() on UDP sockets, use recvfrom instead");
 
-        // assume the listener socket is already non-blocking
-        socket client = { (int)::accept(Sock, nullptr, nullptr), ipaddress{} };
+        // assume the listener socket is already non-
+        int handle = (int)::accept(Sock, nullptr, nullptr);
+        if (handle == -1)
+            return {};
 
-        if (client.Sock != -1) // do we have a client?
-        { 
-            new (&client.Addr) ipaddress(client.Sock); // update ipaddress
-            // set the client socket as non-blocking, since socket options are not inherited
-            client.set_noblock_nodelay();
-            client.Category = SC_Accept;
-        }
+        socket client = socket::from_os_handle(handle, ipaddress{handle});
+        // set the client socket as non-blocking, since socket options are not inherited
+        client.set_noblock_nodelay();
+        client.Category = SC_Accept;
         return client;
     }
-    socket socket::accept(int millis) const noexcept
+    socket socket::accept(int millis) const
     {
         socket client;
         try_for_period(millis, [this, &client]() -> bool {

@@ -274,11 +274,11 @@ TestImpl(test_file_io)
 
     TestCase(system_dirs)
     {
-        LogInfo("working_dir: \"%s\"", working_dir());
-        LogInfo("module_dir:  \"%s\"", module_dir());
-        LogInfo("module_path: \"%s\"", module_path());
-        LogInfo("temp_dir:    \"%s\"", temp_dir());
-        LogInfo("home_dir:    \"%s\"", home_dir());
+        print_info("working_dir: \"%s\"\n", working_dir());
+        print_info("module_dir:  \"%s\"\n", module_dir());
+        print_info("module_path: \"%s\"\n", module_path());
+        print_info("temp_dir:    \"%s\"\n", temp_dir());
+        print_info("home_dir:    \"%s\"\n", home_dir());
 
         AssertThat(working_dir().back(), '/');
         AssertThat(module_dir().back(), '/');

@@ -14,19 +14,19 @@ TestImpl(test_stack_trace)
     {
         thread_pool::global().set_task_tracer(&stack_tracer);
     }
-    TestCase(first_trace_performance)
+    TestCase(second_trace_faster_than_first)
     {
         Timer t;
         stack_trace();
-        double e = t.elapsed();
-        LogInfo("First stack_trace elapsed: %.2fs", e);
-    }
-    TestCase(second_trace_performance)
-    {
-        Timer t;
+        double first_elapsed = t.elapsed();
+        print_info("first stack_trace elapsed: %.2fs\n", first_elapsed);
+
+        Timer t2;
         stack_trace();
-        double e = t.elapsed();
-        LogInfo("second stack_trace elapsed: %.2fs", e);
+        double second_elapsed = t2.elapsed();
+        print_info("second stack_trace elapsed: %.2fs\n", second_elapsed);
+
+        AssertLessOrEqual(second_elapsed, first_elapsed);
     }
     TestCaseExpectedEx(trace_ex, traced_exception)
     {

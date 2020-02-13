@@ -16,7 +16,7 @@ TestImpl(test_threadpool)
 {
     TestInit(test_threadpool)
     {
-        printf("physical_cores: %d\n", thread_pool::physical_cores());
+        print_info("physical_cores: %d\n", thread_pool::physical_cores());
     }
 
     static int parallelism_count(int numIterations)
@@ -91,13 +91,19 @@ TestImpl(test_threadpool)
         //concurrency::parallel_for(size_t(0), numbers.size(), [&](int index) {
         //    sum += ptr[index];
         //});
-        printf("ParallelFor  elapsed: %.3fs  result: %lld\n", timer.elapsed(), (long long)sum);
+        double parallel_elapsed = timer.elapsed();
+        print_info("ParallelFor  elapsed: %.3fs  result: %lld\n", parallel_elapsed, (long long)sum);
+        AssertThat((long long)sum, 88888931111116LL);
 
         timer.start();
         int64_t sum2 = 0;
         for (int i = 0; i < len; ++i)
             sum2 += ptr[i];
-        printf("Singlethread elapsed: %.3fs  result: %lld\n", timer.elapsed(), (long long)sum2);
+        double serial_elapsed = timer.elapsed();
+
+        print_info("Singlethread elapsed: %.3fs  result: %lld\n", serial_elapsed, (long long)sum2);
+        AssertThat((long long)sum2, 88888931111116LL);
+        AssertLessOrEqual(parallel_elapsed, serial_elapsed);
     }
 
     TestCase(parallel_foreach)
@@ -161,9 +167,9 @@ TestImpl(test_threadpool)
         rpp::parallel_task([&] { times_launched += 1; })->wait(1000);
         AssertThat((int)times_launched, 1);
 
-        printf("Waiting for pool tasks to die naturally...\n");
+        print_info("Waiting for pool tasks to die naturally...\n");
         ::sleep_for(0.5s);
-        printf("Attempting pool task resurrection\n");
+        print_info("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 
         })->wait(1000);

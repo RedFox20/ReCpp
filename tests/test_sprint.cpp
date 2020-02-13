@@ -1,7 +1,10 @@
 #include <rpp/sprint.h>
-#include <cfloat> // DBL_MAX
-#include <rpp/tests.h>
+#include <rpp/file_io.h>
 #include <unordered_map>
+#include <cfloat> // DBL_MAX
+#include "TempFILE.h"
+#include <rpp/tests.h>
+
 using namespace rpp;
 using std::unordered_map;
 
@@ -46,24 +49,6 @@ TestImpl(test_sprint)
     TestInit(test_sprint)
     {
     }
-
-    struct TempFile
-    {
-        FILE* out = nullptr;
-        TempFile() { out = fopen("test_sprint.txt", "r+b"); }
-        ~TempFile() { fclose(out); }
-        std::string text()
-        {
-            fflush(out);
-            fseek(out, 0, SEEK_END);
-            size_t len = ftell(out);
-            fseek(out, 0, SEEK_SET);
-            std::string s(len, '\0');
-            size_t n = fread(s.data(), 1, len, out);
-            s.resize(n);
-            return s;
-        }
-    };
 
     TestCase(string_buf)
     {
@@ -114,31 +99,40 @@ TestImpl(test_sprint)
 
     TestCase(println)
     {
-        TempFile printed;
+        TempFILE printed;
         println(printed.out, "hello", 10, "println", 20);
         AssertEqual(printed.text(), "hello 10 println 20\n");
     }
 
     TestCase(println_vector_strings)
     {
-        TempFile printed;
         vector<string> names = { "Bob", "Marley", "Mick", "Jagger", "Bruce" };
+
+        TempFILE printed;
         println(printed.out, names);
-        AssertEqual(printed.text(), "hello 10 println 20\n");
+        AssertEqual(printed.text(),
+            "[5] = { \n  \"Bob\", \n  \"Marley\", \n  \"Mick\", \n  \"Jagger\", \n  \"Bruce\"\n }\n");
     }
 
     TestCase(println_vector_shared_ptrs)
     {
         vector<std::shared_ptr<double>> ptrs = { std::make_shared<double>(1.1), 
                                                  std::make_shared<double>(2.2), 
-                                                 std::make_shared<double>(3.3) };
-        println(ptrs);
+                                                 std::make_shared<double>(3.4) };
+        
+        TempFILE printed;
+        println(printed.out, ptrs);
+        AssertEqual(printed.text(), "{ \n  *{1.1}, \n  *{2.2}, \n  *{3.399999}\n }\n");
     }
 
     TestCase(println_unordered_map)
     {
         unordered_map<int, string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
-        println(map);
+
+        TempFILE printed;
+        println(printed.out, map);
+        AssertEqual(printed.text(),
+            "[5] = { \n  0: \"Bob\", \n  1: \"Marley\", \n  2: \"Mick\", \n  3: \"Jagger\", \n  4: \"Bruce\"\n }\n");
     }
 
     TestCase(format)
