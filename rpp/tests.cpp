@@ -566,34 +566,29 @@ namespace rpp
             }
         }
     }
-    
-    // ignore empty args
-    static bool has_filter_args(int argc, char* argv[])
+
+    // parses for any flags and removes the from the args vector
+    static void parse_flags(std::vector<strview>& args)
     {
-        for (int iarg = 1; iarg < argc; ++iarg) {
-            strview arg = strview{argv[iarg]}.trim();
-            if (arg) return true;
+        for (auto it = args.begin(); it != args.end(); )
+        {
+            if (it->starts_with("--verbosity"))
+            {
+                state().verbosity = (TestVerbosity)it->skip_after('=').to_int();
+                it = args.erase(it);
+            }
+            else ++it;
         }
-        return false;
     }
 
-    static void select_tests_from_args(int argc, char* argv[])
+    static void select_tests_from_args(const std::vector<strview>& args)
     {
         // if arg is provided, we assume they are:
         // test_testname or testname or -test_testname or -testname
         // OR to run a specific test:  testname.specifictest
         std::unordered_set<strview> enabled, disabled;
-        for (int iarg = 1; iarg < argc; ++iarg)
+        for (strview arg : args)
         {
-            strview arg = strview{argv[iarg]}.trim();
-            if (!arg) continue;
-
-            if (arg.starts_with("--verbosity="))
-            {
-                state().verbosity = (TestVerbosity)arg.skip_after('=').to_int();
-                continue;
-            }
-            
             strview testName = arg.next('.');
             strview specific = arg.next('.');
 
@@ -609,8 +604,8 @@ namespace rpp
             const bool exactMatch = testName.starts_with("test_");
             if (state().verbosity >= TestVerbosity::TestLabels)
             {
-                if (exactMatch) consolef(Yellow, "Filtering exact  tests '%s'\n", argv[iarg]);
-                else            consolef(Yellow, "Filtering substr tests '%s'\n", argv[iarg]);
+                if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", arg.len, arg.str);
+                else            consolef(Yellow, "Filtering substr tests '%.*s'\n", arg.len, arg.str);
             }
 
             bool match = false;
@@ -706,9 +701,19 @@ namespace rpp
         #endif
     #endif
     
+        // filter out invalid empty arguments
+        std::vector<strview> args;
+        for (int iarg = 1; iarg < argc; ++iarg)
+        {
+            strview arg = strview{argv[iarg]}.trim();
+            if (arg) args.emplace_back(arg);
+        }
+
         set_test_defaults();
-        if (has_filter_args(argc, argv))
-            select_tests_from_args(argc, argv);
+        parse_flags(args);
+
+        if (!args.empty())
+            select_tests_from_args(args);
         else
             enable_all_autorun_tests();
 
