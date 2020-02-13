@@ -488,9 +488,15 @@ namespace rpp
     /////////        socket
     ///////////////////////////////////////////////////////////////////////////
 
-    socket::socket(int handle, const ipaddress& addr, bool shared, bool blocking) noexcept
+    socket::socket(int handle, const ipaddress& addr, bool shared, bool blocking)
         : Sock{handle}, Addr{addr}, Shared{shared}, Blocking{blocking}, Category{SC_Unknown}
     {
+        // validate the socket handle
+        if (type() == ST_Unspecified)
+        {
+            std::string err = last_err();
+            throw std::invalid_argument{"rpp::socket(int handle): invalid os handle " + err};
+        }
     }
     socket::socket() noexcept
         : Sock{-1}, Addr{}, Shared{false}, Blocking{true}, Category{SC_Unknown}

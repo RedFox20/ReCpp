@@ -194,14 +194,17 @@ namespace rpp
 
     public:
 
-        // Create a socket with an initialized handle
-        // WARNING: socket will take ownership of the handle, 
-        //          unless you set shared=true, which is equivalent of
-        //          set_shared(true) OR calling release_noclose()
-        // @param shared If TRUE, then this socket is not closed in socket destructor
-        // @param blocking Whether the socket is configured as blocking or not.
-        //                 On Windows, there is no way to query this from socket handle
-        socket(int handle, const ipaddress& addr, bool shared=false, bool blocking=true) noexcept;
+        /**
+         * Create a socket with an initialized handle
+         * WARNING: socket will take ownership of the handle, 
+         *          unless you set shared=true, which is equivalent of
+         *          set_shared(true) OR calling release_noclose()
+         * @note THROWS is handle is invalid
+         * @param shared If TRUE, then this socket is not closed in socket destructor
+         * @param blocking Whether the socket is configured as blocking or not.
+         *                 On Windows, there is no way to query this from socket handle
+         */
+        socket(int handle, const ipaddress& addr, bool shared=false, bool blocking=true);
 
         // Creates a default socket object
         socket() noexcept;
