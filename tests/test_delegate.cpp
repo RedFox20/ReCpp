@@ -35,30 +35,30 @@ namespace rpp
     };
     string to_string(const Data& d) { return d.data; }
 
-    #define VALIDATE_DATA_ARG(arg) \
+    #define VALIDATE_DATA_ARG(name, arg) \
         if (!(arg).data || (arg) != "data") \
-            throw rpp::traced_exception{"Argument `"#arg"` did not contain \"data\""};
+            throw rpp::traced_exception{std::string{name}+" argument `"#arg"` did not contain \"data\""};
 
     static Data validate(const char* name, const Data& a)
     {
-        printf("%s: '%s'\n", name, a.data);
-        VALIDATE_DATA_ARG(a);
+        //printf("%s: '%s'\n", name, a.data);
+        VALIDATE_DATA_ARG(name, a);
         return Data{name};
     }
     static Data validate(const char* name, const Data& a, const Data& b)
     {
-        printf("%s: '%s' '%s'\n", name, a.data, b.data);
-        VALIDATE_DATA_ARG(a);
-        VALIDATE_DATA_ARG(b);
+        //printf("%s: '%s' '%s'\n", name, a.data, b.data);
+        VALIDATE_DATA_ARG(name, a);
+        VALIDATE_DATA_ARG(name, b);
         return Data{name};
     }
     static Data validate(const char* name, const Data& a, const Data& b, const Data& c, const Data& d)
     {
-        printf("%s: '%s' '%s' '%s' '%s'\n", name, a.data, b.data, c.data, d.data);
-        VALIDATE_DATA_ARG(a);
-        VALIDATE_DATA_ARG(b);
-        VALIDATE_DATA_ARG(c);
-        VALIDATE_DATA_ARG(d);
+        //printf("%s: '%s' '%s' '%s' '%s'\n", name, a.data, b.data, c.data, d.data);
+        VALIDATE_DATA_ARG(name, a);
+        VALIDATE_DATA_ARG(name, b);
+        VALIDATE_DATA_ARG(name, c);
+        VALIDATE_DATA_ARG(name, d);
         return Data{name};
     }
 

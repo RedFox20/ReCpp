@@ -243,8 +243,8 @@ namespace rpp
 
     void pool_task::unhandled_exception(const char* what) noexcept
     {
-        if (trace.empty()) UnhandledEx("%s", what);
-        else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
+        //if (trace.empty()) UnhandledEx("%s", what);
+        //else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
         error = std::current_exception();
     }
 

@@ -39,6 +39,7 @@ namespace rpp
     struct mapped_state
     {
         std::vector<test_info> global_tests;
+        TestVerbosity verbosity = TestVerbosity::Summary;
     };
 
     /**
@@ -242,9 +243,14 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
+        // only show immediate message if TestLabel-level verbosity
+        if (state().verbosity >= TestVerbosity::TestLabels)
+        {
+            consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
+        }
 
-        if (current_results) {
+        if (current_results)
+        {
             current_results->asserts_failed++;
             current_results->failures.emplace_back(test_failure{name, current_func->name, string{message}, string{filename}, line });
         }
@@ -255,9 +261,14 @@ namespace rpp
         char message[8192]; va_list ap; va_start(ap, fmt);
         vsnprintf(message, 8192, fmt, ap);
 
-        consolef(Red, message);
+        // only show immediate message if TestLabel-level verbosity
+        if (state().verbosity >= TestVerbosity::TestLabels)
+        {
+            consolef(Red, message);
+        }
 
-        if (current_results) {
+        if (current_results)
+        {
             current_results->asserts_failed++;
             current_results->failures.emplace_back(test_failure{name, current_func->name, string{message}, string{}, 0 });
         }
@@ -265,23 +276,35 @@ namespace rpp
 
     void test::print_error(const char* fmt, ...)
     {
-        char message[8192]; va_list ap; va_start(ap, fmt);
-        vsnprintf(message, 8192, fmt, ap);
-        consolef(Red, message);
+        // only show immediate message if TestLabel-level verbosity
+        if (state().verbosity >= TestVerbosity::TestLabels)
+        {
+            char message[8192]; va_list ap; va_start(ap, fmt);
+            vsnprintf(message, 8192, fmt, ap);
+            consolef(Red, message);
+        }
     }
 
     void test::print_warning(const char* fmt, ...)
     {
-        char message[8192]; va_list ap; va_start(ap, fmt);
-        vsnprintf(message, 8192, fmt, ap);
-        consolef(Yellow, message);
+        // only show immediate message if TestLabel-level verbosity
+        if (state().verbosity >= TestVerbosity::TestLabels)
+        {
+            char message[8192]; va_list ap; va_start(ap, fmt);
+            vsnprintf(message, 8192, fmt, ap);
+            consolef(Yellow, message);
+        }
     }
 
     void test::print_info(const char* fmt, ...)
     {
-        char message[8192]; va_list ap; va_start(ap, fmt);
-        vsnprintf(message, 8192, fmt, ap);
-        consolef(Default, message);
+        // only show immediate message if TestLabel-level verbosity
+        if (state().verbosity >= TestVerbosity::TestLabels)
+        {
+            char message[8192]; va_list ap; va_start(ap, fmt);
+            vsnprintf(message, 8192, fmt, ap);
+            consolef(Default, message);
+        }
     }
 
     bool test::run_init()
@@ -319,13 +342,19 @@ namespace rpp
     bool test::run_test(test_results& results, strview methodFilter)
     {
         current_results = &results; // TODO: thread safety?
+        TestVerbosity verb = state().verbosity;
 
         char title[256];
-        int len = methodFilter
-            ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
-            : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
+        int titleLength = 0;
 
-        consolef(Yellow, "%s\n", title);
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            titleLength = methodFilter
+                ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
+                : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
+            consolef(Yellow, "%s\n", title);
+        }
+
         run_init();
 
         int numTests = 0;
@@ -356,7 +385,19 @@ namespace rpp
         }
 
         run_cleanup();
-        consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)len)); // "-------------"
+
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)titleLength)); // "-------------"
+        }
+        else if (verb >= TestVerbosity::Summary)
+        {
+            if (allSuccess)
+                consolef(Green, "TEST %-32s  [OK]\n", name.str);
+            else
+                consolef(Red,   "TEST %-32s  [FAILED]\n", name.str);
+        }
+
         current_results = nullptr; // TODO: thread safety?
 
         return allSuccess && numTests > 0;
@@ -364,7 +405,12 @@ namespace rpp
 
     bool test::run_test_func(test_results& results, test_func& test)
     {
-        consolef(Yellow, "%s::%s\n", name.str, test.name.str);
+        TestVerbosity verb = state().verbosity;
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            consolef(Yellow, "%s::%s\n", name.str, test.name.str);
+        }
+
         current_func = &test; // TODO: thread safety?
         int before = results.asserts_failed;
         try
@@ -380,8 +426,11 @@ namespace rpp
         {
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
-                consolef(Yellow, "Caught Expected Exception in %s::%s\n",
-                                 name.str, test.name.str);
+                if (verb >= TestVerbosity::AllMessages)
+                {
+                    consolef(Yellow, "Caught Expected Exception in %s::%s\n",
+                                     name.str, test.name.str);
+                }
             }
             else
             {
@@ -436,6 +485,11 @@ namespace rpp
         return run_tests(1, argv);
     }
 
+    void test::set_verbosity(TestVerbosity verbosity)
+    {
+        state().verbosity = verbosity;
+    }
+
     int test::add_test_func(test_func func) // @note Because we can't dllexport std::vector
     {
         if (test_count == test_cap)
@@ -462,6 +516,8 @@ namespace rpp
     static void enable_disable_tests(unordered_set<strview>& enabled,
                                      unordered_set<strview>& disabled)
     {
+        TestVerbosity verb = state().verbosity;
+
         if (enabled.empty() && disabled.empty())
         {
             consolef(Red, "  No matching tests found for provided arguments!\n");
@@ -470,20 +526,26 @@ namespace rpp
         }
         else if (!disabled.empty())
         {
-            for (test_info& t : state().global_tests) {
+            for (test_info& t : state().global_tests)
+            {
                 if (t.auto_run) { // only consider disabling auto_run tests
                     t.test_enabled = disabled.find(t.name) == disabled.end();
-                    if (!t.test_enabled)
+                    if (!t.test_enabled && verb >= TestVerbosity::TestLabels)
+                    {
                         consolef(Red, "  Disabled %s\n", t.name.to_cstr());
+                    }
                 }
             }
         }
         else if (!enabled.empty())
         {
-            for (test_info& t : state().global_tests) { // enable whatever was requested
+            for (test_info& t : state().global_tests) // enable whatever was requested
+            {
                 t.test_enabled = enabled.find(t.name) != enabled.end();
-                if (t.test_enabled)
+                if (t.test_enabled && verb >= TestVerbosity::TestLabels)
+                {
                     consolef(Green, "  Enabled %s\n", t.name.to_cstr());
+                }
             }
         }
     }
@@ -508,6 +570,12 @@ namespace rpp
         {
             strview arg = strview{argv[iarg]}.trim();
             if (!arg) continue;
+
+            if (arg.starts_with("--verbosity="))
+            {
+                state().verbosity = (TestVerbosity)arg.skip_after('=').to_int();
+                continue;
+            }
             
             strview testName = arg.next('.');
             strview specific = arg.next('.');
@@ -522,8 +590,11 @@ namespace rpp
             }
 
             const bool exactMatch = testName.starts_with("test_");
-            if (exactMatch) consolef(Yellow, "Filtering exact  tests '%s'\n", argv[iarg]);
-            else            consolef(Yellow, "Filtering substr tests '%s'\n", argv[iarg]);
+            if (state().verbosity >= TestVerbosity::TestLabels)
+            {
+                if (exactMatch) consolef(Yellow, "Filtering exact  tests '%s'\n", argv[iarg]);
+                else            consolef(Yellow, "Filtering substr tests '%s'\n", argv[iarg]);
+            }
 
             bool match = false;
             for (test_info& t : state().global_tests)
@@ -547,10 +618,19 @@ namespace rpp
 
     static void enable_all_autorun_tests()
     {
-        consolef(Green, "Running all AutoRun tests\n");
+        TestVerbosity verb = state().verbosity;
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            consolef(Green, "Running all AutoRun tests\n");
+        }
+
         for (test_info& t : state().global_tests)
-            if (!t.auto_run && !t.test_enabled)
+        {
+            if (!t.auto_run && !t.test_enabled && verb >= TestVerbosity::AllMessages)
+            {
                 consolef(Yellow, "  Disabled NoAutoRun %s\n", t.name.to_cstr());
+            }
+        }
     }
 
     test_results run_all_marked_tests()

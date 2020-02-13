@@ -39,6 +39,14 @@ namespace rpp
 
     RPPAPI void register_test(strview name, test_factory factory, bool autorun);
 
+    enum class TestVerbosity : int
+    {
+        None        = 0, // 0: silent, only failure summary is shown
+        Summary     = 1, // 1: show test summary [OK] or [FAILED] with error details
+        TestLabels  = 2, // 2: show individual test labels
+        AllMessages = 3, // 3: show all information test messages
+    };
+
     struct RPPAPI test
     {
         struct lambda_base { test* self; };
@@ -60,7 +68,7 @@ namespace rpp
 
         test_results* current_results = nullptr;
         test_func* current_func = nullptr;
-    
+
     public:
         explicit test(strview name);
         virtual ~test();
@@ -131,6 +139,16 @@ namespace rpp
          * Runs ALL the tests, no filtering is done
          */
         static int run_tests();
+
+        /**
+         * Sets the verbosity level for unit tests.
+         * The default verbosity level is 1
+         * TestVerbosity::None        0: silent, only failure summary is shown
+         * TestVerbosity::Summary     1: show test summary [OK] or [FAILED] with error details
+         * TestVerbosity::TestLabels  2: show individual test labels
+         * TestVerbosity::AllMessages 3: show all information test messages
+         */
+        static void set_verbosity(TestVerbosity verbosity);
 
         template<class T> static string as_short_string(const T& obj, int maxLen = 512)
         {

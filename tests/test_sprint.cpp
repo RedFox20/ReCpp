@@ -47,6 +47,24 @@ TestImpl(test_sprint)
     {
     }
 
+    struct TempFile
+    {
+        FILE* out = nullptr;
+        TempFile() { out = fopen("test_sprint.txt", "r+b"); }
+        ~TempFile() { fclose(out); }
+        std::string text()
+        {
+            fflush(out);
+            fseek(out, 0, SEEK_END);
+            size_t len = ftell(out);
+            fseek(out, 0, SEEK_SET);
+            std::string s(len, '\0');
+            size_t n = fread(s.data(), 1, len, out);
+            s.resize(n);
+            return s;
+        }
+    };
+
     TestCase(string_buf)
     {
         string_buffer buf; buf.writeln("str", 10, 20.1, "2132"_sv, "abcd"s);
@@ -96,13 +114,17 @@ TestImpl(test_sprint)
 
     TestCase(println)
     {
-        println("hello", 10, "println", 20);
+        TempFile printed;
+        println(printed.out, "hello", 10, "println", 20);
+        AssertEqual(printed.text(), "hello 10 println 20\n");
     }
 
     TestCase(println_vector_strings)
     {
+        TempFile printed;
         vector<string> names = { "Bob", "Marley", "Mick", "Jagger", "Bruce" };
-        println(names);
+        println(printed.out, names);
+        AssertEqual(printed.text(), "hello 10 println 20\n");
     }
 
     TestCase(println_vector_shared_ptrs)
@@ -134,7 +156,7 @@ TestImpl(test_sprint)
         sb.separator = ";";
         sb.write(x, y, z);
 
-        println("float_format:", sb.view());
+        //println("float_format:", sb.view());
         AssertThat(sb.view(), "-0.1708;-2.001199;0.995899");
     }
 
@@ -145,7 +167,7 @@ TestImpl(test_sprint)
         rpp::string_buffer sb;
         sb.separator = ";";
         sb.write(x, y);
-        println("big_doubles:", sb.view());
+        //println("big_doubles:", sb.view());
         AssertThat(sb.view(), "9223372036854775808;-9223372036854775808");
     }
 
@@ -158,7 +180,7 @@ TestImpl(test_sprint)
         rpp::string_buffer sb;
         sb.separator = ";";
         sb.write(x, y, z, w);
-        println("float_edge_case:", sb.view());
+        //println("float_edge_case:", sb.view());
         AssertThat(sb.view(), "9223372036854775808;-9223372036854775808;0.0;-0.0");
     }
 
