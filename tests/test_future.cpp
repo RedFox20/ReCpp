@@ -3,8 +3,6 @@
 using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
-using std::launch;
-using std::runtime_error;
 
 TestImpl(test_future)
 {
@@ -14,14 +12,14 @@ TestImpl(test_future)
 
     TestCase(simple_chaining)
     {
-        std::packaged_task<string()> loadString{[]{ 
+        std::packaged_task<std::string()> loadString{[]{ 
             ::sleep_for(15ms);
             return "future string";
         }};
         std::thread{[&]{ loadString(); }}.detach();
 
-        cfuture<string> futureString = loadString.get_future();
-        cfuture<bool> chain = futureString.then([](string arg) -> bool
+        cfuture<std::string> futureString = loadString.get_future();
+        cfuture<bool> chain = futureString.then([](std::string arg) -> bool
         {
             return arg.length() > 0;
         });
@@ -38,26 +36,26 @@ TestImpl(test_future)
         std::thread{[&]{ loadSomething(); }}.detach();
 
         cfuture<void> futureSomething = loadSomething.get_future();
-        cfuture<string> async = futureSomething.then([]() -> string
+        cfuture<std::string> async = futureSomething.then([]() -> std::string
         {
             return "operation complete!"s;
         });
 
-        string result = async.get();
+        std::string result = async.get();
         AssertThat(result, "operation complete!");
     }
 
     TestCase(chain_decay_string_to_void)
     {
-        std::packaged_task<string()> loadString{[]{ 
+        std::packaged_task<std::string()> loadString{[]{ 
             ::sleep_for(15ms);
             return "some string";
         }};
         std::thread{[&]{ loadString(); }}.detach();
 
         bool continuationCalled = false;
-        cfuture<string> futureString = loadString.get_future();
-        cfuture<void> async = futureString.then([&](string s)
+        cfuture<std::string> futureString = loadString.get_future();
+        cfuture<void> async = futureString.then([&](std::string s)
         {
             continuationCalled = true;
             AssertThat(s.empty(), false);
@@ -69,16 +67,16 @@ TestImpl(test_future)
 
     TestCase(cross_thread_exception_propagation)
     {
-        cfuture<void> asyncThrowingTask = std::async(launch::async, [] {
-            throw runtime_error("background_thread_exception_msg");
+        cfuture<void> asyncThrowingTask = std::async(std::launch::async, [] {
+            throw std::runtime_error("background_thread_exception_msg");
         });
 
-        string result;
+        std::string result;
         try
         {
             asyncThrowingTask.get();
         }
-        catch (const runtime_error& e)
+        catch (const std::runtime_error& e)
         {
             result = e.what();
         }
@@ -87,12 +85,12 @@ TestImpl(test_future)
 
     TestCase(composable_future_type)
     {
-        cfuture<string> f = std::async(launch::async, [] {
+        cfuture<std::string> f = std::async(std::launch::async, [] {
             return "future string"s;
         });
 
         int totalCalls = 0;
-        f.then([&](string s) {
+        f.then([&](std::string s) {
             ++totalCalls;
             AssertThat(s, "future string");
             return 42;
@@ -105,8 +103,8 @@ TestImpl(test_future)
 
     TestCase(except_handler)
     {
-        cfuture<void> f = std::async(launch::async, [] {
-            throw runtime_error("background_thread_exception_msg");
+        cfuture<void> f = std::async(std::launch::async, [] {
+            throw std::runtime_error("background_thread_exception_msg");
         });
 
         bool exceptHandlerCalled = false;
@@ -125,7 +123,7 @@ TestImpl(test_future)
 
     TestCase(except_handlers_catch_first)
     {
-        cfuture<void> f = std::async(launch::async, [] {
+        cfuture<void> f = std::async(std::launch::async, [] {
             throw std::domain_error("background_thread_exception_msg");
         });
 
@@ -149,8 +147,8 @@ TestImpl(test_future)
 
     TestCase(except_handlers_catch_second)
     {
-        cfuture<void> f = std::async(launch::async, [] {
-            throw runtime_error("background_thread_exception_msg");
+        cfuture<void> f = std::async(std::launch::async, [] {
+            throw std::runtime_error("background_thread_exception_msg");
         });
 
         bool exceptHandlerCalled = false;
@@ -178,7 +176,7 @@ TestImpl(test_future)
 
     TestCase(except_handlers_catch_third)
     {
-        cfuture<void> f = std::async(launch::async, [] {
+        cfuture<void> f = std::async(std::launch::async, [] {
             throw std::runtime_error("background_thread_exception_msg");
         });
 
@@ -205,13 +203,13 @@ TestImpl(test_future)
 
     TestCase(except_handler_chaining)
     {
-        cfuture<string> f = std::async(launch::async, [] {
+        cfuture<std::string> f = std::async(std::launch::async, [] {
             return "future string"s;
         });
 
         bool secondExceptHandlerCalled = false;
-        int result = f.then([](string s) {
-            throw runtime_error("future_continuation_exception_msg");
+        int result = f.then([](std::string s) {
+            throw std::runtime_error("future_continuation_exception_msg");
             return 0;
         }).then([](int x) { 
             return 5;
@@ -237,7 +235,7 @@ TestImpl(test_future)
         bool exceptionWasThrown = false;
         try
         {
-            auto future = make_exceptional_future<int>(runtime_error{"aargh!"s});
+            auto future = make_exceptional_future<int>(std::runtime_error{"aargh!"s});
             future.get();
         }
         catch (const std::exception& e)
@@ -250,7 +248,7 @@ TestImpl(test_future)
 
     TestCase(basic_async_task)
     {
-        cfuture<string> f = async_task([] {
+        cfuture<std::string> f = async_task([] {
             return "future string"s;
         });
         AssertThat(f.get(), "future string"s);
@@ -258,12 +256,12 @@ TestImpl(test_future)
 
     TestCase(basic_async_task_chaining)
     {
-        cfuture<string> f = async_task([] {
+        cfuture<std::string> f = async_task([] {
             return "future string"s;
         });
 
         bool continuationCalled = false;
-        f.then([&](string s) {
+        f.then([&](std::string s) {
             continuationCalled = true;
             AssertThat(s.empty(), false);
         }).get();
@@ -273,10 +271,10 @@ TestImpl(test_future)
 
     TestCase(sharing_future_string)
     {
-        cfuture<string> f1 = async_task([] {
+        cfuture<std::string> f1 = async_task([] {
             return "future string"s;
         });
-        cfuture<string> f2 = f1;  // NOLINT
+        cfuture<std::string> f2 = f1;  // NOLINT
         AssertThat(f1.get(), "future string"s);
         AssertThat(f2.get(), "future string"s);
     }
@@ -291,12 +289,12 @@ TestImpl(test_future)
 
     TestCase(get_tasks_string)
     {
-        vector<string> items = {
+        std::vector<std::string> items = {
             "stringA",
             "stringB",
             "stringC"
         };
-        vector<string> tasks = rpp::get_tasks(items, [&](string& s) {
+        std::vector<std::string> tasks = rpp::get_tasks(items, [&](std::string& s) {
             return rpp::async_task([&] {
                 return "future " + s;
             });
@@ -309,12 +307,12 @@ TestImpl(test_future)
 
     TestCase(get_async_tasks)
     {
-        vector<string> items = {
+        std::vector<string> items = {
             "stringA",
             "stringB",
             "stringC"
         };
-        vector<string> tasks = rpp::get_async_tasks(items, [&](string& s) {
+        std::vector<string> tasks = rpp::get_async_tasks(items, [&](std::string& s) {
             return "future " + s;
         });
         AssertThat(tasks.size(), 3u);

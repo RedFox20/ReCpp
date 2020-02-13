@@ -29,10 +29,6 @@
 
 namespace rpp
 {
-    using std::mutex;
-    using std::unique_lock;
-    using std::defer_lock;
-    using std::unordered_set;
     ///////////////////////////////////////////////////////////////////////////
 
 
@@ -161,11 +157,9 @@ namespace rpp
 
     enum ConsoleColor { Default, Green, Yellow, Red, };
 
-    static void consolef(ConsoleColor color, const char* fmt, ...)
+    static void console(ConsoleColor color, const char* str, int len)
     {
-        va_list ap;
-        va_start(ap, fmt);
-#if _WIN32
+    #if _WIN32
         static HANDLE winstd = GetStdHandle(STD_OUTPUT_HANDLE);
         static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
         static const WORD colormap[] = {
@@ -175,38 +169,36 @@ namespace rpp
             FOREGROUND_RED, // dark red
         };
 
-        char buffer[8096];
-        int len = vsnprintf(buffer, sizeof(buffer), fmt, ap);
-        if (len < 0 || len >= 8096) {
-            len = sizeof(buffer) - 1;
-            buffer[len] = '\0';
-        }
-
         HANDLE winout = color == Red ? winerr : winstd;
-        FILE*  cout = color == Red ? stderr : stdout;
+        FILE*  cout   = color == Red ? stderr : stdout;
 
-        static mutex consoleSync;
+        static std::mutex consoleSync;
         {
-            unique_lock<mutex> guard{ consoleSync, defer_lock };
+            std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
             if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
             SetConsoleTextAttribute(winout, colormap[color]);
-            fwrite(buffer, size_t(len), 1, cout); // fwrite to sync with unix-like shells
+            fwrite(str, size_t(len), 1, cout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, colormap[Default]);
         }
         fflush(cout); // flush needed for proper sync with unix-like shells
-#elif __ANDROID__
+    #elif __ANDROID__
         int priority = 0;
         switch (color) {
-        case Default: priority = ANDROID_LOG_DEBUG; break;
-        case Green:   priority = ANDROID_LOG_INFO;  break;
-        case Yellow:  priority = ANDROID_LOG_WARN;  break;
-        case Red:     priority = ANDROID_LOG_ERROR; break;
+            case Default: priority = ANDROID_LOG_DEBUG; break;
+            case Green:   priority = ANDROID_LOG_INFO;  break;
+            case Yellow:  priority = ANDROID_LOG_WARN;  break;
+            case Red:     priority = ANDROID_LOG_ERROR; break;
         }
-        __android_log_vprint(priority, "rpp", fmt, ap);
-#elif __linux || TARGET_OS_OSX
-        FILE* cout = color == Red ? stderr : stdout;
-        if (isatty(fileno(cout))) // is terminal?
+        __android_log_write(priority, "rpp", str);
+    #elif __linux || TARGET_OS_OSX
+        static bool stdoutIsAtty = isatty(fileno(stdout));
+        static bool stderrIsAtty = isatty(fileno(stderr));
+
+        FILE* cout = (color == Red) ? stderr : stdout;
+        bool isTerminal = (color == Red) ? stderrIsAtty : stdoutIsAtty;
+
+        if (isTerminal)
         {
             static const char* colors[] = {
                 "\x1b[0m",  // clears all formatting
@@ -214,63 +206,76 @@ namespace rpp
                 "\x1b[33m", // yellow
                 "\x1b[31m", // red
             };
-            static mutex consoleSync;
+            static std::mutex consoleSync;
             {
-                unique_lock<mutex> guard{ consoleSync, defer_lock };
+                std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
                 if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
                 fwrite(colors[color], strlen(colors[color]), 1, cout);
-                vfprintf(cout, fmt, ap);
+                fwrite(str, size_t(len), 1, cout);
                 fwrite(colors[Default], strlen(colors[Default]), 1, cout);
             }
         }
         else // it's a file descriptor
         {
-            vfprintf(cout, fmt, ap);
+            fwrite(str, size_t(len), 1, cout);
         }
         fflush(cout); // flush needed for proper sync with different shells
-#else
+    #else
         FILE* cout = color == Red ? stderr : stdout;
-        vfprintf(cout, fmt, ap);
+        fwrite(str, size_t(len), 1, cout);
         fflush(cout); // flush needed for proper sync with different shells
-#endif
+    #endif
+    }
+
+    #define safe_vsnprintf_msg_len(fmt) \
+        char msg[8192]; va_list ap; va_start(ap, fmt); \
+        int len = vsnprintf(msg, sizeof(msg), fmt, ap); \
+        if (len < 0 || len >= sizeof(msg)) { \
+            len = sizeof(msg) - 1; \
+            msg[len] = '\0'; \
+        }
+
+    static void consolef(ConsoleColor color, const char* fmt, ...)
+    {
+        safe_vsnprintf_msg_len(fmt);
+        console(color, msg, len);
     }
 
     void test::assert_failed(const char* file, int line, const char* fmt, ...)
     {
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
-
-        char message[8192]; va_list ap; va_start(ap, fmt);
-        vsnprintf(message, 8192, fmt, ap);
+        safe_vsnprintf_msg_len(fmt);
 
         // only show immediate message if TestLabel-level verbosity
         if (state().verbosity >= TestVerbosity::TestLabels)
         {
-            consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, message);
+            consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg);
         }
 
         if (current_results)
         {
             current_results->asserts_failed++;
-            current_results->failures.emplace_back(test_failure{name, current_func->name, string{message}, string{filename}, line });
+            current_results->failures.emplace_back(
+                test_failure{name, current_func->name, string{msg,msg+len}, string{filename}, line });
         }
     }
 
     void test::assert_failed_custom(const char* fmt, ...)
     {
-        char message[8192]; va_list ap; va_start(ap, fmt);
-        vsnprintf(message, 8192, fmt, ap);
+        safe_vsnprintf_msg_len(fmt);
 
         // only show immediate message if TestLabel-level verbosity
         if (state().verbosity >= TestVerbosity::TestLabels)
         {
-            consolef(Red, message);
+            console(Red, msg, len);
         }
 
         if (current_results)
         {
             current_results->asserts_failed++;
-            current_results->failures.emplace_back(test_failure{name, current_func->name, string{message}, string{}, 0 });
+            current_results->failures.emplace_back(
+                test_failure{name, current_func->name, string{msg,msg+len}, string{}, 0 });
         }
     }
 
@@ -279,9 +284,8 @@ namespace rpp
         // only show immediate message if TestLabel-level verbosity
         if (state().verbosity >= TestVerbosity::TestLabels)
         {
-            char message[8192]; va_list ap; va_start(ap, fmt);
-            vsnprintf(message, 8192, fmt, ap);
-            consolef(Red, message);
+            safe_vsnprintf_msg_len(fmt);
+            console(Red, msg, len);
         }
     }
 
@@ -290,9 +294,8 @@ namespace rpp
         // only show immediate message if TestLabel-level verbosity
         if (state().verbosity >= TestVerbosity::TestLabels)
         {
-            char message[8192]; va_list ap; va_start(ap, fmt);
-            vsnprintf(message, 8192, fmt, ap);
-            consolef(Yellow, message);
+            safe_vsnprintf_msg_len(fmt);
+            console(Yellow, msg, len);
         }
     }
 
@@ -301,9 +304,25 @@ namespace rpp
         // only show immediate message if TestLabel-level verbosity
         if (state().verbosity >= TestVerbosity::TestLabels)
         {
-            char message[8192]; va_list ap; va_start(ap, fmt);
-            vsnprintf(message, 8192, fmt, ap);
-            consolef(Default, message);
+            safe_vsnprintf_msg_len(fmt);
+            console(Default, msg, len);
+        }
+    }
+
+    void test::log_adapter(LogSeverity severity, const char* err, int len)
+    {
+        // only show immediate message if TestLabel-level verbosity
+        if (state().verbosity >= TestVerbosity::TestLabels)
+        {
+            ConsoleColor color = Default;
+            switch (severity)
+            {
+                case Default: color = Default; break;
+                case Green:   color = Green; break;
+                case Yellow:  color = Yellow; break;
+                case Red:     color = Red; break;
+            }
+            console(color, err, len);
         }
     }
 
@@ -530,8 +549,8 @@ namespace rpp
         }
     }
 
-    static void enable_disable_tests(unordered_set<strview>& enabled,
-                                     unordered_set<strview>& disabled)
+    static void enable_disable_tests(std::unordered_set<strview>& enabled,
+                                     std::unordered_set<strview>& disabled)
     {
         TestVerbosity verb = state().verbosity;
 

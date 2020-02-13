@@ -12,7 +12,7 @@ TestImpl(test_collections)
 
     TestCase(element_range)
     {
-        vector<int> v = { 1, 1, 1, 1, 1 };
+        std::vector<int> v = { 1, 1, 1, 1, 1 };
 
         int n = 0;
         for (auto& i : range(v)) n += i;
@@ -29,7 +29,7 @@ TestImpl(test_collections)
 
     TestCase(const_element_range)
     {
-        const vector<int> v = { 1, 1, 1, 1, 1 };
+        const std::vector<int> v = { 1, 1, 1, 1, 1 };
 
         int n = 0;
         for (auto& i : range(v)) n += i;
@@ -51,7 +51,7 @@ TestImpl(test_collections)
             for (auto& i : range) n += i;
             return n;
         };
-        int n = sumRange(range(vector<int>{ 1, 1, 1, 1, 1 }));
+        int n = sumRange(range(std::vector<int>{ 1, 1, 1, 1, 1 }));
         AssertThat(n, 5);
     }
 
@@ -98,21 +98,21 @@ TestImpl(test_collections)
 
     TestCase(emplace_back)
     {
-        vector<string> v;
+        std::vector<std::string> v;
         AssertThat(emplace_back(v), v.back());
         AssertThat(emplace_back(v, "emplaced"s), v.back());
     }
 
     TestCase(pop_back)
     {
-        vector<string> v { "first"s, "second"s };
+        std::vector<std::string> v { "first"s, "second"s };
         AssertThat(pop_back(v), "second"s);
         AssertThat(pop_back(v), "first"s);
     }
 
     TestCase(push_unique)
     {
-        vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
         push_unique(v, "5"s);
         AssertThat(v.size(), 5ul);
@@ -123,7 +123,7 @@ TestImpl(test_collections)
 
     TestCase(erase_item)
     {
-        vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
         erase_item(v, "nonexisting"s);
         AssertThat(v.size(), 5ul);
@@ -140,44 +140,44 @@ TestImpl(test_collections)
 
     TestCase(erase_first_if)
     {
-        vector<string> v { "1"s, "2"s, "2"s, "4"s, "5"s };
+        std::vector<string> v { "1"s, "2"s, "2"s, "4"s, "5"s };
 
         erase_first_if(v, [](auto& s){ return s == "nonexisting"s; });
         AssertThat(v.size(), 5ul);
 
         erase_first_if(v, [](auto& s){ return s == "1"s; });
-        AssertThat(v, vector<string>({"2", "2", "4", "5"}));
+        AssertThat(v, std::vector<std::string>({"2", "2", "4", "5"}));
 
         erase_first_if(v, [](auto& s){ return s == "2"s; });
-        AssertThat(v, vector<string>({"2", "4", "5"}));
+        AssertThat(v, std::vector<std::string>({"2", "4", "5"}));
 
         erase_first_if(v, [](auto& s){ return s == "5"s; });
-        AssertThat(v, vector<string>({"2", "4"}));
+        AssertThat(v, std::vector<std::string>({"2", "4"}));
 
         erase_first_if(v, [](auto& s){ return s == "2"s; });
-        AssertThat(v, vector<string>({"4"s}));
+        AssertThat(v, std::vector<std::string>({"4"s}));
     }
 
     TestCase(erase_if)
     {
-        vector<string> v { "1"s, "2"s, "3"s, "2"s, "1"s, "2"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s, "2"s, "1"s, "2"s };
 
         erase_if(v, [](auto& s){ return s == "nonexisting"s; });
         AssertThat(v.size(), 6ul);
 
         erase_if(v, [](auto& s){ return s == "2"s; });
-        AssertThat(v, vector<string>({"1", "3", "1"}));
+        AssertThat(v, std::vector<std::string>({"1", "3", "1"}));
 
         erase_if(v, [](auto& s){ return s == "3"s; });
-        AssertThat(v, vector<string>({"1", "1"}));
+        AssertThat(v, std::vector<std::string>({"1", "1"}));
         
         erase_if(v, [](auto& s){ return s == "1"s; });
-        AssertThat(v, vector<string>());
+        AssertThat(v, std::vector<std::string>());
     }
 
     TestCase(erase_back_swap)
     {
-        vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
         erase_back_swap(v, 4);
         AssertThat(v.size(), 4ul);
@@ -191,7 +191,7 @@ TestImpl(test_collections)
 
     TestCase(erase_item_back_swap)
     {
-        vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
         erase_item_back_swap(v, "nonexisting"s);
         AssertThat(v.size(), 5ul);
@@ -208,7 +208,7 @@ TestImpl(test_collections)
 
     TestCase(erase_back_swap_first_if)
     {
-        vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
 
         erase_back_swap_first_if(v, [](auto& s) { return s == "nonexisting"; });
         AssertThat(v.size(), 5ul);
@@ -225,7 +225,7 @@ TestImpl(test_collections)
     
     TestCase(erase_back_swap_all_if)
     {
-        vector<string> v { "1"s, "1"s, "2"s, "3"s, "3"s, "4"s, "5"s, "5"s };
+        std::vector<std::string> v { "1"s, "1"s, "2"s, "3"s, "3"s, "4"s, "5"s, "5"s };
 
         erase_back_swap_all_if(v, [](auto& s) { return s == "nonexisting"; });
         AssertThat(v.size(), 8ul);
@@ -242,7 +242,7 @@ TestImpl(test_collections)
 
     TestCase(vector_contains)
     {
-        vector<string> v { "1"s, "2"s, "3"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s };
 
         AssertThat(contains(v, "1337"s), false);
         AssertThat(contains(v, ""s),     false);
@@ -261,7 +261,7 @@ TestImpl(test_collections)
 
     TestCase(unordered_map_contains)
     {
-        unordered_map<string,string> v { 
+        std::unordered_map<std::string,std::string> v { 
             {"1","x1"},
             {"2","x2"}, 
             {"3","x3"}
@@ -284,8 +284,8 @@ TestImpl(test_collections)
 
     TestCase(vector_append)
     {
-        vector<string> a { "1"s, "2"s };
-        vector<string> b { "3"s, "4"s, "5"s };
+        std::vector<std::string> a { "1"s, "2"s };
+        std::vector<std::string> b { "3"s, "4"s, "5"s };
 
         append(a, b);
         AssertThat(a.size(), 5ul);
@@ -298,7 +298,7 @@ TestImpl(test_collections)
 
     TestCase(vector_find)
     {
-        vector<string> v { "1"s, "2"s, "3"s };
+        std::vector<std::string> v { "1"s, "2"s, "3"s };
 
         AssertThat(find(v, "1337"s), nullptr);
         AssertNotEqual(find(v, "1"s), nullptr);
@@ -312,7 +312,7 @@ TestImpl(test_collections)
 
     TestCase(unordered_map_find)
     {
-        unordered_map<string,string> v { 
+        std::unordered_map<std::string,std::string> v { 
             {"1","x1"},
             {"2","x2"}, 
             {"3","x3"}
@@ -330,57 +330,57 @@ TestImpl(test_collections)
 
     TestCase(vector_find_if)
     {
-        vector<string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
+        std::vector<std::string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
 
-        AssertThat(find_if(range(v), [](const string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_if(range(v), [](const string& s) { return s == "1"s; }), &v[0]  );
-        AssertThat(find_if(range(v), [](const string& s) { return s == "2"s; }), &v[1]  );
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  );
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  );
     }
 
     TestCase(vector_find_last_if)
     {
-        vector<string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
+        std::vector<std::string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
 
-        AssertThat(find_if(range(v), [](const string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_if(range(v), [](const string& s) { return s == "1"s; }), &v[0]  );
-        AssertThat(find_if(range(v), [](const string& s) { return s == "2"s; }), &v[1]  );
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  );
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  );
     }
 
     TestCase(vector_find_smallest)
     {
-        vector<string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
-        AssertThat(find_smallest(v, [](const string& s) { return s.size(); }), &v[3]);
+        std::vector<std::string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
+        AssertThat(find_smallest(v, [](const std::string& s) { return s.size(); }), &v[3]);
     }
 
     TestCase(vector_find_largest)
     {
-        vector<string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
-        AssertThat(find_largest(v, [](const string& s) { return s.size(); }), &v[0]);
+        std::vector<std::string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
+        AssertThat(find_largest(v, [](const std::string& s) { return s.size(); }), &v[0]);
     }
 
     TestCase(any_of)
     {
-        vector<string> empty;
+        std::vector<std::string> empty;
         AssertThat(any_of(empty, [](auto s){ return true; }), false);
 
-        vector<string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
+        std::vector<std::string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
         AssertThat(any_of(v, [](auto s){ return s == "xxx"s; }), false);
         AssertThat(any_of(v, [](auto s){ return s == "ccc"s; }), true);
     }
 
     TestCase(sum_all)
     {
-        vector<string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
+        std::vector<std::string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
 
         AssertThat(sum_all(v), "abbcccdddd"s);
 
         // we cannot grab address of C++ stdlib methods, so we need a dummy wrapper
-        struct custom : public string {
+        struct custom : public std::string {
             using string::string;
-            custom(string&& s) : string(move(s)) {}
+            custom(string&& s) : string(std::move(s)) {}
             int len() const { return (int)this->length(); }
         };
-        vector<custom> u { "a"s, "bb"s, "ccc"s, "dddd"s };
+        std::vector<custom> u { "a"s, "bb"s, "ccc"s, "dddd"s };
         AssertThat(sum_all(u, &custom::len), 10);
     }
 
@@ -391,13 +391,13 @@ TestImpl(test_collections)
 
     TestCase(transform)
     {
-        vector<string> original { "1"s, "2"s, "3"s, "4"s, "5"s };
-        vector<int>    expected { 1,2,3,4,5 };
+        std::vector<std::string> original { "1"s, "2"s, "3"s, "4"s, "5"s };
+        std::vector<int>    expected { 1,2,3,4,5 };
 
-        vector<int> transformed1 = rpp::transform(original, &string_to_int);
+        std::vector<int> transformed1 = rpp::transform(original, &string_to_int);
         AssertThat(transformed1, expected);
 
-        vector<int> transformed2 = rpp::transform(original, [](const string& s) -> int
+        std::vector<int> transformed2 = rpp::transform(original, [](const string& s) -> int
         {
             return std::stoi(s);
         });

@@ -6,16 +6,12 @@
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
 #include <vector>  // access to std::vector and std::string
-#include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
 #include <typeinfo>
+#include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
+#include <rpp/debugging.h> // for adapting debugging API-s with tests API
 
 namespace rpp
 {
-    using std::string;
-    using std::vector;
-    using std::move;
-    using std::unique_ptr;
-
 #if _MSC_VER
     // warning C4251: 'rpp::test::name': struct 'rpp::strview' needs to have dll-interface to be used by clients of struct 'rpp::test'
     #pragma warning( disable : 4251 ) 
@@ -25,7 +21,7 @@ namespace rpp
     struct test_info;
     struct test_results;
 
-    using test_factory = unique_ptr<test> (*)(strview name);
+    using test_factory = std::unique_ptr<test> (*)(strview name);
 
     struct RPPAPI test_info
     {
@@ -79,6 +75,14 @@ namespace rpp
         static void print_info(const char* fmt, ...);
 
         /**
+         * Adapter for rpp/debugging.h, enables piping `LogInfo()` etc into test framework output
+         * @code
+         * SetLogErrorHandler(&rpp::test::log_adapter);
+         * @endcode
+         */
+        static void log_adapter(LogSeverity severity, const char* err, int len);
+
+        /**
          * Runs all the registered tests on this test impl.
          * If a non-empty methodFilter is provided, then only test methods that contain
          * the methodFilter substring are run
@@ -116,14 +120,14 @@ namespace rpp
         static int run_tests(const char* testNamePatterns) {
             return run_tests(strview{testNamePatterns});
         }
-        static int run_tests(const string& testNamePatterns) {
+        static int run_tests(const std::string& testNamePatterns) {
             return run_tests(strview{testNamePatterns});
         }
 
         /**
          * Pass multiple patterns for enabling multiple different tests
          */
-        static int run_tests(const vector<string>& testNamePatterns);
+        static int run_tests(const std::vector<std::string>& testNamePatterns);
         static int run_tests(const char** testNamePatterns, int numPatterns);
         template<int N> static int run_tests(const char* (&testNamePatterns)[N]) {
             return run_tests(testNamePatterns, N);
@@ -150,9 +154,9 @@ namespace rpp
          */
         static void set_verbosity(TestVerbosity verbosity);
 
-        template<class T> static string as_short_string(const T& obj, int maxLen = 512)
+        template<class T> static std::string as_short_string(const T& obj, int maxLen = 512)
         {
-            string_buffer sb;
+            rpp::string_buffer sb;
             sb << obj;
             if (sb.size() > maxLen)
             {
@@ -166,8 +170,8 @@ namespace rpp
         void assumption_failed(const char* file, int line,
             const char* expr, const Actual& actual, const char* why, const Expected& expected)
         {
-            string sActual = as_short_string(actual);
-            string sExpect = as_short_string(expected);
+            std::string sActual = as_short_string(actual);
+            std::string sExpect = as_short_string(expected);
             assert_failed(file, line, "%s => '%s' %s '%s'", expr, sActual.c_str(), why, sExpect.c_str());
         }
 
@@ -185,7 +189,7 @@ namespace rpp
 
     
     template<class T>
-    bool operator==(const vector<T>& a, const vector<T>& b)
+    bool operator==(const std::vector<T>& a, const std::vector<T>& b)
     {
         size_t len = a.size();
         if (len != b.size()) return false;

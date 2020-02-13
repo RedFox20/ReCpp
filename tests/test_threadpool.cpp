@@ -4,10 +4,6 @@
 #include <atomic>
 #include <unordered_set>
 using namespace rpp;
-using std::mutex;
-using std::atomic;
-using std::atomic_int;
-using std::unordered_set;
 using namespace std::this_thread;
 using namespace std::chrono_literals;
 
@@ -21,16 +17,16 @@ TestImpl(test_threadpool)
 
     static int parallelism_count(int numIterations)
     {
-        mutex m;
-        unordered_set<std::thread::id> ids;
+        std::mutex m;
+        std::unordered_set<std::thread::id> ids;
         parallel_for(0, numIterations, [&](int start, int end)
         {
             ::sleep_for(1ms);
-            { std::lock_guard<mutex> lock{m};
+            { std::lock_guard<std::mutex> lock{m};
                 ids.insert(::get_id());
             }
         });
-        std::lock_guard<mutex> lock{m};
+        std::lock_guard<std::mutex> lock{m};
         return (int)ids.size();
     }
 
@@ -50,7 +46,7 @@ TestImpl(test_threadpool)
             s = "completed";
             sync.notify();
         };
-        parallel_task([f=move(fun)]()
+        parallel_task([f=std::move(fun)]()
         {
             f();
         });
@@ -61,7 +57,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_performance)
     {
-        auto numbers = vector<int>(13333337);
+        auto numbers = std::vector<int>(13333337);
         int* ptr = numbers.data();
         int  len = (int)numbers.size();
 
@@ -78,7 +74,7 @@ TestImpl(test_threadpool)
 
         Timer timer1;
 
-        atomic<int64_t> sum { 0 };;
+        std::atomic<int64_t> sum { 0 };;
         parallel_for(0, (int)numbers.size(), [&](int start, int end) {
             int64_t isum = 0;
             for (int i = start; i < end; ++i)
@@ -113,7 +109,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_foreach)
     {
-        auto numbers = vector<int>(1337);
+        auto numbers = std::vector<int>(1337);
         parallel_foreach(numbers, [](int& n) {
             n = 1;
         });
@@ -168,7 +164,7 @@ TestImpl(test_threadpool)
         thread_pool::global().clear_idle_tasks();
         AssertThat(thread_pool::global().active_tasks(), 0);
 
-        atomic_int times_launched {0};
+        std::atomic_int times_launched {0};
         rpp::parallel_task([&] { times_launched += 1; })->wait(1000);
         AssertThat((int)times_launched, 1);
 
@@ -185,7 +181,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_nested_nodeadlocks)
     {
-        atomic_int times_launched {0};
+        std::atomic_int times_launched {0};
         auto func = [&]() {
             times_launched += 1;
             pool_task* subtasks[5] = {
