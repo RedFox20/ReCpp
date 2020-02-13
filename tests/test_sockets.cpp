@@ -165,12 +165,12 @@ TestImpl(test_sockets)
         send.sendto(recv_addr, "udp_peek1");
         send.sendto(recv_addr, "udp_peek22");
 
-        AssertThat(recv.peek_datagram_size(), "udp_peek1"s.size());
+        AssertThat(recv.peek_datagram_size(), (int)"udp_peek1"s.size());
         AssertThat(recv.peek_str(), "udp_peek1"s);
         AssertThat(recv.peek_str(), "udp_peek1"s);
         AssertThat(recv.recv_str(), "udp_peek1"s);
 
-        AssertThat(recv.peek_datagram_size(), "udp_peek22"s.size());
+        AssertThat(recv.peek_datagram_size(), (int)"udp_peek22"s.size());
         AssertThat(recv.peek_str(), "udp_peek22"s);
         AssertThat(recv.peek_str(), "udp_peek22"s);
         AssertThat(recv.recv_str(), "udp_peek22"s);

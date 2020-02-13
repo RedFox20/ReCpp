@@ -1,12 +1,11 @@
 #include <rpp/sprint.h>
 #include <rpp/file_io.h>
-#include <unordered_map>
+#include <map>
 #include <cfloat> // DBL_MAX
 #include "TempFILE.h"
 #include <rpp/tests.h>
 
 using namespace rpp;
-using std::unordered_map;
 
 struct external_to_string { };
 std::string to_string(external_to_string) { return "external_to_string"; }
@@ -127,7 +126,7 @@ TestImpl(test_sprint)
 
     TestCase(println_unordered_map)
     {
-        unordered_map<int, string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
+        std::map<int, string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
 
         TempFILE printed;
         println(printed.out, map);
