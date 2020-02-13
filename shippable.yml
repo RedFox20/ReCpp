@@ -9,4 +9,4 @@ build:
     - pip3 install mama --upgrade
     - sudo apt -y --allow-unauthenticated --fix-missing install libdw-dev gdb
     - mama build clang
-    - mama test
+    - mama test="--verbosity=2"

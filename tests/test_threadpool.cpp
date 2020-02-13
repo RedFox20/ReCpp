@@ -101,10 +101,16 @@ TestImpl(test_threadpool)
         AssertThat((long long)sum2, 88888931111116LL);
 
         int cores = thread_pool::physical_cores();
-        if (cores > 2)
-            AssertLessOrEqual(parallel_elapsed, serial_elapsed);
-        else // if the system doesn't have enough cores, the overhead should be minimal
+        if (cores <= 2)
+        {
+            // if the system doesn't have enough cores, the overhead should be minimal
+            AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.005);
+        }
+        else
+        {
             AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.001);
+            
+        }
     }
 
     TestCase(parallel_foreach)

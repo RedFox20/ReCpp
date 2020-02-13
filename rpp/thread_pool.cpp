@@ -284,23 +284,32 @@ namespace rpp
 #if _WIN32
     static int num_physical_cores()
     {
-        DWORD bytes = 0;
-        GetLogicalProcessorInformation(nullptr, &bytes);
-        std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> coreInfo(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
-        GetLogicalProcessorInformation(coreInfo.data(), &bytes);
-
-        int cores = 0;
-        for (auto& info : coreInfo)
+        static int num_cores = []
         {
-            if (info.Relationship == RelationProcessorCore)
-                ++cores;
-        }
-        return cores;
+            DWORD bytes = 0;
+            GetLogicalProcessorInformation(nullptr, &bytes);
+            std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> coreInfo(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+            GetLogicalProcessorInformation(coreInfo.data(), &bytes);
+
+            int cores = 0;
+            for (auto& info : coreInfo)
+            {
+                if (info.Relationship == RelationProcessorCore)
+                    ++cores;
+            }
+            return cores > 0 ? cores : 1;
+        }();
+        return num_cores;
     }
 #else
     static int num_physical_cores()
     {
-        return (int)std::thread::hardware_concurrency() / 2;
+        static int num_cores = []
+        {
+            int n = (int)std::thread::hardware_concurrency() / 2;
+            return n > 0 ? n : 1;
+        }();
+        return num_cores;
     }
 #endif
 
@@ -404,18 +413,15 @@ namespace rpp
     void thread_pool::parallel_for(int rangeStart, int rangeEnd, 
                                    const action<int, int>& rangeTask) noexcept
     {
-        assert(!rangeRunning && "Fatal error: nested parallel loops are forbidden!");
-        assert(coreCount > 0 && "There appears to be no hardware concurrency");
-
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
             return;
 
         const int cores = range < coreCount ? range : coreCount;
-        const int len = range / cores;
+        const int len   = range / cores;
 
-        // only one physical core or only one task to run. don't run in a thread
-        if (cores <= 1)
+        // not enough physical cores to run efficiently
+        if (cores <= 2)
         {
             rangeTask(0, len);
             return;

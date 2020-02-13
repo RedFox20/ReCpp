@@ -29,4 +29,4 @@ install:
   - alias mama=~/.local/bin/mama
 
 script:
-  - mama build ${COMPILER} test
+  - mama build ${COMPILER} test="--verbosity=2"

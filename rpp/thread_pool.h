@@ -332,17 +332,18 @@ namespace rpp
         pool_task* start_range_task(size_t& poolIndex, int rangeStart, int rangeEnd, 
                                     const action<int, int>& rangeTask) noexcept;
 
-        // sets a new max idle time for spawned tasks
-        // this does not notify already idle tasks
-        // @param maxIdleSeconds Maximum idle seconds before tasks are abandoned and thread handle is released
-        //                       Setting this to 0 keeps pool tasks alive forever
+        /**
+         * Sets a new max idle time for spawned tasks
+         * This does not notify already idle tasks
+         * @param maxIdleSeconds Maximum idle seconds before tasks are abandoned and thread handle is released
+         *                       Setting this to 0 keeps pool tasks alive forever
+         */
         void max_task_idle_time(float maxIdleSeconds = 15) noexcept;
 
         /**
-         * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
-         * parallel nesting is forbidden. This prevents quadratic thread explosion.
-         *
+         * Runs a new Parallel For range task.
          * This function will block until all parallel tasks have finished running
+         * If number of physical cores is <= 2, then this will run sequentially
          *
          * @param rangeStart Usually 0
          * @param rangeEnd Usually vec.size()
@@ -360,7 +361,7 @@ namespace rpp
         // runs a generic parallel task
         pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept;
 
-        // return the number of physical cores
+        /** @return the number of physical cores */
         static int physical_cores();
 
         /**

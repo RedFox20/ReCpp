@@ -11,7 +11,7 @@ jobs:
       - run: sudo python3.6 -m pip install mama
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: mama build clang
-      - run: mama test
+      - run: mama test="--verbosity=2"
 workflows:
   version: 2
   build_all:
