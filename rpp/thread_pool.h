@@ -306,7 +306,6 @@ namespace rpp
         std::vector<std::unique_ptr<pool_task>> tasks;
         float taskMaxIdleTime = 15; // new task timeout in seconds
         int coreCount = 0;
-        std::atomic_bool rangeRunning { false }; // whether parallel range is running or not
 
     public:
 

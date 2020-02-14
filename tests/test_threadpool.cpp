@@ -65,6 +65,10 @@ TestImpl(test_threadpool)
             for (int i = start; i < end; ++i)
                 ptr[i] = i;
         });
+        for (int i = 0; i < len; ++i)
+        {
+            AssertThat(ptr[i], i);
+        }
         //#pragma loop(hint_parallel(0))
         //for (int i = 0; i < len; ++i)
         //    ptr[i] = rand() % 32768;
@@ -75,7 +79,7 @@ TestImpl(test_threadpool)
         Timer timer1;
 
         std::atomic<int64_t> sum { 0 };;
-        parallel_for(0, (int)numbers.size(), 0, [&](int start, int end) {
+        parallel_for(0, len, 0, [&](int start, int end) {
             int64_t isum = 0;
             for (int i = start; i < end; ++i)
                 isum += ptr[i];
@@ -89,7 +93,7 @@ TestImpl(test_threadpool)
         //});
         double parallel_elapsed = timer1.elapsed();
         print_info("ParallelFor  elapsed: %.3fs  result: %lld\n", parallel_elapsed, (long long)sum);
-        AssertThat((long long)sum, 88888931111116LL);
+        AssertThat((long long)sum, 3299527397221461LL);
 
         Timer timer2;
         int64_t sum2 = 0;
@@ -98,7 +102,7 @@ TestImpl(test_threadpool)
         double serial_elapsed = timer2.elapsed();
 
         print_info("Singlethread elapsed: %.3fs  result: %lld\n", serial_elapsed, (long long)sum2);
-        AssertThat((long long)sum2, 88888931111116LL);
+        AssertThat((long long)sum2, 3299527397221461LL);
 
         int cores = thread_pool::physical_cores();
         if (cores <= 2)

@@ -459,11 +459,9 @@ namespace rpp
         }
 
         auto active = static_cast<pool_task**>(alloca(sizeof(pool_task*) * minTasks));
-        rangeRunning = true;
 
         size_t poolIndex = 0;
         int spawned = 0; // actual number of spawned tasks
-        int start = rangeStart;
 
         for (int start = rangeStart; start < rangeEnd; start += maxLength)
         {
@@ -480,8 +478,6 @@ namespace rpp
         }
 
         if (err) std::rethrow_exception(err);
-
-        rangeRunning = false;
     }
 
     pool_task* thread_pool::parallel_task(task_delegate<void()>&& genericTask) noexcept

@@ -39,54 +39,52 @@
 
 namespace rpp
 {
-    using std::string;
-    using std::runtime_error;
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Trivial convenience wrappers
 
-    string stack_trace(int maxDepth) noexcept
+    std::string stack_trace(int maxDepth) noexcept
     {
         return stack_trace(nullptr, 0, maxDepth, 2);
     }
-    string stack_trace(const char* message, int maxDepth) noexcept
+    std::string stack_trace(const char* message, int maxDepth) noexcept
     {
         return stack_trace(message, strlen(message), maxDepth, 2);
     }
-    string stack_trace(const string& message, int maxDepth) noexcept
+    std::string stack_trace(const std::string& message, int maxDepth) noexcept
     {
         return stack_trace(message.data(), message.size(), maxDepth, 2);
     }
 
     void print_trace(int maxDepth) noexcept
     {
-        string s = stack_trace(nullptr, 0, maxDepth, 2);
+        std::string s = stack_trace(nullptr, 0, maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
     void print_trace(const char* message, int maxDepth) noexcept
     {
-        string s = stack_trace(message, strlen(message), maxDepth, 2);
+        std::string s = stack_trace(message, strlen(message), maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
-    void print_trace(const string& message, int maxDepth) noexcept
+    void print_trace(const std::string& message, int maxDepth) noexcept
     {
-        string s = stack_trace(message.data(), message.size(), maxDepth, 2);
+        std::string s = stack_trace(message.data(), message.size(), maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
 
-    runtime_error error_with_trace(const char* message, int maxDepth) noexcept
+    std::runtime_error error_with_trace(const char* message, int maxDepth) noexcept
     {
-        return runtime_error{ stack_trace(message, strlen(message), maxDepth, 2) };
+        return std::runtime_error{ stack_trace(message, strlen(message), maxDepth, 2) };
     }
-    runtime_error error_with_trace(const string& message, int maxDepth) noexcept
+    std::runtime_error error_with_trace(const std::string& message, int maxDepth) noexcept
     {
-        return runtime_error{ stack_trace(message.data(), message.size(), maxDepth, 2) };
+        return std::runtime_error{ stack_trace(message.data(), message.size(), maxDepth, 2) };
     }
 
     traced_exception::traced_exception(const char* message) noexcept
         : runtime_error(error_with_trace(message))
     {
     }
-    traced_exception::traced_exception(const string& message) noexcept
+    traced_exception::traced_exception(const std::string& message) noexcept
         : runtime_error(error_with_trace(message))
     {
     }
@@ -245,9 +243,6 @@ namespace rpp
 
 #if HAS_LIBDW
     
-    using std::vector;
-    using std::unordered_map;
-
     struct FlatDie
     {
         Dwarf_Addr lo;
@@ -296,8 +291,8 @@ namespace rpp
     {
         int max = 0;
         Dwarf_Addr bias = 0;
-        vector<FlatDie> flatmap;
-        vector<Dwarf_Die*> rootDies;
+        std::vector<FlatDie> flatmap;
+        std::vector<Dwarf_Die*> rootDies;
 
         void init(Dwfl_Module* mod)
         {
@@ -388,7 +383,7 @@ namespace rpp
 
     static Dwarf_Die* custom_module_addrdie(Dwfl_Module* mod, Dwarf_Addr addr, Dwarf_Addr* outBias)
     {
-        static unordered_map<Dwfl_Module*, ModuleMap> moduleDies;
+        static std::unordered_map<Dwfl_Module*, ModuleMap> moduleDies;
         ModuleMap* map;
         auto it = moduleDies.find(mod);
         if (it == moduleDies.end())

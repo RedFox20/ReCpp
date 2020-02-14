@@ -92,8 +92,6 @@ static void ShortFilePathMessage(char*& ptr, int& len)
 
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
 {
-    using std::mutex;
-    using std::unique_lock;
     #if __ANDROID__
         auto priority = severity == LogSeverityInfo ? ANDROID_LOG_INFO :
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
@@ -111,9 +109,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         FILE*  fout   = severity == LogSeverityError ? stderr : stdout;
 
         AllocaPrintlineBuf(err, len);
-        static mutex consoleSync;
+        static std::mutex consoleSync;
         {
-            unique_lock<mutex> guard{ consoleSync, std::defer_lock };
+            std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
             if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
             SetConsoleTextAttribute(winout, colormap[severity]);
@@ -134,8 +132,8 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                         "\x1b[93m", // Warning: bright yellow
                         "\x1b[91m", // Error  : bright red
                 };
-                static mutex consoleSync;
-                unique_lock<mutex> guard{ consoleSync, std::defer_lock };
+                static std::mutex consoleSync;
+                std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
                 if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
             
                 fwrite(colors[severity], strlen(colors[severity]), 1, fout);

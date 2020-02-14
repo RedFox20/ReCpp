@@ -6,8 +6,6 @@
 
 namespace rpp
 {
-    using std::swap;
-
     /////////////////////////////////////////////////////////////////////////////////////
 
     template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y)
@@ -856,9 +854,9 @@ namespace rpp
 
     Matrix3& Matrix3::transpose()
     {
-        swap(m01, m10);
-        swap(m02, m20);
-        swap(m12, m21);
+        std::swap(m01, m10);
+        std::swap(m02, m20);
+        std::swap(m12, m21);
         return *this;
     }
 
@@ -1306,12 +1304,12 @@ namespace rpp
 
     Matrix4& Matrix4::transpose()
     {
-        swap(m01, m10);
-        swap(m02, m20);
-        swap(m03, m30);
-        swap(m12, m21);
-        swap(m13, m31);
-        swap(m23, m32);
+        std::swap(m01, m10);
+        std::swap(m02, m20);
+        std::swap(m03, m30);
+        std::swap(m12, m21);
+        std::swap(m13, m31);
+        std::swap(m23, m32);
         return *this;
     }
 
@@ -1829,7 +1827,7 @@ namespace rpp
         float t0 = tca - thc; // solutions for t if the ray intersects 
         float t1 = tca + thc;
 
-        if (t0 > t1) swap(t0, t1);
+        if (t0 > t1) std::swap(t0, t1);
         if (t0 < 0) {
             t0 = t1; // if t0 is negative, let's use t1 instead 
             if (t0 < 0) t0 = 0.0f; // both t0 and t1 are negative 

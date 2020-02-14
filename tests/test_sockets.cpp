@@ -3,7 +3,6 @@
 #include <rpp/tests.h>
 #include <thread>
 
-using std::thread;
 using namespace rpp;
 using Socket = rpp::socket;
 
@@ -226,7 +225,7 @@ TestImpl(test_sockets)
     TestCase(nonblocking_sockets)
     {
         Socket server = listen(13337); // this is our server
-        thread remote([=] { nonblocking_remote(13337); }); // spawn remote client
+        std::thread remote([=] { nonblocking_remote(13337); }); // spawn remote client
         Socket client = accept(server);
 
         // wait 1ms for a client that will never come
@@ -278,7 +277,7 @@ TestImpl(test_sockets)
         print_info("========= TRANSMIT DATA =========\n");
 
         Socket server = listen(14447);
-        thread remote([=] { this->transmitting_remote(14447); });
+        std::thread remote([=] { this->transmitting_remote(14447); });
         Socket client = accept(server);
         client.set_rcv_buf_size(TransmitSize*2);
 
