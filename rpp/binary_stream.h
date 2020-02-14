@@ -653,8 +653,8 @@ namespace rpp
      */
     class RPPAPI file_writer : public binary_stream, protected stream_source
     {
-        rpp::file* File = nullptr;
         rpp::file Owned;
+        rpp::file* File = nullptr;
     public:
         file_writer() noexcept : binary_stream{this} {}
         explicit file_writer(rpp::file& file)      noexcept : binary_stream{this},           File(&file) {}
@@ -664,10 +664,10 @@ namespace rpp
          * Valid flags: READWRITE, CREATENEW, APPEND
          */
         explicit file_writer(const std::string& pathToFile, file::mode mode = file::CREATENEW) noexcept // NOLINT
-            : binary_stream{this}, File{&Owned}, Owned{pathToFile, mode} {}
+            : binary_stream{this}, Owned{pathToFile, mode}, File{&Owned} {}
 
         file_writer(const std::string& pathToFile, int capacity, file::mode mode = file::CREATENEW) noexcept // NOLINT
-            : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, mode} {}
+            : binary_stream{capacity, this}, Owned{pathToFile, mode}, File{&Owned} {}
 
         ~file_writer() noexcept;
 
@@ -720,18 +720,18 @@ namespace rpp
      */
     class RPPAPI file_reader : public binary_stream, protected stream_source
     {
-        rpp::file* File = nullptr;
         rpp::file Owned;
+        rpp::file* File = nullptr;
     public:
         file_reader() noexcept : binary_stream{this} {}
         explicit file_reader(rpp::file& file)      noexcept : binary_stream{this},           File(&file) {}
         file_reader(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
         
         explicit file_reader(const std::string& pathToFile) noexcept // NOLINT
-            : binary_stream{this}, File{&Owned}, Owned{pathToFile, file::READONLY} {}
+            : binary_stream{this}, Owned{pathToFile, file::READONLY}, File{&Owned} {}
         
         file_reader(const std::string& pathToFile, int capacity) noexcept // NOLINT
-            : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, file::READONLY} {}
+            : binary_stream{capacity, this}, Owned{pathToFile, file::READONLY}, File{&Owned} {}
         
         ~file_reader() noexcept;
 

@@ -18,12 +18,12 @@ namespace rpp
         using bdeserialize_func = void(*)(T* inst,       int offset, binary_stream& r);
         using sserialize_func   = void(*)(const T* inst, int offset, string_buffer& w);
         using sdeserialize_func = void(*)(T* inst,       int offset, strview token);
-        int offset;
+        int offset = 0;
         strview name; // for named serialization such as json
-        bserialize_func   bserialize;
-        bdeserialize_func bdeserialize;
-        sserialize_func   sserialize;
-        sdeserialize_func sdeserialize;
+        bserialize_func   bserialize   = nullptr;
+        bdeserialize_func bdeserialize = nullptr;
+        sserialize_func   sserialize   = nullptr;
+        sdeserialize_func sdeserialize = nullptr;
     };
 
     template<class T> struct serializable

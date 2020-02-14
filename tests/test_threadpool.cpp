@@ -55,6 +55,59 @@ TestImpl(test_threadpool)
         AssertThat(s, "completed");
     }
 
+    TestCase(parallel_for_max_range_size)
+    {
+        auto numbers = std::vector<int>(32);
+        int* ptr = numbers.data();
+        int  len = (int)numbers.size();
+        for (int i = 0; i < len; ++i)
+            ptr[i] = i;
+
+        rpp::Timer t;
+
+        parallel_for(0, len, 8, [&](int start, int end) {
+            AssertThat(end-start, 8);
+            for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
+        });
+        
+        parallel_for(0, len, 2, [&](int start, int end) {
+            AssertThat(end-start, 2);
+            for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
+        });
+
+        parallel_for(0, len, 1, [&](int start, int end) {
+            AssertThat(end-start, 1);
+            for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
+        });
+
+        double elapsed = t.elapsed();
+        AssertLessOrEqual(elapsed, 0.1);
+    }
+
+    TestCase(parallel_for_max_range_size_unaligned)
+    {
+        auto numbers = std::vector<int>(17);
+        int* ptr = numbers.data();
+        int  len = (int)numbers.size();
+        for (int i = 0; i < len; ++i)
+            ptr[i] = i;
+
+        rpp::Timer t;
+
+        // [0,8); [8,16); [16,17)
+        parallel_for(0, len, 8, [&](int start, int end) {
+            if      (start == 0)  { AssertThat(end-start, 8); AssertThat(end, 8); }
+            else if (start == 8)  { AssertThat(end-start, 8); AssertThat(end, 16); }
+            else if (start == 16) { AssertThat(end-start, 1); AssertThat(end, 17); }
+            else AssertMsg(false, "invalid parallel_for range: [%d, %d)", start, end);
+        });
+
+        double elapsed = t.elapsed();
+        AssertLessOrEqual(elapsed, 0.025);
+
+        AssertGreaterOrEqual(thread_pool::global().idle_tasks(), 3);
+    }
+
     TestCase(parallel_for_performance)
     {
         auto numbers = std::vector<int>(81'234'567);
@@ -65,8 +118,7 @@ TestImpl(test_threadpool)
             for (int i = start; i < end; ++i)
                 ptr[i] = i;
         });
-        for (int i = 0; i < len; ++i)
-        {
+        for (int i = 0; i < len; ++i) {
             AssertThat(ptr[i], i);
         }
         //#pragma loop(hint_parallel(0))

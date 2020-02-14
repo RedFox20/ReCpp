@@ -977,11 +977,12 @@ namespace rpp
 
     char* Matrix3::toString(char* buffer, int size) const
     {
-        int len = snprintf(buffer, size_t(size), "{\n");
+        size_t n = size;
+        int len = snprintf(buffer, n, "{\n");
         for (auto v : r)
-            len += snprintf(buffer+len, size_t(size-len), " %8.3f,%8.3f,%8.3f\n",
+            len += snprintf(buffer+len, n-len, " %8.3f,%8.3f,%8.3f\n",
                                                             v.x  , v.y , v.z);
-        snprintf(buffer+len, size_t(size-len), "}");
+        snprintf(buffer+len, n-len, "}");
         return buffer;
     }
 
@@ -1582,11 +1583,12 @@ namespace rpp
     }
     char* Matrix4::toString(char* buffer, int size) const
     {
-        int len = snprintf(buffer, size_t(size), "{\n");
+        size_t n = size;
+        int len = snprintf(buffer, n, "{\n");
         for (auto v : r)
-            len += snprintf(buffer+len, size_t(size-len), " %8.3f,%8.3f,%8.3f,%8.3f\n",
+            len += snprintf(buffer+len, n-len, " %8.3f,%8.3f,%8.3f,%8.3f\n",
                                                             v.x , v.y , v.z , v.w);
-        snprintf(buffer+len, size_t(size-len), "}");
+        snprintf(buffer+len, n-len, "}");
         return buffer;
     }
 

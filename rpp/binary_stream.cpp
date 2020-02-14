@@ -5,17 +5,17 @@ namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////
 
-    // ReSharper disable CppPossiblyUninitializedMember
-    binary_stream::binary_stream(stream_source* src) noexcept : Ptr(Buf), Src(src) // NOLINT
+    binary_stream::binary_stream(stream_source* src) noexcept : Src{src} // NOLINT
     {
+        Ptr = Buf;
     }
-    binary_stream::binary_stream(int capacity, stream_source* src) noexcept : Ptr(Buf), Src(src) // NOLINT
+    binary_stream::binary_stream(int capacity, stream_source* src) noexcept : Src{src} // NOLINT
     {
+        Ptr = Buf;
         if (capacity > SBSize)
             Ptr = (char*)malloc(capacity);
         Cap = capacity;
     }
-    // ReSharper restore CppPossiblyUninitializedMember
 
     binary_stream::~binary_stream() noexcept
     {
@@ -70,13 +70,16 @@ namespace rpp
         {
             if (Cap > SBSize) // realloc dynamic buffer
             {
-                Ptr = (char*)realloc(Ptr, capacity);
+                char* p = (char*)realloc(Ptr, capacity);
+                if (!p) { std::terminate(); }
+                Ptr = p;
             }
             else // change from local buffer to dynamic
             {
                 Ptr = (char*)malloc(capacity);
                 if (uint bytes = size()) {
-                    memcpy(Ptr, Buf, (size_t)bytes);
+                    if (!Ptr) { std::terminate(); }
+                    else { memcpy(Ptr, Buf, (size_t)bytes); }
                 }
             }
         }

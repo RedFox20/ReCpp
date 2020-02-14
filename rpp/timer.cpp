@@ -108,7 +108,7 @@ namespace rpp
                 }
 
                 LARGE_INTEGER interval;
-                interval.QuadPart = micros * -10000000;
+                interval.QuadPart = (LONGLONG)micros * -10000000LL;
                 NtDelayExecution(false, &interval);
             }
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__

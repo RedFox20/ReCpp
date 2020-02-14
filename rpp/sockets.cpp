@@ -844,7 +844,7 @@ namespace rpp
         switch (errcode) {
             default: {
                 indebug(auto errmsg = socket::last_err(errcode));
-                logerror("socket %s", errmsg.c_str());
+                logerror("socket fh:%d %s", Sock, errmsg.c_str());
                 close();
                 Assert(false, "socket operation - unexpected failure");
                 return -1;
@@ -865,7 +865,7 @@ namespace rpp
                 return -1;
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_err(errcode));
-                logerror("%s", errmsg.c_str());
+                logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
                 close();
                 return -1;
             }

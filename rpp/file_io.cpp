@@ -882,7 +882,7 @@ namespace rpp /* ReCpp */
             folders.push_back(folder);
         }
 
-        for (int i = 0; i < static_cast<int>(folders.size()); ++i)
+        for (size_t i = 0; i < folders.size(); ++i)
         {
             if (i > 0 && folders[i] == ".." && folders[i-1] != "..") 
             {

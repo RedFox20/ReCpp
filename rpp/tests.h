@@ -49,9 +49,9 @@ namespace rpp
         struct test_func
         {
             strview name;
-            lambda_base lambda;
-            void (lambda_base::*func)();
-            size_t expectedExType;
+            lambda_base lambda { nullptr };
+            void (lambda_base::*func)() = nullptr;
+            size_t expectedExType = 0;
             bool autorun = true;
         };
 
@@ -70,6 +70,9 @@ namespace rpp
         virtual ~test();
         void assert_failed(const char* file, int line, const char* fmt, ...);
         void assert_failed_custom(const char* fmt, ...);
+    private:
+        void add_assert_failure(const char* file, int line, const char* msg, int len);
+    public:
         static void print_error(const char* fmt, ...);
         static void print_warning(const char* fmt, ...);
         static void print_info(const char* fmt, ...);

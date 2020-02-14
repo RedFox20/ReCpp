@@ -85,10 +85,10 @@ static void ShortFilePathMessage(char*& ptr, int& len)
 
 // this ensures default output newline is atomic with the rest of the error string
 #define AllocaPrintlineBuf(err, len) \
-    auto* buf = (char*)alloca((len) + 2); \
+    auto* buf = (char*)alloca(size_t(len) + 2); \
     memcpy(buf, err, size_t(len)); \
     buf[len] = '\n'; \
-    buf[(len)+1] = '\0';
+    buf[size_t(len)+1] = '\0';
 
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
 {
@@ -195,17 +195,17 @@ RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
     va_list ap; va_start(ap, format); \
     LogFormatv(severity, format, ap); \
     va_end(ap);
-RPPCAPI void _LogInfo(const char* format, ...) {
+RPPCAPI void _LogInfo(PRINTF_FMTSTR const char* format, ...) {
     WrappedLogFormatv(LogSeverityInfo, format);
 }
-RPPCAPI void _LogWarning(const char* format, ...) {
+RPPCAPI void _LogWarning(PRINTF_FMTSTR const char* format, ...) {
     WrappedLogFormatv(LogSeverityWarn, format);
 }
-RPPCAPI void _LogError(const char* format, ...) {
+RPPCAPI void _LogError(PRINTF_FMTSTR const char* format, ...) {
     WrappedLogFormatv(LogSeverityError, format);
 }
 
-RPPCAPI void LogEvent(const char* eventName, const char* format, ...)
+RPPCAPI void LogEvent(const char* eventName, PRINTF_FMTSTR const char* format, ...)
 {
 #if __clang__
 #if __has_feature(address_sanitizer)
@@ -227,7 +227,7 @@ RPPCAPI void LogEvent(const char* eventName, const char* format, ...)
     }
 }
 
-void _LogExcept(const char* exceptionWhat, const char* format, ...)
+void _LogExcept(const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...)
 {
 #if __clang__
 #if __has_feature(address_sanitizer)
@@ -252,7 +252,7 @@ void _LogExcept(const char* exceptionWhat, const char* format, ...)
     }
 }
 
-RPPCAPI const char* _FmtString(const char* format, ...)
+RPPCAPI const char* _FmtString(PRINTF_FMTSTR const char* format, ...)
 {
     static thread_local char errBuf[4096];
     va_list ap; va_start(ap, format);

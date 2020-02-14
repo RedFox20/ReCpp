@@ -76,6 +76,7 @@ namespace rpp
                         fflush(stderr);
                     }
                     assert(handle != nullptr);
+                    std::terminate();
                 }
                 shared_mem = (shared*)MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(shared));
             #elif __ANDROID__
@@ -242,87 +243,67 @@ namespace rpp
         console(color, msg, len);
     }
 
+    // only show immediate message if TestLabel-level verbosity
+    #define LogTestLabel(expr) \
+        if (state().verbosity >= TestVerbosity::TestLabels) { expr; }
+
     void test::assert_failed(const char* file, int line, const char* fmt, ...)
     {
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
         safe_vsnprintf_msg_len(fmt);
-
-        // only show immediate message if TestLabel-level verbosity
-        if (state().verbosity >= TestVerbosity::TestLabels)
-        {
-            consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg);
-        }
+        LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg));
 
         if (current_results)
-        {
-            current_results->asserts_failed++;
-            current_results->failures.emplace_back(
-                test_failure{name, current_func->name, std::string{msg,msg+len}, std::string{filename}, line });
-        }
+            add_assert_failure(filename, line, msg, len);
     }
 
     void test::assert_failed_custom(const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
-
-        // only show immediate message if TestLabel-level verbosity
-        if (state().verbosity >= TestVerbosity::TestLabels)
-        {
-            console(Red, msg, len);
-        }
+        LogTestLabel(console(Red, msg, len));
 
         if (current_results)
+            add_assert_failure("", 0, msg, len);
+    }
+
+    void test::add_assert_failure(const char* file, int line, const char* msg, int len)
+    {
+        static std::mutex mtx;
+        test_failure fail { name, current_func->name, std::string{msg,msg+len}, std::string{file}, line };
         {
+            std::lock_guard<std::mutex> lock {mtx};
             current_results->asserts_failed++;
-            current_results->failures.emplace_back(
-                test_failure{name, current_func->name, std::string{msg,msg+len}, std::string{}, 0 });
+            current_results->failures.emplace_back(std::move(fail));
         }
     }
 
     void test::print_error(const char* fmt, ...)
     {
-        // only show immediate message if TestLabel-level verbosity
-        if (state().verbosity >= TestVerbosity::TestLabels)
-        {
-            safe_vsnprintf_msg_len(fmt);
-            console(Red, msg, len);
-        }
+        LogTestLabel( safe_vsnprintf_msg_len(fmt); console(Red, msg, len) );
     }
 
     void test::print_warning(const char* fmt, ...)
     {
-        // only show immediate message if TestLabel-level verbosity
-        if (state().verbosity >= TestVerbosity::TestLabels)
-        {
-            safe_vsnprintf_msg_len(fmt);
-            console(Yellow, msg, len);
-        }
+        LogTestLabel( safe_vsnprintf_msg_len(fmt); console(Yellow, msg, len) );
     }
 
     void test::print_info(const char* fmt, ...)
     {
-        // only show immediate message if TestLabel-level verbosity
-        if (state().verbosity >= TestVerbosity::TestLabels)
-        {
-            safe_vsnprintf_msg_len(fmt);
-            console(Default, msg, len);
+        LogTestLabel( safe_vsnprintf_msg_len(fmt); console(Default, msg, len) );
+    }
+
+    static ConsoleColor SeverityToColor(LogSeverity severity)
+    {
+        switch (severity) {
+            default: return Default;
+            case LogSeverity::LogSeverityWarn: return Yellow;
+            case LogSeverity::LogSeverityError: return Red;
         }
     }
 
     void test::log_adapter(LogSeverity severity, const char* err, int len)
     {
-        // only show immediate message if TestLabel-level verbosity
-        if (state().verbosity >= TestVerbosity::TestLabels)
-        {
-            ConsoleColor color;
-            switch (severity)
-            {
-                default: color = Default;
-                case LogSeverity::LogSeverityWarn:  color = Yellow; break;
-                case LogSeverity::LogSeverityError: color = Red;    break;
-            }
-            console(color, err, len);
-        }
+        LogTestLabel(console(SeverityToColor(severity), err, len));
     }
 
     bool test::run_init()
@@ -531,7 +512,7 @@ namespace rpp
         {
             test_cap = test_funcs ? test_count * 2 : 8;
             auto* funcs = new test_func[test_cap];
-            for (int i = 0; i < test_count; ++i) funcs[i] = test_funcs[i];
+            if (test_funcs) { for (int i = 0; i < test_count; ++i) { funcs[i] = test_funcs[i]; } }
             delete[] test_funcs;
             test_funcs = funcs;
         }
@@ -620,11 +601,10 @@ namespace rpp
             }
 
             const bool exactMatch = testName.starts_with("test_");
-            if (state().verbosity >= TestVerbosity::TestLabels)
-            {
+            LogTestLabel(
                 if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", arg.len, arg.str);
                 else            consolef(Yellow, "Filtering substr tests '%.*s'\n", arg.len, arg.str);
-            }
+            );
 
             bool match = false;
             for (test_info& t : state().global_tests)
