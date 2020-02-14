@@ -1132,7 +1132,7 @@ namespace rpp /* ReCpp */
         bool    dir_iterator::is_dir() const { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
         strview dir_iterator::name()   const { return s->hFind ? s->ffd.cFileName : ""_sv; }
 #else
-        dir_iterator::dir_iterator(string&& dir) : dir{move(dir)} {
+        dir_iterator::dir_iterator(std::string&& dir) : dir{std::move(dir)} {
             const char* path = this->dir.empty() ? "." : this->dir.c_str();
             s->e = (s->d=opendir(path)) != nullptr ? readdir(s->d) : nullptr;
         }

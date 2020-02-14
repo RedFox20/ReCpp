@@ -84,7 +84,7 @@ namespace rpp
                 shared_mem->initialized = 1;
                 return shared_mem->stored_object;
             #else
-                string name = "/rpp_tests_state_"s + to_string(getpid());
+                std::string name = "/rpp_tests_state_"s + rpp::to_string(getpid());
                 #if __ANDROID__
                     // shm_fd = open(name.c_str(), O_RDWR);
                     // if (shm_fd == -1) {
@@ -314,9 +314,10 @@ namespace rpp
         // only show immediate message if TestLabel-level verbosity
         if (state().verbosity >= TestVerbosity::TestLabels)
         {
-            ConsoleColor color = Default;
+            ConsoleColor color;
             switch (severity)
             {
+                default: color = Default;
                 case LogSeverity::LogSeverityWarn:  color = Yellow; break;
                 case LogSeverity::LogSeverityError: color = Red;    break;
             }

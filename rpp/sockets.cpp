@@ -474,7 +474,7 @@ namespace rpp
                 if (!family || ifa->ifa_addr->sa_family == family) 
                 {
                     auto ipaddr = to_ipaddress(*(saddr*)ifa->ifa_addr);
-                    out.emplace_back(string{ifa->ifa_name}, ipaddr, ipaddr.name());
+                    out.emplace_back(std::string{ifa->ifa_name}, ipaddr, ipaddr.name());
                 }
             }
             freeifaddrs(if_addrs);
