@@ -1,6 +1,6 @@
 #pragma once
 /**
- * Manual cleanup tasks for non-destructor types, Copyright (c) 2017-2018, Jorma Rebane
+ * Manual cleanup Tasks for non-destructor types, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  * @code
  *  void example()

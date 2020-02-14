@@ -4,7 +4,7 @@
  * Distributed under MIT Software License
  *
  * @note This module predates C++17 filesystem and offers a different
- *       set of convenient API's for dealing with every-day File I/O tasks.
+ *       set of convenient API's for dealing with every-day File I/O Tasks.
  */
 #if _MSC_VER
 #  pragma warning(disable: 4251)

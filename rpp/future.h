@@ -518,7 +518,7 @@ namespace rpp
     }
     
     /**
-     * Used to launch multiple parallel tasks and then gather
+     * Used to launch multiple parallel Tasks and then gather
      * the results. It assumes that launcher already started its
      * own future task, which makes it more flexible.
      * @code
@@ -545,7 +545,7 @@ namespace rpp
     }
 
     /**
-     * Used to launch multiple parallel tasks and then gather
+     * Used to launch multiple parallel Tasks and then gather
      * the results. It uses rpp::async_task to launch the futures.
      * @code
      * vector<Result> results = rpp::get_async_tasks(DataList,
@@ -571,7 +571,7 @@ namespace rpp
     }
     
     /**
-     * Used to launch multiple parallel tasks and then wait for
+     * Used to launch multiple parallel Tasks and then wait for
      * the results. It assumes that launcher already started its
      * own future task, which makes it more flexible.
      * @code

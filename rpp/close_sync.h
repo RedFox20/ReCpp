@@ -37,7 +37,7 @@ namespace rpp
      * @endcode
      * 
      * By adding close_sync and manually calling lock_for_close() in the destructor
-     * we'll be able to delay the destruction until all async tasks are finished:
+     * we'll be able to delay the destruction until all async Tasks are finished:
      * @code
      * class ImportantState
      * {
@@ -105,7 +105,7 @@ namespace rpp
                 aliveToken = 0;
                 mut.unlock();
             }
-            else { // no explicit locking used, so simply block until async tasks finish
+            else { // no explicit locking used, so simply block until async Tasks finish
                 exclusive_lock exclusiveLock{ mut };
                 aliveToken = 0;
             }

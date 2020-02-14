@@ -210,7 +210,7 @@ namespace rpp
 
 
     /**
-     * Handles signals for pool tasks. This is expected to throw an exception derived
+     * Handles signals for pool Tasks. This is expected to throw an exception derived
      * from std::runtime_error
      */
     using pool_signal_handler = void (*)(const char* signal);
@@ -225,8 +225,8 @@ namespace rpp
     RPPAPI void set_this_thread_name(const char* name);
 
     /**
-     * A simple thread-pool task. Can run owning generic tasks using standard function<> and
-     * also range non-owning tasks which use the impossibly fast delegate callback system.
+     * A simple thread-pool task. Can run owning generic Tasks using standard function<> and
+     * also range non-owning Tasks which use the impossibly fast delegate callback system.
      */
     class RPPAPI pool_task
     {
@@ -265,15 +265,19 @@ namespace rpp
         // @warning This range task does not retain any resources, so you must ensure
         //          it survives until end of the loop
         // undefined behaviour if called when already running
-        void run_range(int start, int end, const action<int, int>& newTask) noexcept;
+        // @return TRUE if run started successfully (task was not already running)
+        [[nodiscard]] bool run_range(int start, int end, const action<int, int>& newTask) noexcept;
 
         // assigns a new generic task to run
         // undefined behaviour if called when already running
-        void run_generic(task_delegate<void()>&& newTask) noexcept;
+        // @return TRUE if run started successfully (task was not already running)
+        [[nodiscard]] bool run_generic(task_delegate<void()>&& newTask) noexcept;
 
         // wait for task to finish
         // @note Throws any unhandled exceptions from background thread
         //       This is similar to std::future behaviour
+        // @param outErr [out] if outErr != null && *outErr != null, then *outErr
+        //                     is initialized with the caught exception (if any)
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/);
         wait_result wait(int timeoutMillis, std::nothrow_t,
                          std::exception_ptr* outErr = nullptr) noexcept;
@@ -302,10 +306,10 @@ namespace rpp
      */
     class RPPAPI thread_pool
     {
-        std::mutex tasksMutex;
-        std::vector<std::unique_ptr<pool_task>> tasks;
-        float taskMaxIdleTime = 15; // new task timeout in seconds
-        int coreCount = 0;
+        std::mutex TasksMutex;
+        std::vector<std::unique_ptr<pool_task>> Tasks;
+        float TaskMaxIdleTime = 15; // new task timeout in seconds
+        uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for
 
     public:
 
@@ -313,59 +317,71 @@ namespace rpp
         static thread_pool& global();
 
         thread_pool();
+        thread_pool(int maxTasks);
         ~thread_pool() noexcept;
         NOCOPY_NOMOVE(thread_pool)
+            
+        /**
+         * This sets the maximum number of concurrent tasks in parallel_for.
+         * The default value is thread_pool::physical_cores(),
+         * however you can adjust this to fit your specific use cases
+         */
+        void set_max_for_parallelism(int maxParallelism) noexcept;
 
-        // number of thread pool tasks that are currently running
+        // number of thread pool Tasks that are currently running
         int active_tasks() noexcept;
 
-        // number of thread pool tasks that are in idle state
+        // number of thread pool Tasks that are in idle state
         int idle_tasks() noexcept;
 
-        // number of running + idle tasks in this threadpool
+        // number of running + idle Tasks in this threadpool
         int total_tasks() const noexcept;
 
         // if you're completely done with the thread pool, simply call this to clean up the threads
-        // returns the number of tasks cleared
+        // returns the number of Tasks cleared
         int clear_idle_tasks() noexcept;
 
-        // starts a single range task atomically
-        pool_task* start_range_task(size_t& poolIndex, int rangeStart, int rangeEnd, 
-                                    const action<int, int>& rangeTask) noexcept;
-
         /**
-         * Sets a new max idle time for spawned tasks
-         * This does not notify already idle tasks
-         * @param maxIdleSeconds Maximum idle seconds before tasks are abandoned and thread handle is released
-         *                       Setting this to 0 keeps pool tasks alive forever
+         * Sets a new max idle time for spawned Tasks
+         * This does not notify already idle Tasks
+         * @param maxIdleSeconds Maximum idle seconds before Tasks are abandoned and thread handle is released
+         *                       Setting this to 0 keeps pool Tasks alive forever
          */
         void max_task_idle_time(float maxIdleSeconds = 15) noexcept;
 
+    private:
+        // starts a single range task atomically
+        // the task is removed from TaskPool to avoid concurrency issues with regular parallel tasks
+        std::unique_ptr<pool_task> start_range_task(int rangeStart, int rangeEnd, 
+                                                    const action<int, int>& rangeTask) noexcept;
+    
+    public:
+    
         /**
          * Runs a new Parallel For range task.
-         * This function will block until all parallel tasks have finished running
+         * This function will block until all parallel Tasks have finished running
          *
          * The callback function parameters [start, end) provide a range to iterate over,
-         * which yields better loop performance. If your callback tasks are heavy, then
+         * which yields better loop performance. If your callback Tasks are heavy, then
          * consider `rpp::parallel_foreach`
          *
-         * If range and maxRangeSize calculate # of tasks as 1, then this will run sequentially
+         * If range and maxRangeSize calculate # of Tasks as 1, then this will run sequentially
          *
          * @param rangeStart Usually 0
          * @param rangeEnd Usually vec.size()
          * @param maxRangeSize Maximum range size for a single task to execute (if possible)
-         *                     Ex: size=10 will execute tasks as T0[0,10); T1[10,20); ...
-         *                     For very slow individual tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
+         *                     Ex: size=10 will execute Tasks as T0[0,10); T1[10,20); ...
+         *                     For very slow individual Tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
          *                     Size 0 will attempt to auto-detect a reasonable size
-         *                     For very fast tasks, this should be high enough so that individual
+         *                     For very fast Tasks, this should be high enough so that individual
          *                     task threads can maximize throughput.
          * @param rangeTask Non-owning callback action:  void(int start, int end)
          */
         void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize,
-                          const action<int, int>& rangeTask) noexcept;
+                          const action<int, int>& rangeTask);
 
         template<class Func> 
-        void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func) noexcept
+        void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func)
         {
             this->parallel_for(rangeStart, rangeEnd, maxRangeSize,
                                action<int, int>::from_function<Func, &Func::operator()>(&func));
@@ -389,13 +405,13 @@ namespace rpp
 
     /**
      * Runs parallel_for on the default global thread pool
-     * This function will block until all parallel tasks have finished running
+     * This function will block until all parallel Tasks have finished running
      * 
      * The callback function parameters [start, end) provide a range to iterate over,
-     * which yields better loop performance. If your callback tasks are heavy, then
+     * which yields better loop performance. If your callback Tasks are heavy, then
      * consider `rpp::parallel_foreach`
      *
-     * If range and maxRangeSize calculate # of tasks as 1, then this will run sequentially
+     * If range and maxRangeSize calculate # of Tasks as 1, then this will run sequentially
      * 
      * @code
      * rpp::parallel_for(0, images.size(), 0, [&](int start, int end) {
@@ -407,15 +423,15 @@ namespace rpp
      * @param rangeStart Usually 0
      * @param rangeEnd Usually vec.size()
      * @param maxRangeSize Maximum range size for a single task to execute (if possible)
-     *                     Ex: size=10 will execute tasks as T0[0,10); T1[10,20); ...
-     *                     For very slow individual tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
+     *                     Ex: size=10 will execute Tasks as T0[0,10); T1[10,20); ...
+     *                     For very slow individual Tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
      *                     Size 0 will attempt to auto-detect a reasonable size
-     *                     For very fast tasks, this should be high enough so that individual
+     *                     For very fast Tasks, this should be high enough so that individual
      *                     task threads can maximize throughput.
      * @param func Non-owning callback action:  void(int start, int end)
      */
     template<class Func>
-    void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func) noexcept
+    void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func)
     {
         thread_pool::global().parallel_for(rangeStart, rangeEnd, maxRangeSize,
             action<int, int>::from_function<Func, &Func::operator()>(&func));
@@ -424,7 +440,7 @@ namespace rpp
 
     /**
      * Runs parallel_foreach on the default global thread pool
-     * This function will block until all parallel tasks have finished running
+     * This function will block until all parallel Tasks have finished running
      * 
      * @code
      * std::vector<string> images = ... ;
@@ -436,7 +452,7 @@ namespace rpp
      * @param foreach Non-owning foreach callback action:  void(auto item)
      */
     template<class Container, class ForeachFunc>
-    void parallel_foreach(Container& items, const ForeachFunc& foreach) noexcept
+    void parallel_foreach(Container& items, const ForeachFunc& foreach)
     {
         thread_pool::global().parallel_for(0, (int)items.size(), 0, [&](int start, int end) {
             for (int i = start; i < end; ++i) {

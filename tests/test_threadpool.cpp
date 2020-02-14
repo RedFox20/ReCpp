@@ -205,14 +205,14 @@ TestImpl(test_threadpool)
             for (auto* task : subtasks)
                 AssertThat(task->wait(1000), pool_task::finished);
         };
-        pool_task* tasks[4] = {
+        pool_task* Tasks[4] = {
             parallel_task(func),
             parallel_task(func),
             parallel_task(func),
             parallel_task(func),
         };
 
-        for (auto* task : tasks)
+        for (auto* task : Tasks)
             AssertThat(task->wait(1000), pool_task::finished);
 
         int expected = 4 * 6;

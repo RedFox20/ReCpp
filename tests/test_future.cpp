@@ -294,15 +294,15 @@ TestImpl(test_future)
             "stringB",
             "stringC"
         };
-        std::vector<std::string> tasks = rpp::get_tasks(items, [&](std::string& s) {
+        std::vector<std::string> Tasks = rpp::get_tasks(items, [&](std::string& s) {
             return rpp::async_task([&] {
                 return "future " + s;
             });
         });
-        AssertThat(tasks.size(), 3u);
-        AssertThat(tasks[0], "future stringA"s);
-        AssertThat(tasks[1], "future stringB"s);
-        AssertThat(tasks[2], "future stringC"s);
+        AssertThat(Tasks.size(), 3u);
+        AssertThat(Tasks[0], "future stringA"s);
+        AssertThat(Tasks[1], "future stringB"s);
+        AssertThat(Tasks[2], "future stringC"s);
     }
 
     TestCase(get_async_tasks)
@@ -312,12 +312,12 @@ TestImpl(test_future)
             "stringB",
             "stringC"
         };
-        std::vector<std::string> tasks = rpp::get_async_tasks(items, [&](std::string& s) {
+        std::vector<std::string> Tasks = rpp::get_async_tasks(items, [&](std::string& s) {
             return "future " + s;
         });
-        AssertThat(tasks.size(), 3u);
-        AssertThat(tasks[0], "future stringA"s);
-        AssertThat(tasks[1], "future stringB"s);
-        AssertThat(tasks[2], "future stringC"s);
+        AssertThat(Tasks.size(), 3u);
+        AssertThat(Tasks[0], "future stringA"s);
+        AssertThat(Tasks[1], "future stringB"s);
+        AssertThat(Tasks[2], "future stringC"s);
     }
 };
