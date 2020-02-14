@@ -56,6 +56,7 @@
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
 #include <utility> // std::forward
+#include <exception> // std::terminate
 
 namespace rpp
 {
@@ -781,7 +782,7 @@ namespace rpp
                 if (int rem = ptr->capacity % 4)
                     ptr->capacity += 4 - rem;
                 auto* p = static_cast<container*>(realloc(ptr, sizeof(container) + sizeof(deleg) * (ptr->capacity - 1)));
-                if (!p) std::terminate();
+                if (!p) { std::terminate(); }
                 ptr = p;
             }
         }
