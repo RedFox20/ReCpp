@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cassert>
 #include <csignal>
+#include <cmath> // round
 #include <unordered_map>
 #if __APPLE__ || __linux__
 # include <pthread.h>
@@ -465,7 +466,7 @@ namespace rpp
             // spread the range over all available cores, with last task getting the remainder
             // ex 11 / 4 --> round(2.75) --> 3
             // ex 128 / 18 --> round(7.11) --> 7
-            maxLength = (int)std::round((float)range / minTasks);
+            maxLength = (int)roundf((float)range / minTasks);
         }
         else
         {
@@ -473,7 +474,7 @@ namespace rpp
             maxLength = maxRangeSize;
             // see how many Tasks would be needed to satisfy task length
             // eg 50 / 1 => 50;  50 / 10 => 5;  50 / 10000 => 0.0025
-            minTasks = (int)std::ceilf((float)range / maxLength);
+            minTasks = (int)ceilf((float)range / maxLength);
             // clamp Tasks to number of physical cores
             // eg 50 => 4; 5 => 4; 1 => 1
             minTasks = maxTasks < minTasks ? maxTasks : minTasks;

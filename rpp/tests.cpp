@@ -231,8 +231,8 @@ namespace rpp
     #define safe_vsnprintf_msg_len(fmt) \
         char msg[8192]; va_list ap; va_start(ap, fmt); \
         int len = vsnprintf(msg, sizeof(msg), fmt, ap); \
-        if (len < 0 || len >= sizeof(msg)) { \
-            len = sizeof(msg) - 1; \
+        if (len < 0 || len >= (int)sizeof(msg)) { \
+            len = (int)sizeof(msg) - 1; \
             msg[len] = '\0'; \
         }
 
