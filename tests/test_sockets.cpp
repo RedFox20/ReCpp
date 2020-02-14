@@ -105,12 +105,15 @@ TestImpl(test_sockets)
 
         // no data to receive, should return false
         AssertFalse(recv.select(100, rpp::socket::SF_Read));
+        AssertTrue(recv.good());
         send.sendto(recv_addr, "udp_select");
 
         // must be ready to receive immediately
         rpp::Timer t1;
         AssertTrue(recv.select(100, rpp::socket::SF_Read));
+        AssertTrue(recv.good());
         AssertThat(recv.recv_str(), "udp_select"s);
+        AssertTrue(recv.good());
         AssertLessOrEqual(t1.elapsed_ms(), 1.0);
 
         // no data to receive, should return false
@@ -120,15 +123,19 @@ TestImpl(test_sockets)
         send.sendto(recv_addr, "udp_select1");
         send.sendto(recv_addr, "udp_select2");
         AssertTrue(recv.select(100, rpp::socket::SF_Read));
+        AssertTrue(recv.good());
         AssertThat(recv.recv_str(), "udp_select1"s);
         AssertThat(recv.recv_str(), "udp_select2"s);
+        AssertTrue(recv.good());
 
         // now test for timeout
         AssertThat(recv.available(), 0);
         rpp::Timer t2;
         AssertFalse(recv.select(250, rpp::socket::SF_Read));
+        AssertTrue(recv.good());
         AssertGreaterOrEqual(t2.elapsed_ms(), 249.0);
         AssertThat(recv.available(), 0);
+        AssertTrue(recv.good());
     }
 
     TestCase(udp_flush)

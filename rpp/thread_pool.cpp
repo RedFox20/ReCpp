@@ -341,13 +341,14 @@ namespace rpp
         TraceProvider = traceProvider;
     }
 
-    thread_pool::thread_pool() : thread_pool{num_physical_cores()}
+    thread_pool::thread_pool()
     {
+        set_max_for_parallelism(num_physical_cores());
     }
 
-    thread_pool::thread_pool(int maxTasks)
+    thread_pool::thread_pool(int maxParallelism)
     {
-        MaxParallelism = maxTasks > 0 ? maxTasks : 1;
+        set_max_for_parallelism(maxParallelism);
     }
 
     thread_pool::~thread_pool() noexcept

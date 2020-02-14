@@ -60,13 +60,13 @@ namespace rpp
                 return str; // done
         return nullptr; // not found
     }
-    template<int N> bool strequals(const char* s1, const char(&s2)[N]) noexcept {
-        for (int i = 0; i < (N - 1); ++i)
+    template<size_t N> bool strequals(const char* s1, const char(&s2)[N]) noexcept {
+        for (size_t i = 0; i < (N - 1); ++i)
             if (s1[i] != s2[i]) return false; // not equal.
         return true;
     }
-    template<int N> bool strequalsi(const char* s1, const char(&s2)[N]) noexcept {
-        for (int i = 0; i < (N - 1); ++i)
+    template<size_t N> bool strequalsi(const char* s1, const char(&s2)[N]) noexcept {
+        for (size_t i = 0; i < (N - 1); ++i)
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;
     }

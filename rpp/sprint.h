@@ -92,7 +92,7 @@ namespace rpp
     struct RPPAPI string_buffer
     {
         static constexpr int SIZE = 512;
-        char* ptr;
+        char* ptr = nullptr;
         int   len = 0;
         int   cap = SIZE;
         char  buf[SIZE];

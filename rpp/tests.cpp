@@ -74,9 +74,8 @@ namespace rpp
                                        GetLastError(), 0, error, 1024, nullptr);
                         fprintf(stderr, "CreateFileMapping failed: %s\n", error);
                         fflush(stderr);
+                        std::terminate();
                     }
-                    assert(handle != nullptr);
-                    std::terminate();
                 }
                 shared_mem = (shared*)MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(shared));
             #elif __ANDROID__

@@ -317,10 +317,13 @@ namespace rpp
         static thread_pool& global();
 
         thread_pool();
-        thread_pool(int maxTasks);
+        /**
+         * @param maxParallelism @see set_max_for_parallelism
+         */
+        thread_pool(int maxParallelism);
         ~thread_pool() noexcept;
         NOCOPY_NOMOVE(thread_pool)
-            
+        
         /**
          * This sets the maximum number of concurrent tasks in parallel_for.
          * The default value is thread_pool::physical_cores(),

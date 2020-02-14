@@ -846,7 +846,6 @@ namespace rpp
                 indebug(auto errmsg = socket::last_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
                 close();
-                Assert(false, "socket operation - unexpected failure");
                 return -1;
             }
             case ESOCK(EMSGSIZE):    return 0; // message too large to fit into buffer and was truncated

@@ -65,17 +65,18 @@ TestImpl(test_threadpool)
 
         rpp::Timer t;
 
-        parallel_for(0, len, 8, [&](int start, int end) {
+        thread_pool pool{4};
+        pool.parallel_for(0, len, 8, [&](int start, int end) {
             AssertThat(end-start, 8);
             for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
         });
         
-        parallel_for(0, len, 2, [&](int start, int end) {
+        pool.parallel_for(0, len, 2, [&](int start, int end) {
             AssertThat(end-start, 2);
             for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
         });
 
-        parallel_for(0, len, 1, [&](int start, int end) {
+        pool.parallel_for(0, len, 1, [&](int start, int end) {
             AssertThat(end-start, 1);
             for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
         });
@@ -91,11 +92,12 @@ TestImpl(test_threadpool)
         int  len = (int)numbers.size();
         for (int i = 0; i < len; ++i)
             ptr[i] = i;
-
+        
+        thread_pool pool{4};
         rpp::Timer t;
 
         // [0,8); [8,16); [16,17)
-        parallel_for(0, len, 8, [&](int start, int end) {
+        pool.parallel_for(0, len, 8, [&](int start, int end) {
             if      (start == 0)  { AssertThat(end-start, 8); AssertThat(end, 8); }
             else if (start == 8)  { AssertThat(end-start, 8); AssertThat(end, 16); }
             else if (start == 16) { AssertThat(end-start, 1); AssertThat(end, 17); }
@@ -105,7 +107,7 @@ TestImpl(test_threadpool)
         double elapsed = t.elapsed();
         AssertLessOrEqual(elapsed, 0.025);
 
-        AssertGreaterOrEqual(thread_pool::global().idle_tasks(), 3);
+        AssertEqual(pool.idle_tasks(), 3);
     }
 
     TestCase(parallel_for_performance)
