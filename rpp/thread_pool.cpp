@@ -409,6 +409,12 @@ namespace rpp
             task->max_idle_time(TaskMaxIdleTime);
     }
 
+    #define AssertTerminate(success, msg) \
+        if (!success) { \
+            LogError(msg); \
+            std::terminate(); \
+        }
+
     std::unique_ptr<pool_task> thread_pool::start_range_task(int rangeStart, int rangeEnd,
                                                              const action<int, int>& rangeTask) noexcept
     {
@@ -437,7 +443,7 @@ namespace rpp
         auto* task = t.get();
         task->max_idle_time(TaskMaxIdleTime);
         bool success = task->run_range(rangeStart, rangeEnd, rangeTask);
-        assert(success && "brand new pool_task->run_range() failed");
+        AssertTerminate(success, "brand new pool_task->run_range() failed");
         return t;
     }
 
@@ -561,7 +567,7 @@ namespace rpp
         auto* task = t.get();
         task->max_idle_time(TaskMaxIdleTime);
         bool success = task->run_generic(std::move(genericTask));
-        assert(success && "brand new pool_task->run_generic failed!");
+        AssertTerminate(success, "brand new pool_task->run_generic() failed");
 
         std::lock_guard<std::mutex> lock{TasksMutex};
         Tasks.emplace_back(std::move(t));
