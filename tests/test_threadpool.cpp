@@ -82,7 +82,7 @@ TestImpl(test_threadpool)
         });
 
         double elapsed = t.elapsed();
-        AssertLessOrEqual(elapsed, 0.1);
+        AssertLessOrEqual(elapsed, 0.2);
     }
 
     TestCase(parallel_for_max_range_size_unaligned)
@@ -105,7 +105,7 @@ TestImpl(test_threadpool)
         });
 
         double elapsed = t.elapsed();
-        AssertLessOrEqual(elapsed, 0.025);
+        AssertLessOrEqual(elapsed, 0.05);
 
         AssertEqual(pool.idle_tasks(), 3);
     }
