@@ -244,7 +244,8 @@ namespace rpp
         volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
 
     public:
-        enum wait_result {
+        enum wait_result
+        {
             finished,
             timeout,
         };
@@ -274,7 +275,8 @@ namespace rpp
         // @note Throws any unhandled exceptions from background thread
         //       This is similar to std::future behaviour
         wait_result wait(int timeoutMillis = 0/*0=no timeout*/);
-        wait_result wait(int timeoutMillis, std::nothrow_t) noexcept;
+        wait_result wait(int timeoutMillis, std::nothrow_t,
+                         std::exception_ptr* outErr = nullptr) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -343,19 +345,31 @@ namespace rpp
         /**
          * Runs a new Parallel For range task.
          * This function will block until all parallel tasks have finished running
-         * If number of physical cores is <= 2, then this will run sequentially
+         *
+         * The callback function parameters [start, end) provide a range to iterate over,
+         * which yields better loop performance. If your callback tasks are heavy, then
+         * consider `rpp::parallel_foreach`
+         *
+         * If range and maxRangeSize calculate # of tasks as 1, then this will run sequentially
          *
          * @param rangeStart Usually 0
          * @param rangeEnd Usually vec.size()
-         * @param rangeTask Non-owning callback action.
+         * @param maxRangeSize Maximum range size for a single task to execute (if possible)
+         *                     Ex: size=10 will execute tasks as T0[0,10); T1[10,20); ...
+         *                     For very slow individual tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
+         *                     Size 0 will attempt to auto-detect a reasonable size
+         *                     For very fast tasks, this should be high enough so that individual
+         *                     task threads can maximize throughput.
+         * @param rangeTask Non-owning callback action:  void(int start, int end)
          */
-        void parallel_for(int rangeStart, int rangeEnd, const action<int, int>& rangeTask) noexcept;
+        void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize,
+                          const action<int, int>& rangeTask) noexcept;
 
         template<class Func> 
-        void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
+        void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func) noexcept
         {
-            parallel_for(rangeStart, rangeEnd, 
-                action<int, int>::from_function<Func, &Func::operator()>(&func));
+            this->parallel_for(rangeStart, rangeEnd, maxRangeSize,
+                               action<int, int>::from_function<Func, &Func::operator()>(&func));
         }
 
         // runs a generic parallel task
@@ -375,19 +389,17 @@ namespace rpp
 
 
     /**
-     * @brief Runs parallel_for on the default global thread pool
-     *
-     * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
-     * parallel nesting is forbidden. This prevents quadratic thread explosion.
-     *
+     * Runs parallel_for on the default global thread pool
      * This function will block until all parallel tasks have finished running
      * 
      * The callback function parameters [start, end) provide a range to iterate over,
      * which yields better loop performance. If your callback tasks are heavy, then
      * consider `rpp::parallel_foreach`
+     *
+     * If range and maxRangeSize calculate # of tasks as 1, then this will run sequentially
      * 
      * @code
-     * rpp::parallel_for(0, images.size(), [&](int start, int end) {
+     * rpp::parallel_for(0, images.size(), 0, [&](int start, int end) {
      *     for (int i = start; i < end; ++i) {
      *         ProcessImage(images[i]);
      *     }
@@ -395,22 +407,24 @@ namespace rpp
      * @endcode
      * @param rangeStart Usually 0
      * @param rangeEnd Usually vec.size()
+     * @param maxRangeSize Maximum range size for a single task to execute (if possible)
+     *                     Ex: size=10 will execute tasks as T0[0,10); T1[10,20); ...
+     *                     For very slow individual tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
+     *                     Size 0 will attempt to auto-detect a reasonable size
+     *                     For very fast tasks, this should be high enough so that individual
+     *                     task threads can maximize throughput.
      * @param func Non-owning callback action:  void(int start, int end)
      */
     template<class Func>
-    void parallel_for(int rangeStart, int rangeEnd, const Func& func) noexcept
+    void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func) noexcept
     {
-        thread_pool::global().parallel_for(rangeStart, rangeEnd,
+        thread_pool::global().parallel_for(rangeStart, rangeEnd, maxRangeSize,
             action<int, int>::from_function<Func, &Func::operator()>(&func));
     }
 
 
     /**
-     * @brief Runs parallel_foreach on the default global thread pool
-     * 
-     * Runs a new Parallel For range task. Only ONE parallel for can be running, any kind of
-     * parallel nesting is forbidden. This prevents quadratic thread explosion.
-     * 
+     * Runs parallel_foreach on the default global thread pool
      * This function will block until all parallel tasks have finished running
      * 
      * @code
@@ -425,7 +439,7 @@ namespace rpp
     template<class Container, class ForeachFunc>
     void parallel_foreach(Container& items, const ForeachFunc& foreach) noexcept
     {
-        thread_pool::global().parallel_for(0, (int)items.size(), [&](int start, int end) {
+        thread_pool::global().parallel_for(0, (int)items.size(), 0, [&](int start, int end) {
             for (int i = start; i < end; ++i) {
                 foreach(items[i]);
             }

@@ -11,7 +11,7 @@ TestImpl(test_concurrent_queue)
 
     TestCase(basic_enqueue_dequeue)
     {
-        concurrent_queue<string> queue;
+        concurrent_queue<std::string> queue;
         queue.push("item1");
         queue.push("item2");
         queue.push("item3");
@@ -27,7 +27,7 @@ TestImpl(test_concurrent_queue)
 
     TestCase(basic_producer_consumer)
     {
-        concurrent_queue<string> queue;
+        concurrent_queue<std::string> queue;
 
         cfuture<void> producer = rpp::async_task([&] {
             queue.push("item1");

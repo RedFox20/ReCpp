@@ -136,27 +136,37 @@ namespace rpp
 
     pool_task::wait_result pool_task::wait(int timeoutMillis)
     {
-        wait_result result = wait(timeoutMillis, std::nothrow);
-        if (error) rethrow_exception(error);
+        std::exception_ptr err;
+        wait_result result = wait(timeoutMillis, std::nothrow, &err);
+        if (err) std::rethrow_exception(err);
         return result;
     }
 
-    pool_task::wait_result pool_task::wait(int timeoutMillis, std::nothrow_t) noexcept
+    pool_task::wait_result pool_task::wait(int timeoutMillis, std::nothrow_t,
+                                           std::exception_ptr* outErr) noexcept
     {
+        wait_result result = finished;
         std::unique_lock<std::mutex> lock{m};
         while (taskRunning && !killed)
         {
             if (timeoutMillis)
             {
                 if (cv.wait_for(lock, milliseconds_t(timeoutMillis)) == std::cv_status::timeout)
-                    return timeout;
+                {
+                    result = timeout;
+                    break;
+                }
+                // else: loop back and see if we finished
             }
             else
             {
                 cv.wait(lock);
+                // loop back and see if we finished
             }
         }
-        return finished;
+        // NOTE: this is thread safe only thanks to scoped lock above
+        if (outErr) *outErr = error;
+        return result;
     }
 
     pool_task::wait_result pool_task::kill(int timeoutMillis) noexcept
@@ -410,36 +420,66 @@ namespace rpp
             task->max_idle_time(taskMaxIdleTime);
     }
 
-    void thread_pool::parallel_for(int rangeStart, int rangeEnd, 
+    void thread_pool::parallel_for(int rangeStart, int rangeEnd, int maxRangeSize,
                                    const action<int, int>& rangeTask) noexcept
     {
         const int range = rangeEnd - rangeStart;
         if (range <= 0)
             return;
 
-        const int cores = range < coreCount ? range : coreCount;
-        const int len   = range / cores;
-
-        // not enough physical cores to run efficiently
-        if (cores <= 2)
+        int minTasks;  // minimum number of tasks needed
+        int maxLength; // max iter length in a single task except the last element,
+                       // eg rng=11, cor=4 ==> len 3; resulting task lengths: 3,3,3,2
+        if (maxRangeSize <= 0)
         {
-            rangeTask(0, len);
+            // not more tasks than range size, range is guaranteed to be > 0
+            minTasks = range < coreCount ? range : coreCount;
+            // spread the range over all available cores, with last task getting the remainder
+            // ex 11 / 4 --> ceil(2.75) --> 3
+            maxLength = (int)std::ceilf((float)range / minTasks);
+        }
+        else
+        {
+            // user specified minLength, ex: 1, 10, 10000
+            maxLength = maxRangeSize;
+            // see how many tasks would be needed to satisfy task length
+            // eg 50 / 1 => 50;  50 / 10 => 5;  50 / 10000 => 0.0025
+            minTasks = (int)std::ceilf((float)range / maxLength);
+            // clamp tasks to number of physical cores
+            // eg 50 => 4; 5 => 4; 1 => 1
+            minTasks = coreCount < minTasks ? coreCount : minTasks;
+        }
+
+        // either the range is too small OR maxRangeSize calculated effective tasks as 1
+        // OR the number of physical cores is simply 1
+        if (minTasks <= 1)
+        {
+            rangeTask(rangeStart, rangeEnd);
             return;
         }
 
-        auto active = static_cast<pool_task**>(alloca(sizeof(pool_task*) * cores));
+        auto active = static_cast<pool_task**>(alloca(sizeof(pool_task*) * minTasks));
         rangeRunning = true;
 
         size_t poolIndex = 0;
-        for (int i = 0; i < cores; ++i)
+        int spawned = 0; // actual number of spawned tasks
+        int start = rangeStart;
+
+        for (int start = rangeStart; start < rangeEnd; start += maxLength)
         {
-            int start = i * len;
-            int end   = i == cores - 1 ? rangeEnd : start + len;
-            active[i] = start_range_task(poolIndex, start, end, rangeTask);
+            int end = start + maxLength;
+            if (end > rangeEnd) end = rangeEnd; // clamp the last task
+
+            active[spawned++] = start_range_task(poolIndex, start, end, rangeTask);
         }
 
-        for (int i = 0; i < cores; ++i)
-            active[i]->wait();
+        std::exception_ptr err;
+        for (int i = 0; i < spawned; ++i)
+        {
+            active[i]->wait(0, std::nothrow, &err);
+        }
+
+        if (err) std::rethrow_exception(err);
 
         rangeRunning = false;
     }

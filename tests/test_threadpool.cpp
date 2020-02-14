@@ -19,7 +19,7 @@ TestImpl(test_threadpool)
     {
         std::mutex m;
         std::unordered_set<std::thread::id> ids;
-        parallel_for(0, numIterations, [&](int start, int end)
+        parallel_for(0, numIterations, 0, [&](int start, int end)
         {
             ::sleep_for(1ms);
             { std::lock_guard<std::mutex> lock{m};
@@ -39,7 +39,7 @@ TestImpl(test_threadpool)
     TestCase(generic_task)
     {
         semaphore sync;
-        string s = "Data";
+        std::string s = "Data";
         rpp::task_delegate<void()> fun = [x=s, &s, &sync]()
         {
             //printf("generic_task: %s\n", x.c_str());
@@ -57,11 +57,11 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_performance)
     {
-        auto numbers = std::vector<int>(13333337);
+        auto numbers = std::vector<int>(81'234'567);
         int* ptr = numbers.data();
         int  len = (int)numbers.size();
 
-        parallel_for(0, len, [&](int start, int end) {
+        parallel_for(0, len, 0, [&](int start, int end) {
             for (int i = start; i < end; ++i)
                 ptr[i] = i;
         });
@@ -75,7 +75,7 @@ TestImpl(test_threadpool)
         Timer timer1;
 
         std::atomic<int64_t> sum { 0 };;
-        parallel_for(0, (int)numbers.size(), [&](int start, int end) {
+        parallel_for(0, (int)numbers.size(), 0, [&](int start, int end) {
             int64_t isum = 0;
             for (int i = start; i < end; ++i)
                 isum += ptr[i];

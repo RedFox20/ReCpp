@@ -307,12 +307,12 @@ TestImpl(test_future)
 
     TestCase(get_async_tasks)
     {
-        std::vector<string> items = {
+        std::vector<std::string> items = {
             "stringA",
             "stringB",
             "stringC"
         };
-        std::vector<string> tasks = rpp::get_async_tasks(items, [&](std::string& s) {
+        std::vector<std::string> tasks = rpp::get_async_tasks(items, [&](std::string& s) {
             return "future " + s;
         });
         AssertThat(tasks.size(), 3u);
