@@ -317,10 +317,8 @@ namespace rpp
             ConsoleColor color = Default;
             switch (severity)
             {
-                case Default: color = Default; break;
-                case Green:   color = Green; break;
-                case Yellow:  color = Yellow; break;
-                case Red:     color = Red; break;
+                case LogSeverity::LogSeverityWarn:  color = Yellow; break;
+                case LogSeverity::LogSeverityError: color = Red;    break;
             }
             console(color, err, len);
         }

@@ -489,9 +489,9 @@ namespace rpp
         {
             return send(request) <= 0 ? T{} : wait_recv<T>(millis);
         }
-        template<class U> auto request_str(const U& req, int millis = 1000)  noexcept { return request<string>(req, millis); }
-        template<class U> auto request_wstr(const U& req, int millis = 1000) noexcept { return request<wstring>(req, millis); }
-        template<class U> auto request_data(const U& req, int millis = 1000) noexcept { return request<vector<uint8_t>>(req, millis); }
+        template<class U> auto request_str(const U& req, int millis = 1000)  noexcept { return request<std::string>(req, millis); }
+        template<class U> auto request_wstr(const U& req, int millis = 1000) noexcept { return request<std::wstring>(req, millis); }
+        template<class U> auto request_data(const U& req, int millis = 1000) noexcept { return request<std::vector<uint8_t>>(req, millis); }
 
 
         /**

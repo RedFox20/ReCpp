@@ -394,7 +394,7 @@ namespace rpp /* ReCpp */
             for (auto& kv : map)
                 required += kv.first.size() + kv.second.size() + 2ul;
 
-            string buffer; buffer.reserve(required);
+            std::string buffer; buffer.reserve(required);
             for (auto& kv : map)
             {
                 buffer.append(kv.first.c_str(), kv.first.size());
