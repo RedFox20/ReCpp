@@ -40,8 +40,6 @@
 
 namespace rpp
 {
-    using std::string;
-
     /////////// Small string optimized search functions (low loop setup latency, but bad with large strings)
 
     // This is same as memchr, but optimized for very small control strings
@@ -192,7 +190,7 @@ namespace rpp
         FINLINE constexpr strview(const char* str, size_t len) noexcept : str(str), len((int)len)         {}
         FINLINE strview(const char* str, const char* end)      noexcept : str(str), len(int(end-str))     {}
         FINLINE strview(const void* str, const void* end)      noexcept : strview{(const char*)str, (const char*)end} {}
-        FINLINE strview(const string& s)                       noexcept : str(s.c_str()), len((int)s.length()) {}
+        FINLINE strview(const std::string& s)                  noexcept : str(s.c_str()), len((int)s.length()) {}
 
         template<class StringT>
         using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
@@ -206,12 +204,12 @@ namespace rpp
         strview(bool) = delete;
 
         /** Creates a new string from this string-strview */
-        FINLINE string& to_string(string& out) const { return out.assign(str, (size_t)len); }
-        string to_string() const { return string{str, (size_t)len}; }
+        FINLINE std::string& to_string(std::string& out) const { return out.assign(str, (size_t)len); }
+        std::string to_string() const { return std::string{str, (size_t)len}; }
 
         // this is implicit by design; but it may cause some unexpected conversions to std::string
         // main goal is to provide convenient automatic conversion:  string s = my_string_view;
-        operator string() const { return string{str, (size_t)len}; }
+        operator std::string() const { return std::string{str, (size_t)len}; }
 
         /** 
          * Copies this str[len] string into a C-string array
@@ -475,8 +473,8 @@ namespace rpp
 
         template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const noexcept { return equals<SIZE>(s); }
         template<int SIZE> FINLINE bool operator!=(const char(&s)[SIZE]) const noexcept { return !equals<SIZE>(s); }
-        FINLINE bool operator==(const string& s)  const noexcept { return  equals(s); }
-        FINLINE bool operator!=(const string& s)  const noexcept { return !equals(s); }
+        FINLINE bool operator==(const std::string& s)  const noexcept { return  equals(s); }
+        FINLINE bool operator!=(const std::string& s)  const noexcept { return !equals(s); }
         FINLINE bool operator==(const strview& s) const noexcept { return  equals(s.str, s.len); }
         FINLINE bool operator!=(const strview& s) const noexcept { return !equals(s.str, s.len); }
         FINLINE bool operator==(char* s) const noexcept { return  strequals(s, str, len); }
@@ -488,12 +486,12 @@ namespace rpp
         NOINLINE int compare(const char* s, int n) const noexcept;
         NOINLINE int compare(const char* s) const noexcept;
         FINLINE int compare(const strview& b) const noexcept { return compare(b.str, b.len); }
-        FINLINE int compare(const string& b)  const noexcept { return compare(b.c_str(),(int)b.size()); }
+        FINLINE int compare(const std::string& b)  const noexcept { return compare(b.c_str(),(int)b.size()); }
         
         FINLINE bool operator<(const strview& s) const noexcept { return compare(s.str, s.len) < 0; }
         FINLINE bool operator>(const strview& s) const noexcept { return compare(s.str, s.len) > 0; }
-        FINLINE bool operator<(const string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
-        FINLINE bool operator>(const string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
+        FINLINE bool operator<(const std::string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
+        FINLINE bool operator>(const std::string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
         template<int SIZE> FINLINE bool operator<(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)<0;}
         template<int SIZE> FINLINE bool operator>(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)>0;}
         
@@ -653,8 +651,8 @@ namespace rpp
         void convertTo(int& outValue)     const noexcept { outValue = to_int();    }
         void convertTo(float& outValue)   const noexcept { outValue = to_float();  }
         void convertTo(double& outValue)  const noexcept { outValue = to_double(); }
-        void convertTo(string& outValue)  const noexcept { to_string(outValue);    }
-        void convertTo(strview& outValue) const noexcept { outValue = *this;       }
+        void convertTo(std::string& outValue) const noexcept { to_string(outValue);    }
+        void convertTo(strview& outValue)     const noexcept { outValue = *this;       }
         
     private:
         void skipByLength(strview text) noexcept { skip(text.len); }
@@ -778,7 +776,7 @@ namespace rpp
         /**
          * Creates a copy of this strview that is in lowercase
          */
-        NOINLINE string as_lower() const noexcept;
+        NOINLINE std::string as_lower() const noexcept;
 
         /**
          * Creates a copy of this strview that is in lowercase
@@ -794,7 +792,7 @@ namespace rpp
         /**
          * Creates a copy of this strview that is in UPPERCASE
          */
-        NOINLINE string as_upper() const noexcept;
+        NOINLINE std::string as_upper() const noexcept;
 
         /**
          * Creates a copy of this strview that is in UPPERCASE
@@ -863,41 +861,41 @@ namespace rpp
 
     //////////////// string concatenate operators /////////////////
     
-    inline string& operator+=(string& a, const strview& b)
+    inline std::string& operator+=(std::string& a, const strview& b)
     {
         return a.append(b.str, size_t(b.len));
     }
     
-    inline string operator+(const strview& a, const strview& b)
+    inline std::string operator+(const strview& a, const strview& b)
     {
-        string str;
+        std::string str;
         size_t al = size_t(a.len), bl = size_t(b.len);
         str.reserve(al + bl);
         str.append(a.str, al).append(b.str, bl);
         return str;
     }
 
-    inline string operator+(const string& a, const strview& b){ return strview{a} + b;}
-    inline string operator+(const strview& a, const string& b){ return a + strview{b};}
-    inline string operator+(const char* a, const strview& b)  { return strview{a, strlen(a)} + b; }
-    inline string operator+(const strview& a, const char* b)  { return a + strview{b, strlen(b)}; }
-    inline string operator+(const strview& a, char b)      { return a + strview{&b, 1}; }
-    inline string operator+(char a, const strview& b)      { return strview{&a, 1} + b; }
-    inline string&& operator+(string&& a,const strview& b) { return move(a.append(b.str, (size_t)b.len)); }
+    inline std::string operator+(const std::string& a, const strview& b){ return strview{a} + b;}
+    inline std::string operator+(const strview& a, const std::string& b){ return a + strview{b};}
+    inline std::string operator+(const char* a, const strview& b)  { return strview{a, strlen(a)} + b; }
+    inline std::string operator+(const strview& a, const char* b)  { return a + strview{b, strlen(b)}; }
+    inline std::string operator+(const strview& a, char b)      { return a + strview{&b, 1}; }
+    inline std::string operator+(char a, const strview& b)      { return strview{&a, 1} + b; }
+    inline std::string&& operator+(std::string&& a,const strview& b) { return std::move(a.append(b.str, (size_t)b.len)); }
 
     //////////////// optimized string join /////////////////
 
-    RPPAPI string concat(const strview& a, const strview& b);
-    RPPAPI string concat(const strview& a, const strview& b, const strview& c);
-    RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d);
-    RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
+    RPPAPI std::string concat(const strview& a, const strview& b);
+    RPPAPI std::string concat(const strview& a, const strview& b, const strview& c);
+    RPPAPI std::string concat(const strview& a, const strview& b, const strview& c, const strview& d);
+    RPPAPI std::string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
 
     //////////////// string compare operators /////////////////
 
-    inline bool operator< (const string& a,const strview& b) {return strview(a) <  b;}
-    inline bool operator> (const string& a,const strview& b) {return strview(a) >  b;}
-    inline bool operator==(const string& a,const strview& b) {return strview(a) == b;}
-    inline bool operator!=(const string& a,const strview& b) {return strview(a) != b;}
+    inline bool operator< (const std::string& a,const strview& b) {return strview(a) <  b;}
+    inline bool operator> (const std::string& a,const strview& b) {return strview(a) >  b;}
+    inline bool operator==(const std::string& a,const strview& b) {return strview(a) == b;}
+    inline bool operator!=(const std::string& a,const strview& b) {return strview(a) != b;}
     
     inline bool operator< (const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) <  0;}
     inline bool operator> (const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) >  0;}
@@ -942,12 +940,12 @@ namespace rpp
     /**
      * Converts an std::string into its lowercase form
      */
-    RPPAPI string& to_lower(string& str) noexcept;
+    RPPAPI std::string& to_lower(std::string& str) noexcept;
 
     /**
      * Converts an std::string into its uppercase form
      */
-    RPPAPI string& to_upper(string& str) noexcept;
+    RPPAPI std::string& to_upper(std::string& str) noexcept;
 
     /**
      * Replaces characters of 'chOld' with 'chNew' inside the specified string
@@ -957,7 +955,7 @@ namespace rpp
     /**
      * Replaces characters of 'chOld' with 'chNew' inside this std::string
      */
-    RPPAPI string& replace(string& str, char chOld, char chNew) noexcept;
+    RPPAPI std::string& replace(std::string& str, char chOld, char chNew) noexcept;
 
 
     ////////////////////////////////////////////////////////////////////////////////

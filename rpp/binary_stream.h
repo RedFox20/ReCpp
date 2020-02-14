@@ -663,10 +663,10 @@ namespace rpp
         /**
          * Valid flags: READWRITE, CREATENEW, APPEND
          */
-        explicit file_writer(const string& pathToFile, file::mode mode = file::CREATENEW) noexcept // NOLINT
+        explicit file_writer(const std::string& pathToFile, file::mode mode = file::CREATENEW) noexcept // NOLINT
             : binary_stream{this}, File{&Owned}, Owned{pathToFile, mode} {}
 
-        file_writer(const string& pathToFile, int capacity, file::mode mode = file::CREATENEW) noexcept // NOLINT
+        file_writer(const std::string& pathToFile, int capacity, file::mode mode = file::CREATENEW) noexcept // NOLINT
             : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, mode} {}
 
         ~file_writer() noexcept;
@@ -727,10 +727,10 @@ namespace rpp
         explicit file_reader(rpp::file& file)      noexcept : binary_stream{this},           File(&file) {}
         file_reader(rpp::file& file, int capacity) noexcept : binary_stream{capacity, this}, File(&file) {}
         
-        explicit file_reader(const string& pathToFile) noexcept // NOLINT
+        explicit file_reader(const std::string& pathToFile) noexcept // NOLINT
             : binary_stream{this}, File{&Owned}, Owned{pathToFile, file::READONLY} {}
         
-        file_reader(const string& pathToFile, int capacity) noexcept // NOLINT
+        file_reader(const std::string& pathToFile, int capacity) noexcept // NOLINT
             : binary_stream{capacity, this}, File{&Owned}, Owned{pathToFile, file::READONLY} {}
         
         ~file_reader() noexcept;

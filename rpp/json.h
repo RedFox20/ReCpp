@@ -13,10 +13,6 @@
 
 namespace rpp
 {
-    using std::tuple;
-    using std::move;
-    using std::vector;
-    using std::unordered_map;
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     // variadic string type; can be a non-owning rpp::strview or an owning std::string
@@ -82,8 +78,8 @@ namespace rpp
             string,
         };
 
-        using object_t = unordered_map<jstring, json, jstring_hash>;
-        using array_t = vector<json>;
+        using object_t = std::unordered_map<jstring, json, jstring_hash>;
+        using array_t = std::vector<json>;
 
     private:
         type Type = null;

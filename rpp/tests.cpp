@@ -61,7 +61,7 @@ namespace rpp
             if (!shared_mem)
             {
             #if _MSC_VER
-                string name = "Local\\RppTestsState_"s + to_string(GetCurrentProcessId());
+                std::string name = "Local\\RppTestsState_"s + rpp::to_string(GetCurrentProcessId());
                 handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
                 if (!handle)
                 {
@@ -135,10 +135,10 @@ namespace rpp
 
     struct test_failure
     {
-        string testname; // major test name
-        string testcase; // failed case name
-        string message;
-        string file;
+        std::string testname; // major test name
+        std::string testcase; // failed case name
+        std::string message;
+        std::string file;
         int line;
     };
 
@@ -257,7 +257,7 @@ namespace rpp
         {
             current_results->asserts_failed++;
             current_results->failures.emplace_back(
-                test_failure{name, current_func->name, string{msg,msg+len}, string{filename}, line });
+                test_failure{name, current_func->name, std::string{msg,msg+len}, std::string{filename}, line });
         }
     }
 
@@ -275,7 +275,7 @@ namespace rpp
         {
             current_results->asserts_failed++;
             current_results->failures.emplace_back(
-                test_failure{name, current_func->name, string{msg,msg+len}, string{}, 0 });
+                test_failure{name, current_func->name, std::string{msg,msg+len}, std::string{}, 0 });
         }
     }
 
@@ -492,17 +492,17 @@ namespace rpp
 
     int test::run_tests(strview testNamePatterns)
     {
-        std::vector<string> names;
+        std::vector<std::string> names;
         while (strview pattern = testNamePatterns.next(" \t"))
             names.emplace_back(pattern);
         return run_tests(names);
     }
 
-    int test::run_tests(const std::vector<string>& testNamePatterns)
+    int test::run_tests(const std::vector<std::string>& testNamePatterns)
     {
         std::vector<const char*> names;
         names.push_back("");
-        for (const string& name : testNamePatterns) names.push_back(name.c_str());
+        for (const std::string& name : testNamePatterns) names.push_back(name.c_str());
         return run_tests((int)names.size(), (char**)names.data());
     }
 

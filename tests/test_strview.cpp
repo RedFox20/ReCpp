@@ -17,8 +17,8 @@ TestImpl(test_strview)
         AssertThat(str[4], 'o');
         AssertNotEqual(str[3], 'x');
 
-        string stdstr  = "hello"s;
-        string stdstr2 = "heihi"s;
+        std::string stdstr  = "hello"s;
+        std::string stdstr2 = "heihi"s;
         AssertThat(stdstr, str);
         AssertThat(str, stdstr);
         AssertNotEqual(stdstr2, str);
@@ -28,14 +28,14 @@ TestImpl(test_strview)
         AssertThat(str2, stdstr);
         AssertThat(str2.length(), (int)stdstr.length());
 
-        string stdstr3 = str2;
+        std::string stdstr3 = str2;
         AssertThat(stdstr3, str2);
         AssertThat(str2, stdstr3);
     }
 
     TestCase(thread_local_buffer)
     {
-        string buffer(1023, 'a'); // this should be the same length as strview to_cstr thread_local buffer
+        std::string buffer(1023, 'a'); // this should be the same length as strview to_cstr thread_local buffer
         std::vector<char> input(2048, 'a'); // this should be anything bigger and NOT null terminated
         strview view = { input.data(), input.size()-1 };
         const char* cview = view.to_cstr();

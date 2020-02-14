@@ -19,10 +19,10 @@ struct Struct2 : serializable<Struct2>
 {
     float a = 0.0f;
     int b = 0;
-    string c = "";
+    std::string c = "";
 
     Struct2(){}
-    Struct2(float a, int b, string c) : a(a), b(b), c(c) {}
+    Struct2(float a, int b, std::string c) : a(a), b(b), c(c) {}
 
     void introspect()
     {
@@ -33,10 +33,10 @@ struct Struct2 : serializable<Struct2>
 struct Struct3 : serializable<Struct3>
 {
     int a = 0;
-    string b = "";
+    std::string b = "";
 
     Struct3(){}
-    Struct3(int a, string b) : a(a), b(b) {}
+    Struct3(int a, std::string b) : a(a), b(b) {}
 
     void introspect()
     {

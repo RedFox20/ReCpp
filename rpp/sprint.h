@@ -16,39 +16,37 @@
 
 namespace rpp
 {
-    using std::string;
-
     ////////////////////////////////////////////////////////////////////////////////
 
     /**
      * Converts a single char 'x' into string "x"
      */
-    RPPAPI string to_string(char v)   noexcept;
+    RPPAPI std::string to_string(char v)   noexcept;
 
     /**
      * Simple and fast locale-agnostic to_string utilities:
      */
-    RPPAPI string to_string(rpp::byte v) noexcept;
-    RPPAPI string to_string(short v)  noexcept;
-    RPPAPI string to_string(ushort v) noexcept;
-    RPPAPI string to_string(int v)    noexcept;
-    RPPAPI string to_string(uint v)   noexcept;
-    RPPAPI string to_string(long v)   noexcept;
-    RPPAPI string to_string(ulong v)  noexcept;
-    RPPAPI string to_string(int64 v)  noexcept;
-    RPPAPI string to_string(uint64 v) noexcept;
-    RPPAPI string to_string(float v)  noexcept;
-    RPPAPI string to_string(double v) noexcept;
+    RPPAPI std::string to_string(rpp::byte v) noexcept;
+    RPPAPI std::string to_string(short v)  noexcept;
+    RPPAPI std::string to_string(ushort v) noexcept;
+    RPPAPI std::string to_string(int v)    noexcept;
+    RPPAPI std::string to_string(uint v)   noexcept;
+    RPPAPI std::string to_string(long v)   noexcept;
+    RPPAPI std::string to_string(ulong v)  noexcept;
+    RPPAPI std::string to_string(int64 v)  noexcept;
+    RPPAPI std::string to_string(uint64 v) noexcept;
+    RPPAPI std::string to_string(float v)  noexcept;
+    RPPAPI std::string to_string(double v) noexcept;
 
     /** @return "true" or "false" string */
-    RPPAPI string to_string(bool trueOrFalse) noexcept;
+    RPPAPI std::string to_string(bool trueOrFalse) noexcept;
 
     /**
      * @return std::string from cstring. If cstr == nullptr, returns empty string ""
      */
-    RPPAPI string to_string(const char* cstr) noexcept;
+    RPPAPI std::string to_string(const char* cstr) noexcept;
 
-    RPPAPI inline const string& to_string(const string& s) noexcept { return s; }
+    RPPAPI inline const std::string& to_string(const std::string& s) noexcept { return s; }
 
     namespace detail
     {
@@ -281,7 +279,7 @@ namespace rpp
         void write_hex(const strview& str, format_opt opt = lowercase) {
             write_hex(str.str, str.len, opt);
         }
-        void write_hex(const string& str, format_opt opt = lowercase) {
+        void write_hex(const std::string& str, format_opt opt = lowercase) {
             write_hex(str.c_str(), static_cast<int>(str.size()), opt);
         }
 
@@ -353,7 +351,7 @@ namespace rpp
         template<class T> FINLINE void prettyprint(const std::shared_ptr<T>& p) { prettyprint(p.get());   }
 
 
-        FINLINE void prettyprint(const string& value)  { write_quote(); write(value); write_quote(); }
+        FINLINE void prettyprint(const std::string& value)  { write_quote(); write(value); write_quote(); }
         FINLINE void prettyprint(const strview& value) { write_quote(); write(value); write_quote(); }
         FINLINE void prettyprint(const char& value)    { write_apos();  write(value); write_apos();  }
         template<class K, class V> FINLINE void prettyprint(const K& key, const V& value) {
@@ -404,7 +402,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    RPPAPI inline string to_hex_string(const strview& s, format_opt opt = lowercase)
+    RPPAPI inline std::string to_hex_string(const strview& s, format_opt opt = lowercase)
     {
         rpp::string_buffer sb;
         sb.write_hex(s, opt);
@@ -487,24 +485,24 @@ namespace rpp
      * Stringifies and appends the input arguments one by one, filling gaps with spaces, similar to Python print()
      * Ex: sprint("test:", 10, 20.1f);  --> "test: 10 20.1"
      */
-    template<class T, class... Args> string sprint(const T& first, const Args&... args)
+    template<class T, class... Args> std::string sprint(const T& first, const Args&... args)
     {
         string_buffer buf; buf.write(first, args...);
         return buf.str();
     }
-    template<class T, class... Args> string sprintln(const T& first, const Args&... args)
+    template<class T, class... Args> std::string sprintln(const T& first, const Args&... args)
     {
         string_buffer buf; buf.writeln(first, args...);
         return buf.str();
     }
 
-    inline const char* __format_wrap(const string& s)  { return s.c_str();    }
+    inline const char* __format_wrap(const std::string& s) { return s.c_str();    }
     inline const char* __format_wrap(const strview& s) { return s.to_cstr();  }
     template<class T> const T& __format_wrap(const T& t) { return t; }
 
-    RPPAPI string __format(const char* format, ...); 
+    RPPAPI std::string __format(const char* format, ...); 
 
-    template<class... Args> string format(const char* format, const Args&... args)
+    template<class... Args> std::string format(const char* format, const Args&... args)
     {
         return __format(format, __format_wrap(args)...);
     }
@@ -535,15 +533,15 @@ namespace rpp
      *  @endcode
      */
     template<class T, template<class,class...> class C, class... Args>
-    NOINLINE string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
+    NOINLINE std::string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
     }
-    template<class T> NOINLINE string to_string(const std::shared_ptr<T>& p) noexcept
+    template<class T> NOINLINE std::string to_string(const std::shared_ptr<T>& p) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }
-    template<class T> NOINLINE string to_string(const std::weak_ptr<T>& p) noexcept
+    template<class T> NOINLINE std::string to_string(const std::weak_ptr<T>& p) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(p); return sb.str();
     }

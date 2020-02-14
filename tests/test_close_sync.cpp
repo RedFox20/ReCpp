@@ -14,7 +14,7 @@ TestImpl(test_close_sync)
     struct ImportantState
     {
         close_sync CloseSync;
-        string data = "xxxxyyyyzzzzaaaabbbbcccc";
+        std::string data = "xxxxyyyyzzzzaaaabbbbcccc";
 
         ~ImportantState() noexcept(false)
         {

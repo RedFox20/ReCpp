@@ -9,9 +9,6 @@
 
 namespace rpp
 {
-    using std::mutex;
-    using std::lock_guard;
-    
     /**
      * @note This is not optimized for speed
      */
@@ -19,7 +16,7 @@ namespace rpp
     class concurrent_queue
     {
         std::deque<T> Queue;
-        mutable mutex Mutex;
+        mutable std::mutex Mutex;
         std::condition_variable Waiter;
     public:
     
@@ -32,38 +29,38 @@ namespace rpp
         int  size()  const { return (int)Queue.size(); }
         int safe_size() const
         {
-            lock_guard<mutex> lock {Mutex};
+            std::lock_guard<std::mutex> lock {Mutex};
             return (int)Queue.size();
         }
         
-        mutex& sync() const { return Mutex; }
+        std::mutex& sync() const { return Mutex; }
         void notify() { Waiter.notify_all(); }
         
         template<class ChangeWaitFlags>
         void notify(const ChangeWaitFlags& changeFlags)
         {
-            { lock_guard<mutex> lock {Mutex};
+            { std::lock_guard<std::mutex> lock {Mutex};
                 changeFlags(); }
             Waiter.notify_all();
         }
 
         void clear()
         {
-            { lock_guard<mutex> lock {Mutex};
+            { std::lock_guard<std::mutex> lock {Mutex};
                 Queue.clear(); }
             Waiter.notify_all();
         }
         
         void push(T&& item)
         {
-            { lock_guard<mutex> lock {Mutex};
+            { std::lock_guard<std::mutex> lock {Mutex};
                 Queue.emplace_back(std::move(item)); }
             Waiter.notify_all();
         }
 
         void push(const T& item)
         {
-            { lock_guard<mutex> lock {Mutex};
+            { std::lock_guard<std::mutex> lock {Mutex};
                 Queue.push_back(item); }
             Waiter.notify_all();
         }
@@ -71,14 +68,14 @@ namespace rpp
         // pushes an item without calling notify_all()
         void push_no_notify(T&& item)
         {
-            { lock_guard<mutex> lock {Mutex};
+            { std::lock_guard<std::mutex> lock {Mutex};
                 Queue.emplace_back(std::move(item)); }
         }
 
         T pop()
         {
             T item;
-            { lock_guard<mutex> lock {Mutex};
+            { std::lock_guard<std::mutex> lock {Mutex};
                 if (Queue.empty()) throw std::runtime_error("concurrent_queue<T>::pop(): Queue was empty!");
                 pop_unlocked(item); }
             Waiter.notify_all();
@@ -87,13 +84,13 @@ namespace rpp
 
         std::deque<T> atomic_copy() const
         {
-            lock_guard<mutex> lock {Mutex};
+            std::lock_guard<std::mutex> lock {Mutex};
             return Queue;
         }
 
         bool try_pop(T& outItem)
         {
-            lock_guard<mutex> lock {Mutex};
+            std::lock_guard<std::mutex> lock {Mutex};
             if (Queue.empty())
                 return false;
             pop_unlocked(outItem);
@@ -122,7 +119,7 @@ namespace rpp
                       int cancellationInterval = 1000)
         {
             std::chrono::milliseconds interval {cancellationInterval};
-            std::unique_lock<mutex> lock {Mutex};
+            std::unique_lock<std::mutex> lock {Mutex};
             
             while (Queue.empty())
             {
@@ -158,7 +155,7 @@ namespace rpp
         {
             auto end = std::chrono::system_clock::now()
                      + std::chrono::milliseconds{timeoutMillis};
-            std::unique_lock<mutex> lock {Mutex};
+            std::unique_lock<std::mutex> lock {Mutex};
             
             while (Queue.empty())
             {
@@ -181,7 +178,7 @@ namespace rpp
          */
         T wait_pop()
         {
-            std::unique_lock<mutex> lock {Mutex};
+            std::unique_lock<std::mutex> lock {Mutex};
             
             while (Queue.empty())
                 Waiter.wait(lock);

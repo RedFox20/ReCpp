@@ -74,7 +74,7 @@ TestImpl(test_sockets)
     
     TestCase(socket_udp_send_receive)
     {
-        vector<uint8_t> msg(4000, 'x');
+        std::vector<uint8_t> msg(4000, 'x');
         Socket send = rpp::make_udp_randomport();
         Socket recv = rpp::make_udp_randomport();
         AssertFalse(send.is_blocking()); // should be false by default
@@ -83,7 +83,7 @@ TestImpl(test_sockets)
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
         AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
 
-        vector<uint8_t> buf;
+        std::vector<uint8_t> buf;
         Assert(recv.recv(buf));
 
         AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
@@ -238,7 +238,7 @@ TestImpl(test_sockets)
         client.send(msg);
         sleep(100);
 
-        string resp = client.recv_str();
+        std::string resp = client.recv_str();
         print_info("server: received '%s'\n", resp.c_str());
         AssertNotEqual(resp, "");
         sleep(50);
@@ -255,7 +255,7 @@ TestImpl(test_sockets)
         Socket server = connect("127.0.0.1", serverPort);
         while (server.connected())
         {
-            string resp = server.recv_str();
+            std::string resp = server.recv_str();
             if (resp != "")
             {
                 print_info("remote: received '%s'\n", resp.c_str());
@@ -284,7 +284,7 @@ TestImpl(test_sockets)
 
         for (int i = 0; i < 20; ++i)
         {
-            string data = client.recv_str();
+            std::string data = client.recv_str();
             if (data != "")
             {
                 print_info("server: received %d bytes of data from client ", (int)data.length());

@@ -33,7 +33,7 @@ namespace rpp
         bool operator==(const char* s) const { return strcmp(data, s) == 0; }
         bool operator!=(const char* s) const { return strcmp(data, s) != 0; }
     };
-    string to_string(const Data& d) { return d.data; }
+    std::string to_string(const Data& d) { return d.data; }
 
     #define VALIDATE_DATA_ARG(name, arg) \
         if (!(arg).data || (arg) != "data") \

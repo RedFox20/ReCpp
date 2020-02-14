@@ -72,7 +72,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
 #if !_WIN32
-    static string to_string(const wchar_t* ws)
+    static std::string to_string(const wchar_t* ws)
     {
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
         return cvt.to_bytes(ws);
@@ -300,9 +300,9 @@ namespace rpp /* ReCpp */
         }
         return load_buffer{ nullptr, 0 };
     }
-    string file::read_text() noexcept
+    std::string file::read_text() noexcept
     {
-        string out;
+        std::string out;
         int pos   = tell();
         int count = size() - pos;
         if (count <= 0) return out;
@@ -360,22 +360,22 @@ namespace rpp /* ReCpp */
         return file{filename, READONLY}.read_all();
     }
 
-    unordered_map<string, string> file::read_map(const strview& filename) noexcept
+    std::unordered_map<std::string, std::string> file::read_map(const strview& filename) noexcept
     {
         load_buffer buf = read_all(filename);
         strview key, value;
         keyval_parser parser = { buf };
-        unordered_map<string, string> map;
+        std::unordered_map<std::string, std::string> map;
         while (parser.read_next(key, value))
             map[key] = value.to_string();
         return map;
     }
 
-    unordered_map<strview, strview> file::parse_map(const load_buffer& buf) noexcept
+    std::unordered_map<strview, strview> file::parse_map(const load_buffer& buf) noexcept
     {
         strview key, value;
         keyval_parser parser = { buf };
-        unordered_map<strview, strview> map;
+        std::unordered_map<strview, strview> map;
         while (parser.read_next(key, value))
             map[key] = value;
         return map;
@@ -751,7 +751,7 @@ namespace rpp /* ReCpp */
     bool copy_file_into_folder(const strview sourceFile, const strview destinationFolder) noexcept
     {
         char buf1[1024];
-        string destFile = path_combine(destinationFolder, file_nameext(sourceFile));
+        std::string destFile = path_combine(destinationFolder, file_nameext(sourceFile));
         return copy_file(sourceFile.to_cstr(buf1), destFile.c_str());
     }
     
@@ -771,7 +771,7 @@ namespace rpp /* ReCpp */
     #if _WIN32
         return _wmkdir(foldername) == 0 || errno == EEXIST;
     #else
-        string s = { foldername,foldername + wcslen(foldername) };
+        std::string s = { foldername, foldername + wcslen(foldername) };
         return sys_mkdir(s);
     #endif
     }
@@ -813,7 +813,7 @@ namespace rpp /* ReCpp */
             return false;
         return sys_mkdir(foldername);
     }
-    bool create_folder(const wstring& foldername) noexcept
+    bool create_folder(const std::wstring& foldername) noexcept
     {
         if (foldername.empty() || foldername == L"./")
             return false;
@@ -839,16 +839,16 @@ namespace rpp /* ReCpp */
         if (mode == delete_mode::non_recursive)
             return sys_rmdir(foldername); // easy path, just gently try to delete...
 
-        vector<string> folders;
-        vector<string> files;
+        std::vector<std::string> folders;
+        std::vector<std::string> files;
         bool deletedChildren = true;
 
         if (list_alldir(folders, files, foldername))
         {
-            for (const string& folder : folders)
+            for (const std::string& folder : folders)
                 deletedChildren |= delete_folder(path_combine(foldername, folder), delete_mode::recursive);
 
-            for (const string& file : files)
+            for (const std::string& file : files)
                 deletedChildren |= delete_file(path_combine(foldername, file));
         }
 
@@ -859,25 +859,25 @@ namespace rpp /* ReCpp */
     }
 
 
-    string full_path(const char* path) noexcept
+    std::string full_path(const char* path) noexcept
     {
         char buf[4096];
         #if _WIN32
             size_t len = GetFullPathNameA(path, sizeof(buf), buf, nullptr);
             if (len) normalize(buf);
-            return len ? string{ buf,len } : string{};
+            return len ? std::string{ buf,len } : std::string{};
         #else
             char* res = realpath(path, buf);
-            return res ? string{ res } : string{};
+            return res ? std::string{ res } : std::string{};
         #endif
     }
 
 
-    string merge_dirups(strview path) noexcept
+    std::string merge_dirups(strview path) noexcept
     {
         strview pathstr = path;
         const bool isDirPath = path.back() == '/' || path.back() == '\\';
-        vector<strview> folders;
+        std::vector<strview> folders;
         while (strview folder = pathstr.next("/\\")) {
             folders.push_back(folder);
         }
@@ -892,7 +892,7 @@ namespace rpp /* ReCpp */
             }
         }
 
-        string result;
+        std::string result;
         for (const strview& folder : folders) {
             result += folder;
             result += '/';
@@ -931,7 +931,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    string file_replace_ext(strview path, strview ext)
+    std::string file_replace_ext(strview path, strview ext)
     {
         if (strview oldext = file_ext(path))
         {
@@ -945,9 +945,9 @@ namespace rpp /* ReCpp */
         return path;
     }
     
-    string file_name_append(strview path, strview add)
+    std::string file_name_append(strview path, strview add)
     {
-        string result = folder_path(path);
+        std::string result = folder_path(path);
         result += file_name(path);
         result += add;
         if (strview ext = file_ext(path)) {
@@ -957,9 +957,9 @@ namespace rpp /* ReCpp */
         return result;
     }
     
-    string file_name_replace(strview path, strview newFileName)
+    std::string file_name_replace(strview path, strview newFileName)
     {
-        string result = folder_path(path) + newFileName;
+        std::string result = folder_path(path) + newFileName;
         if (strview ext = file_ext(path)) {
             result += '.';
             result += ext;
@@ -967,7 +967,7 @@ namespace rpp /* ReCpp */
         return result;
     }
     
-    string file_nameext_replace(strview path, strview newFileNameAndExt)
+    std::string file_nameext_replace(strview path, strview newFileNameAndExt)
     {
         return folder_path(path) + newFileNameAndExt;
     }
@@ -990,26 +990,26 @@ namespace rpp /* ReCpp */
             return strview{ path.str, end + 1 };
         return strview{};
     }
-    wstring folder_path(const wchar_t* path) noexcept
+    std::wstring folder_path(const wchar_t* path) noexcept
     {
         auto* end = path + wcslen(path);
         for (; path < end; --end)
             if (*end == '/' || *end == '\\')
                 break;
-        return path == end ? wstring{} : wstring{path, end + 1};
+        return path == end ? std::wstring{} : std::wstring{path, end + 1};
     }
-    wstring folder_path(const wstring& path) noexcept
+    std::wstring folder_path(const std::wstring& path) noexcept
     {
         auto* ptr = path.c_str();
         auto* end  = ptr + path.size();
         for (; ptr < end; --end)
             if (*end == '/' || *end == '\\')
                 break;
-        return ptr == end ? wstring{} : wstring{ptr, end + 1};
+        return ptr == end ? std::wstring{} : std::wstring{ptr, end + 1};
     }
 
 
-    string& normalize(string& path, char sep) noexcept
+    std::string& normalize(std::string& path, char sep) noexcept
     {
         if (sep == '/') {
             for (char& ch : path) if (ch == '\\') ch = '/';
@@ -1032,14 +1032,14 @@ namespace rpp /* ReCpp */
         return path;
     }
 
-    string normalized(strview path, char sep) noexcept
+    std::string normalized(strview path, char sep) noexcept
     {
-        string res = path.to_string();
+        std::string res = path.to_string();
         normalize(res, sep);
         return res;
     }
 
-    template<size_t N> string slash_combine(const std::array<strview, N>& args)
+    template<size_t N> std::string slash_combine(const std::array<strview, N>& args)
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
@@ -1050,7 +1050,7 @@ namespace rpp /* ReCpp */
             }
         }
         
-        string result; result.reserve(res);
+        std::string result; result.reserve(res);
         result.append(args[0].c_str(), args[0].size());
 
         for (size_t i = 1; i < N; ++i) {
@@ -1063,14 +1063,14 @@ namespace rpp /* ReCpp */
         return result;
     }
 
-    string path_combine(strview path1, strview path2) noexcept
+    std::string path_combine(strview path1, strview path2) noexcept
     {
         path1.trim_end("/\\");
         path2.trim("/\\");
         return slash_combine(std::array<strview, 2>{{path1, path2}});
     }
 
-    string path_combine(strview path1, strview path2, strview path3) noexcept
+    std::string path_combine(strview path1, strview path2, strview path3) noexcept
     {
         path1.trim_end("/\\");
         path2.trim("/\\");
@@ -1078,7 +1078,7 @@ namespace rpp /* ReCpp */
         return slash_combine(std::array<strview, 3>{{path1, path2, path3}});
     }
 
-    string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept
+    std::string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept
     {
         path1.trim_end("/\\");
         path2.trim("/\\");
@@ -1114,7 +1114,7 @@ namespace rpp /* ReCpp */
 
 #if _WIN32
     // ReSharper disable CppSomeObjectMembersMightNotBeInitialized
-    dir_iterator::dir_iterator(string&& dir) : dir{std::move(dir)} {  // NOLINT
+    dir_iterator::dir_iterator(std::string&& dir) : dir{std::move(dir)} {  // NOLINT
         char path[512];
         if (this->dir.empty()) { // handle dir=="" special case
             snprintf(path, 512, "./*");
@@ -1157,7 +1157,7 @@ namespace rpp /* ReCpp */
     static void traverse_dir2(strview queryRoot, strview relPath, 
                               bool dirs, bool files, bool rec, bool abs, const Func& func)
     {
-        string currentDir = path_combine(queryRoot, relPath);
+        std::string currentDir = path_combine(queryRoot, relPath);
         for (dir_entry e : dir_iterator{ currentDir })
         {
             bool validDir = e.is_dir && e.name != "." && e.name != "..";
@@ -1177,7 +1177,7 @@ namespace rpp /* ReCpp */
     {
         if (abs)
         {
-            string fullpath = full_path(dir.empty() ? "." : dir);
+            std::string fullpath = full_path(dir.empty() ? "." : dir);
             if (fullpath.empty())
                 return; // folder does not exist
             
@@ -1189,62 +1189,62 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    int list_dirs(vector<string>& out, strview dir, bool recursive, bool fullpath) noexcept
+    int list_dirs(std::vector<std::string>& out, strview dir, bool recursive, bool fullpath) noexcept
     {
-        traverse_dir(dir, true, false, recursive, fullpath, [&](string&& path, bool) {
+        traverse_dir(dir, true, false, recursive, fullpath, [&](std::string&& path, bool) {
             out.emplace_back(std::move(path));
         });
         return static_cast<int>(out.size());
     }
 
-    int list_dirs_relpath(vector<string>& out, strview dir, bool recursive) noexcept
+    int list_dirs_relpath(std::vector<std::string>& out, strview dir, bool recursive) noexcept
     {
-        traverse_dir(dir, true, false, recursive, false, [&](string&& path, bool) {
+        traverse_dir(dir, true, false, recursive, false, [&](std::string&& path, bool) {
             out.emplace_back(path_combine(dir, path));
         });
         return static_cast<int>(out.size());
     }
 
-    int list_files(vector<string>& out, strview dir, strview suffix, bool recursive, bool fullpath) noexcept
+    int list_files(std::vector<std::string>& out, strview dir, strview suffix, bool recursive, bool fullpath) noexcept
     {
-        traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
+        traverse_dir(dir, false, true, recursive, fullpath, [&](std::string&& path, bool) {
             if (suffix.empty() || strview{path}.ends_withi(suffix))
                 out.emplace_back(std::move(path));
         });
         return static_cast<int>(out.size());
     }
 
-    int list_files_relpath(vector<string>& out, strview dir, strview suffix, bool recursive) noexcept
+    int list_files_relpath(std::vector<std::string>& out, strview dir, strview suffix, bool recursive) noexcept
     {
-        traverse_dir(dir, false, true, recursive, false, [&](string&& path, bool) {
+        traverse_dir(dir, false, true, recursive, false, [&](std::string&& path, bool) {
             if (suffix.empty() || strview{path}.ends_withi(suffix))
                 out.emplace_back(path_combine(dir, path));
         });
         return static_cast<int>(out.size());
     }
 
-    int list_alldir(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive, bool fullpath) noexcept
+    int list_alldir(std::vector<std::string>& outDirs, std::vector<std::string>& outFiles, strview dir, bool recursive, bool fullpath) noexcept
     {
-        traverse_dir(dir, true, true, recursive, fullpath, [&](string&& path, bool isDir) {
+        traverse_dir(dir, true, true, recursive, fullpath, [&](std::string&& path, bool isDir) {
             auto& out = isDir ? outDirs : outFiles;
             out.emplace_back(std::move(path));
         });
         return static_cast<int>(outDirs.size() + outFiles.size());
     }
 
-    int list_alldir_relpath(vector<string>& outDirs, vector<string>& outFiles, strview dir, bool recursive) noexcept
+    int list_alldir_relpath(std::vector<std::string>& outDirs, std::vector<std::string>& outFiles, strview dir, bool recursive) noexcept
     {
-        traverse_dir(dir, true, true, recursive, false, [&](string&& path, bool isDir) {
+        traverse_dir(dir, true, true, recursive, false, [&](std::string&& path, bool isDir) {
             auto& out = isDir ? outDirs : outFiles;
             out.emplace_back(path_combine(dir, path));
         });
         return static_cast<int>(outDirs.size() + outFiles.size());
     }
 
-    vector<string> list_files(strview dir, const vector<strview>& suffixes, bool recursive, bool fullpath) noexcept
+    std::vector<std::string> list_files(strview dir, const std::vector<strview>& suffixes, bool recursive, bool fullpath) noexcept
     {
-        vector<string> out;
-        traverse_dir(dir, false, true, recursive, fullpath, [&](string&& path, bool) {
+        std::vector<std::string> out;
+        traverse_dir(dir, false, true, recursive, fullpath, [&](std::string&& path, bool) {
             for (const strview& suffix : suffixes) {
                 if (strview{ path }.ends_withi(suffix)) {
                     out.emplace_back(std::move(path));
@@ -1271,7 +1271,7 @@ namespace rpp /* ReCpp */
     }
     #endif
 
-    string working_dir() noexcept
+    std::string working_dir() noexcept
     {
         char path[512];
         #if _WIN32
@@ -1292,7 +1292,7 @@ namespace rpp /* ReCpp */
         return {};
     }
 
-    string module_dir(void* moduleObject) noexcept
+    std::string module_dir(void* moduleObject) noexcept
     {
         #if _WIN32
             char path[512];
@@ -1300,7 +1300,7 @@ namespace rpp /* ReCpp */
             normalize(path);
             return folder_path(strview{path, len});
         #elif __APPLE__
-            extern string apple_module_dir(void* moduleObject) noexcept;
+            extern std::string apple_module_dir(void* moduleObject) noexcept;
             return apple_module_dir(moduleObject);
         #else
             // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
@@ -1308,7 +1308,7 @@ namespace rpp /* ReCpp */
         #endif
     }
 
-    string module_path(void* moduleObject) noexcept
+    std::string module_path(void* moduleObject) noexcept
     {
         #if _WIN32
             char path[512];
@@ -1316,7 +1316,7 @@ namespace rpp /* ReCpp */
             normalize(path);
             return { path, path+len };
         #elif __APPLE__
-            extern string apple_module_path(void* moduleObject) noexcept;
+            extern std::string apple_module_path(void* moduleObject) noexcept;
             return apple_module_path(moduleObject);
         #else
             // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
@@ -1333,7 +1333,7 @@ namespace rpp /* ReCpp */
         #endif
     }
 
-    string temp_dir() noexcept
+    std::string temp_dir() noexcept
     {
         #if _WIN32
             char path[512];
@@ -1341,7 +1341,7 @@ namespace rpp /* ReCpp */
             win32_fixup_path(path, len);
             return { path, path + len };
         #elif __APPLE__
-            extern string apple_temp_dir() noexcept;
+            extern std::string apple_temp_dir() noexcept;
             return apple_temp_dir();
         #elif __ANDROID__
             // return getContext().getExternalFilesDir(null).getPath();
@@ -1355,7 +1355,7 @@ namespace rpp /* ReCpp */
         #endif
     }
     
-    string home_dir() noexcept
+    std::string home_dir() noexcept
     {
         #if _MSC_VER
             size_t len = 0;

@@ -239,21 +239,21 @@ namespace rpp
     {
         resolve_addr(hostname);
     }
-    ipaddress::ipaddress(address_family af, const string& hostname, int port) noexcept
+    ipaddress::ipaddress(address_family af, const std::string& hostname, int port) noexcept
         : ipaddress{af, hostname.c_str(), port}
     {
     }
-    ipaddress::ipaddress(address_family af, const string& ipAddressAndPort) noexcept : ipaddress{af, 0}
+    ipaddress::ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept : ipaddress{af, 0}
     {
         if (ipAddressAndPort.empty()) {
             return;
         }
 
         auto pos = ipAddressAndPort.rfind(':');
-        if (pos != string::npos)
+        if (pos != std::string::npos)
         {
             Port = (uint16_t)atoi(&ipAddressAndPort[pos + 1]);
-            string ip = ipAddressAndPort.substr(0, pos);
+            std::string ip = ipAddressAndPort.substr(0, pos);
             resolve_addr(ip.c_str());
         }
         else
@@ -280,7 +280,7 @@ namespace rpp
             addrinfo hint = { 0 }; // must be nulled
             hint.ai_family = family; // only filter by family
             addrinfo* infos = nullptr;
-            string strPort = std::to_string(Port);
+            std::string strPort = std::to_string(Port);
 
             if (isdigit(hostname[0]))
                 hint.ai_flags = AI_NUMERICHOST;
@@ -357,10 +357,10 @@ namespace rpp
         }
         return 0;
     }
-    string ipaddress::name() const noexcept
+    std::string ipaddress::name() const noexcept
     {
         char buf[128];
-        return string(buf, name(buf, 128));
+        return std::string{buf, buf+name(buf, 128)};
     }
     const char* ipaddress::cname() const noexcept
     {
@@ -414,7 +414,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////
 
 #if _WIN32 // msvc or mingw
-    static string to_string(const wchar_t* wstr) noexcept
+    static std::string to_string(const wchar_t* wstr) noexcept
     {
     #if _MSC_VER
         std::wstring_convert<std::codecvt<wchar_t, char, mbstate_t>, wchar_t> cvt;
@@ -425,10 +425,10 @@ namespace rpp
     }
 #endif
 
-    vector<ipinterface> ipinterface::get_interfaces(address_family af)
+    std::vector<ipinterface> ipinterface::get_interfaces(address_family af)
     {
         int family = addrfamily_int(af);
-        vector<ipinterface> out;
+        std::vector<ipinterface> out;
         
     #if _WIN32
         InitWinSock();
@@ -588,7 +588,7 @@ namespace rpp
         #endif
     }
 
-    string socket::last_err(int err) noexcept
+    std::string socket::last_err(int err) noexcept
     {
         char buf[2048];
         int errcode = err ? err : os_getsockerr();
@@ -603,7 +603,7 @@ namespace rpp
         #endif
         int errlen = snprintf(buf, sizeof(buf), "error %d: %s", errcode, msg);
         if (errlen < 0) errlen = (int)strlen(buf);
-        return string{ buf, buf + errlen };
+        return std::string{ buf, buf + errlen };
     }
 
 
@@ -794,7 +794,7 @@ namespace rpp
         return res;
     }
 
-    bool socket::recv(vector<uint8_t>& outBuffer)
+    bool socket::recv(std::vector<uint8_t>& outBuffer)
     {
         int count = available();
         if (count <= 0)
@@ -806,7 +806,7 @@ namespace rpp
         return n > 0;
     }
     
-    bool socket::recvfrom(ipaddress& from, vector<uint8_t>& outBuffer)
+    bool socket::recvfrom(ipaddress& from, std::vector<uint8_t>& outBuffer)
     {
         int count = available();
         if (count <= 0)
@@ -872,13 +872,13 @@ namespace rpp
         }
     }
     
-    string socket::peek_str(int maxCount) noexcept
+    std::string socket::peek_str(int maxCount) noexcept
     {
         int count = available();
         int n = count < maxCount ? count : maxCount;
         if (n <= 0) return {};
 
-        string cont; cont.resize(n);
+        std::string cont; cont.resize(n);
         int received = peek((void*)cont.data(), n);
         if (received <= 0) return {};
 

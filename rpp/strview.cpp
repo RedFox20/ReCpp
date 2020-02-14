@@ -454,18 +454,18 @@ namespace rpp
         *p = 0;
         return dst;
     }
-    string strview::as_lower() const noexcept
+    std::string strview::as_lower() const noexcept
     {
-        string ret;
+        std::string ret;
         ret.reserve(size_t(len));
         auto s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::tolower(*s++)));
         return ret;
     }
-    string strview::as_upper() const noexcept
+    std::string strview::as_upper() const noexcept
     {
-        string ret;
+        std::string ret;
         ret.reserve(size_t(len));
         auto s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
@@ -475,33 +475,33 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////
 
-    string concat(const strview& a, const strview& b)
+    std::string concat(const strview& a, const strview& b)
     {
-        string str;
+        std::string str;
         auto sa = size_t(a.len), sb = size_t(b.len);
         str.reserve(sa + sb);
         str.append(a.str, sa).append(b.str, sb);
         return str;
     }
-    string concat(const strview& a, const strview& b, const strview& c)
+    std::string concat(const strview& a, const strview& b, const strview& c)
     {
-        string str;
+        std::string str;
         auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
         str.reserve(sa + sb + sc);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
         return str;
     }
-    string concat(const strview& a, const strview& b, const strview& c, const strview& d)
+    std::string concat(const strview& a, const strview& b, const strview& c, const strview& d)
     {
-        string str;
+        std::string str;
         auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
         str.reserve(sa + sb + sc + sd);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
         return str;
     }
-    string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
+    std::string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
     {
-        string str;
+        std::string str;
         auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
         str.reserve(sa + sb + sc + sd + se);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
@@ -518,11 +518,11 @@ namespace rpp
     {
         foreach(str, len, ::toupper); return str;
     }
-    string& to_lower(string& str) noexcept
+    std::string& to_lower(std::string& str) noexcept
     {
         foreach(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::tolower); return str;
     }
-    string& to_upper(string& str) noexcept
+    std::string& to_upper(std::string& str) noexcept
     {
         foreach(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::toupper); return str;
     }
@@ -533,7 +533,7 @@ namespace rpp
         for (; s < e; ++s) if (*s == chOld) *s = chNew;
         return str;
     }
-    string& replace(string& str, char chOld, char chNew) noexcept {
+    std::string& replace(std::string& str, char chOld, char chNew) noexcept {
         replace(const_cast<char*>(str.data()), static_cast<int>(str.size()), chOld, chNew); return str;
     }
 

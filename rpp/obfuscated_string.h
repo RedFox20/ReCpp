@@ -8,8 +8,6 @@
 
 namespace rpp
 {
-    using std::string;
-
     static constexpr char obfuscate  (char ch, int i) { return char((ch + i) ^ 0x55); }
     static constexpr char deobfuscate(char ch, int i) { return char((ch ^ 0x55) - i); }
 
@@ -44,19 +42,19 @@ namespace rpp
     struct obfuscated_string<std::integer_sequence<char, chars...>> // specialize for tstring
     {
         static constexpr int length = sizeof...(chars);
-        template<int... index> static string create_obfuscated_string(int32_sequence<index...>)
+        template<int... index> static std::string create_obfuscated_string(int32_sequence<index...>)
         {
             static constexpr char str[length] = { obfuscate(chars, index)... };
             return {str, str + length };
         }
-        const string& obfuscated() const
+        const std::string& obfuscated() const
         {
-            static const string str = create_obfuscated_string(int32_indices<sizeof...(chars)>{});
+            static const std::string str = create_obfuscated_string(int32_indices<sizeof...(chars)>{});
             return str;
         }
-        string to_string() const
+        std::string to_string() const
         {
-            string result = obfuscated();
+            std::string result = obfuscated();
             for (int i = 0; i < sizeof...(chars); ++i)
                 result[i] = deobfuscate(result[i], i);
             return result;
@@ -91,13 +89,13 @@ namespace rpp
         char chars[length];
         constexpr macro_obfuscated_string(const char* const str) 
             : chars{ obfuscate(str[index], index)... } {}
-        string obfuscated() const
+        std::string obfuscated() const
         {
             return { chars, chars + length };
         }
-        string to_string() const
+        std::string to_string() const
         {
-            string result = obfuscated();
+            std::string result = obfuscated();
             for (int i = 0; i < length; ++i)
                 result[i] = deobfuscate(result[i], i);
             return result;

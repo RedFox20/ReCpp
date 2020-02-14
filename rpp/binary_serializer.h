@@ -28,7 +28,7 @@ namespace rpp
 
     template<class T> struct serializable
     {
-        static vector<member_serialize<T>> members;
+        static std::vector<member_serialize<T>> members;
         serializable()
         {
             static bool introspection_complete = [this](){
@@ -139,7 +139,7 @@ namespace rpp
         }
     };
 
-    template<class T> vector<member_serialize<T>> serializable<T>::members;
+    template<class T> std::vector<member_serialize<T>> serializable<T>::members;
 
     template<class T> binary_stream& operator<<(binary_stream& w, const serializable<T>& s) 
     {

@@ -207,7 +207,7 @@ namespace rpp
     int println(FILE* file)              { return print(file, '\n'); }
     int println()                        { return print(stdout, '\n'); }
 
-    string __format(const char* format, ...)
+    std::string __format(const char* format, ...)
     {
         char buf[8192];
         va_list ap;
@@ -217,33 +217,33 @@ namespace rpp
             n = sizeof(buf)-1;
             buf[n] = '\0';
         }
-        return string{buf, buf+n};
+        return std::string{buf, buf+n};
     }
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    string to_string(char v)   noexcept { return string(&v, 1ul); }
-    string to_string(byte v)   noexcept { char buf[8];  return string(buf, buf + _tostring(buf, v)); }
-    string to_string(short v)  noexcept { char buf[8];  return string(buf, buf + _tostring(buf, v)); }
-    string to_string(ushort v) noexcept { char buf[8];  return string(buf, buf + _tostring(buf, v)); }
-    string to_string(int v)    noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(uint v)   noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(long v)   noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(ulong v)  noexcept { char buf[16]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(int64 v)  noexcept { char buf[40]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(uint64 v) noexcept { char buf[40]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(float v)  noexcept { char buf[32]; return string(buf, buf + _tostring(buf, v)); }
-    string to_string(double v) noexcept { char buf[32]; return string(buf, buf + _tostring(buf, v)); }
+    std::string to_string(char v)   noexcept { return std::string{&v, 1ul}; }
+    std::string to_string(byte v)   noexcept { char buf[8];  return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(short v)  noexcept { char buf[8];  return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(ushort v) noexcept { char buf[8];  return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(int v)    noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(uint v)   noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(long v)   noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(ulong v)  noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(int64 v)  noexcept { char buf[40]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(uint64 v) noexcept { char buf[40]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(float v)  noexcept { char buf[32]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(double v) noexcept { char buf[32]; return std::string{buf, buf + _tostring(buf, v)}; }
 
-    string to_string(bool trueOrFalse) noexcept
+    std::string to_string(bool trueOrFalse) noexcept
     {
         using namespace std::literals;
         return trueOrFalse ? "true"s : "false"s;
     }
 
-    string to_string(const char* cstr) noexcept
+    std::string to_string(const char* cstr) noexcept
     {
-        return cstr ? string{ cstr } : string{};
+        return cstr ? std::string{ cstr } : std::string{};
     }
 
     ////////////////////////////////////////////////////////////////////////////////

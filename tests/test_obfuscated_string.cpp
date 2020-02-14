@@ -11,7 +11,7 @@ TestImpl(test_obfuscated_string)
     TestCase(cross_platform)
     {
         constexpr auto str = make_obfuscated("test!1234!õäöü");
-        string decrypted = str.to_string();
+        std::string decrypted = str.to_string();
         AssertThat(decrypted, "test!1234!õäöü"s);
     }
 

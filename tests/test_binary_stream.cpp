@@ -1,7 +1,6 @@
 #include <rpp/binary_stream.h>
 #include <rpp/minmax.h>
 #include <rpp/tests.h>
-using std::string;
 using namespace std::literals;
 
 TestImpl(test_binary_stream)
@@ -161,7 +160,7 @@ TestImpl(test_binary_stream)
     TestCase(file_read_write)
     {
         int count = 512;
-        string file = rpp::temp_dir() + "/test.rpp.binary_stream.tmp";
+        std::string file = rpp::temp_dir() + "/test.rpp.binary_stream.tmp";
         {
             rpp::file_writer out { file };
             for (int i = 0; i < count; ++i)

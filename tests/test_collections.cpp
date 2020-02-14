@@ -140,7 +140,7 @@ TestImpl(test_collections)
 
     TestCase(erase_first_if)
     {
-        std::vector<string> v { "1"s, "2"s, "2"s, "4"s, "5"s };
+        std::vector<std::string> v { "1"s, "2"s, "2"s, "4"s, "5"s };
 
         erase_first_if(v, [](auto& s){ return s == "nonexisting"s; });
         AssertThat(v.size(), 5ul);
@@ -376,15 +376,15 @@ TestImpl(test_collections)
 
         // we cannot grab address of C++ stdlib methods, so we need a dummy wrapper
         struct custom : public std::string {
-            using string::string;
-            custom(string&& s) : string(std::move(s)) {}
+            using std::string::string;
+            custom(std::string&& s) : std::string(std::move(s)) {}
             int len() const { return (int)this->length(); }
         };
         std::vector<custom> u { "a"s, "bb"s, "ccc"s, "dddd"s };
         AssertThat(sum_all(u, &custom::len), 10);
     }
 
-    static int string_to_int(const string& s)
+    static int string_to_int(const std::string& s)
     {
         return std::stoi(s);
     }
@@ -397,7 +397,7 @@ TestImpl(test_collections)
         std::vector<int> transformed1 = rpp::transform(original, &string_to_int);
         AssertThat(transformed1, expected);
 
-        std::vector<int> transformed2 = rpp::transform(original, [](const string& s) -> int
+        std::vector<int> transformed2 = rpp::transform(original, [](const std::string& s) -> int
         {
             return std::stoi(s);
         });

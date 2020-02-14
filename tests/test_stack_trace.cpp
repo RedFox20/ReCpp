@@ -6,7 +6,7 @@
 #include <rpp/tests.h>
 using namespace rpp;
 
-static string stack_tracer() { return stack_trace(); }
+static std::string stack_tracer() { return stack_trace(); }
 
 TestImpl(test_stack_trace)
 {

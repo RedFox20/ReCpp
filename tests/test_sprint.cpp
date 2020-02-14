@@ -54,7 +54,7 @@ TestImpl(test_sprint)
         string_buffer buf; buf.writeln("str", 10, 20.1, "2132"_sv, "abcd"s);
         AssertThat(buf.view(), "str 10 20.1 2132 abcd\n");
 
-        string bigs(4096, 'z');
+        std::string bigs(4096, 'z');
         string_buffer buf2{ bigs };
         AssertEqual(buf2.view(), bigs);
     }
@@ -70,7 +70,7 @@ TestImpl(test_sprint)
         string_buffer move_init { std::move(bigbuf) };
         AssertThat(move_init.view(), content);
 
-        string_buffer move_assign{ string(4096, 'z') };
+        string_buffer move_assign{ std::string(4096, 'z') };
         move_assign = std::move(move_init);
         AssertThat(move_assign.view(), content);
     }
@@ -82,7 +82,7 @@ TestImpl(test_sprint)
         for (int i = 0; i < 100; ++i)
             buf.writeln("str", 10, 20.1, "2132"_sv, "abcd"s);
 
-        string str;
+        std::string str;
         for (int i = 0; i < 100; ++i)
             str += "str 10 20.1 2132 abcd\n";
         AssertEqual(buf.view(), str);
@@ -92,7 +92,7 @@ TestImpl(test_sprint)
         for (int i = 0; i < 4096; ++i)
             buf2.write('z');
 
-        string bigs(4096, 'z');
+        std::string bigs(4096, 'z');
         AssertEqual(buf2.view(), bigs);
     }
 
@@ -105,7 +105,7 @@ TestImpl(test_sprint)
 
     TestCase(println_vector_strings)
     {
-        vector<string> names = { "Bob", "Marley", "Mick", "Jagger", "Bruce" };
+        std::vector<std::string> names = { "Bob", "Marley", "Mick", "Jagger", "Bruce" };
 
         TempFILE printed;
         println(printed.out, names);
@@ -115,9 +115,9 @@ TestImpl(test_sprint)
 
     TestCase(println_vector_shared_ptrs)
     {
-        vector<std::shared_ptr<double>> ptrs = { std::make_shared<double>(1.1), 
-                                                 std::make_shared<double>(2.2), 
-                                                 std::make_shared<double>(3.4) };
+        std::vector<std::shared_ptr<double>> ptrs = { std::make_shared<double>(1.1), 
+                                                      std::make_shared<double>(2.2), 
+                                                      std::make_shared<double>(3.4) };
         
         TempFILE printed;
         println(printed.out, ptrs);
@@ -126,7 +126,7 @@ TestImpl(test_sprint)
 
     TestCase(println_unordered_map)
     {
-        std::map<int, string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
+        std::map<int, std::string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
 
         TempFILE printed;
         println(printed.out, map);
@@ -136,7 +136,7 @@ TestImpl(test_sprint)
 
     TestCase(format)
     {
-        string s = rpp::format("%02d, %s, %.1f\n", 7, "format", 0.5);
+        std::string s = rpp::format("%02d, %s, %.1f\n", 7, "format", 0.5);
         AssertThat(s, "07, format, 0.5\n");
     }
 
@@ -185,10 +185,10 @@ TestImpl(test_sprint)
             return sb.str();
         };
 
-        string input = "simple STRING with ! different CHARS_and 0123456789;";
+        std::string input = "simple STRING with ! different CHARS_and 0123456789;";
         string_buffer sb;
         sb.write_hex(input);
-        string ashex = sb.str();
+        std::string ashex = sb.str();
         AssertThat(ashex, referenceHex(input));
     }
     

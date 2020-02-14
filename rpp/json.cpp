@@ -5,9 +5,6 @@
 
 namespace rpp
 {
-    using std::swap;
-    using std::runtime_error;
-
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     json::json() noexcept
@@ -50,11 +47,11 @@ namespace rpp
         {
             switch (Type) {
                 case null:    break;
-                case object:  swap(Object, fwd.Object); break;
-                case array:   swap(Array,  fwd.Array);  break;
-                case boolean: swap(Bool,   fwd.Bool);   break;
-                case number:  swap(Number, fwd.Number); break;
-                case string:  swap(String, fwd.String); break;
+                case object:  std::swap(Object, fwd.Object); break;
+                case array:   std::swap(Array,  fwd.Array);  break;
+                case boolean: std::swap(Bool,   fwd.Bool);   break;
+                case number:  std::swap(Number, fwd.Number); break;
+                case string:  std::swap(String, fwd.String); break;
             }
         }
         else if (Type == null)
@@ -64,8 +61,8 @@ namespace rpp
         else
         {
             json temp { (json&&)fwd };    // json temp = move(fwd);
-            new (&fwd) json{move(*this)}; // fwd  = move(this);
-            new (this) json{move(temp)};  // this = move(temp);
+            new (&fwd) json{std::move(*this)}; // fwd  = move(this);
+            new (this) json{std::move(temp)};  // this = move(temp);
         }
         return *this;
     }
@@ -286,9 +283,9 @@ namespace rpp
 
     jstring& jstring::operator=(jstring&& fwd) noexcept
     {
-        jstring temp { move(fwd) };
-        new (&fwd) jstring{move(*this)};
-        new (this) jstring{move(temp)};
+        jstring temp { std::move(fwd) };
+        new (&fwd) jstring{std::move(*this)};
+        new (this) jstring{std::move(temp)};
         return *this;
     }
 
@@ -301,15 +298,15 @@ namespace rpp
 
     jstring& jstring::operator=(std::string&& s) noexcept
     {
-        if (owns) str = move(s);
-        else { new (&str) std::string{move(s)}; owns = true; }
+        if (owns) str = std::move(s);
+        else { new (&str) std::string{std::move(s)}; owns = true; }
         return *this;
     }
 
     jstring& jstring::operator=(const std::string& s) noexcept
     {
         if (owns) str = s;
-        else { new (&str) std::string{move(s)}; owns = true; }
+        else { new (&str) std::string{std::move(s)}; owns = true; }
         return *this;
     }
 

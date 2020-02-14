@@ -12,11 +12,6 @@
 
 namespace rpp
 {
-    using std::string;
-    using std::wstring;
-    using std::basic_string;
-    using std::vector;
-
     enum RPPAPI address_family
     {
         AF_DontCare,    // unspecified AddressFamily, service provider will choose most appropriate
@@ -120,9 +115,9 @@ namespace rpp
         ipaddress(address_family af) noexcept;
         ipaddress(address_family af, int port) noexcept;
         ipaddress(address_family af, const char* hostname, int port) noexcept;
-        ipaddress(address_family af, const string& hostname, int port) noexcept;
+        ipaddress(address_family af, const std::string& hostname, int port) noexcept;
         ipaddress(int socket) noexcept;
-        ipaddress(address_family af, const string& ipAddressAndPort) noexcept;
+        ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept;
 
         bool resolve_addr(const char* hostname) noexcept;
 
@@ -131,7 +126,7 @@ namespace rpp
 
         // @brief Fills buffer dst[maxCount] with addr string
         int name(char* dst, int maxCount) const noexcept;
-        string name() const noexcept;
+        std::string name() const noexcept;
         const char* cname() const noexcept;
 
         void clear() noexcept;
@@ -142,29 +137,29 @@ namespace rpp
         ipaddress4() noexcept : ipaddress(AF_IPv4) {}
         ipaddress4(int port) noexcept : ipaddress(AF_IPv4, port) {}
         ipaddress4(const char* hostname, int port) noexcept : ipaddress(AF_IPv4, hostname, port) {}
-        ipaddress4(const string& ipAddressAndPort) noexcept : ipaddress(AF_IPv4, ipAddressAndPort) {}
+        ipaddress4(const std::string& ipAddressAndPort) noexcept : ipaddress(AF_IPv4, ipAddressAndPort) {}
     };
     struct RPPAPI ipaddress6 : public ipaddress
     {
         ipaddress6() noexcept : ipaddress(AF_IPv6) {}
         ipaddress6(int port) noexcept : ipaddress(AF_IPv6, port) {}
         ipaddress6(const char* hostname, int port) noexcept : ipaddress(AF_IPv6, hostname, port) {}
-        ipaddress6(const string& ipAddressAndPort) noexcept : ipaddress(AF_IPv6, ipAddressAndPort) {}
+        ipaddress6(const std::string& ipAddressAndPort) noexcept : ipaddress(AF_IPv6, ipAddressAndPort) {}
     };
 
     ////////////////////////////////////////////////////////////////////////////////
 
     struct RPPAPI ipinterface
     {
-        string    name; // friendly name
-        ipaddress addr; // address of the IP interface
-        string    addrname;
+        std::string name; // friendly name
+        ipaddress   addr; // address of the IP interface
+        std::string addrname;
 
         ipinterface() = default;
-        ipinterface(string&& name, const ipaddress& addr, string&& addrname) noexcept
-            : name(move(name)), addr(addr), addrname(move(addrname)) {}
+        ipinterface(std::string&& name, const ipaddress& addr, std::string&& addrname) noexcept
+            : name(std::move(name)), addr(addr), addrname(std::move(addrname)) {}
 
-        static vector<ipinterface> get_interfaces(address_family af = AF_IPv4);
+        static std::vector<ipinterface> get_interfaces(address_family af = AF_IPv4);
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -249,13 +244,13 @@ namespace rpp
         const ipaddress& address() const noexcept { return Addr; }
         int port() const noexcept { return Addr.Port; }
         // @return String representation of ipaddress
-        string name() const noexcept { return Addr.name(); }
+        std::string name() const noexcept { return Addr.name(); }
         const char* cname() const noexcept { return Addr.cname(); }
 
         /**
          * @return A human readable description string of the last occurred socket error in errno.
          */
-        static string last_err(int err=0) noexcept;
+        static std::string last_err(int err=0) noexcept;
 
         /**
          * Send data to remote socket, return number of bytes sent or -1 if socket closed
@@ -267,11 +262,11 @@ namespace rpp
         // Send a null delimited WIDE string (platform unsafe)
         int send(const wchar_t* str) noexcept;
         // Send a byte buffer
-        int send(const vector<uint8_t>& bytes) noexcept {
+        int send(const std::vector<uint8_t>& bytes) noexcept {
             return send(bytes.data(), static_cast<int>(bytes.size()));
         }
         // Send a C++ string
-        template<class T> int send(const basic_string<T>& str) noexcept { 
+        template<class T> int send(const std::basic_string<T>& str) noexcept { 
             return send(str.data(), int(sizeof(T) * str.size())); 
         }
 
@@ -286,14 +281,14 @@ namespace rpp
         // Send a null delimited WIDE string (platform unsafe)
         int sendto(const ipaddress& to, const wchar_t* str) noexcept;
         // Send a byte buffer
-        int sendto(const ipaddress& to, const vector<uint8_t>& bytes) noexcept {
+        int sendto(const ipaddress& to, const std::vector<uint8_t>& bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
-        int sendto(const ipaddress& to, const vector<char>& bytes) noexcept {
+        int sendto(const ipaddress& to, const std::vector<char>& bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
         // Send a C++ string
-        template<class T> int sendto(const ipaddress& to, const basic_string<T>& str) noexcept {
+        template<class T> int sendto(const ipaddress& to, const std::basic_string<T>& str) noexcept {
             return sendto(to, str.data(), int(sizeof(T) * str.size()));
         }
 
@@ -371,13 +366,13 @@ namespace rpp
          * Peeks available() bytes, resizes outBuffer and reads some data into it
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
          */
-        NOINLINE bool recv(vector<uint8_t>& outBuffer);
+        NOINLINE bool recv(std::vector<uint8_t>& outBuffer);
         
         /**
          * UDP only. Peeks available() bytes, resizes outBuffer and reads a single packet into it
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
          */
-        NOINLINE bool recvfrom(ipaddress& from, vector<uint8_t>& outBuffer);
+        NOINLINE bool recvfrom(ipaddress& from, std::vector<uint8_t>& outBuffer);
         
 
     private: 
@@ -459,15 +454,15 @@ namespace rpp
             return cont;
         }
 
-        string          recv_str (int maxChars = 0x7fffffff) noexcept { return recv_gen<string>(maxChars); }
-        wstring         recv_wstr(int maxChars = 0x7fffffff) noexcept { return recv_gen<wstring>(maxChars); }
-        vector<uint8_t> recv_data(int maxCount = 0x7fffffff) noexcept { return recv_gen<vector<uint8_t>>(maxCount); }
+        std::string          recv_str (int maxChars = 0x7fffffff) noexcept { return recv_gen<std::string>(maxChars); }
+        std::wstring         recv_wstr(int maxChars = 0x7fffffff) noexcept { return recv_gen<std::wstring>(maxChars); }
+        std::vector<uint8_t> recv_data(int maxCount = 0x7fffffff) noexcept { return recv_gen<std::vector<uint8_t>>(maxCount); }
 
-        string          recvfrom_str (ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<string>(from, maxChars); }
-        wstring         recvfrom_wstr(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<wstring>(from, maxChars); }
-        vector<uint8_t> recvfrom_data(ipaddress& from, int maxCount = 0x7fffffff) noexcept { return recvfrom_gen<vector<uint8_t>>(from, maxCount); }
+        std::string          recvfrom_str (ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<std::string>(from, maxChars); }
+        std::wstring         recvfrom_wstr(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<std::wstring>(from, maxChars); }
+        std::vector<uint8_t> recvfrom_data(ipaddress& from, int maxCount = 0x7fffffff) noexcept { return recvfrom_gen<std::vector<uint8_t>>(from, maxCount); }
 
-        string peek_str(int maxCount = 0x7fffffff) noexcept;
+        std::string peek_str(int maxCount = 0x7fffffff) noexcept;
 
         /**
          * Waits up to timeout millis for data from remote end.
@@ -477,9 +472,9 @@ namespace rpp
         {
             return try_recv(&socket::recv_gen<T>, millis);
         }
-        string          wait_recv_str(int millis)  noexcept { return wait_recv<string>(millis); }
-        wstring         wait_recv_wstr(int millis) noexcept { return wait_recv<wstring>(millis); }
-        vector<uint8_t> wait_recv_data(int millis) noexcept { return wait_recv<vector<uint8_t>>(millis); }
+        std::string          wait_recv_str(int millis)  noexcept { return wait_recv<std::string>(millis); }
+        std::wstring         wait_recv_wstr(int millis) noexcept { return wait_recv<std::wstring>(millis); }
+        std::vector<uint8_t> wait_recv_data(int millis) noexcept { return wait_recv<std::vector<uint8_t>>(millis); }
 
 
         /**
@@ -507,9 +502,9 @@ namespace rpp
         {
             return try_recvfrom(&socket::recvfrom_gen<T>, from, millis);
         }
-        string          wait_recvfrom_str (ipaddress& from, int millis) noexcept { return wait_recvfrom<string>(from,millis); }
-        wstring         wait_recvfrom_wstr(ipaddress& from, int millis) noexcept { return wait_recvfrom<wstring>(from,millis); }
-        vector<uint8_t> wait_recvfrom_data(ipaddress& from, int millis) noexcept { return wait_recvfrom<vector<uint8_t>>(from,millis); }
+        std::string          wait_recvfrom_str (ipaddress& from, int millis) noexcept { return wait_recvfrom<std::string>(from,millis); }
+        std::wstring         wait_recvfrom_wstr(ipaddress& from, int millis) noexcept { return wait_recvfrom<std::wstring>(from,millis); }
+        std::vector<uint8_t> wait_recvfrom_data(ipaddress& from, int millis) noexcept { return wait_recvfrom<std::vector<uint8_t>>(from,millis); }
 
 
 
