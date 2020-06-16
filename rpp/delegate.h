@@ -216,7 +216,6 @@ namespace rpp
         {
             if (this != &d)
             {
-                this->~delegate();
                 d.copy(*this);
             }
             return *this;
@@ -547,6 +546,14 @@ namespace rpp
         {
             reset();
             init_functor(functor);
+        }
+        void reset(const delegate& d) noexcept
+        {
+            d.copy(*this);
+        }
+        void reset(delegate&& d) noexcept
+        {
+            this->operator=(std::move(d));
         }
 
         /** @brief Resets the delegate to its default uninitialized state */

@@ -349,6 +349,22 @@ namespace rpp
             AssertNotEqual(func3, func4);
         }
 
+        TestCase(copy_operator_lambdas)
+        {
+            auto lambda = [](Data a) -> Data {
+                return validate("copy_lambda", a);
+            };
+
+            DataDelegate original { lambda };
+            DataDelegate copied;
+            copied = original; // explicitly test copy operator here
+            AssertThat(original.good(), true);
+            AssertThat(copied.good(), true);
+
+            AssertEqual(original(data), "copy_lambda");
+            AssertEqual(copied(data), "copy_lambda");
+        }
+
         ////////////////////////////////////////////////////
 
         static void event_func(Data a)
