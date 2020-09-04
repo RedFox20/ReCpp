@@ -330,11 +330,6 @@ namespace rpp
     }
 #endif
 
-    int thread_pool::physical_cores()
-    {
-        return global().MaxParallelism;
-    }
-
     void thread_pool::set_task_tracer(pool_trace_provider traceProvider)
     {
         std::lock_guard<std::mutex> lock{ TasksMutex };
@@ -343,12 +338,12 @@ namespace rpp
 
     thread_pool::thread_pool()
     {
-        set_max_for_parallelism(num_physical_cores());
+        set_max_parallelism(num_physical_cores());
     }
 
-    thread_pool::thread_pool(int maxParallelism)
+    thread_pool::thread_pool(int max_parallelism)
     {
-        set_max_for_parallelism(maxParallelism);
+        set_max_parallelism(max_parallelism);
     }
 
     thread_pool::~thread_pool() noexcept
@@ -358,9 +353,19 @@ namespace rpp
         Tasks.clear();
     }
     
-    void thread_pool::set_max_for_parallelism(int maxTasks) noexcept
+    void thread_pool::set_max_parallelism(int max_parallelism) noexcept
     {
-        MaxParallelism = maxTasks > 0 ? maxTasks : 1;
+        MaxParallelism = max_parallelism > 0 ? max_parallelism : 1;
+    }
+    
+    void thread_pool::set_global_max_parallelism(int max_parallelism)
+    {
+        global().MaxParallelism = std::max<int>(1, max_parallelism);
+    }
+
+    int thread_pool::global_max_parallelism()
+    {
+        return global().MaxParallelism;
     }
 
     int thread_pool::active_tasks() noexcept
@@ -412,7 +417,7 @@ namespace rpp
     }
 
     #define AssertTerminate(success, msg) \
-        if (!success) { \
+        if (!(success)) { \
             LogError(msg); \
             std::terminate(); \
         }

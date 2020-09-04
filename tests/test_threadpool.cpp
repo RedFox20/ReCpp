@@ -12,7 +12,7 @@ TestImpl(test_threadpool)
 {
     TestInit(test_threadpool)
     {
-        print_info("physical_cores: %d\n", thread_pool::physical_cores());
+        print_info("global_max_parallelism: %d\n", thread_pool::global_max_parallelism());
     }
 
     static int parallelism_count(int numIterations)
@@ -33,7 +33,7 @@ TestImpl(test_threadpool)
     TestCase(threadpool_concurrency)
     {
         AssertThat(parallelism_count(1), 1);
-        AssertThat(parallelism_count(128), thread_pool::physical_cores());
+        AssertThat(parallelism_count(128), thread_pool::global_max_parallelism());
     }
 
     TestCase(generic_task)
@@ -132,7 +132,16 @@ TestImpl(test_threadpool)
 
         Timer timer1;
 
-        std::atomic<int64_t> sum { 0 };;
+        // Continuous Integration machines are virtualized,
+        // so the parallelism are shared between VM's which can lead to invalid test results
+        // Attempt to detect this and limit the number of tasks
+        if (thread_pool::global_max_parallelism() > 8)
+        {
+            print_info("Limiting Max Parallelism to 8\n");
+            thread_pool::set_global_max_parallelism(8);
+        }
+
+        std::atomic<int64_t> sum { 0 };
         parallel_for(0, len, 0, [&](int start, int end) {
             int64_t isum = 0;
             for (int i = start; i < end; ++i)
@@ -158,17 +167,20 @@ TestImpl(test_threadpool)
         print_info("Singlethread elapsed: %.3fs  result: %lld\n", serial_elapsed, (long long)sum2);
         AssertThat((long long)sum2, 3299527397221461LL);
 
-        int cores = thread_pool::physical_cores();
-        if (cores <= 2)
+        int parallelism = thread_pool::global_max_parallelism();
+        print_info("Test System # Max Parallelism: %d\n", parallelism);
+        if (parallelism <= 2)
         {
-            // if the system doesn't have enough cores, the overhead should be minimal
+            // if the system doesn't have enough parallelism, the overhead should be minimal
             AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.005);
         }
         else
         {
             AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.001);
-            
         }
+
+        print_info("Global Thread Pool idle tasks: %d\n", thread_pool::global().idle_tasks());
+        print_info("Global Thread Pool active tasks: %d\n", thread_pool::global().active_tasks());
     }
 
     TestCase(parallel_foreach)

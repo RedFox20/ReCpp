@@ -317,19 +317,33 @@ namespace rpp
         static thread_pool& global();
 
         thread_pool();
+
         /**
-         * @param maxParallelism @see set_max_for_parallelism
+         * @param max_parallelism Sets the max number of concurrent tasks in parallel_for
+         * @see set_max_parallelism
          */
-        thread_pool(int maxParallelism);
+        explicit thread_pool(int max_parallelism);
         ~thread_pool() noexcept;
         NOCOPY_NOMOVE(thread_pool)
         
         /**
          * This sets the maximum number of concurrent tasks in parallel_for.
-         * The default value is thread_pool::physical_cores(),
+         * The default value is thread_pool::global_max_parallelism(),
          * however you can adjust this to fit your specific use cases
          */
-        void set_max_for_parallelism(int maxParallelism) noexcept;
+        void set_max_parallelism(int max_parallelism) noexcept;
+
+        /** @return Max number of concurrent tasks of this thread pool */
+        int max_parallelism() const { return MaxParallelism; }
+
+        /**
+         * Sets the max parallelism for the global thread pool
+         * @see set_max_parallelism
+         */
+        static void set_global_max_parallelism(int max_parallelism);
+
+        /** @return Current Max number of concurrent tasks of the global thread pool */
+        static int global_max_parallelism();
 
         // number of thread pool Tasks that are currently running
         int active_tasks() noexcept;
@@ -392,9 +406,6 @@ namespace rpp
 
         // runs a generic parallel task
         pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept;
-
-        /** @return the number of physical cores */
-        static int physical_cores();
 
         /**
          * Enables tracing of parallel task calls. This makes it possible
