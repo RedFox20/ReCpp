@@ -360,7 +360,7 @@ namespace rpp
     
     void thread_pool::set_global_max_parallelism(int max_parallelism)
     {
-        global().MaxParallelism = std::max<int>(1, max_parallelism);
+        global().MaxParallelism = max_parallelism < 1 ? 1 : max_parallelism;
     }
 
     int thread_pool::global_max_parallelism()
