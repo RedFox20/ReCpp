@@ -62,10 +62,10 @@ namespace rpp
             {
             #if _MSC_VER
                 std::string name = "Local\\RppTestsState_"s + rpp::to_string(GetCurrentProcessId());
-                handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
+                handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
                 if (!handle)
                 {
-                    handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+                    handle = CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
                                                0, sizeof(shared), name.c_str());
                     if (handle == nullptr)
                     {
