@@ -579,6 +579,18 @@ namespace rpp
         }
     }
 
+    /**
+     * Valid test arguments:
+     * "test_mytest"  enables test with exact match
+     * "-test_mytest" disables test with exact match
+     * "mytest"     enables test with loose match
+     * "-mytest"    disables test with loose match
+     * "mytest.mycasefilter"  enables specific test.case
+     * "-mytest.mycasefilter" disable specific test.case
+     * "*" match all tests  
+     * "mytest.*" match mytest and all cases
+     * "math -math.numeric" enable all math tests except numeric 
+     */
     static void select_tests_from_args(const std::vector<strview>& args)
     {
         // if arg is provided, we assume they are:
@@ -590,13 +602,11 @@ namespace rpp
             strview testName = arg.next('.');
             strview specific = arg.next('.');
 
-            bool enableTest = testName[0] != '-';
-            if (!enableTest) {
+            bool disableTest = false;
+            if (testName[0] == '-')
+            {
+                disableTest = true;
                 testName.chomp_first();
-            }
-            else {
-                enableTest = !testName.starts_with("no:");
-                if (!enableTest) testName.skip(3);
             }
 
             const bool exactMatch = testName.starts_with("test_");
@@ -612,8 +622,8 @@ namespace rpp
                     (!exactMatch && t.name.find(testName)))
                 {
                     t.case_filter = specific;
-                    if (enableTest) enabled.insert(t.name);
-                    else            disabled.insert(t.name);
+                    if (disableTest) disabled.insert(t.name);
+                    else              enabled.insert(t.name);
                     match = true;
                     break;
                 }
