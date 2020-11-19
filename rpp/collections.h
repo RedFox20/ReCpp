@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <numeric>
 #include <algorithm> // std::sort
+#include <stdexcept>
 
 namespace rpp
 {
