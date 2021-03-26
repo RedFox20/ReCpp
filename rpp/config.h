@@ -84,8 +84,14 @@
 #endif
 
 #ifndef NODISCARD
-#  if __has_cpp_attribute(nodiscard)
+#  if __cplusplus >= 201500
 #    define NODISCARD [[nodiscard]]
+#  elif _MSC_VER > 1916
+#    if __has_cpp_attribute(nodiscard)
+#      define NODISCARD [[nodiscard]]
+#    else
+#      define NODISCARD
+#    endif
 #  else
 #    define NODISCARD
 #  endif
