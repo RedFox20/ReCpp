@@ -276,8 +276,10 @@ TestImpl(test_sockets)
         print_info("remote: closing down\n");
     }
 
-    // 65536 is the typical localhost MTU for datagrams
-    static constexpr int TransmitSize = 65536;
+    // localhost MTU size is unreliable, 65536 is very common,
+    // but it can easily not be the case on some Windows machines
+    // Use a relatively small amount which should always go through
+    static constexpr int TransmitSize = 32768;
 
     TestCase(transmit_data)
     {
@@ -286,7 +288,7 @@ TestImpl(test_sockets)
         Socket server = listen(14447);
         std::thread remote([=] { this->transmitting_remote(14447); });
         Socket client = accept(server);
-        client.set_rcv_buf_size(TransmitSize*2);
+        client.set_rcv_buf_size(TransmitSize);
 
         for (int i = 0; i < 20; ++i)
         {
