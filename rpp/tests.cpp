@@ -152,6 +152,8 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////
 
+    static test::test_func* g_current_test_func;
+
     test::test(strview name) : name{ name } {}
     test::~test() = default;
 
@@ -160,27 +162,24 @@ namespace rpp
     static void console(ConsoleColor color, const char* str, int len)
     {
     #if _WIN32
-        static HANDLE winstd = GetStdHandle(STD_OUTPUT_HANDLE);
-        static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
-        static const WORD colormap[] = {
-            FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE, // Default
-            FOREGROUND_GREEN, // dark green
-            FOREGROUND_RED | FOREGROUND_GREEN, // dark yellow
-            FOREGROUND_RED, // dark red
+        FILE* cout = color == Red ? stderr : stdout;
+
+        static constexpr const char* colors[] = {
+            "\x1b[0m",  // clears all formatting
+            "\x1b[32m", // green
+            "\x1b[33m", // yellow
+            "\x1b[31m", // red
         };
-
-        HANDLE winout = color == Red ? winerr : winstd;
-        FILE*  cout   = color == Red ? stderr : stdout;
-
         static std::mutex consoleSync;
         {
             std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
             if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
-            SetConsoleTextAttribute(winout, colormap[color]);
-            fwrite(str, size_t(len), 1, cout); // fwrite to sync with unix-like shells
-            SetConsoleTextAttribute(winout, colormap[Default]);
+            fwrite(colors[color], strlen(colors[color]), 1, cout);
+            fwrite(str, size_t(len), 1, cout);
+            fwrite(colors[Default], strlen(colors[Default]), 1, cout);
         }
+
         fflush(cout); // flush needed for proper sync with unix-like shells
     #elif __ANDROID__
         int priority = 0;
@@ -200,7 +199,7 @@ namespace rpp
 
         if (isTerminal)
         {
-            static const char* colors[] = {
+            static constexpr const char* colors[] = {
                 "\x1b[0m",  // clears all formatting
                 "\x1b[32m", // green
                 "\x1b[33m", // yellow
@@ -276,19 +275,31 @@ namespace rpp
         }
     }
 
+    void test::add_message(int type, const char* msg, int len)
+    {
+        if (g_current_test_func)
+            g_current_test_func->messages.emplace_back(test::message{type, {msg, msg+len}});
+    }
+
     void test::print_error(const char* fmt, ...)
     {
-        LogTestLabel( safe_vsnprintf_msg_len(fmt); console(Red, msg, len) );
+        safe_vsnprintf_msg_len(fmt);
+        LogTestLabel( console(Red, msg, len) );
+        add_message(2, msg, len);
     }
 
     void test::print_warning(const char* fmt, ...)
     {
-        LogTestLabel( safe_vsnprintf_msg_len(fmt); console(Yellow, msg, len) );
+        safe_vsnprintf_msg_len(fmt);
+        LogTestLabel( console(Yellow, msg, len););
+        add_message(1, msg, len);
     }
 
     void test::print_info(const char* fmt, ...)
     {
-        LogTestLabel( safe_vsnprintf_msg_len(fmt); console(Default, msg, len) );
+        safe_vsnprintf_msg_len(fmt);
+        LogTestLabel( console(Default, msg, len); );
+        add_message(0, msg, len);
     }
 
     static ConsoleColor SeverityToColor(LogSeverity severity)
@@ -410,6 +421,17 @@ namespace rpp
             {
                 std::string run = std::to_string(numTestsFailed) + "/" + std::to_string(numTestsRun);
                 consolef(Red,   "TEST %-32s  %-5s  [FAILED]\n", name.str, run.c_str());
+                for (int i = 0; i < test_count; ++i) {
+                    const test_func& test = test_funcs[i];
+                    if (test.success) continue;
+                    consolef(Red, "FAIL %s::%s\n", name.str, test.name.str);
+                    for (const test::message& m : test.messages) {
+                        ConsoleColor c = Default;
+                        if      (m.type == 1) c = Yellow;
+                        else if (m.type == 2) c = Red;
+                        console(c, m.msg.c_str(), (int)m.msg.size()); 
+                    }
+                }
             }
         }
 
@@ -426,7 +448,8 @@ namespace rpp
             consolef(Yellow, "%s::%s\n", name.str, test.name.str);
         }
 
-        current_func = &test; // TODO: thread safety?
+        test.success = false;
+        g_current_test_func = current_func = &test; // TODO: thread safety?
         int before = results.asserts_failed;
         try
         {
@@ -453,9 +476,12 @@ namespace rpp
                                      name.str, test.name.str, e.what());
             }
         }
-        current_func = nullptr; // TODO: thread safety?
+        
+        g_current_test_func =current_func = nullptr; // TODO: thread safety?
+
         int totalFailures = results.asserts_failed - before;
-        return totalFailures <= 0;
+        test.success = totalFailures <= 0;
+        return test.success;
     }
 
     void test::sleep(int millis)
@@ -683,7 +709,7 @@ namespace rpp
                                results.tests_failed, numTests, failed);
             for (const test_failure& f : results.failures)
             {
-                if (f.line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
+                if (f.line) consolef(Red, "    %s(%d)  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
                 else        consolef(Red, "    %s::%s: %s\n",    f.testname.data(), f.testcase.data(), f.message.data());
             }
             consolef(Default, "\n");

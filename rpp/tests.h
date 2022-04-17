@@ -46,6 +46,7 @@ namespace rpp
     struct RPPAPI test
     {
         struct lambda_base { test* self; };
+        struct message { int type; std::string msg; };
         struct test_func
         {
             strview name;
@@ -53,6 +54,8 @@ namespace rpp
             void (lambda_base::*func)() = nullptr;
             size_t expectedExType = 0;
             bool autorun = true;
+            bool success = false;
+            std::vector<message> messages;
         };
 
         strview name;
@@ -72,6 +75,7 @@ namespace rpp
         void assert_failed_custom(const char* fmt, ...);
     private:
         void add_assert_failure(const char* file, int line, const char* msg, int len);
+        static void add_message(int type, const char* msg, int len);
     public:
         static void print_error(const char* fmt, ...);
         static void print_warning(const char* fmt, ...);
