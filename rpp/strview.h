@@ -121,12 +121,13 @@ namespace rpp
 
     /**
      * C-locale specific, simplified ftoa() that prints pretty human-readable floats
-     * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough.
-     * @param f Float value to convert to string
+     * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough for Float/Double.
+     * @param f Float/Double value to convert to string
+     * @param maxDecimals Maximum number of decimal digits to output, default=6
      * @return Length of the string
      */
-    RPPAPI int _tostring(char* buffer, double f) noexcept;
-    inline int _tostring(char* buffer, float f) noexcept { return _tostring(buffer, (double)f); }
+    RPPAPI int _tostring(char* buffer, double f, int maxDecimals = 6) noexcept;
+    inline int _tostring(char* buffer, float f, int maxDecimals = 6) noexcept { return _tostring(buffer, (double)f, maxDecimals); }
 
 
     /**

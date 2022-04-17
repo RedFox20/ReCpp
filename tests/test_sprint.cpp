@@ -121,7 +121,7 @@ TestImpl(test_sprint)
         
         TempFILE printed;
         println(printed.out, ptrs);
-        AssertEqual(printed.text(), "{ \n  *{1.1}, \n  *{2.2}, \n  *{3.399999}\n }\n");
+        AssertEqual(printed.text(), "{ \n  *{1.1}, \n  *{2.2}, \n  *{3.4}\n }\n");
     }
 
     TestCase(println_unordered_map)
@@ -150,7 +150,7 @@ TestImpl(test_sprint)
         sb.write(x, y, z);
 
         //println("float_format:", sb.view());
-        AssertThat(sb.view(), "-0.1708;-2.001199;0.995899");
+        AssertThat(sb.view(), "-0.1708;-2.0012;0.9959");
     }
 
     TestCase(big_doubles)

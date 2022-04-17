@@ -638,17 +638,18 @@ namespace rpp
         return intPart;
     }
 
-    int _tostring(char* buffer, double f) noexcept
+    int _tostring(char* buffer, double f, int maxDecimals) noexcept
     {
         //// @todo Implement scientific notation?
         if (isnan(f)) {
             buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
             return 3;
         }
-        
+
         // we need ceil and floor for handling -DBL_MAX edge case, or -2.0119 edge case
-        double i = f < -0.0 ? ceil(f) : floor(f);
-        double g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
+        // if decimals=0 the float is rounded
+        double i = maxDecimals == 0 ? round(f)
+                 : f < -0.0 ? ceil(f) : floor(f);
         uint64 absIntegral = (int64)abs(i);
 
         char* end = buffer;
@@ -656,21 +657,39 @@ namespace rpp
             *end++ = '-';
         }
         end += _tostring(end, absIntegral);
-        
-        if (g != 0.0) { // do we have a fraction ?
-            double cmp = 0.00001; // 6 decimal places max
-            *end++ = '.'; // place the fraction mark
-            double x = g; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
-            for (;;) {
-                x *= 10;
-                int64 ix = (int64)x;
-                *end++ = '0' + (ix % 10);
-                x -= ix;
-                if (x < cmp) // break from 0.750000011 cases
-                    break;
-                cmp *= 10.0;
+
+        if (maxDecimals > 0) {
+            double g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
+            if (g != 0.0) { // do we have a fraction ?
+                // moving epsilon which has to be slightly smaller than maxDecimals
+                double epsilon = 0.001;
+                for (int d = 0; d < maxDecimals; ++d) {
+                    epsilon *= 0.1;
+                }
+                *end++ = '.'; // place the fraction mark
+                double x = g; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
+                for (int d = 0; d < maxDecimals; ++d) {
+                    x *= 10;
+                    int64 ix = (int64)x;
+                    x -= ix;
+
+                    // CUSTOM ROUNDING RULES:
+                    // handle case of 0.199999 -> 1.99999 -> int(1), but should be int(2)
+                    if (1.0 > x && x > 0.9999) {
+                        int64 ix2 = (int64)round(x);
+                        ix += ix2;
+                        x -= ix2;
+                    }
+
+                    *end++ = '0' + (ix % 10);
+
+                    if (x < epsilon) // break from 0.750000011 cases
+                        break;
+                    epsilon *= 10.0;
+                }
             }
         }
+
         *end = '\0'; // null-terminate
         return (int)(end - buffer); // length of the string
     }

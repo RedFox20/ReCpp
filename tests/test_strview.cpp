@@ -169,4 +169,46 @@ TestImpl(test_strview)
         AssertThat(y, true);
     }
 
+    std::string toString(double f, int maxDecimals) {
+        char buf[32];
+        return std::string{buf, buf + _tostring(buf, f, maxDecimals)};
+    }
+
+    TestCase(tostring_float)
+    {
+        AssertThat(toString(+0.199999, 6), "0.2");
+        AssertThat(toString(-0.199999, 6), "-0.2");
+        AssertThat(toString(+0.099999, 6), "0.1");
+        AssertThat(toString(-0.099999, 6), "-0.1");
+        AssertThat(toString(+100.1, 6), "100.1");
+        AssertThat(toString(+0.05, 6), "0.05");
+        AssertThat(toString(-0.05, 6), "-0.05");
+        AssertThat(toString(-0.17080, 6), "-0.1708");
+        AssertThat(toString(-2.00120, 6), "-2.0012");
+        AssertThat(toString(+0.99590, 6), "0.9959");
+        AssertThat(toString(+0.16, 6), "0.16");
+        AssertThat(toString(+4.8418443193907041e+30, 6), "9223372036854775808");
+        AssertThat(toString(-4.8418443193907041e+30, 6), "-9223372036854775808");
+        AssertThat(toString(+DBL_MAX, 6), "9223372036854775808");
+        AssertThat(toString(-DBL_MAX, 6), "-9223372036854775808");
+        AssertThat(toString(+DBL_MIN, 6), "0.0");
+        AssertThat(toString(-DBL_MIN, 6), "-0.0");
+    }
+
+    TestCase(tostring_float_precision)
+    {
+        // NOTE: if decimals=0 the float is rounded
+        AssertThat(toString(+100.999999, 0), "101");
+        AssertThat(toString(-100.999999, 0), "-101");
+        AssertThat(toString(+100.123456, 0), "100");
+        AssertThat(toString(-100.123456, 0), "-100");
+
+        AssertThat(toString(+100.123456, 1), "100.1");
+        AssertThat(toString(-100.123456, 1), "-100.1");
+        AssertThat(toString(+100.123456, 2), "100.12");
+        AssertThat(toString(-100.123456, 2), "-100.12");
+        AssertThat(toString(+100.123456, 3), "100.123");
+        AssertThat(toString(-100.123456, 3), "-100.123");
+    }
+
 };
