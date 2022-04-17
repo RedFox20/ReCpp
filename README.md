@@ -1,17 +1,19 @@
 # ReCpp [![Build Status](https://travis-ci.org/RedFox20/ReCpp.svg?branch=master)](https://travis-ci.org/RedFox20/ReCpp) [![Build status](https://ci.appveyor.com/api/projects/status/atrsrssb19cgwioy?svg=true)](https://ci.appveyor.com/project/RedFox20/recpp) [![CircleCI](https://circleci.com/gh/RedFox20/ReCpp.svg?style=svg)](https://circleci.com/gh/RedFox20/ReCpp)
 ## Reusable Standalone C++ Libraries and Modules
 
-The goal of this project is to provide C++14 programmers with a small set of reusable and functional C++14 libraries. Each module is stand-alone and does not depend on other modules besides `strview` from this package. Each module is performance oriented and provides the least amount of overhead possible.
+The goal of this project is to provide C++17 developers with convenient and minimal cross-platform C++ utility libraries.
+All of the modules are heavily performance oriented and provides the least amount of overhead possible.
 
-Currently supported and tested platforms are VC++2017 on Windows and Clang 3.8 on Ubuntu,iOS 
+Currently supported and tested platforms are VC++,Clang on Windows and GCC,Clang on Ubuntu,iOS,Android
 
-### [rpp/strview.h](rpp/strview.h) - A lightweight and powerful string view class
-This is definitely one of the core classes of ReCpp. It's the only overarching dependency because of its simplicity
-and usefulness. Currently only char* strview is supported because all the games and applications where strview has
-been used rely on UTF-8.
+### [rpp/strview.h](rpp/strview.h) - A lightweight and powerful string utilities
+An extremely fast and powerful set of string-parsing utilities. Includes fast tokenization, blazing fast number parsers,
+extremely fast number formatters, and not to mention all the basic string search functions and utilities like `starts_with()/contains()/trim()/to_lower()/to_upper()/concat()/replace()/split()/next()`, all optimized to their absolute limits.
 
-The string view header also provides basic example parsers such as `line_parser`, `keyval_parser` and `bracket_parser`.
-It's extremely easy to create a blazing fast parser with `rpp::strview`
+This `strview` module works on UTF-8 strings, and since `std::codecvt_utf8` already exists, there is no plan to add a Wide strview.
+
+The string view header also provides examples of basic parsers such as `line_parser`, `keyval_parser` and `bracket_parser`.
+It's extremely easy to create blazing fast parsers with `rpp::strview`
 
 TODO: Add code examples on how to use strview for parsing
 
