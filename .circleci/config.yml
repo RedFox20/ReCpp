@@ -10,8 +10,8 @@ jobs:
       - run: pipenv install mama
       - run: make configure-clang6-1404
       - run: make configure-cmake
-      - run: mama build clang
-      - run: mama test="--verbosity=2"
+      - run: pipenv run mama build clang
+      - run: pipenv run mama test="--verbosity=2"
 workflows:
   version: 2
   build_all:
