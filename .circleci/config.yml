@@ -5,9 +5,10 @@ jobs:
       - image: cimg/python:3.10
     steps:
       - checkout
+      - run: sudo pip install pipenv
+      - run: pipenv install mama
       - run: make configure-clang6-1404
       - run: make configure-cmake
-      - run: sudo python3 -m pip install mama
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: mama build clang
       - run: mama test="--verbosity=2"
