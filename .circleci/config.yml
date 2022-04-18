@@ -5,10 +5,11 @@ jobs:
       - image: cimg/python:3.10
     steps:
       - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
       - run: make configure-clang6-1404
       - run: make configure-cmake
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: mama build clang
       - run: mama test="--verbosity=2"
 workflows:
