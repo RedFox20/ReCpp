@@ -80,15 +80,22 @@ configure-clang5-1604: download-clang5-1604 install-clang5
 
 
 /opt/pip: configure-pip
-configure-pip: configure-pip3
+configure-pip: configure-pip36
+configure-pip310:
+	sudo mkdir -p /opt/pip
+	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
+	python3 -V
+	sudo python3.10 /opt/pip/get-pip.py
 configure-pip37:
 	sudo mkdir -p /opt/pip
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
+	python3 -V
 	sudo python3.7 /opt/pip/get-pip.py
-configure-pip3:
+configure-pip36:
 	sudo mkdir -p /opt/pip
 	sudo wget https://bootstrap.pypa.io/get-pip.py -P /opt/pip
-	sudo python3 /opt/pip/get-pip.py
+	python3 -V
+	sudo python3.6 /opt/pip/get-pip.py
 
 
 /opt/cmake: configure-cmake
