@@ -1609,20 +1609,34 @@ namespace rpp
         float radius;
         BoundingSphere() : center{0.0f, 0.0f, 0.0f}, radius{0.0f} {}
         BoundingSphere(const Vector3& center, float radius) : center{center}, radius{radius} {}
-        BoundingSphere(const BoundingBox& bbox) : center{bbox.center()}, radius{bbox.radius()} {}
+
+        /**
+         * Calculates the bounding sphere from an arbitrary vertex array
+         * @note Position data must be the first Vector3 element!
+         * @param vertexData Array of vertices
+         * @param vertexCount Number of vertices in vertexData
+         * @param stride The step in bytes(!!) to the next element
+         * 
+         * Example:
+         * @code
+         *     vector<Vertex3UVNorm> vertices;
+         *     auto s = BoundingSphere::create((Vector3*)vertices.data(), vertices.size(), sizeof(Vertex3UVNorm));
+         * @endcode
+         */
+        static BoundingSphere create(const Vector3* vertexData, int vertexCount, int stride) noexcept;
 
         // calculates the bounding sphere from basic bounding box of the point cloud
         static BoundingSphere create(const std::vector<Vector3>& points) noexcept
         {
-            return { BoundingBox::create(points) };
+            return create(points.data(), (int)points.size(), sizeof(Vector3));
         }
         template<class Vertex> static BoundingSphere create(const std::vector<Vertex>& vertices)
         {
-            return { BoundingBox::create(vertices) };
+            return create((Vector3*)vertices.data(), (int)vertices.size(), sizeof(Vertex));
         }
         template<class Vertex> static BoundingSphere create(const Vertex* vertices, int vertexCount)
         {
-            return { BoundingBox::create(vertices, vertexCount) };
+            return create((Vector3*)vertices, vertexCount, sizeof(Vertex));
         }
     };
 

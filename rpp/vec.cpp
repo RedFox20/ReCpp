@@ -1812,6 +1812,34 @@ namespace rpp
         return { min, max };
     }
 
+    BoundingSphere BoundingSphere::create(const Vector3* vertexData, int vertexCount, int stride) noexcept
+    {
+        if (vertexCount == 0)
+            return { Vector3::Zero(), 0.0f };
+
+        Vector3 min = vertexData[0];
+        Vector3 max = min;
+        for (int i = 1; i < vertexCount; ++i)
+        {
+            vertexData = (Vector3*)((byte*)vertexData + stride);
+
+            const Vector3 pos = *vertexData;
+            if      (pos.x < min.x) min.x = pos.x;
+            else if (pos.x > max.x) max.x = pos.x;
+            if      (pos.y < min.y) min.y = pos.y;
+            else if (pos.y > max.y) max.y = pos.y;
+            if      (pos.z < min.z) min.z = pos.z;
+            else if (pos.z > max.z) max.z = pos.z;
+        }
+
+        Vector3 center = lerp(0.5f, min, max);
+        float rx = rpp::max(abs(center.x - min.x), abs(center.x - max.x));
+        float ry = rpp::max(abs(center.y - min.y), abs(center.y - max.y));
+        float rz = rpp::max(abs(center.z - min.z), abs(center.z - max.z));
+        float radius = max3(rx, ry, rz);
+        return { center, radius };
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////
 
     // Thank you!
