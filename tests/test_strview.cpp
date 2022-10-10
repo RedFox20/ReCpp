@@ -1,5 +1,9 @@
 #include <rpp/tests.h>
 using namespace rpp;
+#include <limits>
+
+constexpr auto MAX_DOUBLE = std::numeric_limits<double>::max();
+constexpr auto MIN_DOUBLE = std::numeric_limits<double>::min();
 
 TestImpl(test_strview)
 {
@@ -189,10 +193,10 @@ TestImpl(test_strview)
         AssertThat(toString(+0.16, 6), "0.16");
         AssertThat(toString(+4.8418443193907041e+30, 6), "9223372036854775808");
         AssertThat(toString(-4.8418443193907041e+30, 6), "-9223372036854775808");
-        AssertThat(toString(+DBL_MAX, 6), "9223372036854775808");
-        AssertThat(toString(-DBL_MAX, 6), "-9223372036854775808");
-        AssertThat(toString(+DBL_MIN, 6), "0.0");
-        AssertThat(toString(-DBL_MIN, 6), "-0.0");
+        AssertThat(toString(+MAX_DOUBLE, 6), "9223372036854775808");
+        AssertThat(toString(-MAX_DOUBLE, 6), "-9223372036854775808");
+        AssertThat(toString(+MIN_DOUBLE, 6), "0.0");
+        AssertThat(toString(-MIN_DOUBLE, 6), "-0.0");
     }
 
     TestCase(tostring_float_precision)

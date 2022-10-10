@@ -4,6 +4,7 @@
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
+#include <charconv> // std::to_chars
 
 #if DEBUG || _DEBUG || RPP_DEBUG
 #define RPP_SOCKETS_DBG 1
@@ -353,7 +354,12 @@ namespace rpp
         inwin32(InitWinSock());
 
         if (inet_ntop(addrfamily_int(Family), (void*)&Addr4, dst, maxCount)) {
-            return Port ? snprintf(dst, maxCount, "%s:%d", dst, Port) : (int)strlen(dst);
+            int len = (int)strlen(dst);
+            if (Port) { // "host:port"
+                dst[len++] = ':';
+                std::to_chars(dst+len, dst+maxCount, Port);
+            }
+            return len;
         }
         return 0;
     }
@@ -370,7 +376,11 @@ namespace rpp
     }
     void ipaddress::clear() noexcept
     {
-        memset(this, 0, sizeof(*this));
+        Family = AF_DontCare;
+        Port = 0;
+        new (&Addr6) char[16]();
+        FlowInfo = 0;
+        ScopeId = 0;
     }
     int ipaddress::port() const noexcept
     {
