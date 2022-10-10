@@ -219,8 +219,8 @@ namespace rpp
     };
 
     ipaddress::ipaddress() noexcept
+        : Family{AF_DontCare}, Port{0}, Addr6{}, FlowInfo{0}, ScopeId{0}
     {
-        memset(this, 0, sizeof(*this));
     }
     ipaddress::ipaddress(address_family af) noexcept
         : Family{af}, Port{0}, FlowInfo{0}, ScopeId{0}
