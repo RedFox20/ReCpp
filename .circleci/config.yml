@@ -8,7 +8,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
-      - run: make configure-clang6-1404
+      - run: sudo apt-get install clang-9 -y --install-suggests
       - run: make configure-cmake
       - run: pipenv run mama build clang
       - run: pipenv run mama test="--verbosity=2"
