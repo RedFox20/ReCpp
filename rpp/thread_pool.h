@@ -233,11 +233,14 @@ namespace rpp
         std::mutex m;
         std::condition_variable cv;
         std::thread th;
+        char name[32];
+
         rpp::task_delegate<void()> genericTask;
         rpp::action<int, int> rangeTask;
         int rangeStart  = 0;
         int rangeEnd    = 0;
         float maxIdleTime = 15;
+
         std::string trace;
         std::exception_ptr error;
         volatile bool taskRunning = false; // an active task is being executed

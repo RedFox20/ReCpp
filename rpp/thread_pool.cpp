@@ -101,7 +101,7 @@ namespace rpp
         rangeEnd     = end;
 
         if (killed) {
-            TaskDebug("resurrecting task");
+            TaskDebug("resurrecting %s", name);
             killed = false;
             (void)join_or_detach(finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
@@ -128,7 +128,7 @@ namespace rpp
         rangeEnd     = 0;
 
         if (killed) {
-            TaskDebug("resurrecting task");
+            TaskDebug("resurrecting %s", name);
             killed = false;
             (void)join_or_detach(finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
@@ -182,7 +182,7 @@ namespace rpp
             return join_or_detach(finished);
         }
         { std::unique_lock<std::mutex> lock{m};
-            TaskDebug("killing task");
+            TaskDebug("%s", name);
             killed = true;
         }
         cv.notify_all();
@@ -195,13 +195,22 @@ namespace rpp
         if (th.joinable())
         {
             if (result == timeout)
+            {
+                TaskDebug("detaching %s", name);
                 th.detach();
+            }
             // can't join if we're on the same thread as the task itself
             // (can happen during exit())
             else if (std::this_thread::get_id() == th.get_id())
+            {
+                TaskDebug("detaching in same thread %s", name);
                 th.detach();
+            }
             else
+            {
+                TaskDebug("joining %s", name);
                 th.join();
+            }
         }
         return result;
     }
@@ -209,10 +218,9 @@ namespace rpp
     void pool_task::run() noexcept
     {
         static int pool_task_id;
-        char name[32];
         snprintf(name, sizeof(name), "rpp_task_%d", pool_task_id++);
         set_this_thread_name(name);
-        //TaskDebug("%s start", name);
+        TaskDebug("%s start", name);
         for (;;)
         {
             try
@@ -222,7 +230,7 @@ namespace rpp
                 
                 // consume the Tasks atomically
                 { std::unique_lock<std::mutex> lock{m};
-                    //TaskDebug("%s wait for task", name);
+                    TaskDebug("%s wait for task", name);
                     if (!wait_for_task(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
                         killed = true;

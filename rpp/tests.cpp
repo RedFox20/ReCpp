@@ -1,5 +1,4 @@
 #include "tests.h"
-#include <chrono>
 #include <memory>
 #include <mutex>
 #include <unordered_set>
@@ -727,13 +726,14 @@ namespace rpp
 
     int test::run_tests(int argc, char* argv[])
     {
-    #if _WIN32 && _MSC_VER
-        #if _CRTDBG_MAP_ALLOC  
+        #if _WIN32 && _MSC_VER && _CRTDBG_MAP_ALLOC
             _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
             _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
         #endif
-    #endif
-    
+        #if __GNUC__ // for GCC, set a verbose terminate() handler
+            std::set_terminate(__gnu_cxx::__verbose_terminate_handler);
+        #endif
+
         // filter out invalid empty arguments
         std::vector<strview> args;
         for (int iarg = 1; iarg < argc; ++iarg)
@@ -750,8 +750,18 @@ namespace rpp
         else
             enable_all_autorun_tests();
 
-        test_results testResults = run_all_marked_tests();
-        int returnCode = print_final_summary(testResults);
+        test_results results;
+        try
+        {
+            results = run_all_marked_tests();
+        }
+        catch (const std::exception& e)
+        {
+            consolef(Red, "Unhandled exception while running tests: %s\n", e.what());
+            return -1;
+        }
+
+        int returnCode = print_final_summary(results);
         #if _WIN32 && _MSC_VER
             #if _CRTDBG_MAP_ALLOC
                 _CrtDumpMemoryLeaks();

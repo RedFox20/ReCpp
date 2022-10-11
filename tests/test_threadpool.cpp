@@ -114,7 +114,7 @@ TestImpl(test_threadpool)
     {
         auto numbers = std::vector<int>(81'234'567);
         int* ptr = numbers.data();
-        int  len = (int)numbers.size();
+        volatile int len = (int)numbers.size();
 
         parallel_for(0, len, 0, [&](int start, int end) {
             for (int i = start; i < end; ++i)
@@ -155,7 +155,7 @@ TestImpl(test_threadpool)
         //    sum += ptr[index];
         //});
         double parallel_elapsed = timer1.elapsed();
-        print_info("ParallelFor  elapsed: %.3fs  result: %lld\n", parallel_elapsed, (long long)sum);
+        print_info("ParallelFor  elapsed: %.4fs  result: %lld\n", parallel_elapsed, (long long)sum);
         AssertThat((long long)sum, 3299527397221461LL);
 
         Timer timer2;
@@ -164,12 +164,17 @@ TestImpl(test_threadpool)
             sum2 += ptr[i];
         double serial_elapsed = timer2.elapsed();
 
-        print_info("Singlethread elapsed: %.3fs  result: %lld\n", serial_elapsed, (long long)sum2);
+        print_info("Singlethread elapsed: %.4fs  result: %lld\n", serial_elapsed, (long long)sum2);
         AssertThat((long long)sum2, 3299527397221461LL);
 
         int parallelism = thread_pool::global_max_parallelism();
         print_info("Test System # Max Parallelism: %d\n", parallelism);
-        if (parallelism <= 2)
+        if (parallelism == 1)
+        {
+            // System has no parallelism at all, so there is going to be significant overhead!
+            AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.06);
+        }
+        else if (parallelism <= 2)
         {
             // if the system doesn't have enough parallelism, the overhead should be minimal
             AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.005);
@@ -246,6 +251,7 @@ TestImpl(test_threadpool)
 
         print_info("Waiting for pool tasks to die naturally...\n");
         ::sleep_for(0.5s);
+
         print_info("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 
