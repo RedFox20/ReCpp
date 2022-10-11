@@ -5,6 +5,7 @@
  */
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
+#include <cstdint> // uint32_t, etc
 #include <vector>  // access to std::vector and std::string
 #include <typeinfo>
 #include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
@@ -205,10 +206,46 @@ namespace rpp
         return true;
     }
 
-    template<class Expr, class Expected> inline bool are_equal(const Expr& expr, const Expected& expected)
+    struct Compare
     {
-        return expr == expected;
-    }
+        template<class Expr, class Expected> static bool eq(const Expr& expr, const Expected& expected)
+        {
+            return expr == expected;
+        }
+        static bool eq(unsigned int expr, int expected) { return expr == (unsigned int)expected; }
+        static bool eq(long unsigned int expr, int expected) { return expr == (long unsigned int)expected; }
+        static bool eq(long unsigned int expr, long int expected) { return expr == (long unsigned int)expected; }
+        static bool eq(long unsigned long expr, long long expected) { return expr == (long unsigned long)expected; }
+
+        template<class Expr, class Than> static bool gt(const Expr& expr, const Than& than)
+        {
+            return expr > than;
+        }
+        static bool gt(unsigned int expr, int than) { return expr > (unsigned int)than; }
+        static bool gt(long unsigned int expr, int than) { return expr > (long unsigned int)than; }
+        static bool gt(long unsigned int expr, long int than) { return expr > (long unsigned int)than; }
+        static bool gt(long unsigned long expr, long long than) { return expr > (long unsigned long)than; }
+
+        template<class Expr, class Than> static bool lt(const Expr& expr, const Than& than)
+        {
+            return expr < than;
+        }
+        static bool lt(unsigned int expr, int than) { return expr < (unsigned int)than; }
+        static bool lt(long unsigned int expr, int than) { return expr < (long unsigned int)than; }
+        static bool lt(long unsigned int expr, long int than) { return expr < (long unsigned int)than; }
+        static bool lt(long unsigned long expr, long long than) { return expr < (long unsigned long)than; }
+
+        template<class Expr, class Than> static bool lte(const Expr& expr, const Than& than)
+        {
+            return lt(expr, than) || eq(expr, than);
+        }
+
+        template<class Expr, class Than> static bool gte(const Expr& expr, const Than& than)
+        {
+            return gt(expr, than) || eq(expr, than);
+        }
+    };
+
 
 #undef Assert
 #undef AssertTrue
@@ -246,7 +283,7 @@ namespace rpp
 #define AssertThat(expr, expected) do { \
     const auto& __expr   = expr;           \
     const auto& __expect = expected;       \
-    if (!rpp::are_equal(__expr,__expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
+    if (!rpp::Compare::eq(__expr, __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
 }while(0)
 
 #define AssertEqual AssertThat
@@ -261,31 +298,31 @@ namespace rpp
 #define AssertNotEqual(expr, mustNotEqual) do { \
     const auto& __expr    = expr;         \
     const auto& __mustnot = mustNotEqual; \
-    if (rpp::are_equal(__expr, __mustnot)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
+    if (rpp::Compare::eq(__expr, __mustnot)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
 }while(0)
 
 #define AssertGreater(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr > __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); } \
+    if (!rpp::Compare::gt(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); } \
 }while(0)
 
 #define AssertLess(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr < __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); } \
+    if (!rpp::Compare::lt(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); } \
 }while(0)
 
 #define AssertGreaterOrEqual(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr >= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); } \
+    if (!rpp::Compare::gte(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); } \
 }while(0)
 
 #define AssertLessOrEqual(expr, than) do { \
     const auto& __expr = expr;            \
     const auto& __than = than;            \
-    if (!(__expr <= __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); } \
+    if (!rpp::Compare::lte(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); } \
 }while(0)
 
 #define TestImpl(testclass) struct testclass : public rpp::test
