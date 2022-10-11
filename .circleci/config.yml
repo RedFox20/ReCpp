@@ -8,12 +8,25 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
-      - run: sudo apt-get install clang-9 -y --install-suggests
+      - run: sudo apt-get install clang-12 -y --install-suggests
       - run: make configure-cmake
       - run: pipenv run mama build clang
+      - run: pipenv run mama test="--verbosity=2"
+  gcc:
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
+      - run: pipenv install mama
+      - run: sudo apt-get install gcc-10 -y --install-suggests
+      - run: make configure-cmake
+      - run: pipenv run mama build gcc
       - run: pipenv run mama test="--verbosity=2"
 workflows:
   version: 2
   build_all:
     jobs:
       - clang
+      - gcc
