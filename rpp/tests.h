@@ -205,6 +205,10 @@ namespace rpp
         return true;
     }
 
+    template<class Expr, class Expected> inline bool are_equal(const Expr& expr, const Expected& expected)
+    {
+        return expr == expected;
+    }
 
 #undef Assert
 #undef AssertTrue
@@ -242,7 +246,7 @@ namespace rpp
 #define AssertThat(expr, expected) do { \
     const auto& __expr   = expr;           \
     const auto& __expect = expected;       \
-    if (!(__expr == __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
+    if (!rpp::are_equal(__expr,__expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
 }while(0)
 
 #define AssertEqual AssertThat
@@ -257,7 +261,7 @@ namespace rpp
 #define AssertNotEqual(expr, mustNotEqual) do { \
     const auto& __expr    = expr;         \
     const auto& __mustnot = mustNotEqual; \
-    if (__expr == __mustnot) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
+    if (rpp::are_equal(__expr, __mustnot)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
 }while(0)
 
 #define AssertGreater(expr, than) do { \
