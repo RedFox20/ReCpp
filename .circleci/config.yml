@@ -8,7 +8,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
-      - run: sudo apt-get install clang-12 -y --install-suggests
+      - run: sudo apt-get install clang-12 -y
       - run: make configure-cmake
       - run: pipenv run mama build clang
       - run: pipenv run mama test="--verbosity=2"
@@ -20,7 +20,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
-      - run: sudo apt-get install gcc-10 -y --install-suggests
+      - run: sudo apt-get install gcc-10 -y
       - run: make configure-cmake
       - run: pipenv run mama build gcc
       - run: pipenv run mama test="--verbosity=2"
