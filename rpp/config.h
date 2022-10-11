@@ -1,5 +1,25 @@
 #pragma once 
 
+// MSVC++ with unknown standard lib
+#ifndef RPP_MSVC
+#  define RPP_MSVC _MSC_VER
+#endif
+
+// MSVC++ with VC standard libs
+#ifndef RPP_MSVC_WIN
+#  define RPP_MSVC_WIN (_WIN32 && _MSC_VER)
+#endif
+
+// GCC with unknown standard lib
+#ifndef RPP_GCC
+#  define RPP_GCC (__GNUC__ && !__clang__)
+#endif
+
+// Clang using GCC/LLVM standard libs
+#ifndef RPP_CLANG_LLVM
+#  define RPP_CLANG_LLVM (__GNUC__ && __clang__)
+#endif
+
 #ifndef RPPAPI
 #  if _MSC_VER
 #    define RPPAPI //__declspec(dllexport)
@@ -47,7 +67,7 @@
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE
-#  ifdef _MSC_VER
+#  if _MSC_VER
 #    define NOINLINE __declspec(noinline)
 #  else
 #    define NOINLINE __attribute__((noinline))
@@ -56,7 +76,7 @@
 
 //// @note Some strong hints that some functions are merely wrappers, so should be forced inline
 #ifndef FINLINE
-#  ifdef _MSC_VER
+#  if _MSC_VER
 #    define FINLINE __forceinline
 #  elif __APPLE__
 #    define FINLINE inline __attribute__((always_inline))

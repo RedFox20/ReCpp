@@ -280,10 +280,11 @@ TestImpl(test_file_io)
         print_info("temp_dir:    \"%s\"\n", temp_dir().c_str());
         print_info("home_dir:    \"%s\"\n", home_dir().c_str());
 
-        AssertThat(working_dir().back(), '/');
-        AssertThat(module_dir().back(), '/');
-        AssertThat(temp_dir().back(), '/');
-        AssertThat(home_dir().back(), '/');
+        const auto last = [](const std::string& s) -> char { return s.back(); };
+        AssertThat(last(working_dir()), '/');
+        AssertThat(last(module_dir()), '/');
+        AssertThat(last(temp_dir()), '/');
+        AssertThat(last(home_dir()), '/');
     }
 
 };

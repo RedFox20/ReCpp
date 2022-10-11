@@ -726,11 +726,11 @@ namespace rpp
 
     int test::run_tests(int argc, char* argv[])
     {
-        #if _WIN32 && _MSC_VER && _CRTDBG_MAP_ALLOC
+        #if RPP_MSVC_WIN && _CRTDBG_MAP_ALLOC
             _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
             _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
         #endif
-        #if __GNUC__ // for GCC, set a verbose terminate() handler
+        #if RPP_GCC // for GCC, set a verbose terminate() handler
             std::set_terminate(__gnu_cxx::__verbose_terminate_handler);
         #endif
 
