@@ -8,7 +8,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
-      - run: sudo apt-get install clang-12 -y
+      - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
       - run: pipenv run mama build clang
       - run: pipenv run mama test="--verbosity=2"
