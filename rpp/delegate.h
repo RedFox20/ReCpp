@@ -788,7 +788,8 @@ namespace rpp
                 ptr->capacity += 3;
                 if (int rem = ptr->capacity % 4)
                     ptr->capacity += 4 - rem;
-                auto* p = static_cast<container*>(realloc(ptr, sizeof(container) + sizeof(deleg) * (ptr->capacity - 1)));
+                auto* p = static_cast<container*>(realloc(reinterpret_cast<void*>(ptr), 
+                                                  sizeof(container) + sizeof(deleg) * (ptr->capacity - 1)));
                 if (!p) { std::terminate(); }
                 ptr = p;
             }
@@ -822,8 +823,10 @@ namespace rpp
                 if (data[i] == d)
                 {
                     int unshift = size - (i + 1);
-                    if (unshift > 0)
-                        memmove(&data[i], &data[i + 1], sizeof(deleg)*unshift); // unshift
+                    if (unshift > 0) {
+                        memmove(reinterpret_cast<void*>(&data[i]), reinterpret_cast<void*>(&data[i + 1]),
+                                sizeof(deleg)*unshift); // unshift
+                    }
                     --ptr->size;
                     return;
                 }

@@ -4,7 +4,8 @@
  * Distributed under MIT Software License
  * 
  */
-#include <shared_mutex>
+#include <shared_mutex> // shared_lock
+#include <mutex> // unique_lock
 #include <cassert>
 
 namespace rpp
