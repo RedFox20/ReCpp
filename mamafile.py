@@ -6,6 +6,10 @@ class ReCpp(mama.BuildTarget):
     def dependencies(self):
         pass
 
+    def configure(self):
+        if self.oclea:
+            self.add_cmake_options('BUILD_WITH_LIBDW=FALSE')
+
     def package(self):
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
         self.export_includes('.')  # So: #include <rpp/strview.h>
