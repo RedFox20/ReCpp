@@ -6,7 +6,7 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
@@ -18,7 +18,7 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
