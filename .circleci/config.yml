@@ -10,8 +10,8 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      - run: pipenv run mama build clang
-      - run: pipenv run mama test="--verbosity=2"
+      - run: pipenv run mama build clang verbose
+      - run: pipenv run mama clang verbose test="--verbosity=2"
   gcc:
     docker:
       - image: cimg/python:3.10
@@ -22,8 +22,8 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install gcc-10 -y
       - run: make configure-cmake
-      - run: pipenv run mama build gcc
-      - run: pipenv run mama test="--verbosity=2"
+      - run: pipenv run mama build gcc verbose
+      - run: pipenv run mama gcc verbose test="--verbosity=2"
 workflows:
   version: 2
   build_all:
