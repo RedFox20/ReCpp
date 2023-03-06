@@ -10,7 +10,7 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      - run: pipenv run mama build clang verbose
+      - run: pipenv run mama clang verbose build
       - run: pipenv run mama clang verbose test="--verbosity=2"
   gcc:
     docker:
@@ -20,9 +20,9 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev gdb
       - run: pipenv install mama
-      - run: sudo apt-get install gcc-10 -y
+      - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: pipenv run mama build gcc verbose
+      - run: pipenv run mama gcc verbose build
       - run: pipenv run mama gcc verbose test="--verbosity=2"
 workflows:
   version: 2
