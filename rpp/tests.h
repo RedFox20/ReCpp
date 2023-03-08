@@ -6,6 +6,7 @@
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
 #include <cstdint> // uint32_t, etc
+#include <cmath>   // fabs
 #include <vector>  // access to std::vector and std::string
 #include <typeinfo>
 #include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
@@ -222,6 +223,8 @@ namespace rpp
         static bool eq(long unsigned int expr, int expected) { return expr == (long unsigned int)expected; }
         static bool eq(long unsigned int expr, long int expected) { return expr == (long unsigned int)expected; }
         static bool eq(long unsigned long expr, long long expected) { return expr == (long unsigned long)expected; }
+        static bool eq(float expr, float expected) { return fabs(expr - expected) < FLT_EPSILON; }
+        static bool eq(double expr, double expected) { return fabs(expr - expected) < DBL_EPSILON; }
 
         template<class Expr, class Than> static bool gt(const Expr& expr, const Than& than)
         {

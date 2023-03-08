@@ -137,7 +137,8 @@ TestImpl(test_future)
             AssertThat(e.what(), "background_thread_exception_msg"s);
             return 42;
         },
-        [&](std::runtime_error) {
+        [&](std::runtime_error e) {
+            (void)e;
             return 21;
         }).get();
 
@@ -156,7 +157,8 @@ TestImpl(test_future)
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
-        [&](std::domain_error) {
+        [&](std::domain_error e) {
+            (void)e;
             return 21;
         },
         [&](std::runtime_error e) {
@@ -185,10 +187,12 @@ TestImpl(test_future)
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
-        [&](const SpecificError&) {
+        [&](const SpecificError& e) {
+            (void)e;
             return 1;
         },
-        [&](const std::range_error&) {
+        [&](const std::range_error& e) {
+            (void)e;
             return 2;
         },
         [&](const std::runtime_error& e) {
