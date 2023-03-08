@@ -56,31 +56,31 @@ TestImpl(test_debugging)
         AssertThat(log_output, "$ Log(8): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview', 42");
 
         LogWarning("Warn(0):");
-        AssertThat(log_output, "test_debugging.cpp:57 test_debug_api $ Warn(0):");
+        AssertThat(log_output, "test_debugging.cpp:58 test_debug_api $ Warn(0):");
 
         LogWarning("Warn(1): '%s'", a);
-        AssertThat(log_output, "test_debugging.cpp:60 test_debug_api $ Warn(1): 'string'");
+        AssertThat(log_output, "test_debugging.cpp:61 test_debug_api $ Warn(1): 'string'");
 
         LogWarning("Warn(2): '%s', '%s'", a, b);
-        AssertThat(log_output, "test_debugging.cpp:63 test_debug_api $ Warn(2): 'string', 'strview'");
+        AssertThat(log_output, "test_debugging.cpp:64 test_debug_api $ Warn(2): 'string', 'strview'");
 
         LogWarning("Warn(3): '%s', '%s', %d", a, b, c);
-        AssertThat(log_output, "test_debugging.cpp:66 test_debug_api $ Warn(3): 'string', 'strview', 42");
+        AssertThat(log_output, "test_debugging.cpp:67 test_debug_api $ Warn(3): 'string', 'strview', 42");
 
         LogWarning("Warn(4): '%s', '%s', %d, %.1f", a, b, c, d);
-        AssertThat(log_output, "test_debugging.cpp:69 test_debug_api $ Warn(4): 'string', 'strview', 42, 42.0");
+        AssertThat(log_output, "test_debugging.cpp:70 test_debug_api $ Warn(4): 'string', 'strview', 42, 42.0");
 
         LogWarning("Warn(5): '%s', '%s', %d, %.1f, `%c`", a, b, c, d, e);
-        AssertThat(log_output, "test_debugging.cpp:72 test_debug_api $ Warn(5): 'string', 'strview', 42, 42.0, `4`");
+        AssertThat(log_output, "test_debugging.cpp:73 test_debug_api $ Warn(5): 'string', 'strview', 42, 42.0, `4`");
 
         LogWarning("Warn(6): '%s', '%s', %d, %.1f, `%c`, '%s'", a, b, c, d, e, a);
-        AssertThat(log_output, "test_debugging.cpp:75 test_debug_api $ Warn(6): 'string', 'strview', 42, 42.0, `4`, 'string'");
+        AssertThat(log_output, "test_debugging.cpp:76 test_debug_api $ Warn(6): 'string', 'strview', 42, 42.0, `4`, 'string'");
 
         LogWarning("Warn(7): '%s', '%s', %d, %.1f, `%c`, '%s', '%s'", a, b, c, d, e, a, b);
-        AssertThat(log_output, "test_debugging.cpp:78 test_debug_api $ Warn(7): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview'");
+        AssertThat(log_output, "test_debugging.cpp:79 test_debug_api $ Warn(7): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview'");
 
         LogWarning("Warn(8): '%s', '%s', %d, %.1f, `%c`, '%s', '%s', %d", a, b, c, d, e, a, b, c);
-        AssertThat(log_output, "test_debugging.cpp:81 test_debug_api $ Warn(8): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview', 42");
+        AssertThat(log_output, "test_debugging.cpp:82 test_debug_api $ Warn(8): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview', 42");
     }
 
     //TestCase(log_except)

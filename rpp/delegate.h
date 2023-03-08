@@ -266,10 +266,14 @@ namespace rpp
             {
                 // store function as 'this' and call dummy class instance method
                 // which will cast 'this' into 'func_type'
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wcast-function-type"
+                #if __GNUG__ // G++
+                #  pragma GCC diagnostic push
+                #  pragma GCC diagnostic ignored "-Wcast-function-type"
+                #endif
                 dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
-                #pragma GCC diagnostic pop
+                #if __GNUG__ // G++
+                #  pragma GCC diagnostic pop
+                #endif
                 obj = reinterpret_cast<void*>(function);
             }
             else
@@ -405,10 +409,14 @@ namespace rpp
         {
             using FunctorType = typename std::decay<Functor>::type;
 
-            #pragma GCC diagnostic push
-            #pragma GCC diagnostic ignored "-Wcast-function-type"
+            #if __GNUG__ // G++
+            #  pragma GCC diagnostic push
+            #  pragma GCC diagnostic ignored "-Wcast-function-type"
+            #endif
             dfunc = reinterpret_cast<dummy_type>( &FunctorType::operator() );
-            #pragma GCC diagnostic pop
+            #if __GNUG__ // G++
+            #  pragma GCC diagnostic pop
+            #endif
 
             obj = new FunctorType{ std::forward<Functor>(functor) };
             destructor = &functor_delete<FunctorType>;
