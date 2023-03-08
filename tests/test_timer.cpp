@@ -15,11 +15,15 @@ TestImpl(test_timer)
 
     static void sleep_for(double seconds)
     {
-        using clock = std::chrono::high_resolution_clock;
-        static constexpr std::chrono::duration<double> MIN_SLEEP_DURATION {0};
-        clock::time_point start = clock::now();
-        while (std::chrono::duration<double>(clock::now() - start).count() < seconds) {
-            std::this_thread::sleep_for(MIN_SLEEP_DURATION);
+        namespace time = std::chrono;
+        auto t1 = time::high_resolution_clock::now();
+        while (true)
+        {
+            time::duration<double> elapsed = time::high_resolution_clock::now() - t1;
+            if (elapsed.count() >= seconds) {
+                break;
+            }
+            // maybe add std::this_thread::yield(); here?
         }
     }
 
