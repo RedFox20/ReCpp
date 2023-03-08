@@ -361,7 +361,7 @@ TestImpl(test_collections)
     TestCase(any_of)
     {
         std::vector<std::string> empty;
-        AssertThat(any_of(empty, [](auto s){ return true; }), false);
+        AssertThat(any_of(empty, [](auto s){ (void)s; return true; }), false);
 
         std::vector<std::string> v { "a"s, "bb"s, "ccc"s, "dddd"s };
         AssertThat(any_of(v, [](auto s){ return s == "xxx"s; }), false);

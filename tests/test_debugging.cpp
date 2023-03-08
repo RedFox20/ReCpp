@@ -24,6 +24,7 @@ TestImpl(test_debugging)
         static std::string log_output;
         SetLogErrorHandler([](LogSeverity sev, const char* err, int len)
         {
+            (void)sev;
             log_output = std::string{err, err+len};
         });
 

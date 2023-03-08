@@ -21,6 +21,7 @@ TestImpl(test_threadpool)
         std::unordered_set<std::thread::id> ids;
         parallel_for(0, numIterations, 0, [&](int start, int end)
         {
+            (void)start; (void)end;
             ::sleep_for(1ms);
             { std::lock_guard<std::mutex> lock{m};
                 ids.insert(::get_id());

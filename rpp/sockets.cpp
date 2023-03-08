@@ -281,7 +281,7 @@ namespace rpp
         //// www.google.com
         //else
         //{
-            addrinfo hint = { 0 }; // must be nulled
+            addrinfo hint = {}; // must be nulled
             hint.ai_family = family; // only filter by family
             addrinfo* infos = nullptr;
             std::string strPort = std::to_string(Port);

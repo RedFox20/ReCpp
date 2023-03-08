@@ -137,7 +137,7 @@ TestImpl(test_future)
             AssertThat(e.what(), "background_thread_exception_msg"s);
             return 42;
         },
-        [&](std::runtime_error e) {
+        [&](std::runtime_error) {
             return 21;
         }).get();
 
@@ -156,7 +156,7 @@ TestImpl(test_future)
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
-        [&](std::domain_error e) {
+        [&](std::domain_error) {
             return 21;
         },
         [&](std::runtime_error e) {
@@ -185,10 +185,10 @@ TestImpl(test_future)
             AssertMsg(false, "This callback should never be executed");
             return 0;
         },
-        [&](const SpecificError& e) {
+        [&](const SpecificError&) {
             return 1;
         },
-        [&](const std::range_error& e) {
+        [&](const std::range_error&) {
             return 2;
         },
         [&](const std::runtime_error& e) {
@@ -209,9 +209,11 @@ TestImpl(test_future)
 
         bool secondExceptHandlerCalled = false;
         int result = f.then([](std::string s) {
+            (void)s;
             throw std::runtime_error("future_continuation_exception_msg");
             return 0;
-        }).then([](int x) { 
+        }).then([](int x) {
+            (void)x;
             return 5;
         }, [&](const std::exception& e) {
             secondExceptHandlerCalled = true;

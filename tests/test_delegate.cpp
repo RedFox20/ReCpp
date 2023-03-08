@@ -197,6 +197,7 @@ namespace rpp
         {
             DataDelegate lambda = [x=data](Data a) {
                 DataDelegate nested = [x=x](Data a) {
+                    (void)a;
                     return validate("nested_lambda", x);
                 };
                 return nested(a);
