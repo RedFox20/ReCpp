@@ -794,9 +794,9 @@ namespace rpp
         float a00 = m00, a01 = m01, a02 = m02;
         float a10 = m10, a11 = m11, a12 = m12;
         float a20 = m20, a21 = m21, a22 = m22;
-        float B00 = m00, B01 = m01, B02 = m02;
-        float B10 = m10, B11 = m11, B12 = m12;
-        float B20 = m20, B21 = m21, B22 = m22;
+        float B00 = mb.m00, B01 = mb.m01, B02 = mb.m02;
+        float B10 = mb.m10, B11 = mb.m11, B12 = mb.m12;
+        float B20 = mb.m20, B21 = mb.m21, B22 = mb.m22;
         m00 = a00 * B00 + a10 * B01 + a20 * B02;
         m01 = a01 * B00 + a11 * B01 + a21 * B02;
         m02 = a02 * B00 + a12 * B01 + a22 * B02;
@@ -814,9 +814,9 @@ namespace rpp
         float a00 = m00, a01 = m01, a02 = m02;
         float a10 = m10, a11 = m11, a12 = m12;
         float a20 = m20, a21 = m21, a22 = m22;
-        float B00 = m00, B01 = m01, B02 = m02;
-        float B10 = m10, B11 = m11, B12 = m12;
-        float B20 = m20, B21 = m21, B22 = m22;
+        float B00 = mb.m00, B01 = mb.m01, B02 = mb.m02;
+        float B10 = mb.m10, B11 = mb.m11, B12 = mb.m12;
+        float B20 = mb.m20, B21 = mb.m21, B22 = mb.m22;
         return {
             a00 * B00 + a10 * B01 + a20 * B02,
             a01 * B00 + a11 * B01 + a21 * B02,

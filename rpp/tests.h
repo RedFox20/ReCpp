@@ -191,7 +191,13 @@ namespace rpp
         {
             (void)lambda;
             size_t expectedExHash = ti ? ti->hash_code() : 0;
-            return self->add_test_func(test_func{ name, {self}, (void (lambda_base::*)())&Lambda::operator(), expectedExHash, autorun });
+            return self->add_test_func(test_func{ 
+                name, {self}, (void (lambda_base::*)())&Lambda::operator(),
+                expectedExHash,
+                /*autorun:*/ autorun,
+                /*success:*/ false,
+                /*messages:*/ {}
+            });
         }
     };
 

@@ -753,6 +753,7 @@ namespace rpp /* ReCpp */
 
     std::string module_path(void* moduleObject) noexcept
     {
+        (void)moduleObject;
         #if _WIN32
             char path[512];
             int len = (int)GetModuleFileNameA(reinterpret_cast<HMODULE>(moduleObject), path, 512);

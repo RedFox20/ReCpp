@@ -110,7 +110,10 @@ namespace rpp
         pthread_attr_t attr;
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wcast-function-type"
         pthread_create(&threadHandle, &attr, (void*(*)(void*))thread_func, arg);
+        #pragma GCC diagnostic pop
         pthread_attr_destroy(&attr);
     #endif
     }

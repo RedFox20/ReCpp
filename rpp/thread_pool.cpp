@@ -270,6 +270,7 @@ namespace rpp
     {
         //if (trace.empty()) UnhandledEx("%s", what);
         //else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
+        (void)what;
         error = std::current_exception();
     }
 
