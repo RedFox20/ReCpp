@@ -216,6 +216,11 @@ TestImpl(test_sockets)
     {
         return create("server: listening on " + std::to_string(port), Socket::listen_to(port));
     }
+    Socket listen(Socket&& s)
+    {
+        int port = s.port();
+        return create("server: listening on " + std::to_string(port), std::move(s));
+    }
     Socket accept(const Socket& server)
     {
         return create("server: accepted client", server.accept(5000/*ms*/));
@@ -231,8 +236,8 @@ TestImpl(test_sockets)
      */
     TestCase(nonblocking_sockets)
     {
-        Socket server = listen(13337); // this is our server
-        std::thread remote([this] { this->nonblocking_remote(13337); }); // spawn remote client
+        Socket server = listen(rpp::make_tcp_randomport()); // this is our server
+        std::thread remote([this,port=server.port()] { this->nonblocking_remote(port); }); // spawn remote client
         Socket client = accept(server);
 
         // wait 1ms for a client that will never come
@@ -285,8 +290,8 @@ TestImpl(test_sockets)
     {
         print_info("========= TRANSMIT DATA =========\n");
 
-        Socket server = listen(14447);
-        std::thread remote([this] { this->transmitting_remote(14447); });
+        Socket server = listen(rpp::make_tcp_randomport()); // this is our server
+        std::thread remote([this,port=server.port()] { this->transmitting_remote(port); });
         Socket client = accept(server);
         client.set_rcv_buf_size(TransmitSize);
 
