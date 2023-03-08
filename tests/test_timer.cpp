@@ -29,7 +29,8 @@ TestImpl(test_timer)
         sleep_for(0.1);
         double elapsed = t.elapsed();
         print_info("100ms sleep time: %f seconds\n", elapsed);
-        AssertThat(0.1 <= elapsed && elapsed <= 0.1 + sigma_s, true);
+        AssertGreaterOrEqual(elapsed, 0.1);
+        AssertLessOrEqual(elapsed, 0.1 + sigma_s);
     }
 
     TestCase(basic_timer_ms)
@@ -38,7 +39,8 @@ TestImpl(test_timer)
         sleep_for(0.1);
         double elapsed = t.elapsed_ms();
         print_info("100ms sleep time: %f milliseconds\n", elapsed);
-        AssertThat(100.0 <= elapsed && elapsed <= 100.0 + sigma_ms, true);
+        AssertGreaterOrEqual(elapsed, 100.0);
+        AssertLessOrEqual(elapsed, 100.0 + sigma_ms);
     }
 
     TestCase(basic_stopwatch)
@@ -58,7 +60,8 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), true);
         print_info("100ms stopwatch time: %f seconds\n", sw.elapsed());
-        AssertThat(0.1 <= sw.elapsed() && sw.elapsed() <= 0.1 + sigma_s, true);
+        AssertGreaterOrEqual(sw.elapsed(), 0.1);
+        AssertLessOrEqual(sw.elapsed(), 0.1 + sigma_s);
         AssertThat(sw.elapsed(), sw.elapsed()); // ensure time is stable after stop
 
         sw.resume();
