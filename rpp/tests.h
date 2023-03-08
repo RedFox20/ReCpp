@@ -7,6 +7,7 @@
 #include <cstdio>  // some basic printf etc.
 #include <cstdint> // uint32_t, etc
 #include <cmath>   // fabs
+#include <cfloat>  // FLT_EPSILON, DBL_EPSILON
 #include <vector>  // access to std::vector and std::string
 #include <typeinfo>
 #include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
