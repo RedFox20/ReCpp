@@ -365,7 +365,14 @@ namespace rpp
             if (Port) { // "host:port"
                 dst[len++] = ':';
                 auto end = std::to_chars(dst+len, dst+maxCount, Port);
-                len = int(end.ptr - dst);
+                if (end.ec == std::errc{})
+                {
+                    *end.ptr = '\0';
+                    return int(end.ptr - dst);
+                }
+                // on error, terminate the string
+                dst[len++] = '?';
+                dst[len] = '\0';
             }
             return len;
         }
