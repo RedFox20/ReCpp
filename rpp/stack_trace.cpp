@@ -449,7 +449,7 @@ namespace rpp
 
     static CallstackEntry resolve_trace(Demangler& d, void* addr)
     {
-        Dl_info info { nullptr };
+        Dl_info info { nullptr, nullptr, nullptr, nullptr };
         dladdr(addr, &info);
         return {
             .addr = (uint64_t)addr,

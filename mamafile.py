@@ -7,8 +7,7 @@ class ReCpp(mama.BuildTarget):
         pass
 
     def configure(self):
-        if self.oclea:
-            self.add_cmake_options('BUILD_WITH_LIBDW=FALSE')
+        pass
 
     def package(self):
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
