@@ -394,6 +394,17 @@ namespace rpp
     {
         return Port;
     }
+    bool ipaddress::equals(const ipaddress& ip) const
+    {
+        if (Family == ip.Family && Port == ip.Port)
+        {
+            if (Family == AF_IPv4)
+                return Addr4 == ip.Addr4;
+            return FlowInfo == ip.FlowInfo && ScopeId == ip.ScopeId
+                && memcmp(Addr6, ip.Addr6, sizeof(Addr6)) == 0;
+        }
+        return false;
+    }
 
     static saddr to_saddr(const ipaddress& ipa) noexcept
     {

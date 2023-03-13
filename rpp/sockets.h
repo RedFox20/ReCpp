@@ -131,6 +131,10 @@ namespace rpp
 
         void clear() noexcept;
         int port() const noexcept;
+
+        bool equals(const ipaddress& ip) const;
+        bool operator==(const ipaddress& ip) const { return this->equals(ip); }
+        bool operator!=(const ipaddress& ip) const { return !this->equals(ip); }
     };
     struct RPPAPI ipaddress4 : public ipaddress
     {
