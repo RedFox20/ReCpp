@@ -59,8 +59,8 @@ if(CLANG OR GCC)
     endif()
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
         # -march=x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
-        # -march=x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
-        add_compile_options(-march=x86-64-v4)
+        # -march=x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL (generally not available on VM-s in 2023)
+        add_compile_options(-march=x86-64-v3)
     endif()
 elseif(MSVC)
     message("Configure for VisualC++")
