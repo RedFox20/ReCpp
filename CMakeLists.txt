@@ -106,21 +106,17 @@ elseif(MSVC)
     endif()
 endif()
 
-# Echo the final flags for people who care:
-get_directory_property(CURRENT_OPTIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_OPTIONS)
-get_directory_property(CURRENT_DEFINES DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
-message("ReCpp ${CMAKE_BUILD_TYPE} CXXFLAGS: ${CMAKE_CXX_FLAGS}   ${CMAKE_CXX_FLAGS_${CURRENT_BUILD_TYPE}}")
-message("ReCpp ${CMAKE_BUILD_TYPE} OPTIONS:  ${CURRENT_OPTIONS}")
-message("ReCpp ${CMAKE_BUILD_TYPE} DEFINES:  ${CURRENT_DEFINES}")
-
 
 ###################################################
 
 
 # Configure platform specific system dependencies
 find_package(Threads REQUIRED)
+
+set(LIBDW_LIB "")
+set(LIBDL_LIB "")
 if(RASPI)
-    set(DWARF_LIBRARY "")
+    set(LIBDL_LIB "dl")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 elseif(OCLEA)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed")
@@ -128,26 +124,35 @@ elseif(OCLEA)
     if (BUILD_WITH_LIBDW)
         # TODO: handle differences between build systems
         set(FAKEROOT_DIR "/build/platforms/cv25/fakeroot")
-        set(DWARF_LIBRARY "${FAKEROOT_DIR}/usr/lib/libdw.so.1" dl)
-        message("DWARF: ${DWARF_LIBRARY}")
-        if (DWARF_LIBRARY)
-            add_compile_options(-DRPP_LIBDW_ENABLED=1)
-        endif()
-    else()
-        set(DWARF_LIBRARY "dl")
+        set(LIBDW_LIB "${FAKEROOT_DIR}/usr/lib/libdw.so;${FAKEROOT_DIR}/usr/lib/libelf.so")
+        set(LIBDW_INCLUDE "${FAKEROOT_DIR}/usr/include")
     endif()
+    set(LIBDL_LIB "dl")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 elseif(LINUX AND BUILD_WITH_LIBDW)
-    find_package(DWARF)
-    message("DWARF: ${DWARF_LIBRARY}")
-    if (DWARF_LIBRARY)
-        add_compile_options(-DRPP_LIBDW_ENABLED=1)
-    endif()
+    find_package(DWARF) # sets DWARF_LIBRARY and DWARF_INCLUDE_DIR
+    set(LIBDW_LIB ${DWARF_LIBRARY})
+    set(LIBDW_INCLUDE ${DWARF_INCLUDE_DIR})
 elseif(LINUX)
-    set(DWARF_LIBRARY "dl")
-else()
-    set(DWARF_LIBRARY "")
+    set(LIBDL_LIB "dl")
 endif()
+
+if(LIBDW_LIB)
+    add_definitions(-DRPP_LIBDW_ENABLED=1)
+    set(TRACE_LIBRARY ${LIBDW_LIB} ${LIBDL_LIB})
+    message("RPP_LIBDW_ENABLED=1")
+    message("LIBDW_LIB: ${TRACE_LIBRARY}")
+    message("LIBDW_INCLUDE: ${LIBDW_INCLUDE}")
+    if(LIBDW_INCLUDE)
+        include_directories(${LIBDW_INCLUDE})
+    endif()
+elseif(LIBDL_LIB)
+    set(TRACE_LIBRARY ${LIBDL_LIB})
+    message("DISABLED libdw: rpp::stack_trace will not give good traces")
+else()
+    # windows: probably has good traces anyways
+endif()
+
 if(ANDROID)
     set(RPP_RUNTIME android log)
 elseif(LINUX)
@@ -156,25 +161,33 @@ elseif(APPLE)
     set(RPP_RUNTIME "-framework Foundation")
 endif()
 
+###################################################
+# Echo the final flags for people who care:
+get_directory_property(CURRENT_OPTIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_OPTIONS)
+get_directory_property(CURRENT_DEFINES DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
+message("ReCpp ${CMAKE_BUILD_TYPE} CXXFLAGS: ${CMAKE_CXX_FLAGS}   ${CMAKE_CXX_FLAGS_${CURRENT_BUILD_TYPE}}")
+message("ReCpp ${CMAKE_BUILD_TYPE} OPTIONS:  ${CURRENT_OPTIONS}")
+message("ReCpp ${CMAKE_BUILD_TYPE} DEFINES:  ${CURRENT_DEFINES}")
+###################################################
+
+# gather source files
 set(SRC_PATTERN rpp/*.cpp rpp/*.h rpp/*.natvis)
 if(APPLE)
     set(SRC_PATTERN ${SRC_PATTERN} rpp/*.mm)
 endif()
 file(GLOB_RECURSE RPP_SRC ${SRC_PATTERN})
-
-
 source_group(rpp FILES ${RPP_SRC})
+
+# rpp static library
 add_library(ReCpp ${RPP_SRC})
 set_target_properties(ReCpp PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
-
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
 target_include_directories(ReCpp PUBLIC ".")
 target_link_libraries(ReCpp
     PUBLIC ${RPP_RUNTIME}
-    PUBLIC ${DWARF_LIBRARY}
+    PUBLIC ${TRACE_LIBRARY}
     PUBLIC Threads::Threads
 )
-
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################
@@ -182,15 +195,17 @@ install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 if (BUILD_TESTS)
     file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
     source_group(tests FILES ${RPP_TESTS})
-    
+
     # we build Rpp from source again so that RPP_DEBUG=1 has an effect in unit tests
     add_executable(RppTests ${RPP_TESTS} ${RPP_SRC})
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
     target_compile_definitions(RppTests PRIVATE -DRPP_DEBUG=1)
-
     target_include_directories(RppTests PUBLIC ".")
-    target_link_libraries(RppTests ${RPP_RUNTIME} ${DWARF_LIBRARY} Threads::Threads)
-
+    target_link_libraries(RppTests
+        ${RPP_RUNTIME}
+        ${TRACE_LIBRARY}
+        Threads::Threads
+    )
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()
 

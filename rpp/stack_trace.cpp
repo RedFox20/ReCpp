@@ -5,36 +5,40 @@
 #include <cstring> // strlen
 
 #if _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN 1
-#endif
-#include <windows.h>
-#include <dbghelp.h>
-#include <tchar.h>
-#include <cstdio>
-#include <TlHelp32.h>
-#include <Psapi.h>
-#include <vector>
-#include <mutex>
-#else
-#include <cstdlib>  // malloc/free
-#include <cxxabi.h> // __cxa_demangle
-#include <unwind.h> // _Unwind_Backtrace
-# if RPP_LIBDW_ENABLED && __has_include(<elfutils/libdwfl.h>)
-#  define HAS_LIBDW 1
-# endif
-# if HAS_LIBDW
-#  include <elfutils/libdw.h>
-#  include <elfutils/libdwfl.h>
-#  include <dwarf.h>
-#  include <unistd.h> // getpid
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN 1
+#  endif
+#  include <windows.h>
+#  include <dbghelp.h>
+#  include <tchar.h>
+#  include <cstdio>
+#  include <TlHelp32.h>
+#  include <Psapi.h>
 #  include <vector>
-#  include <unordered_map>
 #  include <mutex>
-#  include <algorithm> // std::sort
-# else
-#  include <dlfcn.h>
-# endif
+#else
+#  include <cstdlib>  // malloc/free
+#  include <cxxabi.h> // __cxa_demangle
+#  include <unwind.h> // _Unwind_Backtrace
+#  if RPP_LIBDW_ENABLED
+#    if __has_include(<elfutils/libdwfl.h>)
+#      define HAS_LIBDW 1
+#    else
+#      warning RPP_LIBDW_ENABLED but <elfutils/libdwfl.h> was not found so LIBDW was disabled, resulting in bad rpp::stack_trace
+#    endif
+#  endif
+#  if HAS_LIBDW
+#    include <elfutils/libdw.h>
+#    include <elfutils/libdwfl.h>
+#    include <dwarf.h>
+#    include <unistd.h> // getpid
+#    include <vector>
+#    include <unordered_map>
+#    include <mutex>
+#    include <algorithm> // std::sort
+#  else
+#    include <dlfcn.h>
+#  endif
 #endif
 
 namespace rpp
