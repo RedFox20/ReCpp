@@ -49,27 +49,13 @@ namespace rpp
     struct RPPAPI test
     {
         struct lambda_base { test* self; };
-        struct message { int type; std::string msg; };
-        struct test_func
-        {
-            strview name;
-            lambda_base lambda { nullptr };
-            void (lambda_base::*func)() = nullptr;
-            size_t expectedExType = 0;
-            bool autorun = true;
-            bool success = false;
-            std::vector<message> messages;
-        };
+        using lambda_base_fn = void (lambda_base::*)();
+        struct test_func;
+        struct test_impl;
 
         strview name;
     private:
-        // @note Need to use raw array because std::vector cannot be exported on MSVC
-        test_func* test_funcs = nullptr; // all the automatic tests to run
-        int test_count = 0;
-        int test_cap = 0;
-
-        test_results* current_results = nullptr;
-        test_func* current_func = nullptr;
+        test_impl* impl = nullptr;
 
     public:
         explicit test(strview name);
@@ -100,7 +86,7 @@ namespace rpp
          */
         bool run_test(test_results& results, strview methodFilter = {});
     private:
-        bool run_test_func(test_results& results, test_func& test);
+        bool run_test_func(test_func& test);
 
     public:
         /**
@@ -197,21 +183,18 @@ namespace rpp
             assert_failed(file, line, "%s => '%s' %s '%s'", expr, sActual.c_str(), why, sExpect.c_str());
         }
 
-        int add_test_func(test_func func);
+        int add_test_func(strview name, lambda_base lambda, lambda_base_fn fn, 
+                          size_t expectedExHash, bool autorun);
 
         // adds a test to the automatic test run list
-        template<class T, class Lambda> static int add_test_func(
-            T* self, strview name, Lambda lambda, const std::type_info* ti = nullptr, bool autorun = true)
+        template<class T, class Lambda>
+        static int add_test_func(T* self, strview name, Lambda lambda, 
+                                 const std::type_info* ti = nullptr, bool autorun = true)
         {
             (void)lambda;
             size_t expectedExHash = ti ? ti->hash_code() : 0;
-            return self->add_test_func(test_func{ 
-                name, {self}, (void (lambda_base::*)())&Lambda::operator(),
-                expectedExHash,
-                /*autorun:*/ autorun,
-                /*success:*/ false,
-                /*messages:*/ {}
-            });
+            return self->add_test_func(name, {self}, reinterpret_cast<lambda_base_fn>(&Lambda::operator()), 
+                                       expectedExHash, autorun);
         }
     };
 

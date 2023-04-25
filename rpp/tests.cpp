@@ -148,14 +148,49 @@ namespace rpp
         int tests_failed = 0;
         int asserts_failed = 0;
         std::vector<test_failure> failures;
+        std::mutex mutex;
     };
+
+    struct message
+    {
+        int type;
+        std::string msg;
+    };
+
+    struct test::test_func
+    {
+        std::mutex mutex;
+        strview name;
+        lambda_base lambda { nullptr };
+        lambda_base_fn func = nullptr;
+        size_t expectedExType = 0;
+        bool autorun = true;
+        bool success = false;
+        std::vector<message> messages;
+    };
+
+    struct test::test_impl
+    {
+        std::vector<std::unique_ptr<test_func>> test_functions;
+
+        test_results* current_results = nullptr;
+        test_func* current_func = nullptr;
+    };
+
 
     ///////////////////////////////////////////////////////////////////////////
 
-    static test::test_func* g_current_test_func;
+    // current test func is thread-local, so that tests could be run in parallel
+    static thread_local test::test_func* tl_current_test_func;
 
-    test::test(strview name) : name{ name } {}
-    test::~test() = default;
+    test::test(strview name) : name{ name }
+    {
+        impl = new test_impl();
+    }
+    test::~test()
+    {
+        delete impl;
+    }
 
     enum ConsoleColor { Default, Green, Yellow, Red, };
 
@@ -251,7 +286,7 @@ namespace rpp
         safe_vsnprintf_msg_len(fmt);
         LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg));
 
-        if (current_results)
+        if (impl->current_results)
             add_assert_failure(filename, line, msg, len);
     }
 
@@ -260,25 +295,33 @@ namespace rpp
         safe_vsnprintf_msg_len(fmt);
         LogTestLabel(console(Red, msg, len));
 
-        if (current_results)
+        if (impl->current_results)
             add_assert_failure("", 0, msg, len);
     }
 
     void test::add_assert_failure(const char* file, int line, const char* msg, int len)
     {
-        static std::mutex mtx;
-        test_failure fail { name, current_func->name, std::string{msg,msg+len}, std::string{file}, line };
+        test_failure fail {
+            .testname = name,
+            .testcase = impl->current_func->name,
+            .message = std::string{msg,msg+len},
+            .file = std::string{file},
+            .line = line
+        };
         {
-            std::lock_guard<std::mutex> lock {mtx};
-            current_results->asserts_failed++;
-            current_results->failures.emplace_back(std::move(fail));
+            std::lock_guard lock {impl->current_results->mutex};
+            impl->current_results->asserts_failed++;
+            impl->current_results->failures.emplace_back(std::move(fail));
         }
     }
 
     void test::add_message(int type, const char* msg, int len)
     {
-        if (g_current_test_func)
-            g_current_test_func->messages.emplace_back(test::message{type, {msg, msg+len}});
+        if (auto* func = tl_current_test_func)
+        {
+            std::lock_guard lock {func->mutex};
+            func->messages.emplace_back(message{type, {msg, msg+len}});
+        }
     }
 
     void test::print_error(const char* fmt, ...)
@@ -318,25 +361,26 @@ namespace rpp
 
     bool test::run_init()
     {
-        test_func init; init.name = "init";
-        current_func = &init;
+        test_func init { .name = "init" };
+        impl->current_func = &init;
         try
         {
             init_test();
+            impl->current_func = nullptr;
             return true;
         }
         catch (const std::exception& e)
         {
             assert_failed_custom("FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
+            impl->current_func = nullptr;
             return false;
         }
-        current_func = nullptr;
     }
 
     void test::run_cleanup()
     {
-        test_func cleanup; cleanup.name = "cleanup";
-        current_func = &cleanup;
+        test_func cleanup { .name = "cleanup" };
+        impl->current_func = &cleanup;
         try
         {
             cleanup_test();
@@ -345,12 +389,12 @@ namespace rpp
         {
             assert_failed_custom("FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
         }
-        current_func = nullptr;
+        impl->current_func = nullptr;
     }
 
     bool test::run_test(test_results& results, strview methodFilter)
     {
-        current_results = &results; // TODO: thread safety?
+        impl->current_results = &results;
         TestVerbosity verb = state().verbosity;
 
         char title[256];
@@ -372,12 +416,12 @@ namespace rpp
 
         if (methodFilter)
         {
-            for (int i = 0; i < test_count; ++i)
+            for (std::unique_ptr<test_func>& fn : impl->test_functions)
             {
-                if (test_funcs[i].name.find(methodFilter))
+                if (fn->name.find(methodFilter))
                 {
-                    if (run_test_func(results, test_funcs[i])) ++numTestsOk;
-                    else                                       ++numTestsFailed;
+                    if (run_test_func(*fn)) ++numTestsOk;
+                    else                       ++numTestsFailed;
                     ++numTestsRun;
                 }
             }
@@ -388,12 +432,12 @@ namespace rpp
         }
         else
         {
-            for (int i = 0; i < test_count; ++i)
+            for (std::unique_ptr<test_func>& fn : impl->test_functions)
             {
-                if (test_funcs[i].autorun)
+                if (fn->autorun)
                 {
-                    if (run_test_func(results, test_funcs[i])) ++numTestsOk;
-                    else                                       ++numTestsFailed;
+                    if (run_test_func(*fn)) ++numTestsOk;
+                    else                       ++numTestsFailed;
                     ++numTestsRun;
                 }
             }
@@ -421,26 +465,27 @@ namespace rpp
             {
                 std::string run = std::to_string(numTestsFailed) + "/" + std::to_string(numTestsRun);
                 consolef(Red,   "TEST %-32s  %-5s  [FAILED]\n", name.str, run.c_str());
-                for (int i = 0; i < test_count; ++i) {
-                    const test_func& test = test_funcs[i];
-                    if (test.success) continue;
-                    consolef(Red, "FAIL %s::%s\n", name.str, test.name.str);
-                    for (const test::message& m : test.messages) {
+                for (std::unique_ptr<test_func>& fn : impl->test_functions)
+                {
+                    if (fn->success) continue;
+                    consolef(Red, "FAIL %s::%s\n", name.str, fn->name.str);
+                    for (const message& m : fn->messages)
+                    {
                         ConsoleColor c = Default;
                         if      (m.type == 1) c = Yellow;
                         else if (m.type == 2) c = Red;
-                        console(c, m.msg.c_str(), (int)m.msg.size()); 
+                        console(c, m.msg.c_str(), static_cast<int>(m.msg.size())); 
                     }
                 }
             }
         }
 
-        current_results = nullptr; // TODO: thread safety?
+        impl->current_results = nullptr;
 
         return allSuccess && numTestsRun > 0;
     }
 
-    bool test::run_test_func(test_results& results, test_func& test)
+    bool test::run_test_func(test_func& test)
     {
         TestVerbosity verb = state().verbosity;
         if (verb >= TestVerbosity::TestLabels)
@@ -449,8 +494,8 @@ namespace rpp
         }
 
         test.success = false;
-        g_current_test_func = current_func = &test; // TODO: thread safety?
-        int before = results.asserts_failed;
+        tl_current_test_func = impl->current_func = &test;
+        int before = impl->current_results->asserts_failed;
         try
         {
             (test.lambda.*test.func)();
@@ -477,9 +522,9 @@ namespace rpp
             }
         }
         
-        g_current_test_func =current_func = nullptr; // TODO: thread safety?
+        tl_current_test_func = impl->current_func = nullptr;
 
-        int totalFailures = results.asserts_failed - before;
+        int totalFailures = impl->current_results->asserts_failed - before;
         test.success = totalFailures <= 0;
         return test.success;
     }
@@ -526,7 +571,7 @@ namespace rpp
         std::vector<const char*> names;
         names.push_back("");
         for (const std::string& name : testNamePatterns) names.push_back(name.c_str());
-        return run_tests((int)names.size(), (char**)names.data());
+        return run_tests(static_cast<int>(names.size()), (char**)names.data());
     }
 
     int test::run_tests(const char** testNamePatterns, int numPatterns)
@@ -534,7 +579,7 @@ namespace rpp
         std::vector<const char*> names;
         names.push_back("");
         names.insert(names.end(), testNamePatterns, testNamePatterns + numPatterns);
-        return run_tests((int)names.size(), (char**)names.data());
+        return run_tests(static_cast<int>(names.size()), (char**)names.data());
     }
 
     int test::run_tests()
@@ -549,18 +594,19 @@ namespace rpp
         state().verbosity = verbosity;
     }
 
-    int test::add_test_func(test_func func) // @note Because we can't dllexport std::vector
+    int test::add_test_func(strview name, lambda_base lambda, lambda_base_fn fn, 
+                            size_t expectedExHash, bool autorun)
     {
-        if (test_count == test_cap)
-        {
-            test_cap = test_funcs ? test_count * 2 : 8;
-            auto* funcs = new test_func[test_cap];
-            if (test_funcs) { for (int i = 0; i < test_count; ++i) { funcs[i] = test_funcs[i]; } }
-            delete[] test_funcs;
-            test_funcs = funcs;
-        }
-        test_funcs[test_count++] = func;
-        return test_count - 1;
+        impl->test_functions.emplace_back(std::unique_ptr<test_func>{
+            new test_func {
+                .name = name,
+                .lambda = lambda,
+                .func = fn,
+                .expectedExType = expectedExHash,
+                .autorun = autorun
+            }
+        });
+        return static_cast<int>(impl->test_functions.size()) - 1;
     }
 
     static void set_test_defaults()
@@ -696,9 +742,8 @@ namespace rpp
         }
     }
 
-    test_results run_all_marked_tests()
+    void run_all_marked_tests(test_results& results)
     {
-        test_results results;
         for (test_info& t : state().global_tests)
         {
             if (t.test_enabled)
@@ -711,7 +756,6 @@ namespace rpp
                 results.tests_run++;
             }
         }
-        return results;
     }
 
     static int print_final_summary(const test_results& results)
@@ -772,7 +816,7 @@ namespace rpp
         test_results results;
         try
         {
-            results = run_all_marked_tests();
+            run_all_marked_tests(results);
         }
         catch (const std::exception& e)
         {
