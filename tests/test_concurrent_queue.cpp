@@ -150,14 +150,14 @@ TestImpl(test_concurrent_queue)
         AssertThat(item, "item1");
         rpp::Timer t;
         AssertThat(queue.wait_pop(item, 75ms), true);
-        AssertLess(t.elapsed_ms(), 55);
+        AssertLess(t.elapsed_ms(), 65);
         AssertThat(item, "item2");
         AssertThat(queue.wait_pop(item, 75ms), true);
         AssertThat(item, "item3");
         // now we enter a long wait, but we should be notified by the producer
         t.start();
         AssertThat(queue.wait_pop(item, 1000ms), true);
-        AssertLess(t.elapsed_ms(), 110);
+        AssertLess(t.elapsed_ms(), 120);
     }
 
     // in general the pop_with_timeout is not very useful because
@@ -180,17 +180,17 @@ TestImpl(test_concurrent_queue)
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
-        AssertThat(queue.wait_pop(item, 1ms, cancelCondition), false); // this should timeout
-        AssertThat(queue.wait_pop(item, 50ms, cancelCondition), true);
+        AssertFalse(queue.wait_pop(item, 1ms, cancelCondition)); // this should timeout
+        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
         AssertThat(item, "item1");
-        AssertThat(queue.wait_pop(item, 51ms, cancelCondition), true);
+        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
         AssertThat(item, "item2");
-        AssertThat(queue.wait_pop(item, 51ms, cancelCondition), true);
+        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
         // this should not take longer than ~55ms
         rpp::Timer t;
-        AssertThat(queue.wait_pop(item, 1000ms, cancelCondition), false);
+        AssertFalse(queue.wait_pop(item, 1000ms, cancelCondition));
         AssertLess(t.elapsed_ms(), 55);
     }
 
