@@ -1,6 +1,8 @@
 version: 2
 jobs:
   clang:
+    description: Ubuntu Clang x64 Build
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.10
     steps:
@@ -13,6 +15,8 @@ jobs:
       - run: pipenv run mama clang verbose build
       - run: pipenv run mama clang verbose test="--verbosity=2"
   gcc:
+    description: Ubuntu GCC x64 Build
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.10
     steps:
