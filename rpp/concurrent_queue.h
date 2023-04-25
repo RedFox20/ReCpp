@@ -4,6 +4,7 @@
  * Distributed under MIT Software License
  */
 #pragma once
+#include "config.h"
 #include <deque>
 #include <mutex>
 #include <condition_variable>
@@ -238,7 +239,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock {Mutex}; // may throw
             while (Queue.empty())
             {
-                std::cv_status status = Waiter.wait_until(lock, end); // may throw
+                std::cv_status status = wait_until(lock, end); // may throw
                 if (status == std::cv_status::timeout)
                     break;
             }
@@ -319,7 +320,7 @@ namespace rpp
                 next += interval;
                 if (next > end)
                     next = end;
-                std::cv_status status = Waiter.wait_until(lock, next); // may throw
+                std::cv_status status = wait_until(lock, next); // may throw
                 if (status == std::cv_status::no_timeout && !Queue.empty())
                     break; // notified
                 if (next == end)
@@ -332,10 +333,24 @@ namespace rpp
         }
 
     private:
-        inline void pop_unlocked(T& outItem) noexcept
+        FINLINE void pop_unlocked(T& outItem) noexcept
         {
             outItem = std::move(Queue.front());
             Queue.pop_front();
+        }
+
+        // wrapper around wait_until, due to some issues with MSVC implementation
+        FINLINE std::cv_status wait_until(std::unique_lock<std::mutex>& lock,
+                                          std::chrono::system_clock::time_point end)
+        {
+            #if _MSC_VER
+                // MSVC implementation of wait_until seems to have a precision issue
+                // so we use wait_for instead
+                auto duration = end - std::chrono::system_clock::now();
+                return Waiter.wait_for(lock, duration);
+            #else
+                return Waiter.wait_until(lock, timeout);
+            #endif
         }
     };
 }
