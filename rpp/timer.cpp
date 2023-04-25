@@ -46,7 +46,8 @@ namespace rpp
             mach_timebase_info(&timebase);
             return double(timebase.numer) / timebase.denom / 1e9;
         #elif __linux__
-            return 1e-6;
+            return 1e-9; // nanoseconds for clock_gettime
+            // return 1e-6; // microseconds for gettimeofday
         #elif __EMSCRIPTEN__
             return 1e-6;
         #else // default to std::chrono
@@ -65,9 +66,13 @@ namespace rpp
         #elif __APPLE__
             return mach_absolute_time();
         #elif __linux__
-            struct timeval t;
-            gettimeofday(&t, NULL);
-            return (t.tv_sec * 1000000ull) + t.tv_usec;
+            struct timespec t;
+            clock_gettime(CLOCK_REALTIME, &t);
+            return (t.tv_sec * 1'000'000'000ull) + t.tv_nsec;
+            // gettimeofday is apparently obsolete
+            // struct timeval t;
+            // gettimeofday(&t, NULL);
+            // return (t.tv_sec * 1000000ull) + t.tv_usec;
         #elif __EMSCRIPTEN__
             return uint64_t(emscripten_get_now() * 1000);
         #else
