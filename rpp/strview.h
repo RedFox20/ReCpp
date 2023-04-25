@@ -199,10 +199,19 @@ namespace rpp
         template<class StringT, typename = enable_if_string_like_t<StringT>>
         FINLINE strview(const StringT& str) noexcept : str(str.c_str()), len((int)str.length()) {}
         FINLINE const char& operator[](int index) const noexcept { return str[index]; }
-        
+
         // disallow accidental init from char or bool
         strview(char) = delete;
         strview(bool) = delete;
+
+        // disallow accidental assignment from an std::string&& which is an error, 
+        // because the strview will be invalidated immediately
+        // however strview(std::string&&) is allowed because it allows passing temporaries as arguments to functions
+        strview& operator=(std::string&&) = delete;
+
+        FINLINE strview& operator=(const char* str) noexcept { this->str = str; this->len = (int)strlen(str); return *this; }
+        template<int N>
+        FINLINE strview& operator=(const char (&str)[N]) noexcept { this->str = str; this->len = N-1; return *this; }
 
         /** Creates a new string from this string-strview */
         FINLINE std::string& to_string(std::string& out) const { return out.assign(str, (size_t)len); }
