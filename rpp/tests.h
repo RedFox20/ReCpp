@@ -103,8 +103,20 @@ namespace rpp
         bool run_test_func(test_results& results, test_func& test);
 
     public:
-        // generic sleep for testing purposes
+        /**
+         * @brief Generic sleep for testing purposes
+         * @warning This is not a high-precision sleep, it's only for vague waiting purposes
+         * @param millis Milliseconds to sleep, give or take 15ms (on windows)
+         */
         static void sleep(int millis);
+
+        /**
+         * Spin sleep is more accurate than std::this_thread::sleep_for
+         * which can be seriously bad on windows (+- 15ms)
+         * @note Does not rely on timer.h implementation
+         * @param seconds Seconds to sleep, should be very accurate
+         */
+        static void spin_sleep_for(double seconds);
 
         // main entry/initialization point for the test class
         virtual void init_test() {}

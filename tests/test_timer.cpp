@@ -13,24 +13,10 @@ TestImpl(test_timer)
     {
     }
 
-    static void sleep_for(double seconds)
-    {
-        namespace time = std::chrono;
-        auto t1 = time::high_resolution_clock::now();
-        while (true)
-        {
-            time::duration<double> elapsed = time::high_resolution_clock::now() - t1;
-            if (elapsed.count() >= seconds) {
-                break;
-            }
-            // maybe add std::this_thread::yield(); here?
-        }
-    }
-
     TestCase(basic_timer)
     {
         Timer t;
-        sleep_for(0.1);
+        spin_sleep_for(0.1);
         double elapsed = t.elapsed();
         print_info("100ms sleep time: %f seconds\n", elapsed);
         AssertGreaterOrEqual(elapsed, 0.1);
@@ -40,7 +26,7 @@ TestImpl(test_timer)
     TestCase(basic_timer_ms)
     {
         Timer t;
-        sleep_for(0.1);
+        spin_sleep_for(0.1);
         double elapsed = t.elapsed_ms();
         print_info("100ms sleep time: %f milliseconds\n", elapsed);
         AssertGreaterOrEqual(elapsed, 100.0);
@@ -58,7 +44,7 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), false);
 
-        sleep_for(0.1);
+        spin_sleep_for(0.1);
 
         sw.stop();
         AssertThat(sw.started(), true);

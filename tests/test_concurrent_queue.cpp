@@ -7,6 +7,8 @@ using namespace std::chrono_literals;
 
 TestImpl(test_concurrent_queue)
 {
+    static constexpr double MS = 1.0 / 1000.0;
+
     TestInit(test_concurrent_queue)
     {
     }
@@ -132,13 +134,13 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         cfuture<void> slow_producer = rpp::async_task([&] {
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item1");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item2");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item3");
-            std::this_thread::sleep_for(100ms);
+            spin_sleep_for(100*MS);
             queue.push("item3");
         });
 
@@ -150,14 +152,14 @@ TestImpl(test_concurrent_queue)
         AssertThat(item, "item1");
         rpp::Timer t;
         AssertThat(queue.wait_pop(item, 75ms), true);
-        AssertLess(t.elapsed_ms(), 65);
+        AssertLess(t.elapsed_ms(), 55);
         AssertThat(item, "item2");
         AssertThat(queue.wait_pop(item, 75ms), true);
         AssertThat(item, "item3");
         // now we enter a long wait, but we should be notified by the producer
         t.start();
         AssertThat(queue.wait_pop(item, 1000ms), true);
-        AssertLess(t.elapsed_ms(), 120);
+        AssertLess(t.elapsed_ms(), 110);
     }
 
     // in general the pop_with_timeout is not very useful because
@@ -167,13 +169,13 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
         cfuture<void> slow_producer = rpp::async_task([&] {
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item1");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item2");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item3");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             finished = true;
             queue.notify(); // notify any waiting threads
         });
@@ -181,7 +183,7 @@ TestImpl(test_concurrent_queue)
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
         AssertFalse(queue.wait_pop(item, 1ms, cancelCondition)); // this should timeout
-        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
+        AssertTrue(queue.wait_pop(item, 50ms, cancelCondition));
         AssertThat(item, "item1");
         AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
         AssertThat(item, "item2");
@@ -200,11 +202,11 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         cfuture<void> slow_producer = rpp::async_task([&] {
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item1");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item2");
-            std::this_thread::sleep_for(50ms);
+            spin_sleep_for(50*MS);
             queue.push("item3");
         });
 

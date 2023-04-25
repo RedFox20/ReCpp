@@ -2,6 +2,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_set>
+#include <chrono> // high_resolution_clock
 #include <cstdarg>
 #include <cassert>
 
@@ -492,6 +493,24 @@ namespace rpp
 #else
         usleep(millis * 1000);
 #endif
+    }
+
+    void test::spin_sleep_for(double seconds)
+    {
+        namespace time = std::chrono;
+        // NOTE: high_resolution_clock might not be available on some target systems
+        //       which would require a fallback to rolling our own.
+        //       However, we want to avoid using rpp/timer.h here, since that would
+        //       introduce a circular dependency in the testing framework and not test
+        //       the timer.h implementation.
+        auto t1 = time::high_resolution_clock::now();
+        while (true)
+        {
+            time::duration<double> elapsed = time::high_resolution_clock::now() - t1;
+            if (elapsed.count() >= seconds) {
+                break;
+            }
+        }
     }
 
     int test::run_tests(strview testNamePatterns)
