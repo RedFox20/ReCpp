@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  
-    <Type Name="rpp::strview_vishelper">
-        <DisplayString>{str,[len]}</DisplayString>
-        <StringView>str,len</StringView>
-    </Type>
-  
+
     <Type Name="rpp::strview">
-        <DisplayString>{v,na}</DisplayString>
+        <!-- This is the quick view representation
+             [len] specifies the length of the string
+             s8 suffix enables rendering as UTF-8 -->
+        <DisplayString>{str,[len]s8}</DisplayString>
+        <!-- StringView is for the "Text View" tool -->
         <StringView>str,[len]</StringView>
         <Expand>
             <Item Name="[length]">len</Item>
-            <Item Name="[pointer]">str</Item>
+            <Item Name="[pointer]">str,s8</Item>
             <ArrayItems>
                 <Size>len</Size>
                 <ValuePointer>str</ValuePointer>
@@ -20,7 +19,7 @@
     </Type>
   
     <Type Name="rpp::strview_">
-    <DisplayString>{v,na}</DisplayString>
+    <DisplayString>{str,[len]s8}</DisplayString>
     <StringView>str,[len]</StringView>
     <Expand>
       <Item Name="[length]">len</Item>

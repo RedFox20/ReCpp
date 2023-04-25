@@ -339,7 +339,7 @@ namespace rpp
 
         saddr a;
         socklen_t len = sizeof(a);
-        if (getsockname(socket, (sockaddr*)&a, &len)) {
+        if (getsockname(socket, reinterpret_cast<sockaddr*>(&a), &len)) {
             Family=AF_IPv4, Port=0, FlowInfo=0, ScopeId=0;
             return; // quiet fail on error/invalid socket
         }

@@ -150,15 +150,6 @@ namespace rpp
 
 
 
-    struct strview_vishelper // VC++ visualization helper
-    {
-        const char* str;
-        int len;
-    };
-
-
-
-
     /**
      * String token for efficient parsing.
      * Represents a 'weak' reference string with Start pointer and Length.
@@ -171,27 +162,17 @@ namespace rpp
      */
     struct RPPAPI strview
     {
-    #ifdef _MSC_VER
-        union {
-            struct {
-                const char* str; // start of string
-                int len;         // length of string
-            };
-            strview_vishelper v;	// VC++ visualization helper
-        };
-    #else
         const char* str; // start of string
         int len;         // length of string
-    #endif
 
-        FINLINE constexpr strview()                            noexcept : str(""),  len(0) {}
-        FINLINE strview(char* str)                             noexcept : str(str), len((int)strlen(str)) {}
-        FINLINE strview(const char* str)                       noexcept : str(str), len((int)strlen(str)) {}
-        FINLINE constexpr strview(const char* str, int len)    noexcept : str(str), len(len)              {}
-        FINLINE constexpr strview(const char* str, size_t len) noexcept : str(str), len((int)len)         {}
-        FINLINE strview(const char* str, const char* end)      noexcept : str(str), len(int(end-str))     {}
-        FINLINE strview(const void* str, const void* end)      noexcept : strview{(const char*)str, (const char*)end} {}
-        FINLINE strview(const std::string& s)                  noexcept : str(s.c_str()), len((int)s.length()) {}
+        FINLINE constexpr strview()                            noexcept : str{""},  len{0} {}
+        FINLINE strview(char* str)                             noexcept : str{str}, len{static_cast<int>(strlen(str))} {}
+        FINLINE strview(const char* str)                       noexcept : str{str}, len{static_cast<int>(strlen(str))} {}
+        FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len}                           {}
+        FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)}         {}
+        FINLINE strview(const char* str, const char* end)      noexcept : str{str}, len{static_cast<int>(end - str)}   {}
+        FINLINE strview(const void* str, const void* end)      noexcept : strview{static_cast<const char*>(str), static_cast<const char*>(end)} {}
+        FINLINE strview(const std::string& s)                  noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
 
         template<class StringT>
         using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
@@ -920,13 +901,8 @@ namespace rpp
      */
     struct strview_
     {
-        union {
-            struct {
-                const char* str;
-                int len;
-            };
-            strview_vishelper v;	// VC++ visualization helper
-        };
+        const char* str;
+        int len;
         FINLINE operator strview()        const { return strview{str, len}; }
         FINLINE operator strview&()             { return *(rpp::strview*)this; }
         FINLINE operator const strview&() const { return *(rpp::strview*)this; }

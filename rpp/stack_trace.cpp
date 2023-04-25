@@ -518,7 +518,7 @@ namespace rpp
         {
             char error[1024];
             int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, lastError, 0, error, 1024, nullptr);
-            if (error[len - 2] == '\r') error[len -= 2] = '\0';
+            if (len > 2 && error[len - 2] == '\r') error[len -= 2] = '\0';
             fprintf(stderr, "Error %s addr: 0x%016llx error: (%d) %s\n", what, offset, lastError, error);
         }
         else
