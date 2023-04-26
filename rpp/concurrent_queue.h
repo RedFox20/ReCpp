@@ -5,9 +5,10 @@
  */
 #pragma once
 #include "config.h"
+#include "condition_variable.h"
+#include "timer.h"
 #include <deque>
 #include <mutex>
-#include <condition_variable>
 
 namespace rpp
 {
@@ -23,9 +24,14 @@ namespace rpp
     {
         std::deque<T> Queue;
         mutable std::mutex Mutex;
-        std::condition_variable Waiter;
+        rpp::condition_variable Waiter;
 
     public:
+
+        using Clock = std::chrono::high_resolution_clock;
+        using Duration = Clock::duration;
+        using TimePoint = Clock::time_point;
+
         concurrent_queue() = default;
         ~concurrent_queue() noexcept
         {
@@ -126,7 +132,7 @@ namespace rpp
         void push(T&& item)
         {
             {
-                std::lock_guard<std::mutex> lock {Mutex}; // may throw
+                std::lock_guard lock {Mutex}; // may throw
                 Queue.emplace_back(std::move(item)); // may throw
             }
             notify();
@@ -138,7 +144,7 @@ namespace rpp
         void push(const T& item)
         {
             {
-                std::lock_guard<std::mutex> lock {Mutex}; // may throw
+                std::lock_guard lock {Mutex}; // may throw
                 Queue.push_back(item); // may throw
             }
             notify();
@@ -150,7 +156,7 @@ namespace rpp
         void push_no_notify(T&& item)
         {
             {
-                std::lock_guard<std::mutex> lock {Mutex}; // may throw
+                std::lock_guard lock {Mutex}; // may throw
                 Queue.emplace_back(std::move(item)); // may throw
             }
         }
@@ -163,7 +169,7 @@ namespace rpp
         {
             T item;
             {
-                std::lock_guard<std::mutex> lock {Mutex};
+                std::lock_guard lock {Mutex};
                 if (Queue.empty()) throw std::runtime_error("concurrent_queue<T>::pop(): Queue was empty!");
                 pop_unlocked(item);
             }
@@ -203,7 +209,7 @@ namespace rpp
          */
         [[nodiscard]] T wait_pop() noexcept
         {
-            std::unique_lock<std::mutex> lock {Mutex}; // may throw
+            std::unique_lock lock {Mutex}; // may throw
             while (Queue.empty())
                 Waiter.wait(lock);
             T result;
@@ -233,10 +239,10 @@ namespace rpp
          * @endcode
          */
         [[nodiscard]]
-        bool wait_pop(T& outItem, std::chrono::system_clock::duration timeout)
+        bool wait_pop(T& outItem, Duration timeout)
         {
-            auto end = std::chrono::system_clock::now() + timeout;
-            std::unique_lock<std::mutex> lock {Mutex}; // may throw
+            TimePoint end = Clock::now() + timeout;
+            std::unique_lock lock {Mutex}; // may throw
             while (Queue.empty())
             {
                 std::cv_status status = wait_until(lock, end); // may throw
@@ -251,14 +257,14 @@ namespace rpp
 
         /**
          * Waits up to @param timeout duration until an item is ready to be popped.
-         * The cancellationCondition is used to terminate the wait.
+         * The cancelCondition is used to terminate the wait.
          * 
          * @note This is a wrapper around wait_pop_interval, with the cancellation check
          *       interval set to 1/10th of the timeout.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
          * @param timeout [required] Maximum time to wait before returning FALSE
-         * @param cancellationCondition Cancellation condition, CANCEL if cancellationCondition()==true
+         * @param cancelCondition Cancellation condition, CANCEL if cancelCondition()==true
          * @return TRUE if an item was popped,
          *         FALSE if no item popped due to: timeout or cancellation.
          * @code
@@ -272,26 +278,24 @@ namespace rpp
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop(T& outItem, std::chrono::system_clock::duration timeout,
-                      const WaitUntil& cancellationCondition)
+        bool wait_pop(T& outItem, Duration timeout, const WaitUntil& cancelCondition)
         {
             auto interval = timeout / 10;
-            return wait_pop_interval<WaitUntil>(outItem, timeout, interval,
-                                                cancellationCondition);
+            return wait_pop_interval<WaitUntil>(outItem, timeout, interval, cancelCondition);
         }
 
         /**
          * Waits until an item is ready to be popped.
-         * The @param cancellationCondition is used to terminate the wait.
-         * And @param conditionInterval defines how often the cancellationCondition is checked.
+         * The @param cancelCondition is used to terminate the wait.
+         * And @param interval defines how often the cancelCondition is checked.
          * 
-         * @note This is a superior alternative to wait_pop(), because the cancellationCondition
+         * @note This is a superior alternative to wait_pop(), because the cancelCondition
          *       is checked multiple times, instead of only between waits if someone notifies.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
          * @param timeout Total timeout for the entire wait loop, granularity is defined by @param interval
          * @param interval Interval for checking the cancellation condition
-         * @param cancellationCondition Cancellation condition, CANCEL if cancellationCondition()==true
+         * @param cancelCondition Cancellation condition, CANCEL if cancelCondition()==true
          * @return TRUE if an item was popped,
          *         FALSE if no item popped due to: timeout or cancellation
          * @code
@@ -305,17 +309,14 @@ namespace rpp
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop_interval(T& outItem,
-                               std::chrono::system_clock::duration timeout,
-                               std::chrono::system_clock::duration interval,
-                               const WaitUntil& cancellationCondition)
+        bool wait_pop_interval(T& outItem, Duration timeout, Duration interval, const WaitUntil& cancelCondition)
         {
-            auto next = std::chrono::system_clock::now();
-            auto end = next + timeout;
-            std::unique_lock<std::mutex> lock {Mutex};
+            TimePoint next = Clock::now();
+            TimePoint end = next + timeout;
+            std::unique_lock lock {Mutex};
             while (Queue.empty())
             {
-                if (cancellationCondition())
+                if (cancelCondition())
                     break;
                 next += interval;
                 if (next > end)
@@ -340,17 +341,53 @@ namespace rpp
         }
 
         // wrapper around wait_until, due to some issues with MSVC implementation
-        FINLINE std::cv_status wait_until(std::unique_lock<std::mutex>& lock,
-                                          std::chrono::system_clock::time_point end)
+        std::cv_status wait_until(std::unique_lock<std::mutex>& lock, TimePoint end)
         {
-            #if _MSC_VER
-                // MSVC implementation of wait_until seems to have a precision issue
-                // so we use wait_for instead
-                auto duration = end - std::chrono::system_clock::now();
-                return Waiter.wait_for(lock, duration);
-            #else
-                return Waiter.wait_until(lock, timeout);
-            #endif
+        #if _MSC_VER
+            TimePoint start = Clock::now();
+            Duration duration = end - start;
+            using namespace std::chrono_literals;
+
+            // the granularity of WinAPI SleepConditionVariable is ~15-16ms
+            // due to internal SLEEP(), so we sleep the majority of time
+            // except for the last 16ms
+            if (duration > 16ms)
+            {
+                duration -= 16ms;
+                std::cv_status status = Waiter.wait_for(lock, duration);
+
+                //TimePoint after = Clock::now();
+                //std::chrono::duration<double> elapsed = (after - start);
+                //printf("wait elapsed: %.2fms %s\n", elapsed.count()*1000,
+                //        status == std::cv_status::no_timeout ? "no_timeout" : "timeout");
+
+                if (status == std::cv_status::no_timeout) // notified
+                    return std::cv_status::no_timeout;
+            }
+
+            // by using our own condition_variable on windows, we can pass in
+            // duration 0ms, which simply performs a check on the condition_variable
+            TimePoint now = Clock::now();
+            while (now < end)
+            {
+                std::cv_status status = Waiter.wait_for(lock, 1ms);
+                if (status == std::cv_status::no_timeout) // notified
+                    return std::cv_status::no_timeout;
+
+                // yield the thread
+                //rpp::sleep_us(500);
+
+                TimePoint after = Clock::now();
+                std::chrono::duration<double> elapsed = (after - now);
+                printf("precise wait elapsed: %.2fms %s\n", elapsed.count()*1000,
+                        status == std::cv_status::no_timeout ? "no_timeout" : "timeout");
+
+                now = Clock::now();
+            }
+            return std::cv_status::timeout;
+        #else
+            return Waiter.wait_until(lock, end);
+        #endif
         }
     };
 }

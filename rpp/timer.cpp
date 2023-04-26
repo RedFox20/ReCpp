@@ -105,6 +105,7 @@ namespace rpp
                 static auto NtDelayExecution     = (long(__stdcall*)(BOOL alertable, PLARGE_INTEGER delayInterval))GetProcAddress(NtDll, "NtDelayExecution");
                 static auto ZwSetTimerResolution = (long(__stdcall*)(ULONG requestedRes, BOOL setNew, ULONG* actualRes))GetProcAddress(NtDll, "ZwSetTimerResolution");
 
+                // TODO: this modifies the timer res for the entire application
                 static bool resolutionSet;
                 if (!resolutionSet) {
                     ULONG actualResolution;
@@ -113,8 +114,11 @@ namespace rpp
                 }
 
                 LARGE_INTEGER interval;
-                interval.QuadPart = (LONGLONG)micros * -10000000LL;
-                NtDelayExecution(false, &interval);
+                interval.QuadPart = (LONGLONG)micros * -1LL;
+                NtDelayExecution(true, &interval);
+
+                // this is how to restore the timer res later
+                //ZwSetTimerResolution(1, false, &actualResolution);
             }
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             usleep(micros);
