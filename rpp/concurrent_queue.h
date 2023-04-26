@@ -245,7 +245,7 @@ namespace rpp
             std::unique_lock lock {Mutex}; // may throw
             while (Queue.empty())
             {
-                std::cv_status status = wait_until(lock, end); // may throw
+                std::cv_status status = Waiter.wait_until(lock, end); // may throw
                 if (status == std::cv_status::timeout)
                     break;
             }
@@ -321,7 +321,7 @@ namespace rpp
                 next += interval;
                 if (next > end)
                     next = end;
-                std::cv_status status = wait_until(lock, next); // may throw
+                std::cv_status status = Waiter.wait_until(lock, next); // may throw
                 if (status == std::cv_status::no_timeout && !Queue.empty())
                     break; // notified
                 if (next == end)
@@ -338,56 +338,6 @@ namespace rpp
         {
             outItem = std::move(Queue.front());
             Queue.pop_front();
-        }
-
-        // wrapper around wait_until, due to some issues with MSVC implementation
-        std::cv_status wait_until(std::unique_lock<std::mutex>& lock, TimePoint end)
-        {
-        #if _MSC_VER
-            TimePoint start = Clock::now();
-            Duration duration = end - start;
-            using namespace std::chrono_literals;
-
-            // the granularity of WinAPI SleepConditionVariable is ~15-16ms
-            // due to internal SLEEP(), so we sleep the majority of time
-            // except for the last 16ms
-            if (duration > 16ms)
-            {
-                duration -= 16ms;
-                std::cv_status status = Waiter.wait_for(lock, duration);
-
-                //TimePoint after = Clock::now();
-                //std::chrono::duration<double> elapsed = (after - start);
-                //printf("wait elapsed: %.2fms %s\n", elapsed.count()*1000,
-                //        status == std::cv_status::no_timeout ? "no_timeout" : "timeout");
-
-                if (status == std::cv_status::no_timeout) // notified
-                    return std::cv_status::no_timeout;
-            }
-
-            // by using our own condition_variable on windows, we can pass in
-            // duration 0ms, which simply performs a check on the condition_variable
-            TimePoint now = Clock::now();
-            while (now < end)
-            {
-                std::cv_status status = Waiter.wait_for(lock, 1ms);
-                if (status == std::cv_status::no_timeout) // notified
-                    return std::cv_status::no_timeout;
-
-                // yield the thread
-                //rpp::sleep_us(500);
-
-                TimePoint after = Clock::now();
-                std::chrono::duration<double> elapsed = (after - now);
-                printf("precise wait elapsed: %.2fms %s\n", elapsed.count()*1000,
-                        status == std::cv_status::no_timeout ? "no_timeout" : "timeout");
-
-                now = Clock::now();
-            }
-            return std::cv_status::timeout;
-        #else
-            return Waiter.wait_until(lock, end);
-        #endif
         }
     };
 }

@@ -34,6 +34,7 @@ namespace rpp
 
     private:
         struct mutex_type;
+
         std::shared_ptr<mutex_type> mtx;
         struct { native_handle_type impl; } handle { nullptr };
 
@@ -170,10 +171,21 @@ namespace rpp
         }
 
         // returns the native handle
-        native_handle_type native_handle() noexcept
-        {
-            return handle.impl;
-        }
+        native_handle_type native_handle() noexcept { return handle.impl; }
+
+    private:
+
+        /**
+         * suspended wait which has roughly ~15.6ms tick resolution
+         * accuracy on the timeout
+         * @returns no_timeout if signalled or error, timeout if timed out without a signal
+         */
+        std::cv_status _wait_suspended_unlocked(mutex_type* m, unsigned long timeoutMs) noexcept;
+
+        /**
+         * @returns TRUE if CondVar is signaled, FALSE otherwise
+         */
+        bool _is_signaled(mutex_type* m) noexcept;
     #endif
     };
 }
