@@ -159,14 +159,14 @@ namespace rpp
 
     struct test::test_func
     {
-        std::mutex mutex;
         strview name;
+        std::mutex mutex{};
         lambda_base lambda { nullptr };
         lambda_base_fn func = nullptr;
         size_t expectedExType = 0;
         bool autorun = true;
         bool success = false;
-        std::vector<message> messages;
+        std::vector<message> messages{};
     };
 
     struct test::test_impl
