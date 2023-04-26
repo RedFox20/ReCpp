@@ -1,17 +1,30 @@
 #include "condition_variable.h"
-
+/**
+ * This implementation is based on the C++ standard std::condition_variable,
+ * and implements Spin-wait timeouts in wait_for() and wait_until(),
+ * which allows timeouts smaller than ~15.6ms (default timer tick) on Windows.
+ *
+ * For UNIX platforms, the standard std::condition_variable is used
+ *
+ * Copyright (c) 2023, Jorma Rebane
+ * Distributed under MIT Software License
+ */
 #if _MSC_VER
 #define WIN32_LEAN_AND_MEAN 1
 #include <Windows.h>
-#endif
 
 namespace rpp
 {
-#if _MSC_VER
-
-    #define CONDVAR(handle) PCONDITION_VARIABLE(&handle)
+    // NOTE on debugging: enabling this will cause extra delays in the timing logic,
+    //                    which will show false positive test failures; always disable this before testing
+    #define DEBUG_CVAR 0
     #define USE_SRWLOCK 0
-    #define USE_EVENT 0
+
+    #if DEBUG_CVAR
+        #define IN_CVAR_DEBUG(expr) expr
+    #else
+        #define IN_CVAR_DEBUG(...)
+    #endif
 
     #if !USE_SRWLOCK
         #define IN_CSLOCK(expr) expr
@@ -42,28 +55,13 @@ namespace rpp
         }
     };
     
-    struct unlock_guard
-    {
-        std::unique_lock<std::mutex>& mtx;
-        explicit unlock_guard(std::unique_lock<std::mutex>& mtx) : mtx{mtx} {
-            mtx.unlock();
-        }
-        ~unlock_guard() noexcept /* terminates */ {
-            // relock mutex or terminate()
-            // condition_variable_any wait functions are required to terminate if
-            // the mutex cannot be relocked;
-            // we slam into noexcept here for easier user debugging.
-            mtx.lock();
-        }
-    };
+    #define CONDVAR(handle) PCONDITION_VARIABLE(&handle)
 
     condition_variable::condition_variable() noexcept
     {
         mtx = std::make_shared<mutex_type>();
-        #if !USE_EVENT
-            // Win32 COND VARS are allocated once and never deleted
-            InitializeConditionVariable(CONDVAR(handle));
-        #endif
+        // Win32 COND VARS are allocated once and never deleted
+        InitializeConditionVariable(CONDVAR(handle));
     }
 
     condition_variable::~condition_variable() noexcept = default;
@@ -78,95 +76,21 @@ namespace rpp
         WakeAllConditionVariable(CONDVAR(handle));
     }
 
-    void condition_variable::wait(std::unique_lock<std::mutex>& lock) noexcept
+    void condition_variable::_lock(mutex_type* m) noexcept
     {
-        std::shared_ptr<mutex_type> m = mtx; // for immunity to *this destruction
-
-        std::unique_lock csGuard {*m}; // critical section
-        unlock_guard unlockOuter {lock}; // unlock the outer lock, and relock when we exit the scope
-        _wait_suspended_unlocked(m.get(), INFINITE);
-        csGuard.unlock(); // unlock critical section before relocking outer
+        m->lock();
     }
 
-    constexpr DWORD clampTimeout(int64_t timeoutMs) noexcept
+    void condition_variable::_unlock(mutex_type* m) noexcept
     {
-        return timeoutMs <= 0 ? 0 : static_cast<DWORD>(timeoutMs);
-    }
-    constexpr DWORD getTimeoutMs(const condition_variable::duration& dur) noexcept
-    {
-        return clampTimeout(duration_cast<std::chrono::milliseconds>(dur).count());
-    }
-    
-    // NOTE: the granularity of WinAPI SleepConditionVariable is ~15.6ms
-    //       which is the default scheduling rate on Windows systems, and windows is not a realtime OS
-    std::cv_status condition_variable::wait_for(std::unique_lock<std::mutex>& lock, 
-                                                const duration& rel_time) noexcept
-    {
-        std::cv_status status = std::cv_status::timeout;
-
-        using namespace std::chrono_literals;
-        std::shared_ptr<mutex_type> cs = mtx; // for immunity to *this destruction
-        
-        std::unique_lock csGuard {*cs}; // critical section guard
-        unlock_guard unlockOuter {lock}; // unlock the outer lock, and relock when we exit the scope
-
-        duration spinDuration;
-
-        // for long waits, we first do a long suspended sleep,
-        // but with granularity that aligns to windows timer tick rate
-        if (rel_time > 16ms)
-        {
-            spinDuration = 16ms;
-            DWORD timeout1 = getTimeoutMs(rel_time - 16ms);
-            time_point start = clock::now();
-            status = _wait_suspended_unlocked(cs.get(), timeout1);
-
-            std::chrono::duration<double> elapsed = (clock::now() - start);
-            printf("suspended wait %p elapsed: %.2fms %s\n", CONDVAR(handle), elapsed.count()*1000,
-                    status == std::cv_status::no_timeout ? "no_timeout" : "timeout");
-        }
-        else // for short waits we have to spin loop until the time is out
-        {
-            spinDuration = rel_time;
-        }
-
-        // spin loop is required because timeout is too short, or suspended wait timed out
-        if (status == std::cv_status::timeout)
-        {
-            time_point start = clock::now();
-            time_point now = start;
-            time_point end = now + spinDuration;
-            do
-            {
-                if (_is_signaled(cs.get()))
-                {
-                    status = std::cv_status::no_timeout;
-
-                    std::chrono::duration<double> elapsed = (clock::now() - start);
-                    printf("spinwait %p elapsed: %.2fms SIGNALED\n", CONDVAR(handle), elapsed.count()*1000);
-                    break;
-                }
-
-                Sleep(0); // sleep 0 is special, gives priority to other threads
-
-                //std::chrono::duration<double> elapsed = (clock::now() - now);
-                //printf("spinwait elapsed: %.2fms\n", elapsed.count()*1000);
-
-                now = clock::now();
-            }
-            while (now < end);
-        }
-
-        csGuard.unlock(); // unlock critical section before relocking outer
-        return status;
+        m->unlock();
     }
 
-    std::cv_status condition_variable::wait_until(std::unique_lock<std::mutex>& lock, 
-                                                  const time_point& abs_time) noexcept
+    bool condition_variable::_is_signaled(mutex_type* m) noexcept
     {
-        // in the actual WinAPI level, the solution is to use rel_time,
-        duration rel_time = (abs_time - clock::now());
-        return wait_for(lock, rel_time);
+        BOOL result = IN_CSLOCK(SleepConditionVariableCS(CONDVAR(handle), m, 0))
+                      IN_SRWLOCK(SleepConditionVariableSRW(CONDVAR(handle), m, 0, 0));
+        return result;
     }
 
     std::cv_status condition_variable::_wait_suspended_unlocked(mutex_type* m, unsigned long timeoutMs) noexcept
@@ -180,18 +104,79 @@ namespace rpp
             if (err == ERROR_TIMEOUT)
                 return std::cv_status::timeout;
         }
-        else
-        {
-        }
         return std::cv_status::no_timeout;
     }
 
-    bool condition_variable::_is_signaled(mutex_type* m) noexcept
+    IN_CVAR_DEBUG(inline double to_ms(const condition_variable::duration& dur) noexcept
+                  { return std::chrono::duration<double>{dur}.count() * 1000; })
+
+    // NOTE: the granularity of WinAPI SleepConditionVariable is ~15.6ms
+    //       which is the default scheduling rate on Windows systems, and windows is not a realtime OS
+    std::cv_status condition_variable::_wait_for_unlocked(mutex_type* m, const duration& rel_time) noexcept
     {
-        BOOL result = IN_CSLOCK(SleepConditionVariableCS(CONDVAR(handle), m, 0))
-                      IN_SRWLOCK(SleepConditionVariableSRW(CONDVAR(handle), m, 0, 0));
-        return result;
+        std::cv_status status = std::cv_status::timeout;
+
+        // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
+        constexpr duration suspendThreshold = std::chrono::milliseconds{16};
+        constexpr duration zero = duration{0};
+
+        duration dur = rel_time;
+        if (dur > suspendThreshold)
+        {
+            // we need to measure exact suspend start time in case we timed out
+            // because the suspension timeout is not accurate at all
+            time_point suspendStart = clock::now();
+
+            int64_t timeout = duration_cast<std::chrono::milliseconds>(dur - suspendThreshold).count();
+            if (timeout < 0) timeout = 0;
+
+            status = _wait_suspended_unlocked(m, static_cast<DWORD>(timeout));
+            if (status == std::cv_status::timeout)
+                dur -= (clock::now() - suspendStart);
+
+            IN_CVAR_DEBUG(duration totalElapsed = (clock::now() - suspendStart);
+                          printf("suspended wait %p dur=%.2fms elapsed: %.2fms %s\n",
+                                  CONDVAR(handle), to_ms(rel_time), to_ms(totalElapsed),
+                                  status == std::cv_status::no_timeout ? "SIGNALED" : "timeout"));
+            if (dur <= zero)
+                return status;
+        }
+
+        // spin loop is required because timeout is too short, or suspended wait timed out
+        if (status == std::cv_status::timeout)
+        {
+            duration remaining = dur;
+            time_point prevTime = clock::now();
+            IN_CVAR_DEBUG(time_point spinStart = prevTime);
+
+            // always enter the loop at least once, in case this is a 0-timeout condition check
+            do
+            {
+                if (_is_signaled(m))
+                {
+                    status = std::cv_status::no_timeout;
+                    break;
+                }
+
+                Sleep(0); // sleep 0 is special, gives priority to other threads
+                
+                // clock is assumed to be steady and should only tick forward
+                // but we all know stdlib bugs happen, so this is not always correct
+                // this abs(delta_time) approach circumvents any such issues
+                time_point now = clock::now();
+                remaining -= std::chrono::abs(now - prevTime);
+                prevTime = now;
+            }
+            while (remaining > zero);
+
+            IN_CVAR_DEBUG(duration totalElapsed = (clock::now() - spinStart);
+                          printf("spinwait %p spin=%.2fms elapsed: %.2fms %s\n",
+                                  CONDVAR(handle), to_ms(dur), to_ms(totalElapsed),
+                                  status == std::cv_status::no_timeout ? "SIGNALED" : "timeout"));
+        }
+        return status;
     }
 
-#endif
 }
+
+#endif // _MSC_VER

@@ -147,8 +147,9 @@ TestImpl(test_concurrent_queue)
         std::string item;
         AssertThat(queue.wait_pop(item, 5ms), false);
         AssertThat(queue.wait_pop(item, 0ms), false);
-        AssertThat(queue.wait_pop(item, 5ms), false);
-        AssertThat(queue.wait_pop(item, 50ms), true); // this should not timeout
+        AssertThat(queue.wait_pop(item, 25ms), false);
+
+        AssertThat(queue.wait_pop(item, 25ms), true); // this should not timeout
         AssertThat(item, "item1");
         rpp::Timer t;
         AssertThat(queue.wait_pop(item, 75ms), true);
@@ -182,8 +183,8 @@ TestImpl(test_concurrent_queue)
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
-        AssertFalse(queue.wait_pop(item, 1ms, cancelCondition)); // this should timeout
-        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
+        AssertFalse(queue.wait_pop(item, 25ms, cancelCondition)); // this should timeout
+        AssertTrue(queue.wait_pop(item, 26ms, cancelCondition));
         AssertThat(item, "item1");
         AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
         AssertThat(item, "item2");
@@ -232,15 +233,18 @@ TestImpl(test_concurrent_queue)
 
         // wait until we pop the item finally
         counter = 0;
-        AssertTrue(queue.wait_pop_interval(item, 100ms, 10ms, [&] { return ++counter >= 10; }));
+        AssertTrue(queue.wait_pop_interval(item, 100ms, 5ms, [&] { return ++counter >= 20; }));
         AssertThat(item, "item2");
-        AssertLess(int(counter), 10); // we should never have reached 10 checks
+        AssertLess(int(counter), 20); // we should never have reached all the checks
 
         // now wait with extreme short intervals
         counter = 0;
         AssertTrue(queue.wait_pop_interval(item, 55ms, 1ms, [&] { return ++counter >= 55; }));
         AssertThat(item, "item3");
         AssertLess(int(counter), 55); // we should never have reached the limit
-        AssertGreater(int(counter), 49); // but we should have reached at least 49 checks
+
+        // we should have reached at least 49 checks, but the previous tests also produce some
+        // timing side effects, so relax the requirement to (50 - prevTestIntervalMS) which is 45
+        AssertGreater(int(counter), 45);
     }
 };

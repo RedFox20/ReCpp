@@ -28,9 +28,9 @@ namespace rpp
 
     public:
 
-        using Clock = std::chrono::high_resolution_clock;
-        using Duration = Clock::duration;
-        using TimePoint = Clock::time_point;
+        using clock = std::chrono::high_resolution_clock;
+        using duration = clock::duration;
+        using time_point = clock::time_point;
 
         concurrent_queue() = default;
         ~concurrent_queue() noexcept
@@ -170,7 +170,8 @@ namespace rpp
             T item;
             {
                 std::lock_guard lock {Mutex};
-                if (Queue.empty()) throw std::runtime_error("concurrent_queue<T>::pop(): Queue was empty!");
+                if (Queue.empty())
+                    throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
                 pop_unlocked(item);
             }
             notify();
@@ -239,15 +240,29 @@ namespace rpp
          * @endcode
          */
         [[nodiscard]]
-        bool wait_pop(T& outItem, Duration timeout)
+        bool wait_pop(T& outItem, duration timeout)
         {
-            TimePoint end = Clock::now() + timeout;
+            duration remaining = timeout;
+            time_point prevTime = clock::now();
+            constexpr duration zero = duration{0};
+
             std::unique_lock lock {Mutex}; // may throw
             while (Queue.empty())
             {
-                std::cv_status status = Waiter.wait_until(lock, end); // may throw
+                std::cv_status status = Waiter.wait_for(lock, remaining); // may throw
+                if (status == std::cv_status::no_timeout && !Queue.empty())
+                    break; // notified
                 if (status == std::cv_status::timeout)
                     break;
+
+                // clock is assumed to be steady and should only tick forward
+                // but we all know stdlib bugs happen, so this is not always correct
+                // this abs(delta_time) approach circumvents any such issues
+                time_point now = clock::now();
+                remaining -= std::chrono::abs(now - prevTime);
+                prevTime = now;
+                if (remaining <= zero)
+                    break; // final timeout
             }
             if (Queue.empty())
                 return false;
@@ -278,9 +293,9 @@ namespace rpp
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop(T& outItem, Duration timeout, const WaitUntil& cancelCondition)
+        bool wait_pop(T& outItem, duration timeout, const WaitUntil& cancelCondition)
         {
-            auto interval = timeout / 10;
+            duration interval = timeout / 10;
             return wait_pop_interval<WaitUntil>(outItem, timeout, interval, cancelCondition);
         }
 
@@ -293,7 +308,8 @@ namespace rpp
          *       is checked multiple times, instead of only between waits if someone notifies.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
-         * @param timeout Total timeout for the entire wait loop, granularity is defined by @param interval
+         * @param timeout Total timeout for the entire wait loop, granularity
+         *                is defined by @param interval
          * @param interval Interval for checking the cancellation condition
          * @param cancelCondition Cancellation condition, CANCEL if cancelCondition()==true
          * @return TRUE if an item was popped,
@@ -309,24 +325,36 @@ namespace rpp
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop_interval(T& outItem, Duration timeout, Duration interval, const WaitUntil& cancelCondition)
+        bool wait_pop_interval(T& outItem, duration timeout, duration interval, 
+                               const WaitUntil& cancelCondition)
         {
-            TimePoint next = Clock::now();
-            TimePoint end = next + timeout;
+            duration remaining = timeout;
+            time_point prevTime = clock::now();
+            constexpr duration zero = duration{0};
+
             std::unique_lock lock {Mutex};
             while (Queue.empty())
             {
                 if (cancelCondition())
                     break;
-                next += interval;
-                if (next > end)
-                    next = end;
-                std::cv_status status = Waiter.wait_until(lock, next); // may throw
+                std::cv_status status = Waiter.wait_for(lock, interval); // may throw
                 if (status == std::cv_status::no_timeout && !Queue.empty())
                     break; // notified
-                if (next == end)
-                    break; // final timeout
+
+                // clock is assumed to be steady and should only tick forward
+                // but we all know stdlib bugs happen, so this is not always correct
+                // this abs(delta_time) approach circumvents any such issues
+                time_point now = clock::now();
+                remaining -= std::chrono::abs(now - prevTime);
+                prevTime = now;
+                if (remaining <= zero)
+                    break; // timed out
+
+                // make sure we don't suspend past the final waiting point
+                if (interval > remaining)
+                    interval = remaining;
             }
+
             if (Queue.empty())
                 return false;
             pop_unlocked(outItem);
