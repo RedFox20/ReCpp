@@ -9,8 +9,6 @@
 #include <vector>
 #include <thread>
 #include <string>
-#include <mutex>
-#include <atomic>
 #include "condition_variable.h"
 #include "delegate.h"
 #include "config.h"
@@ -75,137 +73,6 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Simple semaphore for notifying and waiting on events
-     */
-    class semaphore
-    {
-        std::mutex m;
-        rpp::condition_variable cv;
-        int value = 0;
-
-    public:
-        enum wait_result {
-            notified,
-            timeout,
-        };
-    
-        semaphore() = default;
-        explicit semaphore(int initialCount)
-        {
-            reset(initialCount);
-        }
-
-        int count() const { return value; }
-
-        void reset(int newCount = 0)
-        {
-            value = newCount;
-            if (newCount > 0)
-                cv.notify_one();
-        }
-
-        void notify()
-        {
-            { std::lock_guard<std::mutex> lock{ m };
-                ++value;
-            }
-            cv.notify_one();
-        }
-
-        bool notify_once() // only notify if count <= 0
-        {
-            bool shouldNotify;
-            { std::lock_guard<std::mutex> lock{ m };
-                shouldNotify = value <= 0;
-                if (shouldNotify)
-                    ++value;
-            }
-            if (shouldNotify) cv.notify_one();
-            return shouldNotify;
-        }
-
-        void wait()
-        {
-           std::unique_lock<std::mutex> lock{ m };
-            while (value <= 0) // wait until value is actually set
-                cv.wait(lock);
-            --value; // consume the value
-        }
-
-        /**
-         * Waits while @taskIsRunning is TRUE and sets it to TRUE again before returning
-         * This works well for atomic barriers, for example:
-         * @code
-         *   sync.wait_barrier_while(IsRunning);  // waits while IsRunning == true and sets it to true on return
-         *   processTask();
-         * @endcode
-         * @param taskIsRunning Reference to atomic flag to wait on
-         */
-        void wait_barrier_while(std::atomic_bool& taskIsRunning)
-        {
-            if (!taskIsRunning) {
-                taskIsRunning = true;
-                return;
-            }
-            std::unique_lock<std::mutex> lock{ m };
-            while (taskIsRunning)
-                cv.wait(lock);
-            taskIsRunning = true;
-        }
-        
-        /**
-         * Waits while @atomicFlag is FALSE and sets it to FALSE again before returning
-         * This works well for atomic barriers, for example:
-         * @code
-         *   sync.wait_barrier_until(HasFinished);  // waits while HasFinished == false and sets it to false on return
-         *   processResults();
-         * @endcode
-         * @param hasFinished Reference to atomic flag to wait on
-         */
-        void wait_barrier_until(std::atomic_bool& hasFinished)
-        {
-            if (hasFinished) {
-                hasFinished = false;
-                return;
-            }
-            std::unique_lock<std::mutex> lock{ m };
-            while (!hasFinished)
-                cv.wait(lock);
-            hasFinished = false;
-        }
-        
-        /**
-         * @param timeout Maximum time to wait for this semaphore to be notified
-         * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
-         */
-        template<class Rep, class Period>
-        wait_result wait(std::chrono::duration<Rep, Period> timeout)
-        {
-            std::unique_lock<std::mutex> lock{ m };
-            while (value <= 0)
-            {
-                if (cv.wait_for(lock, timeout) == std::cv_status::timeout)
-                    return semaphore::timeout;
-            }
-            --value;
-            return notified;
-        }
-
-        bool try_wait()
-        {
-            std::unique_lock<std::mutex> lock{ m };
-            if (value > 0) {
-                --value;
-                return true;
-            }
-            return false;
-        }
-    };
-
-    //////////////////////////////////////////////////////////////////////////////////////////
-
-
     template<class Signature> using task_delegate = rpp::delegate<Signature>;
 
 
@@ -222,7 +89,14 @@ namespace rpp
     using pool_trace_provider = std::string (*)();
 
 
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief Sets the debug name for this thread
+     */
     RPPAPI void set_this_thread_name(const char* name);
+
+    //////////////////////////////////////////////////////////////////////////////////////////
 
     /**
      * A simple thread-pool task. Can run owning generic Tasks using standard function<> and

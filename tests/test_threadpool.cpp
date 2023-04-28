@@ -1,5 +1,6 @@
 #include <rpp/tests.h>
 #include <rpp/thread_pool.h>
+#include <rpp/semaphore.h>
 #include <rpp/timer.h> // performance measurement
 #include <atomic>
 #include <unordered_set>
