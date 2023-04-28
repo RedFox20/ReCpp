@@ -476,14 +476,4 @@ namespace rpp
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @return TRUE if @flag == @expectedValue and atomically sets @flag to @newValue
-     */
-    inline bool atomic_test_and_set(std::atomic_bool& flag, bool expectedValue = true, bool newValue = false)
-    {
-        return flag.compare_exchange_weak(expectedValue, newValue);
-    }
-
-    //////////////////////////////////////////////////////////////////////////////////////////
-
 } // namespace rpp
