@@ -11,7 +11,7 @@
 #include <string>
 #include <mutex>
 #include <atomic>
-#include <condition_variable>
+#include "condition_variable.h"
 #include "delegate.h"
 #include "config.h"
 
@@ -81,7 +81,7 @@ namespace rpp
     class semaphore
     {
         std::mutex m;
-        std::condition_variable cv;
+        rpp::condition_variable cv;
         int value = 0;
 
     public:
