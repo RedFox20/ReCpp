@@ -45,6 +45,7 @@
     #include <errno.h>              // last error number
     #include <sys/ioctl.h>          // ioctl()
     #include <sys/fcntl.h>          // fcntl()
+    #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
     #include <ifaddrs.h>            // getifaddrs / freeifaddrs
     #define sleep(milliSeconds) ::usleep((milliSeconds) * 1000)
@@ -1079,6 +1080,17 @@ namespace rpp
     {
         int n = get_opt(SOL_SOCKET, SO_SNDBUF);
         return n >= 0 ? n : 0;
+    }
+
+    int socket::get_send_buffer_remaining() const noexcept
+    {
+        int outQueueSize; // (not sent + not acked)
+        if (get_ioctl(SIOCOUTQ, outQueueSize) == 0/*OK*/)
+        {
+            int sndBufSize = get_snd_buf_size();
+            return (sndBufSize > outQueueSize) ? (sndBufSize - outQueueSize) : 0;
+        }
+        return -1; // unknown
     }
 
     ////////////////////////////////////////////////////////////////////////////////

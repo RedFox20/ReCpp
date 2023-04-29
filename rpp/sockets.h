@@ -577,6 +577,9 @@ namespace rpp
         // @return Send buffer size
         int get_snd_buf_size() const noexcept;
 
+        /// @return Remaining space in the socket send buffer. 0 if no space. -1 on error.
+        int get_send_buffer_remaining() const noexcept;
+
         ////////////////////////////////////////////////////////////////////////////
 
         // @return The SocketType of the socket
