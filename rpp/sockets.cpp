@@ -1084,12 +1084,14 @@ namespace rpp
 
     int socket::get_send_buffer_remaining() const noexcept
     {
-        int outQueueSize; // (not sent + not acked)
-        if (get_ioctl(SIOCOUTQ, outQueueSize) == 0/*OK*/)
-        {
-            int sndBufSize = get_snd_buf_size();
-            return (sndBufSize > outQueueSize) ? (sndBufSize - outQueueSize) : 0;
-        }
+        #ifdef SIOCOUTQ
+            int outQueueSize; // (not sent + not acked)
+            if (get_ioctl(SIOCOUTQ, outQueueSize) == 0/*OK*/)
+            {
+                int sndBufSize = get_snd_buf_size();
+                return (sndBufSize > outQueueSize) ? (sndBufSize - outQueueSize) : 0;
+            }
+        #endif
         return -1; // unknown
     }
 
