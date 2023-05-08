@@ -1,6 +1,7 @@
 //#define _DEBUG_FUNCTIONAL_MACHINERY
 #include <rpp/delegate.h>
 #include <rpp/stack_trace.h>
+#include <functional>
 #include <rpp/tests.h>
 
 namespace rpp

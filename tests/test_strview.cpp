@@ -1,6 +1,7 @@
 #include <rpp/tests.h>
 using namespace rpp;
 #include <limits>
+#include <unordered_map>
 
 constexpr auto MAX_DOUBLE = std::numeric_limits<double>::max();
 constexpr auto MIN_DOUBLE = std::numeric_limits<double>::min();
@@ -171,6 +172,17 @@ TestImpl(test_strview)
         AssertThat(c, "strview");
         AssertThat(x, 1556);
         AssertThat(y, true);
+    }
+
+    TestCase(hashmap_of_strview)
+    {
+        std::unordered_map<strview, int> map;
+        map["hello"] = 1;
+        map["world"] = 2;
+        map["strview"] = 3;
+        AssertThat(map["hello"], 1);
+        AssertThat(map["world"], 2);
+        AssertThat(map["strview"], 3);
     }
 
     std::string toString(double f, int maxDecimals) {

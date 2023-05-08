@@ -8,7 +8,6 @@
 #endif
 #include <cstring>    // C string utilities
 #include <string>     // compatibility with std::string
-#include <functional> // std::hash
 #include "config.h"
 
 #ifndef RPP_STRVIEW_H
@@ -1076,6 +1075,7 @@ namespace rpp
 namespace std
 {
     /////////////////////// std::hash to use strview in maps ///////////////////////
+    template<class T> struct hash;
 
     template<> struct hash<rpp::strview>
     {
