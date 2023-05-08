@@ -4,7 +4,7 @@ project(ReCpp)
 option(BUILD_TESTS "Build RppTests executable for unit testing?" ON)
 option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
-option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" OFF)
+option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 
 if(ANDROID OR ANDROID_NDK)
 elseif(WIN32 OR MSVC)
