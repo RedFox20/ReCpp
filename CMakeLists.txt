@@ -4,7 +4,7 @@ project(ReCpp)
 option(BUILD_TESTS "Build RppTests executable for unit testing?" ON)
 option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
-option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
+option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" OFF)
 
 if(ANDROID OR ANDROID_NDK)
 elseif(WIN32 OR MSVC)
@@ -78,9 +78,11 @@ elseif(MSVC)
     if (MSVC_DYNAMIC)
         message("Using Dynamic CRT")
         set(MSVC_CRT /MD)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
     else()
         message("Using Static CRT")
         set(MSVC_CRT /MT)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
         # switch from dynamic to static linking of msvcrt
         foreach(flag_var
             CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
