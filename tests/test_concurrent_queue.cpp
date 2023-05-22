@@ -213,38 +213,38 @@ TestImpl(test_concurrent_queue)
 
         // wait for 100ms with 10ms intervals, but first item will arrive within ~50ms
         std::string item;
-        std::atomic_int counter = 0;
 
-        AssertTrue(queue.wait_pop_interval(item, 100ms, 10ms, [&] { return ++counter >= 10; }));
+        std::atomic_int counter0 = 0;
+        AssertTrue(queue.wait_pop_interval(item, 100ms, 10ms, [&] { return ++counter0 >= 10; }));
         AssertThat(item, "item1");
-        AssertGreaterOrEqual(int(counter), 5);
-        AssertLess(int(counter), 10);
+        AssertGreaterOrEqual(int(counter0), 5);
+        AssertLess(int(counter0), 10);
 
         // wait for 20ms with 5ms intervals, it should timeout
-        counter = 0;
-        AssertFalse(queue.wait_pop_interval(item, 20ms, 5ms, [&] { return ++counter >= 10; }));
-        AssertGreaterOrEqual(int(counter), 4);
-        AssertLess(int(counter), 6);
+        std::atomic_int counter1 = 0;
+        AssertFalse(queue.wait_pop_interval(item, 20ms, 5ms, [&] { return ++counter1 >= 10; }));
+        AssertGreaterOrEqual(int(counter1), 4);
+        AssertLess(int(counter1), 6);
 
         // wait another 30ms with 2ms intervals, and it should trigger the cancelcondition
-        counter = 0;
-        AssertFalse(queue.wait_pop_interval(item, 30ms, 2ms, [&] { return ++counter >= 10; }));
-        AssertThat(int(counter), 10); // it should have cancelled exactly at 10 checks
+        std::atomic_int counter2 = 0;
+        AssertFalse(queue.wait_pop_interval(item, 30ms, 2ms, [&] { return ++counter2 >= 10; }));
+        AssertThat(int(counter2), 10); // it should have cancelled exactly at 10 checks
 
         // wait until we pop the item finally
-        counter = 0;
-        AssertTrue(queue.wait_pop_interval(item, 100ms, 5ms, [&] { return ++counter >= 20; }));
+        std::atomic_int counter3 = 0;
+        AssertTrue(queue.wait_pop_interval(item, 100ms, 5ms, [&] { return ++counter3 >= 20; }));
         AssertThat(item, "item2");
-        AssertLess(int(counter), 20); // we should never have reached all the checks
+        AssertLess(int(counter3), 20); // we should never have reached all the checks
 
         // now wait with extreme short intervals
-        counter = 0;
-        AssertTrue(queue.wait_pop_interval(item, 55ms, 1ms, [&] { return ++counter >= 55; }));
+        std::atomic_int counter4 = 0;
+        AssertTrue(queue.wait_pop_interval(item, 55ms, 1ms, [&] { return ++counter4 >= 55; }));
         AssertThat(item, "item3");
-        AssertLess(int(counter), 55); // we should never have reached the limit
+        AssertLess(int(counter4), 55); // we should never have reached the limit
 
         // we should have reached at least 49 checks, but the previous tests also produce some
         // timing side effects, so relax the requirement to (50 - prevTestIntervalMS) which is 45
-        AssertGreater(int(counter), 45);
+        AssertGreater(int(counter4), 45);
     }
 };
