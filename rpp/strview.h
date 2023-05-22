@@ -1072,6 +1072,10 @@ namespace rpp
 
 } // namespace rpp
 
+#if RPP_CLANG_LLVM
+#  include <utility> // std::hash
+#endif
+
 namespace std
 {
     /////////////////////// std::hash to use strview in maps ///////////////////////
