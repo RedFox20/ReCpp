@@ -248,7 +248,7 @@ TestImpl(test_threadpool)
         AssertThat(thread_pool::global().active_tasks(), 0);
 
         std::atomic_int times_launched {0};
-        rpp::parallel_task([&] { times_launched += 1; })->wait(1000);
+        rpp::parallel_task([&] { times_launched += 1; })->wait(std::chrono::milliseconds{1000});
         AssertThat((int)times_launched, 1);
 
         print_info("Waiting for pool tasks to die naturally...\n");
@@ -257,7 +257,7 @@ TestImpl(test_threadpool)
         print_info("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 
-        })->wait(1000);
+        })->wait(std::chrono::milliseconds{1000});
         AssertThat((int)times_launched, 2);
 
         thread_pool::global().max_task_idle_time(2);
@@ -277,7 +277,7 @@ TestImpl(test_threadpool)
             };
 
             for (auto* task : subtasks)
-                AssertThat(task->wait(1000), pool_task::finished);
+                AssertThat(task->wait(std::chrono::milliseconds{1000}), pool_task::finished);
         };
         pool_task* Tasks[4] = {
             parallel_task(func),
@@ -287,7 +287,7 @@ TestImpl(test_threadpool)
         };
 
         for (auto* task : Tasks)
-            AssertThat(task->wait(1000), pool_task::finished);
+            AssertThat(task->wait(std::chrono::milliseconds{1000}), pool_task::finished);
 
         int expected = 4 * 6;
         AssertThat((int)times_launched, expected);

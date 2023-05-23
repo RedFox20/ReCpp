@@ -105,7 +105,7 @@ namespace rpp
     class RPPAPI pool_task
     {
         std::mutex m;
-        std::condition_variable cv;
+        rpp::condition_variable cv;
         std::thread th;
         char name[32];
 
@@ -121,11 +121,14 @@ namespace rpp
         volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
 
     public:
+
         enum wait_result
         {
             finished,
             timeout,
         };
+
+        using duration = rpp::condition_variable::duration;
 
         bool running()  const noexcept { return taskRunning; }
         const char* start_trace() const noexcept { return trace.empty() ? nullptr : trace.c_str(); }
@@ -150,14 +153,22 @@ namespace rpp
         // @return TRUE if run started successfully (task was not already running)
         [[nodiscard]] bool run_generic(task_delegate<void()>&& newTask) noexcept;
 
-        // wait for task to finish
+        // wait for task to finish with timeout
+        // if timeout duration is 0, then task completion is checked atomically
         // @note Throws any unhandled exceptions from background thread
         //       This is similar to std::future behaviour
         // @param outErr [out] if outErr != null && *outErr != null, then *outErr
         //                     is initialized with the caught exception (if any)
-        wait_result wait(int timeoutMillis = 0/*0=no timeout*/);
-        wait_result wait(int timeoutMillis, std::nothrow_t,
-                         std::exception_ptr* outErr = nullptr) noexcept;
+        wait_result wait(duration timeout);
+        wait_result wait(duration timeout, std::nothrow_t, std::exception_ptr* outErr = nullptr) noexcept;
+
+        // wait for task to finish (no timeout)
+        // @note Throws any unhandled exceptions from background thread
+        //       This is similar to std::future behaviour
+        // @param outErr [out] if outErr != null && *outErr != null, then *outErr
+        //                     is initialized with the caught exception (if any)
+        wait_result wait();
+        wait_result wait(std::nothrow_t, std::exception_ptr* outErr = nullptr) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -189,6 +200,8 @@ namespace rpp
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for
 
     public:
+
+        using duration = pool_task::duration;
 
         // the default global thread pool
         static thread_pool& global();

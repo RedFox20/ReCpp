@@ -138,35 +138,51 @@ namespace rpp
         return true;
     }
 
-    pool_task::wait_result pool_task::wait(int timeoutMillis)
+    pool_task::wait_result pool_task::wait(rpp::condition_variable::duration timeout)
     {
         std::exception_ptr err;
-        wait_result result = wait(timeoutMillis, std::nothrow, &err);
+        wait_result result = wait(timeout, std::nothrow, &err);
         if (err) std::rethrow_exception(err);
         return result;
     }
 
-    pool_task::wait_result pool_task::wait(int timeoutMillis, std::nothrow_t,
+    pool_task::wait_result pool_task::wait(rpp::condition_variable::duration timeout, std::nothrow_t,
                                            std::exception_ptr* outErr) noexcept
     {
-        wait_result result = finished;
+        wait_result result = wait_result::finished;
         std::unique_lock<std::mutex> lock{m};
         while (taskRunning && !killed)
         {
-            if (timeoutMillis)
+            if (cv.wait_for(lock, timeout) == std::cv_status::timeout)
             {
-                if (cv.wait_for(lock, milliseconds_t(timeoutMillis)) == std::cv_status::timeout)
-                {
-                    result = timeout;
-                    break;
-                }
-                // else: loop back and see if we finished
+                result = wait_result::timeout;
+                break;
             }
-            else
-            {
-                cv.wait(lock);
-                // loop back and see if we finished
-            }
+        }
+        // NOTE: this is thread safe only thanks to the unique lock above
+        if (auto e = error; outErr != nullptr && !*outErr)
+        {
+            *outErr = e;
+        }
+        return result;
+    }
+
+    pool_task::wait_result pool_task::wait()
+    {
+        std::exception_ptr err;
+        wait_result result = wait(std::nothrow, &err);
+        if (err) std::rethrow_exception(err);
+        return result;
+    }
+
+    pool_task::wait_result pool_task::wait(std::nothrow_t, std::exception_ptr* outErr) noexcept
+    {
+        wait_result result = wait_result::finished;
+        std::unique_lock<std::mutex> lock{m};
+        while (taskRunning && !killed)
+        {
+            cv.wait(lock);
+            // loop back and see if we finished
         }
         // NOTE: this is thread safe only thanks to the unique lock above
         if (auto e = error; outErr != nullptr && !*outErr)
@@ -186,7 +202,7 @@ namespace rpp
             killed = true;
         }
         cv.notify_all();
-        wait_result result = wait(timeoutMillis, std::nothrow);
+        wait_result result = wait(std::chrono::milliseconds{timeoutMillis}, std::nothrow);
         return join_or_detach(result);
     }
 
@@ -289,7 +305,8 @@ namespace rpp
                 return true;
             if (maxIdleTime > 0.000001f)
             {
-                if (cv.wait_for(lock, fseconds_t(maxIdleTime)) == std::cv_status::timeout)
+                auto wait = std::chrono::duration_cast<rpp::condition_variable::duration>(fseconds_t(maxIdleTime));
+                if (cv.wait_for(lock, wait) == std::cv_status::timeout)
                     return got_task(); // make sure to check for task even if it timeouts
             }
             else
@@ -533,7 +550,7 @@ namespace rpp
                     if (nextWait >= spawned) nextWait = 0;
 
                     auto& wait = active[nextWait];
-                    wait->wait(0, std::nothrow, &err);
+                    wait->wait(std::chrono::milliseconds{1}, std::nothrow, &err);
                     if (wait->run_range(start, end, rangeTask))
                         break; // great!
 
@@ -548,7 +565,7 @@ namespace rpp
         // wait on all the spawned tasks to finish
         for (uint32_t i = 0; i < spawned; ++i)
         {
-            active[i]->wait(0, std::nothrow, &err);
+            active[i]->wait(std::nothrow, &err);
         }
 
         // and finally throw them back into the pool
