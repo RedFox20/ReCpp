@@ -138,7 +138,7 @@ namespace rpp
         return true;
     }
 
-    pool_task::wait_result pool_task::wait(rpp::condition_variable::duration timeout)
+    pool_task::wait_result pool_task::wait(duration timeout)
     {
         std::exception_ptr err;
         wait_result result = wait(timeout, std::nothrow, &err);
@@ -146,7 +146,7 @@ namespace rpp
         return result;
     }
 
-    pool_task::wait_result pool_task::wait(rpp::condition_variable::duration timeout, std::nothrow_t,
+    pool_task::wait_result pool_task::wait(duration timeout, std::nothrow_t,
                                            std::exception_ptr* outErr) noexcept
     {
         wait_result result = wait_result::finished;
@@ -305,7 +305,7 @@ namespace rpp
                 return true;
             if (maxIdleTime > 0.000001f)
             {
-                auto wait = std::chrono::duration_cast<rpp::condition_variable::duration>(fseconds_t(maxIdleTime));
+                auto wait = std::chrono::duration_cast<duration>(fseconds_t(maxIdleTime));
                 if (cv.wait_for(lock, wait) == std::cv_status::timeout)
                     return got_task(); // make sure to check for task even if it timeouts
             }

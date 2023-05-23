@@ -128,7 +128,7 @@ namespace rpp
             timeout,
         };
 
-        using duration = rpp::condition_variable::duration;
+        using duration = std::chrono::high_resolution_clock::duration;
 
         bool running()  const noexcept { return taskRunning; }
         const char* start_trace() const noexcept { return trace.empty() ? nullptr : trace.c_str(); }
