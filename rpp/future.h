@@ -922,7 +922,7 @@ namespace rpp
         void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
         {
             if (poolTask) std::terminate(); // avoid task explosion
-            poolTask = rpp::parallel_task([this, cont]
+            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
             {
                 result = action();
                 cont.resume(); // call await_resume() and continue on this background thread
@@ -957,7 +957,7 @@ namespace rpp
         }
         void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) const
         {
-            rpp::parallel_task([cont,end=end]
+            rpp::parallel_task([cont,end=end]() /*clang-12 compat*/mutable
             {
                 // using cv wait_until since that's the most accurate way to suspend on both unix and win32
                 // only problem is spurious wakeups, but a simple while loop takes care of that
