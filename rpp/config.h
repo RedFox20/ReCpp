@@ -49,6 +49,22 @@
 #endif
 
 #if __cplusplus
+#  if _MSC_VER
+#    define RPP_HAS_CXX20 (_MSVC_LANG >= 202002L)
+#  else
+#    define RPP_HAS_CXX20 (__cplusplus >= 202002L)
+#  endif
+#endif
+
+#if __cplusplus
+#  if _MSC_VER
+#    define RPP_HAS_CXX23 (_MSVC_LANG > 202002L)
+#  else
+#    define RPP_HAS_CXX23 (__cplusplus > 202002L)
+#  endif
+#endif
+
+#if __cplusplus
 #  if RPP_HAS_CXX17
 #    define RPP_INLINE_STATIC inline static
 #  else

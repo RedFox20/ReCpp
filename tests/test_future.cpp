@@ -242,7 +242,7 @@ TestImpl(test_future)
         try
         {
             auto future = make_exceptional_future<int>(std::runtime_error{"aargh!"s});
-            future.get();
+            (void)future.get();
         }
         catch (const std::exception& e)
         {
@@ -326,4 +326,99 @@ TestImpl(test_future)
         AssertThat(Tasks[1], "future stringB"s);
         AssertThat(Tasks[2], "future stringC"s);
     }
+
+// C++20 coro support
+#if RPP_HAS_CXX20
+
+    rpp::cfuture<std::string> string_coro()
+    {
+        co_await std::chrono::milliseconds{1};
+        co_return "string from coro";
+    }
+
+    TestCase(coroutines_basic_string_coro)
+    {
+        AssertThat(string_coro().get(), "string from coro"s);
+    }
+
+    cfuture<void> void_coro(std::string& result)
+    {
+        co_await std::chrono::milliseconds{1};
+        result = co_await string_coro();
+        co_return;
+    }
+
+    TestCase(coroutines_basic_void_coro)
+    {
+        std::string result = "default";
+        auto f = void_coro(result);
+        AssertThat(result, "default"s);
+        f.get();
+        AssertThat(result, "string from coro"s);
+    }
+
+    cfuture<std::string> as_async(std::string s)
+    {
+        co_await std::chrono::milliseconds{1};
+        co_return s;
+    }
+
+    cfuture<std::string> multi_stage_coro()
+    {
+        std::string s = co_await as_async("123_");
+        s += co_await as_async("456_");
+        s += co_await as_async("789");
+        co_return s;
+    }
+
+    TestCase(coroutines_multi_stage_coro)
+    {
+        AssertThat(multi_stage_coro().get(), "123_456_789"s);
+    }
+
+    cfuture<std::string> future_string_coro()
+    {
+        co_return co_await async_task([] {
+            return "future string"s;
+        });
+    }
+
+    TestCase(coroutines_await_on_async_task)
+    {
+        AssertThat(future_string_coro().get(), "future string"s);
+    }
+
+    cfuture<std::string> exceptional_coro()
+    {
+        co_await std::chrono::milliseconds{1};
+
+        throw std::runtime_error{"aargh!"};
+        co_return "aargh!";
+    }
+
+    cfuture<std::string> exception_handling_coro()
+    {
+        std::string s = co_await as_async("abc");
+        bool exceptionWasThrown = false;
+        try
+        {
+            s += co_await exceptional_coro();
+            s += "xyz";
+        }
+        catch (const std::exception& e)
+        {
+            exceptionWasThrown = true;
+            AssertThat(e.what(), "aargh!"s);
+        }
+        AssertThat(exceptionWasThrown, true);
+
+        s += co_await as_async("def");
+        co_return s;
+    }
+    TestCase(coroutines_exception_handling)
+    {
+        AssertThat(exception_handling_coro().get(), "abcdef"s);
+    }
+
+#endif
 };

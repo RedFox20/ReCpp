@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "mamabuild",
+            "command": "mama", // Could be any other shell command
+            "args": ["build"],
+            "type": "shell"
+        },
+        {
+            "label": "mamabuild_debug",
+            "command": "mama", // Could be any other shell command
+            "args": ["build","debug"],
+            "type": "shell"
+        }
+    ]
+}
