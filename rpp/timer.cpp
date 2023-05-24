@@ -80,10 +80,53 @@ namespace rpp
         #endif
     }
 
+#if _WIN32
+    // win32 Sleep can be extremely inaccurate because the OS scheduler accuracy is 15.6ms by default
+    // to work around that issue, most of the sleep can be done in one big sleep, and the remainder
+    // can be spin looped with a Sleep(0) for yielding
+    void win32_sleep_us(uint64_t micros)
+    {
+        // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
+        constexpr uint64_t suspendThreshold = 16 * 1000; // 16ms as micros
+
+        // convert micros to time_now() resolution:
+        int64_t remaining = int64_t( (micros / 1'000'000.0) * period );
+        if (remaining > suspendThreshold)
+        {
+            // we need to measure exact suspend start time in case we timed out
+            // because the suspension timeout is not accurate at all
+            int64_t suspendStart = time_now();
+
+            int64_t timeout = remaining - suspendThreshold;
+            if (timeout < 0) timeout = 0;
+            Sleep(DWORD(timeout));
+
+            int64_t now = time_now();
+            remaining -= std::abs(now - suspendStart);
+            if (remaining <= 0)
+                return;
+        }
+
+        // spin loop is required because timeout is too short
+        {
+            int64_t prevTime = time_now();
+            do
+            {
+                Sleep(0); // sleep 0 is special, gives priority to other threads
+
+                int64_t now = time_now();
+                remaining -= std::abs(now - prevTime);
+                prevTime = now;
+            }
+            while (remaining > 0);
+        }
+    }
+#endif
+
     void sleep_ms(unsigned int millis) noexcept
     {
         #if _WIN32
-            Sleep(millis);
+            win32_sleep_us(millis * 1000);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             usleep(millis*1000);
         #else
@@ -94,32 +137,7 @@ namespace rpp
     void sleep_us(unsigned int micros) noexcept
     {
         #if _WIN32
-            if (micros >= 1000)
-            {
-                Sleep(micros / 1000); // this is not really accurate either... maybe always use NtDelayExecution?
-            }
-            else
-            {
-                // On Windows it's difficult to get sub-millisecond precision, so no guarantees...
-                static auto NtDll = GetModuleHandleW(L"ntdll.dll");
-                static auto NtDelayExecution     = (long(__stdcall*)(BOOL alertable, PLARGE_INTEGER delayInterval))GetProcAddress(NtDll, "NtDelayExecution");
-                static auto ZwSetTimerResolution = (long(__stdcall*)(ULONG requestedRes, BOOL setNew, ULONG* actualRes))GetProcAddress(NtDll, "ZwSetTimerResolution");
-
-                // TODO: this modifies the timer res for the entire application
-                static bool resolutionSet;
-                if (!resolutionSet) {
-                    ULONG actualResolution;
-                    ZwSetTimerResolution(1, true, &actualResolution);
-                    resolutionSet = true;
-                }
-
-                LARGE_INTEGER interval;
-                interval.QuadPart = (LONGLONG)micros * -1LL;
-                NtDelayExecution(true, &interval);
-
-                // this is how to restore the timer res later
-                //ZwSetTimerResolution(1, false, &actualResolution);
-            }
+            win32_sleep_us(micros);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             usleep(micros);
         #else
