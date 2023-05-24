@@ -8,7 +8,7 @@
 #include "thread_pool.h"
 #include <type_traits>
 
-#if RPP_HAS_CXX20 && defined(__cpp_impl_coroutine) && defined(__has_include) // Coroutines support for C++20
+#if RPP_HAS_CXX20 && defined(__has_include) // Coroutines support for C++20
     #if __has_include(<coroutine>)
         #include <coroutine>
         #define RPP_HAS_COROUTINES 1
@@ -433,7 +433,7 @@ namespace rpp
             return std::move((T&&)super::get()); // force-steal the internal shared_future result
         }
 
-    #if RPP_HAS_CXX20 // C++20 coro support
+    #if RPP_HAS_COROUTINES // C++20 coro support
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
