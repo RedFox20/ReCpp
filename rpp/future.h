@@ -442,7 +442,7 @@ namespace rpp
         // suspension point that launches the background async task
         void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
         {
-            rpp::parallel_task([this, cont]
+            rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
                     this->wait();
@@ -667,7 +667,7 @@ namespace rpp
         // suspension point that launches the background async task
         void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
         {
-            rpp::parallel_task([this, cont]
+            rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
                     this->wait();
@@ -861,8 +861,8 @@ struct RPP_CORO_STD::coroutine_traits<rpp::cfuture<T>, Args...>
          * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
          */
         rpp::cfuture<T> get_return_object() noexcept { return this->get_future().share(); }
-        std::suspend_never initial_suspend() const noexcept { return {}; }
-        std::suspend_never final_suspend() const noexcept { return {}; }
+        RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
+        RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
         void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
         {
             rpp::cpromise<T>::set_value(value);
@@ -884,8 +884,8 @@ struct RPP_CORO_STD::coroutine_traits<rpp::cfuture<void>, Args...>
     struct promise_type : rpp::cpromise<void>
     {
         rpp::cfuture<void> get_return_object() noexcept { return this->get_future().share(); }
-        std::suspend_never initial_suspend() const noexcept { return {}; }
-        std::suspend_never final_suspend() const noexcept { return {}; }
+        RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
+        RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
         void return_void() noexcept { this->set_value(); }
         void unhandled_exception() noexcept { this->set_exception(std::current_exception()); }
     };
