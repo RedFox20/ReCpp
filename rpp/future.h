@@ -8,8 +8,22 @@
 #include "thread_pool.h"
 #include <type_traits>
 
-#if RPP_HAS_CXX20 // Coroutines support for C++20
-#include <coroutine>
+#if RPP_HAS_CXX20 && defined(__cpp_impl_coroutine) && defined(__has_include) // Coroutines support for C++20
+    #if __has_include(<coroutine>)
+        #include <coroutine>
+        #define RPP_HAS_COROUTINES 1
+        #define RPP_CORO_STD std
+    #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang
+        #include <experimental/coroutine>
+        #define RPP_HAS_COROUTINES 1
+        #define RPP_CORO_STD std::experimental
+    #else
+        #define RPP_HAS_COROUTINES 0
+        #define RPP_CORO_STD
+    #endif
+#else
+    #define RPP_HAS_COROUTINES 0
+    #define RPP_CORO_STD
 #endif
 
 namespace rpp
@@ -426,7 +440,7 @@ namespace rpp
             return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
         // suspension point that launches the background async task
-        void await_suspend(std::coroutine_handle<> cont) noexcept
+        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
         {
             rpp::parallel_task([this, cont]
             {
@@ -644,14 +658,14 @@ namespace rpp
             }
         }
 
-#   if RPP_HAS_CXX20 // C++20 coroutine support
+    #if RPP_HAS_COROUTINES // C++20 coroutine support
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
             return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
         // suspension point that launches the background async task
-        void await_suspend(std::coroutine_handle<> cont) noexcept
+        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
         {
             rpp::parallel_task([this, cont]
             {
@@ -818,68 +832,64 @@ namespace rpp
     }
 } // namespace rpp
 
-#if RPP_HAS_CXX20 // Coroutines support for C++20
-#include <coroutine>
-namespace std
+#if RPP_HAS_COROUTINES
+/**
+ * Enable the use of rpp::cfuture<T> as a coroutine type
+ * by using a rpp::cpromise<T> as the promise type.
+ *
+ * The most flexible way to do this is to define a specialization
+ * of std::coroutine_traits<>
+ *
+ * This does not provide any async behaviors - simply allows easier interop
+ * between existing rpp::cfuture<T> async functions
+ *
+ * @code
+ *     // enables creating coroutines using rpp::cfuture<T>
+ *     rpp::cfuture<std::string> doWorkAsync()
+ *     {
+ *         co_return "hello from suspendable method";
+ *     }
+ * @endcode
+ */
+template<typename T, typename... Args>
+    requires(!std::is_void_v<T> && !std::is_reference_v<T>)
+struct RPP_CORO_STD::coroutine_traits<rpp::cfuture<T>, Args...>
 {
-    /**
-     * Enable the use of rpp::cfuture<T> as a coroutine type
-     * by using a rpp::cpromise<T> as the promise type.
-     *
-     * The most flexible way to do this is to define a specialization
-     * of std::coroutine_traits<>
-     *
-     * This does not provide any async behaviors - simply allows easier interop
-     * between existing rpp::cfuture<T> async functions
-     *
-     * @code
-     *     // enables creating coroutines using rpp::cfuture<T>
-     *     rpp::cfuture<std::string> doWorkAsync()
-     *     {
-     *         co_return "hello from suspendable method";
-     *     }
-     * @endcode
-     */
-    template<typename T, typename... Args>
-        requires(!std::is_void_v<T> && !std::is_reference_v<T>)
-    struct coroutine_traits<rpp::cfuture<T>, Args...>
+    struct promise_type : rpp::cpromise<T>
     {
-        struct promise_type : rpp::cpromise<T>
+        /**
+         * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
+         */
+        rpp::cfuture<T> get_return_object() noexcept { return this->get_future().share(); }
+        std::suspend_never initial_suspend() const noexcept { return {}; }
+        std::suspend_never final_suspend() const noexcept { return {}; }
+        void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
         {
-            /**
-             * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
-             */
-            rpp::cfuture<T> get_return_object() noexcept { return this->get_future().share(); }
-            std::suspend_never initial_suspend() const noexcept { return {}; }
-            std::suspend_never final_suspend() const noexcept { return {}; }
-            void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
-            {
-                rpp::cpromise<T>::set_value(value);
-            }
-            void return_value(T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
-            {
-                rpp::cpromise<T>::set_value(std::move(value));
-            }
-            void unhandled_exception() noexcept
-            {
-                rpp::cpromise<T>::set_exception(std::current_exception());
-            }
-        };
+            rpp::cpromise<T>::set_value(value);
+        }
+        void return_value(T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
+        {
+            rpp::cpromise<T>::set_value(std::move(value));
+        }
+        void unhandled_exception() noexcept
+        {
+            rpp::cpromise<T>::set_exception(std::current_exception());
+        }
     };
+};
 
-    template<typename... Args>
-    struct coroutine_traits<rpp::cfuture<void>, Args...>
+template<typename... Args>
+struct RPP_CORO_STD::coroutine_traits<rpp::cfuture<void>, Args...>
+{
+    struct promise_type : rpp::cpromise<void>
     {
-        struct promise_type : rpp::cpromise<void>
-        {
-            rpp::cfuture<void> get_return_object() noexcept { return this->get_future().share(); }
-            std::suspend_never initial_suspend() const noexcept { return {}; }
-            std::suspend_never final_suspend() const noexcept { return {}; }
-            void return_void() noexcept { this->set_value(); }
-            void unhandled_exception() noexcept { this->set_exception(std::current_exception()); }
-        };
+        rpp::cfuture<void> get_return_object() noexcept { return this->get_future().share(); }
+        std::suspend_never initial_suspend() const noexcept { return {}; }
+        std::suspend_never final_suspend() const noexcept { return {}; }
+        void return_void() noexcept { this->set_value(); }
+        void unhandled_exception() noexcept { this->set_exception(std::current_exception()); }
     };
-} // namespace std coro extension
+};
 
 namespace rpp
 {
@@ -909,7 +919,7 @@ namespace rpp
             return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
         }
         // suspension point that launches the background async task
-        void await_suspend(std::coroutine_handle<> cont) noexcept
+        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
         {
             if (poolTask) std::terminate(); // avoid task explosion
             poolTask = rpp::parallel_task([this, cont]
@@ -945,7 +955,7 @@ namespace rpp
         {
             return Clock::now() >= end;
         }
-        void await_suspend(std::coroutine_handle<> cont) const
+        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) const
         {
             rpp::parallel_task([cont,end=end]
             {
