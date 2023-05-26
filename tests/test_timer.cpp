@@ -33,6 +33,26 @@ TestImpl(test_timer)
         AssertLessOrEqual(elapsed, 100.0 + sigma_ms);
     }
 
+    TestCase(ensure_sleep_ms_accuracy)
+    {
+        Timer t;
+        rpp::sleep_ms(18);
+        double elapsed = t.elapsed_ms();
+        print_info("18ms sleep time: %f milliseconds\n", elapsed);
+        AssertGreaterOrEqual(elapsed, 18.0);
+        AssertLessOrEqual(elapsed, 18.1);
+    }
+
+    TestCase(ensure_sleep_us_accuracy)
+    {
+        Timer t;
+        rpp::sleep_us(1500);
+        double elapsed = t.elapsed_ms();
+        print_info("1500us sleep time: %f milliseconds\n", elapsed);
+        AssertGreaterOrEqual(elapsed, 1.5);
+        AssertLessOrEqual(elapsed, 1.52);
+    }
+
     TestCase(basic_stopwatch)
     {
         StopWatch sw;
