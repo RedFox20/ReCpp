@@ -6,29 +6,12 @@
  */
 #include <future>
 #include "thread_pool.h"
+#include "coroutines.h"
 #include <type_traits>
-
-#if RPP_HAS_CXX20 && defined(__has_include) // Coroutines support for C++20
-    #if __has_include(<coroutine>)
-        #include <coroutine>
-        #define RPP_HAS_COROUTINES 1
-        #define RPP_CORO_STD std
-    #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang
-        #include <experimental/coroutine>
-        #define RPP_HAS_COROUTINES 1
-        #define RPP_CORO_STD std::experimental
-    #else
-        #define RPP_HAS_COROUTINES 0
-        #define RPP_CORO_STD
-    #endif
-#else
-    #define RPP_HAS_COROUTINES 0
-    #define RPP_CORO_STD
-#endif
 
 namespace rpp
 {
-    template<class T>
+    template<class T = void>
     class NODISCARD cfuture;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -434,13 +417,15 @@ namespace rpp
         }
 
     #if RPP_HAS_COROUTINES // C++20 coro support
+
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
             return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
+
         // suspension point that launches the background async task
-        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
+        void await_suspend(rpp::coro_handle<> cont) noexcept
         {
             rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
             {
@@ -449,18 +434,58 @@ namespace rpp
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
+
         // gets the result and will rethrow any exceptions from the cfuture
         const T& await_resume() const &
         {
             return super::get();
         }
+
         // when called on temporary cfuture objects, the result has to be forcefully moved out
         [[nodiscard]] T await_resume() const &&
         {
             return std::move((T&&)super::get()); // force-steal the internal shared_future result
         }
-    #endif
+
+        /**
+         * Enable the use of rpp::cfuture<T> as a coroutine type
+         * by using a rpp::cpromise<T> as the promise type.
+         *
+         * This does not provide any async behaviors - simply allows easier interop
+         * between existing rpp::cfuture<T> async functions
+         *
+         * @code
+         *     // enables creating coroutines using rpp::cfuture<T>
+         *     rpp::cfuture<std::string> doWorkAsync()
+         *     {
+         *         co_return "hello from suspendable method";
+         *     }
+         * @endcode
+         */
+        struct promise_type : rpp::cpromise<T>
+        {
+            /**
+             * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
+             */
+            rpp::cfuture<T> get_return_object() noexcept { return this->get_future().share(); }
+            RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
+            RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
+            void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
+            {
+                rpp::cpromise<T>::set_value(value);
+            }
+            void return_value(T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
+            {
+                rpp::cpromise<T>::set_value(std::move(value));
+            }
+            void unhandled_exception() noexcept
+            {
+                rpp::cpromise<T>::set_exception(std::current_exception());
+            }
+        };
+    #endif // RPP_HAS_COROUTINES
     }; // cfuture<T>
+
 
     /**
      * Composable Futures with Coroutine support. See docs in cfuture<T>.
@@ -659,13 +684,15 @@ namespace rpp
         }
 
     #if RPP_HAS_COROUTINES // C++20 coroutine support
+
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
             return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
+
         // suspension point that launches the background async task
-        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
+        void await_suspend(rpp::coro_handle<> cont) noexcept
         {
             rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
             {
@@ -674,12 +701,35 @@ namespace rpp
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
+
         void await_resume() const
         {
             // get() waits for the final result and will rethrow any exceptions from the cfuture
             this->get();
         }
-    #endif
+
+        /**
+         * Enable the use of rpp::cfuture<void> as a coroutine type.
+         *
+         * This does not provide any async behaviors - simply allows easier interop
+         * between existing rpp::cfuture<void> async functions
+         *
+         * @code
+         *     rpp::cfuture<void> doWorkAsync()
+         *     {
+         *         co_return;
+         *     }
+         * @endcode
+         */
+        struct promise_type : rpp::cpromise<void>
+        {
+            rpp::cfuture<void> get_return_object() noexcept { return this->get_future().share(); }
+            RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
+            RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
+            void return_void() noexcept { this->set_value(); }
+            void unhandled_exception() noexcept { this->set_exception(std::current_exception()); }
+        };
+    #endif // RPP_HAS_COROUTINES
     }; // cfuture<void>
 
 
@@ -831,179 +881,3 @@ namespace rpp
         return wait_all(futures);
     }
 } // namespace rpp
-
-#if RPP_HAS_COROUTINES
-/**
- * Enable the use of rpp::cfuture<T> as a coroutine type
- * by using a rpp::cpromise<T> as the promise type.
- *
- * The most flexible way to do this is to define a specialization
- * of std::coroutine_traits<>
- *
- * This does not provide any async behaviors - simply allows easier interop
- * between existing rpp::cfuture<T> async functions
- *
- * @code
- *     // enables creating coroutines using rpp::cfuture<T>
- *     rpp::cfuture<std::string> doWorkAsync()
- *     {
- *         co_return "hello from suspendable method";
- *     }
- * @endcode
- */
-template<typename T, typename... Args>
-    requires(!std::is_void_v<T> && !std::is_reference_v<T>)
-struct RPP_CORO_STD::coroutine_traits<rpp::cfuture<T>, Args...>
-{
-    struct promise_type : rpp::cpromise<T>
-    {
-        /**
-         * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
-         */
-        rpp::cfuture<T> get_return_object() noexcept { return this->get_future().share(); }
-        RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
-        RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
-        void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
-        {
-            rpp::cpromise<T>::set_value(value);
-        }
-        void return_value(T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
-        {
-            rpp::cpromise<T>::set_value(std::move(value));
-        }
-        void unhandled_exception() noexcept
-        {
-            rpp::cpromise<T>::set_exception(std::current_exception());
-        }
-    };
-};
-
-template<typename... Args>
-struct RPP_CORO_STD::coroutine_traits<rpp::cfuture<void>, Args...>
-{
-    struct promise_type : rpp::cpromise<void>
-    {
-        rpp::cfuture<void> get_return_object() noexcept { return this->get_future().share(); }
-        RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
-        RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
-        void return_void() noexcept { this->set_value(); }
-        void unhandled_exception() noexcept { this->set_exception(std::current_exception()); }
-    };
-};
-
-namespace rpp
-{
-    /**
-     * @brief Allows to asynchronously co_await on any lambdas via rpp::parallel_task()
-     * @code
-     *     using namespace rpp::coro_operators;
-     *     co_await [&]{ downloadFile(url); };
-     * @endcode
-     */
-    template<typename Task>
-        requires std::is_invocable_v<Task>
-    struct lambda_awaiter
-    {
-        Task action;
-        using T = decltype(action());
-        T result {};
-        rpp::pool_task* poolTask = nullptr;
-
-        explicit lambda_awaiter(Task&& task) noexcept : action{std::move(task)} {}
-
-        // is the task ready?
-        bool await_ready() const noexcept
-        {
-            if (!poolTask) // task hasn't even been created yet!
-                return false;
-            return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
-        }
-        // suspension point that launches the background async task
-        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) noexcept
-        {
-            if (poolTask) std::terminate(); // avoid task explosion
-            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
-            {
-                result = action();
-                cont.resume(); // call await_resume() and continue on this background thread
-            });
-        }
-        T await_resume() noexcept
-        {
-            return std::move(result);
-        }
-    };
-    
-    /**
-     * @brief Awaiter object for std::chrono durations
-     */
-    template<class Clock = std::chrono::high_resolution_clock>
-    struct chrono_awaiter
-    {
-        using time_point = typename Clock::time_point;
-        using duration = typename Clock::duration;
-        time_point end;
-
-        explicit chrono_awaiter(const time_point& end) noexcept : end{end} {}
-        explicit chrono_awaiter(const duration& d) noexcept : end{Clock::now() + d} {}
-
-        template<typename Rep, typename Period>
-        explicit chrono_awaiter(std::chrono::duration<Rep, Period> d) noexcept
-            : end{Clock::now() + std::chrono::duration_cast<duration>(d)} {}
-
-        bool await_ready() const noexcept
-        {
-            return Clock::now() >= end;
-        }
-        void await_suspend(RPP_CORO_STD::coroutine_handle<> cont) const
-        {
-            rpp::parallel_task([cont,end=end]() /*clang-12 compat*/mutable
-            {
-                // using cv wait_until since that's the most accurate way to suspend on both unix and win32
-                // only problem is spurious wakeups, but a simple while loop takes care of that
-                {
-                    rpp::condition_variable cv;
-                    std::mutex m;
-                    std::unique_lock lock { m };
-                    while (cv.wait_until(lock, end) != std::cv_status::timeout)
-                    {
-                    }
-                }
-                // resume execution while still inside the background thread
-                cont.resume();
-            });
-        }
-        void await_resume() const noexcept {}
-    };
-
-    inline namespace coro_operators
-    {
-        /**
-         * @brief Allows to asynchronously co_await on any lambdas via rpp::parallel_task()
-         * @code
-         *     using namespace rpp::coro_operators;
-         *     co_await [&]{ downloadFile(url); };
-         * @endcode
-         */
-        template<typename Task>
-            requires std::is_invocable_v<Task>
-        lambda_awaiter<Task> operator co_await(Task&& task) noexcept
-        {
-            return lambda_awaiter<Task>{ std::move(task) };
-        }
-
-        /**
-         * @brief Allows to co_await on a std::chrono::duration
-         * @code
-         *     using namespace rpp::coro_operators;
-         *     co_await std::chrono::milliseconds{100};
-         * @endcode
-         */
-        template<typename Rep, typename Period>
-        auto operator co_await(const std::chrono::duration<Rep, Period>& duration) noexcept
-        {
-            return chrono_awaiter<>{ duration };
-        }
-    }
-} // namespace rpp coro
-#endif // Coroutines support for C++20
