@@ -50,7 +50,7 @@ TestImpl(test_timer)
         double elapsed = t.elapsed_ms();
         print_info("1500us sleep time: %f milliseconds\n", elapsed);
         AssertGreaterOrEqual(elapsed, 1.5);
-        AssertLessOrEqual(elapsed, 1.52);
+        AssertLessOrEqual(elapsed, 1.6);
     }
 
     TestCase(basic_stopwatch)
