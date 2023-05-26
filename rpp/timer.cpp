@@ -35,25 +35,31 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static const double period = []
+    // clock ticks divided by this period_den gives duration in seconds
+    // seconds multiplied by this gives clock ticks
+    static const double period_den = []() -> double
     {
         #if _WIN32
             LARGE_INTEGER freq;
             QueryPerformanceFrequency(&freq);
-            return 1.0 / double(freq.QuadPart);
+            return double(freq.QuadPart);
         #elif __APPLE__
             mach_timebase_info_data_t timebase;
             mach_timebase_info(&timebase);
-            return double(timebase.numer) / timebase.denom / 1e9;
+            return (1.0 / (double(timebase.numer) / timebase.denom / 1e9));
         #elif __linux__
-            return 1e-9; // nanoseconds for clock_gettime
-            // return 1e-6; // microseconds for gettimeofday
+            return 1'000'000'000; // nanoseconds for clock_gettime
+            // return 1'000'000; // microseconds for gettimeofday
         #elif __EMSCRIPTEN__
-            return 1e-6;
+            return 1'000'000;
         #else // default to std::chrono
-            return double(microseconds::period::num) / microseconds::period::den;
+            return (1.0 / (double(microseconds::period::num) / microseconds::period::den));
         #endif
     } ();
+
+    // clock ticks multiplied by this period gives duration in seconds
+    // seconds divided by this gives clock ticks
+    static const double period = []{ return 1.0 / period_den; }();
 
     double time_period() noexcept { return period; }
 
@@ -80,6 +86,38 @@ namespace rpp
         #endif
     }
 
+    int64_t from_sec_to_time_ticks(double seconds) noexcept
+    {
+        return int64_t(seconds * period_den);
+    }
+    int64_t from_ms_to_time_ticks(double millis) noexcept
+    {
+        return int64_t(millis / 1000.0 * period_den);
+    }
+    int64_t from_us_to_time_ticks(double micros) noexcept
+    {
+        return int64_t(micros / 1'000'000.0 * period_den);
+    }
+
+    int64_t ticks_to_millis(int64_t ticks) noexcept
+    {
+        double seconds = ticks * period;
+        return int64_t(seconds * 1000);
+    }
+
+    double time_ticks_to_sec(int64_t ticks) noexcept
+    {
+        return ticks * period;
+    }
+    double time_ticks_to_ms(int64_t ticks) noexcept
+    {
+        return ticks * period * 1'000;
+    }
+    double time_ticks_to_us(int64_t ticks) noexcept
+    {
+        return ticks * period * 1'000'000;
+    }
+
 #if _WIN32
     // win32 Sleep can be extremely inaccurate because the OS scheduler accuracy is 15.6ms by default
     // to work around that issue, most of the sleep can be done in one big sleep, and the remainder
@@ -87,18 +125,17 @@ namespace rpp
     void win32_sleep_us(uint64_t micros)
     {
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
-        constexpr uint64_t suspendThreshold = 16 * 1000; // 16ms as micros
+        const int64_t suspendThreshold = from_ms_to_time_ticks(16.0);
 
         // convert micros to time_now() resolution:
-        int64_t remaining = int64_t( (micros / 1'000'000.0) * period );
+        int64_t remaining = from_us_to_time_ticks(double(micros));
         if (remaining > suspendThreshold)
         {
             // we need to measure exact suspend start time in case we timed out
             // because the suspension timeout is not accurate at all
             int64_t suspendStart = time_now();
 
-            int64_t timeout = remaining - suspendThreshold;
-            if (timeout < 0) timeout = 0;
+            int64_t timeout = int64_t(time_ticks_to_ms(std::abs(remaining - suspendThreshold)));
             Sleep(DWORD(timeout));
 
             int64_t now = time_now();

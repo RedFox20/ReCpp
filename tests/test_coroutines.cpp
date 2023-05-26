@@ -1,5 +1,6 @@
 #include <rpp/coroutines.h>
 #include <rpp/future.h>
+#include <rpp/timer.h>
 
 #include <rpp/tests.h>
 using namespace rpp;
@@ -13,6 +14,27 @@ TestImpl(test_coroutines)
     }
 
 #if RPP_HAS_COROUTINES
+
+    rpp::cfuture<void> chrono_coro(int millis)
+    {
+        co_await std::chrono::milliseconds{millis};
+    }
+    TestCase(basic_chrono_coro)
+    {
+        rpp::Timer t1;
+        chrono_coro(50).get();
+        double e = t1.elapsed_ms();
+        // require some level of acceptable accuracy in the sleeps
+        AssertGreater(e, 49.5);
+        AssertLess(e, 55.0);
+
+        rpp::Timer t2;
+        chrono_coro(15).get();
+        double e2 = t2.elapsed_ms();
+        // require some level of acceptable accuracy in the sleeps
+        AssertGreater(e2, 14.5);
+        AssertLess(e2, 20.0);
+    }
 
     rpp::cfuture<std::string> string_coro()
     {

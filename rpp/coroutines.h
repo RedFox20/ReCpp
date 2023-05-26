@@ -127,16 +127,17 @@ namespace rpp
         {
             rpp::parallel_task([cont,end=end]() /*clang-12 compat*/mutable
             {
-                #if _MSC_VER
-                    auto d = std::chrono::duration_cast<std::chrono::microseconds>(end - Clock::now());
-                    int micros = static_cast<int>(d.count());
-                    if (micros > 0)
-                    {
-                        rpp::sleep_us(micros);
-                    }
-                #else
-                    std::this_thread::sleep_until(end);
-                #endif
+            #if _MSC_VER
+                // win32 internal Sleep is incredibly inaccurate, so rpp::sleep_us must be used
+                auto d = std::chrono::duration_cast<std::chrono::microseconds>(end - Clock::now());
+                int micros = static_cast<int>(d.count());
+                if (micros > 0)
+                {
+                    rpp::sleep_us(micros);
+                }
+            #else
+                std::this_thread::sleep_until(end);
+            #endif
                 // resume execution while still inside the background thread
                 cont.resume();
             });
