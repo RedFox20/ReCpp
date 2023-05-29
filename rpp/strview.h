@@ -393,11 +393,14 @@ namespace rpp
          * Count number of occurrances of this character inside the strview bounds
          */
         int count(char ch) const noexcept;
+
+        /** Index of character, or -1 if not found */
         int indexof(char ch) const noexcept;
         
-        // reverse iterating indexof
+        // Reverse iterating indexof
         int rindexof(char ch) const noexcept;
-        
+
+        // First index of any character that matches Chars array
         int indexofany(const char* chars, int n) const noexcept;
         template<int N> FINLINE int indexofany(const char (&chars)[N]) const noexcept {
             return indexofany(chars, N - 1);
