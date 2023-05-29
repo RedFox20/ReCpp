@@ -121,6 +121,27 @@ namespace rpp
     }
 
 #if _WIN32
+    void periodSleep(MMRESULT& status, DWORD milliseconds)
+    {
+        if (status == -1)
+        {
+            status = timeBeginPeriod(1); // set 1ms precision
+        }
+        constexpr int64_t mmTicksToMillis = 10000; // 1 tick = 100nsec
+        LARGE_INTEGER dueTime;
+        dueTime.QuadPart = int64_t(milliseconds) * -mmTicksToMillis;
+
+        if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
+            SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
+        {
+            WaitForSingleObject(hTimer, INFINITE);
+            CloseHandle(hTimer);
+        }
+        else
+        {
+            SleepEx(milliseconds, /*alertable*/TRUE);
+        }
+    }
     // win32 Sleep can be extremely inaccurate because the OS scheduler accuracy is 15.6ms by default
     // to work around that issue, most of the sleep can be done in one big sleep, and the remainder
     // can be spin looped with a Sleep(0) for yielding
@@ -139,6 +160,7 @@ namespace rpp
 
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
         const int64_t suspendThreshold = from_ms_to_time_ticks(16.0);
+        const int64_t periodThreshold = from_ms_to_time_ticks(2.0);
 
         MMRESULT timeBeginStatus = -1;
 
@@ -149,31 +171,18 @@ namespace rpp
             // suspended sleep, it's quite difficult to get this accurate on Windows compared to other OS's
             if (remaining > suspendThreshold)
             {
-                if (timeBeginStatus == -1)
-                {
-                    timeBeginStatus = timeBeginPeriod(1); // set 1ms precision
-                }
-
-                constexpr int64_t mmTicksToMillis = 10000; // 1 tick = 100nsec
-                LARGE_INTEGER dueTime;
-                dueTime.QuadPart = -15 * mmTicksToMillis;
-
-                if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
-                    SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
-                {
-                    WaitForSingleObject(hTimer, INFINITE);
-                    CloseHandle(hTimer);
-                }
-                else
-                {
-                    int64_t timeout = int64_t(time_ticks_to_ms(std::abs(remaining - suspendThreshold)));
-                    SleepEx(DWORD(timeout), /*alertable*/TRUE);
-                }
+                DWORD timeout = DWORD(time_ticks_to_ms(std::abs(remaining - suspendThreshold)));
+                periodSleep(timeBeginStatus, timeout);
+            }
+            else if (remaining > periodThreshold)
+            {
+                periodSleep(timeBeginStatus, 1);
             }
             else // spin loop is required because timeout is too short
             {
-                // sleep 0 is special, gives priority to other threads, otherwise returns immediately
-                SleepEx(0, /*alertable*/TRUE);
+                // on low-cpu count systems, SleepEx can lock us out for an indefinite period,
+                // so we're using yield for precision sleep here
+                YieldProcessor();
             }
 
             int64_t now = time_now();

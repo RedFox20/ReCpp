@@ -7,7 +7,8 @@ class ReCpp(mama.BuildTarget):
         pass
 
     def configure(self):
-        pass
+        if self.windows and os.getenv('APPVEYOR') != None:
+            self.add_cl_flags('/DAPPVEYOR')
 
     def package(self):
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
