@@ -1,4 +1,7 @@
 version: 2
+orbs:
+  win: circleci/windows@5.0 # VS2022
+
 jobs:
   clang:
     description: Ubuntu Clang x64 Build
@@ -29,10 +32,10 @@ jobs:
       - run: pipenv run mama gcc verbose build
       - run: pipenv run mama gcc verbose test="--verbosity=2"
   msvc:
-    description: Windows MSVC x64 Build
-    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    description: Windows MSVC VS2022 x64 Build
     executor:
-      name: win/default # VS2022
+      name: win/default
+      size: medium # can be medium, large, xlarge, 2xlarge
     steps:
       - checkout
       - run: pip3 install mama
