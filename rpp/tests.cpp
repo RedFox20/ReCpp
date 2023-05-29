@@ -771,7 +771,7 @@ namespace rpp
                                results.tests_failed, numTests, failed);
             for (const test_failure& f : results.failures)
             {
-                if (f.line) consolef(Red, "    %s(%d)  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
+                if (f.line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
                 else        consolef(Red, "    %s::%s: %s\n",    f.testname.data(), f.testcase.data(), f.message.data());
             }
             consolef(Default, "\n");

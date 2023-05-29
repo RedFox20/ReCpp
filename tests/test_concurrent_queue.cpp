@@ -113,21 +113,45 @@ TestImpl(test_concurrent_queue)
         consumer.get();
     }
 
-    // 
+    struct PopResult
+    {
+        std::string item;
+        double elapsed_ms;
+        bool success = false;
+        explicit operator bool() const noexcept { return success; }
+    };
+
+    PopResult wait_pop_timed(concurrent_queue<std::string>& queue, std::chrono::milliseconds timeout)
+    {
+        PopResult r;
+        rpp::Timer t;
+        r.success = queue.wait_pop(r.item, timeout);
+        r.elapsed_ms = t.elapsed_ms();
+        print_info("wait_pop_timed elapsed: %.2f ms item: %s\n", r.elapsed_ms, r.item.c_str());
+        return r;
+    };
+
+    // wait infinitely until an item is pushed
     TestCase(wait_pop_with_timeout)
     {
         concurrent_queue<std::string> queue;
-        std::string item;
-        AssertThat(queue.wait_pop(item, 5ms), false);
-        AssertThat(queue.wait_pop(item, 0ms), false);
+
+        PopResult r;
+        AssertFalse((r = wait_pop_timed(queue, 5ms)));
+        AssertInRange(r.elapsed_ms, 5.0, 5.2);
+
+        AssertFalse((r = wait_pop_timed(queue, 0ms)));
+        AssertInRange(r.elapsed_ms, 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout, 
         // we should get it immediately
         queue.push("item1");
-        rpp::Timer t;
-        AssertThat(queue.wait_pop(item, 10s), true);
-        AssertLess(t.elapsed_ms(), 10);
-        AssertThat(queue.wait_pop(item, 15ms), false);
+
+        AssertTrue((r = wait_pop_timed(queue, 10s)));
+        AssertInRange(r.elapsed_ms, 0.0, 10.0);
+
+        AssertFalse((r = wait_pop_timed(queue, 15ms)));
+        AssertInRange(r.elapsed_ms, 15.0, 15.2);
     }
 
     // introduce a slow producer thread so we can test our timeouts

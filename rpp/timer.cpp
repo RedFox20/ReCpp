@@ -160,8 +160,8 @@ namespace rpp
 
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
         static const int64_t millisecondTicks = from_ms_to_time_ticks(1.0);
-        static const int64_t suspendThreshold = millisecondTicks * 24; // ms
-        static const int64_t periodThreshold = millisecondTicks * 3; // ms
+        static const int64_t suspendThreshold = millisecondTicks * 16; // ms
+        static const int64_t periodThreshold = millisecondTicks * 2; // ms
 
         MMRESULT timeBeginStatus = -1;
 

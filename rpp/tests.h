@@ -183,6 +183,16 @@ namespace rpp
             assert_failed(file, line, "%s => '%s' %s '%s'", expr, sActual.c_str(), why, sExpect.c_str());
         }
 
+        template<class Actual, class Min, class Max>
+        void assumption_failed(const char* file, int line,
+            const char* expr, const Actual& actual, const char* why, const Min& min, const Max& max)
+        {
+            std::string sActual = as_short_string(actual);
+            std::string sMin = as_short_string(min);
+            std::string sMax = as_short_string(max);
+            assert_failed(file, line, "%s => '%s' %s min:'%s' max:'%s'", expr, sActual.c_str(), why, sMin.c_str(), sMax.c_str());
+        }
+
         int add_test_func(strview name, lambda_base lambda, lambda_base_fn fn, 
                           size_t expectedExHash, bool autorun);
 
@@ -215,39 +225,48 @@ namespace rpp
         {
             return expr == expected;
         }
-        static bool eq(unsigned int expr, int expected) { return expr == (unsigned int)expected; }
-        static bool eq(long unsigned int expr, int expected) { return expr == (long unsigned int)expected; }
-        static bool eq(long unsigned int expr, long int expected) { return expr == (long unsigned int)expected; }
-        static bool eq(long unsigned long expr, long long expected) { return expr == (long unsigned long)expected; }
-        static bool eq(float expr, float expected) { return fabs(expr - expected) < FLT_EPSILON; }
-        static bool eq(double expr, double expected) { return fabs(expr - expected) < DBL_EPSILON; }
+        static bool eq(unsigned int expr, int expected) noexcept { return expr == (unsigned int)expected; }
+        static bool eq(long unsigned int expr, int expected) noexcept { return expr == (long unsigned int)expected; }
+        static bool eq(long unsigned int expr, long int expected) noexcept { return expr == (long unsigned int)expected; }
+        static bool eq(long unsigned long expr, long long expected) noexcept { return expr == (long unsigned long)expected; }
+        static bool eq(float expr, float expected) noexcept { return fabs(expr - expected) < FLT_EPSILON; }
+        static bool eq(double expr, double expected) noexcept { return fabs(expr - expected) < DBL_EPSILON; }
 
-        template<class Expr, class Than> static bool gt(const Expr& expr, const Than& than)
+        template<class Expr, class Than> static bool gt(const Expr& expr, const Than& than) noexcept
         {
             return expr > than;
         }
-        static bool gt(unsigned int expr, int than) { return expr > (unsigned int)than; }
-        static bool gt(long unsigned int expr, int than) { return expr > (long unsigned int)than; }
-        static bool gt(long unsigned int expr, long int than) { return expr > (long unsigned int)than; }
-        static bool gt(long unsigned long expr, long long than) { return expr > (long unsigned long)than; }
+        static bool gt(unsigned int expr, int than) noexcept { return expr > (unsigned int)than; }
+        static bool gt(long unsigned int expr, int than) noexcept { return expr > (long unsigned int)than; }
+        static bool gt(long unsigned int expr, long int than) noexcept { return expr > (long unsigned int)than; }
+        static bool gt(long unsigned long expr, long long than) noexcept { return expr > (long unsigned long)than; }
 
-        template<class Expr, class Than> static bool lt(const Expr& expr, const Than& than)
+        template<class Expr, class Than> static bool lt(const Expr& expr, const Than& than) noexcept
         {
             return expr < than;
         }
-        static bool lt(unsigned int expr, int than) { return expr < (unsigned int)than; }
-        static bool lt(long unsigned int expr, int than) { return expr < (long unsigned int)than; }
-        static bool lt(long unsigned int expr, long int than) { return expr < (long unsigned int)than; }
-        static bool lt(long unsigned long expr, long long than) { return expr < (long unsigned long)than; }
+        static bool lt(unsigned int expr, int than) noexcept { return expr < (unsigned int)than; }
+        static bool lt(long unsigned int expr, int than) noexcept { return expr < (long unsigned int)than; }
+        static bool lt(long unsigned int expr, long int than) noexcept { return expr < (long unsigned int)than; }
+        static bool lt(long unsigned long expr, long long than) noexcept { return expr < (long unsigned long)than; }
 
-        template<class Expr, class Than> static bool lte(const Expr& expr, const Than& than)
+        template<class Expr, class Than> static bool lte(const Expr& expr, const Than& than) noexcept
         {
             return lt(expr, than) || eq(expr, than);
         }
 
-        template<class Expr, class Than> static bool gte(const Expr& expr, const Than& than)
+        template<class Expr, class Than> static bool gte(const Expr& expr, const Than& than) noexcept
         {
             return gt(expr, than) || eq(expr, than);
+        }
+
+        template<class Expr, class Min, class Max> static bool rngEx(const Expr& expr, const Min& min, const Max& max) noexcept
+        {
+            return gt(expr, min) && lt(expr, max);
+        }
+        template<class Expr, class Min, class Max> static bool rngInc(const Expr& expr, const Min& min, const Max& max) noexcept
+        {
+            return gte(expr, min) && lte(expr, max);
         }
     };
 
@@ -286,48 +305,80 @@ namespace rpp
 }while(0)
 
 #define AssertThat(expr, expected) do { \
-    const auto& __expr   = expr;           \
-    const auto& __expect = expected;       \
-    if (!rpp::Compare::eq(__expr, __expect)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); } \
+    const auto& __expr   = expr;        \
+    const auto& __expect = expected;    \
+    if (!rpp::Compare::eq(__expr, __expect)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); \
+    } \
 }while(0)
 
 #define AssertEqual AssertThat
 
 #define AssertThrows(expr, exceptionType) do { \
-    try { \
-        expr; \
+    try {                                      \
+        expr;                                  \
         assert_failed(__FILE__, __LINE__, "%s => expected exception of type %s", #expr, #exceptionType); \
     } catch (const exceptionType&) {} \
 }while(0)
 
 #define AssertNotEqual(expr, mustNotEqual) do { \
-    const auto& __expr    = expr;         \
-    const auto& __mustnot = mustNotEqual; \
-    if (rpp::Compare::eq(__expr, __mustnot)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); } \
+    const auto& __expr    = expr;               \
+    const auto& __mustnot = mustNotEqual;       \
+    if (rpp::Compare::eq(__expr, __mustnot)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); \
+    } \
 }while(0)
 
 #define AssertGreater(expr, than) do { \
-    const auto& __expr = expr;            \
-    const auto& __than = than;            \
-    if (!rpp::Compare::gt(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); } \
+    const auto& __expr = expr;         \
+    const auto& __than = than;         \
+    if (!rpp::Compare::gt(__expr, __than)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); \
+    } \
 }while(0)
 
 #define AssertLess(expr, than) do { \
-    const auto& __expr = expr;            \
-    const auto& __than = than;            \
-    if (!rpp::Compare::lt(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); } \
+    const auto& __expr = expr;      \
+    const auto& __than = than;      \
+    if (!rpp::Compare::lt(__expr, __than)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); \
+    } \
 }while(0)
 
 #define AssertGreaterOrEqual(expr, than) do { \
-    const auto& __expr = expr;            \
-    const auto& __than = than;            \
-    if (!rpp::Compare::gte(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); } \
+    const auto& __expr = expr;                \
+    const auto& __than = than;                \
+    if (!rpp::Compare::gte(__expr, __than)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); \
+    } \
 }while(0)
 
 #define AssertLessOrEqual(expr, than) do { \
-    const auto& __expr = expr;            \
-    const auto& __than = than;            \
-    if (!rpp::Compare::lte(__expr, __than)) { assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); } \
+    const auto& __expr = expr;             \
+    const auto& __than = than;             \
+    if (!rpp::Compare::lte(__expr, __than)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); \
+    } \
+}while(0)
+
+// whether expr is in range (INCLUSIVE) [rangeMin, rangeMax]
+#define AssertInRange(expr, rangeMin, rangeMax) do { \
+    const auto& __expr = expr;                       \
+    const auto& __rmin = rangeMin;                   \
+    const auto& __rmax = rangeMax;                   \
+    if (!rpp::Compare::rngInc(__expr, __rmin, __rmax)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be within inclusive range ["#rangeMin","#rangeMax"]", __rmin, __rmax); \
+    } \
+}while(0)
+
+// whether expr is in range (EXCLUSIVE) (rangeMin, rangeMax)
+#define AssertExRange(expr, rangeMin, rangeMax) do { \
+    const auto& __expr = expr;                       \
+    const auto& __rmin = rangeMin;                   \
+    const auto& __rmax = rangeMax;                   \
+    if (!rpp::Compare::rngEx(__expr, __rmin, __rmax)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be within exclusive range ("#rangeMin","#rangeMax")", __rmin, __rmax); \
+    } \
 }while(0)
 
 #define TestImpl(testclass) struct testclass : public rpp::test

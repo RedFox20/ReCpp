@@ -18,8 +18,7 @@ TestImpl(test_timer)
             spin_sleep_for(0.05);
             double elapsed = t.elapsed();
             print_info("iteration %d 50ms spin_sleep timer result: %f seconds\n", i+1, elapsed);
-            AssertGreaterOrEqual(elapsed, 0.05);
-            AssertLessOrEqual(elapsed, 0.05 + sigma_s);
+            AssertInRange(elapsed, 0.05, 0.05 + sigma_s);
         }
     }
 
@@ -31,8 +30,7 @@ TestImpl(test_timer)
             spin_sleep_for(0.05);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 50ms spin_sleep timer result: %f milliseconds\n", i+1, elapsed);
-            AssertGreaterOrEqual(elapsed, 50.0);
-            AssertLessOrEqual(elapsed, 50.0 + sigma_ms);
+            AssertInRange(elapsed, 50.0, 50.0 + sigma_ms);
         }
     }
 
@@ -45,8 +43,7 @@ TestImpl(test_timer)
             rpp::sleep_ms(18);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 18ms sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertGreaterOrEqual(elapsed, 18.0);
-            AssertLessOrEqual(elapsed, 18.2);
+            AssertInRange(elapsed, 18.0, 18.2);
         }
     }
 
@@ -59,8 +56,7 @@ TestImpl(test_timer)
             rpp::sleep_us(2500);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 2500us sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertGreaterOrEqual(elapsed, 2.5);
-            AssertLessOrEqual(elapsed, 2.7);
+            AssertInRange(elapsed, 2.5, 2.7);
         }
         for (int i = 0; i < 20; ++i)
         {
@@ -68,8 +64,7 @@ TestImpl(test_timer)
             rpp::sleep_us(500);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 500us sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertGreaterOrEqual(elapsed, 0.5);
-            AssertLessOrEqual(elapsed, 0.7);
+            AssertInRange(elapsed, 0.5, 0.7);
         }
     }
 
@@ -90,8 +85,7 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), true);
         print_info("100ms stopwatch time: %f seconds\n", sw.elapsed());
-        AssertGreaterOrEqual(sw.elapsed(), 0.1);
-        AssertLessOrEqual(sw.elapsed(), 0.1 + sigma_s);
+        AssertInRange(sw.elapsed(), 0.1, 0.1 + sigma_s);
         AssertThat(sw.elapsed(), sw.elapsed()); // ensure time is stable after stop
 
         sw.resume();
