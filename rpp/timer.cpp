@@ -17,6 +17,7 @@
             #include <android/log.h>
         #endif
     #endif
+    #include <thread>
 #elif __EMSCRIPTEN__
     #include <unistd.h> // usleep()
     #include <emscripten.h>
@@ -228,10 +229,10 @@ namespace rpp
     {
         #if _WIN32
             win32_sleep_us(millis * 1000);
-        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_us_abstime(millis * 1000);
+        // #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+        //     unix_sleep_us_abstime(millis * 1000);
         #else
-            this_thread::sleep_for(milliseconds(millis));
+            std::this_thread::sleep_for(std::chrono::milliseconds(millis));
         #endif
     }
 
@@ -239,10 +240,10 @@ namespace rpp
     {
         #if _WIN32
             win32_sleep_us(micros);
-        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_us_abstime(micros);
+        // #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+        //     unix_sleep_us_abstime(micros);
         #else
-            this_thread::sleep_for(microseconds(micros)); // On Windows, this does Sleep(1) in a loop
+            std::this_thread::sleep_for(std::chrono::microseconds(micros));
         #endif
     }
 
