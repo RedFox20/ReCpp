@@ -65,10 +65,11 @@ namespace rpp
 
     /**
      * Installs a default handler for SIGSEGV which will
-     * throw a traced_exception instead of terminating
+     * throw a traced_exception instead of quietly terminating
      * @note Will cause std::terminate if SIGSEGV happens in noexcept context
      */
     RPPAPI void register_segfault_tracer();
+
     /**
      * Installs a default handler for SIGSEGV which will
      * prints stack trace to stderr and then calls std::terminate

@@ -64,10 +64,10 @@ namespace rpp
         /** Starts the timer */
         void start() noexcept;
 
-        /** @return Number of seconds elapsed from start(); */
+        /** @return Fractional seconds elapsed from start() */
         double elapsed() const noexcept;
 
-        /** @return Number of milliseconds elapsed from start(); */
+        /** @return Fractional milliseconds elapsed from start() */
         double elapsed_ms() const noexcept { return elapsed() * 1000.0; }
 
         /** Gets the next time sample, since the last call to next() or start() and calls start() again */

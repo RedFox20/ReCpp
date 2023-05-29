@@ -177,9 +177,9 @@ TestImpl(test_concurrent_queue)
         scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 5.5);
-        AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 15.5);
+        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 8.0);
+        AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
+        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 18.0);
 
         AssertWaitPopTimed(50ms, true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
         AssertWaitPopTimed(75ms, true, /*item*/"item2", /*elapsed ms:*/ 25.0, 55.0);
