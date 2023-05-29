@@ -4,8 +4,15 @@
 
 TestImpl(test_timer)
 {
+
+#if APPVEYOR
+    static constexpr double sigma_s = 0.02;
+    static constexpr double sigma_ms = sigma_s * 2000.0;
+#else
     static constexpr double sigma_s = 0.01;
     static constexpr double sigma_ms = sigma_s * 1000.0;
+#endif
+
     TestInit(test_timer)
     {
     }

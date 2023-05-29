@@ -28,9 +28,20 @@ jobs:
       - run: make configure-cmake
       - run: pipenv run mama gcc verbose build
       - run: pipenv run mama gcc verbose test="--verbosity=2"
+  msvc:
+    description: Windows MSVC x64 Build
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    executor:
+      name: win/default # VS2022
+    steps:
+      - checkout
+      - run: pip3 install mama
+      - run: mama windows verbose build
+      - run: mama windows verbose test="--verbosity=2"
 workflows:
   version: 2
   build_all:
     jobs:
       - clang
       - gcc
+      - msvc
