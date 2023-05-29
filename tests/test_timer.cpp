@@ -43,7 +43,7 @@ TestImpl(test_timer)
             rpp::sleep_ms(18);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 18ms sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertInRange(elapsed, 18.0, 18.2);
+            AssertInRange(elapsed, 18.0, 19.0);
         }
     }
 

@@ -196,12 +196,40 @@ namespace rpp
     }
 #endif
 
+    #if __APPLE__ || __linux__ || __EMSCRIPTEN__
+    // void unix_sleep_us_loop(uin64_t micros)
+    // {
+    //     struct timespec t;
+    //     t.tv_sec  = (micros / 1'000'000ul);
+    //     t.tv_nsec = (micros % 1'000'000ul) * 1'000ul;
+    //     struct timespec rem;
+    //     while (nanosleep(&t, &rem) != 0)
+    //     {
+    //         t = rem; // keep sleeping
+    //     }
+    // }
+    void unix_sleep_us_abstime(uint64_t micros)
+    {
+        struct timespec deadline;
+        clock_gettime(CLOCK_MONOTONIC, &deadline);
+
+        deadline.tv_sec  += (micros / 1'000'000ul);
+        deadline.tv_nsec += (micros % 1'000'000ul) * 1'000ul;
+        // normalize tv_nsec by overflowing into tv_sec
+        if (deadline.tv_nsec >= 1000000000) {
+            deadline.tv_nsec -= 1000000000;
+            deadline.tv_sec++;
+        }
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, NULL);
+    }
+    #endif
+
     void sleep_ms(unsigned int millis) noexcept
     {
         #if _WIN32
             win32_sleep_us(millis * 1000);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            usleep(millis*1000);
+            unix_sleep_us_abstime(millis * 1000);
         #else
             this_thread::sleep_for(milliseconds(millis));
         #endif
@@ -212,7 +240,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_us(micros);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            usleep(micros);
+            unix_sleep_us_abstime(micros);
         #else
             this_thread::sleep_for(microseconds(micros)); // On Windows, this does Sleep(1) in a loop
         #endif
