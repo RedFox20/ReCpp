@@ -133,7 +133,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_with_timeout_slow_producer)
     {
         concurrent_queue<std::string> queue;
-        cfuture<void> slow_producer = rpp::async_task([&] {
+        auto slow_producer = std::jthread([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -169,7 +169,7 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
-        cfuture<void> slow_producer = rpp::async_task([&] {
+        auto slow_producer = std::jthread([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -202,7 +202,8 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_interval)
     {
         concurrent_queue<std::string> queue;
-        cfuture<void> slow_producer = rpp::async_task([&] {
+        auto slow_producer = std::jthread([&]
+        {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -211,35 +212,43 @@ TestImpl(test_concurrent_queue)
             queue.push("item3");
         });
 
-        // wait for 100ms with 10ms intervals, but first item will arrive within ~50ms
+        auto wait_pop_interval_timed = [&](std::string& item, std::chrono::milliseconds timeout, std::chrono::milliseconds interval, auto cancelCondition) {
+            rpp::Timer t;
+            bool result = queue.wait_pop_interval(item, timeout, interval, cancelCondition);
+            double elapsed = t.elapsed_ms();
+            print_info("wait_pop_interval elapsed: %.2f ms item: %s\n", elapsed, item.c_str());
+            return result;
+        };
+
         std::string item;
 
+        // wait for 100ms with 10ms intervals, but first item will arrive within ~50ms
         std::atomic_int counter0 = 0;
-        AssertTrue(queue.wait_pop_interval(item, 100ms, 10ms, [&] { return ++counter0 >= 10; }));
+        AssertTrue(wait_pop_interval_timed(item, 100ms, 10ms, [&] { return ++counter0 >= 10; }));
         AssertThat(item, "item1");
         AssertGreaterOrEqual(int(counter0), 5);
         AssertLess(int(counter0), 10);
 
         // wait for 20ms with 5ms intervals, it should timeout
         std::atomic_int counter1 = 0;
-        AssertFalse(queue.wait_pop_interval(item, 20ms, 5ms, [&] { return ++counter1 >= 10; }));
+        AssertFalse(wait_pop_interval_timed(item, 20ms, 5ms, [&] { return ++counter1 >= 10; }));
         AssertGreaterOrEqual(int(counter1), 4);
         AssertLess(int(counter1), 6);
 
         // wait another 30ms with 2ms intervals, and it should trigger the cancelcondition
         std::atomic_int counter2 = 0;
-        AssertFalse(queue.wait_pop_interval(item, 30ms, 2ms, [&] { return ++counter2 >= 10; }));
+        AssertFalse(wait_pop_interval_timed(item, 30ms, 2ms, [&] { return ++counter2 >= 10; }));
         AssertThat(int(counter2), 10); // it should have cancelled exactly at 10 checks
 
         // wait until we pop the item finally
         std::atomic_int counter3 = 0;
-        AssertTrue(queue.wait_pop_interval(item, 100ms, 5ms, [&] { return ++counter3 >= 20; }));
+        AssertTrue(wait_pop_interval_timed(item, 100ms, 5ms, [&] { return ++counter3 >= 20; }));
         AssertThat(item, "item2");
         AssertLess(int(counter3), 20); // we should never have reached all the checks
 
         // now wait with extreme short intervals
         std::atomic_int counter4 = 0;
-        AssertTrue(queue.wait_pop_interval(item, 55ms, 1ms, [&] { return ++counter4 >= 55; }));
+        AssertTrue(wait_pop_interval_timed(item, 55ms, 1ms, [&] { return ++counter4 >= 55; }));
         AssertThat(item, "item3");
         AssertLess(int(counter4), 55); // we should never have reached the limit
 
