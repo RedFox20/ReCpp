@@ -3,6 +3,8 @@
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
+    #include <timeapi.h>
+    #pragma comment(lib, "Winmm.lib") // MM time library
 #elif __APPLE__ || __linux__ || __ANDROID__
     #include <stdio.h>  // fprintf
     #include <unistd.h> // usleep()
@@ -124,38 +126,64 @@ namespace rpp
     // can be spin looped with a Sleep(0) for yielding
     void win32_sleep_us(uint64_t micros)
     {
+        if (micros == 0)
+        {
+            // sleep 0 is special, gives priority to other threads, otherwise returns immediately
+            SleepEx(0, /*alertable*/TRUE);
+            return;
+        }
+
+        // we need to measure exact suspend start time in case we timed out
+        // because the suspension timeout is not accurate at all
+        int64_t prevTime = time_now();
+
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
         const int64_t suspendThreshold = from_ms_to_time_ticks(16.0);
 
+        MMRESULT timeBeginStatus = -1;
+
         // convert micros to time_now() resolution:
         int64_t remaining = from_us_to_time_ticks(double(micros));
-        if (remaining > suspendThreshold)
+        while (remaining > 0)
         {
-            // we need to measure exact suspend start time in case we timed out
-            // because the suspension timeout is not accurate at all
-            int64_t suspendStart = time_now();
+            // suspended sleep, it's quite difficult to get this accurate on Windows compared to other OS's
+            if (remaining > suspendThreshold)
+            {
+                if (timeBeginStatus == -1)
+                {
+                    timeBeginStatus = timeBeginPeriod(1); // set 1ms precision
+                }
 
-            int64_t timeout = int64_t(time_ticks_to_ms(std::abs(remaining - suspendThreshold)));
-            Sleep(DWORD(timeout));
+                constexpr int64_t mmTicksToMillis = 10000; // 1 tick = 100nsec
+                LARGE_INTEGER dueTime;
+                dueTime.QuadPart = -15 * mmTicksToMillis;
+
+                if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
+                    SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
+                {
+                    WaitForSingleObject(hTimer, INFINITE);
+                    CloseHandle(hTimer);
+                }
+                else
+                {
+                    int64_t timeout = int64_t(time_ticks_to_ms(std::abs(remaining - suspendThreshold)));
+                    SleepEx(DWORD(timeout), /*alertable*/TRUE);
+                }
+            }
+            else // spin loop is required because timeout is too short
+            {
+                // sleep 0 is special, gives priority to other threads, otherwise returns immediately
+                SleepEx(0, /*alertable*/TRUE);
+            }
 
             int64_t now = time_now();
-            remaining -= std::abs(now - suspendStart);
-            if (remaining <= 0)
-                return;
+            remaining -= std::abs(now - prevTime);
+            prevTime = now;
         }
 
-        // spin loop is required because timeout is too short
+        if (timeBeginStatus == TIMERR_NOERROR)
         {
-            int64_t prevTime = time_now();
-            do
-            {
-                Sleep(0); // sleep 0 is special, gives priority to other threads
-
-                int64_t now = time_now();
-                remaining -= std::abs(now - prevTime);
-                prevTime = now;
-            }
-            while (remaining > 0);
+            timeEndPeriod(1);
         }
     }
 #endif

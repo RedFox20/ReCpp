@@ -15,42 +15,56 @@ TestImpl(test_timer)
 
     TestCase(basic_timer)
     {
-        Timer t;
-        spin_sleep_for(0.1);
-        double elapsed = t.elapsed();
-        print_info("100ms sleep time: %f seconds\n", elapsed);
-        AssertGreaterOrEqual(elapsed, 0.1);
-        AssertLessOrEqual(elapsed, 0.1 + sigma_s);
+        for (int i = 0; i < 10; ++i)
+        {
+            Timer t;
+            spin_sleep_for(0.1);
+            double elapsed = t.elapsed();
+            print_info("iteration %d 100ms sleep time: %f seconds\n", i+1, elapsed);
+            AssertGreaterOrEqual(elapsed, 0.1);
+            AssertLessOrEqual(elapsed, 0.1 + sigma_s);
+        }
     }
 
     TestCase(basic_timer_ms)
     {
-        Timer t;
-        spin_sleep_for(0.1);
-        double elapsed = t.elapsed_ms();
-        print_info("100ms sleep time: %f milliseconds\n", elapsed);
-        AssertGreaterOrEqual(elapsed, 100.0);
-        AssertLessOrEqual(elapsed, 100.0 + sigma_ms);
+        for (int i = 0; i < 10; ++i)
+        {
+            Timer t;
+            spin_sleep_for(0.1);
+            double elapsed = t.elapsed_ms();
+            print_info("100ms sleep time: %f milliseconds\n", elapsed);
+            AssertGreaterOrEqual(elapsed, 100.0);
+            AssertLessOrEqual(elapsed, 100.0 + sigma_ms);
+        }
     }
 
     TestCase(ensure_sleep_ms_accuracy)
     {
-        Timer t;
-        rpp::sleep_ms(18);
-        double elapsed = t.elapsed_ms();
-        print_info("18ms sleep time: %f milliseconds\n", elapsed);
-        AssertGreaterOrEqual(elapsed, 18.0);
-        AssertLessOrEqual(elapsed, 18.2);
+        print_info("ticks_per_second: %lld\n", from_sec_to_time_ticks(1.0));
+        for (int i = 0; i < 10; ++i)
+        {
+            Timer t;
+            rpp::sleep_ms(18);
+            double elapsed = t.elapsed_ms();
+            print_info("18ms sleep time: %f milliseconds\n", elapsed);
+            AssertGreaterOrEqual(elapsed, 18.0);
+            AssertLessOrEqual(elapsed, 18.2);
+        }
     }
 
     TestCase(ensure_sleep_us_accuracy)
     {
-        Timer t;
-        rpp::sleep_us(1500);
-        double elapsed = t.elapsed_ms();
-        print_info("1500us sleep time: %f milliseconds\n", elapsed);
-        AssertGreaterOrEqual(elapsed, 1.5);
-        AssertLessOrEqual(elapsed, 1.7);
+        print_info("ticks_per_second: %lld\n", from_sec_to_time_ticks(1.0));
+        for (int i = 0; i < 10; ++i)
+        {
+            Timer t;
+            rpp::sleep_us(1500);
+            double elapsed = t.elapsed_ms();
+            print_info("1500us sleep time: %f milliseconds\n", elapsed);
+            AssertGreaterOrEqual(elapsed, 1.5);
+            AssertLessOrEqual(elapsed, 1.7);
+        }
     }
 
     TestCase(basic_stopwatch)
