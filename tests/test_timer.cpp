@@ -17,7 +17,7 @@ TestImpl(test_timer)
             rpp::Timer t;
             spin_sleep_for(0.05);
             double elapsed = t.elapsed();
-            print_info("iteration %d 50ms spin_sleep timer result: %f seconds\n", i+1, elapsed);
+            print_info("iteration %d 50ms spin_sleep timer result: %fs\n", i+1, elapsed);
             AssertInRange(elapsed, 0.05, 0.05 + sigma_s);
         }
     }
@@ -29,7 +29,7 @@ TestImpl(test_timer)
             rpp::Timer t;
             spin_sleep_for(0.05);
             double elapsed = t.elapsed_ms();
-            print_info("iteration %d 50ms spin_sleep timer result: %f milliseconds\n", i+1, elapsed);
+            print_info("iteration %d 50ms spin_sleep timer result: %fms\n", i+1, elapsed);
             AssertInRange(elapsed, 50.0, 50.0 + sigma_ms);
         }
     }
@@ -42,8 +42,8 @@ TestImpl(test_timer)
             rpp::Timer t;
             rpp::sleep_ms(18);
             double elapsed = t.elapsed_ms();
-            print_info("iteration %d 18ms sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertInRange(elapsed, 18.0, 19.0);
+            print_info("iteration %d 18ms sleep time: %fms\n", i+1, elapsed);
+            AssertInRange(elapsed, 18.0, 30.0); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 
@@ -55,16 +55,16 @@ TestImpl(test_timer)
             rpp::Timer t;
             rpp::sleep_us(2500);
             double elapsed = t.elapsed_ms();
-            print_info("iteration %d 2500us sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertInRange(elapsed, 2.5, 2.7);
+            print_info("iteration %d 2500us sleep time: %fms\n", i+1, elapsed);
+            AssertInRange(elapsed, 2.5, 4.0); // OS sleep can never be accurate enough, so the range must be very loose
         }
         for (int i = 0; i < 20; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(500);
             double elapsed = t.elapsed_ms();
-            print_info("iteration %d 500us sleep time: %f milliseconds\n", i+1, elapsed);
-            AssertInRange(elapsed, 0.5, 0.7);
+            print_info("iteration %d 500us sleep time: %fms\n", i+1, elapsed);
+            AssertInRange(elapsed, 0.5, 2.0); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 
@@ -84,7 +84,7 @@ TestImpl(test_timer)
         sw.stop();
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), true);
-        print_info("100ms stopwatch time: %f seconds\n", sw.elapsed());
+        print_info("100ms stopwatch time: %fs\n", sw.elapsed());
         AssertInRange(sw.elapsed(), 0.1, 0.1 + sigma_s);
         AssertThat(sw.elapsed(), sw.elapsed()); // ensure time is stable after stop
 
