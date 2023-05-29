@@ -118,9 +118,12 @@ namespace rpp
 
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
         constexpr duration suspendThreshold = std::chrono::milliseconds{16};
+        constexpr duration periodThreshold = std::chrono::milliseconds{2};
         constexpr duration zero = duration{0};
 
         duration dur = rel_time;
+        time_point endTime = clock::now() + dur;
+
         if (dur > suspendThreshold)
         {
             // we need to measure exact suspend start time in case we timed out
@@ -132,7 +135,7 @@ namespace rpp
 
             status = _wait_suspended_unlocked(m, static_cast<DWORD>(timeout));
             if (status == std::cv_status::timeout)
-                dur -= (clock::now() - suspendStart);
+                dur = endTime - clock::now();
 
             IN_CVAR_DEBUG(duration totalElapsed = (clock::now() - suspendStart);
                           printf("suspended wait %p dur=%.2fms elapsed: %.2fms %s\n",
@@ -146,8 +149,7 @@ namespace rpp
         if (status == std::cv_status::timeout)
         {
             duration remaining = dur;
-            time_point prevTime = clock::now();
-            IN_CVAR_DEBUG(time_point spinStart = prevTime);
+            IN_CVAR_DEBUG(time_point spinStart = clock::now());
 
             // always enter the loop at least once, in case this is a 0-timeout condition check
             do
@@ -158,14 +160,11 @@ namespace rpp
                     break;
                 }
 
-                Sleep(0); // sleep 0 is special, gives priority to other threads
-                
-                // clock is assumed to be steady and should only tick forward
-                // but we all know stdlib bugs happen, so this is not always correct
-                // this abs(delta_time) approach circumvents any such issues
-                time_point now = clock::now();
-                remaining -= std::chrono::abs(now - prevTime);
-                prevTime = now;
+                // on low-cpu count systems, SleepEx can lock us out for an indefinite period,
+                // so we're using yield for precision sleep here
+                YieldProcessor();
+
+                remaining = endTime - clock::now();
             }
             while (remaining > zero);
 
