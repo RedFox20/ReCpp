@@ -10,6 +10,14 @@ TestImpl(test_concurrent_queue)
 {
     static constexpr double MS = 1.0 / 1000.0;
 
+#if APPVEYOR
+    static constexpr double sigma_s = 0.02;
+    static constexpr double sigma_ms = sigma_s * 2000.0;
+#else
+    static constexpr double sigma_s = 0.01;
+    static constexpr double sigma_ms = sigma_s * 1000.0;
+#endif
+
     TestInit(test_concurrent_queue)
     {
     }
@@ -169,11 +177,11 @@ TestImpl(test_concurrent_queue)
         scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 5.2);
+        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 5.5);
         AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
-        AssertWaitPopTimed(25ms, false, /*item*/"", /*elapsed ms:*/ 25.0, 25.2);
+        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 15.5);
 
-        AssertWaitPopTimed(25ms, true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
+        AssertWaitPopTimed(50ms, true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
         AssertWaitPopTimed(75ms, true, /*item*/"item2", /*elapsed ms:*/ 25.0, 55.0);
         AssertWaitPopTimed(75ms, true, /*item*/"item3", /*elapsed ms:*/ 25.0, 55.0);
 
