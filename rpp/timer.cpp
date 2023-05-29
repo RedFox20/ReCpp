@@ -156,27 +156,28 @@ namespace rpp
 
         // we need to measure exact suspend start time in case we timed out
         // because the suspension timeout is not accurate at all
-        int64_t prevTime = time_now();
+        int64_t startTime = time_now();
 
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
-        const int64_t suspendThreshold = from_ms_to_time_ticks(16.0);
-        const int64_t periodThreshold = from_ms_to_time_ticks(2.0);
+        static const int64_t millisecondTicks = from_ms_to_time_ticks(1.0);
+        static const int64_t suspendThreshold = millisecondTicks * 24; // ms
+        static const int64_t periodThreshold = millisecondTicks * 3; // ms
 
         MMRESULT timeBeginStatus = -1;
 
         // convert micros to time_now() resolution:
-        int64_t remaining = from_us_to_time_ticks(double(micros));
+        int64_t endTime = startTime + from_us_to_time_ticks(double(micros));
+        int64_t remaining = endTime - time_now();
         while (remaining > 0)
         {
             // suspended sleep, it's quite difficult to get this accurate on Windows compared to other OS's
             if (remaining > suspendThreshold)
             {
-                DWORD timeout = DWORD(time_ticks_to_ms(std::abs(remaining - suspendThreshold)));
-                periodSleep(timeBeginStatus, timeout);
+                periodSleep(timeBeginStatus, 5);
             }
             else if (remaining > periodThreshold)
             {
-                periodSleep(timeBeginStatus, 1);
+                periodSleep(timeBeginStatus, 1/*ms*/);
             }
             else // spin loop is required because timeout is too short
             {
@@ -185,9 +186,7 @@ namespace rpp
                 YieldProcessor();
             }
 
-            int64_t now = time_now();
-            remaining -= std::abs(now - prevTime);
-            prevTime = now;
+            remaining = endTime - time_now();
         }
 
         if (timeBeginStatus == TIMERR_NOERROR)
