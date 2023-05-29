@@ -1,6 +1,7 @@
 #include <rpp/concurrent_queue.h>
 #include <rpp/future.h>
 #include <rpp/timer.h>
+#include <rpp/scope_guard.h>
 #include <rpp/tests.h>
 using namespace rpp;
 using namespace std::chrono_literals;
@@ -133,7 +134,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_with_timeout_slow_producer)
     {
         concurrent_queue<std::string> queue;
-        auto slow_producer = std::jthread([&] {
+        auto slow_producer = std::thread([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -143,6 +144,7 @@ TestImpl(test_concurrent_queue)
             spin_sleep_for(100*MS);
             queue.push("item3");
         });
+        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
 
         std::string item;
         AssertThat(queue.wait_pop(item, 5ms), false);
@@ -169,7 +171,7 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
-        auto slow_producer = std::jthread([&] {
+        auto slow_producer = std::thread([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -180,6 +182,7 @@ TestImpl(test_concurrent_queue)
             finished = true;
             queue.notify(); // notify any waiting threads
         });
+        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
@@ -202,7 +205,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_interval)
     {
         concurrent_queue<std::string> queue;
-        auto slow_producer = std::jthread([&]
+        auto slow_producer = std::thread([&]
         {
             spin_sleep_for(50*MS);
             queue.push("item1");
@@ -211,6 +214,7 @@ TestImpl(test_concurrent_queue)
             spin_sleep_for(50*MS);
             queue.push("item3");
         });
+        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
 
         auto wait_pop_interval_timed = [&](std::string& item, std::chrono::milliseconds timeout, std::chrono::milliseconds interval, auto cancelCondition) {
             rpp::Timer t;
