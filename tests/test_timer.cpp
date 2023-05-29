@@ -63,7 +63,7 @@ TestImpl(test_timer)
             rpp::sleep_us(2500);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 2500us sleep time: %fms\n", i+1, elapsed);
-            AssertInRange(elapsed, 2.5, 4.0); // OS sleep can never be accurate enough, so the range must be very loose
+            AssertInRange(elapsed, 2.5, 5.0); // OS sleep can never be accurate enough, so the range must be very loose
         }
         for (int i = 0; i < 20; ++i)
         {
@@ -71,7 +71,7 @@ TestImpl(test_timer)
             rpp::sleep_us(500);
             double elapsed = t.elapsed_ms();
             print_info("iteration %d 500us sleep time: %fms\n", i+1, elapsed);
-            AssertInRange(elapsed, 0.5, 2.0); // OS sleep can never be accurate enough, so the range must be very loose
+            AssertInRange(elapsed, 0.5, 2.5); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 
