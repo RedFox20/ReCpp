@@ -39,8 +39,9 @@ jobs:
     steps:
       - checkout
       - run: pip3 install mama
-      - run: mama windows verbose build
-      - run: mama windows verbose test="--verbosity=2"
+      - run: choco install cmake -y
+      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose build
+      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose test="--verbosity=2"
 workflows:
   version: 2
   build_all:
