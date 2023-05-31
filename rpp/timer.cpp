@@ -101,11 +101,9 @@ namespace rpp
     {
         return int64_t(micros / 1'000'000.0 * period_den);
     }
-
-    int64_t ticks_to_millis(int64_t ticks) noexcept
+    int64_t from_ns_to_time_ticks(double nanos) noexcept
     {
-        double seconds = ticks * period;
-        return int64_t(seconds * 1000);
+        return int64_t(nanos / 1'000'000'000.0 * period_den);
     }
 
     double time_ticks_to_sec(int64_t ticks) noexcept
@@ -120,9 +118,13 @@ namespace rpp
     {
         return ticks * period * 1'000'000;
     }
+    double time_ticks_to_ns(int64_t ticks) noexcept
+    {
+        return ticks * period * 1'000'000'000;
+    }
 
 #if _WIN32
-    void periodSleep(MMRESULT& status, DWORD milliseconds)
+    static void periodSleep(MMRESULT& status, DWORD milliseconds)
     {
         if (status == -1)
         {
@@ -146,9 +148,9 @@ namespace rpp
     // win32 Sleep can be extremely inaccurate because the OS scheduler accuracy is 15.6ms by default
     // to work around that issue, most of the sleep can be done in one big sleep, and the remainder
     // can be spin looped with a Sleep(0) for yielding
-    void win32_sleep_us(uint64_t micros)
+    static void win32_sleep_ns(uint64_t nanos)
     {
-        if (micros == 0)
+        if (nanos == 0)
         {
             // sleep 0 is special, gives priority to other threads, otherwise returns immediately
             SleepEx(0, /*alertable*/TRUE);
@@ -195,44 +197,53 @@ namespace rpp
             timeEndPeriod(1);
         }
     }
+#elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+    inline void unix_sleep_ns_abstime(uint64_t nanos)
+    {
+        struct timespec deadline;
+        clock_gettime(CLOCK_REALTIME, &deadline);
+        constexpr uint64_t nanosPerSecond = 1'000'000'000ull;
+        deadline.tv_sec  += (nanos / nanosPerSecond);
+        deadline.tv_nsec += (nanos % nanosPerSecond);
+        // normalize tv_nsec by overflowing into tv_sec
+        if (deadline.tv_nsec >= nanosPerSecond) {
+            deadline.tv_nsec -= nanosPerSecond;
+            deadline.tv_sec++;
+        }
+        clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
+    }
 #endif
-
-    // #if __APPLE__ || __linux__ || __EMSCRIPTEN__
-    // void unix_sleep_us_abstime(uint64_t micros)
-    // {
-    //     struct timespec deadline;
-    //     clock_gettime(CLOCK_MONOTONIC, &deadline);
-
-    //     deadline.tv_sec  += (micros / 1'000'000ul);
-    //     deadline.tv_nsec += (micros % 1'000'000ul) * 1'000ul;
-    //     // normalize tv_nsec by overflowing into tv_sec
-    //     if (deadline.tv_nsec >= 1000000000) {
-    //         deadline.tv_nsec -= 1000000000;
-    //         deadline.tv_sec++;
-    //     }
-    //     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, NULL);
-    // }
-    // #endif
 
     void sleep_ms(unsigned int millis) noexcept
     {
         #if _WIN32
-            win32_sleep_us(millis * 1000);
-        // #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-        //     unix_sleep_us_abstime(millis * 1000);
+            win32_sleep_ns(millis * 1'000'000ull);
+        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+            unix_sleep_ns_abstime(millis * 1'000'000ull);
         #else
-            std::this_thread::sleep_for(std::chrono::milliseconds(millis));
+            std::this_thread::sleep_for(std::chrono::milliseconds{millis});
         #endif
     }
 
     void sleep_us(unsigned int micros) noexcept
     {
         #if _WIN32
-            win32_sleep_us(micros);
-        // #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-        //     unix_sleep_us_abstime(micros);
+            win32_sleep_ns(micros * 1'000ull);
+        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+            unix_sleep_ns_abstime(micros * 1'000ull);
         #else
-            std::this_thread::sleep_for(std::chrono::microseconds(micros));
+            std::this_thread::sleep_for(std::chrono::microseconds{micros});
+        #endif
+    }
+
+    void sleep_ns(uint64_t nanos) noexcept
+    {
+        #if _WIN32
+            win32_sleep_ns(nanos);
+        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
+            unix_sleep_ns_abstime(nanos);
+        #else
+            std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
     }
 

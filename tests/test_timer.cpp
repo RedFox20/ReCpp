@@ -24,7 +24,7 @@ TestImpl(test_timer)
             rpp::Timer t;
             spin_sleep_for(0.05);
             double elapsed = t.elapsed();
-            print_info("iteration %d 50ms spin_sleep timer result: %fs\n", i+1, elapsed);
+            print_info("timer %d 50ms spin_sleep timer result: %fs\n", i+1, elapsed);
             AssertInRange(elapsed, 0.05, 0.05 + sigma_s);
         }
     }
@@ -36,12 +36,12 @@ TestImpl(test_timer)
             rpp::Timer t;
             spin_sleep_for(0.05);
             double elapsed = t.elapsed_ms();
-            print_info("iteration %d 50ms spin_sleep timer result: %fms\n", i+1, elapsed);
+            print_info("timer_ms %d 50ms spin_sleep timer result: %fms\n", i+1, elapsed);
             AssertInRange(elapsed, 50.0, 50.0 + sigma_ms);
         }
     }
 
-    TestCase(ensure_sleep_ms_accuracy)
+    TestCase(ensure_sleep_millis_accuracy)
     {
         print_info("ticks_per_second: %lld\n", rpp::from_sec_to_time_ticks(1.0));
         for (int i = 0; i < 20; ++i)
@@ -49,29 +49,43 @@ TestImpl(test_timer)
             rpp::Timer t;
             rpp::sleep_ms(18);
             double elapsed = t.elapsed_ms();
-            print_info("iteration %d 18ms sleep time: %fms\n", i+1, elapsed);
+            print_info("millis %d 18ms sleep time: %gms\n", i+1, elapsed);
             AssertInRange(elapsed, 18.0, 30.0); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 
-    TestCase(ensure_sleep_us_accuracy)
+    TestCase(ensure_sleep_micros_accuracy)
     {
         print_info("ticks_per_second: %lld\n", rpp::from_sec_to_time_ticks(1.0));
         for (int i = 0; i < 20; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(2500);
-            double elapsed = t.elapsed_ms();
-            print_info("iteration %d 2500us sleep time: %fms\n", i+1, elapsed);
-            AssertInRange(elapsed, 2.5, 5.0); // OS sleep can never be accurate enough, so the range must be very loose
+            double elapsed_us = t.elapsed_ms() * 1000.0;
+            print_info("micros %d 2500us sleep time: %gus\n", i+1, elapsed_us);
+            AssertInRange(elapsed_us, 2500, 5000); // OS sleep can never be accurate enough, so the range must be very loose
         }
         for (int i = 0; i < 20; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(500);
-            double elapsed = t.elapsed_ms();
-            print_info("iteration %d 500us sleep time: %fms\n", i+1, elapsed);
-            AssertInRange(elapsed, 0.5, 2.5); // OS sleep can never be accurate enough, so the range must be very loose
+            double elapsed_us = t.elapsed_ms() * 1000.0;
+            print_info("micros %d 500us sleep time: %gus\n", i+1, elapsed_us);
+            AssertInRange(elapsed_us, 500, 4000); // OS sleep can never be accurate enough, so the range must be very loose
+        }
+    }
+
+    TestCase(ensure_sleep_nanos_accuracy)
+    {
+        print_info("ticks_per_second: %lld\n", rpp::from_sec_to_time_ticks(1.0));
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::Timer t;
+            // going below 100'000ns is not accurate with clock_nanosleep
+            rpp::sleep_ns(100'000);
+            double elapsed_ns = t.elapsed_ms() * 1'000'000.0;
+            print_info("nanos %d 100000ns sleep time: %gns\n", i+1, elapsed_ns);
+            AssertInRange(elapsed_ns, 100000, 400000); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 

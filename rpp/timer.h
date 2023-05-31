@@ -23,24 +23,31 @@ namespace rpp
     RPPAPI double time_period() noexcept;
 
     /** Converts fractional seconds to clock ticks that matches time_now() */
-    int64_t from_sec_to_time_ticks(double seconds) noexcept;
-    /** Converts fractional milliseconds int to clock ticks that matches time_now() */
-    int64_t from_ms_to_time_ticks(double millis) noexcept;
-    /** Converts fractional microseconds int to clock ticks that matches time_now() */
-    int64_t from_us_to_time_ticks(double micros) noexcept;
+    RPPAPI int64_t from_sec_to_time_ticks(double seconds) noexcept;
+    /** Converts fractional milliseconds to clock ticks that matches time_now() */
+    RPPAPI int64_t from_ms_to_time_ticks(double millis) noexcept;
+    /** Converts fractional microseconds to clock ticks that matches time_now() */
+    RPPAPI int64_t from_us_to_time_ticks(double micros) noexcept;
+    /** Converts fractional nanoseconds to clock ticks that matches time_now() */
+    RPPAPI int64_t from_ns_to_time_ticks(double nanos) noexcept;
 
     /** Converts clock ticks that matches time_now() into fractional seconds */
-    double time_ticks_to_sec(int64_t ticks) noexcept;
+    RPPAPI double time_ticks_to_sec(int64_t ticks) noexcept;
     /** Converts clock ticks that matches time_now() into fractional milliseconds */
-    double time_ticks_to_ms(int64_t ticks) noexcept;
+    RPPAPI double time_ticks_to_ms(int64_t ticks) noexcept;
     /** Converts clock ticks that matches time_now() into fractional microseconds */
-    double time_ticks_to_us(int64_t ticks) noexcept;
+    RPPAPI double time_ticks_to_us(int64_t ticks) noexcept;
+    /** Converts clock ticks that matches time_now() into fractional nanoseconds */
+    RPPAPI double time_ticks_to_ns(int64_t ticks) noexcept;
 
-    /** Let this thread sleep for provided milliseconds */
+    /** Let this thread sleep for provided MILLISECONDS */
     RPPAPI void sleep_ms(unsigned int millis) noexcept;
 
     /** Let this thread sleep for provided MICROSECONDS */
-    RPPAPI void sleep_us(unsigned int microseconds) noexcept;
+    RPPAPI void sleep_us(unsigned int micros) noexcept;
+
+    /** Let this thread sleep for provided NANOSECONDS */
+    RPPAPI void sleep_ns(uint64_t nanos) noexcept;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
