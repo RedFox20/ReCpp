@@ -168,8 +168,8 @@ namespace rpp
 
         MMRESULT timeBeginStatus = -1;
 
-        // convert micros to time_now() resolution:
-        int64_t endTime = startTime + from_us_to_time_ticks(double(micros));
+        // convert nanos to time_now() resolution:
+        int64_t endTime = startTime + from_ns_to_time_ticks(double(nanos));
         int64_t remaining = endTime - time_now();
         while (remaining > 0)
         {
