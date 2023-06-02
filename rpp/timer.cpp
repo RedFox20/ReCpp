@@ -202,7 +202,7 @@ namespace rpp
     {
         struct timespec deadline;
         clock_gettime(CLOCK_REALTIME, &deadline);
-        constexpr uint64_t nanosPerSecond = 1'000'000'000ull;
+        constexpr long nanosPerSecond = 1'000'000'000L;
         deadline.tv_sec  += (nanos / nanosPerSecond);
         deadline.tv_nsec += (nanos % nanosPerSecond);
         // normalize tv_nsec by overflowing into tv_sec
