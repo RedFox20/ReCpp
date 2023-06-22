@@ -129,6 +129,10 @@ TestImpl(test_timer)
             spin_sleep_for(0.05);
         }
         {
+            auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__ };
+            spin_sleep_for(0.05);
+        }
+        {
             auto spt = rpp::ScopedPerfTimer{ "[perf]", std::source_location::current() };
             spin_sleep_for(0.05);
         }
