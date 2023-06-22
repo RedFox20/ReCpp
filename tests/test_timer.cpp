@@ -125,10 +125,6 @@ TestImpl(test_timer)
             spin_sleep_for(0.05);
         }
         {
-            auto spt = rpp::ScopedPerfTimer{ std::source_location::current() };
-            spin_sleep_for(0.05);
-        }
-        {
             auto spt = rpp::ScopedPerfTimer { __FUNCTION__ }; // backwards compatibility
             spin_sleep_for(0.05);
         }

@@ -7,9 +7,6 @@
 #include "config.h"
 
 #if __cplusplus
-#  if RPP_HAS_CXX20
-#    include <source_location>
-#  endif
 
 namespace rpp
 {
@@ -176,16 +173,16 @@ namespace rpp
         ScopedPerfTimer(const char* prefix, const char* location, const char* detail) noexcept;
         ScopedPerfTimer(const char* prefix, const char* location) noexcept
             : ScopedPerfTimer{prefix, location, nullptr} {}
-    #if RPP_HAS_CXX20
-        ScopedPerfTimer(std::source_location location = std::source_location::current()) noexcept
-            : ScopedPerfTimer{"[perf]", location.function_name(), nullptr} {}
-    #endif
-        /**
-         * @brief For backwards compatibility
-         * @param location Location name where time is being measured
-         */
+    #if RPP_HAS_CXX20 || _MSC_VER >= 1926 || defined(__GNUC__)
+        explicit ScopedPerfTimer(const char* location = __builtin_FUNCTION()) noexcept
+            : ScopedPerfTimer{"[perf]", location, nullptr} {}
+    #else
+        ScopedPerfTimer() noexcept
+            : ScopedPerfTimer{"[perf]", "unknown location", nullptr} {}
+        /** @brief For backwards compatibility */
         explicit ScopedPerfTimer(const char* location) noexcept
             : ScopedPerfTimer{"[perf]", location, nullptr} {}
+    #endif
         ~ScopedPerfTimer() noexcept;
     };
 
