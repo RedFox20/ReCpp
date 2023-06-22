@@ -118,4 +118,19 @@ TestImpl(test_timer)
         AssertThat(sw.stopped(), false);
     }
 
+    TestCase(scoped_perf_timer)
+    {
+        {
+            auto spt = rpp::ScopedPerfTimer{};
+            spin_sleep_for(0.05);
+        }
+        {
+            auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__, "detail-item" };
+            spin_sleep_for(0.05);
+        }
+        {
+            auto spt = rpp::ScopedPerfTimer{ "[perf]", std::source_location::current() };
+            spin_sleep_for(0.05);
+        }
+    }
 };

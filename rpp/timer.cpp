@@ -63,7 +63,7 @@ namespace rpp
     // clock ticks multiplied by this period gives duration in seconds
     // seconds divided by this gives clock ticks
     static const double period = []{ return 1.0 / period_den; }();
-
+    
     double time_period() noexcept { return period; }
 
     uint64_t time_now() noexcept
@@ -282,26 +282,36 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    ScopedPerfTimer::ScopedPerfTimer(const char* what) noexcept : what(what)
+    ScopedPerfTimer::ScopedPerfTimer(const char* prefix, const char* location, const char* detail) noexcept
+        : prefix{prefix}, location{location}, detail{detail}
     {
+        // start the timer as the last action in the constructor
+        start = time_now();
     }
 
     ScopedPerfTimer::~ScopedPerfTimer() noexcept
     {
-        double elapsed_ms = timer.elapsed_ms();
+        // measure elapsed time as the first operation in the destructor
+        uint64_t elapsed = time_now() - start;
+        double elapsed_ms = elapsed * (rpp::period * 1000.0);
+
+        const char* padDetail = detail ? " " : "";
+        detail = detail ? detail : "";
+        prefix = prefix ? prefix : "";
+
         #if HAS_DEBUGGING_H
-            LogInfo("%s elapsed: %.3fms", what, elapsed_ms);
+            LogInfo("%s %s%s%s elapsed: %.3fms", prefix, location, padDetail, detail, elapsed_ms);
         #else
-            constexpr const char format[] = "$ %s elapsed: %.3fms\n";
+            constexpr const char format[] = "$ %s %s%s%s elapsed: %.3fms\n";
             #if _WIN32
                 static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
                 SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN); // dark yellow
-                fprintf(stderr, format, what, elapsed_ms);
+                fprintf(stderr, format, prefix, location, padDetail, detail, elapsed_ms);
                 SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // default color
             #elif __ANDROID__
-                __android_log_print(ANDROID_LOG_WARN, "rpp", format, what, elapsed_ms);
+                __android_log_print(ANDROID_LOG_WARN, "rpp", format, prefix, location, padDetail, detail, elapsed_ms);
             #else // @todo Proper Linux & OSX implementations
-                fprintf(stderr, format, what, elapsed_ms);
+                fprintf(stderr, format, prefix, location, padDetail, detail, elapsed_ms);
             #endif
         #endif
     }

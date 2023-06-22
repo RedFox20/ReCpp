@@ -7,6 +7,10 @@
 #include "config.h"
 
 #if __cplusplus
+#  if RPP_HAS_CXX20
+#    include <source_location>
+#  endif
+
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,11 +162,33 @@ namespace rpp
      */
     class RPPAPI ScopedPerfTimer
     {
-        Timer timer;
-        const char* what;
+        const char* prefix;   // log prefix:   "[perf]"
+        const char* location; // funcname:     "someFunction()"
+        const char* detail;   // detail info:  currentItem.name.c_str()
+        uint64_t start;
     public:
-        ScopedPerfTimer(const char* what) noexcept ;
-        ~ScopedPerfTimer() noexcept ;
+        /**
+         * @brief For backwards compatibility
+         * @param location Location name where time is being measured
+         */
+        explicit ScopedPerfTimer(const char* location) noexcept
+            : ScopedPerfTimer{"[perf]", location, nullptr} {}
+        /**
+         * Scoped performance timer with optional prefix, function name and detail info
+         * @param prefix Prefix used in log, for example "[perf]"
+         * @param location Location name where time is being measured
+         * @param detail Detailed info of which item is being measured, for example an item name
+         */
+        ScopedPerfTimer(const char* prefix, 
+                        const char* location,
+                        const char* detail) noexcept;
+    #if RPP_HAS_CXX20
+        ScopedPerfTimer(const char* prefix = "[perf]",
+                        std::source_location location = std::source_location::current(),
+                        const char* detail = nullptr) noexcept
+            : ScopedPerfTimer{prefix, location.function_name(), detail} {}
+    #endif
+        ~ScopedPerfTimer() noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
