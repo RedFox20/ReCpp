@@ -168,24 +168,24 @@ namespace rpp
         uint64_t start;
     public:
         /**
-         * @brief For backwards compatibility
-         * @param location Location name where time is being measured
-         */
-        explicit ScopedPerfTimer(const char* location) noexcept : ScopedPerfTimer{"[perf]", location, nullptr} {}
-        /**
          * Scoped performance timer with optional prefix, function name and detail info
          * @param prefix Prefix used in log, for example "[perf]"
          * @param location Location name where time is being measured
          * @param detail Detailed info of which item is being measured, for example an item name
          */
         ScopedPerfTimer(const char* prefix, const char* location, const char* detail) noexcept;
-        ScopedPerfTimer(const char* prefix, const char* location) noexcept : ScopedPerfTimer{prefix, location, nullptr} {}
+        ScopedPerfTimer(const char* prefix, const char* location) noexcept
+            : ScopedPerfTimer{prefix, location, nullptr} {}
     #if RPP_HAS_CXX20
-        ScopedPerfTimer(const char* prefix = "[perf]",
-                        std::source_location location = std::source_location::current(),
-                        const char* detail = nullptr) noexcept
-            : ScopedPerfTimer{prefix, location.function_name(), detail} {}
+        ScopedPerfTimer(std::source_location location = std::source_location::current()) noexcept
+            : ScopedPerfTimer{"[perf]", location.function_name(), nullptr} {}
     #endif
+        /**
+         * @brief For backwards compatibility
+         * @param location Location name where time is being measured
+         */
+        explicit ScopedPerfTimer(const char* location) noexcept
+            : ScopedPerfTimer{"[perf]", location, nullptr} {}
         ~ScopedPerfTimer() noexcept;
     };
 
