@@ -531,7 +531,7 @@ namespace rpp
          * @param delims Delimiter characters between string tokens
          * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
          */
-        template<int N> NOINLINE bool next(strview& out, const char (&delims)[N]) {
+        template<int N> NOINLINE bool next(strview& out, const char (&delims)[N]) noexcept {
             return _next_trim(out, [&delims](const char* s, int n) {
                 return strcontains<N>(s, n, delims);
             });
@@ -539,14 +539,42 @@ namespace rpp
         /**
          * Same as bool next(strview& out, char delim), but returns a token instead
          */
-        FINLINE strview next(char delim) {
+        FINLINE strview next(char delim) noexcept {
             strview out; next(out, delim); return out;
         }
-        FINLINE strview next(const char* delim, int ndelims) {
+        FINLINE strview next(const char* delim, int ndelims) noexcept {
             strview out; next(out, delim, ndelims); return out;
         }
-        template<int N> FINLINE strview next(const char (&delims)[N]) {
+        template<int N> FINLINE strview next(const char (&delims)[N]) noexcept {
             strview out; next<N>(out, delims); return out;
+        }
+
+        /**
+         * Gets the next strview and skips any empty tokens; also advances the ptr to next token.
+         * @param out Resulting string token. Only valid if result is TRUE.
+         * @param delim Delimiter char between string tokens
+         * @return TRUE if a token was returned, FALSE if no more tokens (no token [out]).
+         */
+        NOINLINE bool next_skip_empty(strview& out, char delim) noexcept {
+            return trim_start(delim).next(out, delim);
+        }
+        NOINLINE bool next_skip_empty(strview& out, const char* delims, int ndelims) noexcept {
+            return trim_start(delims, ndelims).next(out, delims, ndelims);
+        }
+        template<int N> NOINLINE bool next_skip_empty(strview& out, const char (&delims)[N]) noexcept {
+            return trim_start<N>(delims).next<N>(out, delims);
+        }
+        /**
+         * Same as bool next_skip_empty(strview& out, char delim), but returns a token instead
+         */
+        FINLINE strview next_skip_empty(char delim) noexcept {
+            return trim_start(delim).next(delim);
+        }
+        FINLINE strview next_skip_empty(const char* delims, int ndelims) noexcept {
+            return trim_start(delims, ndelims).next(delims, ndelims);
+        }
+        template<int N> NOINLINE strview next_skip_empty(const char (&delims)[N]) noexcept {
+            return trim_start<N>(delims).next<N>(delims);
         }
 
         /**
