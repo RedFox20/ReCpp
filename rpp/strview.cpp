@@ -148,7 +148,7 @@ namespace rpp
         return *this;
     }
 
-    strview& strview::trim_end()
+    strview& strview::trim_end() noexcept
     {
         auto n = len;
         auto e = str + n;
@@ -807,8 +807,8 @@ namespace rpp
     ///////////// bracket_parser
 
 
-    bracket_parser::bracket_parser(const void* data, int len) 
-        : buffer((const char*)data, len), depth(0), line(1)
+    bracket_parser::bracket_parser(const void* data, int len) noexcept
+        : buffer{(const char*)data, len}, depth{0}, line{1}
     {
         // Skips UTF-8 BOM if it exists
         if (buffer.starts_with("\xEF\xBB\xBF")) {

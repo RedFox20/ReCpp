@@ -165,20 +165,20 @@ namespace rpp
         int len;         // length of string
 
         FINLINE constexpr strview()                            noexcept : str{""},  len{0} {}
-        FINLINE strview(char* str)                             noexcept : str{str}, len{static_cast<int>(strlen(str))} {}
-        FINLINE strview(const char* str)                       noexcept : str{str}, len{static_cast<int>(strlen(str))} {}
+        FINLINE constexpr strview(char* str)                   noexcept : str{str}, len{static_cast<int>(std::char_traits<char>::length(str))} {}
+        FINLINE constexpr strview(const char* str)             noexcept : str{str}, len{static_cast<int>(std::char_traits<char>::length(str))} {}
         FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len}                           {}
         FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)}         {}
-        FINLINE strview(const char* str, const char* end)      noexcept : str{str}, len{static_cast<int>(end - str)}   {}
-        FINLINE strview(const void* str, const void* end)      noexcept : strview{static_cast<const char*>(str), static_cast<const char*>(end)} {}
+        FINLINE constexpr strview(const char* str, const char* end) noexcept : str{str}, len{static_cast<int>(end - str)}   {}
+        FINLINE constexpr strview(const void* str, const void* end) noexcept : strview{static_cast<const char*>(str), static_cast<const char*>(end)} {}
         FINLINE strview(const std::string& s)                  noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
 
         template<class StringT>
         using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
 
         template<class StringT, typename = enable_if_string_like_t<StringT>>
-        FINLINE strview(const StringT& str) noexcept : str(str.c_str()), len((int)str.length()) {}
-        FINLINE const char& operator[](int index) const noexcept { return str[index]; }
+        FINLINE constexpr strview(const StringT& str) noexcept : str{str.c_str()}, len{static_cast<int>(str.length())} {}
+        FINLINE constexpr const char& operator[](int index) const noexcept { return str[index]; }
 
         // disallow accidental init from char or bool
         strview(char) = delete;
@@ -189,9 +189,13 @@ namespace rpp
         // however strview(std::string&&) is allowed because it allows passing temporaries as arguments to functions
         strview& operator=(std::string&&) = delete;
 
-        FINLINE strview& operator=(const char* str) noexcept { this->str = str; this->len = (int)strlen(str); return *this; }
+        FINLINE constexpr strview& operator=(const char* str) noexcept {
+            this->str = str;
+            this->len = std::char_traits<char>::length(str);
+            return *this;
+        }
         template<int N>
-        FINLINE strview& operator=(const char (&str)[N]) noexcept { this->str = str; this->len = N-1; return *this; }
+        FINLINE constexpr strview& operator=(const char (&str)[N]) noexcept { this->str = str; this->len = N-1; return *this; }
 
         /** Creates a new string from this string-strview */
         FINLINE std::string& to_string(std::string& out) const { return out.assign(str, (size_t)len); }
@@ -206,8 +210,8 @@ namespace rpp
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
          */
         NOINLINE const char* to_cstr(char* buf, int max) const noexcept;
-        template<int N> 
-        FINLINE const char* to_cstr(char (&buf)[N]) const { return to_cstr(buf, N); }
+        template<int N>
+        FINLINE const char* to_cstr(char (&buf)[N]) const noexcept { return to_cstr(buf, N); }
         /** 
          * Copies this str[len] into a max of 512 byte static thread-local C-string array 
          * Result is only valid until next call to this method
@@ -216,15 +220,15 @@ namespace rpp
         NOINLINE const char* to_cstr() const noexcept;
 
         /** Parses this strview as an integer */
-        FINLINE int to_int() const { return rpp::to_int(str, len); }
+        FINLINE int to_int() const noexcept { return rpp::to_int(str, len); }
         /** Parses this strview as a HEX integer ('0xff' or '0ff' or 'ff') */
-        FINLINE int to_int_hex() const { return to_inthx(str, len); }
+        FINLINE int to_int_hex() const noexcept { return to_inthx(str, len); }
         /** Parses this strview as a long */
-        FINLINE long to_long()     const { return (long)rpp::to_int(str, len); }
+        FINLINE long to_long() const noexcept { return static_cast<long>(rpp::to_int(str, len)); }
         /** Parses this strview as a float */
-        FINLINE float to_float()   const { return (float)rpp::to_double(str, len); }
+        FINLINE float to_float() const noexcept { return static_cast<float>(rpp::to_double(str, len)); }
         /** Parses this strview as a double */
-        FINLINE double to_double() const { return rpp::to_double(str, len); }
+        FINLINE double to_double() const noexcept { return rpp::to_double(str, len); }
         // Relaxed parsing of this strview as a boolean.
         // Accepts strings that start_with ignorecase: "true", "yes", "on", "1"
         // Everything else is parsed as false.
@@ -234,25 +238,25 @@ namespace rpp
         bool to_bool() const noexcept;
 
         /** Clears the strview */
-        FINLINE void clear() { str = ""; len = 0; }
+        FINLINE void clear() noexcept { str = ""; len = 0; }
         /** @return Length of the string */
-        FINLINE constexpr int length() const  { return len; }
-        FINLINE constexpr int size()   const  { return len; }
+        FINLINE constexpr int length() const noexcept { return len; }
+        FINLINE constexpr int size()   const noexcept { return len; }
         /** @return TRUE if length of the string is 0 - thus the string is empty */
-        FINLINE constexpr bool empty() const { return !len; }
+        FINLINE constexpr bool empty() const noexcept { return !len; }
         /** @return TRUE if string is non-empty */
-        explicit FINLINE constexpr operator bool() const { return len != 0; }
+        explicit FINLINE constexpr operator bool() const noexcept { return len != 0; }
         /** @return Pointer to the start of the string */
-        FINLINE const char* c_str() const { return str; }
-        FINLINE const char* data()  const { return str; }
-        FINLINE const char* begin() const { return str; }
-        FINLINE const char* end()   const { return str + len; }
-        FINLINE char front() const { return *str; }
-        FINLINE char back()  const { return str[len - 1]; }
+        FINLINE const char* c_str() const noexcept { return str; }
+        FINLINE const char* data()  const noexcept { return str; }
+        FINLINE const char* begin() const noexcept { return str; }
+        FINLINE const char* end()   const noexcept { return str + len; }
+        FINLINE char front() const noexcept { return *str; }
+        FINLINE char back()  const noexcept { return str[len - 1]; }
         /** @return TRUE if the strview is only whitespace: " \t\r\n"  */
         NOINLINE bool is_whitespace() const noexcept;
         /** @return TRUE if the strview ends with a null terminator */
-        FINLINE bool is_nullterm() const { return str[len] == '\0'; }
+        FINLINE bool is_nullterm() const noexcept { return str[len] == '\0'; }
 
         /** Trims the start of the string from any whitespace */
         NOINLINE strview& trim_start() noexcept;
@@ -273,10 +277,10 @@ namespace rpp
         /** Trims end from this char */
         NOINLINE strview& trim_end(char ch) noexcept;
         /** Trims the end of the string from any whitespace */
-        NOINLINE strview& trim_end();
+        NOINLINE strview& trim_end() noexcept;
         NOINLINE strview& trim_end(const char* chars, int nchars) noexcept;
         /* Optimized noinline version for specific character sequences */
-        template<int N> NOINLINE strview& trim_end(const char (&chars)[N]) {
+        template<int N>NOINLINE strview& trim_end(const char (&chars)[N]) noexcept {
             auto n = len;
             auto e = str + n;
             for (; n && strcontains<N>(chars, *--e); --n)
@@ -284,37 +288,37 @@ namespace rpp
             len = n; // write result
             return *this;
         }
-        inline strview& trim_end(strview s) { return trim_end(s.str, s.len); }
+        inline strview& trim_end(strview s) noexcept { return trim_end(s.str, s.len); }
 
         /** Trims both start and end with whitespace */
-        FINLINE strview& trim() { return trim_start().trim_end(); }
+        FINLINE strview& trim() noexcept { return trim_start().trim_end(); }
         /** Trims both start and end width this char*/
-        FINLINE strview& trim(char ch) { return trim_start(ch).trim_end(ch); }
-        FINLINE strview& trim(const char* chars, int nchars) { return trim_start(chars, nchars).trim_end(chars, nchars); }
+        FINLINE strview& trim(char ch) noexcept { return trim_start(ch).trim_end(ch); }
+        FINLINE strview& trim(const char* chars, int nchars) noexcept { return trim_start(chars, nchars).trim_end(chars, nchars); }
         /** Trims both start and end with any of the given chars */
-        template<int N> FINLINE strview& trim(const char (&chars)[N]) { 
+        template<int N> FINLINE strview& trim(const char (&chars)[N]) noexcept { 
             return trim_start(chars, N-1).trim_end(chars, N-1);
         }
-        inline strview& trim(strview s) { return trim_start(s.str, s.len).trim_end(s.str, s.len); }
+        inline strview& trim(strview s) noexcept { return trim_start(s.str, s.len).trim_end(s.str, s.len); }
 
         /** Consumes the first character in the strview if possible. */
-        FINLINE strview& chomp_first() { if (len) ++str;--len; return *this; }
+        FINLINE strview& chomp_first() noexcept { if (len) ++str;--len; return *this; }
         /** Consumes the last character in the strview if possible. */
-        FINLINE strview& chomp_last()  { if (len) --len; return *this; }
+        FINLINE strview& chomp_last() noexcept { if (len) --len; return *this; }
 
         /** Pops and returns the first character in the strview if possible. */
-        FINLINE char pop_front() { if (len) { char ch = *str++; --len;       return ch; } return '\0'; }
+        FINLINE char pop_front() noexcept { if (len) { char ch = *str++; --len;       return ch; } return '\0'; }
         /** Pops and returns the last character in the strview if possible. */
-        FINLINE char pop_back()  { if (len) { char ch = str[len - 1]; --len; return ch; } return '\0'; }
+        FINLINE char pop_back()  noexcept { if (len) { char ch = str[len - 1]; --len; return ch; } return '\0'; }
 
         /** Consumes the first COUNT characters in the strview String if possible. */
-        FINLINE strview& chomp_first(int count) { 
+        FINLINE strview& chomp_first(int count) noexcept { 
             int n = count < len ? count : len;
             str += n; len -= n;
             return *this;
         }
         /** Consumes the last COUNT characters in the strview String if possible. */
-        FINLINE strview& chomp_last(int count) {
+        FINLINE strview& chomp_last(int count) noexcept {
             len -= (count < len ? count : len);
             return *this; 
         }
@@ -326,20 +330,20 @@ namespace rpp
          * strview value = content.find_sv("key:").after(4); // "true"
          * @endcode
          */
-        FINLINE strview after(int len) const { return { end(), len }; }
+        FINLINE strview after(int len) const noexcept { return { end(), len }; }
 
         /** Similar to after(int), but the end is calculated via @param limit */
-        FINLINE strview after_until(const strview& limit) const { return { end(), limit.end() }; }
+        FINLINE strview after_until(const strview& limit) const noexcept { return { end(), limit.end() }; }
 
         /** @return TRUE if the strview contains this char */
-        FINLINE bool contains(char c) const { return memchr(str, c, (size_t)len) != nullptr; }
+        FINLINE bool contains(char c) const noexcept { return memchr(str, c, (size_t)len) != nullptr; }
         /** @return TRUE if the strview contains this string */
-        FINLINE bool contains(const strview& s) const { return find(s) != nullptr; }
+        FINLINE bool contains(const strview& s) const noexcept { return find(s) != nullptr; }
         /** @return TRUE if the strview contains any of the chars */
-        NOINLINE bool contains_any(const char* chars, int nchars) const {
+        NOINLINE bool contains_any(const char* chars, int nchars) const noexcept {
             return strcontains(str, len, chars, nchars) != nullptr;
         }
-        template<int N> FINLINE bool contains_any(const char (&chars)[N]) const {
+        template<int N> FINLINE bool contains_any(const char (&chars)[N]) const noexcept {
             return strcontains<N>(str, len, chars) != nullptr;
         }
 
@@ -396,7 +400,7 @@ namespace rpp
 
         /** Index of character, or -1 if not found */
         int indexof(char ch) const noexcept;
-        
+
         // Reverse iterating indexof
         int rindexof(char ch) const noexcept;
 
@@ -466,8 +470,8 @@ namespace rpp
 
         template<int SIZE> FINLINE bool operator==(const char(&s)[SIZE]) const noexcept { return equals<SIZE>(s); }
         template<int SIZE> FINLINE bool operator!=(const char(&s)[SIZE]) const noexcept { return !equals<SIZE>(s); }
-        FINLINE bool operator==(const std::string& s)  const noexcept { return  equals(s); }
-        FINLINE bool operator!=(const std::string& s)  const noexcept { return !equals(s); }
+        FINLINE bool operator==(const std::string& s) const noexcept { return  equals(s); }
+        FINLINE bool operator!=(const std::string& s) const noexcept { return !equals(s); }
         FINLINE bool operator==(const strview& s) const noexcept { return  equals(s.str, s.len); }
         FINLINE bool operator!=(const strview& s) const noexcept { return !equals(s.str, s.len); }
         FINLINE bool operator==(char* s) const noexcept { return  strequals(s, str, len); }
@@ -479,12 +483,12 @@ namespace rpp
         NOINLINE int compare(const char* s, int n) const noexcept;
         NOINLINE int compare(const char* s) const noexcept;
         FINLINE int compare(const strview& b) const noexcept { return compare(b.str, b.len); }
-        FINLINE int compare(const std::string& b)  const noexcept { return compare(b.c_str(),(int)b.size()); }
+        FINLINE int compare(const std::string& b) const noexcept { return compare(b.c_str(),(int)b.size()); }
         
         FINLINE bool operator<(const strview& s) const noexcept { return compare(s.str, s.len) < 0; }
         FINLINE bool operator>(const strview& s) const noexcept { return compare(s.str, s.len) > 0; }
-        FINLINE bool operator<(const std::string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
-        FINLINE bool operator>(const std::string& s)  const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
+        FINLINE bool operator<(const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
+        FINLINE bool operator>(const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
         template<int SIZE> FINLINE bool operator<(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)<0;}
         template<int SIZE> FINLINE bool operator>(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)>0;}
         
@@ -672,8 +676,8 @@ namespace rpp
         void convertTo(int& outValue)     const noexcept { outValue = to_int();    }
         void convertTo(float& outValue)   const noexcept { outValue = to_float();  }
         void convertTo(double& outValue)  const noexcept { outValue = to_double(); }
-        void convertTo(std::string& outValue) const noexcept { to_string(outValue);    }
-        void convertTo(strview& outValue)     const noexcept { outValue = *this;       }
+        void convertTo(std::string& outValue) const noexcept { to_string(outValue); }
+        void convertTo(strview& outValue)     const noexcept { outValue = *this; }
         
     private:
         void skipByLength(strview text) noexcept { skip(text.len); }
@@ -836,7 +840,7 @@ namespace rpp
     {
         using namespace std::string_literals;
 
-        constexpr strview operator "" _sv(const char* str, std::size_t len)
+        constexpr strview operator "" _sv(const char* str, std::size_t len) noexcept
         {
             return { str, (int)len };
         }
@@ -844,27 +848,27 @@ namespace rpp
 
     //////////////// handy stream operators /////////////////
     
-    inline strview& operator>>(strview& s, float& out)
+    inline strview& operator>>(strview& s, float& out) noexcept
     {
         out = s.next_float();
         return s;
     }
-    inline strview& operator>>(strview& s, double& out)
+    inline strview& operator>>(strview& s, double& out) noexcept
     {
         out = s.next_double();
         return s;
     }
-    inline strview& operator>>(strview& s, int& out)
+    inline strview& operator>>(strview& s, int& out) noexcept
     {
         out = s.next_int();
         return s;
     }
-    inline strview& operator>>(strview& s, unsigned& out)
+    inline strview& operator>>(strview& s, unsigned& out) noexcept
     {
         out = (unsigned)s.next_int();
         return s;
     }
-    inline strview& operator>>(strview& s, bool& out)
+    inline strview& operator>>(strview& s, bool& out) noexcept
     {
         if      (s.equalsi("true")){ s.skip(4); out = true; }
         else if (s.equalsi("yes")) { s.skip(3); out = true; }
@@ -873,7 +877,7 @@ namespace rpp
         else out = false;
         return s;
     }
-    inline strview& operator>>(strview& s, std::string& out)
+    inline strview& operator>>(strview& s, std::string& out) noexcept
     {
         (void)s.to_string(out);
         s.skip(s.len);
@@ -896,8 +900,8 @@ namespace rpp
         return str;
     }
 
-    inline std::string operator+(const std::string& a, const strview& b){ return strview{a} + b;}
-    inline std::string operator+(const strview& a, const std::string& b){ return a + strview{b};}
+    inline std::string operator+(const std::string& a, const strview& b){ return strview{a} + b; }
+    inline std::string operator+(const strview& a, const std::string& b){ return a + strview{b}; }
     inline std::string operator+(const char* a, const strview& b)  { return strview{a, strlen(a)} + b; }
     inline std::string operator+(const strview& a, const char* b)  { return a + strview{b, strlen(b)}; }
     inline std::string operator+(const strview& a, char b)      { return a + strview{&b, 1}; }
@@ -913,15 +917,15 @@ namespace rpp
 
     //////////////// string compare operators /////////////////
 
-    inline bool operator< (const std::string& a,const strview& b) {return strview(a) <  b;}
-    inline bool operator> (const std::string& a,const strview& b) {return strview(a) >  b;}
-    inline bool operator==(const std::string& a,const strview& b) {return strview(a) == b;}
-    inline bool operator!=(const std::string& a,const strview& b) {return strview(a) != b;}
+    inline bool operator< (const std::string& a,const strview& b) noexcept { return strview(a) <  b; }
+    inline bool operator> (const std::string& a,const strview& b) noexcept { return strview(a) >  b; }
+    inline bool operator==(const std::string& a,const strview& b) noexcept { return strview(a) == b; }
+    inline bool operator!=(const std::string& a,const strview& b) noexcept { return strview(a) != b; }
     
-    inline bool operator< (const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) <  0;}
-    inline bool operator> (const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) >  0;}
-    inline bool operator==(const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) == 0;}
-    inline bool operator!=(const char* a,const strview& b){return strncmp(a, b.str, (size_t)b.len) != 0;}
+    inline bool operator< (const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) <  0; }
+    inline bool operator> (const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) >  0; }
+    inline bool operator==(const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) == 0; }
+    inline bool operator!=(const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) != 0; }
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -933,10 +937,10 @@ namespace rpp
     {
         const char* str;
         int len;
-        FINLINE operator strview()        const { return strview{str, len}; }
-        FINLINE operator strview&()             { return *(rpp::strview*)this; }
-        FINLINE operator const strview&() const { return *(rpp::strview*)this; }
-        FINLINE strview* operator->()     const { return  (rpp::strview*)this; }
+        FINLINE operator strview()        const noexcept { return strview{str, len}; }
+        FINLINE operator strview&()             noexcept { return *(rpp::strview*)this; }
+        FINLINE operator const strview&() const noexcept { return *(rpp::strview*)this; }
+        FINLINE strview* operator->()     const noexcept { return  (rpp::strview*)this; }
     };
 
 
@@ -988,9 +992,9 @@ namespace rpp
     protected:
         strview buffer;
     public:
-        FINLINE line_parser(const strview& buffer)         : buffer(buffer) {}
-        FINLINE line_parser(const char* data, int size)    : buffer(data, data + size) {}
-        FINLINE line_parser(const char* data, size_t size) : buffer(data, data + size) {}
+        FINLINE line_parser(const strview& buffer)         noexcept : buffer{buffer} {}
+        FINLINE line_parser(const char* data, int size)    noexcept : buffer{data, data + size} {}
+        FINLINE line_parser(const char* data, size_t size) noexcept : buffer{data, data + size} {}
 
         /**
          * Reads next line from the base buffer and advances its pointers.
@@ -1026,9 +1030,9 @@ namespace rpp
     protected:
         strview buffer;
     public:
-        FINLINE keyval_parser(const strview& buffer)         : buffer(buffer) {}
-        FINLINE keyval_parser(const char* data, int size)    : buffer(data, data + size) {}
-        FINLINE keyval_parser(const char* data, size_t size) : buffer(data, data + size) {}
+        FINLINE keyval_parser(const strview& buffer)         noexcept : buffer{buffer} {}
+        FINLINE keyval_parser(const char* data, int size)    noexcept : buffer{data, data + size} {}
+        FINLINE keyval_parser(const char* data, size_t size) noexcept : buffer{data, data + size} {}
 
         /**
          * Reads next line from the base buffer and advances its pointers.
@@ -1078,9 +1082,9 @@ namespace rpp
         int depth;
         int line; // current line
 
-        NOINLINE bracket_parser(const void* data, int len);
-        FINLINE bracket_parser(const strview& s)             : bracket_parser(s.str, s.len)   {}
-        FINLINE bracket_parser(const void* data, size_t len) : bracket_parser(data, (int)len) {}
+        NOINLINE bracket_parser(const void* data, int len) noexcept;
+        FINLINE bracket_parser(const strview& s)             noexcept : bracket_parser{s.str, s.len}   {}
+        FINLINE bracket_parser(const void* data, size_t len) noexcept : bracket_parser{data, (int)len} {}
 
         /**
          * Reads the next line from the buffer and advances its position
@@ -1099,7 +1103,7 @@ namespace rpp
     };
 
     // support for "debugging.h"
-    inline const char* __wrap_arg(const strview& arg) { return arg.to_cstr(); }
+    inline const char* __wrap_arg(const strview& arg) noexcept { return arg.to_cstr(); }
 
 } // namespace rpp
 
