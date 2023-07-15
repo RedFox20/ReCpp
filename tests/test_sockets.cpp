@@ -200,6 +200,31 @@ TestImpl(test_sockets)
         AssertThat(recv.recv_data(), v1);
     }
 
+    TestCase(list_interfaces)
+    {
+        #if _WIN32
+            std::string name = "lan";
+        #else
+            std::string name = "eth";
+        #endif
+        // TODO: maybe add a way to check for specific interfaces like wlan, eth, etc.
+        std::vector<ipinterface> ifaces = ipinterface::get_interfaces(name, AF_IPv4);
+        AssertNotEqual(ifaces.size(), 0);
+        for (const auto& iface : ifaces)
+        {
+            print_info("ipinterface  %-32s  addr:%-15s  netmask:%-15s  broadcast:%-15s\n",
+                iface.name.c_str(),
+                iface.addr.name().c_str(),
+                iface.netmask.name().c_str(),
+                iface.broadcast.name().c_str()
+            );
+            AssertNotEqual(iface.name, "");
+            AssertTrue(iface.addr.is_resolved());
+            AssertTrue(iface.netmask.is_resolved());
+            AssertTrue(iface.broadcast.is_resolved());
+        }
+    }
+
     //////////////////////////////////////////////////////////////////
 
     Socket create(std::string msg, Socket&& s)

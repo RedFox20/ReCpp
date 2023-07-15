@@ -1,3 +1,4 @@
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1 // for std::codecvt_utf8
 #include "sockets.h"
 #include <rpp/debugging.h>
 #include <stdlib.h>    // malloc
@@ -220,9 +221,9 @@ namespace rpp
         operator const sockaddr*() const { return &sa; }
         int size() const {
             switch (sa.sa_family) {
-                default:       return sizeof sa;
-                case AF_INET:  return sizeof sa4;
-                case AF_INET6: return sizeof sa6;
+                default:       return sizeof(sa);
+                case AF_INET:  return sizeof(sa4);
+                case AF_INET6: return sizeof(sa6);
             }
         }
     };
@@ -235,13 +236,13 @@ namespace rpp
         : Family{af}, Port{0}, FlowInfo{0}, ScopeId{0}
     {
         if (af == AF_IPv4) Addr4 = INADDR_ANY;
-        else memset(Addr6, 0, sizeof Addr6);
+        else memset(Addr6, 0, sizeof(Addr6));
     }
     ipaddress::ipaddress(address_family af, int port) noexcept
         : Family{af}, Port{uint16_t(port)}, FlowInfo{0}, ScopeId{0}
     {
         if (af == AF_IPv4) Addr4 = INADDR_ANY;
-        else memset(Addr6, 0, sizeof Addr6);
+        else memset(Addr6, 0, sizeof(Addr6));
     }
     ipaddress::ipaddress(address_family af, const char* hostname, int port) noexcept
         : Family{af}, Port{uint16_t(port)}, FlowInfo{0}, ScopeId{0}
@@ -252,7 +253,8 @@ namespace rpp
         : ipaddress{af, hostname.c_str(), port}
     {
     }
-    ipaddress::ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept : ipaddress{af, 0}
+    ipaddress::ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept
+        : ipaddress{af, 0}
     {
         if (ipAddressAndPort.empty()) {
             return;
@@ -275,8 +277,7 @@ namespace rpp
         void* addr  = Family == AF_IPv4 ? (void*)&Addr4 : (void*)&Addr6;
         //int addrLen = Family == AF_IPv4 ? sizeof Addr4 : sizeof Addr6;
         int family  = Family == AF_IPv4 ? AF_INET : AF_INET6;
-
-        memset(addr, 0, sizeof Addr6);
+        memset(addr, 0, sizeof(Addr6));
 
         //// 192.168.0.1
         //if (isdigit(hostname[0])) {
@@ -329,10 +330,6 @@ namespace rpp
         //}
         //memset(addr, 0, addrLen);
         return false;
-    }
-    bool ipaddress::is_resolved() const noexcept
-    {
-        return Addr4 != 0; // also handles IPv6 due to union magic
     }
     ipaddress::ipaddress(int socket) noexcept
     {
@@ -402,7 +399,7 @@ namespace rpp
     {
         return Port;
     }
-    bool ipaddress::equals(const ipaddress& ip) const
+    bool ipaddress::equals(const ipaddress& ip) const noexcept
     {
         if (Family == ip.Family && Port == ip.Port)
         {
@@ -412,6 +409,28 @@ namespace rpp
                 && memcmp(Addr6, ip.Addr6, sizeof(Addr6)) == 0;
         }
         return false;
+    }
+    int ipaddress::compare(const ipaddress& ip) const noexcept
+    {
+        if (Family < ip.Family) return -1;
+        if (Family > ip.Family) return +1;
+
+        // families are equal, compare by addr
+        if (Family == AF_IPv4)
+        {
+            int c = memcmp(&Addr4, &ip.Addr4, sizeof(Addr4));
+            if (c != 0) return c;
+        }
+        else
+        {
+            int c = memcmp(&Addr6, &ip.Addr6, sizeof(Addr6));
+            if (c != 0) return c;
+        }
+
+        // addresses are equal, compare by port
+        if (Port < ip.Port) return -1;
+        if (Port > ip.Port) return +1;
+        return 0;
     }
 
     static saddr to_saddr(const ipaddress& ipa) noexcept
@@ -462,14 +481,22 @@ namespace rpp
     }
 #endif
 
-    std::vector<ipinterface> ipinterface::get_interfaces(address_family af)
+    template<class ADAPTER_ADDRESS_T>
+    ADAPTER_ADDRESS_T* get_first_address(int family, ADAPTER_ADDRESS_T* firstAddress) noexcept
+    {
+        for (auto addr = firstAddress; addr != nullptr; addr = addr->Next)
+            if (!family || addr->Address.lpSockaddr->sa_family == family)
+                return addr;
+        return nullptr;
+    }
+
+    std::vector<ipinterface> ipinterface::get_interfaces(address_family af) noexcept
     {
         int family = addrfamily_int(af);
         std::vector<ipinterface> out;
-        
+
     #if _WIN32
         InitWinSock();
-
         ULONG bufLen = 0;
         GetAdaptersAddresses(family, 0, nullptr, nullptr, &bufLen);
         IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)alloca(bufLen);
@@ -477,23 +504,43 @@ namespace rpp
         if (!GetAdaptersAddresses(family, 0, nullptr, ipa_addrs, &bufLen))
         {
             int count = 0;
-            for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next) {
+            for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next)
                 ++count;
-            }
             out.reserve(count);
 
             for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next)
             {
-                out.emplace_back();
-                ipinterface& in = out.back();
-                in.name = to_string(ipaa->Description);
+                ipinterface& in = out.emplace_back();
+                in.name = to_string(ipaa->FriendlyName);
 
-                if (auto unicast = ipaa->FirstUnicastAddress) do
+                // prepend DNS suffix to the name, eg "lan"
+                if (std::string suffix = to_string(ipaa->DnsSuffix); !suffix.empty())
+                    in.name = suffix + " " + in.name;
+
+                if (auto* unicast = get_first_address(family, ipaa->FirstUnicastAddress))
                 {
                     in.addr = to_ipaddress(*(saddr*)unicast->Address.lpSockaddr);
-                    in.addrname = in.addr.name();
+                    if (family == AF_INET || (!family && unicast->Address.lpSockaddr->sa_family == AF_INET))
+                    {
+                        in.netmask = in.addr;
+                        ConvertLengthToIpv4Mask(unicast->OnLinkPrefixLength, &in.netmask.Addr4);
+                    }
                 }
-                while ((unicast = unicast->Next) != nullptr);
+                if (auto* multicast = get_first_address(family, ipaa->FirstMulticastAddress))
+                {
+                    in.broadcast = to_ipaddress(*(saddr*)multicast->Address.lpSockaddr);
+                }
+                if (ipaa->Flags & IP_ADAPTER_ADDRESS_DNS_ELIGIBLE)
+                {
+                    if (auto* dns = get_first_address(family, ipaa->FirstDnsServerAddress))
+                    {
+                        in.gateway = to_ipaddress(*(saddr*)dns->Address.lpSockaddr);
+                    }
+                    if (auto* gateway = get_first_address(family, ipaa->FirstGatewayAddress))
+                    {
+                        in.gateway = to_ipaddress(*(saddr*)gateway->Address.lpSockaddr);
+                    }
+                }
             }
         }
     #else
@@ -510,16 +557,39 @@ namespace rpp
             {
                 if (!family || ifa->ifa_addr->sa_family == family) 
                 {
-                    auto ipaddr = to_ipaddress(*(saddr*)ifa->ifa_addr);
-                    out.emplace_back(std::string{ifa->ifa_name}, ipaddr, ipaddr.name());
+                    ipinterface& in = out.emplace_back();
+                    in.name = std::string{ifa->ifa_name};
+                    in.addr = to_ipaddress(*(saddr*)ifa->ifa_addr);
+                    in.netmask = to_ipaddress(*(saddr*)ifa->ifa_netmask);
+                    in.broadcast = to_ipaddress(*(saddr*)ifa->ifu_broadaddr);
+                    // TODO: gateway
                 }
             }
             freeifaddrs(if_addrs);
         }
     #endif
+
+        std::sort(out.begin(), out.end(), [](const ipinterface& a, const ipinterface& b) noexcept
+        {
+            if (a.gateway.is_resolved() && !b.gateway.is_resolved())
+                return true;
+            return a.addr.compare(b.addr) < 0;
+        });
         return out;
     }
 
+    std::vector<ipinterface> ipinterface::get_interfaces(const std::string& name_match, address_family af) noexcept
+    {
+        auto out = get_interfaces(af);
+        if (!name_match.empty())
+        {
+            std::sort(out.begin(), out.end(), [&](const ipinterface& a, const ipinterface& b) noexcept
+            {
+                return a.name.find(name_match) < b.name.find(name_match);
+            });
+        }
+        return out;
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     /////////        socket
@@ -991,6 +1061,14 @@ namespace rpp
         return os_getsockerr();
     }
 
+    bool socket::enable_broadcast() noexcept
+    {
+        bool success = set_opt(SOL_SOCKET, SO_BROADCAST, true) == 0;
+        if (!success)
+            LogError("setsockopt SO_BROADCAST TRUE failed: %s\n", last_err());
+        return success;
+    }
+
     void socket::set_noblock_nodelay() noexcept
     {
         set_blocking(false); // blocking: false
@@ -1109,9 +1187,9 @@ namespace rpp
     ip_protocol socket::ipproto() const noexcept 
     {
         #ifdef _WIN32
-            WSAPROTOCOL_INFO winf = { 0 };
+            WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
-            getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFO, (char*)&winf, &len);
+            getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len);
             return to_ipproto(winf.iProtocol);
         #else // this implementation is incomplete:
             switch (get_opt(SOL_SOCKET, SO_TYPE)) {
@@ -1126,9 +1204,9 @@ namespace rpp
     protocol_info socket::protocol() const noexcept
     {
         #ifdef _WIN32
-            WSAPROTOCOL_INFO winf = { 0 };
+            WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
-            getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFO, (char*)&winf, &len);
+            getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len);
             return protocol_info {
                 winf.iProtocol,
                 to_addrfamily(winf.iAddressFamily),

@@ -191,7 +191,7 @@ namespace rpp
 
         FINLINE constexpr strview& operator=(const char* str) noexcept {
             this->str = str;
-            this->len = std::char_traits<char>::length(str);
+            this->len = static_cast<int>(std::char_traits<char>::length(str));
             return *this;
         }
         template<int N>

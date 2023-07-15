@@ -116,15 +116,20 @@ namespace rpp
         ipaddress(address_family af, int port) noexcept;
         ipaddress(address_family af, const char* hostname, int port) noexcept;
         ipaddress(address_family af, const std::string& hostname, int port) noexcept;
-        ipaddress(int socket) noexcept;
         ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept;
+        explicit ipaddress(int socket) noexcept;
 
+        /**
+         * Initializes this ipaddress to a resolved hostname
+         * @returns true if hostname was resolved successfully
+         */
         bool resolve_addr(const char* hostname) noexcept;
 
-        // True if current ADDRRESS part has been resolved (or properly constructed)
-        bool is_resolved() const noexcept;
+        /// @returns true if current ADDRRESS part has been resolved (or properly constructed)
+        bool is_resolved() const noexcept { return Addr4 != 0; /*also handles IPv6 due to union magic*/ }
+        explicit operator bool() const noexcept { return Addr4 != 0; }
 
-        // @brief Fills buffer dst[maxCount] with addr string
+        /// @brief Fills buffer dst[maxCount] with addr string
         int name(char* dst, int maxCount) const noexcept;
         std::string name() const noexcept;
         const char* cname() const noexcept;
@@ -132,10 +137,18 @@ namespace rpp
         void clear() noexcept;
         int port() const noexcept;
 
-        bool equals(const ipaddress& ip) const;
-        bool operator==(const ipaddress& ip) const { return this->equals(ip); }
-        bool operator!=(const ipaddress& ip) const { return !this->equals(ip); }
+        /** @returns true if this IP address family, address, port all equal */
+        bool equals(const ipaddress& ip) const noexcept;
+        bool operator==(const ipaddress& ip) const noexcept { return this->equals(ip); }
+        bool operator!=(const ipaddress& ip) const noexcept { return !this->equals(ip); }
+
+        /** @brief Compares two IP addresses by their family, address and then by port */
+        int compare(const ipaddress& ip) const noexcept;
     };
+
+    /**
+     * @brief Wrapper class to construct IPv4 addresses
+     */
     struct RPPAPI ipaddress4 : public ipaddress
     {
         ipaddress4() noexcept : ipaddress(AF_IPv4) {}
@@ -143,6 +156,10 @@ namespace rpp
         ipaddress4(const char* hostname, int port) noexcept : ipaddress(AF_IPv4, hostname, port) {}
         ipaddress4(const std::string& ipAddressAndPort) noexcept : ipaddress(AF_IPv4, ipAddressAndPort) {}
     };
+
+    /**
+     * @brief Wrapper class to construct IPv6 addresses
+     */
     struct RPPAPI ipaddress6 : public ipaddress
     {
         ipaddress6() noexcept : ipaddress(AF_IPv6) {}
@@ -157,13 +174,21 @@ namespace rpp
     {
         std::string name; // friendly name
         ipaddress   addr; // address of the IP interface
-        std::string addrname;
+        ipaddress   netmask; // subnet mask
+        ipaddress   broadcast; // broadcast address
+        ipaddress   gateway; // gateway address
 
-        ipinterface() = default;
-        ipinterface(std::string&& name, const ipaddress& addr, std::string&& addrname) noexcept
-            : name(std::move(name)), addr(addr), addrname(std::move(addrname)) {}
+        ipinterface() noexcept = default;
 
-        static std::vector<ipinterface> get_interfaces(address_family af = AF_IPv4);
+        /**
+         * @returns All interfaces sorted by IP address
+         */
+        static std::vector<ipinterface> get_interfaces(address_family af = AF_IPv4) noexcept;
+
+        /**
+         * Gets interfaces sorted by name match
+         */
+        static std::vector<ipinterface> get_interfaces(const std::string& name_match, address_family af = AF_IPv4) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -539,6 +564,11 @@ namespace rpp
          * @return 0 on success, error code otherwise (or check last_error())
          */
         int set_ioctl(int iocmd, int value) noexcept;
+
+        /**
+         * Enables broadcast on UDP sockets
+         */
+        bool enable_broadcast() noexcept;
 
         /**
          * Configure socket settings: non-blocking I/O,
