@@ -6,6 +6,7 @@
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
 #include <charconv> // std::to_chars
+#include <regex> // std::regex
 
 #if DEBUG || _DEBUG || RPP_DEBUG
 #define RPP_SOCKETS_DBG 1
@@ -208,7 +209,6 @@ namespace rpp
         return protos[ipProtocol];
     }
 
-
     ///////////////////////////////////////////////////////////////////////////
     ////////        IP Address
     ///////////////////////////////////////////////////////////////////////////
@@ -228,205 +228,313 @@ namespace rpp
         }
     };
 
-    ipaddress::ipaddress() noexcept
-        : Family{AF_DontCare}, Port{0}, Addr6{}, FlowInfo{0}, ScopeId{0}
+    // --------------------------------------------------------------------------------
+
+    raw_address::raw_address() noexcept
+        : Family{AF_DontCare}, Addr6{}, FlowInfo{0}, ScopeId{0}
     {
     }
-    ipaddress::ipaddress(address_family af) noexcept
-        : Family{af}, Port{0}, FlowInfo{0}, ScopeId{0}
+
+    raw_address::raw_address(address_family af) noexcept
+        : Family{af}, FlowInfo{0}, ScopeId{0}
     {
         if (af == AF_IPv4) Addr4 = INADDR_ANY;
         else memset(Addr6, 0, sizeof(Addr6));
     }
-    ipaddress::ipaddress(address_family af, int port) noexcept
-        : Family{af}, Port{uint16_t(port)}, FlowInfo{0}, ScopeId{0}
-    {
-        if (af == AF_IPv4) Addr4 = INADDR_ANY;
-        else memset(Addr6, 0, sizeof(Addr6));
-    }
-    ipaddress::ipaddress(address_family af, const char* hostname, int port) noexcept
-        : Family{af}, Port{uint16_t(port)}, FlowInfo{0}, ScopeId{0}
-    {
-        resolve_addr(hostname);
-    }
-    ipaddress::ipaddress(address_family af, const std::string& hostname, int port) noexcept
-        : ipaddress{af, hostname.c_str(), port}
-    {
-    }
-    ipaddress::ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept
-        : ipaddress{af, 0}
-    {
-        if (ipAddressAndPort.empty()) {
-            return;
-        }
 
-        auto pos = ipAddressAndPort.rfind(':');
-        if (pos != std::string::npos)
-        {
-            Port = (uint16_t)atoi(&ipAddressAndPort[pos + 1]);
-            std::string ip = ipAddressAndPort.substr(0, pos);
-            resolve_addr(ip.c_str());
-        }
-        else
-        {
-            resolve_addr(ipAddressAndPort.c_str());
-        }
-    }
-    bool ipaddress::resolve_addr(const char* hostname) noexcept
-    {
-        void* addr  = Family == AF_IPv4 ? (void*)&Addr4 : (void*)&Addr6;
-        //int addrLen = Family == AF_IPv4 ? sizeof Addr4 : sizeof Addr6;
-        int family  = Family == AF_IPv4 ? AF_INET : AF_INET6;
-        memset(addr, 0, sizeof(Addr6));
-
-        //// 192.168.0.1
-        //if (isdigit(hostname[0])) {
-        //    if (inet_pton(family, hostname, addr) == 1)
-        //        return true;
-        //}
-        //// www.google.com
-        //else
-        //{
-            addrinfo hint = {}; // must be nulled
-            hint.ai_family = family; // only filter by family
-            addrinfo* infos = nullptr;
-            std::string strPort = std::to_string(Port);
-
-            if (isdigit(hostname[0]))
-                hint.ai_flags = AI_NUMERICHOST;
-
-            inwin32(InitWinSock());
-
-            if (!getaddrinfo(hostname, strPort.empty() ? 0 : strPort.c_str(), &hint, &infos))
-            {
-                for (addrinfo* info = infos; info != nullptr; info = info->ai_next)
-                {
-                    if (info->ai_family == family)
-                    {
-                        sockaddr_in* sin = (sockaddr_in*)info->ai_addr;
-                        //int port = ntohs(sin->sin_port);
-                        if (family == AF_INET)
-                        {
-                            Addr4 = sin->sin_addr.s_addr;
-                        }
-                        else
-                        {
-                            sockaddr_in6* sin6 = (sockaddr_in6*)sin;
-                            memcpy(Addr6, &sin6->sin6_addr, sizeof(Addr6));
-                            FlowInfo = sin6->sin6_flowinfo;
-                            ScopeId  = sin6->sin6_scope_id;
-                        }
-                        //printf("Address: %s\n", cname());
-                        freeaddrinfo(infos);
-                        return true;
-                    }
-                }
-                freeaddrinfo(infos);
-            }
-            else
-            {
-                logerror("getaddrinfo failed: %s", socket::last_err().c_str());
-            }
-        //}
-        //memset(addr, 0, addrLen);
-        return false;
-    }
-    ipaddress::ipaddress(int socket) noexcept
-    {
-        inwin32(InitWinSock());
-
-        saddr a;
-        socklen_t len = sizeof(a);
-        if (getsockname(socket, reinterpret_cast<sockaddr*>(&a), &len)) {
-            Family=AF_IPv4, Port=0, FlowInfo=0, ScopeId=0;
-            return; // quiet fail on error/invalid socket
-        }
-
-        Family = to_addrfamily(a.sa4.sin_family);
-        Port   = ntohs(a.sa4.sin_port);
-        if (Family == AF_IPv4) {
-            Addr4 = a.sa4.sin_addr.s_addr;
-            FlowInfo = 0, ScopeId = 0;
-        }
-        else if (Family == AF_IPv6) { // AF_IPv6
-            memcpy(Addr6, &a.sa6.sin6_addr, sizeof Addr6);
-            FlowInfo = a.sa6.sin6_flowinfo;
-            ScopeId  = a.sa6.sin6_scope_id;
-        }
-    }
-    int ipaddress::name(char* dst, int maxCount) const noexcept
-    {
-        inwin32(InitWinSock());
-
-        if (inet_ntop(addrfamily_int(Family), (void*)&Addr4, dst, maxCount)) {
-            int len = (int)strlen(dst);
-            if (Port) { // "host:port"
-                dst[len++] = ':';
-                auto end = std::to_chars(dst+len, dst+maxCount, Port);
-                if (end.ec == std::errc{})
-                {
-                    *end.ptr = '\0';
-                    return int(end.ptr - dst);
-                }
-                // on error, terminate the string
-                dst[len++] = '?';
-                dst[len] = '\0';
-            }
-            return len;
-        }
-        return 0;
-    }
-    std::string ipaddress::name() const noexcept
-    {
-        char buf[128];
-        return std::string{buf, buf+name(buf, 128)};
-    }
-    const char* ipaddress::cname() const noexcept
-    {
-        static char buf[128];
-        (void)name(buf, 128);
-        return buf;
-    }
-    void ipaddress::clear() noexcept
+    void raw_address::reset() noexcept
     {
         Family = AF_DontCare;
-        Port = 0;
-        new (&Addr6) char[16]();
+        memset(Addr6, 0, sizeof(Addr6));
         FlowInfo = 0;
         ScopeId = 0;
     }
-    int ipaddress::port() const noexcept
-    {
-        return Port;
-    }
-    bool ipaddress::equals(const ipaddress& ip) const noexcept
-    {
-        if (Family == ip.Family && Port == ip.Port)
-        {
-            if (Family == AF_IPv4)
-                return Addr4 == ip.Addr4;
-            return FlowInfo == ip.FlowInfo && ScopeId == ip.ScopeId
-                && memcmp(Addr6, ip.Addr6, sizeof(Addr6)) == 0;
-        }
-        return false;
-    }
-    int ipaddress::compare(const ipaddress& ip) const noexcept
-    {
-        if (Family < ip.Family) return -1;
-        if (Family > ip.Family) return +1;
 
-        // families are equal, compare by addr
-        if (Family == AF_IPv4)
+    address_family raw_address::get_address_family(const char* ip_and_port) noexcept
+    {
+        if (!ip_and_port || *ip_and_port == '\0')
+            return AF_IPv4;
+
+        if (*ip_and_port == '[') // IPv6 "[2001:db8::1]:8080"
+            return AF_IPv6;
+
+        bool was_colon = false;
+        for (const char* p = ip_and_port; *p != '\0'; ++p)
         {
-            int c = memcmp(&Addr4, &ip.Addr4, sizeof(Addr4));
-            if (c != 0) return c;
+            bool is_colon = *p == ':';
+            if (is_colon && was_colon)
+                return AF_IPv6; // IPv6 "::1" or "2001:db8::1"
+            was_colon = is_colon;
+        }
+        // this is a hostname like "www.kratt.codefox.ee", or ip "192.168.1.1:8912", or ":8080"
+        return AF_IPv4;
+    }
+
+    bool raw_address::resolve_addr(address_family af, const char* hostname, int port) noexcept
+    {
+        Family = af;
+        void* addr = af == AF_IPv4 ? (void*)&Addr4 : (void*)&Addr6;
+        //int addrLen = Family == AF_IPv4 ? sizeof Addr4 : sizeof Addr6;
+        int family = af == AF_IPv4 ? AF_INET : AF_INET6;
+        memset(addr, 0, sizeof(Addr6));
+
+        if (af == AF_IPv4 && (!hostname || *hostname == '\0'))
+            return true; // listener socket IP addresss { "", 8080 }
+
+        // TODO: add parsing for scopeid "::1/64" and "::1%eth0"
+        if (af == AF_IPv6 && strcmp(hostname, "::1") == 0) // IPv6 loopback address
+        {
+            Addr6[15] = 1;
+            return true;
+        }
+
+        addrinfo hint = {}; // must be nulled
+        hint.ai_family = family; // only filter by family
+
+        char port_str[32] = "";
+        if (port > 0)
+            itoa(port, port_str, 10);
+
+        if (isdigit(hostname[0]))
+            hint.ai_flags = AI_NUMERICHOST;
+
+        inwin32(InitWinSock());
+
+        addrinfo* infos = nullptr;
+        bool success = false;
+        if (!getaddrinfo(hostname, (port > 0 ? port_str : nullptr), &hint, &infos))
+        {
+            for (addrinfo* info = infos; info != nullptr; info = info->ai_next)
+            {
+                if (info->ai_family == family)
+                {
+                    sockaddr_in* sin = (sockaddr_in*)info->ai_addr;
+                    if (family == AF_INET)
+                    {
+                        Addr4 = sin->sin_addr.s_addr;
+                    }
+                    else
+                    {
+                        sockaddr_in6* sin6 = (sockaddr_in6*)sin;
+                        memcpy(Addr6, &sin6->sin6_addr, sizeof(Addr6));
+                        FlowInfo = sin6->sin6_flowinfo;
+                        ScopeId  = sin6->sin6_scope_id;
+                    }
+                    success = true;
+                    break;
+                }
+            }
+            freeaddrinfo(infos);
         }
         else
         {
-            int c = memcmp(&Addr6, &ip.Addr6, sizeof(Addr6));
-            if (c != 0) return c;
+            logerror("getaddrinfo failed: %s", socket::last_err().c_str());
+        }
+        return success;
+    }
+
+    bool raw_address::equals(const raw_address& addr) const noexcept
+    {
+        if (Family == addr.Family)
+        {
+            if (Family == AF_IPv4)
+                return Addr4 == addr.Addr4;
+            return FlowInfo == addr.FlowInfo && ScopeId == addr.ScopeId
+                && memcmp(Addr6, addr.Addr6, sizeof(Addr6)) == 0;
+        }
+        return false;
+    }
+
+    int raw_address::compare(const raw_address& addr) const noexcept
+    {
+        if (Family < addr.Family) return -1;
+        if (Family > addr.Family) return +1;
+
+        // families are equal, compare by addr
+        if (Family == AF_IPv4)
+            return memcmp(&Addr4, &addr.Addr4, sizeof(Addr4));
+        else
+            return memcmp(&Addr6, &addr.Addr6, sizeof(Addr6));
+    }
+
+    bool raw_address::has_address() const noexcept
+    {
+        if (Family == AF_IPv4)
+            return Addr4 != INADDR_ANY;
+        for (int i = 0; i < 4; ++i)
+            if (Addr6Parts[i] != 0)
+                return true;
+        return false;
+    }
+
+    std::string raw_address::str() const noexcept
+    {
+        char buf[128];
+        return std::string{buf, buf+to_cstr(buf, 128)};
+    }
+
+    char* raw_address::c_str() const noexcept
+    {
+        static thread_local char buf[128];
+        (void)to_cstr(buf, 128);
+        return buf;
+    }
+
+    int raw_address::to_cstr(char* buf, int max) const noexcept
+    {
+        if (Family == AF_DontCare) {
+            if (max > 0) buf[0] = '\0';
+            return 0;
+        }
+        inwin32(InitWinSock());
+        if (inet_ntop(addrfamily_int(Family), (void*)&Addr4, buf, max))
+            return (int)strlen(buf);
+        return snprintf(buf, max, "%u.%u.%u.%u",
+                        Addr4Parts[0], Addr4Parts[1], Addr4Parts[2], Addr4Parts[3]);
+    }
+
+    // --------------------------------------------------------------------------------
+
+    ipaddress::ipaddress(address_family af, const char* hostname, int port) noexcept
+        : Address{af}, Port{static_cast<uint16_t>(port)}
+    {
+        Address.resolve_addr(af, hostname, port);
+    }
+
+    ipaddress::ipaddress(address_family af, const char* ip_and_port) noexcept
+        : ipaddress{af, 0}
+    {
+        if (ip_and_port && *ip_and_port != '\0')
+        {
+            if (af == AF_IPv6)
+            {
+                if (*ip_and_port == '[') // IPv6 "[2001:db8::1]:8080"
+                {
+                    if (const char* end = strchr(ip_and_port, ']'))
+                    {
+                        int ip_len = static_cast<int>(end - ip_and_port - 1);
+                        char ip_part[128] = "";
+                        memcpy(ip_part, ip_and_port + 1, ip_len);
+                        ip_part[ip_len] = '\0';
+
+                        Port = atoi(end + 2);
+                        resolve_addr(af, ip_part, Port);
+                    }
+                }
+                else // only IP, port 0
+                {
+                    resolve_addr(af, ip_and_port, 0);
+                }
+            }
+            else if (const char* port = strchr(ip_and_port, ':')) // got port?
+            {
+                int ip_len = static_cast<int>(port - ip_and_port);
+                char ip_part[128] = "";
+                memcpy(ip_part, ip_and_port, ip_len);
+                ip_part[ip_len] = '\0';
+
+                Port = atoi(port + 1);
+                resolve_addr(af, ip_part, Port);
+            }
+            else // only IP, port 0
+            {
+                resolve_addr(af, ip_and_port, 0);
+            }
+        }
+    }
+
+    ipaddress::ipaddress(int socket) noexcept
+    {
+        inwin32(InitWinSock());
+        saddr a;
+        socklen_t len = sizeof(a);
+        if (getsockname(socket, reinterpret_cast<sockaddr*>(&a), &len) != 0) {
+            Address.Family=AF_DontCare, Port=0, Address.FlowInfo=0, Address.ScopeId=0;
+            return; // quiet fail on error/invalid socket
         }
 
+        Address.Family = to_addrfamily(a.sa4.sin_family);
+        Port = ntohs(a.sa4.sin_port);
+        if (Address.Family == AF_IPv4) {
+            Address.Addr4 = a.sa4.sin_addr.s_addr;
+            Address.FlowInfo = 0, Address.ScopeId = 0;
+        }
+        else if (Address.Family == AF_IPv6) { // AF_IPv6
+            memcpy(Address.Addr6, &a.sa6.sin6_addr, sizeof(Address.Addr6));
+            Address.FlowInfo = a.sa6.sin6_flowinfo;
+            Address.ScopeId  = a.sa6.sin6_scope_id;
+        }
+    }
+
+    // --------------------------------------------------------------------------------
+
+    void ipaddress::reset() noexcept
+    {
+        Address.reset();
+        Port = 0;
+    }
+
+    int ipaddress::to_cstr(char* dst, int maxCount) const noexcept
+    {
+        if (!Port) // default case is easy, just return address string with no port
+            return Address.to_cstr(dst, maxCount);
+
+        int addrLen = Address.to_cstr(dst, maxCount);
+        if (addrLen > 0)
+        {
+            int len;
+            // by default use IPv4 format for all output
+            if (Address.Family != AF_IPv6) // "127.0.0.1:port"
+            {
+                len = Address.to_cstr(dst, maxCount);
+            }
+            else // AF_IPv6 [2001:db8::1]:8080
+            {
+                len = 0;
+                dst[len++] = '[';
+                len += Address.to_cstr(dst+len, maxCount-len);
+                dst[len++] = ']';
+            }
+
+            dst[len++] = ':';
+            auto end = std::to_chars(dst+len, dst+maxCount, Port);
+            if (end.ec == std::errc{}) // success
+            {
+                *end.ptr = '\0';
+                return int(end.ptr - dst);
+            }
+            else // on error, terminate the string
+            {
+                dst[len++] = '?';
+                dst[len] = '\0';
+                return len;
+            }
+        }
+        return 0;
+    }
+
+    std::string ipaddress::str() const noexcept
+    {
+        char buf[128];
+        return std::string{buf, buf+to_cstr(buf, 128)};
+    }
+
+    const char* ipaddress::cstr() const noexcept
+    {
+        static char buf[128];
+        (void)to_cstr(buf, 128);
+        return buf;
+    }
+
+    bool ipaddress::equals(const ipaddress& ip) const noexcept
+    {
+        return Port == ip.Port && Address == ip.Address;
+    }
+
+    int ipaddress::compare(const ipaddress& ip) const noexcept
+    {
+        int c = Address.compare(ip.Address);
+        if (c != 0) return c;
         // addresses are equal, compare by port
         if (Port < ip.Port) return -1;
         if (Port > ip.Port) return +1;
@@ -436,16 +544,15 @@ namespace rpp
     static saddr to_saddr(const ipaddress& ipa) noexcept
     {
         saddr a;
-        a.sa4.sin_family = (uint16_t)addrfamily_int(ipa.Family);
-        a.sa4.sin_port   = htons(ipa.Port);
-        if (ipa.Family == AF_IPv4) {
-            a.sa4.sin_addr.s_addr = (unsigned)ipa.Addr4;
+        a.sa4.sin_family = (uint16_t)addrfamily_int(ipa.Address.Family);
+        a.sa4.sin_port = htons(ipa.Port);
+        if (ipa.Address.Family == AF_IPv4) {
+            a.sa4.sin_addr.s_addr = (unsigned)ipa.Address.Addr4;
             memset(a.sa4.sin_zero, 0, sizeof(a.sa4.sin_zero));
-        }
-        else { // AF_IPv6
-            memcpy(&a.sa6.sin6_addr, ipa.Addr6, sizeof(ipa.Addr6));
-            a.sa6.sin6_flowinfo = (unsigned)ipa.FlowInfo;
-            a.sa6.sin6_scope_id = (unsigned)ipa.ScopeId;
+        } else { // AF_IPv6
+            memcpy(&a.sa6.sin6_addr, ipa.Address.Addr6, sizeof(ipa.Address.Addr6));
+            a.sa6.sin6_flowinfo = (unsigned)ipa.Address.FlowInfo;
+            a.sa6.sin6_scope_id = (unsigned)ipa.Address.ScopeId;
         }
         return a;
     }
@@ -453,13 +560,12 @@ namespace rpp
     static ipaddress to_ipaddress(const saddr& a) noexcept
     {
         ipaddress ipa = { to_addrfamily(a.sa4.sin_family), (int)ntohs(a.sa4.sin_port) };
-        if (ipa.Family == AF_IPv4) {
-            ipa.Addr4 = a.sa4.sin_addr.s_addr;
-        }
-        else { // AF_IPv6
-            memcpy(ipa.Addr6, &a.sa6.sin6_addr, sizeof(ipa.Addr6));
-            ipa.FlowInfo = a.sa6.sin6_flowinfo;
-            ipa.ScopeId  = a.sa6.sin6_scope_id;
+        if (ipa.Address.Family == AF_IPv4) {
+            ipa.Address.Addr4 = a.sa4.sin_addr.s_addr;
+        } else { // AF_IPv6
+            memcpy(ipa.Address.Addr6, &a.sa6.sin6_addr, sizeof(ipa.Address.Addr6));
+            ipa.Address.FlowInfo = a.sa6.sin6_flowinfo;
+            ipa.Address.ScopeId  = a.sa6.sin6_scope_id;
         }
         return ipa;
     }
@@ -497,11 +603,12 @@ namespace rpp
 
     #if _WIN32
         InitWinSock();
+
         ULONG bufLen = 0;
-        GetAdaptersAddresses(family, 0, nullptr, nullptr, &bufLen);
+        GetAdaptersAddresses(family, GAA_FLAG_INCLUDE_PREFIX, nullptr, nullptr, &bufLen);
         IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)alloca(bufLen);
 
-        if (!GetAdaptersAddresses(family, 0, nullptr, ipa_addrs, &bufLen))
+        if (!GetAdaptersAddresses(family, GAA_FLAG_INCLUDE_PREFIX, nullptr, ipa_addrs, &bufLen))
         {
             int count = 0;
             for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next)
@@ -517,19 +624,35 @@ namespace rpp
                 if (std::string suffix = to_string(ipaa->DnsSuffix); !suffix.empty())
                     in.name = suffix + " " + in.name;
 
-                if (auto* unicast = get_first_address(family, ipaa->FirstUnicastAddress))
+                if (IP_ADAPTER_UNICAST_ADDRESS* unicast = get_first_address(family, ipaa->FirstUnicastAddress))
                 {
                     in.addr = to_ipaddress(*(saddr*)unicast->Address.lpSockaddr);
-                    if (family == AF_INET || (!family && unicast->Address.lpSockaddr->sa_family == AF_INET))
+                    if (family == AF_INET6 && unicast->Address.lpSockaddr->sa_family == AF_INET6)
+                    {
+                        // TODO: ipv6 scopeid
+                        // in.addr.Address.ScopeId = unicast->OnLinkPrefixLength;
+                    }
+                    else if (family == AF_INET || (!family && unicast->Address.lpSockaddr->sa_family == AF_INET))
                     {
                         in.netmask = in.addr;
-                        ConvertLengthToIpv4Mask(unicast->OnLinkPrefixLength, &in.netmask.Addr4);
+                        ConvertLengthToIpv4Mask(unicast->OnLinkPrefixLength, &in.netmask.Address.Addr4);
+
+                        // calculate broadcast address using the subnet mask
+                        in.broadcast = in.addr;
+                        in.broadcast.Address.Addr4 = (in.addr.Address.Addr4 & in.netmask.Address.Addr4) | ~in.netmask.Address.Addr4;
                     }
                 }
-                if (auto* multicast = get_first_address(family, ipaa->FirstMulticastAddress))
+
+                if (family == AF_INET6)
                 {
-                    in.broadcast = to_ipaddress(*(saddr*)multicast->Address.lpSockaddr);
+                    // Multicast addresses are address groups identified by a single IP address
+                    // This is used by IPv6 for broadcasting
+                    if (auto* multicast = get_first_address(family, ipaa->FirstMulticastAddress))
+                    {
+                        in.broadcast = to_ipaddress(*(saddr*)multicast->Address.lpSockaddr);
+                    }
                 }
+
                 if (ipaa->Flags & IP_ADAPTER_ADDRESS_DNS_ELIGIBLE)
                 {
                     if (auto* dns = get_first_address(family, ipaa->FirstDnsServerAddress))
@@ -571,7 +694,7 @@ namespace rpp
 
         std::sort(out.begin(), out.end(), [](const ipinterface& a, const ipinterface& b) noexcept
         {
-            if (a.gateway.is_resolved() && !b.gateway.is_resolved())
+            if (a.gateway.has_address() && !b.gateway.has_address())
                 return true;
             return a.addr.compare(b.addr) < 0;
         });
@@ -583,9 +706,13 @@ namespace rpp
         auto out = get_interfaces(af);
         if (!name_match.empty())
         {
+            std::regex pattern { name_match };
             std::sort(out.begin(), out.end(), [&](const ipinterface& a, const ipinterface& b) noexcept
             {
-                return a.name.find(name_match) < b.name.find(name_match);
+                std::smatch amatch, bmatch;
+                size_t apos = std::regex_search(a.name, amatch, pattern) ? amatch.position(0) : size_t(-1);
+                size_t bpos = std::regex_search(b.name, bmatch, pattern) ? bmatch.position(0) : size_t(-1);
+                return apos < bpos;
             });
         }
         return out;
@@ -644,7 +771,7 @@ namespace rpp
         : Sock{s.Sock}, Addr{s.Addr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
     {
         s.Sock = -1;
-        s.Addr.clear();
+        s.Addr.reset();
         s.Shared = false;
         s.Blocking = false;
         s.Category = SC_Unknown;
@@ -658,7 +785,7 @@ namespace rpp
         Blocking = s.Blocking;
         Category = s.Category;
         s.Sock = -1;
-        s.Addr.clear();
+        s.Addr.reset();
         s.Shared   = false;
         s.Blocking = false;
         s.Category = SC_Unknown;
@@ -684,6 +811,15 @@ namespace rpp
         int sock = Sock;
         Sock = -1;
         return sock;
+    }
+
+    static void os_setsockerr(int err) noexcept
+    {
+        #if _WIN32
+            WSASetLastError(err);
+        #else
+            errno = err;
+        #endif
     }
 
     static int os_getsockerr() noexcept
@@ -953,6 +1089,7 @@ namespace rpp
                 indebug(auto errmsg = socket::last_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
                 close();
+                os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
             case ESOCK(EMSGSIZE):    return 0; // message too large to fit into buffer and was truncated
@@ -968,11 +1105,13 @@ namespace rpp
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(ECONNABORTED):  // connection closed
                 close();
+                os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
                 close();
+                os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
         }
@@ -995,8 +1134,8 @@ namespace rpp
 
     bool socket::wait_available(int millis) noexcept
     {
-        if (!connected()) return false;
-        try_for_period(millis, [this]() { return available() != 0; });
+        if (!connected() || !select(millis, SelectFlag::SF_Read))
+            return false;
         return available() > 0;
     }
 
@@ -1182,7 +1321,7 @@ namespace rpp
         return to_socktype(type);
     }
     address_family socket::family() const noexcept {
-        return Addr.Family;
+        return Addr.Address.Family;
     }
     ip_protocol socket::ipproto() const noexcept 
     {
@@ -1338,7 +1477,7 @@ namespace rpp
 
     bool socket::listen(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
-        if (!create(localAddr.Family, ipp, opt) || !bind(localAddr))
+        if (!create(localAddr.Address.Family, ipp, opt) || !bind(localAddr))
             return false;
 
         if (ipp != IPP_UDP && !listen()) // start listening for new clients
@@ -1376,12 +1515,20 @@ namespace rpp
         client.Category = SC_Accept;
         return client;
     }
+
     socket socket::accept(int millis) const
     {
         socket client;
-        try_for_period(millis, [this, &client]() -> bool {
-            return (client = accept()).good();
-        });
+        const double timeout = millis / 1000.0; // millis to seconds
+        const double start = timer_time();
+        do
+        {
+            if ((client = accept()).good())
+                return client; // success
+            thread_sleep(1); // suspend until next timeslice
+        }
+        while (timeout > 0.0 && (timer_time() - start) < timeout);
+
         return client;
     }
 
@@ -1390,7 +1537,7 @@ namespace rpp
         // a connection only makes sense for TCP.. unless we implement
         // an UDP application layer to handle connections? out of scope for socket..
         // need to use SO_Blocking during connect:
-        if (create(remoteAddr.Family, IPP_TCP, socket_option(opt|SO_Blocking)))
+        if (create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt|SO_Blocking)))
         {
             Addr = remoteAddr;
             auto sa = to_saddr(remoteAddr);
@@ -1416,7 +1563,7 @@ namespace rpp
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
         // we need a non-blocking socket to do select right after connect
-        if (create(remoteAddr.Family, IPP_TCP, socket_option(opt & ~SO_Blocking)))
+        if (create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & ~SO_Blocking)))
         {
             Addr = remoteAddr;
             auto sa = to_saddr(remoteAddr);
@@ -1468,7 +1615,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    socket make_udp_randomport(socket_option opt)
+    socket make_udp_randomport(socket_option opt) noexcept
     {
         for (int i = 0; i < 10; ++i) {
             int port = (rand() % (65536 - 8000));
@@ -1478,7 +1625,7 @@ namespace rpp
         return {};
     }
 
-    socket make_tcp_randomport(socket_option opt)
+    socket make_tcp_randomport(socket_option opt) noexcept
     {
         for (int i = 0; i < 10; ++i) {
             int port = (rand() % (65536 - 8000));
@@ -1486,6 +1633,28 @@ namespace rpp
                 return s;
         }
         return {};
+    }
+
+    rpp::ipinterface get_ip_interface(const std::string& iface, address_family af)
+    {
+        std::vector<rpp::ipinterface> ifaces = rpp::ipinterface::get_interfaces(iface, af);
+        if (ifaces.empty())
+            return {};
+        std::regex pattern { iface };
+        for (const rpp::ipinterface& ip : ifaces)
+            if (std::regex_search(ip.name, pattern))
+                return ip;
+        return ifaces.front();
+    }
+
+    std::string get_system_ip(const std::string& iface, address_family af)
+    {
+        return get_ip_interface(iface, af).addr.str();
+    }
+
+    std::string get_broadcast_ip(const std::string& iface, address_family af)
+    {
+        return get_ip_interface(iface, af).broadcast.str();
     }
 
     ////////////////////////////////////////////////////////////////////////////////

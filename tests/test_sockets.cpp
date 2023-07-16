@@ -12,6 +12,188 @@ TestImpl(test_sockets)
 
     TestInit(test_sockets) {}
 
+    TestCase(init_ipv4)
+    {
+        ipaddress4 a;
+        AssertTrue(a.is_empty());
+        AssertFalse(a.is_valid());
+        AssertTrue(a.address().is_empty());
+        AssertFalse(a.address().has_address());
+        AssertEqual(a.port(), 0);
+        AssertEqual(a.address().str(), "");
+
+        ipaddress4 b { 1234 };
+        AssertFalse(b.is_empty());
+        AssertTrue(b.is_valid());
+        AssertFalse(b.address().is_empty());
+        AssertFalse(b.address().has_address());
+        AssertEqual(b.port(), 1234);
+        AssertEqual(b.address().str(), "0.0.0.0");
+
+        ipaddress4 c { "127.0.0.1", 12345 };
+        AssertFalse(c.is_empty());
+        AssertTrue(c.is_valid());
+        AssertFalse(c.address().is_empty());
+        AssertTrue(c.address().has_address());
+        AssertEqual(c.port(), 12345);
+        AssertEqual(c.address().str(), "127.0.0.1");
+
+        ipaddress4 d { "127.0.0.1:12345" };
+        AssertFalse(d.is_empty());
+        AssertTrue(d.is_valid());
+        AssertFalse(d.address().is_empty());
+        AssertTrue(d.address().has_address());
+        AssertEqual(d.port(), 12345);
+        AssertEqual(d.address().str(), "127.0.0.1");
+    }
+
+    TestCase(init_ipv6)
+    {
+        ipaddress6 a;
+        AssertTrue(a.is_empty());
+        AssertFalse(a.is_valid());
+        AssertTrue(a.address().is_empty());
+        AssertFalse(a.address().has_address());
+        AssertEqual(a.port(), 0);
+        AssertEqual(a.address().str(), "");
+
+        ipaddress6 b { 1234 };
+        AssertFalse(b.is_empty());
+        AssertTrue(b.is_valid());
+        AssertFalse(b.address().is_empty());
+        AssertFalse(b.address().has_address());
+        AssertEqual(b.port(), 1234);
+        AssertEqual(b.address().str(), "::");
+
+        ipaddress6 c { "::1", 12345 };
+        AssertFalse(c.is_empty());
+        AssertTrue(c.is_valid());
+        AssertFalse(c.address().is_empty());
+        AssertTrue(c.address().has_address());
+        AssertEqual(c.port(), 12345);
+        AssertEqual(c.address().str(), "::1");
+
+        ipaddress6 d { "[2001:db8:1::ab9:C0A8:102]:12345" };
+        AssertFalse(d.is_empty());
+        AssertTrue(d.is_valid());
+        AssertFalse(d.address().is_empty());
+        AssertTrue(d.address().has_address());
+        AssertEqual(d.port(), 12345);
+        AssertEqual(d.address().str(), "2001:db8:1::ab9:c0a8:102");
+    }
+
+    TestCase(ipaddress_from_ip_and_port)
+    {
+        std::string system_ip = get_system_ip("eth|lan|wlan");
+        print_info("system_ip: %s\n", system_ip.c_str());
+
+        rpp::ipaddress ip { system_ip + ":14550" };
+        print_info("ipaddress: %s\n", ip.cname());
+        AssertTrue(ip.is_valid());
+        AssertEqual(ip.port(), 14550);
+        AssertEqual(ip.address().str(), system_ip);
+    }
+
+    TestCase(ipaddress_from_unknown_subnet)
+    {
+        rpp::ipaddress ip { "172.23.0.3:14560" };
+        print_info("ipaddress: %s\n", ip.cname());
+        AssertTrue(ip.is_valid());
+        AssertEqual(ip.port(), 14560);
+        AssertEqual(ip.address().str(), "172.23.0.3");
+        AssertEqual(ip.str(), "172.23.0.3:14560");
+    }
+
+    TestCase(ipaddress_for_listener_port)
+    {
+        rpp::ipaddress ip { "", "14550" };
+        print_info("ipaddress: %s\n", ip.cname());
+        AssertTrue(ip.is_valid());
+        AssertEqual(ip.port(), 14550);
+        AssertEqual(ip.address().str(), "0.0.0.0");
+        AssertEqual(ip.str(), "0.0.0.0:14550");
+    }
+
+    TestCase(ipaddress_for_listener_port_single_arg)
+    {
+        rpp::ipaddress ip { ":14550" };
+        print_info("ipaddress: %s\n", ip.cname());
+        AssertTrue(ip.is_valid());
+        AssertEqual(ip.port(), 14550);
+        AssertEqual(ip.address().str(), "0.0.0.0");
+        AssertEqual(ip.str(), "0.0.0.0:14550");
+    }
+
+    TestCase(broadcast)
+    {
+        rpp::ipinterface iface = rpp::get_ip_interface("eth|lan|wlan");
+        std::string system_ip = iface.addr.str();
+        std::string broadcast_ip = iface.broadcast.str();
+        print_info("system_ip: %s\n", system_ip.c_str());
+        print_info("broadcast_ip: %s\n", broadcast_ip.c_str());
+
+        rpp::socket listener;
+        AssertTrue(listener.create(rpp::AF_IPv4, rpp::IPP_UDP, rpp::SO_Blocking));
+        AssertMsg(listener.bind(rpp::ipaddress{ ":12550" }), "bind failed: %s", listener.last_err().c_str());
+        AssertTrue(listener.enable_broadcast());
+
+        rpp::socket listener2;
+        AssertTrue(listener2.create(rpp::AF_IPv4, rpp::IPP_UDP, rpp::SO_Blocking));
+        AssertTrue(listener2.bind(rpp::ipaddress{ ":15550" }));
+
+        rpp::ipaddress broadcast_addr { broadcast_ip + ":15550" };
+        AssertGreater(listener.sendto(broadcast_addr, "hello\0", 6), 0);
+
+        char message[256] = "no-mesages-received";
+        rpp::ipaddress from;
+        AssertGreater(listener2.recvfrom_timeout(from, message, sizeof(message), /*timeout_ms*/500), 0);
+        AssertEqual(rpp::strview{message}, "hello");
+        AssertEqual(from.str(), system_ip + ":12550");
+    }
+
+    TestCase(list_interfaces_ipv4)
+    {
+        std::vector<ipinterface> ifaces = ipinterface::get_interfaces("eth|lan|wlan", AF_IPv4);
+        AssertNotEqual(ifaces.size(), 0);
+        AssertTrue(ifaces[0].gateway.has_address()); // the very first interface should have a gateway (the lan interface)
+
+        for (const auto& iface : ifaces)
+        {
+            print_info("ipinterface  %-32s  addr:%-15s  netmask:%-15s  broadcast:%-15s  gateway:%-15s\n",
+                iface.name.c_str(),
+                iface.addr.str().c_str(),
+                iface.netmask.str().c_str(),
+                iface.broadcast.str().c_str(),
+                iface.gateway.str().c_str()
+            );
+            AssertNotEqual(iface.name, "");
+            AssertTrue(iface.addr.has_address());
+            AssertTrue(iface.netmask.has_address());
+            AssertTrue(iface.broadcast.has_address());
+            // AssertTrue(iface.gateway.has_address()); // disabled because virtual interfaces don't have a gateway
+        }
+    }
+
+    TestCase(list_interfaces_ipv6)
+    {
+        std::vector<ipinterface> ifaces = ipinterface::get_interfaces("eth|lan|wlan", AF_IPv6);
+        AssertNotEqual(ifaces.size(), 0);
+        AssertTrue(ifaces[0].gateway.has_address()); // the very first interface should have a gateway (the lan interface)
+
+        for (const auto& iface : ifaces)
+        {
+            print_info("ipinterface  %-32s  addr=%-15s  broadcast=%-15s  gateway=%-15s\n",
+                iface.name.c_str(),
+                iface.addr.str().c_str(),
+                iface.broadcast.str().c_str(),
+                iface.gateway.str().c_str()
+            );
+            AssertNotEqual(iface.name, "");
+            AssertTrue(iface.addr.has_address());
+            AssertTrue(iface.broadcast.has_address());
+        }
+    }
+
     TestCase(udp_socket_options)
     {
         Socket sock = rpp::make_udp_randomport();
@@ -200,31 +382,6 @@ TestImpl(test_sockets)
         AssertThat(recv.recv_data(), v1);
     }
 
-    TestCase(list_interfaces)
-    {
-        #if _WIN32
-            std::string name = "lan";
-        #else
-            std::string name = "eth";
-        #endif
-        // TODO: maybe add a way to check for specific interfaces like wlan, eth, etc.
-        std::vector<ipinterface> ifaces = ipinterface::get_interfaces(name, AF_IPv4);
-        AssertNotEqual(ifaces.size(), 0);
-        for (const auto& iface : ifaces)
-        {
-            print_info("ipinterface  %-32s  addr:%-15s  netmask:%-15s  broadcast:%-15s\n",
-                iface.name.c_str(),
-                iface.addr.name().c_str(),
-                iface.netmask.name().c_str(),
-                iface.broadcast.name().c_str()
-            );
-            AssertNotEqual(iface.name, "");
-            AssertTrue(iface.addr.is_resolved());
-            AssertTrue(iface.netmask.is_resolved());
-            AssertTrue(iface.broadcast.is_resolved());
-        }
-    }
-
     //////////////////////////////////////////////////////////////////
 
     Socket create(std::string msg, Socket&& s)
@@ -232,9 +389,9 @@ TestImpl(test_sockets)
         AssertMsg(s.good(), "expected good() for '%s'", msg.c_str());
         AssertMsg(s.connected(), "expected connected() for '%s'", msg.c_str());
         if (!s.good() || !s.connected())
-            print_error("%s %s socket error: %s\n", msg.c_str(), s.name().c_str(), s.last_err().c_str());
+            print_error("%s %s socket error: %s\n", msg.c_str(), s.str().c_str(), s.last_err().c_str());
         else
-            print_info("%s %s\n", msg.c_str(), s.name().c_str());
+            print_info("%s %s\n", msg.c_str(), s.str().c_str());
         return std::move(s);
     }
     Socket listen(int port)

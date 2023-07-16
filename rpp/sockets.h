@@ -49,7 +49,7 @@ namespace rpp
         SO_Blocking  = (1<<1),  // request a blocking socket instead of the default non-blocking
         // Enables socket load balancing and buffering Nagle algorithm.
         // Will cause delays. Only applies to TCP sockets.
-        SO_Nagle     = (1<<2),  
+        SO_Nagle     = (1<<2),
     };
 
     // @return UNIX af => AddressFamily conversion
@@ -90,12 +90,15 @@ namespace rpp
     // Measure highest accuracy time in seconds for both Windows and Linux
     double RPPAPI timer_time() noexcept;
 
-
-    // Basic IP-Address abstraction
-    struct RPPAPI ipaddress
+    /**
+     * @brief IP address abstraction, without port
+     */
+    struct RPPAPI raw_address
     {
-        address_family Family;     // IPv4 or IPv6
-        unsigned short Port;       // port in host byte order
+        /**
+         * @brief Current Address family, supported values AF_IPv4 or AF_IPv6, anything else is invalid
+         */
+        address_family Family; // IPv4 or IPv6
         #if _MSC_VER
         #  pragma warning(disable:4201)
         #endif
@@ -105,37 +108,207 @@ namespace rpp
                 unsigned char Addr4Parts[4];
             };
             struct {
-                unsigned char Addr6[16]; // IPv6 Address
+                union {
+                    unsigned char Addr6[16]; // IPv6 Address
+                    unsigned long Addr6Parts[4];
+                };
                 unsigned long FlowInfo;
-                unsigned long ScopeId;
+                unsigned long ScopeId; // The network prefix for IPv6
             };
         };
 
-        ipaddress() noexcept; // memset 0 ipaddress
-        ipaddress(address_family af) noexcept;
-        ipaddress(address_family af, int port) noexcept;
-        ipaddress(address_family af, const char* hostname, int port) noexcept;
-        ipaddress(address_family af, const std::string& hostname, int port) noexcept;
-        ipaddress(address_family af, const std::string& ipAddressAndPort) noexcept;
-        explicit ipaddress(int socket) noexcept;
+        raw_address() noexcept; // memset 0 raw_address
+        raw_address(address_family af) noexcept;
+
+        /** Resets this raw_address to a default state */
+        void reset() noexcept;
+
+        /**
+         * @returns AF_IPv4 or AF_IPv6 depending on the syntax of this ip_and_port string.
+         *          AF_DontCare if the string is invalid
+         */
+        static address_family get_address_family(const char* ip_and_port) noexcept;
+        static address_family get_address_family(const std::string& ip_and_port) noexcept
+        {
+            return get_address_family(ip_and_port.c_str());
+        }
 
         /**
          * Initializes this ipaddress to a resolved hostname
+         * @param af Address family, such as AF_IPv4 or AF_IPv6
+         * @param hostname Such as "www.google.com" or "192.168.1.0"
+         * @param port Optional port number that can be used to resolve the hostname
          * @returns true if hostname was resolved successfully
          */
-        bool resolve_addr(const char* hostname) noexcept;
+        bool resolve_addr(address_family af, const char* hostname, int port = 0) noexcept;
+        bool resolve_addr(address_family af, const std::string& hostname, int port = 0) noexcept
+        {
+            return resolve_addr(af, hostname.c_str(), port);
+        }
 
-        /// @returns true if current ADDRRESS part has been resolved (or properly constructed)
-        bool is_resolved() const noexcept { return Addr4 != 0; /*also handles IPv6 due to union magic*/ }
-        explicit operator bool() const noexcept { return Addr4 != 0; }
+        bool equals(const raw_address& addr) const noexcept;
+        int compare(const raw_address& addr) const noexcept;
+        bool operator==(const raw_address& addr) const noexcept { return equals(addr); }
+        bool operator!=(const raw_address& addr) const noexcept { return !equals(addr); }
 
-        /// @brief Fills buffer dst[maxCount] with addr string
-        int name(char* dst, int maxCount) const noexcept;
-        std::string name() const noexcept;
-        const char* cname() const noexcept;
+        /**
+         * @returns true if this address family has not been set
+         * A zero address is valid for listener sockets, so this only validates the Family
+         */
+        bool is_empty() const noexcept { return Family == 0; }
+        explicit operator bool() const noexcept { return Family != 0; }
 
-        void clear() noexcept;
-        int port() const noexcept;
+        /**
+         * @returns true if this raw_address has an ip address sequence set. returns false for listener ports
+        */
+        bool has_address() const noexcept;
+
+        /** 
+         * @brief Returns the IP address as a string. Example result: "192.168.1.110"
+         */
+        std::string str() const noexcept;
+
+        /**
+         * @brief Returns the IP address as a string. Example result: "192.168.1.110"
+         * WARNING: uses a hidden global buffer, so this is safe to use only once per line
+         */
+        char* c_str() const noexcept;
+
+        /** 
+         * @brief Formats the IP into `buf` and returns the length of the string
+         * Example result: "192.168.1.110"
+         */
+        int to_cstr(char* buf, int max) const noexcept;
+    };
+
+
+    /**
+     * @brief IP address and port abstraction for both IPv4 and IPv6
+     */
+    struct RPPAPI ipaddress
+    {
+        raw_address Address;
+        unsigned short Port; // port in host byte order
+
+        /** @brief Creates a default address that is_empty() */
+        ipaddress() noexcept : Address{}, Port{0} {}
+
+        /**
+         * Initializes a new IP address from port int
+         * This can be used for listener sockets
+         */
+        ipaddress(address_family af, int port) noexcept
+            : Address{af}, Port{static_cast<uint16_t>(port)} {}
+
+        /**
+         * Initializes a new IP address from hostname and port int
+         * Example: hostname="192.168.1.110" port=14550
+         * If you don't know AF, use `ipaddress::get_address_family(hostname)` to detect it
+         */
+        ipaddress(address_family af, const char* hostname, int port) noexcept;
+        ipaddress(address_family af, const std::string& hostname, int port) noexcept
+            : ipaddress{af, hostname.c_str(), port} {}
+
+        /**
+         * Initializes a new IP address from ip and port string
+         * Example: "192.168.1.110:14550"
+         * If you don't know AF, use `ipaddress::get_address_family(ip_and_port)` to detect it
+         */
+        ipaddress(address_family af, const char* ip_and_port) noexcept;
+        ipaddress(address_family af, const std::string& ip_and_port) noexcept
+            : ipaddress{af, ip_and_port.c_str()} {}
+
+        /**
+         * Initializes a new IP address from ip and port string
+         * Example: "192.168.1.110:14550"
+         * Detects IPv4 or IPv6 automatically
+         */
+        ipaddress(const char* ip_and_port) noexcept
+            : ipaddress{get_address_family(ip_and_port), ip_and_port} {}
+        ipaddress(const std::string& ip_and_port) noexcept
+            : ipaddress{get_address_family(ip_and_port), ip_and_port} {}
+
+        /**
+         * Initializes a new IP address from string hostname and port
+         * hostname:"192.168.1.110", port:"14550"
+         * Detects IPv4 or IPv6 automatically
+         */
+        ipaddress(const char* hostname, const char* port) noexcept
+            : ipaddress{get_address_family(hostname), hostname, atoi(port)} {}
+        ipaddress(const std::string& hostname, const std::string& port) noexcept
+            : ipaddress{hostname.c_str(), port.c_str()} {}
+
+        /**
+         * Initializes directly from a socket handle, 
+         * figures out adddress family from the socket
+         */
+        explicit ipaddress(int socket) noexcept;
+
+        /**
+         * @returns AF_IPv4 or AF_IPv6 depending on the syntax of this ip_and_port string.
+         *          AF_DontCare if the string is invalid
+         */
+        static address_family get_address_family(const char* ip_and_port) noexcept
+        {
+            return raw_address::get_address_family(ip_and_port);
+        }
+        static address_family get_address_family(const std::string& ip_and_port) noexcept
+        {
+            return raw_address::get_address_family(ip_and_port.c_str());
+        }
+
+        /**
+         * Initializes this ipaddress to a resolved hostname
+         * @param af Address family, such as AF_IPv4 or AF_IPv6
+         * @param hostname Such as "www.google.com" or "192.168.1.0"
+         * @param port Optional port number that can be used to resolve the hostname
+         * @returns true if hostname was resolved successfully
+         */
+        bool resolve_addr(address_family af, const char* hostname, int port = 0) noexcept
+        {
+            return Address.resolve_addr(af, hostname, port);
+        }
+        bool resolve_addr(address_family af, const std::string& hostname, int port = 0) noexcept
+        {
+            return Address.resolve_addr(af, hostname.c_str(), port);
+        }
+
+        /** Resets this ipaddress to a default state */
+        void reset() noexcept;
+
+        /** @returns IP address part of this socket */
+        const raw_address& address() const noexcept { return Address; }
+
+        /** @returns The port number of this ipaddress */
+        int port() const noexcept { return Port; }
+
+        /**
+         * @returns true if current ADDRESS part has been resolved to an IP address (or properly constructed).
+         *          false if this is a listener port or an uninitialized struct
+         */
+        bool has_address() const noexcept { return Address.has_address(); }
+
+        /**
+         * @returns true if this address is not even a listener port, but just an uninitialized struct
+         */
+        bool is_empty() const noexcept { return Port == 0; }
+
+        /**
+         * @returns true if this address has at least a listener port
+         **/
+        bool is_valid() const noexcept { return Address.Family && Port != 0; }
+        explicit operator bool() const noexcept { return Address.Family && Port != 0; }
+
+        /** @returns Address string with port, eg "192.168.1.1:14550" "*/
+        std::string str() const noexcept;
+        const char* cstr() const noexcept;
+        /** @brief Fills buffer dst[maxCount] with addr string */
+        int to_cstr(char* dst, int maxCount) const noexcept;
+
+        // BACKWARDS COMPATIBILITY
+        std::string name() const noexcept { return str(); }
+        const char* cname() const noexcept { return cstr(); }
+        int name(char* dst, int maxCount) const noexcept { return to_cstr(dst, maxCount); }
 
         /** @returns true if this IP address family, address, port all equal */
         bool equals(const ipaddress& ip) const noexcept;
@@ -151,10 +324,28 @@ namespace rpp
      */
     struct RPPAPI ipaddress4 : public ipaddress
     {
-        ipaddress4() noexcept : ipaddress(AF_IPv4) {}
-        ipaddress4(int port) noexcept : ipaddress(AF_IPv4, port) {}
-        ipaddress4(const char* hostname, int port) noexcept : ipaddress(AF_IPv4, hostname, port) {}
-        ipaddress4(const std::string& ipAddressAndPort) noexcept : ipaddress(AF_IPv4, ipAddressAndPort) {}
+        /** @brief Creates a default address that is_empty() */
+        ipaddress4() noexcept = default;
+
+        /**
+         * Initializes a new IP address from port int
+         * This can be used for listener sockets
+         */
+        ipaddress4(int port) noexcept : ipaddress{AF_IPv4, port} {}
+
+        /**
+         * Initializes a new IP address from hostname and port int
+         * Example: hostname="192.168.1.110" port=14550
+         */
+        ipaddress4(const char* hostname, int port) noexcept : ipaddress{AF_IPv4, hostname, port} {}
+        ipaddress4(const std::string& hostname, int port) noexcept : ipaddress{AF_IPv4, hostname, port} {}
+
+        /**
+         * Initializes a new IP address from ip and port string
+         * Example: "192.168.1.110:14550"
+         */
+        ipaddress4(const char* ip_and_port) noexcept : ipaddress{AF_IPv4, ip_and_port} {}
+        ipaddress4(const std::string& ip_and_port) noexcept : ipaddress{AF_IPv4, ip_and_port} {}
     };
 
     /**
@@ -162,10 +353,26 @@ namespace rpp
      */
     struct RPPAPI ipaddress6 : public ipaddress
     {
-        ipaddress6() noexcept : ipaddress(AF_IPv6) {}
+        /** @brief Creates a default address that is_empty() */
+        ipaddress6() noexcept = default;
+
+        /**
+         * Initializes a new IP address from port int
+         * This can be used for listener sockets
+         */
         ipaddress6(int port) noexcept : ipaddress(AF_IPv6, port) {}
+
+        /**
+         * Initializes a new IP address from hostname and port int
+         */
         ipaddress6(const char* hostname, int port) noexcept : ipaddress(AF_IPv6, hostname, port) {}
-        ipaddress6(const std::string& ipAddressAndPort) noexcept : ipaddress(AF_IPv6, ipAddressAndPort) {}
+        ipaddress6(const std::string& hostname, int port) noexcept : ipaddress{AF_IPv6, hostname, port} {}
+
+        /**
+         * Initializes a new IP address from ip and port string
+         */
+        ipaddress6(const char* ip_and_port) noexcept : ipaddress{AF_IPv6, ip_and_port} {}
+        ipaddress6(const std::string& ip_and_port) noexcept : ipaddress(AF_IPv6, ip_and_port) {}
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -231,37 +438,39 @@ namespace rpp
         static socket from_os_handle(int handle, const ipaddress& addr,
                                      bool shared=false, bool blocking=true);
 
-        // Creates a default socket object
+        /* Creates a default socket object */
         socket() noexcept;
-        // Creates a listener socket, can be TCP or UDP
+        /* Creates a listener socket, can be TCP or UDP */
         explicit socket(int port, address_family af = AF_IPv4, ip_protocol ipp = IPP_TCP, socket_option opt = SO_None) noexcept;
-        // Creates a connection to the specified remote address, always TCP!
+        /* Creates a connection to the specified remote address, always TCP! */
         socket(const ipaddress& addr, socket_option opt = SO_None) noexcept;
-        // Tries to connect to the specified remote address with timeout, always TCP!
+        /* Tries to connect to the specified remote address with timeout, always TCP! */
         socket(const ipaddress& addr, int millis, socket_option opt = SO_None) noexcept;
-        // Connects to hostname:port, always TCP! 
+        /* Connects to hostname:port, always TCP! */
         socket(const char* hostname, int port, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
-        // Connects to hostname:port with timeout, always TCP! 
+        /* Connects to hostname:port with timeout, always TCP! */
         socket(const char* hostname, int port, int millis, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
         ~socket() noexcept;
 
-        // Closes the connection (if any) and returns this socket to a default state
+        /** Closes the connection (if any) and returns this socket to a default state */
         void close() noexcept;
 
         // Releases the socket handle from this socket:: but does not call closesocket() !
         // The socket handle itself is returned
         int release_noclose() noexcept;
 
-        // Set this socket as shared, which means closesocket() won't be called
+        /** Set this socket as shared, which means closesocket() won't be called */
         void set_shared(bool shared=true) noexcept { Shared = shared; }
         bool is_shared() const noexcept { return Shared != 0; }
 
         explicit operator bool() const noexcept { return Sock != INVALID; }
-        // @return TRUE if Sock handle is currently VALID
+        /** @return TRUE if Sock handle is currently VALID */
         bool good() const noexcept { return Sock != INVALID; }
-        // @return TRUE if Sock handle is currently INVALID
+        /** @return TRUE if Sock handle is currently INVALID */
         bool bad()  const noexcept { return Sock == INVALID; }
-        // @return OS socket handle. We are generous.
+
+        /** @return OS socket handle. We are generous. */
+        int os_handle() const noexcept { return Sock; }
         int oshandle() const noexcept { return Sock; }
 
         socket(const socket&)            = delete; // no copy construct
@@ -269,12 +478,16 @@ namespace rpp
         socket(socket&& fwd)            noexcept;  // move construct allowed
         socket& operator=(socket&& fwd) noexcept;  // move assign allowed
 
-        // @return Current ipaddress
+        /** @returns Current ipaddress */
         const ipaddress& address() const noexcept { return Addr; }
+        /** @returns Port of the current ipaddress */
         int port() const noexcept { return Addr.Port; }
-        // @return String representation of ipaddress
-        std::string name() const noexcept { return Addr.name(); }
-        const char* cname() const noexcept { return Addr.cname(); }
+
+        /** @returns String representation of ipaddress */
+        std::string str() const noexcept { return Addr.str(); }
+        const char* cstr() const noexcept { return Addr.cstr(); }
+        std::string name() const noexcept { return Addr.str(); }
+        const char* cname() const noexcept { return Addr.cstr(); }
 
         /**
          * @return A human readable description string of the last occurred socket error in errno.
@@ -286,6 +499,7 @@ namespace rpp
          * Automatically closes socket during critical failure
          */
         NOINLINE int send(const void* buffer, int numBytes) noexcept;
+
         // Send a null delimited C string
         int send(const char* str) noexcept;
         // Send a null delimited WIDE string (platform unsafe)
@@ -305,18 +519,20 @@ namespace rpp
          * Automatically closes socket during critical failure
          */
         int sendto(const ipaddress& to, const void* buffer, int numBytes) noexcept;
-        // Send a null delimited C string
+
+        /** Send a null delimited C string */
         int sendto(const ipaddress& to, const char* str) noexcept;
-        // Send a null delimited WIDE string (platform unsafe)
+        /** Send a null delimited WIDE string (platform unsafe) */
         int sendto(const ipaddress& to, const wchar_t* str) noexcept;
-        // Send a byte buffer
+        /** Send a byte buffer */
         int sendto(const ipaddress& to, const std::vector<uint8_t>& bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
+        /** Send a byte buffer */
         int sendto(const ipaddress& to, const std::vector<char>& bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
-        // Send a C++ string
+        /** Send a C++ string */
         template<class T> int sendto(const ipaddress& to, const std::basic_string<T>& str) noexcept {
             return sendto(to, str.data(), int(sizeof(T) * str.size()));
         }
@@ -378,6 +594,15 @@ namespace rpp
         NOINLINE int recv(void* buffer, int maxBytes) noexcept;
 
         /**
+         * @brief Waits up to timeout until data is available and then calls recv() or returns 0
+         * @param timeout Timeout millis
+         */
+        int recv_timeout(void* buffer, int maxBytes, int timeout) noexcept
+        {
+            return wait_available(timeout) ? recv(buffer, maxBytes) : 0;
+        }
+
+        /**
          * Peek bytes from remote socket, return number of bytes peeked
          * Automatically closes socket during critical failure and returns -1
          * If there is no data to peek, this function returns 0
@@ -392,6 +617,15 @@ namespace rpp
         NOINLINE int recvfrom(ipaddress& from, void* buffer, int maxBytes) noexcept;
 
         /**
+         * @brief Waits up to timeout until data is available and then calls recvfrom() or returns 0
+         * @param timeout Timeout millis
+         */
+        int recvfrom_timeout(ipaddress& from, void* buffer, int maxBytes, int timeout) noexcept
+        {
+            return wait_available(timeout) ? recvfrom(from, buffer, maxBytes) : 0;
+        }
+
+        /**
          * Peeks available() bytes, resizes outBuffer and reads some data into it
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
          */
@@ -402,44 +636,11 @@ namespace rpp
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
          */
         NOINLINE bool recvfrom(ipaddress& from, std::vector<uint8_t>& outBuffer);
-        
 
     private: 
         int handle_errno(int err=0) noexcept;
         int handle_txres(long ret) noexcept;
 
-        // TODO: rewrite or delete this
-        template<class Action> static bool try_for_period(int millis, Action action) noexcept
-        {
-            const double timeout = millis / 1000.0; // millis to seconds
-            const double start = timer_time();
-            do
-            {
-                if (action())
-                    return true; // success
-                thread_sleep(1); // suspend until next timeslice
-            }
-            while (timeout > 0.0 && (timer_time() - start) < timeout);
-
-            return false; // timeout
-        }
-        template<class Ret> Ret try_recv(Ret (socket::*recv)(int max), int millis) noexcept
-        {
-            Ret res;
-            this->try_for_period(millis, [&]() {
-                return available() != 0 ? (res = (this->*recv)(0x7fffffff)),true : false;
-            });
-            return res;
-        }
-        template<class Ret> Ret try_recvfrom(Ret (socket::*recvfrom)(ipaddress& from, int max),
-                                             ipaddress& from, int millis) noexcept
-        {
-            Ret res;
-            this->try_for_period(millis, [&]() {
-                return available() != 0 ? (res = (this->*recvfrom)(from, 0x7fffffff)),true : false;
-            });
-            return res;
-        }
     public:
 
         /**
@@ -483,14 +684,17 @@ namespace rpp
             return cont;
         }
 
-        std::string          recv_str (int maxChars = 0x7fffffff) noexcept { return recv_gen<std::string>(maxChars); }
-        std::wstring         recv_wstr(int maxChars = 0x7fffffff) noexcept { return recv_gen<std::wstring>(maxChars); }
+        std::string recv_str(int maxChars = 0x7fffffff) noexcept { return recv_gen<std::string>(maxChars); }
+        std::wstring recv_wstr(int maxChars = 0x7fffffff) noexcept { return recv_gen<std::wstring>(maxChars); }
         std::vector<uint8_t> recv_data(int maxCount = 0x7fffffff) noexcept { return recv_gen<std::vector<uint8_t>>(maxCount); }
 
-        std::string          recvfrom_str (ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<std::string>(from, maxChars); }
-        std::wstring         recvfrom_wstr(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<std::wstring>(from, maxChars); }
+        std::string recvfrom_str(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<std::string>(from, maxChars); }
+        std::wstring recvfrom_wstr(ipaddress& from, int maxChars = 0x7fffffff) noexcept { return recvfrom_gen<std::wstring>(from, maxChars); }
         std::vector<uint8_t> recvfrom_data(ipaddress& from, int maxCount = 0x7fffffff) noexcept { return recvfrom_gen<std::vector<uint8_t>>(from, maxCount); }
 
+        /**
+         * Peeks the recv buffer for a single string, up to maxCount chars
+         */
         std::string peek_str(int maxCount = 0x7fffffff) noexcept;
 
         /**
@@ -499,10 +703,10 @@ namespace rpp
          */
         template<class T> NOINLINE T wait_recv(int millis) noexcept
         {
-            return try_recv(&socket::recv_gen<T>, millis);
+            return wait_available(millis) ? recv_gen<T>() : T{};
         }
-        std::string          wait_recv_str(int millis)  noexcept { return wait_recv<std::string>(millis); }
-        std::wstring         wait_recv_wstr(int millis) noexcept { return wait_recv<std::wstring>(millis); }
+        std::string wait_recv_str(int millis) noexcept { return wait_recv<std::string>(millis); }
+        std::wstring wait_recv_wstr(int millis) noexcept { return wait_recv<std::wstring>(millis); }
         std::vector<uint8_t> wait_recv_data(int millis) noexcept { return wait_recv<std::vector<uint8_t>>(millis); }
 
 
@@ -518,7 +722,7 @@ namespace rpp
         {
             return send(request) <= 0 ? T{} : wait_recv<T>(millis);
         }
-        template<class U> auto request_str(const U& req, int millis = 1000)  noexcept { return request<std::string>(req, millis); }
+        template<class U> auto request_str(const U& req, int millis = 1000) noexcept { return request<std::string>(req, millis); }
         template<class U> auto request_wstr(const U& req, int millis = 1000) noexcept { return request<std::wstring>(req, millis); }
         template<class U> auto request_data(const U& req, int millis = 1000) noexcept { return request<std::vector<uint8_t>>(req, millis); }
 
@@ -529,10 +733,10 @@ namespace rpp
          */
         template<class T> NOINLINE T wait_recvfrom(ipaddress& from, int millis) noexcept
         {
-            return try_recvfrom(&socket::recvfrom_gen<T>, from, millis);
+            return wait_available(millis) ? recvfrom_gen<T>(from) : T{};
         }
-        std::string          wait_recvfrom_str (ipaddress& from, int millis) noexcept { return wait_recvfrom<std::string>(from,millis); }
-        std::wstring         wait_recvfrom_wstr(ipaddress& from, int millis) noexcept { return wait_recvfrom<std::wstring>(from,millis); }
+        std::string wait_recvfrom_str(ipaddress& from, int millis) noexcept { return wait_recvfrom<std::string>(from,millis); }
+        std::wstring wait_recvfrom_wstr(ipaddress& from, int millis) noexcept { return wait_recvfrom<std::wstring>(from,millis); }
         std::vector<uint8_t> wait_recvfrom_data(ipaddress& from, int millis) noexcept { return wait_recvfrom<std::vector<uint8_t>>(from,millis); }
 
 
@@ -566,7 +770,7 @@ namespace rpp
         int set_ioctl(int iocmd, int value) noexcept;
 
         /**
-         * Enables broadcast on UDP sockets
+         * Enables broadcast on UDP sockets, returns true on success
          */
         bool enable_broadcast() noexcept;
 
@@ -581,7 +785,10 @@ namespace rpp
          * @return TRUE if set succeded, check socket::last_err() for error message
          */
         bool set_blocking(bool socketsBlock) noexcept;
-        // @return TRUE if socket is set to blocking: set_blocking(true);, check socket::last_err() for error message
+        /**
+         * @return TRUE if socket is set to blocking: set_blocking(true);,
+         *         check socket::last_err() for error message
+         **/
         bool is_blocking() const noexcept;
 
         /**
@@ -592,33 +799,40 @@ namespace rpp
          * @return TRUE if set succeeded, check socket::last_err() for error message
          */
         bool set_nagle(bool enableNagle) noexcept;
-        // @return TRUE if socket is set to nodelay: set_nagle(false);, check socket::last_err() for error message
+        /**
+         * @returns true if socket is set to nodelay: set_nagle(false);, 
+         *          check socket::last_err() for error message
+         */
         bool is_nodelay() const noexcept;
 
-        // Sets the receive buffer size
-        // @return TRUE if set size was successful, check socket::last_err() for error message
+        /**
+         * Sets the receive buffer size
+         * @return TRUE if set size was successful, check socket::last_err() for error message
+         */
         bool set_rcv_buf_size(size_t size) noexcept;
-        // @return Receive buffer size
+        /** @return Receive buffer size */
         int get_rcv_buf_size() const noexcept;
 
-        // Sets the send buffer size
-        // @return TRUE if set size was successful, check socket::last_err() for error message
+        /**
+         * Sets the send buffer size
+         * @return true if set size was successful, check socket::last_err() for error message
+         */
         bool set_snd_buf_size(size_t size) noexcept;
-        // @return Send buffer size
+        /** @return Send buffer size */
         int get_snd_buf_size() const noexcept;
 
-        /// @return Remaining space in the socket send buffer. 0 if no space. -1 on error.
+        /** @return Remaining space in the socket send buffer. 0 if no space. -1 on error. */
         int get_send_buffer_remaining() const noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
 
-        // @return The SocketType of the socket
+        /** @return The SocketType of the socket */
         socket_type type() const noexcept;
-        // @return The AddressFamily of the socket
+        /** @return The AddressFamily of the socket */
         address_family family() const noexcept;
-        // @return The IP Protocol of the socket
+        /** @return The IP Protocol of the socket */
         ip_protocol ipproto() const noexcept;
-        // @return ProtocolInfo of the socket
+        /** @return ProtocolInfo of the socket */
         protocol_info protocol() const noexcept;
         /**
          * Checks if the socket is still valid and connected. If connection has
@@ -629,14 +843,24 @@ namespace rpp
 
         ////////////////////////////////////////////////////////////////////////////
 
-        // Creates a new socket without binding or connecting anything
-        bool create(address_family af = AF_IPv4, ip_protocol ipp = IPP_TCP, socket_option opt = SO_None) noexcept;
+        /**
+         * @brief Creates a new socket without binding or connecting anything
+         * @param af Address family of the socket
+         * @param ipp IP protocol of the socket
+         * @param opt Socket options to set. The socket is NON BLOCKING by default!
+         *             Use SO_Blocking to get classic blocking socket.
+         */
+        bool create(address_family af = AF_IPv4,
+                    ip_protocol ipp = IPP_TCP,
+                    socket_option opt = SO_None) noexcept;
         
         // Binds this socket to some address:port -- as a TCP listener OR a general UDP socket
         // If you bind an UDP socket to a remote address, you can use send() to send datagrams without specifying remote address
         bool bind(const ipaddress& address) noexcept;
 
-        // Start listening for new clients
+        /**
+         * @brief For TCP sockets, starts listening for new clients, returns true on success
+         */
         bool listen() noexcept;
 
 
@@ -648,9 +872,13 @@ namespace rpp
             SF_ReadWrite = SF_Read|SF_Write, //
         };
 
-        // Tries to select this socket for conditions
-        // Select suspends the thread until this Socket file descriptor is signaled
-        // Return false on timeout or error. (check socket::last_err())
+        /**
+         * @brief Tries to select this socket for conditions
+         * Select suspends the thread until this Socket file descriptor is signaled
+         * @param timeoutMillis The maximum time to wait for the socket to be signaled
+         * @param selectFlags Which condition should trigger a return? Read, Write, ReadWrite, Except?
+         * @returns true on condition success, false on timeout or error. (check socket::last_err())
+         */
         bool select(int timeoutMillis, SelectFlag selectFlags = SF_ReadWrite) noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
@@ -659,22 +887,30 @@ namespace rpp
          * Creates a new listener type socket used for accepting new connections
          * @return TRUE if the socket is successfully listening to addr
          */
-        bool listen(const ipaddress& localAddr, ip_protocol ipp = IPP_TCP, socket_option opt = SO_None) noexcept;
+        bool listen(const ipaddress& localAddr,
+                    ip_protocol ipp = IPP_TCP,
+                    socket_option opt = SO_None) noexcept;
         /**
          * Creates a new listener type socket used for accepting new connections
          * @return TRUE if the socket is successfully listening to addr
          */
-        bool listen(int localPort, address_family af = AF_IPv4, ip_protocol ipp = IPP_TCP, socket_option opt = SO_None) noexcept;
+        bool listen(int localPort, address_family af = AF_IPv4,
+                    ip_protocol ipp = IPP_TCP,
+                    socket_option opt = SO_None) noexcept;
         /**
          * STATIC
          * Creates a new listener type socket used for accepting new connections
          */
-        static socket listen_to(const ipaddress& localAddr, ip_protocol ipp = IPP_TCP, socket_option opt = SO_None) noexcept;
+        static socket listen_to(const ipaddress& localAddr,
+                                ip_protocol ipp = IPP_TCP,
+                                socket_option opt = SO_None) noexcept;
         /**
          * STATIC
          * Creates a new listener type socket used for accepting new connections
          */
-        static socket listen_to(int localPort, address_family af = AF_IPv4, ip_protocol ipp = IPP_TCP, socket_option opt = SO_None) noexcept;
+        static socket listen_to(int localPort, address_family af = AF_IPv4,
+                                ip_protocol ipp = IPP_TCP,
+                                socket_option opt = SO_None) noexcept;
 
 
         /**
@@ -720,21 +956,26 @@ namespace rpp
          * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
          * @return TRUE: valid socket, false: error (check socket::last_err())
          */
-        bool connect(const char* hostname, int port, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
+        bool connect(const char* hostname, int port,
+                     address_family af = AF_IPv4,
+                     socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param millis Timeout value if the server takes too long to respond
          * @return TRUE: valid socket, false: error (check socket::last_err())
          */
-        bool connect(const ipaddress& remoteAddr, int millis, socket_option opt = SO_None) noexcept;
+        bool connect(const ipaddress& remoteAddr, int millis,
+                     socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
          * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
          * @param millis Timeout value if the server takes too long to respond
          * @return TRUE: valid socket, false: error (check socket::last_err())
          */
-        bool connect(const char* hostname, int port, int millis, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
+        bool connect(const char* hostname, int port, int millis,
+                     address_family af = AF_IPv4,
+                     socket_option opt = SO_None) noexcept;
 
 
         /**
@@ -742,27 +983,33 @@ namespace rpp
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @return If successful, an initialized Socket object
          */
-        static socket connect_to(const ipaddress& remoteAddr, socket_option opt = SO_None) noexcept;
+        static socket connect_to(const ipaddress& remoteAddr,
+                                 socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
          * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
          * @return If successful, an initialized Socket object
          */
-        static socket connect_to(const char* hostname, int port, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
+        static socket connect_to(const char* hostname, int port, 
+                                 address_family af = AF_IPv4,
+                                 socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param millis Timeout value if the server takes too long to respond
          * @return If successful, an initialized Socket object
          */
-        static socket connect_to(const ipaddress& remoteAddr, int millis, socket_option opt = SO_None) noexcept;
+        static socket connect_to(const ipaddress& remoteAddr, int millis,
+                                 socket_option opt = SO_None) noexcept;
         /**
          * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
          * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
          * @param millis Timeout value if the server takes too long to respond
          * @return If successful, an initialized Socket object
          */
-        static socket connect_to(const char* hostname, int port, int millis, address_family af = AF_IPv4, socket_option opt = SO_None) noexcept;
+        static socket connect_to(const char* hostname, int port, int millis, 
+                                 address_family af = AF_IPv4,
+                                 socket_option opt = SO_None) noexcept;
 
 
         /**
@@ -773,6 +1020,7 @@ namespace rpp
          */
         template<class Func> void accept_async(Func&& func, int millis = -1) noexcept
         {
+            // TODO: rewrite using new rpp coroutines
             struct async {
                 socket* listener;
                 Func callback;
@@ -796,6 +1044,7 @@ namespace rpp
          */
         template<class Func> void connect_async(const ipaddress& remoteAddr, Func&& func, int millis, socket_option opt = SO_None) noexcept
         {
+            // TODO: rewrite using new rpp coroutines
             struct async {
                 ipaddress remoteAddr;
                 Func callback;
@@ -819,12 +1068,31 @@ namespace rpp
     /**
      * Makes an UDP socket with a random port
      */
-    RPPAPI socket make_udp_randomport(socket_option opt = SO_None);
+    RPPAPI socket make_udp_randomport(socket_option opt = SO_None) noexcept;
 
     /**
      * Creates a loopback (127.0.0.1) TCP Listener with a random port number
      */
-    RPPAPI socket make_tcp_randomport(socket_option opt = SO_None);
+    RPPAPI socket make_tcp_randomport(socket_option opt = SO_None) noexcept;
+
+    /**
+     * @returns Main interface of the current system
+     * @param iface ["eth|lan|wlan"] Main interface name regex pattern to 
+     * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
+     */
+    rpp::ipinterface get_ip_interface(const std::string& iface = "eth|lan|wlan", address_family af = AF_IPv4);
+
+    /**
+     * @returns Main interface IP address of the current system
+     * @param iface ["eth|lan|wlan"] Main interface name regex pattern to match
+     */
+    std::string get_system_ip(const std::string& iface = "eth|lan|wlan", address_family af = AF_IPv4);
+
+    /**
+     * @returns Main interface Broadcast IP address of the current system
+     * @param iface ["eth|lan|wlan"] Main interface name regex pattern to match
+     */
+    std::string get_broadcast_ip(const std::string& iface = "eth|lan|wlan", address_family af = AF_IPv4);
 
     ////////////////////////////////////////////////////////////////////////////////
 
