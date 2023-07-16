@@ -226,8 +226,9 @@ namespace rpp
     // --------------------------------------------------------------------------------
 
     raw_address::raw_address() noexcept
-        : Family{AF_DontCare}, Addr6{}, FlowInfo{0}, ScopeId{0}
+        : Family{AF_DontCare}, FlowInfo{0}, ScopeId{0}
     {
+        memset(Addr6, 0, sizeof(Addr6));
     }
 
     raw_address::raw_address(address_family af) noexcept
@@ -1407,6 +1408,9 @@ namespace rpp
 
     bool socket::select(int millis, SelectFlag selectFlags) noexcept
     {
+        if (Sock == -1) // cannot select on an invalid socket
+            return false;
+
         fd_set set;
         FD_ZERO(&set);
         FD_SET(Sock, &set);

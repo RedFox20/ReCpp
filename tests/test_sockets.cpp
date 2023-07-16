@@ -169,7 +169,9 @@ TestImpl(test_sockets)
             AssertNotEqual(iface.name, "");
             AssertTrue(iface.addr.has_address());
             AssertTrue(iface.netmask.has_address());
+        #if _MSC_VER
             AssertTrue(iface.broadcast.has_address());
+        #endif
             // AssertTrue(iface.gateway.has_address()); // disabled because virtual interfaces don't have a gateway
         }
     }
