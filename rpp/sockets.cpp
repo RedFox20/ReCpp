@@ -671,7 +671,7 @@ namespace rpp
                     in.name = std::string{ifa->ifa_name};
                     in.addr = to_ipaddress(*(saddr*)ifa->ifa_addr);
                     in.netmask = to_ipaddress(*(saddr*)ifa->ifa_netmask);
-                    if (ifa->ifa_flags & IFF_BROADCAST)
+                    if (ifa->ifa_flags & 0x2/*IFF_BROADCAST*/)
                     {
                         in.broadcast = to_ipaddress(*(saddr*)ifa->ifa_ifu.ifu_broadaddr);
                     }
@@ -686,6 +686,8 @@ namespace rpp
         {
             if (a.gateway.has_address() && !b.gateway.has_address())
                 return true;
+            if (b.gateway.has_address() && !a.gateway.has_address())
+                return false;
             return a.addr.compare(b.addr) < 0;
         });
         return out;
@@ -729,33 +731,8 @@ namespace rpp
         return s;
     }
     socket::socket() noexcept
-        : Sock{-1}, Addr{}, Shared{false}, Blocking{true}, Category{SC_Unknown}
+        : Sock{-1}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
-    }
-    socket::socket(int port, address_family af, ip_protocol ipp, socket_option opt) noexcept
-        : Sock{-1}, Addr{af, port}, Shared{false}, Blocking{true}, Category{SC_Unknown}
-    {
-        listen(Addr, ipp, opt);
-    }
-    socket::socket(const ipaddress& address, socket_option opt) noexcept
-        : Sock{-1}, Addr{address}, Shared{false}, Blocking{true}, Category{SC_Unknown}
-    {
-        connect(Addr, opt);
-    }
-    socket::socket(const ipaddress& address, int timeoutMillis, socket_option opt) noexcept
-        : Sock{-1}, Addr(address), Shared{false}, Blocking{true}, Category{SC_Unknown}
-    {
-        connect(Addr, timeoutMillis, opt);
-    }
-    socket::socket(const char* hostname, int port, address_family af, socket_option opt) noexcept
-        : Sock{-1}, Addr{af, hostname, port}, Shared{false}, Blocking{true}, Category{SC_Unknown}
-    {
-        connect(Addr, opt);
-    }
-    socket::socket(const char* hostname, int port, int timeoutMillis, address_family af, socket_option opt) noexcept
-        : Sock{-1}, Addr{af, hostname, port}, Shared{false}, Blocking{true}, Category{SC_Unknown}
-    {
-        connect(Addr, timeoutMillis, opt);
     }
     socket::socket(socket&& s) noexcept
         : Sock{s.Sock}, Addr{s.Addr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
@@ -1474,19 +1451,12 @@ namespace rpp
             return false;
         return true;
     }
-    bool socket::listen(int localPort, address_family af, ip_protocol ipp, socket_option opt) noexcept
-    {
-        return listen(ipaddress{ af, localPort }, ipp, opt);
-    }
+
     socket socket::listen_to(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
-        socket s; 
-        s.listen(localAddr, ipp, opt); 
-        return s;
-    }
-    socket socket::listen_to(int localPort, address_family af, ip_protocol ipp, socket_option opt) noexcept
-    {
-        return listen_to(ipaddress{ af, localPort }, ipp, opt);
+        if (socket s; s.listen(localAddr, ipp, opt))
+            return s;
+        return {};
     }
 
 
@@ -1576,31 +1546,18 @@ namespace rpp
         close();
         return false;
     }
-    bool socket::connect(const char* hostname, int port, address_family af, socket_option opt) noexcept
-    {
-        return connect(ipaddress(af, hostname, port), opt);
-    }
-    bool socket::connect(const char* hostname, int port, int millis, address_family af, socket_option opt) noexcept
-    {
-        return connect(ipaddress(af, hostname, port), millis, opt);
-    }
 
-
-    socket socket::connect_to(const ipaddress& addr, socket_option opt) noexcept
-    { 
-        return socket(addr, opt); 
-    }
-    socket socket::connect_to(const char* hostname, int port, address_family af, socket_option opt) noexcept
+    socket socket::connect_to(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        return connect_to(ipaddress(af, hostname, port), opt);
+        if (socket s; s.connect(remoteAddr, opt))
+            return s;
+        return {}; // failed
     }
-    socket socket::connect_to(const ipaddress& addr, int millis, socket_option opt) noexcept
-    { 
-        return socket(addr, millis, opt); 
-    }
-    socket socket::connect_to(const char* hostname, int port, int millis, address_family af, socket_option opt) noexcept
+    socket socket::connect_to(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        return connect_to(ipaddress(af, hostname, port), millis, opt);
+        if (socket s; s.connect(remoteAddr, millis, opt))
+            return s;
+        return {}; // failed
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1609,7 +1566,7 @@ namespace rpp
     {
         for (int i = 0; i < 10; ++i) {
             int port = (rand() % (65536 - 8000));
-            if (socket s = socket::make_udp(port, AF_IPv4, opt))
+            if (socket s = socket::make_udp({AF_IPv4, port}, opt))
                 return s;
         }
         return {};
@@ -1619,32 +1576,32 @@ namespace rpp
     {
         for (int i = 0; i < 10; ++i) {
             int port = (rand() % (65536 - 8000));
-            if (socket s = socket::listen_to(port, AF_IPv4, IPP_TCP, opt))
+            if (socket s = socket::listen_to({AF_IPv4, port}, IPP_TCP, opt))
                 return s;
         }
         return {};
     }
 
-    rpp::ipinterface get_ip_interface(const std::string& iface, address_family af)
+    ipinterface get_ip_interface(const std::string& interface, address_family af)
     {
-        std::vector<rpp::ipinterface> ifaces = rpp::ipinterface::get_interfaces(iface, af);
-        if (ifaces.empty())
+        std::vector<ipinterface> interfaces = ipinterface::get_interfaces(interface, af);
+        if (interfaces.empty())
             return {};
-        std::regex pattern { iface };
-        for (const rpp::ipinterface& ip : ifaces)
+        std::regex pattern { interface };
+        for (const ipinterface& ip : interfaces)
             if (std::regex_search(ip.name, pattern))
                 return ip;
-        return ifaces.front();
+        return interfaces.front();
     }
 
-    std::string get_system_ip(const std::string& iface, address_family af)
+    std::string get_system_ip(const std::string& interface, address_family af)
     {
-        return get_ip_interface(iface, af).addr.str();
+        return get_ip_interface(interface, af).addr.str();
     }
 
-    std::string get_broadcast_ip(const std::string& iface, address_family af)
+    std::string get_broadcast_ip(const std::string& interface, address_family af)
     {
-        return get_ip_interface(iface, af).broadcast.str();
+        return get_ip_interface(interface, af).broadcast.str();
     }
 
     ////////////////////////////////////////////////////////////////////////////////
