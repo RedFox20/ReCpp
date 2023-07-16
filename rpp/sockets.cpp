@@ -103,27 +103,6 @@ namespace rpp
     {
         sleep(milliseconds);
     }
-    // spawns a new thread, thread handles are automatically closed 
-    void spawn_thread(void(*thread_func)(void* arg), void* arg) noexcept
-    {
-    #if _WIN32
-        _beginthreadex(nullptr, 0, (unsigned(_stdcall*)(void*))thread_func, arg, 0, nullptr);
-    #else // Linux
-        pthread_t threadHandle;
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        #if __GNUG__ && !__clang__ // G++
-        #  pragma GCC diagnostic push
-        #  pragma GCC diagnostic ignored "-Wcast-function-type"
-        #endif
-        pthread_create(&threadHandle, &attr, (void*(*)(void*))thread_func, arg);
-        #if __GNUG__ && !__clang__ // G++
-        #  pragma GCC diagnostic pop
-        #endif
-        pthread_attr_destroy(&attr);
-    #endif
-    }
     // measure highest accuracy time in seconds for both Windows and Linux
     double timer_time() noexcept
     {
@@ -142,6 +121,22 @@ namespace rpp
         clock_gettime(CLOCK_REALTIME, &tm);
         return tm.tv_sec + (double)tm.tv_nsec / 1000000000.0;
     #endif
+    }
+
+    /// @brief Converts `value` to string, returns string length
+    int to_str(char* buf, int max, int value) noexcept
+    {
+        auto end = std::to_chars(buf, buf + max, value);
+        if (end.ec == std::errc{}) // success
+        {
+            *end.ptr = '\0';
+            return int(end.ptr - buf);
+        }
+        else // on error, terminate the string
+        {
+            buf[0] = '?', buf[1] = '\0';
+            return 1;
+        }
     }
     ////////////////////////////////////////////////////////////////////
 
@@ -293,7 +288,7 @@ namespace rpp
 
         char port_str[32] = "";
         if (port > 0)
-            itoa(port, port_str, 10);
+            to_str(port_str, sizeof(port_str), port);
 
         if (isdigit(hostname[0]))
             hint.ai_flags = AI_NUMERICHOST;
@@ -443,6 +438,9 @@ namespace rpp
         }
     }
 
+    ipaddress::ipaddress(const char* hostname, const char* port) noexcept
+        : ipaddress{get_address_family(hostname), hostname, atoi(port)} {}
+
     ipaddress::ipaddress(int socket) noexcept
     {
         inwin32(InitWinSock());
@@ -495,20 +493,9 @@ namespace rpp
                 len += Address.to_cstr(dst+len, maxCount-len);
                 dst[len++] = ']';
             }
-
             dst[len++] = ':';
-            auto end = std::to_chars(dst+len, dst+maxCount, Port);
-            if (end.ec == std::errc{}) // success
-            {
-                *end.ptr = '\0';
-                return int(end.ptr - dst);
-            }
-            else // on error, terminate the string
-            {
-                dst[len++] = '?';
-                dst[len] = '\0';
-                return len;
-            }
+            len += to_str(dst+len, maxCount-len, Port);
+            return len;
         }
         return 0;
     }

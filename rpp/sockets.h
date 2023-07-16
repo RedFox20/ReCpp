@@ -233,8 +233,7 @@ namespace rpp
          * hostname:"192.168.1.110", port:"14550"
          * Detects IPv4 or IPv6 automatically
          */
-        ipaddress(const char* hostname, const char* port) noexcept
-            : ipaddress{get_address_family(hostname), hostname, atoi(port)} {}
+        ipaddress(const char* hostname, const char* port) noexcept;
         ipaddress(const std::string& hostname, const std::string& port) noexcept
             : ipaddress{hostname.c_str(), port.c_str()} {}
 
