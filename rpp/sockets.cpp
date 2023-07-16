@@ -671,7 +671,10 @@ namespace rpp
                     in.name = std::string{ifa->ifa_name};
                     in.addr = to_ipaddress(*(saddr*)ifa->ifa_addr);
                     in.netmask = to_ipaddress(*(saddr*)ifa->ifa_netmask);
-                    in.broadcast = to_ipaddress(*(saddr*)ifa->ifu_broadaddr);
+                    if (ifa->ifa_flags & IFF_BROADCAST)
+                    {
+                        in.broadcast = to_ipaddress(*(saddr*)ifa->ifa_ifu.ifu_broadaddr);
+                    }
                     // TODO: gateway
                 }
             }
