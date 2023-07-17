@@ -5,7 +5,7 @@
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
-#include <charconv> // std::to_chars
+#include <rpp/strview.h> // _tostring
 #include <regex> // std::regex
 
 #if DEBUG || _DEBUG || RPP_DEBUG
@@ -46,7 +46,11 @@
     #include <netinet/tcp.h>        // TCP_NODELAY
     #include <errno.h>              // last error number
     #include <sys/ioctl.h>          // ioctl()
-    #include <sys/fcntl.h>          // fcntl()
+    #if __has_include(<fcntl.h>)
+        #include <fcntl.h>          // fcntl()
+    #else
+        #include <sys/fcntl.h>      // fcntl()
+    #endif
     #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
     #include <ifaddrs.h>            // getifaddrs / freeifaddrs
@@ -123,21 +127,6 @@ namespace rpp
     #endif
     }
 
-    /// @brief Converts `value` to string, returns string length
-    int to_str(char* buf, int max, int value) noexcept
-    {
-        auto end = std::to_chars(buf, buf + max, value);
-        if (end.ec == std::errc{}) // success
-        {
-            *end.ptr = '\0';
-            return int(end.ptr - buf);
-        }
-        else // on error, terminate the string
-        {
-            buf[0] = '?', buf[1] = '\0';
-            return 1;
-        }
-    }
     ////////////////////////////////////////////////////////////////////
 
 
@@ -289,7 +278,7 @@ namespace rpp
 
         char port_str[32] = "";
         if (port > 0)
-            to_str(port_str, sizeof(port_str), port);
+            _tostring(port_str, port);
 
         if (isdigit(hostname[0]))
             hint.ai_flags = AI_NUMERICHOST;
@@ -495,7 +484,7 @@ namespace rpp
                 dst[len++] = ']';
             }
             dst[len++] = ':';
-            len += to_str(dst+len, maxCount-len, Port);
+            len += _tostring(dst+len, Port);
             return len;
         }
         return 0;

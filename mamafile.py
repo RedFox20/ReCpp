@@ -11,9 +11,10 @@ class ReCpp(mama.BuildTarget):
             self.add_cl_flags('/DAPPVEYOR')
         if os.getenv('BUILD_WITH_MEM_SAFETY') != None:
             self.add_cmake_options('BUILD_WITH_MEM_SAFETY=ON')
-        if os.getenv('CXX17') != None:
+        
+        if os.getenv('CXX17') or self.is_enabled_cxx17():
             self.add_cmake_options('CXX17=TRUE')
-        if os.getenv('CXX20') != None:
+        if os.getenv('CXX20') or self.is_enabled_cxx20():
             self.add_cmake_options('CXX20=TRUE')
 
     def package(self):
@@ -22,6 +23,10 @@ class ReCpp(mama.BuildTarget):
         if self.raspi or self.oclea:
             self.export_syslib('dl')
             self.export_syslib('rt')
+        elif self.mips:
+            self.export_syslib('dl')
+            self.export_syslib('rt')
+            self.export_syslib('atomic')
         elif self.linux:
             self.export_syslib('dl')
             self.export_syslib('dw', 'libdw-dev')

@@ -146,7 +146,15 @@ namespace rpp
     inline int _tostring(char* buffer, long value)      noexcept { return _tostring(buffer, (int)value);  }
     inline int _tostring(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint)value); }
 
-
+    #ifndef RPP_CONSTEXPR_STRLEN
+    #  if _MSC_VER
+    #    define RPP_CONSTEXPR_STRLEN constexpr
+    #  elif __GNUG__ && __cplusplus >= 201703L
+    #    define RPP_CONSTEXPR_STRLEN constexpr
+    #  else
+    #    define RPP_CONSTEXPR_STRLEN
+    #  endif
+    #endif
 
 
     /**
@@ -165,8 +173,8 @@ namespace rpp
         int len;         // length of string
 
         FINLINE constexpr strview()                            noexcept : str{""},  len{0} {}
-        FINLINE constexpr strview(char* str)                   noexcept : str{str}, len{static_cast<int>(std::char_traits<char>::length(str))} {}
-        FINLINE constexpr strview(const char* str)             noexcept : str{str}, len{static_cast<int>(std::char_traits<char>::length(str))} {}
+        FINLINE RPP_CONSTEXPR_STRLEN strview(char* str)        noexcept : str{str}, len{static_cast<int>(std::char_traits<char>::length(str))} {}
+        FINLINE RPP_CONSTEXPR_STRLEN strview(const char* str)  noexcept : str{str}, len{static_cast<int>(std::char_traits<char>::length(str))} {}
         FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len}                           {}
         FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)}         {}
         FINLINE constexpr strview(const char* str, const char* end) noexcept : str{str}, len{static_cast<int>(end - str)}   {}
@@ -189,7 +197,7 @@ namespace rpp
         // however strview(std::string&&) is allowed because it allows passing temporaries as arguments to functions
         strview& operator=(std::string&&) = delete;
 
-        FINLINE constexpr strview& operator=(const char* str) noexcept {
+        FINLINE RPP_CONSTEXPR_STRLEN strview& operator=(const char* str) noexcept {
             this->str = str;
             this->len = static_cast<int>(std::char_traits<char>::length(str));
             return *this;
@@ -1117,29 +1125,32 @@ namespace rpp
 namespace std { template<class T> struct hash; }
 #endif
 
-template<>
-struct std::hash<rpp::strview>
+namespace std
 {
-    size_t operator()(const rpp::strview& s) const noexcept
+    template<>
+    struct hash<rpp::strview>
     {
-        #if INTPTR_MAX == INT64_MAX // 64-bit
-            static_assert(sizeof(size_t) == 8, "Expected 64-bit build");
-            constexpr size_t FNV_offset_basis = 14695981039346656037ULL;
-            constexpr size_t FNV_prime = 1099511628211ULL;
-        #elif INTPTR_MAX == INT32_MAX // 32-bit
-            static_assert(sizeof(size_t) == 4, "Expected 32-bit build");
-            constexpr size_t FNV_offset_basis = 2166136261U;
-            constexpr size_t FNV_prime = 16777619U;
-        #endif
-        const char* p = s.str;
-        size_t value = FNV_offset_basis;
-        for (auto e = p + s.len; p < e; ++p) {
-            value ^= (size_t)*p;
-            value *= FNV_prime;
+        size_t operator()(const rpp::strview& s) const noexcept
+        {
+            #if INTPTR_MAX == INT64_MAX // 64-bit
+                static_assert(sizeof(size_t) == 8, "Expected 64-bit build");
+                constexpr size_t FNV_offset_basis = 14695981039346656037ULL;
+                constexpr size_t FNV_prime = 1099511628211ULL;
+            #elif INTPTR_MAX == INT32_MAX // 32-bit
+                static_assert(sizeof(size_t) == 4, "Expected 32-bit build");
+                constexpr size_t FNV_offset_basis = 2166136261U;
+                constexpr size_t FNV_prime = 16777619U;
+            #endif
+            const char* p = s.str;
+            size_t value = FNV_offset_basis;
+            for (auto e = p + s.len; p < e; ++p) {
+                value ^= (size_t)*p;
+                value *= FNV_prime;
+            }
+            return value;
         }
-        return value;
-    }
-};
+    };
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 

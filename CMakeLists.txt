@@ -45,12 +45,16 @@ endif()
 string(TOUPPER ${CMAKE_BUILD_TYPE} CURRENT_BUILD_TYPE)
 
 if(CXX17)
+    message("ENABLE C++17")
     set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS ON)
 else()
+    message("ENABLE C++20")
     set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS ON)
 endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 
 # Add compiler specific flags
@@ -176,6 +180,8 @@ endif()
 
 if(ANDROID)
     set(RPP_RUNTIME android log)
+elseif(MIPS)
+    set(RPP_RUNTIME rt atomic)
 elseif(LINUX)
     set(RPP_RUNTIME rt)
 elseif(APPLE)

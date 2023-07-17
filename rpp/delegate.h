@@ -88,18 +88,19 @@ namespace rpp
     #endif
 
 
-    #if !DELEGATE_HAS_CXX17 && __clang__ // only parse this monstrocity in legacy clang builds
+    #if !DELEGATE_HAS_CXX17 && (__clang__) // only parse this monstrocity in legacy builds
     namespace detail {
         //  from: http://en.cppreference.com/w/cpp/types/result_of, CC-BY-SA
+        template< class... > using void_t = void;
         template <typename F, typename... Args> using invoke_result_ = decltype(invoke(std::declval<F>(), std::declval<Args>()...));
         template <typename Void, typename F, typename... Args> struct invoke_result {};
-        template <typename F, typename... Args> struct invoke_result<std::void_t<invoke_result_<F, Args...>>, F, Args...> { using type = invoke_result_<F, Args...>; };
+        template <typename F, typename... Args> struct invoke_result<void_t<invoke_result_<F, Args...>>, F, Args...> { using type = invoke_result_<F, Args...>; };
         template <typename Void, typename F, typename... Args> struct is_invocable : std::false_type {};
-        template <typename F, typename... Args> struct is_invocable<std::void_t<invoke_result_<F, Args...>>, F, Args...> : std::true_type {};
+        template <typename F, typename... Args> struct is_invocable<void_t<invoke_result_<F, Args...>>, F, Args...> : std::true_type {};
         template <typename Void, typename R, typename F, typename... Args>
         struct is_invocable_r : std::false_type {};
         template <typename R, typename F, typename... Args>
-        struct is_invocable_r<std::void_t<invoke_result_<F, Args...>>, R, F, Args...>
+        struct is_invocable_r<void_t<invoke_result_<F, Args...>>, R, F, Args...>
             : std::is_convertible<invoke_result_<F, Args...>, R> {};
     }
     #endif
@@ -266,7 +267,7 @@ namespace rpp
             {
                 // store function as 'this' and call dummy class instance method
                 // which will cast 'this' into 'func_type'
-                #if __GNUG__ && !__clang__ // G++
+                #if (__GNUG__ && __GNUG__ > 5) && !__clang__ // G++
                     #pragma GCC diagnostic push
                     #pragma GCC diagnostic ignored "-Wcast-function-type"
                     dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
@@ -409,7 +410,7 @@ namespace rpp
         {
             using FunctorType = typename std::decay<Functor>::type;
 
-            #if __GNUG__ && !__clang__ // G++
+            #if (__GNUG__ && __GNUG__ > 5) && !__clang__ // G++
                 #pragma GCC diagnostic push
                 #pragma GCC diagnostic ignored "-Wcast-function-type"
                 dfunc = reinterpret_cast<dummy_type>( &FunctorType::operator() );

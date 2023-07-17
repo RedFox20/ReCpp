@@ -1499,8 +1499,15 @@ namespace rpp
     {
         int ID; // vertex id, -1 means invalid Vertex ID, [0] based indices
 
-        IdVector3(int id, const Vector3& v) : Vector3{ v }, ID{ id } {}
-        IdVector3(int id, float x, float y, float z) : Vector3{ x,y,z }, ID{ id } {}
+        constexpr IdVector3(int id, const Vector3& v) noexcept
+            : Vector3{ v }, ID{ id } {}
+        IdVector3(int id, float x, float y, float z) noexcept
+        {
+            this->x = x;
+            this->y = y;
+            this->z = z;
+            this->ID = id;
+        }
     };
 
     ////////////////////////////////////////////////////////////////////////////////
