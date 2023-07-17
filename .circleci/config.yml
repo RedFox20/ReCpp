@@ -15,7 +15,7 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      - run: pipenv run mama clang verbose build
+      - run: BUILD_WITH_MEM_SAFETY=ON pipenv run mama clang verbose build
       - run: pipenv run mama clang verbose test="--verbosity=2"
   gcc:
     description: Ubuntu GCC x64 Build
@@ -29,7 +29,7 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: pipenv run mama gcc verbose build
+      - run: BUILD_WITH_MEM_SAFETY=ON pipenv run mama gcc verbose build
       - run: pipenv run mama gcc verbose test="--verbosity=2"
   msvc:
     description: Windows MSVC VS2022 x64 Build
@@ -40,7 +40,7 @@ jobs:
       - checkout
       - run: pip3 install mama
       - run: choco install cmake -y
-      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose build
+      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; $env:BUILD_WITH_MEM_SAFETY="ON"; mama windows verbose build
       - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose test="--verbosity=2"
 workflows:
   version: 2

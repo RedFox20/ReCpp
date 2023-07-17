@@ -132,12 +132,20 @@ TestImpl(memory_pool)
     {
         rpp::linear_dynamic_pool pool { 1024 };
 
+        float* floatsPrev = pool.construct_array<float>(5, 11.0f);
         float* floats = pool.construct_array<float>(10, 42.0f);
+        float* floatsAfter = pool.construct_array<float>(5, 33.0f);
+
+        for (int i = 0; i < 5; ++i)
+            AssertThat(floatsPrev[i], 11.0f);
         for (int i = 0; i < 10; ++i)
             AssertThat(floats[i], 42.0f);
-        
-        AssertNotEqual(floats[-1], 42.0f); // check out of range
-        AssertNotEqual(floats[10], 42.0f);
+        for (int i = 0; i < 5; ++i)
+            AssertThat(floatsAfter[i], 33.0f);
+
+        // check out of range entries before and after
+        AssertEqual(floats[-1], 11.0f);
+        AssertEqual(floats[10], 33.0f);
     }
 
     TestCase(construct_array_nonpod)

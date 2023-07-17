@@ -6,5 +6,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < argc; ++i)
         printf("  -- arg %d: %s\n", i, argv[i]);
 
-    return rpp::test::run_tests(argc, argv);
+    int result = rpp::test::run_tests(argc, argv);
+    rpp::test::cleanup_all_tests();
+    return result;
 }

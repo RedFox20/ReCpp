@@ -446,7 +446,7 @@ namespace rpp
         ~socket() noexcept;
         socket(socket&& s) noexcept;             // move construct allowed
         socket& operator=(socket&& s) noexcept;  // move assign allowed
-        
+
         socket(const socket&) = delete;            // no copy construct
         socket& operator=(const socket&) = delete; // no copy assign
 

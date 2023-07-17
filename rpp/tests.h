@@ -59,7 +59,7 @@ namespace rpp
 
     public:
         explicit test(strview name);
-        virtual ~test();
+        virtual ~test() noexcept;
         void assert_failed(const char* file, int line, const char* fmt, ...);
         void assert_failed_custom(const char* fmt, ...);
     private:
@@ -151,6 +151,14 @@ namespace rpp
          * Runs ALL the tests, no filtering is done
          */
         static int run_tests();
+
+        /**
+         * For clean leak detection, this allows to deallocate all unit testing state.
+         * Call this after run_tests() to cleanup everything.
+         * 
+         * After calling this, unit tests cannot be run again.
+         */
+        static void cleanup_all_tests();
 
         /**
          * Sets the verbosity level for unit tests.
@@ -386,7 +394,7 @@ namespace rpp
 #define __TestInit(testclass, autorun)                                \
     explicit testclass(rpp::strview name) : rpp::test{name} {}        \
     static std::unique_ptr<test> __create(rpp::strview name)          \
-    { return std::unique_ptr<test>( new testclass{name} ); }          \
+    { return std::unique_ptr<test>{ new testclass{name} }; }          \
     RPP_INLINE_STATIC bool __registered = [] {                        \
         rpp::register_test(#testclass, &__create, autorun);           \
         return true;                                                  \

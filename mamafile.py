@@ -9,6 +9,8 @@ class ReCpp(mama.BuildTarget):
     def configure(self):
         if self.windows and os.getenv('APPVEYOR') != None:
             self.add_cl_flags('/DAPPVEYOR')
+        if os.getenv('BUILD_WITH_MEM_SAFETY') != None:
+            self.add_cmake_options('BUILD_WITH_MEM_SAFETY=ON')
 
     def package(self):
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])

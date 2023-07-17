@@ -117,13 +117,39 @@ namespace rpp
             }
             return shared_mem->stored_object;
         }
+        void unmap()
+        {
+            if (!shared_mem)
+                return;
+            if (shared_mem->initialized)
+            {
+                shared_mem->initialized = false;
+                shared_mem->stored_object.~T();
+            }
+            #if _MSC_VER
+                UnmapViewOfFile(shared_mem);
+                CloseHandle(handle);
+                handle = INVALID_HANDLE_VALUE;
+            #elif __ANDROID__
+                delete shared_mem;
+            #else // _WIN32
+                munmap(shared_mem, sizeof(shared));
+                close(shm_fd);
+                shm_fd = 0;
+            #endif
+            shared_mem = nullptr;
+        }
     };
 
+    static shared_memory_view<mapped_state>& get_mapped_state()
+    {
+        static shared_memory_view<mapped_state> s;
+        return s;
+    }
 
     static mapped_state& state()
     {
-        static shared_memory_view<mapped_state> s;
-        return s.get();
+        return get_mapped_state().get();
     }
 
     void register_test(strview name, test_factory factory, bool autorun)
@@ -187,7 +213,7 @@ namespace rpp
     {
         impl = new test_impl();
     }
-    test::~test()
+    test::~test() noexcept
     {
         delete impl;
     }
@@ -587,6 +613,11 @@ namespace rpp
         char empty[1] = "";
         char* argv[1] = { empty };
         return run_tests(1, argv);
+    }
+
+    void test::cleanup_all_tests()
+    {
+        get_mapped_state().unmap();
     }
 
     void test::set_verbosity(TestVerbosity verbosity)

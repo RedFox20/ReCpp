@@ -11,6 +11,34 @@ TestImpl(test_sockets)
 
     TestInit(test_sockets) {}
 
+    TestCase(ipaddress_doesnt_smash_stack)
+    {
+        uint8_t before[4] = { 0xBB,0xBB,0xBB,0xBB };
+        ipaddress addr;
+        uint8_t after[4] = { 0xAA,0xAA,0xAA,0xAA };
+
+        addr = ipaddress4{"192.168.1.1", 1234};
+        AssertTrue(!addr.is_empty());
+        AssertTrue(addr.is_valid());
+        AssertTrue(addr.has_address());
+        for (int i = 0; i < 4; ++i) AssertEqual(before[i], 0xBB);
+        for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA);
+    }
+
+    TestCase(socket_doesnt_smash_stack)
+    {
+        uint8_t before[4] = { 0xBB,0xBB,0xBB,0xBB };
+        socket s;
+        uint8_t after[4] = { 0xAA,0xAA,0xAA,0xAA };
+
+        s = rpp::make_udp_randomport();
+        AssertTrue(s.good());
+        AssertTrue(!s.address().is_empty());
+        AssertTrue(s.address().is_valid());
+        for (int i = 0; i < 4; ++i) AssertEqual(before[i], 0xBB);
+        for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA);
+    }
+
     TestCase(init_ipv4)
     {
         ipaddress4 a;
