@@ -105,10 +105,7 @@ namespace rpp
                 unsigned char Addr4Parts[4];
             };
             struct {
-                union {
-                    unsigned char Addr6[16]; // IPv6 Address
-                    unsigned long Addr6Parts[4];
-                };
+                unsigned char Addr6[16]; // IPv6 Address
                 unsigned long FlowInfo;
                 unsigned long ScopeId; // The network prefix for IPv6
             };

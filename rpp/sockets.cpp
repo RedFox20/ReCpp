@@ -357,8 +357,8 @@ namespace rpp
     {
         if (Family == AF_IPv4)
             return Addr4 != INADDR_ANY;
-        for (int i = 0; i < 4; ++i)
-            if (Addr6Parts[i] != 0)
+        for (int i = 0; i < 16; ++i)
+            if (Addr6[i] != 0)
                 return true;
         return false;
     }
@@ -547,7 +547,7 @@ namespace rpp
 
     static ipaddress to_ipaddress(const saddr& a) noexcept
     {
-        ipaddress ipa = { to_addrfamily(a.sa4.sin_family), (int)ntohs(a.sa4.sin_port) };
+        ipaddress ipa { to_addrfamily(a.sa4.sin_family), (int)ntohs(a.sa4.sin_port) };
         if (ipa.Address.Family == AF_IPv4) {
             ipa.Address.Addr4 = a.sa4.sin_addr.s_addr;
         } else { // AF_IPv6
@@ -671,8 +671,9 @@ namespace rpp
                     ipinterface& in = out.emplace_back();
                     in.name = std::string{ifa->ifa_name};
                     in.addr = to_ipaddress(*(saddr*)ifa->ifa_addr);
-                    in.netmask = to_ipaddress(*(saddr*)ifa->ifa_netmask);
-                    if (ifa->ifa_flags & 0x2/*IFF_BROADCAST*/)
+                    if (ifa->ifa_netmask)
+                        in.netmask = to_ipaddress(*(saddr*)ifa->ifa_netmask);
+                    if ((ifa->ifa_flags & 0x2/*IFF_BROADCAST*/) != 0 && ifa->ifa_ifu.ifu_broadaddr)
                     {
                         in.broadcast = to_ipaddress(*(saddr*)ifa->ifa_ifu.ifu_broadaddr);
                     }
