@@ -81,6 +81,18 @@ jobs:
       - run: choco install cmake -y
       - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; $env:BUILD_WITH_MEM_SAFETY="ON"; $env:CXX17="1"; mama windows verbose build
       - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose test="--verbosity=2"
+  gcc-mipsel-cpp20:
+    description: MIPSEL C++20 GCC Build (NO TESTS)
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install gcc-mipsel-linux-gnu g++-mipsel-linux-gnu
+      - run: pipenv install mama
+      - run: make configure-cmake
+      - run: CXX20=1 pipenv run mama mips verbose build
 workflows:
   version: 2
   build_all:
@@ -91,3 +103,4 @@ workflows:
       - gcc-cpp17
       - msvc-cpp20
       - msvc-cpp17
+      - gcc-mipsel-cpp20
