@@ -130,7 +130,7 @@ namespace rpp
             // because the suspension timeout is not accurate at all
             time_point suspendStart = clock::now();
 
-            int64_t timeout = duration_cast<std::chrono::milliseconds>(dur - suspendThreshold).count();
+            int64_t timeout = std::chrono::duration_cast<std::chrono::milliseconds>(dur - suspendThreshold).count();
             if (timeout < 0) timeout = 0;
 
             status = _wait_suspended_unlocked(m, static_cast<DWORD>(timeout));

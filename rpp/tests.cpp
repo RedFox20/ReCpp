@@ -386,7 +386,8 @@ namespace rpp
 
     bool test::run_init()
     {
-        test_func init { .name = "init" };
+        test_func init;
+        init.name = "init";
         impl->current_func = &init;
         try
         {
@@ -404,7 +405,8 @@ namespace rpp
 
     void test::run_cleanup()
     {
-        test_func cleanup { .name = "cleanup" };
+        test_func cleanup;
+        cleanup.name = "cleanup";
         impl->current_func = &cleanup;
         try
         {
@@ -627,15 +629,12 @@ namespace rpp
     int test::add_test_func(strview name, lambda_base lambda, lambda_base_fn fn, 
                             size_t expectedExHash, bool autorun)
     {
-        impl->test_functions.emplace_back(std::unique_ptr<test_func>{
-            new test_func {
-                .name = name,
-                .lambda = lambda,
-                .func = fn,
-                .expectedExType = expectedExHash,
-                .autorun = autorun
-            }
-        });
+        auto& func = impl->test_functions.emplace_back(std::make_unique<test_func>());
+        func->name = name;
+        func->lambda = lambda;
+        func->func = fn;
+        func->expectedExType = expectedExHash;
+        func->autorun = autorun;
         return static_cast<int>(impl->test_functions.size()) - 1;
     }
 
