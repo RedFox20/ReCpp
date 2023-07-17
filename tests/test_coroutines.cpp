@@ -13,6 +13,11 @@ TestImpl(test_coroutines)
     {
     }
 
+    TestCleanup()
+    {
+        rpp::thread_pool::global().clear_idle_tasks();
+    }
+
 #if RPP_HAS_COROUTINES
 
     rpp::cfuture<void> chrono_coro(int millis)

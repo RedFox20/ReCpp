@@ -327,13 +327,12 @@ namespace rpp
 
     void test::add_assert_failure(const char* file, int line, const char* msg, int len)
     {
-        test_failure fail {
-            .testname = name,
-            .testcase = impl->current_func->name,
-            .message = std::string{msg,msg+len},
-            .file = std::string{file},
-            .line = line
-        };
+        test_failure fail;
+        fail.testname = name;
+        fail.testcase = impl->current_func->name;
+        fail.message = std::string{msg,msg+len};
+        fail.file = std::string{file};
+        fail.line = line;
         {
             std::lock_guard lock {impl->current_results->mutex};
             impl->current_results->asserts_failed++;
