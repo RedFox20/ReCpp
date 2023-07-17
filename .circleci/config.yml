@@ -3,8 +3,8 @@ orbs:
   win: circleci/windows@5.0 # VS2022
 
 jobs:
-  clang:
-    description: Ubuntu Clang x64 Build
+  clang-cpp20:
+    description: Ubuntu Clang C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.10
@@ -15,10 +15,24 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      - run: BUILD_WITH_MEM_SAFETY=ON pipenv run mama clang verbose build
-      - run: pipenv run mama clang verbose test="--verbosity=2"
-  gcc:
-    description: Ubuntu GCC x64 Build
+      - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
+      - run: pipenv run mama clang verbose test="nogdb --verbosity=2"
+  clang-cpp17:
+    description: Ubuntu Clang C++17 x64 Build
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
+      - run: pipenv install mama
+      - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
+      - run: make configure-cmake
+      - run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 pipenv run mama clang verbose build
+      - run: pipenv run mama clang verbose test="nogdb --verbosity=2"
+  gcc-cpp20:
+    description: Ubuntu GCC C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.10
@@ -29,10 +43,24 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: BUILD_WITH_MEM_SAFETY=ON pipenv run mama gcc verbose build
-      - run: pipenv run mama gcc verbose test="--verbosity=2"
-  msvc:
-    description: Windows MSVC VS2022 x64 Build
+      - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 pipenv run mama gcc verbose build
+      - run: pipenv run mama gcc verbose test="nogdb --verbosity=2"
+  gcc-cpp17:
+    description: Ubuntu GCC C++17 x64 Build
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
+      - run: pipenv install mama
+      - run: sudo apt-get install gcc-11 -y
+      - run: make configure-cmake
+      - run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 pipenv run mama gcc verbose build
+      - run: pipenv run mama gcc verbose test="nogdb --verbosity=2"
+  msvc-cpp20:
+    description: Windows MSVC C++20 VS2022 x64 Build
     executor:
       name: win/default
       size: medium # can be medium, large, xlarge, 2xlarge
@@ -40,12 +68,26 @@ jobs:
       - checkout
       - run: pip3 install mama
       - run: choco install cmake -y
-      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; $env:BUILD_WITH_MEM_SAFETY="ON"; mama windows verbose build
+      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; $env:BUILD_WITH_MEM_SAFETY="ON"; $env:CXX20="1"; mama windows verbose build
+      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose test="--verbosity=2"
+  msvc-cpp17:
+    description: Windows MSVC C++17 VS2022 x64 Build
+    executor:
+      name: win/default
+      size: medium # can be medium, large, xlarge, 2xlarge
+    steps:
+      - checkout
+      - run: pip3 install mama
+      - run: choco install cmake -y
+      - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; $env:BUILD_WITH_MEM_SAFETY="ON"; $env:CXX17="1"; mama windows verbose build
       - run: $env:Path+=";$Env:ProgramFiles\CMake\bin"; mama windows verbose test="--verbosity=2"
 workflows:
   version: 2
   build_all:
     jobs:
-      - clang
-      - gcc
-      - msvc
+      - clang-cpp20
+      - clang-cpp17
+      - gcc-cpp20
+      - gcc-cpp17
+      - msvc-cpp20
+      - msvc-cpp17

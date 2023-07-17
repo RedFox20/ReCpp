@@ -44,7 +44,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 string(TOUPPER ${CMAKE_BUILD_TYPE} CURRENT_BUILD_TYPE)
 
-set(CMAKE_CXX_STANDARD 20)
+if(CXX17)
+    set(CMAKE_CXX_STANDARD 17)
+else()
+    set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
@@ -78,7 +82,7 @@ elseif(MSVC)
     # /Zi - Debug Database
     # /Oi - Intrinsics Enabled
     # /MP - MultiProcess build
-    add_compile_options(/std:c++latest /arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP)
+    add_compile_options(/arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP)
     # /MD - MultiThreaded Dynamic CRT
     # /MT - MultiThreaded Static CRT
     if (MSVC_DYNAMIC)
@@ -104,18 +108,22 @@ elseif(MSVC)
         message("Disabling Debug CRT")
         add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
         foreach(MODE "_DEBUG" "_MINSIZEREL" "_RELEASE" "_RELWITHDEBINFO")
-            string(REPLACE "${MSVC_CRT}d" "${MSVC_CRT}" TMP "${CMAKE_C_FLAGS${MODE}}")
-            string(REPLACE "${MSVC_CRT}d" "${MSVC_CRT}" TMP "${CMAKE_CXX_FLAGS${MODE}}")
-            set(CMAKE_C_FLAGS${MODE} "${TMP}" CACHE STRING "" FORCE)
-            set(CMAKE_CXX_FLAGS${MODE} "${TMP}" CACHE STRING "" FORCE)
+            string(REPLACE "${MSVC_CRT}d" "${MSVC_CRT}" TMP1 "${CMAKE_C_FLAGS${MODE}}")
+            string(REPLACE "${MSVC_CRT}d" "${MSVC_CRT}" TMP2 "${CMAKE_CXX_FLAGS${MODE}}")
+            set(CMAKE_C_FLAGS${MODE} "${TMP1}" CACHE STRING "" FORCE)
+            set(CMAKE_CXX_FLAGS${MODE} "${TMP2}" CACHE STRING "" FORCE)
             #message(STATUS "C_${MODE}=${CMAKE_C_FLAGS${MODE}}")
             #message(STATUS "CXX_${MODE}=${CMAKE_CXX_FLAGS${MODE}}")
         endforeach(MODE)
     endif()
     if(BUILD_WITH_MEM_SAFETY)
         message("Building with memory safety checks")
-        add_compile_options(/RTC1 /fsanitize=address)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /fsanitize=address")
+        # fsanitize fails with C++20 modules
+        #add_compile_options(/fsanitize=address)
+        #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /fsanitize=address")
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug") # enable Runtime Checks in Debug mode
+            add_compile_options(/RTC1)
+        endif()
     endif()
 endif()
 

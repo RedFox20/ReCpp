@@ -16,6 +16,13 @@ TestImpl(test_threadpool)
         print_info("global_max_parallelism: %d\n", thread_pool::global_max_parallelism());
     }
 
+    TestCleanup()
+    {
+        thread_pool::global().clear_idle_tasks();
+        if (thread_pool::global().active_tasks() > 0)
+            print_error("Dangling tasks detected: %d\n", thread_pool::global().active_tasks());
+    }
+
     static int parallelism_count(int numIterations)
     {
         std::mutex m;
@@ -286,6 +293,7 @@ TestImpl(test_threadpool)
             parallel_task(func),
         };
 
+        // TODO: this test is failing, run some stress tests
         for (auto* task : Tasks)
             AssertThat(task->wait(std::chrono::milliseconds{1000}), pool_task::finished);
 
