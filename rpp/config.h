@@ -120,9 +120,7 @@
 #endif
 
 #ifndef NODISCARD
-#  if __GNUC__ <= 6
-#    define NODISCARD __attribute__((warn_unused_result))
-#  elif __cplusplus >= 201500
+#  if __cplusplus >= 201500
 #    define NODISCARD [[nodiscard]]
 #  elif _MSC_VER > 1916
 #    ifdef __has_cpp_attribute
