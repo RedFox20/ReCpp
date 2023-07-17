@@ -609,7 +609,7 @@ namespace rpp
 
     void Vector4::print() const
     {
-        char buffer[48];
+        char buffer[64];
         puts(toString(buffer));
     }
 

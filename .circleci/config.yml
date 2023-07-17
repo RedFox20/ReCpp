@@ -17,6 +17,9 @@ jobs:
       - run: make configure-cmake
       - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
       - run: pipenv run mama clang verbose test="nogdb --verbosity=2"
+      # do a second run with thread sanitizer
+      # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
+      # - run: pipenv run mama clang verbose test="nogdb --verbosity=2"
   clang-ubuntu-cpp17:
     description: Ubuntu Clang C++17 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -45,6 +48,9 @@ jobs:
       - run: make configure-cmake
       - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 pipenv run mama gcc verbose build
       - run: pipenv run mama gcc verbose test="nogdb --verbosity=2"
+      # do a second run with thread sanitizer
+      # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
+      # - run: pipenv run mama clang verbose test="nogdb --verbosity=2"
   gcc-ubuntu-cpp17:
     description: Ubuntu GCC C++17 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM

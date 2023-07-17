@@ -11,6 +11,8 @@ class ReCpp(mama.BuildTarget):
             self.add_cl_flags('/DAPPVEYOR')
         if os.getenv('BUILD_WITH_MEM_SAFETY') != None:
             self.add_cmake_options('BUILD_WITH_MEM_SAFETY=ON')
+        if os.getenv('BUILD_WITH_THREAD_SAFETY') != None:
+            self.add_cmake_options('BUILD_WITH_THREAD_SAFETY=ON')
         
         if os.getenv('CXX17') or self.is_enabled_cxx17():
             self.add_cmake_options('CXX17=TRUE')
