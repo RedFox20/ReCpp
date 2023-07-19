@@ -280,6 +280,7 @@ namespace rpp
 
 
 #undef Assert
+#undef AssertFailed
 #undef AssertTrue
 #undef AssertFalse
 #undef AssertMsg
@@ -301,6 +302,10 @@ namespace rpp
 
 #define Assert(expr) do { \
     if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "but expected", true); } \
+}while(0)
+
+#define AssertFailed(fmt, ...) do { \
+    assert_failed(__FILE__, __LINE__, "assertion failed => " fmt, ##__VA_ARGS__); \
 }while(0)
 
 #define AssertTrue Assert

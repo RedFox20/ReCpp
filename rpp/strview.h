@@ -493,12 +493,18 @@ namespace rpp
         FINLINE int compare(const strview& b) const noexcept { return compare(b.str, b.len); }
         FINLINE int compare(const std::string& b) const noexcept { return compare(b.c_str(),(int)b.size()); }
         
-        FINLINE bool operator<(const strview& s) const noexcept { return compare(s.str, s.len) < 0; }
-        FINLINE bool operator>(const strview& s) const noexcept { return compare(s.str, s.len) > 0; }
-        FINLINE bool operator<(const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
-        FINLINE bool operator>(const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
-        template<int SIZE> FINLINE bool operator<(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)<0;}
-        template<int SIZE> FINLINE bool operator>(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1)>0;}
+        FINLINE bool operator< (const strview& s) const noexcept { return compare(s.str, s.len) < 0; }
+        FINLINE bool operator> (const strview& s) const noexcept { return compare(s.str, s.len) > 0; }
+        FINLINE bool operator<=(const strview& s) const noexcept { return compare(s.str, s.len) <= 0; }
+        FINLINE bool operator>=(const strview& s) const noexcept { return compare(s.str, s.len) >= 0; }
+        FINLINE bool operator< (const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
+        FINLINE bool operator> (const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
+        FINLINE bool operator<=(const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) <= 0; }
+        FINLINE bool operator>=(const std::string& s) const noexcept { return compare(s.c_str(),(int)s.size()) >= 0; }
+        template<int SIZE> FINLINE bool operator< (const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) < 0;}
+        template<int SIZE> FINLINE bool operator> (const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) > 0;}
+        template<int SIZE> FINLINE bool operator<=(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) <= 0;}
+        template<int SIZE> FINLINE bool operator>=(const char(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) >= 0;}
         
         /**
          * Splits the string into TWO and returns strview to the first one
@@ -925,15 +931,19 @@ namespace rpp
 
     //////////////// string compare operators /////////////////
 
-    inline bool operator< (const std::string& a,const strview& b) noexcept { return strview(a) <  b; }
-    inline bool operator> (const std::string& a,const strview& b) noexcept { return strview(a) >  b; }
-    inline bool operator==(const std::string& a,const strview& b) noexcept { return strview(a) == b; }
-    inline bool operator!=(const std::string& a,const strview& b) noexcept { return strview(a) != b; }
+    inline bool operator< (const std::string& a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) < 0; }
+    inline bool operator> (const std::string& a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) > 0; }
+    inline bool operator<=(const std::string& a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) <= 0; }
+    inline bool operator>=(const std::string& a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) >= 0; }
+    inline bool operator==(const std::string& a,const strview& b) noexcept { return strview{a}.equals(b.str, b.len); }
+    inline bool operator!=(const std::string& a,const strview& b) noexcept { return !strview{a}.equals(b.str, b.len); }
     
-    inline bool operator< (const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) <  0; }
-    inline bool operator> (const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) >  0; }
-    inline bool operator==(const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) == 0; }
-    inline bool operator!=(const char* a,const strview& b) noexcept { return strncmp(a, b.str, (size_t)b.len) != 0; }
+    inline bool operator< (const char* a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) < 0; }
+    inline bool operator> (const char* a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) > 0; }
+    inline bool operator<=(const char* a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) <= 0; }
+    inline bool operator>=(const char* a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) >= 0; }
+    inline bool operator==(const char* a,const strview& b) noexcept { return strview{a}.equals(b.str, b.len); }
+    inline bool operator!=(const char* a,const strview& b) noexcept { return !strview{a}.equals(b.str, b.len); }
 
     ////////////////////////////////////////////////////////////////////////////////
 

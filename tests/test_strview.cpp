@@ -227,4 +227,56 @@ TestImpl(test_strview)
         AssertThat(toString(-100.123456, 3), "-100.123");
     }
 
+    TestCase(equals_with_identical_strings)
+    {
+        AssertEqual(strview{"hello"}, "hello");
+        AssertEqual("hello", strview{"hello"});
+        AssertTrue(strview{"hello"} == strview{"hello"});
+        AssertTrue(strview{"hello"} == std::string{"hello"});
+        AssertTrue(std::string{"hello"} == strview{"hello"});
+        AssertFalse(strview{"hello"} == "");
+        AssertFalse("" == strview{"hello"});
+    }
+
+    TestCase(empty_string_equals_empty_string)
+    {
+        AssertEqual(strview{""}, "");
+        AssertEqual("", strview{""});
+        AssertEqual(strview{""}, strview{""});
+        AssertEqual(strview{""}, std::string{""});
+        AssertEqual(std::string{""}, strview{""});
+    }
+
+    TestCase(empty_string_must_not_equal_nonempty)
+    {
+        // regression test: this was a surprising regression in equality operator
+        AssertNotEqual(strview{""}, "--help");
+        AssertNotEqual("--help", strview{""});
+        AssertFalse(strview{""} == "--help");
+        AssertFalse("--help" == strview{""});
+        AssertTrue(strview{""} != "--help");
+        AssertTrue("--help" != strview{""});
+    }
+
+    TestCase(string_compare_less)
+    {
+        AssertLess(strview{"aaaa"}, "bbbbbbbb");
+        AssertLess(strview{"aaaa"}, strview{"bbbbbbbb"});
+        AssertLess(strview{"aaaa"}, std::string{"bbbbbbbb"});
+
+        AssertLess("aaaa", strview{"bbbbbbbb"});
+        AssertLess(strview{"aaaa"}, strview{"bbbbbbbb"});
+        AssertLess(std::string{"aaaa"}, strview{"bbbbbbbb"});
+    }
+
+    TestCase(string_compare_greater)
+    {
+        AssertGreater(strview{"bbbb"}, "aaaaaaaa");
+        AssertGreater(strview{"bbbb"}, strview{"aaaaaaaa"});
+        AssertGreater(strview{"bbbb"}, std::string{"aaaaaaaa"});
+
+        AssertGreater("bbbb", strview{"aaaaaaaa"});
+        AssertGreater(strview{"bbbb"}, strview{"aaaaaaaa"});
+        AssertGreater(std::string{"bbbb"}, strview{"aaaaaaaa"});
+    }
 };
