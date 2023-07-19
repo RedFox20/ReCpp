@@ -72,6 +72,22 @@ TestImpl(test_sockets)
         AssertTrue(d.address().has_address());
         AssertEqual(d.port(), 12345);
         AssertEqual(d.address().str(), "127.0.0.1");
+
+        ipaddress4 e { d, 54321 };
+        AssertFalse(e.is_empty());
+        AssertTrue(e.is_valid());
+        AssertFalse(e.address().is_empty());
+        AssertTrue(e.address().has_address());
+        AssertEqual(e.port(), 54321);
+        AssertEqual(e.address().str(), "127.0.0.1");
+
+        ipaddress4 f { d.address(), 54321 };
+        AssertFalse(f.is_empty());
+        AssertTrue(f.is_valid());
+        AssertFalse(f.address().is_empty());
+        AssertTrue(f.address().has_address());
+        AssertEqual(f.port(), 54321);
+        AssertEqual(f.address().str(), "127.0.0.1");
     }
 
     TestCase(init_ipv6)
@@ -107,6 +123,22 @@ TestImpl(test_sockets)
         AssertTrue(d.address().has_address());
         AssertEqual(d.port(), 12345);
         AssertEqual(d.address().str(), "2001:db8:1::ab9:c0a8:102");
+
+        ipaddress6 e { d, 54321 };
+        AssertFalse(e.is_empty());
+        AssertTrue(e.is_valid());
+        AssertFalse(e.address().is_empty());
+        AssertTrue(e.address().has_address());
+        AssertEqual(e.port(), 54321);
+        AssertEqual(e.address().str(), "2001:db8:1::ab9:c0a8:102");
+
+        ipaddress6 f { d.address(), 54321 };
+        AssertFalse(f.is_empty());
+        AssertTrue(f.is_valid());
+        AssertFalse(f.address().is_empty());
+        AssertTrue(f.address().has_address());
+        AssertEqual(f.port(), 54321);
+        AssertEqual(f.address().str(), "2001:db8:1::ab9:c0a8:102");
     }
 
     TestCase(ipaddress_from_ip_and_port)

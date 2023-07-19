@@ -187,6 +187,14 @@ namespace rpp
         /** @brief Creates a default address that is_empty() */
         ipaddress() noexcept : Address{}, Port{0} {}
 
+        /** @brief Copies the address, but changes the port */
+        ipaddress(const ipaddress& ip, int port) noexcept
+            : Address{ip.Address}, Port{static_cast<uint16_t>(port)} {}
+
+        /** @brief Copies the address, but changes the port */
+        ipaddress(const raw_address& addr, int port) noexcept
+            : Address{addr}, Port{static_cast<uint16_t>(port)} {}
+
         /**
          * Initializes a new IP address from port int
          * This can be used for listener sockets
@@ -330,6 +338,12 @@ namespace rpp
         /** @brief Creates a default address that is_empty() */
         ipaddress4() noexcept = default;
 
+        /** @brief Copies the address, but changes the port */
+        ipaddress4(const ipaddress& ip, int port) noexcept : ipaddress{ip, port} {}
+
+        /** @brief Copies the address, but changes the port */
+        ipaddress4(const raw_address& addr, int port) noexcept : ipaddress{addr, port} {}
+
         /**
          * Initializes a new IP address from port int
          * This can be used for listener sockets
@@ -358,6 +372,12 @@ namespace rpp
     {
         /** @brief Creates a default address that is_empty() */
         ipaddress6() noexcept = default;
+
+        /** @brief Copies the address, but changes the port */
+        ipaddress6(const ipaddress& ip, int port) noexcept : ipaddress{ip, port} {}
+
+        /** @brief Copies the address, but changes the port */
+        ipaddress6(const raw_address& addr, int port) noexcept : ipaddress{addr, port} {}
 
         /**
          * Initializes a new IP address from port int
