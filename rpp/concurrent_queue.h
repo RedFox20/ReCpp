@@ -4,9 +4,7 @@
  * Distributed under MIT Software License
  */
 #pragma once
-#include "config.h"
 #include "condition_variable.h"
-#include "timer.h"
 #include <deque>
 #include <mutex>
 
@@ -362,7 +360,7 @@ namespace rpp
         }
 
     private:
-        FINLINE void pop_unlocked(T& outItem) noexcept
+        inline void pop_unlocked(T& outItem) noexcept
         {
             outItem = std::move(Queue.front());
             Queue.pop_front();
