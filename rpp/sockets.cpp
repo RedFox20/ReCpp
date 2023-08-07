@@ -184,8 +184,8 @@ namespace rpp
     }
     int socktype_int(socket_type sockType) noexcept
     {
-        //SOCK_STREAM,SOCK_DGRAM,SOCK_RAW
-        return (int)sockType; // SOCK is linear
+        static int types[] = { 0, SOCK_STREAM, SOCK_DGRAM, SOCK_RAW, SOCK_RDM, SOCK_SEQPACKET };
+        return types[sockType];
     }
     int ipproto_int(ip_protocol ipProtocol) noexcept
     {
