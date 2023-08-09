@@ -1074,19 +1074,19 @@ namespace rpp
      * @param interface ["eth|lan|wlan"] Main interface name regex pattern to 
      * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
      */
-    rpp::ipinterface get_ip_interface(const std::string& interface = "eth|lan|wlan", address_family af = AF_IPv4);
+    rpp::ipinterface get_ip_interface(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
 
     /**
      * @returns Main interface IP address of the current system
      * @param interface ["eth|lan|wlan"] Main interface name regex pattern to match
      */
-    std::string get_system_ip(const std::string& interface = "eth|lan|wlan", address_family af = AF_IPv4);
+    std::string get_system_ip(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
 
     /**
      * @returns Main interface Broadcast IP address of the current system
      * @param interface ["eth|lan|wlan"] Main interface name regex pattern to match
      */
-    std::string get_broadcast_ip(const std::string& interface = "eth|lan|wlan", address_family af = AF_IPv4);
+    std::string get_broadcast_ip(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
 
     ////////////////////////////////////////////////////////////////////////////////
 

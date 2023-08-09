@@ -1576,26 +1576,26 @@ namespace rpp
         return {};
     }
 
-    ipinterface get_ip_interface(const std::string& interface, address_family af)
+    ipinterface get_ip_interface(const std::string& network_interface, address_family af)
     {
-        std::vector<ipinterface> interfaces = ipinterface::get_interfaces(interface, af);
+        std::vector<ipinterface> interfaces = ipinterface::get_interfaces(network_interface, af);
         if (interfaces.empty())
             return {};
-        std::regex pattern { interface };
+        std::regex pattern { network_interface };
         for (const ipinterface& ip : interfaces)
             if (std::regex_search(ip.name, pattern))
                 return ip;
         return interfaces.front();
     }
 
-    std::string get_system_ip(const std::string& interface, address_family af)
+    std::string get_system_ip(const std::string& network_interface, address_family af)
     {
-        return get_ip_interface(interface, af).addr.str();
+        return get_ip_interface(network_interface, af).addr.str();
     }
 
-    std::string get_broadcast_ip(const std::string& interface, address_family af)
+    std::string get_broadcast_ip(const std::string& network_interface, address_family af)
     {
-        return get_ip_interface(interface, af).broadcast.str();
+        return get_ip_interface(network_interface, af).broadcast.str();
     }
 
     ////////////////////////////////////////////////////////////////////////////////
