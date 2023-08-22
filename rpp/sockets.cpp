@@ -53,7 +53,12 @@
     #endif
     #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
-    #include <ifaddrs.h>            // getifaddrs / freeifaddrs
+    // on __ANDROID__ this requires API level 24
+    #if __ANDROID__ && __ANDROID_API__ < 24
+        #error "<ifaddrs.h> requires ANDROID_API level 24"
+    #else
+        #include <ifaddrs.h>        // getifaddrs / freeifaddrs
+    #endif
     #define sleep(milliSeconds) ::usleep((milliSeconds) * 1000)
     #define inwin32(...) /*nothing*/ 
     #define inunix(...) __VA_ARGS__
