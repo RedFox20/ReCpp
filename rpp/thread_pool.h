@@ -356,11 +356,11 @@ namespace rpp
      * @param foreach Non-owning foreach callback action:  void(auto item)
      */
     template<class Container, class ForeachFunc>
-    void parallel_foreach(Container& items, const ForeachFunc& foreach)
+    void parallel_foreach(Container& items, const ForeachFunc& forEach)
     {
         thread_pool::global().parallel_for(0, (int)items.size(), 0, [&](int start, int end) {
             for (int i = start; i < end; ++i) {
-                foreach(items[i]);
+                forEach(items[i]);
             }
         });
     }

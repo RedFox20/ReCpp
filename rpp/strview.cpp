@@ -422,8 +422,7 @@ namespace rpp
         return *this;
     }
 
-
-    static void foreach(char* str, int len, int func(int)) noexcept
+    static void transform_chars(char* str, int len, int func(int)) noexcept
     {
         auto s = str, e = s + len;
         for (; s < e; ++s)
@@ -431,11 +430,11 @@ namespace rpp
     }
     strview& strview::to_lower() noexcept
     {
-        foreach(const_cast<char*>(str), len, ::tolower); return *this;
+        transform_chars(const_cast<char*>(str), len, ::tolower); return *this;
     }
     strview& strview::to_upper() noexcept
     {
-        foreach(const_cast<char*>(str), len, ::toupper); return *this;
+        transform_chars(const_cast<char*>(str), len, ::toupper); return *this;
     }
     char* strview::as_lower(char* dst) const noexcept {
         auto p = dst;
@@ -512,19 +511,19 @@ namespace rpp
 
     char* to_lower(char* str, int len) noexcept
     {
-        foreach(str, len, ::tolower); return str;
+        transform_chars(str, len, ::tolower); return str;
     }
     char* to_upper(char* str, int len) noexcept
     {
-        foreach(str, len, ::toupper); return str;
+        transform_chars(str, len, ::toupper); return str;
     }
     std::string& to_lower(std::string& str) noexcept
     {
-        foreach(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::tolower); return str;
+        transform_chars(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::tolower); return str;
     }
     std::string& to_upper(std::string& str) noexcept
     {
-        foreach(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::toupper); return str;
+        transform_chars(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::toupper); return str;
     }
 
     char* replace(char* str, int len, char chOld, char chNew) noexcept
