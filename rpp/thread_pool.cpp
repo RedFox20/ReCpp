@@ -4,6 +4,7 @@
 #include <csignal>
 #include <cmath> // round
 #include <unordered_map>
+#include <atomic>
 #if __APPLE__ || __linux__
 # include <pthread.h>
 #endif
@@ -79,6 +80,7 @@ namespace rpp
 
     pool_task::~pool_task() noexcept
     {
+        destroyed = true;
         kill();
     }
 
@@ -87,7 +89,10 @@ namespace rpp
     bool pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
         std::lock_guard<std::mutex> lock{m};
-        if (taskRunning) // handle this nasty race condition
+
+        // https://preshing.com/20130930/double-checked-locking-is-fixed-in-cpp11/
+        std::atomic_thread_fence(std::memory_order_acquire);
+        if (taskRunning || destroyed) // handle this nasty race condition
             return false;
 
         trace.clear();
@@ -106,6 +111,8 @@ namespace rpp
             (void)join_or_detach(finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
+
+        std::atomic_thread_fence(std::memory_order_release);
         taskRunning = true;
         cv.notify_one();
         return true;
@@ -114,7 +121,10 @@ namespace rpp
     bool pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
     {
         std::lock_guard<std::mutex> lock{m};
-        if (taskRunning) // handle this nasty race condition
+
+        // https://preshing.com/20130930/double-checked-locking-is-fixed-in-cpp11/
+        std::atomic_thread_fence(std::memory_order_acquire);
+        if (taskRunning || destroyed) // handle this nasty race condition
             return false;
 
         trace.clear();
@@ -133,6 +143,8 @@ namespace rpp
             (void)join_or_detach(finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
+
+        std::atomic_thread_fence(std::memory_order_release);
         taskRunning = true;
         cv.notify_one();
         return true;
@@ -194,11 +206,14 @@ namespace rpp
 
     pool_task::wait_result pool_task::kill(int timeoutMillis) noexcept
     {
+        std::atomic_thread_fence(std::memory_order_acquire);
         if (killed) {
             return join_or_detach(finished);
         }
-        { std::unique_lock<std::mutex> lock{m};
+
+        { std::lock_guard<std::mutex> lock{m};
             TaskDebug("%s", name);
+            std::atomic_thread_fence(std::memory_order_release);
             killed = true;
         }
         cv.notify_all();
@@ -243,14 +258,14 @@ namespace rpp
             {
                 decltype(rangeTask)   range;
                 decltype(genericTask) generic;
-                
+
                 // consume the Tasks atomically
                 { std::unique_lock<std::mutex> lock{m};
                     TaskDebug("%s wait for task", name);
                     if (!wait_for_task(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
-                        killed = true;
-                        taskRunning = false;
+                        killed.store(true, std::memory_order_seq_cst);
+                        taskRunning.store(false, std::memory_order_seq_cst);
                         cv.notify_all();
                         return;
                     }

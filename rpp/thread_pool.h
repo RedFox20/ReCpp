@@ -117,9 +117,9 @@ namespace rpp
 
         std::string trace;
         std::exception_ptr error;
-        volatile bool taskRunning = false; // an active task is being executed
-        volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
-
+        std::atomic_bool taskRunning { false }; // an active task is being executed
+        std::atomic_bool killed      { false }; // this pool_task is being destroyed/has been destroyed
+        std::atomic_bool destroyed   { false }; // destructor is being called
     public:
 
         enum wait_result
