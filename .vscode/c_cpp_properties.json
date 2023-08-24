@@ -1,6 +1,16 @@
 {
     "configurations": [
         {
+            "name": "Windows",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**"
