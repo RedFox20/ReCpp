@@ -48,8 +48,29 @@ namespace rpp
 
     struct RPPAPI test
     {
-        struct lambda_base { test* self; };
-        using lambda_base_fn = void (lambda_base::*)();
+        struct dummy { };
+
+        // minimal version from delegate.h for impossibly fast delegates
+        #if _MSC_VER  // VC++
+            #if INTPTR_MAX != INT64_MAX // __thiscall only applies for 32-bit MSVC
+                using memb_type = void (__thiscall*)(void*);
+            #else
+                using memb_type = void (*)(void*);
+            #endif
+            using dummy_type = void (dummy::*)();
+        #elif __clang__
+            using memb_type  = void (*)(void*);
+            using dummy_type = void (dummy::*)();
+        #else
+            using memb_type  = void (*)(void*);
+            using dummy_type = void (dummy::*)(void*);
+        #endif
+
+        union test_func_type {
+            memb_type mfunc;
+            dummy_type dfunc;
+        };
+
         struct test_func;
         struct test_impl;
 
@@ -201,18 +222,28 @@ namespace rpp
             assert_failed(file, line, "%s => '%s' %s min:'%s' max:'%s'", expr, sActual.c_str(), why, sMin.c_str(), sMax.c_str());
         }
 
-        int add_test_func(strview name, lambda_base lambda, lambda_base_fn fn, 
-                          size_t expectedExHash, bool autorun);
+        int add_test_func(strview name, test_func_type fn, size_t expectedExHash, bool autorun);
 
         // adds a test to the automatic test run list
-        template<class T, class Lambda>
-        static int add_test_func(T* self, strview name, Lambda lambda, 
+        template<class TestClass>
+        static int add_test_func(TestClass* self, strview name, void (TestClass::*test_method)(), 
                                  const std::type_info* ti = nullptr, bool autorun = true)
         {
-            (void)lambda;
+            test_func_type fn;
+            #if _MSC_VER // VC++ and MSVC clang
+                fn.dfunc = reinterpret_cast<dummy_type>(test_method);
+            #elif __clang__
+                fn.dfunc = reinterpret_cast<dummy_type>(test_method);
+            #elif __GNUG__ // G++
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                fn.mfunc = (memb_type)((*self).*test_method); // de-virtualize / pfm-conversion
+                #pragma GCC diagnostic pop
+            #endif
+
             size_t expectedExHash = ti ? ti->hash_code() : 0;
-            return self->add_test_func(name, {self}, reinterpret_cast<lambda_base_fn>(&Lambda::operator()), 
-                                       expectedExHash, autorun);
+            return self->add_test_func(name, fn, expectedExHash, autorun);
         }
     };
 
@@ -421,15 +452,15 @@ namespace rpp
 #endif
 
 #define TestCase(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, __TestLambda(testname) ); \
+    const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
     void test_##testname()
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
-    const int _test_##testname = add_test_func(self(), #testname, __TestLambda(testname), &typeid(expectedExceptionType)); \
+    const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname, &typeid(expectedExceptionType)); \
     void test_##testname()
 
 #define TestCaseNoAutorun(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, __TestLambda(testname), nullptr, false); \
+    const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname, nullptr, false); \
     void test_##testname()
 
 }

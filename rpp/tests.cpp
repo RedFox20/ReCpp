@@ -187,8 +187,7 @@ namespace rpp
     {
         strview name;
         std::mutex mutex{};
-        lambda_base lambda { nullptr };
-        lambda_base_fn func = nullptr;
+        test_func_type func { nullptr };
         size_t expectedExType = 0;
         bool autorun = true;
         bool success = false;
@@ -526,29 +525,19 @@ namespace rpp
         int before = impl->current_results->asserts_failed;
         try
         {
-            (test.lambda.*test.func)();
+            #if _MSC_VER
+                (reinterpret_cast<dummy*>(this)->*test.func.dfunc)();
+            #else
+                test.func.mfunc(this);
+            #endif
             if (test.expectedExType) // we expected an exception, but none happened?!
             {
                 assert_failed_custom("FAILED with expected EXCEPTION NOT THROWN in %s::%s\n",
                                      name.str, test.name.str);
             }
         }
-    #if __GNUC__ && __clang__
-        catch (...) // NOTE: Clang++ leaks memory if we use std::exception& here
-        {
-            std::exception_ptr eptr = std::current_exception();
-            const std::exception& e = [](const std::exception_ptr& eptr) {
-                try {
-                    std::rethrow_exception(eptr);
-                } catch (const std::exception& ex) {
-                    return ex;
-                }
-                throw std::runtime_error{"could not get exception reference"};
-            }(eptr);
-    #else
         catch (const std::exception& e)
         {
-    #endif
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
                 if (verb >= TestVerbosity::AllMessages)
@@ -641,12 +630,11 @@ namespace rpp
         state().verbosity = verbosity;
     }
 
-    int test::add_test_func(strview name, lambda_base lambda, lambda_base_fn fn, 
+    int test::add_test_func(strview name, test_func_type fn, 
                             size_t expectedExHash, bool autorun)
     {
         auto& func = impl->test_functions.emplace_back(std::make_unique<test_func>());
         func->name = name;
-        func->lambda = lambda;
         func->func = fn;
         func->expectedExType = expectedExHash;
         func->autorun = autorun;
