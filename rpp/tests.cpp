@@ -533,8 +533,22 @@ namespace rpp
                                      name.str, test.name.str);
             }
         }
-        catch (std::exception& e) // BUG: Clang++ leaks memory if we use const& here
+    #if __GNUC__ && __clang__
+        catch (...) // NOTE: Clang++ leaks memory if we use std::exception& here
         {
+            std::exception_ptr eptr = std::current_exception();
+            const std::exception& e = [](const std::exception_ptr& eptr) {
+                try {
+                    std::rethrow_exception(eptr);
+                } catch (const std::exception& ex) {
+                    return ex;
+                }
+                throw std::runtime_error{"could not get exception reference"};
+            }(eptr);
+    #else
+        catch (const std::exception& e)
+        {
+    #endif
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
                 if (verb >= TestVerbosity::AllMessages)
