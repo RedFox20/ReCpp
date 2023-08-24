@@ -93,6 +93,7 @@ static void ShortFilePathMessage(char*& ptr, int& len)
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
 {
     #if __ANDROID__
+        (void)len;
         auto priority = severity == LogSeverityInfo ? ANDROID_LOG_INFO :
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
                                                       ANDROID_LOG_ERROR;

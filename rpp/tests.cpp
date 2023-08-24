@@ -243,6 +243,7 @@ namespace rpp
 
         fflush(cout); // flush needed for proper sync with unix-like shells
     #elif __ANDROID__
+        (void)len;
         int priority = 0;
         switch (color) {
             case Default: priority = ANDROID_LOG_DEBUG; break;
