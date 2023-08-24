@@ -130,5 +130,5 @@ workflows:
       - msvc-win64-cpp20
       - msvc-win64-cpp17
       - gcc-mipsel-cpp20
-      #- android-cpp17
-      #- android-cpp20
+      - android-cpp17
+      - android-cpp20
