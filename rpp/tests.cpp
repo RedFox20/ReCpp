@@ -533,7 +533,7 @@ namespace rpp
                                      name.str, test.name.str);
             }
         }
-        catch (const std::exception& e)
+        catch (std::exception e)
         {
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
