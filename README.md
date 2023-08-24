@@ -460,3 +460,22 @@ Provides detailed stack traces on demand, which is not yet part of C++ standard.
 | `std::runtime_error error_with_trace(const std::string& message, int maxDepth)` | Prepared runtime_error with error message and stack trace
 | `rpp::traced_exception` | Traced exception forms a complete [message]\\n[stacktrace] string which can be retrieved via runtime_error::what()
 | `void register_segfault_tracer()` | Installs a default handler for SIGSEGV which will throw a traced_exception instead of quietly terminating
+
+
+# CircleCI Local
+Running CircleCI locally on WSL/Ubuntu. 
+If running on WSL, you need Docker Desktop with WSL2 integration enabled.
+
+You will need to configure a personal API token to use the CircleCI CLI.
+Read more at: https://circleci.com/docs/local-cli/#configure-the-cli
+```
+curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | sudo bash
+circleci update
+circleci setup
+```
+
+Executing the build locally, targeting the `android-cpp17` Job:
+```
+circleci config process .circleci/config.yml > process.yml && \
+circleci local execute -c process.yml android-cpp17
+```
