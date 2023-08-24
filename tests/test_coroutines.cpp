@@ -111,7 +111,7 @@ TestImpl(test_coroutines)
             s += co_await exceptional_coro();
             s += "xyz";
         }
-        catch (const std::exception& e)
+        catch (std::exception& e) // BUG: Clang++ leaks memory if we use const& here
         {
             exceptionWasThrown = true;
             AssertThat(e.what(), "aargh!"s);

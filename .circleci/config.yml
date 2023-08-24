@@ -99,7 +99,7 @@ jobs:
       - run: pipenv install mama
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama mips verbose build
-  android-cpp17:
+  clang-android-cpp17:
     description: Android C++17 Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -110,7 +110,7 @@ jobs:
       - run: make configure-pip3
       - run: pip3 install mama
       - run: CXX17=1 mama android verbose build
-  android-cpp20:
+  clang-android-cpp20:
     description: Android C++20 Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -132,5 +132,5 @@ workflows:
       - msvc-win64-cpp20
       - msvc-win64-cpp17
       - gcc-mipsel-cpp20
-      - android-cpp17
-      - android-cpp20
+      - clang-android-cpp17
+      - clang-android-cpp20
