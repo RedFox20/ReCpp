@@ -24,6 +24,10 @@ namespace rpp
         mutable std::mutex Mutex;
         rpp::condition_variable Waiter;
 
+        // regular int+mutex is faster than atomic_int+mutex
+        int Size = 0;
+        // std::atomic_int Size {0};
+
     public:
 
         using clock = std::chrono::high_resolution_clock;
@@ -42,12 +46,20 @@ namespace rpp
         [[nodiscard]] std::mutex& sync() const noexcept { return Mutex; }
 
         /** @returns TRUE if this queue is empty */
-        [[nodiscard]] bool empty() const noexcept { return Queue.empty(); }
+        [[nodiscard]] bool empty() const noexcept
+        {
+            return !Size;
+            // return !Size.load(std::memory_order::relaxed);
+        }
 
         /**
          * @returns Approximate size of the queue (unsafe)
          */
-        [[nodiscard]] int size() const noexcept { return (int)Queue.size(); }
+        [[nodiscard]] int size() const noexcept
+        {
+            return Size;
+            // return Size.load(std::memory_order::relaxed);
+        }
 
         /**
          * @returns Synchronized current size of the queue,
@@ -73,6 +85,14 @@ namespace rpp
         }
 
         /**
+         * @brief Notifies only a single waiter that the queue has changed
+         */
+        void notify_one() noexcept
+        {
+            Waiter.notify_one();
+        }
+
+        /**
          * @brief Thread-safely clears the entire queue and notifies all waiters
          */
         void clear() noexcept
@@ -80,6 +100,7 @@ namespace rpp
             if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
             {
                 Queue.clear();
+                Size = 0;
                 Mutex.unlock();
                 notify();
             }
@@ -125,27 +146,29 @@ namespace rpp
         }
 
         /**
-         * @brief Thread-safely moves an item into the queue and notifies all waiters
+         * @brief Thread-safely moves an item into the queue and notifies one waiter
          */
         void push(T&& item)
         {
             {
                 std::lock_guard lock {Mutex}; // may throw
                 Queue.emplace_back(std::move(item)); // may throw
+                ++Size;
             }
-            notify();
+            notify_one();
         }
 
         /**
-         * @brief Thread-safely copies an item into the queue and notifies all waiters
+         * @brief Thread-safely copies an item into the queue and notifies one waiter
          */
         void push(const T& item)
         {
             {
                 std::lock_guard lock {Mutex}; // may throw
                 Queue.push_back(item); // may throw
+                ++Size;
             }
-            notify();
+            notify_one();
         }
 
         /**
@@ -156,6 +179,7 @@ namespace rpp
             {
                 std::lock_guard lock {Mutex}; // may throw
                 Queue.emplace_back(std::move(item)); // may throw
+                ++Size;
             }
         }
 
@@ -168,7 +192,7 @@ namespace rpp
             T item;
             {
                 std::lock_guard lock {Mutex};
-                if (Queue.empty())
+                if (empty())
                     throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
                 pop_unlocked(item);
             }
@@ -185,9 +209,12 @@ namespace rpp
          */ 
         [[nodiscard]] bool try_pop(T& outItem) noexcept
         {
+            if (empty())
+                return false;
+
             if (Mutex.try_lock())
             {
-                if (Queue.empty())
+                if (empty())
                 {
                     Mutex.unlock();
                     return false;
@@ -195,6 +222,40 @@ namespace rpp
                 pop_unlocked(outItem);
                 Mutex.unlock();
                 return true;
+            }
+            else
+            {
+                // if we failed to lock, yielding here will improve perf by 5-10x
+                std::this_thread::yield();
+            }
+            return false;
+        }
+
+        /**
+         * @brief Attempts to pop all pending items from the queue without waiting
+        */
+        [[nodiscard]] bool try_pop_all(std::deque<T>& outItems) noexcept
+        {
+            if (empty())
+                return false;
+
+            if (Mutex.try_lock())
+            {
+                if (empty())
+                {
+                    Mutex.unlock();
+                    return false;
+                }
+                outItems.swap(Queue);
+                Queue.clear();
+                Size = 0;
+                Mutex.unlock();
+                return true;
+            }
+            else
+            {
+                // if we failed to lock, yielding here will improve perf by 5-10x
+                std::this_thread::yield();
             }
             return false;
         }
@@ -209,7 +270,7 @@ namespace rpp
         [[nodiscard]] T wait_pop() noexcept
         {
             std::unique_lock lock {Mutex}; // may throw
-            while (Queue.empty())
+            while (empty())
                 Waiter.wait(lock);
             T result;
             pop_unlocked(result);
@@ -220,9 +281,8 @@ namespace rpp
          * Waits up to @param timeout duration until an item is ready to be popped.
          * For waiting without timeout @see wait_pop().
          * 
-         * @note This is best used for cases where you want to wait a specific
-         *       amount of time for an item to be available and don't want to
-         *       return before that time.
+         * @note This is best used for cases where you want to wait up to a certain time
+         *       before giving up. This may return false before the timeout due to spurious wakeups.
          *       Useful for synchronization tasks that have a time limit.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
@@ -240,29 +300,10 @@ namespace rpp
         [[nodiscard]]
         bool wait_pop(T& outItem, duration timeout)
         {
-            duration remaining = timeout;
-            time_point prevTime = clock::now();
-            constexpr duration zero = duration{0};
-
             std::unique_lock lock {Mutex}; // may throw
-            while (Queue.empty())
-            {
-                std::cv_status status = Waiter.wait_for(lock, remaining); // may throw
-                if (status == std::cv_status::no_timeout && !Queue.empty())
-                    break; // notified
-                if (status == std::cv_status::timeout)
-                    break;
-
-                // clock is assumed to be steady and should only tick forward
-                // but we all know stdlib bugs happen, so this is not always correct
-                // this abs(delta_time) approach circumvents any such issues
-                time_point now = clock::now();
-                remaining -= std::chrono::abs(now - prevTime);
-                prevTime = now;
-                if (remaining <= zero)
-                    break; // final timeout
-            }
-            if (Queue.empty())
+            if (empty())
+                Waiter.wait_for(lock, timeout); // may throw
+            if (empty())
                 return false;
             pop_unlocked(outItem);
             return true;
@@ -320,10 +361,12 @@ namespace rpp
          *       // item is valid
          *   }
          * @endcode
+         * 
+         * TODO: this is unreasonably 10-20x slower than wait_pop(item, timeout)
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop_interval(T& outItem, duration timeout, duration interval, 
+        bool wait_pop_interval(T& outItem, duration timeout, duration interval,
                                const WaitUntil& cancelCondition)
         {
             duration remaining = timeout;
@@ -331,12 +374,12 @@ namespace rpp
             constexpr duration zero = duration{0};
 
             std::unique_lock lock {Mutex};
-            while (Queue.empty())
+            while (empty())
             {
                 if (cancelCondition())
                     break;
                 std::cv_status status = Waiter.wait_for(lock, interval); // may throw
-                if (status == std::cv_status::no_timeout && !Queue.empty())
+                if (status == std::cv_status::no_timeout && !empty())
                     break; // notified
 
                 // clock is assumed to be steady and should only tick forward
@@ -353,7 +396,7 @@ namespace rpp
                     interval = remaining;
             }
 
-            if (Queue.empty())
+            if (empty())
                 return false;
             pop_unlocked(outItem);
             return true;
@@ -364,6 +407,7 @@ namespace rpp
         {
             outItem = std::move(Queue.front());
             Queue.pop_front();
+            --Size;
         }
     };
 }
