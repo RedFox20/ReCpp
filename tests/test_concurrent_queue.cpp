@@ -323,6 +323,7 @@ TestImpl(test_concurrent_queue)
             double elapsed_ms = t.elapsed_ms();
             avg_time += elapsed_ms;
             print_info("wait_pop consumer elapsed: %.2f ms\n", elapsed_ms);
+            print_info("queue capacity: %d\n", queue.capacity());
         }
 
         avg_time /= num_iterations;
@@ -360,6 +361,7 @@ TestImpl(test_concurrent_queue)
             double elapsed_ms = t.elapsed_ms();
             avg_time += elapsed_ms;
             print_info("wait_pop_interval consumer elapsed: %.2f ms\n", elapsed_ms);
+            print_info("queue capacity: %d\n", queue.capacity());
         }
 
         avg_time /= num_iterations;

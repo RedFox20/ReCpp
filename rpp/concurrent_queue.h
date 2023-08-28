@@ -88,6 +88,14 @@ namespace rpp
         }
 
         /**
+         * @returns Capacity of the queue (unsafe)
+         */
+        [[nodiscard]] int capacity() const noexcept
+        {
+            return Capacity;
+        }
+
+        /**
          * @returns Approximate size of the queue (unsafe)
          */
         [[nodiscard]] int size() const noexcept
