@@ -21,10 +21,12 @@ namespace rpp
     template<class T>
     class concurrent_queue
     {
-        int Head = 0; // index of the First element
-        int Count = 0; // number of elements in the queue
-        int Capacity = 0; // max capacity of the queue
-        T* Items = nullptr;
+        // for faster performance the Head and Tail are always within the linear range
+        // of [ItemsStart, ItemsEnd) and the items are always contiguous in memory.
+        T* Head = nullptr;
+        T* Tail = nullptr;
+        T* ItemsStart = nullptr;
+        T* ItemsEnd = nullptr;
 
         mutable std::mutex Mutex;
         rpp::condition_variable Waiter;
@@ -40,8 +42,8 @@ namespace rpp
         {
             // safely lock, clear and notify all waiters to give up
             clear();
-            if (Items) // all items should be destroyed now, free the ringbuffer
-                free(Items);
+            if (ItemsStart) // all items should be destroyed now, free the ringbuffer
+                free(ItemsStart);
         }
 
         concurrent_queue(const concurrent_queue&) = delete;
@@ -49,24 +51,28 @@ namespace rpp
 
         concurrent_queue(concurrent_queue&& q) noexcept
         {
-            // safely swap the states from q to default empty state
-            std::lock_guard lock { q.Mutex };
-            std::swap(Head, q.Head);
-            std::swap(Count, q.Count);
-            std::swap(Capacity, q.Capacity);
-            std::swap(Items, q.Items);
+            {
+                // safely swap the states from q to default empty state
+                std::lock_guard lock { q.Mutex };
+                std::swap(Head, q.Head);
+                std::swap(Tail, q.Tail);
+                std::swap(ItemsStart, q.ItemsStart);
+                std::swap(ItemsEnd, q.ItemsEnd);
+            }
             // notify only the old queue
             q.Waiter.notify_all();
         }
 
         concurrent_queue& operator=(concurrent_queue&& q) noexcept
         {
-            // safely swap the states of both queues
-            std::scoped_lock dual_lock { Mutex, q.Mutex };
-            std::swap(Head, q.Head);
-            std::swap(Count, q.Count);
-            std::swap(Capacity, q.Capacity);
-            std::swap(Items, q.Items);
+            {
+                // safely swap the states of both queues
+                std::scoped_lock dual_lock { Mutex, q.Mutex };
+                std::swap(Head, q.Head);
+                std::swap(Tail, q.Tail);
+                std::swap(ItemsStart, q.ItemsStart);
+                std::swap(ItemsEnd, q.ItemsEnd);
+            }
             // notify all waiters for both queues
             q.Waiter.notify_all();
             Waiter.notify_all();
@@ -84,7 +90,7 @@ namespace rpp
         /** @returns TRUE if this queue is empty */
         [[nodiscard]] bool empty() const noexcept
         {
-            return !Count;
+            return Head == Tail;
         }
 
         /**
@@ -92,7 +98,7 @@ namespace rpp
          */
         [[nodiscard]] int capacity() const noexcept
         {
-            return Capacity;
+            return (int)(ItemsEnd - ItemsStart);
         }
 
         /**
@@ -100,7 +106,7 @@ namespace rpp
          */
         [[nodiscard]] int size() const noexcept
         {
-            return Count;
+            return (int)(Tail - Head);
         }
 
         /**
@@ -123,8 +129,7 @@ namespace rpp
          */
         void notify() noexcept
         {
-            std::lock_guard lock {Mutex};
-            Waiter.notify_all();
+            Waiter.notify_all(); // does not need to be locked
         }
 
         /**
@@ -132,8 +137,7 @@ namespace rpp
          */
         void notify_one() noexcept
         {
-            std::lock_guard lock {Mutex};
-            Waiter.notify_one();
+            Waiter.notify_one(); // does not need to be locked
         }
 
         /**
@@ -153,8 +157,10 @@ namespace rpp
         template<class ChangeWaitFlags>
         void notify(const ChangeWaitFlags& changeWaitFlags)
         {
-            std::lock_guard lock {Mutex};
-            changeWaitFlags();
+            {
+                std::lock_guard lock {Mutex};
+                changeWaitFlags();
+            }
             Waiter.notify_all();
         }
 
@@ -163,8 +169,10 @@ namespace rpp
          */
         void clear() noexcept
         {
-            std::lock_guard lock {Mutex};
-            clear_unlocked(); // destroy all elements
+            {
+                std::lock_guard lock {Mutex};
+                clear_unlocked(); // destroy all elements
+            }
             Waiter.notify_all(); // notify all waiters that the queue was emptied
         }
 
@@ -173,21 +181,8 @@ namespace rpp
          */
         [[nodiscard]] std::vector<T> atomic_copy() const noexcept
         {
-            std::vector<T> copy;
-            if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
-            {
-                int count = Count;
-                int capacity = Capacity;
-                const T* items = Items;
-                copy.reserve(count);
-                for (int i = 0, head = Head; i < count; ++i)
-                {
-                    copy.push_back(items[head++]);
-                    if (head == capacity) head = 0; // wrap around the ringbuffer
-                }
-                Mutex.unlock();
-            }
-            return copy;
+            std::lock_guard lock {Mutex};
+            return std::vector<T>{Head, Tail};
         }
 
         /**
@@ -200,10 +195,9 @@ namespace rpp
 
             if (Mutex.try_lock())
             {
-                if (int count = Count)
+                if (T* head = Head, *tail = Tail; head != tail)
                 {
-                    outItems.resize(count);
-                    move_items(Items, Head, count, Capacity, outItems.data());
+                    outItems.assign(head, tail);
                     clear_unlocked();
                     Mutex.unlock();
                     return true;
@@ -224,8 +218,10 @@ namespace rpp
          */
         void push(T&& item)
         {
-            std::lock_guard lock {Mutex}; // may throw
-            push_unlocked(std::move(item));
+            {
+                std::lock_guard lock {Mutex}; // may throw
+                push_unlocked(std::move(item));
+            }
             Waiter.notify_one();
         }
 
@@ -234,8 +230,10 @@ namespace rpp
          */
         void push(const T& item)
         {
-            std::lock_guard lock {Mutex}; // may throw
-            push_unlocked(item);
+            {
+                std::lock_guard lock {Mutex}; // may throw
+                push_unlocked(item);
+            }
             Waiter.notify_one();
         }
 
@@ -311,9 +309,9 @@ namespace rpp
          */
         [[nodiscard]] T wait_pop() noexcept
         {
-            std::unique_lock lock {Mutex}; // may throw
+            std::unique_lock<std::mutex> lock {Mutex}; // may throw
             while (empty())
-                Waiter.wait(lock);
+                Waiter.wait(lock); // may throw
             T result;
             pop_unlocked(result);
             return result;
@@ -350,9 +348,9 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     Waiter.wait_until(lock, clock::now() + timeout); // may throw
                 #endif
+                if (empty())
+                    return false;
             }
-            if (empty())
-                return false;
             pop_unlocked(outItem);
             return true;
         }
@@ -443,10 +441,10 @@ namespace rpp
                     if (interval > remaining)
                         interval = remaining;
                 } while (empty());
-            }
 
-            if (empty())
-                return false;
+                if (empty())
+                    return false;
+            }
             pop_unlocked(outItem);
             return true;
         }
@@ -454,84 +452,66 @@ namespace rpp
     private:
         inline void push_unlocked(T&& item) noexcept
         {
-            int count = Count;
-            if (count == Capacity)
+            if (Tail == ItemsEnd)
                 grow();
-            new (&Items[(Head + count) % Capacity]) T{ std::move(item) };
-            Count = count + 1;
+
+            new (Tail++) T{ std::move(item) };
         }
         inline void push_unlocked(const T& item) noexcept
         {
-            int count = Count;
-            if (count == Capacity)
+            if (Tail == ItemsEnd)
                 grow();
-            new (&Items[(Head + count) % Capacity]) T{ item };
-            Count = count + 1;
+
+            new (Tail++) T{ item };
         }
         inline void pop_unlocked(T& outItem) noexcept
         {
-            outItem = std::move(Items[Head]);
-            if (++Head == Capacity) Head = 0; // wrap around the ringbuffer
-            --Count;
-        }
-        void grow()
-        {
-            const int oldCap = Capacity;
-            int newCapacity = oldCap ? oldCap * 2 : 16;
-            T* newItems = (T*)malloc(newCapacity * sizeof(T));
-            // reorders the items in the ringbuffer to the beginning of the new ringbuffer
-            if (const int count = Count)
+            T* head = Head++;
+            outItem = std::move(*head);
+
+            if (Head == Tail) // clear the queue if Head catches the Tail
             {
-                T* oldItems = Items;
-                move_items_uninit(oldItems, Head, count, oldCap, newItems);
-                free(oldItems);
+                clear_unlocked();
             }
-            Items = newItems;
-            Capacity = newCapacity;
-            Head = 0;
         }
-        inline void move_items_uninit(T* items, int head, int count, int capacity, T* out)
+        void grow() noexcept
         {
-            // move first part of the ringbuffer
-            T* oldHead = items + head;
-            int firstLen = capacity - head;
-            std::uninitialized_move(oldHead, oldHead+firstLen, out);
-            // move the second part of the ringbuffer
-            if (int secondLen = count - firstLen; secondLen > 0)
-                std::uninitialized_move(items, items+secondLen, out+firstLen);
-        }
-        inline void move_items(T* items, int head, int count, int capacity, T* out)
-        {
-            // move first part of the ringbuffer
-            T* oldHead = items + head;
-            int firstLen = capacity - head;
-            std::move(oldHead, oldHead+firstLen, out);
-            // move the second part of the ringbuffer
-            if (int secondLen = count - firstLen; secondLen > 0)
-                std::move(items, items+secondLen, out+firstLen);
-        }
-        inline void copy_items(T* items, int head, int count, int capacity, T* out)
-        {
-            // copy first part of the ringbuffer
-            T* oldHead = items + head;
-            int firstLen = capacity - head;
-            std::copy(oldHead, oldHead+firstLen, out);
-            // move the second part of the ringbuffer
-            if (int secondLen = count - firstLen; secondLen > 0)
-                std::copy(items, items+secondLen, out+firstLen);
+            const int oldCap = capacity();
+            int growBy = oldCap ? oldCap : 32;
+            if (growBy > 8192) growBy = 8192;
+            const int newCap = oldCap + growBy;
+
+            T* newStart = (T*)malloc(newCap * sizeof(T));
+            T* newTail = newStart;
+
+            T* oldStart = ItemsStart;
+            T* oldHead = Head;
+            T* oldTail = Tail;
+
+            // reorders the items to the beginning
+            for (; oldHead != oldTail; ++newTail, ++oldHead)
+                new (newTail) T{ std::move(*oldHead) };
+
+            Head = newStart;
+            Tail = newTail;
+            ItemsStart = newStart;
+            ItemsEnd = newStart + newCap;
+            free(oldStart);
         }
         inline void clear_unlocked() noexcept
         {
-            int count = Count;
-            int capacity = Capacity;
-            const T* items = Items;
-            for (int i = 0, head = Head; i < count; ++i)
+            for (T* head = Head, *tail = Tail; head != tail; ++head)
+                head->~T();
+
+            // if the capacity was huge, then free the entire buffer
+            // to avoid massive memory usage for a small queue
+            if (capacity() > 8192)
             {
-                items[head++].~T();
-                if (head == capacity) head = 0; // wrap around the ringbuffer
+                free(ItemsStart);
+                ItemsStart = ItemsEnd = nullptr;
             }
-            Head = 0;
-            Count = 0;
+
+            Head = Tail = ItemsStart;
         }
     };
 }
