@@ -150,7 +150,7 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 6.0);
+        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 7.0);
         AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout, 

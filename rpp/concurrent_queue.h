@@ -7,6 +7,7 @@
 #include "condition_variable.h"
 #include <deque>
 #include <mutex>
+#include <thread> // std::this_thread::yield()
 
 namespace rpp
 {
