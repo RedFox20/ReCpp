@@ -457,9 +457,9 @@ namespace rpp
             std::unique_lock<std::mutex> lock {Mutex, std::try_to_lock};
             if (!lock.owns_lock())
             {
-                for (int i = 0; i < 100; ++i)
+                for (int i = 0; i < 10; ++i)
                 {
-                    std::this_thread::yield(); // yielding here will improve perf by ~25%
+                    std::this_thread::yield(); // yielding here will improve perf massively
                     if (lock.try_lock())
                         return lock;
                 }
