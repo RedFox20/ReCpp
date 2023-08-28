@@ -312,12 +312,9 @@ TestImpl(test_concurrent_queue)
                     //     ++num_received;
                     // item = queue.wait_pop();
                     // ++num_received;
-                    if (queue.wait_pop(item, std::chrono::milliseconds{5}))
+                    if (queue.wait_pop(item, std::chrono::milliseconds{5})) {
                         ++num_received;
-
-                    // if (queue.wait_pop_interval(item, std::chrono::milliseconds{50}, std::chrono::milliseconds{5}, []{ return false; })) {
-                    //     ++num_received;
-                    // }
+                    }
                 }
             });
 
@@ -330,5 +327,42 @@ TestImpl(test_concurrent_queue)
 
         avg_time /= num_iterations;
         print_info("AVERAGE wait_pop consumer elapsed: %.2f ms\n", avg_time);
+    }
+
+    TestCase(wait_pop_interval_cross_thread_perf)
+    {
+        constexpr int num_iterations = 10;
+        double avg_time = 0.0;
+        for (int i = 0; i < num_iterations; ++i)
+        {
+            concurrent_queue<std::string> queue;
+            constexpr int num_items = 1000000;
+            rpp::Timer t;
+
+            cfuture<void> producer = rpp::async_task([&] {
+                for (int i = 0; i < num_items; ++i) {
+                    queue.push("item");
+                }
+            });
+            cfuture<void> consumer = rpp::async_task([&] {
+                int num_received = 0;
+                std::string item;
+                while (num_received < num_items) {
+                    if (queue.wait_pop_interval(item, std::chrono::milliseconds{15}, std::chrono::milliseconds{5},
+                                                []{ return false; })) {
+                        ++num_received;
+                    }
+                }
+            });
+
+            producer.get();
+            consumer.get();
+            double elapsed_ms = t.elapsed_ms();
+            avg_time += elapsed_ms;
+            print_info("wait_pop_interval consumer elapsed: %.2f ms\n", elapsed_ms);
+        }
+
+        avg_time /= num_iterations;
+        print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms\n", avg_time);
     }
 };

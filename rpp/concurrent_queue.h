@@ -303,7 +303,13 @@ namespace rpp
         {
             std::unique_lock lock {Mutex}; // may throw
             if (empty())
-                Waiter.wait_for(lock, timeout); // may throw
+            {
+                #if _MSC_VER // on Win32 wait_for is faster
+                    Waiter.wait_for(lock, timeout); // may throw
+                #else // on GCC wait_until is faster
+                    Waiter.wait_until(lock, clock::now() + timeout); // may throw
+                #endif
+            }
             if (empty())
                 return false;
             pop_unlocked(outItem);
@@ -362,39 +368,40 @@ namespace rpp
          *       // item is valid
          *   }
          * @endcode
-         * 
-         * TODO: this is unreasonably 10-20x slower than wait_pop(item, timeout)
          */
         template<class WaitUntil>
         [[nodiscard]]
         bool wait_pop_interval(T& outItem, duration timeout, duration interval,
                                const WaitUntil& cancelCondition)
         {
-            duration remaining = timeout;
-            time_point prevTime = clock::now();
-            constexpr duration zero = duration{0};
-
-            std::unique_lock lock {Mutex};
-            while (empty())
+            std::unique_lock lock {Mutex}; // may throw
+            if (empty())
             {
-                if (cancelCondition())
-                    break;
-                std::cv_status status = Waiter.wait_for(lock, interval); // may throw
-                if (status == std::cv_status::no_timeout && !empty())
-                    break; // notified
+                duration remaining = timeout;
+                time_point prevTime = clock::now();
+                constexpr duration zero = duration{0};
+                do
+                {
+                    if (cancelCondition())
+                        return false;
+                    #if _MSC_VER // on Win32 wait_for is faster
+                        Waiter.wait_for(lock, interval); // may throw
+                    #else // on GCC wait_until is faster
+                        Waiter.wait_until(lock, prevTime + interval); // may throw
+                    #endif
+                    if (!empty())
+                        break; // got data
 
-                // clock is assumed to be steady and should only tick forward
-                // but we all know stdlib bugs happen, so this is not always correct
-                // this abs(delta_time) approach circumvents any such issues
-                time_point now = clock::now();
-                remaining -= std::chrono::abs(now - prevTime);
-                prevTime = now;
-                if (remaining <= zero)
-                    break; // timed out
+                    time_point now = clock::now();
+                    remaining -= (now - prevTime);
+                    if (remaining <= zero)
+                        break; // timed out
 
-                // make sure we don't suspend past the final waiting point
-                if (interval > remaining)
-                    interval = remaining;
+                    prevTime = now;
+                    // make sure we don't suspend past the final waiting point
+                    if (interval > remaining)
+                        interval = remaining;
+                } while (empty());
             }
 
             if (empty())
