@@ -286,11 +286,12 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_cross_thread_perf)
     {
         constexpr int num_iterations = 10;
-        double avg_time = 0.0;
+        constexpr int num_items = 1'000'000;
+        constexpr int total_items = num_iterations * num_items;
+        double total_time = 0.0;
         for (int i = 0; i < num_iterations; ++i)
         {
             concurrent_queue<std::string> queue;
-            constexpr int num_items = 1'000'000;
             rpp::Timer t;
 
             std::thread producer = std::thread([&] {
@@ -323,18 +324,21 @@ TestImpl(test_concurrent_queue)
             producer.join();
             consumer.join();
             double elapsed_ms = t.elapsed_ms();
-            avg_time += elapsed_ms;
+            total_time += elapsed_ms;
             print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed_ms, queue.capacity());
         }
 
-        avg_time /= num_iterations;
-        print_info("AVERAGE wait_pop consumer elapsed: %.2f ms\n", avg_time);
+        double avg_time = total_time / num_iterations;
+        double megaitems_per_sec = total_items / (avg_time * 1000.0);
+        print_info("AVERAGE wait_pop consumer elapsed: %.2f ms  %.0f Mitems/s\n", avg_time, megaitems_per_sec);
     }
 
     TestCase(wait_pop_interval_cross_thread_perf)
     {
         constexpr int num_iterations = 10;
-        double avg_time = 0.0;
+        constexpr int num_items = 1'000'000;
+        constexpr int total_items = num_iterations * num_items;
+        double total_time = 0.0;
         for (int i = 0; i < num_iterations; ++i)
         {
             concurrent_queue<std::string> queue;
@@ -362,11 +366,12 @@ TestImpl(test_concurrent_queue)
             producer.join();
             consumer.join();
             double elapsed_ms = t.elapsed_ms();
-            avg_time += elapsed_ms;
+            total_time += elapsed_ms;
             print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed_ms, queue.capacity());
         }
 
-        avg_time /= num_iterations;
-        print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms\n", avg_time);
+        double avg_time = total_time / num_iterations;
+        double megaitems_per_sec = total_items / (avg_time * 1000.0);
+        print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.0f Mitems/s\n", avg_time, megaitems_per_sec);
     }
 };
