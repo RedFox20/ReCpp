@@ -159,7 +159,7 @@ namespace rpp
         void notify(const ChangeWaitFlags& changeWaitFlags)
         {
             {
-                std::lock_guard lock {Mutex};
+                std::unique_lock<std::mutex> lock = spin_lock(); // may throw
                 changeWaitFlags();
             }
             Waiter.notify_all();
@@ -171,7 +171,7 @@ namespace rpp
         void clear() noexcept
         {
             {
-                std::lock_guard lock {Mutex};
+                std::unique_lock<std::mutex> lock = spin_lock(); // may throw
                 clear_unlocked(); // destroy all elements
             }
             Waiter.notify_all(); // notify all waiters that the queue was emptied
@@ -182,7 +182,7 @@ namespace rpp
          */
         [[nodiscard]] std::vector<T> atomic_copy() const noexcept
         {
-            std::lock_guard lock {Mutex};
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             return std::vector<T>{Head, Tail};
         }
 
@@ -220,7 +220,7 @@ namespace rpp
         void push(T&& item)
         {
             {
-                std::lock_guard lock {Mutex}; // may throw
+                std::unique_lock<std::mutex> lock = spin_lock(); // may throw
                 push_unlocked(std::move(item));
             }
             Waiter.notify_one();
@@ -232,7 +232,7 @@ namespace rpp
         void push(const T& item)
         {
             {
-                std::lock_guard lock {Mutex}; // may throw
+                std::unique_lock<std::mutex> lock = spin_lock(); // may throw
                 push_unlocked(item);
             }
             Waiter.notify_one();
@@ -243,7 +243,7 @@ namespace rpp
          */
         void push_no_notify(T&& item)
         {
-            std::lock_guard lock {Mutex}; // may throw
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             push_unlocked(std::move(item));
         }
 
@@ -252,7 +252,7 @@ namespace rpp
          */
         void push_no_notify(const T& item)
         {
-            std::lock_guard lock {Mutex}; // may throw
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             push_unlocked(item);
         }
 
@@ -263,7 +263,7 @@ namespace rpp
         [[nodiscard]] T pop()
         {
             T item;
-            std::lock_guard lock {Mutex};
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
                 throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
             pop_unlocked(item);
@@ -310,7 +310,7 @@ namespace rpp
          */
         [[nodiscard]] T wait_pop() noexcept
         {
-            std::unique_lock<std::mutex> lock {Mutex}; // may throw
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             while (empty())
                 Waiter.wait(lock); // may throw
             T result;
@@ -341,7 +341,7 @@ namespace rpp
         [[nodiscard]]
         bool wait_pop(T& outItem, duration timeout)
         {
-            std::unique_lock lock {Mutex}; // may throw
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
                 #if _MSC_VER // on Win32 wait_for is faster
@@ -414,7 +414,7 @@ namespace rpp
         bool wait_pop_interval(T& outItem, duration timeout, duration interval,
                                const WaitUntil& cancelCondition)
         {
-            std::unique_lock lock {Mutex}; // may throw
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
                 duration remaining = timeout;
@@ -451,31 +451,45 @@ namespace rpp
         }
 
     private:
-        inline void push_unlocked(T&& item) noexcept
+        std::unique_lock<std::mutex> spin_lock() const
+        {
+            // spin until we can lock the mutex
+            std::unique_lock<std::mutex> lock {Mutex, std::try_to_lock};
+            if (!lock.owns_lock())
+            {
+                for (int i = 0; i < 100; ++i)
+                {
+                    std::this_thread::yield(); // yielding here will improve perf by ~25%
+                    if (lock.try_lock())
+                        return lock;
+                }
+
+                // suspend until we can lock the mutex
+                lock.lock();
+            }
+            return lock;
+        }
+        void push_unlocked(T&& item) noexcept
         {
             if (Tail == ItemsEnd)
-            {
                 ensure_capacity();
-            }
 
             if constexpr (std::is_trivially_move_assignable_v<T>)
                 *Tail++ = std::move(item);
             else
                 new (Tail++) T{ std::move(item) };
         }
-        inline void push_unlocked(const T& item) noexcept
+        void push_unlocked(const T& item) noexcept
         {
             if (Tail == ItemsEnd)
-            {
                 ensure_capacity();
-            }
 
             if constexpr (std::is_trivially_copy_assignable_v<T>)
                 *Tail++ = item;
             else
                 new (Tail++) T{ item };
         }
-        inline void pop_unlocked(T& outItem) noexcept
+        void pop_unlocked(T& outItem) noexcept
         {
             T* head = Head++;
             outItem = std::move(*head);
@@ -534,7 +548,7 @@ namespace rpp
                 return newTail;
             }
         }
-        inline void clear_unlocked() noexcept
+        void clear_unlocked() noexcept
         {
             for (T* head = Head, *tail = Tail; head != tail; ++head)
                 head->~T();
