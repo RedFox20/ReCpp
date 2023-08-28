@@ -66,7 +66,7 @@ TestImpl(test_concurrent_queue)
         queue.push("item1");
         queue.push("item2");
         queue.push("item3");
-        std::deque<std::string> items = queue.atomic_copy();
+        std::vector<std::string> items = queue.atomic_copy();
         AssertThat(items.size(), 3);
         AssertThat(items.at(0), "item1");
         AssertThat(items.at(1), "item2");

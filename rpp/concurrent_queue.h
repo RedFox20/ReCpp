@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "condition_variable.h"
-#include <deque>
+#include <vector>
 #include <mutex>
 #include <thread> // std::this_thread::yield()
 
@@ -21,13 +21,13 @@ namespace rpp
     template<class T>
     class concurrent_queue
     {
-        std::deque<T> Queue;
+        int Head = 0; // index of the First element
+        int Count = 0; // number of elements in the queue
+        int Capacity = 0; // max capacity of the queue
+        T* Items = nullptr;
+
         mutable std::mutex Mutex;
         rpp::condition_variable Waiter;
-
-        // regular int+mutex is faster than atomic_int+mutex
-        int Size = 0;
-        // std::atomic_int Size {0};
 
     public:
 
@@ -38,19 +38,53 @@ namespace rpp
         concurrent_queue() = default;
         ~concurrent_queue() noexcept
         {
-            clear(); // safely lock, pop and notify all waiters to give up
+            // safely lock, clear and notify all waiters to give up
+            clear();
+            if (Items) // all items should be destroyed now, free the ringbuffer
+                free(Items);
+        }
+
+        concurrent_queue(const concurrent_queue&) = delete;
+        concurrent_queue& operator=(const concurrent_queue&) = delete;
+
+        concurrent_queue(concurrent_queue&& q) noexcept
+        {
+            // safely swap the states from q to default empty state
+            std::lock_guard lock { q.Mutex };
+            std::swap(Head, q.Head);
+            std::swap(Count, q.Count);
+            std::swap(Capacity, q.Capacity);
+            std::swap(Items, q.Items);
+            // notify only the old queue
+            q.Waiter.notify_all();
+        }
+
+        concurrent_queue& operator=(concurrent_queue&& q) noexcept
+        {
+            // safely swap the states of both queues
+            std::scoped_lock dual_lock { Mutex, q.Mutex };
+            std::swap(Head, q.Head);
+            std::swap(Count, q.Count);
+            std::swap(Capacity, q.Capacity);
+            std::swap(Items, q.Items);
+            // notify all waiters for both queues
+            q.Waiter.notify_all();
+            Waiter.notify_all();
+            return *this;
         }
 
         /**
          * @brief Returns the internal mutex for this queue
          */
-        [[nodiscard]] std::mutex& sync() const noexcept { return Mutex; }
+        [[nodiscard]] std::mutex& sync() const noexcept
+        {
+            return Mutex;
+        }
 
         /** @returns TRUE if this queue is empty */
         [[nodiscard]] bool empty() const noexcept
         {
-            return !Size;
-            // return !Size.load(std::memory_order::relaxed);
+            return !Count;
         }
 
         /**
@@ -58,8 +92,7 @@ namespace rpp
          */
         [[nodiscard]] int size() const noexcept
         {
-            return Size;
-            // return Size.load(std::memory_order::relaxed);
+            return Count;
         }
 
         /**
@@ -82,6 +115,7 @@ namespace rpp
          */
         void notify() noexcept
         {
+            std::lock_guard lock {Mutex};
             Waiter.notify_all();
         }
 
@@ -90,35 +124,8 @@ namespace rpp
          */
         void notify_one() noexcept
         {
+            std::lock_guard lock {Mutex};
             Waiter.notify_one();
-        }
-
-        /**
-         * @brief Thread-safely clears the entire queue and notifies all waiters
-         */
-        void clear() noexcept
-        {
-            if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
-            {
-                Queue.clear();
-                Size = 0;
-                Mutex.unlock();
-                notify();
-            }
-        }
-
-        /**
-         * @returns An atomic copy of the entire queue items
-         */
-        [[nodiscard]] std::deque<T> atomic_copy() const noexcept
-        {
-            std::deque<T> copy;
-            if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
-            {
-                copy = Queue;
-                Mutex.unlock();
-            }
-            return copy;
         }
 
         /**
@@ -138,12 +145,70 @@ namespace rpp
         template<class ChangeWaitFlags>
         void notify(const ChangeWaitFlags& changeWaitFlags)
         {
+            std::lock_guard lock {Mutex};
+            changeWaitFlags();
+            Waiter.notify_all();
+        }
+
+        /**
+         * @brief Thread-safely clears the entire queue and notifies all waiters
+         */
+        void clear() noexcept
+        {
+            std::lock_guard lock {Mutex};
+            clear_unlocked(); // destroy all elements
+            Waiter.notify_all(); // notify all waiters that the queue was emptied
+        }
+
+        /**
+         * @returns An atomic copy of the entire queue items
+         */
+        [[nodiscard]] std::vector<T> atomic_copy() const noexcept
+        {
+            std::vector<T> copy;
             if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
             {
-                changeWaitFlags();
+                int count = Count;
+                int capacity = Capacity;
+                const T* items = Items;
+                copy.reserve(count);
+                for (int i = 0, head = Head; i < count; ++i)
+                {
+                    copy.push_back(items[head++]);
+                    if (head == capacity) head = 0; // wrap around the ringbuffer
+                }
                 Mutex.unlock();
-                notify();
             }
+            return copy;
+        }
+
+        /**
+         * @brief Attempts to pop all pending items from the queue without waiting
+         */
+        [[nodiscard]] bool try_pop_all(std::vector<T>& outItems) noexcept
+        {
+            if (empty())
+                return false;
+
+            if (Mutex.try_lock())
+            {
+                if (int count = Count)
+                {
+                    outItems.resize(count);
+                    move_items(Items, Head, count, Capacity, outItems.data());
+                    clear_unlocked();
+                    Mutex.unlock();
+                    return true;
+                }
+                Mutex.unlock();
+                return false;
+            }
+            else
+            {
+                // if we failed to lock, yielding here will improve perf by 5-10x
+                std::this_thread::yield();
+            }
+            return false;
         }
 
         /**
@@ -151,12 +216,9 @@ namespace rpp
          */
         void push(T&& item)
         {
-            {
-                std::lock_guard lock {Mutex}; // may throw
-                Queue.emplace_back(std::move(item)); // may throw
-                ++Size;
-            }
-            notify_one();
+            std::lock_guard lock {Mutex}; // may throw
+            push_unlocked(std::move(item));
+            Waiter.notify_one();
         }
 
         /**
@@ -164,12 +226,9 @@ namespace rpp
          */
         void push(const T& item)
         {
-            {
-                std::lock_guard lock {Mutex}; // may throw
-                Queue.push_back(item); // may throw
-                ++Size;
-            }
-            notify_one();
+            std::lock_guard lock {Mutex}; // may throw
+            push_unlocked(item);
+            Waiter.notify_one();
         }
 
         /**
@@ -177,11 +236,17 @@ namespace rpp
          */
         void push_no_notify(T&& item)
         {
-            {
-                std::lock_guard lock {Mutex}; // may throw
-                Queue.emplace_back(std::move(item)); // may throw
-                ++Size;
-            }
+            std::lock_guard lock {Mutex}; // may throw
+            push_unlocked(std::move(item));
+        }
+
+        /**
+         * @brief Thread-safely copies an item into the queue without notifying waiters
+         */
+        void push_no_notify(const T& item)
+        {
+            std::lock_guard lock {Mutex}; // may throw
+            push_unlocked(item);
         }
 
         /**
@@ -191,13 +256,10 @@ namespace rpp
         [[nodiscard]] T pop()
         {
             T item;
-            {
-                std::lock_guard lock {Mutex};
-                if (empty())
-                    throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
-                pop_unlocked(item);
-            }
-            notify();
+            std::lock_guard lock {Mutex};
+            if (empty())
+                throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
+            pop_unlocked(item);
             return item;
         }
 
@@ -221,35 +283,6 @@ namespace rpp
                     return false;
                 }
                 pop_unlocked(outItem);
-                Mutex.unlock();
-                return true;
-            }
-            else
-            {
-                // if we failed to lock, yielding here will improve perf by 5-10x
-                std::this_thread::yield();
-            }
-            return false;
-        }
-
-        /**
-         * @brief Attempts to pop all pending items from the queue without waiting
-        */
-        [[nodiscard]] bool try_pop_all(std::deque<T>& outItems) noexcept
-        {
-            if (empty())
-                return false;
-
-            if (Mutex.try_lock())
-            {
-                if (empty())
-                {
-                    Mutex.unlock();
-                    return false;
-                }
-                outItems.swap(Queue);
-                Queue.clear();
-                Size = 0;
                 Mutex.unlock();
                 return true;
             }
@@ -411,11 +444,86 @@ namespace rpp
         }
 
     private:
+        inline void push_unlocked(T&& item) noexcept
+        {
+            int count = Count;
+            if (count == Capacity)
+                grow();
+            new (&Items[(Head + count) % Capacity]) T{ std::move(item) };
+            Count = count + 1;
+        }
+        inline void push_unlocked(const T& item) noexcept
+        {
+            int count = Count;
+            if (count == Capacity)
+                grow();
+            new (&Items[(Head + count) % Capacity]) T{ item };
+            Count = count + 1;
+        }
         inline void pop_unlocked(T& outItem) noexcept
         {
-            outItem = std::move(Queue.front());
-            Queue.pop_front();
-            --Size;
+            outItem = std::move(Items[Head]);
+            if (++Head == Capacity) Head = 0; // wrap around the ringbuffer
+            --Count;
+        }
+        void grow()
+        {
+            const int oldCap = Capacity;
+            int newCapacity = oldCap ? oldCap * 2 : 16;
+            T* newItems = (T*)malloc(newCapacity * sizeof(T));
+            // reorders the items in the ringbuffer to the beginning of the new ringbuffer
+            if (const int count = Count)
+            {
+                T* oldItems = Items;
+                move_items_uninit(oldItems, Head, count, oldCap, newItems);
+                free(oldItems);
+            }
+            Items = newItems;
+            Capacity = newCapacity;
+            Head = 0;
+        }
+        inline void move_items_uninit(T* items, int head, int count, int capacity, T* out)
+        {
+            // move first part of the ringbuffer
+            T* oldHead = items + head;
+            int firstLen = capacity - head;
+            std::uninitialized_move(oldHead, oldHead+firstLen, out);
+            // move the second part of the ringbuffer
+            if (int secondLen = count - firstLen; secondLen > 0)
+                std::uninitialized_move(items, items+secondLen, out+firstLen);
+        }
+        inline void move_items(T* items, int head, int count, int capacity, T* out)
+        {
+            // move first part of the ringbuffer
+            T* oldHead = items + head;
+            int firstLen = capacity - head;
+            std::move(oldHead, oldHead+firstLen, out);
+            // move the second part of the ringbuffer
+            if (int secondLen = count - firstLen; secondLen > 0)
+                std::move(items, items+secondLen, out+firstLen);
+        }
+        inline void copy_items(T* items, int head, int count, int capacity, T* out)
+        {
+            // copy first part of the ringbuffer
+            T* oldHead = items + head;
+            int firstLen = capacity - head;
+            std::copy(oldHead, oldHead+firstLen, out);
+            // move the second part of the ringbuffer
+            if (int secondLen = count - firstLen; secondLen > 0)
+                std::copy(items, items+secondLen, out+firstLen);
+        }
+        inline void clear_unlocked() noexcept
+        {
+            int count = Count;
+            int capacity = Capacity;
+            const T* items = Items;
+            for (int i = 0, head = Head; i < count; ++i)
+            {
+                items[head++].~T();
+                if (head == capacity) head = 0; // wrap around the ringbuffer
+            }
+            Head = 0;
+            Count = 0;
         }
     };
 }
