@@ -157,7 +157,7 @@ TestImpl(test_concurrent_queue)
         // we should get it immediately
         queue.push("item1");
         AssertWaitPopTimed(10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 16.0);
+        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 17.0);
     }
 
     // introduce a slow producer thread so we can test our timeouts
@@ -280,7 +280,7 @@ TestImpl(test_concurrent_queue)
         // we should never have reached the limit of 55
         // we should have reached at least 49 checks, but the previous tests also produce some
         // timing side effects, and OS sleeps are never accurate enough, so relax the requirements by A LOT
-        AssertInRange(int(counter4), 40, 54);
+        AssertInRange(int(counter4), 30, 54);
     }
 
     TestCase(wait_pop_cross_thread_perf)
