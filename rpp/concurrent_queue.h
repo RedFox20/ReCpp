@@ -8,6 +8,7 @@
 #include <vector>
 #include <mutex>
 #include <thread> // std::this_thread::yield()
+#include <type_traits> // std::is_trivially_destructible_v
 
 namespace rpp
 {
@@ -453,50 +454,85 @@ namespace rpp
         inline void push_unlocked(T&& item) noexcept
         {
             if (Tail == ItemsEnd)
-                grow();
+            {
+                ensure_capacity();
+            }
 
-            new (Tail++) T{ std::move(item) };
+            if constexpr (std::is_trivially_move_assignable_v<T>)
+                *Tail++ = std::move(item);
+            else
+                new (Tail++) T{ std::move(item) };
         }
         inline void push_unlocked(const T& item) noexcept
         {
             if (Tail == ItemsEnd)
-                grow();
+            {
+                ensure_capacity();
+            }
 
-            new (Tail++) T{ item };
+            if constexpr (std::is_trivially_copy_assignable_v<T>)
+                *Tail++ = item;
+            else
+                new (Tail++) T{ item };
         }
         inline void pop_unlocked(T& outItem) noexcept
         {
             T* head = Head++;
             outItem = std::move(*head);
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                head->~T();
 
             if (Head == Tail) // clear the queue if Head catches the Tail
             {
                 clear_unlocked();
             }
         }
-        void grow() noexcept
+        void ensure_capacity() noexcept
         {
             const int oldCap = capacity();
-            int growBy = oldCap ? oldCap : 32;
-            if (growBy > 8192) growBy = 8192;
-            const int newCap = oldCap + growBy;
+            if (oldCap > 0 && (Head - ItemsStart) >= (oldCap / 2))
+            {
+                // unshift elements to the front of the queue
+                T* newStart = ItemsStart;
+                T* newTail = move_items(Head, Tail, newStart);
+                Head = newStart;
+                Tail = newTail;
+            }
+            else // grow
+            {
+                int growBy = oldCap ? oldCap : 32;
+                if (growBy > (16*1024)) growBy = 16*1024;
+                const int newCap = oldCap + growBy;
 
-            T* newStart = (T*)malloc(newCap * sizeof(T));
-            T* newTail = newStart;
-
-            T* oldStart = ItemsStart;
-            T* oldHead = Head;
-            T* oldTail = Tail;
-
-            // reorders the items to the beginning
-            for (; oldHead != oldTail; ++newTail, ++oldHead)
-                new (newTail) T{ std::move(*oldHead) };
-
-            Head = newStart;
-            Tail = newTail;
-            ItemsStart = newStart;
-            ItemsEnd = newStart + newCap;
-            free(oldStart);
+                T* oldStart = ItemsStart;
+                T* newStart = (T*)malloc(newCap * sizeof(T));
+                T* newTail = move_items(Head, Tail, newStart);
+                Head = newStart;
+                Tail = newTail;
+                ItemsStart = newStart;
+                ItemsEnd = newStart + newCap;
+                free(oldStart);
+            }
+        }
+        static T* move_items(T* oldHead, T* oldTail, T* newStart) noexcept
+        {
+            if constexpr (std::is_trivially_move_assignable_v<T>)
+            {
+                int count = (oldTail - oldHead);
+                memmove(newStart, oldHead, count * sizeof(T));
+                return newStart + count;
+            }
+            else
+            {
+                T* newTail = newStart;
+                for (; oldHead != oldTail; ++newTail, ++oldHead)
+                {
+                    new (newTail) T{ std::move(*oldHead) };
+                    if constexpr (!std::is_trivially_destructible_v<T>)
+                        oldHead->~T();
+                }
+                return newTail;
+            }
         }
         inline void clear_unlocked() noexcept
         {
