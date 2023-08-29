@@ -232,6 +232,24 @@ namespace rpp
         else memset(Addr6, 0, sizeof(Addr6));
     }
 
+    raw_address::raw_address(address_family af, uint32_t ipv4) noexcept : raw_address{af}
+    {
+        Addr4 = ipv4;
+    }
+
+    raw_address::raw_address(address_family af, const void* ipv6, 
+                             unsigned long flowInfo, unsigned long scopeId) noexcept : raw_address{af}
+    {
+        memcpy(Addr6, ipv6, sizeof(Addr6));
+        FlowInfo = flowInfo;
+        ScopeId = scopeId;
+    }
+    
+    raw_address::raw_address(address_family af, const char* ip_address) noexcept : raw_address{af}
+    {
+        resolve_addr(af, ip_address);
+    }
+
     void raw_address::reset() noexcept
     {
         Family = AF_DontCare;

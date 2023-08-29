@@ -112,7 +112,16 @@ namespace rpp
         };
 
         raw_address() noexcept; // memset 0 raw_address
-        raw_address(address_family af) noexcept;
+        explicit raw_address(address_family af) noexcept;
+
+        // manually initialize address from an IPv4 integer address
+        raw_address(address_family af, uint32_t ipv4) noexcept;
+
+        // manually initialize an IPv6 address
+        raw_address(address_family af, const void* ipv6, unsigned long flowInfo, unsigned long scopeId) noexcept;
+
+        // resolves the ip address from a string
+        raw_address(address_family af, const char* ip_address) noexcept;
 
         /** @returns rpp::address_family of this raw_address */
         address_family family() const noexcept { return Family; }
