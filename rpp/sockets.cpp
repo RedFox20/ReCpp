@@ -745,11 +745,11 @@ namespace rpp
         return s;
     }
     socket::socket() noexcept
-        : Sock{-1}, LastErr{0}, Shared{false}, Blocking{true}, Category{SC_Unknown}
+        : Sock{-1}, Addr{}, LastErr{0}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
     }
     socket::socket(socket&& s) noexcept
-        : Sock{s.Sock}, LastErr{s.LastErr}, Addr{s.Addr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
+        : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
     {
         s.Sock = -1;
         s.Addr.reset();

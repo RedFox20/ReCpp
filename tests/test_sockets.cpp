@@ -585,7 +585,7 @@ TestImpl(test_sockets)
             if (sentBytes > 0)
                 print_info("remote: sent %d bytes of data\n", sentBytes);
             else
-                print_info("remote: failed to send data: %s\n", socket::last_err().c_str());
+                print_info("remote: failed to send data: %s\n", server.last_err().c_str());
 
             // we need to create a large gap in the data
             sleep(15);
