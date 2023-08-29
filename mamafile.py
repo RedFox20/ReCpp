@@ -20,8 +20,13 @@ class ReCpp(mama.BuildTarget):
             self.add_cmake_options('CXX20=TRUE')
 
     def package(self):
+        # copy headers to build dir
+        os.makedirs(self.build_dir('include/rpp/'), exist_ok=True)
+        self.copy(self.source_dir('src/rpp/'), self.build_dir('include/rpp/'))
+
+        self.export_includes('include', build_dir=True)  # So: #include <rpp/strview.h>
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
-        self.export_includes('src')  # So: #include <rpp/strview.h>
+
         if self.raspi or self.oclea:
             self.export_syslib('dl')
             self.export_syslib('rt')
