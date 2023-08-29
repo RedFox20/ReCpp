@@ -547,12 +547,12 @@ namespace rpp
         a.sa4.sin_family = (uint16_t)addrfamily_int(ipa.Address.Family);
         a.sa4.sin_port = htons(ipa.Port);
         if (ipa.Address.Family == AF_IPv4) {
-            a.sa4.sin_addr.s_addr = (unsigned)ipa.Address.Addr4;
+            a.sa4.sin_addr.s_addr = ipa.Address.Addr4;
             memset(a.sa4.sin_zero, 0, sizeof(a.sa4.sin_zero));
         } else { // AF_IPv6
             memcpy(&a.sa6.sin6_addr, ipa.Address.Addr6, sizeof(ipa.Address.Addr6));
-            a.sa6.sin6_flowinfo = (unsigned)ipa.Address.FlowInfo;
-            a.sa6.sin6_scope_id = (unsigned)ipa.Address.ScopeId;
+            a.sa6.sin6_flowinfo = ipa.Address.FlowInfo;
+            a.sa6.sin6_scope_id = ipa.Address.ScopeId;
         }
         return a;
     }

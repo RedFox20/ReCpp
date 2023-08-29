@@ -101,11 +101,11 @@ namespace rpp
         #endif
         union {
             union {
-                unsigned long Addr4; // IPv4 Address
+                unsigned long Addr4; // IPv4 Address in NETWORK byte order (!)
                 unsigned char Addr4Parts[4];
             };
             struct {
-                unsigned char Addr6[16]; // IPv6 Address
+                unsigned char Addr6[16]; // IPv6 Address in NETWORK byte order (!)
                 unsigned long FlowInfo;
                 unsigned long ScopeId; // The network prefix for IPv6
             };
@@ -122,6 +122,8 @@ namespace rpp
 
         // resolves the ip address from a string
         raw_address(address_family af, const char* ip_address) noexcept;
+        raw_address(address_family af, const std::string& ip_address) noexcept
+            : raw_address(af, ip_address.c_str()) {}
 
         /** @returns rpp::address_family of this raw_address */
         address_family family() const noexcept { return Family; }
