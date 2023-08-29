@@ -114,6 +114,18 @@ namespace rpp
         raw_address() noexcept; // memset 0 raw_address
         raw_address(address_family af) noexcept;
 
+        /** @returns rpp::address_family of this raw_address */
+        address_family family() const noexcept { return Family; }
+
+        /** @returns true if this raw_address is IPv4 */
+        bool is_ipv4() const noexcept { return Family == AF_IPv4; }
+
+        /** @returns true if this raw_address is IPv6 */
+        bool is_ipv6() const noexcept { return Family == AF_IPv6; }
+
+        /** @returns IPv4 address as a 32-bit integer */
+        uint32_t ipv4_address() const noexcept { return Addr4; }
+
         /** Resets this raw_address to a default state */
         void reset() noexcept;
 
