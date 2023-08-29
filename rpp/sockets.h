@@ -461,11 +461,12 @@ namespace rpp
         };
 
         static constexpr int INVALID = -1;
-        int       Sock;   // Socket handle
-        ipaddress Addr;   // remote addr
-        bool      Shared; // if true, Socket is shared and dtor won't call closesocket()
-        bool      Blocking; // only relevant on windows, if TRUE, the socket is blocking
-        category  Category;
+        int Sock;            // Socket handle
+        ipaddress Addr;      // remote addr
+        mutable int LastErr; // last error code
+        bool Shared;         // if true, Socket is shared and dtor won't call closesocket()
+        bool Blocking;       // only relevant on windows, if TRUE, the socket is blocking
+        category Category;
 
     public:
 
@@ -524,9 +525,14 @@ namespace rpp
         const char* cname() const noexcept { return Addr.cstr(); }
 
         /**
-         * @return A human readable description string of the last occurred socket error in errno.
+         * @return A human readable description string of the last occurred socket error.
          */
-        static std::string last_err(int err=0) noexcept;
+        std::string last_err() const noexcept;
+
+        /**
+         * @return A human readable description string of the last occurred socket error.
+         */
+        static std::string last_os_socket_err(int err=0) noexcept;
 
         /**
          * Send data to remote socket, return number of bytes sent or -1 if socket closed

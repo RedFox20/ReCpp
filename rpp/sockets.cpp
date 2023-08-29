@@ -336,7 +336,7 @@ namespace rpp
         }
         else
         {
-            logerror("getaddrinfo failed: %s", socket::last_err().c_str());
+            logerror("getaddrinfo failed: %s", socket::last_os_socket_err().c_str());
         }
         return success;
     }
@@ -745,11 +745,11 @@ namespace rpp
         return s;
     }
     socket::socket() noexcept
-        : Sock{-1}, Shared{false}, Blocking{true}, Category{SC_Unknown}
+        : Sock{-1}, LastErr{0}, Shared{false}, Blocking{true}, Category{SC_Unknown}
     {
     }
     socket::socket(socket&& s) noexcept
-        : Sock{s.Sock}, Addr{s.Addr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
+        : Sock{s.Sock}, LastErr{s.LastErr}, Addr{s.Addr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
     {
         s.Sock = -1;
         s.Addr.reset();
@@ -762,11 +762,13 @@ namespace rpp
         close();
         Sock   = s.Sock;
         Addr   = s.Addr;
+        LastErr = s.LastErr;
         Shared = s.Shared;
         Blocking = s.Blocking;
         Category = s.Category;
         s.Sock = -1;
         s.Addr.reset();
+        s.LastErr  = 0;
         s.Shared   = false;
         s.Blocking = false;
         s.Category = SC_Unknown;
@@ -812,7 +814,12 @@ namespace rpp
         #endif
     }
 
-    std::string socket::last_err(int err) noexcept
+    std::string socket::last_err() const noexcept
+    {
+        return last_os_socket_err(LastErr);
+    }
+
+    std::string socket::last_os_socket_err(int err) noexcept
     {
         char buf[2048];
         int errcode = err ? err : os_getsockerr();
@@ -1022,7 +1029,7 @@ namespace rpp
     {
         int count = available();
         if (count <= 0)
-            return 0;
+            return false;
         outBuffer.resize(count);
         int n = recv(outBuffer.data(), (int)outBuffer.size());
         if (n >= 0 && n != count)
@@ -1034,7 +1041,7 @@ namespace rpp
     {
         int count = available();
         if (count <= 0)
-            return 0;
+            return false;
         outBuffer.resize(count);
         int n = recvfrom(from, outBuffer.data(), (int)outBuffer.size());
         if (n >= 0 && n != count)
@@ -1047,12 +1054,15 @@ namespace rpp
     int socket::handle_txres(long ret) noexcept
     {
         if (ret == 0) { // socket closed gracefully
+            LastErr = os_getsockerr();
             close();
             return -1;
         }
         else if (ret == -1) { // socket error?
-            return handle_errno();
+            LastErr = os_getsockerr();
+            return handle_errno(LastErr);
         }
+        LastErr = 0;
         return (int)ret; // return as bytesAvailable
     }
 
@@ -1067,12 +1077,14 @@ namespace rpp
         int errcode = err ? err : os_getsockerr();
         switch (errcode) {
             default: {
-                indebug(auto errmsg = socket::last_err(errcode));
+                indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
                 close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
+            // The connection has been broken due to keep-alive activity detecting a failure while the operation was in progress.
+            case ESOCK(ENETRESET):   return 0; // ignore net reset errors
             case ESOCK(EMSGSIZE):    return 0; // message too large to fit into buffer and was truncated
             case ESOCK(EINPROGRESS): return 0; // request is in progress, you should call wait
             case ESOCK(EWOULDBLOCK): return 0; // no data available right now
@@ -1089,7 +1101,7 @@ namespace rpp
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             case ESOCK(EADDRINUSE): {
-                indebug(auto errmsg = socket::last_err(errcode));
+                indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
                 close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
@@ -1123,11 +1135,14 @@ namespace rpp
     int socket::get_opt(int optlevel, int socketopt) const noexcept
     {
         int value = 0; socklen_t len = sizeof(int);
-        return getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) ? -1 : value;
+        bool success = getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) == 0;
+        LastErr = !success ? os_getsockerr() : 0;
+        return !success ? -1 : value;
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept
     {
-        return setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
+        LastErr = setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
+        return LastErr;
     }
 
 #if RPP_SOCKETS_DBG
@@ -1147,6 +1162,7 @@ namespace rpp
 
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept
     {
+        LastErr = 0;
     #if _WIN32 // on win32, ioctlsocket SETS FIONBIO, so we need this little helper
         if (iocmd == FIONBIO)
         {
@@ -1163,13 +1179,14 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &outValue) == 0)
             return 0;
     #endif
-        int err = os_getsockerr();
-        logerronce(err, "(%s) failed: %s", ioctl_string(iocmd), last_err(err).c_str());
-        return err;
+        LastErr = os_getsockerr();
+        logerronce(LastErr, "(%s) failed: %s", ioctl_string(iocmd), last_err().c_str());
+        return LastErr;
     }
 
     int socket::set_ioctl(int iocmd, int value) noexcept
     {
+        LastErr = 0;
     #if _WIN32
         u_long val = value;
         if (ioctlsocket(Sock, iocmd, &val) == 0)
@@ -1178,7 +1195,8 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &value) == 0)
             return 0;
     #endif
-        return os_getsockerr();
+        LastErr = os_getsockerr();
+        return LastErr;
     }
 
     bool socket::enable_broadcast() noexcept
@@ -1309,7 +1327,8 @@ namespace rpp
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
-            getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len);
+            bool ok = getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len) == 0;
+            LastErr = ok ? 0 : os_getsockerr();
             return to_ipproto(winf.iProtocol);
         #else // this implementation is incomplete:
             switch (get_opt(SOL_SOCKET, SO_TYPE)) {
@@ -1326,7 +1345,8 @@ namespace rpp
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
-            getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len);
+            bool ok = getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len) == 0;
+            LastErr = ok ? 0 : os_getsockerr();
             return protocol_info {
                 winf.iProtocol,
                 to_addrfamily(winf.iAddressFamily),
