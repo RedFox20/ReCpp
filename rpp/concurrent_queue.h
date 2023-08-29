@@ -344,11 +344,11 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
-                #if _MSC_VER // on Win32 wait_for is faster
-                    (void)Waiter.wait_for(lock, timeout); // may throw
-                #else // on GCC wait_until is faster
-                    (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
-                #endif
+            #if _MSC_VER // on Win32 wait_for is faster
+                (void)Waiter.wait_for(lock, timeout); // may throw
+            #else // on GCC wait_until is faster
+                (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
+            #endif
                 if (empty())
                     return false;
             }
@@ -386,14 +386,14 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
-                #if _MSC_VER // on Win32 wait_for is faster
-                    // don't measure `now` again, even if locking took a while
-                    // this can make us suspend beyond `until` time, but that's ok
-                    duration timeout = until - now;
-                    (void)Waiter.wait_for(lock, timeout); // may throw
-                #else // on GCC wait_until is faster
-                    (void)Waiter.wait_until(lock, until); // may throw
-                #endif
+            #if _MSC_VER // on Win32 wait_for is faster
+                // don't measure `now` again, even if locking took a while
+                // this can make us suspend beyond `until` time, but that's ok
+                duration timeout = until - now;
+                (void)Waiter.wait_for(lock, timeout); // may throw
+            #else // on GCC wait_until is faster
+                (void)Waiter.wait_until(lock, until); // may throw
+            #endif
                 if (empty())
                     return false;
             }
@@ -469,11 +469,11 @@ namespace rpp
                 {
                     if (cancelCondition())
                         return false;
-                    #if _MSC_VER // on Win32 wait_for is faster
-                        (void)Waiter.wait_for(lock, interval); // may throw
-                    #else // on GCC wait_until is faster
-                        (void)Waiter.wait_until(lock, prevTime + interval); // may throw
-                    #endif
+                #if _MSC_VER // on Win32 wait_for is faster
+                    (void)Waiter.wait_for(lock, interval); // may throw
+                #else // on GCC wait_until is faster
+                    (void)Waiter.wait_until(lock, prevTime + interval); // may throw
+                #endif
                     if (!empty())
                         break; // got data
 
