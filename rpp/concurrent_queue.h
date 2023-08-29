@@ -357,6 +357,51 @@ namespace rpp
         }
 
         /**
+         * Only returns items if `clock::now() < until`. This is excellent for message handling
+         * loops that have an absolute time limit for processing messages.
+         * 
+         * @param outItem [out] The popped item. Only valid if return value is TRUE
+         * @param until [required] Timepoint to wait until before returning FALSE
+         * @return TRUE if an item was popped, FALSE if timed out.
+         * @code
+         *   auto until = std::chrono::steady_clock::now() + time_limit;
+         *   string item;
+         *   // process messages until time limit is reached
+         *   while (queue.wait_pop_until(item, until))
+         *   {
+         *       // item is valid
+         *   }
+         * @endcode
+         */
+        [[nodiscard]]
+        bool wait_pop_until(T& outItem, time_point until)
+        {
+            auto now = clock::now();
+
+            // if we're already past the time limit, then don't check anything
+            // this ensures while() loops don't get stuck processing items endlessly
+            if (now > until)
+                return false;
+
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            if (empty())
+            {
+                #if _MSC_VER // on Win32 wait_for is faster
+                    // don't measure `now` again, even if locking took a while
+                    // this can make us suspend beyond `until` time, but that's ok
+                    duration timeout = until - now;
+                    Waiter.wait_for(lock, timeout); // may throw
+                #else // on GCC wait_until is faster
+                    Waiter.wait_until(lock, until); // may throw
+                #endif
+                if (empty())
+                    return false;
+            }
+            pop_unlocked(outItem);
+            return true;
+        }
+
+        /**
          * Waits up to @param timeout duration until an item is ready to be popped.
          * The cancelCondition is used to terminate the wait.
          * 

@@ -18,6 +18,9 @@ TestImpl(test_concurrent_queue)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
+    using Clock = concurrent_queue<std::string>::clock;
+    using Millis = std::chrono::milliseconds;
+
     TestInit(test_concurrent_queue)
     {
     }
@@ -129,7 +132,7 @@ TestImpl(test_concurrent_queue)
         explicit operator bool() const noexcept { return success; }
     };
 
-    PopResult wait_pop_timed(concurrent_queue<std::string>& queue, std::chrono::milliseconds timeout)
+    PopResult wait_pop_timed(concurrent_queue<std::string>& queue, Clock::duration timeout)
     {
         PopResult r;
         rpp::Timer t;
@@ -137,7 +140,7 @@ TestImpl(test_concurrent_queue)
         r.elapsed_ms = t.elapsed_ms();
         print_info("wait_pop_timed elapsed: %.2f ms item: %s\n", r.elapsed_ms, r.item.c_str());
         return r;
-    };
+    }
 
     #define AssertWaitPopTimed(timeout, expectSuccess, expectItem, minElapsedMs, maxElapsedMs) \
         AssertThat(bool(r = wait_pop_timed(queue, timeout)), expectSuccess); \
@@ -187,6 +190,67 @@ TestImpl(test_concurrent_queue)
 
         // now we enter a long wait, but we should be notified by the producer
         AssertWaitPopTimed(1000ms, true, /*item*/"item4", /*elapsed ms:*/ 0.0, 110.0);
+    }
+
+    PopResult wait_pop_until(concurrent_queue<std::string>& queue, Clock::time_point until)
+    {
+        PopResult r;
+        rpp::Timer t;
+        r.success = queue.wait_pop_until(r.item, until);
+        r.elapsed_ms = t.elapsed_ms();
+        print_info("wait_pop_until elapsed: %.2f ms item: %s\n", r.elapsed_ms, r.item.c_str());
+        return r;
+    }
+
+    #define AssertWaitPopUntil(until, expectSuccess, expectItem, minElapsedMs, maxElapsedMs) \
+        AssertThat(bool(r = wait_pop_until(queue, until)), expectSuccess); \
+        AssertThat(r.item, expectItem); \
+        AssertInRange(r.elapsed_ms, minElapsedMs, maxElapsedMs);
+
+    // wait until an absolute time limit
+    TestCase(wait_pop_until)
+    {
+        concurrent_queue<std::string> queue;
+
+        PopResult r;
+
+        AssertWaitPopUntil(Clock::now()+5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 10.0);
+        AssertWaitPopUntil(Clock::now()+0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
+
+        // if someone pushes an item if we have a huge timeout,
+        // we should get it immediately
+        queue.push("item1");
+        AssertWaitPopUntil(Clock::now()+10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
+        AssertWaitPopUntil(Clock::now()+15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 20.0);
+
+        // if we have an item, but `until` is in the past, it should immediately return false
+        queue.push("item2");
+        AssertWaitPopUntil(Clock::now()-15ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
+        // and now we can consume it
+        AssertWaitPopUntil(Clock::now()+15ms, true, /*item*/"item2", /*elapsed ms:*/ 0.0, 0.2);
+    }
+
+    // ensure that `wait_pop_until` gives up if timeout is reached
+    TestCase(wait_pop_until_stops_on_timeout)
+    {
+        concurrent_queue<std::string> queue;
+        auto slow_producer = std::thread([&] {
+            spin_sleep_for(50*MS);
+            queue.push("item1");
+            spin_sleep_for(50*MS);
+            queue.push("item2");
+            spin_sleep_for(50*MS);
+            queue.push("item3");
+        });
+        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
+
+        PopResult r;
+
+        // we should only have time to receive item1 and item2
+        auto until = Clock::now() + 125ms;
+        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 20.0, 60.0);
+        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 20.0, 60.0);
+        AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 20.0, 60.0);
     }
 
     // in general the pop_with_timeout is not very useful because
@@ -315,7 +379,7 @@ TestImpl(test_concurrent_queue)
                     //     ++num_received;
                     // item = queue.wait_pop();
                     // ++num_received;
-                    if (queue.wait_pop(item, std::chrono::milliseconds{5})) {
+                    if (queue.wait_pop(item, Millis{5})) {
                         ++num_received;
                     }
                 }
@@ -356,7 +420,7 @@ TestImpl(test_concurrent_queue)
                 int num_received = 0;
                 std::string item;
                 while (num_received < num_items) {
-                    if (queue.wait_pop_interval(item, std::chrono::milliseconds{15}, std::chrono::milliseconds{5},
+                    if (queue.wait_pop_interval(item, Millis{15}, Millis{5},
                                                 []{ return false; })) {
                         ++num_received;
                     }
