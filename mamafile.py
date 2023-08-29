@@ -21,7 +21,7 @@ class ReCpp(mama.BuildTarget):
 
     def package(self):
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
-        self.export_includes('.')  # So: #include <rpp/strview.h>
+        self.export_includes('src')  # So: #include <rpp/strview.h>
         if self.raspi or self.oclea:
             self.export_syslib('dl')
             self.export_syslib('rt')

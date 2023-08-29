@@ -206,9 +206,9 @@ message("ReCpp ${CMAKE_BUILD_TYPE} DEFINES:  ${CURRENT_DEFINES}")
 ###################################################
 
 # gather source files
-set(SRC_PATTERN rpp/*.cpp rpp/*.h rpp/*.natvis)
+set(SRC_PATTERN src/rpp/*.cpp src/rpp/*.h src/rpp/*.natvis)
 if(APPLE)
-    set(SRC_PATTERN ${SRC_PATTERN} rpp/*.mm)
+    set(SRC_PATTERN ${SRC_PATTERN} src/rpp/*.mm)
 endif()
 file(GLOB_RECURSE RPP_SRC ${SRC_PATTERN})
 source_group(rpp FILES ${RPP_SRC})
@@ -217,7 +217,7 @@ source_group(rpp FILES ${RPP_SRC})
 add_library(ReCpp ${RPP_SRC})
 set_target_properties(ReCpp PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 target_compile_definitions(ReCpp PUBLIC RPP_TESTS_DEFINE_MAIN=0)
-target_include_directories(ReCpp PUBLIC ".")
+target_include_directories(ReCpp PUBLIC "src")
 target_link_libraries(ReCpp
     PUBLIC ${RPP_RUNTIME}
     PUBLIC ${TRACE_LIBRARY}
@@ -235,7 +235,7 @@ if (BUILD_TESTS)
     add_executable(RppTests ${RPP_TESTS} ${RPP_SRC})
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
     target_compile_definitions(RppTests PRIVATE -DRPP_DEBUG=1)
-    target_include_directories(RppTests PUBLIC ".")
+    target_include_directories(RppTests PUBLIC "src")
     target_link_libraries(RppTests
         ${RPP_RUNTIME}
         ${TRACE_LIBRARY}
