@@ -19,7 +19,7 @@
             "cStandard": "c17",
             "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-gcc-x64",
-            "compileCommands": "/home/jorma/microhard-development/util/mavdriver/packages/ReCpp/linux/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/build/ReCpp/linux/compile_commands.json"
         },
         {
             "name": "Android",

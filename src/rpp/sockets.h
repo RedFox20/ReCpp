@@ -935,6 +935,21 @@ namespace rpp
          */
         bool select(int timeoutMillis, SelectFlag selectFlags = SF_ReadWrite) noexcept;
 
+        /**
+         * @brief Calls poll() or WSAPoll() on this socket
+         * This is faster than select()
+         */
+        bool poll(int timeoutMillis) noexcept;
+
+        /**
+         * @brief Enables polling multiple sockets for READ readiness
+         * @param in List of sockets to poll
+         * @param ready Indexes of sockets that are ready for reading
+         * @param timeoutMillis Maximum time to wait for a socket to be ready
+         * @returns true if at least one socket is ready for reading
+         */
+        static bool poll(const std::vector<socket*>& in, std::vector<int>& ready, int timeoutMillis) noexcept;
+
         ////////////////////////////////////////////////////////////////////////////
 
         /**

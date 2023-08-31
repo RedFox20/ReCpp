@@ -51,6 +51,7 @@
     #else
         #include <sys/fcntl.h>      // fcntl()
     #endif
+    #include <poll.h> // poll()
     #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
     // on __ANDROID__ this requires API level 24
@@ -1474,6 +1475,56 @@ namespace rpp
             }
         }
         return rescode > 0; // success: > 0, timeout == 0
+    }
+
+    bool socket::poll(int timeoutMillis) noexcept
+    {
+        struct pollfd pfd;
+        pfd.fd = Sock;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+
+    #if _WIN32 || _WIN64
+        int r = WSAPoll(&pfd, 1, timeoutMillis);
+    #else
+        int r = ::poll(&pfd, 1, timeoutMillis);
+    #endif
+        if (r <= 0)
+        {
+            LastErr = os_getsockerr();
+            return false;
+        }
+
+        return (pfd.revents & POLLIN) != 0;
+    }
+
+    bool socket::poll(const std::vector<socket*>& in, std::vector<int>& ready, int timeoutMillis) noexcept
+    {
+        const size_t n = in.size();
+        struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
+
+        for (size_t i = 0; i < n; ++i)
+        {
+            pfd[i].fd = in[i]->Sock;
+            pfd[i].events = POLLIN;
+            pfd[i].revents = 0;
+        }
+
+    #if _WIN32 || _WIN64
+        int r = WSAPoll(pfd, n, timeoutMillis);
+    #else
+        int r = ::poll(pfd, n, timeoutMillis);
+    #endif
+        if (r <= 0)
+            return false;
+
+        for (size_t i = 0; i < n; ++i)
+        {
+            if ((pfd[i].revents & POLLIN) != 0)
+                ready.push_back(i);
+        }
+
+        return false;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
