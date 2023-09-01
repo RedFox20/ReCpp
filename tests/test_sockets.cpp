@@ -367,7 +367,7 @@ TestImpl(test_sockets)
         // now test two consecutive datagrams
         send.sendto(recv_addr, "udp_select1");
         send.sendto(recv_addr, "udp_select2");
-        AssertTrue(recv.select(100, rpp::socket::SF_Read));
+        AssertTrue(recv.select(100, socket::SF_Read));
         AssertTrue(recv.good());
         AssertThat(recv.recv_str(), "udp_select1"s);
         AssertThat(recv.recv_str(), "udp_select2"s);
@@ -377,6 +377,49 @@ TestImpl(test_sockets)
         AssertThat(recv.available(), 0);
         rpp::Timer t2;
         AssertFalse(recv.select(250, socket::SF_Read));
+        AssertTrue(recv.good());
+        AssertGreaterOrEqual(t2.elapsed_ms(), 249.0);
+        AssertThat(recv.available(), 0);
+        AssertTrue(recv.good());
+    }
+    
+    TestCase(udp_nonblocking_poll)
+    {
+        socket send = rpp::make_udp_randomport();
+        socket recv = rpp::make_udp_randomport();
+        AssertFalse(send.is_blocking()); // should be false by default
+        AssertFalse(recv.is_blocking()); // should be false by default
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+
+        // no data to receive, should return false
+        AssertFalse(recv.poll(100, socket::PF_Read));
+        AssertTrue(recv.good());
+        send.sendto(recv_addr, "udp_poll");
+
+        // must be ready to receive immediately
+        rpp::Timer t1;
+        AssertTrue(recv.poll(100, socket::PF_Read));
+        AssertTrue(recv.good());
+        AssertThat(recv.recv_str(), "udp_poll"s);
+        AssertTrue(recv.good());
+        AssertLessOrEqual(t1.elapsed_ms(), 1.0);
+
+        // no data to receive, should return false
+        AssertFalse(recv.poll(100, socket::PF_Read));
+
+        // now test two consecutive datagrams
+        send.sendto(recv_addr, "udp_poll1");
+        send.sendto(recv_addr, "udp_poll2");
+        AssertTrue(recv.poll(100, socket::PF_Read));
+        AssertTrue(recv.good());
+        AssertThat(recv.recv_str(), "udp_poll1"s);
+        AssertThat(recv.recv_str(), "udp_poll2"s);
+        AssertTrue(recv.good());
+
+        // now test for timeout
+        AssertThat(recv.available(), 0);
+        rpp::Timer t2;
+        AssertFalse(recv.poll(250, socket::PF_Read));
         AssertTrue(recv.good());
         AssertGreaterOrEqual(t2.elapsed_ms(), 249.0);
         AssertThat(recv.available(), 0);

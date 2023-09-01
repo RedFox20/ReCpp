@@ -1477,11 +1477,13 @@ namespace rpp
         return rescode > 0; // success: > 0, timeout == 0
     }
 
-    bool socket::poll(int timeoutMillis) noexcept
+    bool socket::poll(int timeoutMillis, PollFlag pollFlags) noexcept
     {
+        const bool read = (pollFlags & PF_Read) != 0;
+        const bool write = (pollFlags & PF_Write) != 0;
         struct pollfd pfd;
         pfd.fd = Sock;
-        pfd.events = POLLIN;
+        pfd.events = (read ? POLLIN : 0) | (write ? POLLOUT : 0);
         pfd.revents = 0;
 
     #if _WIN32 || _WIN64
@@ -1495,18 +1497,25 @@ namespace rpp
             return false;
         }
 
-        return (pfd.revents & POLLIN) != 0;
+        return (read && (pfd.revents & POLLIN))
+            || (write && (pfd.revents & POLLOUT));
     }
 
-    bool socket::poll(const std::vector<socket*>& in, std::vector<int>& ready, int timeoutMillis) noexcept
+    bool socket::poll(const std::vector<socket*>& in, std::vector<int>& ready,
+                      int timeoutMillis, PollFlag pollFlags) noexcept
     {
+        ready.clear();
         const size_t n = in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
+
+        const bool read = (pollFlags & PF_Read) != 0;
+        const bool write = (pollFlags & PF_Write) != 0;
+        const short events = (read ? POLLIN : 0) | (write ? POLLOUT : 0);
 
         for (size_t i = 0; i < n; ++i)
         {
             pfd[i].fd = in[i]->Sock;
-            pfd[i].events = POLLIN;
+            pfd[i].events = events;
             pfd[i].revents = 0;
         }
 
@@ -1520,11 +1529,14 @@ namespace rpp
 
         for (size_t i = 0; i < n; ++i)
         {
-            if ((pfd[i].revents & POLLIN) != 0)
+            if ((read && (pfd[i].revents & POLLIN)) ||
+                (write && (pfd[i].revents & POLLOUT)))
+            {
                 ready.push_back(i);
+            }
         }
 
-        return false;
+        return !ready.empty();
     }
 
     ////////////////////////////////////////////////////////////////////////////////

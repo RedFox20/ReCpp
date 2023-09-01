@@ -935,20 +935,33 @@ namespace rpp
          */
         bool select(int timeoutMillis, SelectFlag selectFlags = SF_ReadWrite) noexcept;
 
+
+        enum PollFlag
+        {
+            PF_Read = (1<<0), // poll if socket is ready for reading
+            PF_Write = (1<<1), // poll if socket is ready for writing
+            PF_ReadWrite = PF_Read|PF_Write, // poll if socket is ready for reading or writing
+        };
+
         /**
          * @brief Calls poll() or WSAPoll() on this socket
          * This is faster than select()
+         * @param timeoutMillis Timeout in milliseconds to suspend until the socket is signaled
+         * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
+         * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
          */
-        bool poll(int timeoutMillis) noexcept;
+        bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
         /**
          * @brief Enables polling multiple sockets for READ readiness
          * @param in List of sockets to poll
          * @param ready Indexes of sockets that are ready for reading
          * @param timeoutMillis Maximum time to wait for a socket to be ready
+         * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if at least one socket is ready for reading
          */
-        static bool poll(const std::vector<socket*>& in, std::vector<int>& ready, int timeoutMillis) noexcept;
+        static bool poll(const std::vector<socket*>& in, std::vector<int>& ready,
+                         int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
         ////////////////////////////////////////////////////////////////////////////
 
