@@ -23,8 +23,8 @@ class ReCpp(mama.BuildTarget):
         os.makedirs(self.build_dir('include/rpp/'), exist_ok=True)
         self.copy(self.source_dir('src/rpp/'),
                   self.build_dir('include/rpp/'), filter=['.h','.natvis'])
-        self.export_includes('include', build_dir=True)
         self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
+        self.export_includes('include', build_dir=True)
 
         if self.raspi or self.oclea:
             self.export_syslib('dl')
@@ -42,6 +42,10 @@ class ReCpp(mama.BuildTarget):
             self.export_syslib('log')
         elif self.macos or self.ios:
             self.export_syslib('-framework Foundation')
+
+    def deploy(self):
+        # deploy directly to build directory
+        self.papa_deploy(f'.', src_dir=False)
 
     def test(self, args):
         if 'nogdb' in args:
