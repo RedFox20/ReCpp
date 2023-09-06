@@ -1322,6 +1322,7 @@ namespace rpp
     socket_type socket::type() const noexcept
     {
         int type = get_opt(SOL_SOCKET, SO_TYPE);
+        fprintf(stderr, "socket fh:%d SOL_SOCKET SO_TYPE:%d lasterr:%s\n", Sock, type, last_err().c_str());
         if (type < 0) return ST_Unspecified;
         return to_socktype(type);
     }
