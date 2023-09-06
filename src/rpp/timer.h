@@ -64,7 +64,7 @@ namespace rpp
             uint64_t ticks = 0;
         #else
             #if __ANDROID__
-                time_t sec = 0;
+                long sec = 0;
             #elif defined(__USE_TIME_BITS64)
                 __time64_t sec = 0;
             #else
