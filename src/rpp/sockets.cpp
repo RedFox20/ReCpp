@@ -1081,6 +1081,7 @@ namespace rpp
             default: {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
+                fprintf(stderr, "socket fh:%d %d %s\n", Sock, errcode, socket::last_os_socket_err(errcode).c_str());
                 close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
@@ -1100,11 +1101,13 @@ namespace rpp
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(ECONNABORTED):  // connection closed
                 close();
+                fprintf(stderr, "socket fh:%d ECONNABORTED\n", Sock);
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
+                fprintf(stderr, "socket fh:%d EADDRINUSE\n", Sock);
                 close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
