@@ -754,17 +754,21 @@ namespace rpp
         return s;
     }
     socket::socket() noexcept
-        : Sock{-1}, Addr{}, LastErr{0}, Shared{false}, Blocking{true}, Category{SC_Unknown}
+        : Sock{-1}, Addr{}, LastErr{0}, Shared{false}, Blocking{true}
+        , Category{SC_Unknown}, Type{ST_Unspecified}
     {
     }
     socket::socket(socket&& s) noexcept
-        : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}, Shared{s.Shared}, Blocking{s.Blocking}, Category{s.Category}
+        : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}
+        , Shared{s.Shared}, Blocking{s.Blocking}
+        , Category{s.Category}, Type{s.Type}
     {
         s.Sock = -1;
         s.Addr.reset();
         s.Shared = false;
         s.Blocking = false;
         s.Category = SC_Unknown;
+        s.Type = ST_Unspecified;
     }
     socket& socket::operator=(socket&& s) noexcept
     {
@@ -775,12 +779,14 @@ namespace rpp
         Shared = s.Shared;
         Blocking = s.Blocking;
         Category = s.Category;
+        Type = s.Type;
         s.Sock = -1;
         s.Addr.reset();
         s.LastErr  = 0;
         s.Shared   = false;
         s.Blocking = false;
         s.Category = SC_Unknown;
+        s.Type = ST_Unspecified;
         return *this;
     }
     socket::~socket() noexcept
@@ -1137,7 +1143,7 @@ namespace rpp
 
     bool socket::wait_available(int millis) noexcept
     {
-        if (!connected() || !select(millis, SelectFlag::SF_Read))
+        if (!connected() || !poll(millis, PF_Read))
             return false;
         return available() > 0;
     }
@@ -1413,6 +1419,7 @@ namespace rpp
             return false;
         }
 
+        Type = stype;
         if (stype == ST_Stream)
             set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
         set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
