@@ -13,7 +13,7 @@
 
 namespace rpp
 {
-    enum RPPAPI address_family
+    enum RPPAPI address_family : uint8_t
     {
         AF_DontCare,    // unspecified AddressFamily, service provider will choose most appropriate
         AF_IPv4,        // The Internet Protocol version 4 (IPv4) address family
@@ -21,7 +21,7 @@ namespace rpp
         AF_Bth,         // Bluetooth address family, supported since WinXP SP2
     };
 
-    enum RPPAPI socket_type
+    enum RPPAPI socket_type : uint8_t
     {
         ST_Unspecified, // unspecified socket type (invalid socket)
         ST_Stream,      // TCP only, byte stream for IPv4 or IPv6 protocols
@@ -31,7 +31,7 @@ namespace rpp
         ST_SeqPacket,   // TCP based, similar to ST_Stream but slower, however packet boundaries are respected "TCP datagrams"
     };
 
-    enum RPPAPI ip_protocol
+    enum RPPAPI ip_protocol : uint8_t
     {
         IPP_DontCare,   // generic IP based protocol, service provider will choose most appropriate
         IPP_ICMP,       // only supported with ST_Raw on IPv4 or IPv6
@@ -470,6 +470,7 @@ namespace rpp
         bool Shared;         // if true, Socket is shared and dtor won't call closesocket()
         bool Blocking;       // only relevant on windows, if TRUE, the socket is blocking
         category Category;
+        socket_type Type;
 
     public:
 
@@ -878,7 +879,10 @@ namespace rpp
         ////////////////////////////////////////////////////////////////////////////
 
         /** @return The SocketType of the socket */
-        socket_type type() const noexcept;
+        socket_type type() const noexcept { return Type; }
+
+        /** @brief Updates the internal socket Type */
+        socket_type update_socket_type() noexcept;
 
         /** @return The AddressFamily of the socket */
         address_family family() const noexcept;

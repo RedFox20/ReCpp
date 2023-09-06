@@ -162,7 +162,14 @@ namespace rpp
     }
     socket_type to_socktype(int sock) noexcept
     {
-        return socket_type(sock < 0 || sock > SOCK_SEQPACKET ? 0 : sock);
+        switch (sock) {
+        default:             return ST_Unspecified;
+        case SOCK_STREAM:    return ST_Stream;
+        case SOCK_DGRAM:     return ST_Datagram;
+        case SOCK_RAW:       return ST_Raw;
+        case SOCK_RDM:       return ST_RDM;
+        case SOCK_SEQPACKET: return ST_SeqPacket;
+        }
     }
     socket_type to_socktype(ip_protocol ipp) noexcept
     {
@@ -739,7 +746,7 @@ namespace rpp
         s.Shared = shared;
         s.Blocking = blocking;
         s.Category = SC_Unknown;
-        if (s.type() == ST_Unspecified) // validate the socket handle
+        if (s.update_socket_type() == ST_Unspecified) // validate the socket handle
         {
             std::string err = s.last_err();
             throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + err};
@@ -787,6 +794,7 @@ namespace rpp
         if (Sock != -1) {
             if (!Shared) closesocket(Sock);
             Sock = -1;
+            Type = ST_Unspecified;
         }
         //Addr.clear(); // dont clear the address, so we have info on what we just closed
     }
@@ -1057,7 +1065,6 @@ namespace rpp
     {
         if (ret == 0) { // socket closed gracefully
             LastErr = os_getsockerr();
-            fprintf(stderr, "socket fh:%d closed gracefully: %s\n", Sock, last_os_socket_err(LastErr).c_str());
             close();
             return -1;
         }
@@ -1082,7 +1089,6 @@ namespace rpp
             default: {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
-                fprintf(stderr, "socket fh:%d %d %s\n", Sock, errcode, socket::last_os_socket_err(errcode).c_str());
                 close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
@@ -1102,13 +1108,11 @@ namespace rpp
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(ECONNABORTED):  // connection closed
                 close();
-                fprintf(stderr, "socket fh:%d ECONNABORTED\n", Sock);
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
-                fprintf(stderr, "socket fh:%d EADDRINUSE\n", Sock);
                 close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
@@ -1319,12 +1323,14 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    socket_type socket::type() const noexcept
+    socket_type socket::update_socket_type() noexcept
     {
-        int type = get_opt(SOL_SOCKET, SO_TYPE);
-        fprintf(stderr, "socket fh:%d SOL_SOCKET SO_TYPE:%d lasterr:%s\n", Sock, type, last_err().c_str());
-        if (type < 0) return ST_Unspecified;
-        return to_socktype(type);
+        int so_type = get_opt(SOL_SOCKET, SO_TYPE);
+        Type = to_socktype(so_type);
+        if (Type == ST_Unspecified) {
+            logerror("socket fh:%d SOL_SOCKET SO_TYPE:%d lasterr:%s\n", Sock, so_type, last_err().c_str());
+        }
+        return Type;
     }
     address_family socket::family() const noexcept {
         return Addr.Address.Family;
