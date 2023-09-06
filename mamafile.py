@@ -4,14 +4,18 @@ import os
 class ReCpp(mama.BuildTarget):
 
     def dependencies(self):
-        pass
+        # if no preference, prefer gcc since its support is better in 2023
+        self.prefer_gcc()
 
     def configure(self):
         if self.windows and os.getenv('APPVEYOR') != None:
             self.add_cl_flags('/DAPPVEYOR')
-        if os.getenv('BUILD_WITH_MEM_SAFETY') != None:
+        def is_enabled(name):
+            env = os.getenv(name)
+            return env and env == '1' or env == 'ON' or env == 'TRUE'
+        if is_enabled('BUILD_WITH_MEM_SAFETY'):
             self.add_cmake_options('BUILD_WITH_MEM_SAFETY=ON')
-        if os.getenv('BUILD_WITH_THREAD_SAFETY') != None:
+        if is_enabled('BUILD_WITH_THREAD_SAFETY'):
             self.add_cmake_options('BUILD_WITH_THREAD_SAFETY=ON')
         
         if os.getenv('CXX17') or self.is_enabled_cxx17():

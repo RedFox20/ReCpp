@@ -41,6 +41,8 @@ namespace rpp
     /** Converts clock ticks that matches time_now() into fractional nanoseconds */
     RPPAPI double time_ticks_to_ns(int64_t ticks) noexcept;
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     /** Let this thread sleep for provided MILLISECONDS */
     RPPAPI void sleep_ms(unsigned int millis) noexcept;
 
@@ -53,12 +55,81 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * @brief New TimePoint API for OS specific high accuracy timepoints
+     *        which avoids floating point calculations
+     */
+    struct TimePoint
+    {
+        #if _WIN32 || __APPLE__
+            uint64_t ticks = 0;
+        #else
+            #ifdef __USE_TIME_BITS64
+                __time64_t sec = 0;
+            #else
+                __time_t sec = 0;
+            #endif
+                long int nanos = 0;
+        #endif
+
+        /** @brief The ZERO TimePoint */
+        static constexpr TimePoint zero() noexcept { return {}; }
+
+        /** @returns Current OS specific high accuracy timepoint */
+        static TimePoint now() noexcept;
+
+        /** @returns fractional seconds elapsed from this time point until end */
+        double elapsed_sec(const TimePoint& end) const noexcept;
+
+        /** @returns integer milliseconds elapsed from this time point until end */
+        uint32_t elapsed_ms(const TimePoint& end) const noexcept;
+
+        /** @returns integer microseconds elapsed from this time point until end */
+        uint32_t elapsed_us(const TimePoint& end) const noexcept;
+
+        /** @returns integer nanoseconds elapsed from this time point until end */
+        uint32_t elapsed_ns(const TimePoint& end) const noexcept;
+
+        /** @returns true if this timepoint has been initialized */
+        bool is_valid() const noexcept
+        {
+            #if _WIN32 || __APPLE__
+                return ticks != 0;
+            #else 
+                return sec != 0 || nanos != 0;
+            #endif
+        }
+
+        explicit operator bool() const noexcept { return is_valid(); }
+
+        bool operator==(const TimePoint& t) const noexcept
+        {
+            #if _WIN32 || __APPLE__
+                return ticks == t.ticks;
+            #else
+                return sec == t.sec && nanos == t.nanos;
+            #endif
+        }
+
+        bool operator!=(const TimePoint& t) const noexcept
+        {
+            #if _WIN32 || __APPLE__
+                return ticks != t.ticks;
+            #else
+                return sec != t.sec || nanos != t.nanos;
+            #endif
+        }
+    };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
      * High accuracy timer for performance profiling or deltaTime measurement
      */
     struct RPPAPI Timer
     {
-        uint64_t value;
-        
+        // public started timepoint, feel free to set it to whatever you want
+        TimePoint started;
+
         enum StartMode {
             NoStart,
             AutoStart, // default behaviour
@@ -66,11 +137,18 @@ namespace rpp
 
         /** Initializes a new timer by calling start */
         Timer() noexcept;
-        
-        explicit Timer(StartMode startMode) noexcept;
+
+        /** @brief Initializes timer with either NoStart or AutoStart modes */
+        explicit Timer(StartMode mode) noexcept;
+
+        /** @returns true if this timer has been started */
+        bool is_started() const noexcept { return started.is_valid(); }
 
         /** Starts the timer */
-        void start() noexcept;
+        void start() noexcept { started = TimePoint::now(); }
+
+        /** @brief Resets the timer to a custom time point */
+        void reset(const TimePoint& time) noexcept { started = time; }
 
         /** @return Fractional seconds elapsed from start() */
         double elapsed() const noexcept;
@@ -83,6 +161,15 @@ namespace rpp
 
         /** @return next() converted to milliseconds */
         double next_ms() noexcept { return next() * 1000.0; }
+
+        /** @returns integer milliseconds elapsed from this time point until end */
+        uint32_t elapsed_ms(const TimePoint& end) const noexcept { return started.elapsed_ms(end); }
+
+        /** @returns integer microseconds elapsed from this time point until end */
+        uint32_t elapsed_us(const TimePoint& end) const noexcept { return started.elapsed_us(end); }
+
+        /** @returns integer nanoseconds elapsed from this time point until end */
+        uint32_t elapsed_ns(const TimePoint& end) const noexcept { return started.elapsed_ns(end); }
 
         /** Measure block execution time as seconds */
         template<class Func> static double measure(const Func& f)
@@ -108,8 +195,8 @@ namespace rpp
      */
     struct RPPAPI StopWatch
     {
-        uint64_t begin = 0;
-        uint64_t end   = 0;
+        TimePoint begin;
+        TimePoint end;
 
         /** Creates an uninitialized StopWatch. Reported time is always 0.0 */
         StopWatch() = default;
@@ -135,10 +222,10 @@ namespace rpp
         void reset();
 
         /** Has the stopwatch been started? */
-        bool started() const { return begin != 0; }
+        bool started() const { return begin.is_valid(); }
 
         /** Has the stopwatch been stopped with a valid time? */
-        bool stopped() const { return end != 0; }
+        bool stopped() const { return end.is_valid(); }
 
         /** 
          * Reports the currently elapsed time. 
@@ -148,7 +235,7 @@ namespace rpp
          */
         double elapsed() const;
 
-        /** Currently elpased time in milliseconds */
+        /** Currently elapsed time in milliseconds */
         double elapsed_ms() const { return elapsed() * 1000.0; }
     };
 
@@ -162,7 +249,7 @@ namespace rpp
         const char* prefix;   // log prefix:   "[perf]"
         const char* location; // funcname:     "someFunction()"
         const char* detail;   // detail info:  currentItem.name.c_str()
-        uint64_t start;
+        TimePoint start;
     public:
         /**
          * Scoped performance timer with optional prefix, function name and detail info

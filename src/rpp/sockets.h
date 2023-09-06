@@ -1147,4 +1147,40 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Helper utility for UDP sockets to perform load balancing on send operations
+     */
+    class RPPAPI load_balancer
+    {
+        uint32_t maxBytesPerSec;
+        uint32_t nanosBetweenBytes;
+
+    public:
+        explicit load_balancer(uint32_t maxBytesPerSec) noexcept
+        {
+            set_max_bytes_per_sec(maxBytesPerSec);
+        }
+
+        /** @returns Current bytes per sec limit */
+        uint32_t get_max_bytes_per_sec() const noexcept { return maxBytesPerSec; }
+
+        /** @brief Sets the new max bytes per second limit */
+        void set_max_bytes_per_sec(uint32_t maxBytesPerSec) noexcept;
+
+        /** @returns Average nanoseconds between bytes */
+        uint32_t avg_nanos_between_bytes() const noexcept { return nanosBetweenBytes; }
+
+        /**
+         * @returns TRUE if the specified number of bytes can be sent
+         */
+        bool can_send(uint32_t bytesToSend) noexcept;
+
+        /**
+         * @brief Blocks until the specified number of bytes can be sent
+         */
+        void wait_to_send(uint32_t bytesToSend) noexcept;
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
 } // namespace rpp

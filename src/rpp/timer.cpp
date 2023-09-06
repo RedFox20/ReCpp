@@ -38,34 +38,60 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    // clock ticks divided by this period_den gives duration in seconds
-    // seconds multiplied by this gives clock ticks
-    static const double period_den = []() -> double
+    struct Period
     {
-        #if _WIN32
+        // clock ticks divided by this period_den gives duration in seconds
+        // seconds multiplied by this gives clock ticks
+        double period_den;
+
+        // clock ticks multiplied by this period gives duration in seconds
+        // seconds divided by this gives clock ticks
+        double period_sec;
+        double period_ms;
+        double period_us;
+        double period_ns;
+
+        constexpr Period(double period_den, double period) noexcept
+            : period_den{period_den}
+            , period_sec{period}
+            , period_ms{period * 1'000}
+            , period_us{period * 1'000'000}
+            , period_ns{period * 1'000'000'000}
+        {
+        }
+    };
+
+    #if _WIN32
+        static const Period period = []() -> Period
+        {
             LARGE_INTEGER freq;
             QueryPerformanceFrequency(&freq);
-            return double(freq.QuadPart);
-        #elif __APPLE__
+            double period_den = double(freq.QuadPart);
+            return { period_den, 1.0 / period_den };
+        }();
+    #elif __APPLE__
+        static const Period period = []() -> Period
+        {
             mach_timebase_info_data_t timebase;
             mach_timebase_info(&timebase);
-            return (1.0 / (double(timebase.numer) / timebase.denom / 1e9));
-        #elif __linux__
-            return 1'000'000'000; // nanoseconds for clock_gettime
-            // return 1'000'000; // microseconds for gettimeofday
-        #elif __EMSCRIPTEN__
-            return 1'000'000;
-        #else // default to std::chrono
-            return (1.0 / (double(microseconds::period::num) / microseconds::period::den));
-        #endif
-    } ();
+            double period = (double(timebase.numer) / timebase.denom / 1e9);
+            return { 1.0 / period, period };
+        }();
+    #elif __linux__
+        static constexpr Period period = { 1'000'000'000, 1.0 / 1'000'000'000.0 };
+    #elif __EMSCRIPTEN__
+        static constexpr Period period = { 1'000'000, 1.0 / 1'000'000.0 };
+    #else
+        static const Period period = []() -> Period
+        {
+            double period = double(microseconds::period::num) / microseconds::period::den;
+            return { 1.0 / period, period };
+        }();
+    #endif
 
-    // clock ticks multiplied by this period gives duration in seconds
-    // seconds divided by this gives clock ticks
-    static const double period = []{ return 1.0 / period_den; }();
-    
-    double time_period() noexcept { return period; }
+    double time_period() noexcept { return period.period_sec; }
 
+    // time now in ticks (not as fast as accurate as TimePoint::now())
     uint64_t time_now() noexcept
     {
         #if _WIN32
@@ -78,10 +104,6 @@ namespace rpp
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
             return (t.tv_sec * 1'000'000'000ull) + t.tv_nsec;
-            // gettimeofday is apparently obsolete
-            // struct timeval t;
-            // gettimeofday(&t, NULL);
-            // return (t.tv_sec * 1000000ull) + t.tv_usec;
         #elif __EMSCRIPTEN__
             return uint64_t(emscripten_get_now() * 1000);
         #else
@@ -91,36 +113,36 @@ namespace rpp
 
     int64_t from_sec_to_time_ticks(double seconds) noexcept
     {
-        return int64_t(seconds * period_den);
+        return int64_t(seconds * period.period_den);
     }
     int64_t from_ms_to_time_ticks(double millis) noexcept
     {
-        return int64_t(millis / 1000.0 * period_den);
+        return int64_t(millis / 1000.0 * period.period_den);
     }
     int64_t from_us_to_time_ticks(double micros) noexcept
     {
-        return int64_t(micros / 1'000'000.0 * period_den);
+        return int64_t(micros / 1'000'000.0 * period.period_den);
     }
     int64_t from_ns_to_time_ticks(double nanos) noexcept
     {
-        return int64_t(nanos / 1'000'000'000.0 * period_den);
+        return int64_t(nanos / 1'000'000'000.0 * period.period_den);
     }
 
     double time_ticks_to_sec(int64_t ticks) noexcept
     {
-        return ticks * period;
+        return ticks * period.period_sec;
     }
     double time_ticks_to_ms(int64_t ticks) noexcept
     {
-        return ticks * period * 1'000;
+        return ticks * period.period_ms;
     }
     double time_ticks_to_us(int64_t ticks) noexcept
     {
-        return ticks * period * 1'000'000;
+        return ticks * period.period_us;
     }
     double time_ticks_to_ns(int64_t ticks) noexcept
     {
-        return ticks * period * 1'000'000'000;
+        return ticks * period.period_ns;
     }
 
 #if _WIN32
@@ -249,51 +271,112 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    Timer::Timer() noexcept
+    TimePoint TimePoint::now() noexcept
     {
-        start();
-    }
-    
-    Timer::Timer(StartMode startMode) noexcept
-    {
-        if (startMode == StartMode::AutoStart)
-            start();
-        else
-            value = 0;
+        #if _WIN32
+            LARGE_INTEGER time;
+            QueryPerformanceCounter(&time);
+            return TimePoint{ time.QuadPart };
+        #elif __APPLE__
+            return TimePoint{ mach_absolute_time() };
+        #else
+            static_assert(sizeof(struct timespec) == sizeof(TimePoint), "TimePoint size mismatch");
+            union U { 
+                struct timespec t;
+                TimePoint tp;
+                U() noexcept {} // dont initialize anything
+            } u;
+            clock_gettime(CLOCK_REALTIME, &u.t);
+            return u.tp;
+        #endif
     }
 
-    void Timer::start() noexcept
+    double TimePoint::elapsed_sec(const TimePoint& end) const noexcept
     {
-        value = time_now();
+    #if _WIN32 || __APPLE__
+        return (end.ticks - ticks) * period.period_sec;
+    #else
+        return (end.sec - sec) + (end.nanos - nanos) * period.period_sec;
+    #endif
+    }
+
+    uint32_t TimePoint::elapsed_ms(const TimePoint& end) const noexcept
+    {
+    #if _WIN32 || __APPLE__
+        return uint32_t((end.ticks - ticks) * period.period_ms);
+    #else
+        return uint32_t(
+            (((end.sec - sec))*1'000) +
+            ((end.nanos - nanos) / 1'000'000)
+        );
+    #endif
+    }
+
+    uint32_t TimePoint::elapsed_us(const TimePoint& end) const noexcept
+    {
+    #if _WIN32 || __APPLE__
+        return uint32_t((end.ticks - ticks) * period.period_us);
+    #else
+        return uint32_t(
+            (((end.sec - sec))*1'000'000) +
+            ((end.nanos - nanos) / 1'000)
+        );
+    #endif
+    }
+
+    // TODO: overflow protections?
+    uint32_t TimePoint::elapsed_ns(const TimePoint& end) const noexcept
+    {
+    #if _WIN32 || __APPLE__
+        return uint32_t((end.ticks - ticks) * period.period_ns);
+    #else
+        return uint32_t(
+            (((end.sec - sec))*1'000'000'000) +
+            (end.nanos - nanos)
+        );
+    #endif
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    Timer::Timer() noexcept : started{TimePoint::now()}
+    {
+    }
+
+    Timer::Timer(StartMode mode) noexcept
+        : started{mode == StartMode::AutoStart ? TimePoint::now() : TimePoint{}}
+    {
     }
 
     double Timer::elapsed() const noexcept
     {
-        uint64_t end = time_now();
-        return (end - value) * rpp::period;
+        TimePoint end = TimePoint::now();
+        return started.elapsed_sec(end);
     }
 
     double Timer::next() noexcept
     {
-        double t = elapsed();
-        start();
+        TimePoint now = TimePoint::now();
+        double t = started.elapsed_sec(now);
+        started = now;
         return t;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     ScopedPerfTimer::ScopedPerfTimer(const char* prefix, const char* location, const char* detail) noexcept
-        : prefix{prefix}, location{location}, detail{detail}
+        : prefix{prefix}
+        , location{location}
+        , detail{detail}
+        , start{TimePoint::now()}
     {
-        // start the timer as the last action in the constructor
-        start = time_now();
     }
 
     ScopedPerfTimer::~ScopedPerfTimer() noexcept
     {
         // measure elapsed time as the first operation in the destructor
-        uint64_t elapsed = time_now() - start;
-        double elapsed_ms = elapsed * (rpp::period * 1000.0);
+        TimePoint now = TimePoint::now();
+        double elapsed_ms = start.elapsed_sec(now) * 1000.0;
 
         const char* padDetail = detail ? " " : "";
         detail = detail ? detail : "";
@@ -321,33 +404,36 @@ namespace rpp
     void StopWatch::start()
     {
         if (!begin) {
-            begin = time_now();
-            end   = 0;
+            begin = TimePoint::now();
+            end = {};
         }
     }
 
     void StopWatch::stop()
     {
         if (begin && !end)
-            end = time_now();
+            end = TimePoint::now();
     }
 
     void StopWatch::resume()
     {
-        end = 0;
+        end = {};
     }
 
     void StopWatch::reset()
     {
-        begin = 0;
-        end   = 0;
+        begin = {};
+        end = {};
     }
 
     double StopWatch::elapsed() const
     {
         if (begin) {
-            if (end) return (end - begin) * rpp::period;
-            return (time_now() - begin) * rpp::period;
+            if (end) {
+                return begin.elapsed_sec(end);
+            } else {
+                return begin.elapsed_sec(TimePoint::now());
+            }
         }
         return 0.0;
     }
@@ -358,5 +444,5 @@ namespace rpp
 
 extern "C" double time_now_seconds()
 {
-    return rpp::time_now() * rpp::period;
+    return rpp::time_now() * rpp::period.period_sec;
 }

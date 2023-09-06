@@ -1706,5 +1706,24 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    void load_balancer::set_max_bytes_per_sec(uint32_t maxBytesPerSec) noexcept
+    {
+        this->maxBytesPerSec = maxBytesPerSec;
+        this->nanosBetweenBytes = maxBytesPerSec / 1'000'000'000;
+        if (nanosBetweenBytes == 0)
+            nanosBetweenBytes = 1;
+    }
+
+    bool load_balancer::can_send(uint32_t bytesToSend) noexcept
+    {
+        return false;
+    }
+
+    void load_balancer::wait_to_send(uint32_t bytesToSend) noexcept
+    {
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
 } // namespace rpp
 
