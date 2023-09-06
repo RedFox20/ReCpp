@@ -1057,6 +1057,7 @@ namespace rpp
     {
         if (ret == 0) { // socket closed gracefully
             LastErr = os_getsockerr();
+            fprintf(stderr, "socket fh:%d closed gracefully: %s\n", Sock, last_os_socket_err(LastErr).c_str());
             close();
             return -1;
         }
