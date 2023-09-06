@@ -63,7 +63,9 @@ namespace rpp
         #if _WIN32 || __APPLE__
             uint64_t ticks = 0;
         #else
-            #ifdef __USE_TIME_BITS64
+            #if __ANDROID__
+                __kernel_time_t sec = 0;
+            #elif defined(__USE_TIME_BITS64)
                 __time64_t sec = 0;
             #else
                 __time_t sec = 0;

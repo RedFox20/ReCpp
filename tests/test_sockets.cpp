@@ -650,7 +650,7 @@ TestImpl(test_sockets)
         std::atomic_bool running { true };
 
         std::future<int32_t> receiver = std::async(std::launch::async,
-            [this, &running, &server]() mutable {
+            [&running, &server]() {
                 int32_t bytesReceived = 0;
                 uint8_t buffer[2048];
                 rpp::ipaddress from;
