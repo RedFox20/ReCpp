@@ -9,6 +9,7 @@
 #include <string>   // std::string, std::wstring
 #include <vector>   // std::vector
 #include "config.h"
+#include <rpp/timer.h> // rpp::TimePoint
 
 namespace rpp
 {
@@ -1154,6 +1155,8 @@ namespace rpp
     {
         uint32_t maxBytesPerSec;
         uint32_t nanosBetweenBytes;
+        rpp::TimePoint lastSendTime;
+        uint32_t nextSendTimeout = 0;
 
     public:
         explicit load_balancer(uint32_t maxBytesPerSec) noexcept
@@ -1172,13 +1175,21 @@ namespace rpp
 
         /**
          * @returns TRUE if the specified number of bytes can be sent
+         * @note The caller must manually call notify_sent() after sending the bytes
          */
-        bool can_send(uint32_t bytesToSend) noexcept;
+        bool can_send() const noexcept;
+        bool can_send(const rpp::TimePoint& now) const noexcept;
 
         /**
          * @brief Blocks until the specified number of bytes can be sent
+         *        and notifies the load balancer that we sent the bytes
          */
         void wait_to_send(uint32_t bytesToSend) noexcept;
+
+        /**
+         * @brief Notify that we sent this # of bytes
+         */
+        void notify_sent(const rpp::TimePoint& now, uint32_t bytesToSend) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////

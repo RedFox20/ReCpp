@@ -2,6 +2,7 @@
 #include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
+#include <future> // std::async
 
 using namespace rpp;
 
@@ -636,4 +637,54 @@ TestImpl(test_sockets)
         print_info("remote: server disconnected\n");
         print_info("remote: closing down\n");
     }
+
+    //////////////////////////////////////////////////////////////////
+
+    TestCase(udp_load_balancer)
+    {
+        // setup load balancer at 2MB/s
+        rpp::load_balancer balancer { 2 * 1024 * 1024 };
+
+        rpp::socket server = rpp::make_udp_randomport();
+        rpp::ipaddress server_addr = server.address();
+        std::atomic_bool running { true };
+
+        std::future<int32_t> receiver = std::async(std::launch::async,
+            [this, &running, &server]() mutable {
+                int32_t bytesReceived = 0;
+                uint8_t buffer[2048];
+                rpp::ipaddress from;
+                while (running) {
+                    if (server.poll(10)) do {
+                        bytesReceived += server.recvfrom(from, buffer, sizeof(buffer));
+                    } while (server.available() > 0);
+                }
+                return bytesReceived;
+            }
+        );
+
+        rpp::socket sender = rpp::make_udp_randomport();
+        uint8_t buffer[1024];
+
+        rpp::Timer t;
+        while (t.elapsed() < 1.0)
+        {
+            int packetSize = 280;
+            balancer.wait_to_send(packetSize);
+            sender.sendto(server_addr, buffer, packetSize);
+        }
+
+        running = false;
+        double elapsed = t.elapsed();
+        int32_t actualReceived = receiver.get();
+        int32_t actualReceivedKB = actualReceived / 1024;
+        print_info("elapsed: %.3fs, actual received: %d KB\n", elapsed, actualReceivedKB);
+
+        // we should not have sent more than 2MB within this time
+        AssertLessOrEqual(actualReceivedKB, 2 * 1024);
+        // however, we should have sent at least 1.5MB, otherwise the load balancer is inefficient
+        AssertGreaterOrEqual(actualReceivedKB, (int)(1.5 * 1024));
+    }
+
+    //////////////////////////////////////////////////////////////////
 };
