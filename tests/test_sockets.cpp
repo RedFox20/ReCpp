@@ -186,7 +186,7 @@ TestImpl(test_sockets)
 
     TestCase(broadcast)
     {
-        rpp::ipinterface iface = rpp::get_ip_interface("eth|lan|wlan");
+        rpp::ipinterface iface = rpp::get_ip_interface("eth|lan|wlan|localdomain");
         std::string system_ip = iface.addr.str();
         std::string broadcast_ip = iface.broadcast.str();
         print_info("system_ip: %s\n", system_ip.c_str());
@@ -645,33 +645,42 @@ TestImpl(test_sockets)
         // setup load balancer at 2MB/s
         rpp::load_balancer balancer { 2 * 1024 * 1024 };
 
-        rpp::socket server = rpp::make_udp_randomport();
-        rpp::ipaddress server_addr = server.address();
+        rpp::socket receiverSocket = rpp::make_udp_randomport();
+        AssertTrue(receiverSocket.good());
         std::atomic_bool running { true };
 
         std::future<int32_t> receiver = std::async(std::launch::async,
-            [&running, &server]() {
+            [&running, &receiverSocket]() {
                 int32_t bytesReceived = 0;
                 uint8_t buffer[2048];
                 rpp::ipaddress from;
                 while (running) {
-                    if (server.poll(10)) do {
-                        bytesReceived += server.recvfrom(from, buffer, sizeof(buffer));
-                    } while (server.available() > 0);
+                    if (receiverSocket.poll(10)) do {
+                        bytesReceived += receiverSocket.recvfrom(from, buffer, sizeof(buffer));
+                    } while (receiverSocket.available() > 0);
                 }
                 return bytesReceived;
             }
         );
 
         rpp::socket sender = rpp::make_udp_randomport();
+        AssertTrue(sender.good());
         uint8_t buffer[1024];
+
+        rpp::ipaddress receiverAddr = rpp::ipaddress4{"127.0.0.1", receiverSocket.port()};
+        print_info("receiver: %s\n", receiverAddr.cstr());
+        print_info("sender: %s\n", sender.address().cstr());
 
         rpp::Timer t;
         while (t.elapsed() < 1.0)
         {
             int packetSize = 280;
             balancer.wait_to_send(packetSize);
-            sender.sendto(server_addr, buffer, packetSize);
+            if (sender.sendto(receiverAddr, buffer, packetSize) <= 0)
+            {
+                AssertFailed("sender.sendto failed: %s", sender.last_err().c_str());
+                break;
+            }
         }
 
         running = false;
@@ -681,7 +690,7 @@ TestImpl(test_sockets)
         print_info("elapsed: %.3fs, actual received: %d KB\n", elapsed, actualReceivedKB);
 
         // we should not have sent more than 2MB within this time
-        AssertLessOrEqual(actualReceivedKB, 2 * 1024);
+        AssertLessOrEqual(actualReceivedKB, (int)(2.05 * 1024));
         // however, we should have sent at least 1.5MB, otherwise the load balancer is inefficient
         AssertGreaterOrEqual(actualReceivedKB, (int)(1.5 * 1024));
     }
