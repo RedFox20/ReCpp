@@ -1506,14 +1506,14 @@ namespace rpp
                       int timeoutMillis, PollFlag pollFlags) noexcept
     {
         ready.clear();
-        const size_t n = in.size();
+        const int n = in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
 
         const bool read = (pollFlags & PF_Read) != 0;
         const bool write = (pollFlags & PF_Write) != 0;
         const short events = (read ? POLLIN : 0) | (write ? POLLOUT : 0);
 
-        for (size_t i = 0; i < n; ++i)
+        for (int i = 0; i < n; ++i)
         {
             pfd[i].fd = in[i]->Sock;
             pfd[i].events = events;
@@ -1528,7 +1528,7 @@ namespace rpp
         if (r <= 0)
             return false;
 
-        for (size_t i = 0; i < n; ++i)
+        for (int i = 0; i < n; ++i)
         {
             if ((read && (pfd[i].revents & POLLIN)) ||
                 (write && (pfd[i].revents & POLLOUT)))

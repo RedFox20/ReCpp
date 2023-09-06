@@ -276,9 +276,9 @@ namespace rpp
         #if _WIN32
             LARGE_INTEGER time;
             QueryPerformanceCounter(&time);
-            return TimePoint{ time.QuadPart };
+            return TimePoint{ uint64_t(time.QuadPart) };
         #elif __APPLE__
-            return TimePoint{ mach_absolute_time() };
+            return TimePoint{ uint64_t(mach_absolute_time()) };
         #else
             static_assert(sizeof(struct timespec) == sizeof(TimePoint), "TimePoint size mismatch");
             union U { 
