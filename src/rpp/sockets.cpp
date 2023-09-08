@@ -1075,8 +1075,7 @@ namespace rpp
             return -1;
         }
         else if (ret == -1) { // socket error?
-            LastErr = os_getsockerr();
-            return handle_errno(LastErr);
+            return handle_errno();
         }
         LastErr = 0;
         return (int)ret; // return as bytesAvailable
@@ -1091,6 +1090,7 @@ namespace rpp
     int socket::handle_errno(int err) noexcept
     {
         int errcode = err ? err : os_getsockerr();
+        LastErr = errcode;
         switch (errcode) {
             default: {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
@@ -1108,9 +1108,12 @@ namespace rpp
             case EAGAIN:             return 0; // no data available right now
             #endif
             case ESOCK(ENOTCONN):    return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
+            #if _WIN32 && ESOCK(EADDRNOTAVAIL) != WSAEADDRNOTAVAIL
+            case WSAEADDRNOTAVAIL:
+            #endif
+            case ESOCK(EADDRNOTAVAIL): return 0; // address doesn't exist
             case ESOCK(ECONNRESET):    // connection lost
             case ESOCK(ECONNREFUSED):  // connect failed
-            case ESOCK(EADDRNOTAVAIL): // address doesn't exist - connect failed
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(ECONNABORTED):  // connection closed
                 close();
@@ -1387,7 +1390,7 @@ namespace rpp
         int err = get_opt(SOL_SOCKET, SO_ERROR);
         if (err != 0)
         {
-            if (handle_errno(err > 0 ? err : os_getsockerr()) == 0)
+            if (handle_errno(err > 0 ? err : 0) == 0)
                 return true; // still connected, but pending something
 
             return false; // it was a fatal error
@@ -1480,7 +1483,7 @@ namespace rpp
         if (err != 0)
         {
             // select failed somehow
-            handle_errno(err > 0 ? err : os_getsockerr());
+            handle_errno(err > 0 ? err : 0);
             return false;
         }
 
@@ -1524,7 +1527,7 @@ namespace rpp
                       int timeoutMillis, PollFlag pollFlags) noexcept
     {
         ready.clear();
-        const int n = in.size();
+        const int n = (int)in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
 
         const bool read = (pollFlags & PF_Read) != 0;
