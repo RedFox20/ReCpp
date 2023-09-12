@@ -6,7 +6,6 @@
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
 #include <rpp/strview.h> // _tostring
-#include <regex> // std::regex
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG
@@ -716,17 +715,28 @@ namespace rpp
         return out;
     }
 
+    // does a simple pattern match by splitting on certain characters like "|"
+    static int pattern_match(rpp::strview haystack, rpp::strview patterns)
+    {
+        rpp::strview pattern;
+        // TODO: support more patterns like specific wildcards etc
+        while (patterns.next(pattern, '|'))
+        {
+            if (const char* match = haystack.find(pattern))
+                return int(match - haystack.begin());
+        }
+        return -1; // no match
+    }
+
     std::vector<ipinterface> ipinterface::get_interfaces(const std::string& name_match, address_family af) noexcept
     {
         auto out = get_interfaces(af);
         if (!name_match.empty())
         {
-            std::regex pattern { name_match };
             std::sort(out.begin(), out.end(), [&](const ipinterface& a, const ipinterface& b) noexcept
             {
-                std::smatch amatch, bmatch;
-                size_t apos = std::regex_search(a.name, amatch, pattern) ? amatch.position(0) : size_t(-1);
-                size_t bpos = std::regex_search(b.name, bmatch, pattern) ? bmatch.position(0) : size_t(-1);
+                int apos = pattern_match(a.name, name_match);
+                int bpos = pattern_match(b.name, name_match);
                 return apos < bpos;
             });
         }
@@ -1715,9 +1725,8 @@ namespace rpp
         std::vector<ipinterface> interfaces = ipinterface::get_interfaces(network_interface, af);
         if (interfaces.empty())
             return {};
-        std::regex pattern { network_interface };
         for (const ipinterface& ip : interfaces)
-            if (std::regex_search(ip.name, pattern))
+            if (pattern_match(ip.name, network_interface))
                 return ip;
         return interfaces.front();
     }
