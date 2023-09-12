@@ -996,7 +996,13 @@ namespace rpp
     int socket::available() const noexcept
     {
         int bytesAvail;
+    #if MIPS
+        // TODO: this is a hack to get available() working on MIPS
+        //       later on it should be fixed in the kernel
+        return get_ioctl(0x467F, bytesAvail) ? -1 : bytesAvail;
+    #else
         return get_ioctl(FIONREAD, bytesAvail) ? -1 : bytesAvail;
+    #endif
     }
 
     int socket::peek_datagram_size() noexcept
