@@ -22,6 +22,8 @@ class ReCpp(mama.BuildTarget):
             self.add_cmake_options('CXX17=TRUE')
         if os.getenv('CXX20') or self.is_enabled_cxx20():
             self.add_cmake_options('CXX20=TRUE')
+        if os.getenv('BUILD_TESTS'):
+            self.add_cmake_options('BUILD_TESTS=ON')
 
     def package(self):
         os.makedirs(self.build_dir('include/rpp/'), exist_ok=True)

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(ReCpp)
 
-option(BUILD_TESTS "Build RppTests executable for unit testing?" ON)
+option(BUILD_TESTS "Build RppTests executable for unit testing?" OFF)
 option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
