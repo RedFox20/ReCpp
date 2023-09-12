@@ -890,11 +890,11 @@ namespace rpp
         if (type() == ST_Stream)
         {
             // flush write buffer (hack only available for TCP sockets)
-            bool nodelay = is_nodelay();
-            if (!nodelay) set_nagle(true); // force only if needed
-            set_nagle(nodelay); // this must be called at least once
+            bool nagleEnabled = !is_nodelay();
+            if (nagleEnabled)
+                set_nagle(false); // disable nagle
+            set_nagle(nagleEnabled); // this must be called at least once
         }
-
     }
 
     void socket::flush_recv_buf() noexcept
