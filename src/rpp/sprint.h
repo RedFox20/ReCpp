@@ -128,6 +128,9 @@ namespace rpp
         void reserve(int count) noexcept;
         void resize(int count) noexcept;
 
+        /** @brief Append a string to this buffer */
+        void append(const char* str, int slen) noexcept;
+
         /** @param count Size of buffer to emplace */
         char* emplace_buffer(int count) noexcept;
         void writef(const char* format, ...);

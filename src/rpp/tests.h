@@ -146,21 +146,11 @@ namespace rpp
          * @return 0 on success, -1 on failure
          */
         static int run_tests(strview testNamePatterns);
-        static int run_tests(const char* testNamePatterns) {
-            return run_tests(strview{testNamePatterns});
-        }
-        static int run_tests(const std::string& testNamePatterns) {
-            return run_tests(strview{testNamePatterns});
-        }
 
         /**
          * Pass multiple patterns for enabling multiple different tests
          */
-        static int run_tests(const std::vector<std::string>& testNamePatterns);
         static int run_tests(const char** testNamePatterns, int numPatterns);
-        template<int N> static int run_tests(const char* (&testNamePatterns)[N]) {
-            return run_tests(testNamePatterns, N);
-        }
 
         /**
          * Same as run_tests(const char*), but it expects program argc and argv from main()

@@ -1,4 +1,5 @@
 #include "file_io.h"
+#include "strview.h"
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
@@ -21,10 +22,7 @@
     #define fseeki64 fseeko
     #define ftelli64 ftello
 #endif
-#if !_WIN32
-    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
-    #include <codecvt> // codecvt_utf8
-#elif !USE_WINAPI_IO
+#if _WIN32 && !USE_WINAPI_IO
     #include <io.h>     // _chsize
 #endif
 #if __APPLE__
@@ -66,14 +64,6 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-#if !_WIN32
-    static std::string to_string(const wchar_t* ws)
-    {
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-        return cvt.to_bytes(ws);
-    }
-#endif
-
 #if USE_WINAPI_IO
     static void* OpenF(const char* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
     { return CreateFileA(f, a, s, sa, c, o, nullptr); }
@@ -99,7 +89,7 @@ namespace rpp /* ReCpp */
         const wchar_t* modes[] = { L"rb", L"", L"wb+", L"ab" };
         return _wfopen(f, modes[mode]); 
     #else
-        return OpenF(to_string(f).c_str(), mode);
+        return OpenF(rpp::to_string(f).c_str(), mode);
     #endif
     }
 #endif

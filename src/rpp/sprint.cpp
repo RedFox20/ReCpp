@@ -67,6 +67,14 @@ namespace rpp
         len = count;
     }
 
+    
+    void string_buffer::append(const char* str, int slen) noexcept
+    {
+        char* dst = emplace_buffer(slen);
+        memcpy(dst, str, (size_t)slen);
+        ptr[len] = '\0';
+    }
+
     char* string_buffer::emplace_buffer(int count) noexcept
     {
         reserve(count);

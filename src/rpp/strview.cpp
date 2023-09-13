@@ -10,6 +10,13 @@
 #include <locale> // toupper
 #include <cfloat> // DBL_MAX
 //#include <charconv> // to_chars, C++17, not implemented yet
+#if _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <Windows.h>
+#else
+    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
+    #include <codecvt> // codecvt_utf8
+#endif
 
 namespace rpp
 {
@@ -744,6 +751,22 @@ namespace rpp
         return _tostring(buffer, buffer, value);
     }
 
+
+    ///////////// to_string(wchar)
+
+    std::string to_string(const wchar_t* str) noexcept
+    {
+    #if _WIN32
+        int len = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
+        std::string ret;
+        ret.resize(len);
+        WideCharToMultiByte(CP_UTF8, 0, str, -1, ret.data(), len, nullptr, nullptr);
+        return ret;
+    #else
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
+        return cvt.to_bytes(str);
+    #endif
+    }
 
     ///////////// line_parser
 

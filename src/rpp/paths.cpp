@@ -1,5 +1,7 @@
 #include "paths.h"
 #include "file_io.h"
+#include "delegate.h"
+#include "strview.h"
 
 #include <cerrno> // errno
 #include <array> // std::array
@@ -23,10 +25,6 @@
     #define fseeki64 fseeko
     #define ftelli64 ftello
 #endif
-#if !_WIN32
-    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
-    #include <codecvt> // codecvt_utf8
-#endif
 #if __ANDROID__
     #include <jni.h>
 #endif
@@ -34,14 +32,6 @@
 namespace rpp /* ReCpp */
 {
     ////////////////////////////////////////////////////////////////////////////////
-
-#if !_WIN32
-    static std::string to_string(const wchar_t* ws)
-    {
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-        return cvt.to_bytes(ws);
-    }
-#endif
 
     bool file_exists(const char* filename) noexcept
     {
@@ -63,7 +53,7 @@ namespace rpp /* ReCpp */
             struct _stat64 s;
             return _wstat64(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
         #else
-            return file_exists(to_string(filename).c_str());
+            return file_exists(rpp::to_string(filename).c_str());
         #endif
     }
 
@@ -590,15 +580,15 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-
+    using DirTraverseFunc = rpp::delegate<void(std::string&& path, bool isDir)>;
 
     // @param queryRoot The original path passed to the query.
     //                  For abs listing, this must be an absolute path value!
     //                  For rel listing, this is only used for opening the directory
     // @param relPath Relative path from search root, ex: "src", "src/session/util", etc.
-    template<class Func> 
-    static void traverse_dir2(strview queryRoot, strview relPath, 
-                              bool dirs, bool files, bool rec, bool abs, const Func& func)
+    static NOINLINE void traverse_dir2(
+        strview queryRoot, strview relPath, bool dirs, bool files, bool rec, bool abs,
+        const DirTraverseFunc& func) noexcept
     {
         std::string currentDir = path_combine(queryRoot, relPath);
         for (dir_entry e : dir_iterator{ currentDir })
@@ -615,8 +605,9 @@ namespace rpp /* ReCpp */
             }
         }
     }
-    template<class Func> 
-    static void traverse_dir(strview dir, bool dirs, bool files, bool rec, bool abs, const Func& func)
+    static NOINLINE void traverse_dir(
+        strview dir, bool dirs, bool files, bool rec, bool abs,
+        const DirTraverseFunc& func) noexcept
     {
         if (abs)
         {

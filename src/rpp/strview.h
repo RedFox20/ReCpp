@@ -146,6 +146,11 @@ namespace rpp
     inline int _tostring(char* buffer, long value)      noexcept { return _tostring(buffer, (int)value);  }
     inline int _tostring(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint)value); }
 
+    /**
+     * @brief Converts a Wide String to a UTF-8 String
+     */
+    std::string to_string(const wchar_t* str) noexcept;
+
     #ifndef RPP_CONSTEXPR_STRLEN
     #  if _MSC_VER
     #    define RPP_CONSTEXPR_STRLEN constexpr
@@ -580,19 +585,19 @@ namespace rpp
             return trim_start(delims, ndelims).next(out, delims, ndelims);
         }
         template<int N> NOINLINE bool next_skip_empty(strview& out, const char (&delims)[N]) noexcept {
-            return trim_start<N>(delims).next<N>(out, delims);
+            return trim_start<N>(delims).next(out, delims);
         }
         /**
          * Same as bool next_skip_empty(strview& out, char delim), but returns a token instead
          */
-        FINLINE strview next_skip_empty(char delim) noexcept {
+        NOINLINE strview next_skip_empty(char delim) noexcept {
             return trim_start(delim).next(delim);
         }
-        FINLINE strview next_skip_empty(const char* delims, int ndelims) noexcept {
+        NOINLINE strview next_skip_empty(const char* delims, int ndelims) noexcept {
             return trim_start(delims, ndelims).next(delims, ndelims);
         }
         template<int N> NOINLINE strview next_skip_empty(const char (&delims)[N]) noexcept {
-            return trim_start<N>(delims).next<N>(delims);
+            return trim_start<N>(delims).next(delims);
         }
 
         /**
@@ -624,13 +629,13 @@ namespace rpp
         /**
          * Same as bool next(strview& out, char delim), but returns a token instead
          */
-        FINLINE strview next_notrim(char delim) noexcept {
+        NOINLINE strview next_notrim(char delim) noexcept {
             strview out; next_notrim(out, delim); return out;
         }
-        FINLINE strview next_notrim(const char* delim, int ndelims) noexcept {
+        NOINLINE strview next_notrim(const char* delim, int ndelims) noexcept {
             strview out; next_notrim(out, delim, ndelims); return out;
         }
-        template<int N> FINLINE strview next_notrim(const char (&delims)[N]) noexcept {
+        template<int N> NOINLINE strview next_notrim(const char (&delims)[N]) noexcept {
             strview out;
             _next_notrim(out, [&delims](const char* s, int n) {
                 return strcontains<N>(s, n, delims);
@@ -640,7 +645,7 @@ namespace rpp
 
 
         // don't forget to mark NOINLINE in the function where you call this...
-        template<class SearchFn> FINLINE bool _next_notrim(strview& out, SearchFn searchFn) noexcept
+        template<class SearchFn> NOINLINE bool _next_notrim(strview& out, SearchFn searchFn) noexcept
         {
             auto s = str, end = s + len;
             for (;;) { // using a loop to skip empty tokens
@@ -661,7 +666,7 @@ namespace rpp
             }
         }
 
-        template<class SearchFn> FINLINE bool _next_trim(strview& out, SearchFn searchFn) noexcept
+        template<class SearchFn> NOINLINE bool _next_trim(strview& out, SearchFn searchFn) noexcept
         {
             auto s = str, end = s + len;
             for (;;) { // using a loop to skip empty tokens

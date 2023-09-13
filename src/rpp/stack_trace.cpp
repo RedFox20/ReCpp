@@ -35,7 +35,7 @@
 #    include <vector>
 #    include <unordered_map>
 #    include <mutex>
-#    include <algorithm> // std::sort
+#    include <rpp/sort.h> // rpp::insertion_sort
 #  else
 #    include <dlfcn.h>
 #  endif
@@ -311,20 +311,21 @@ namespace rpp
 
             max = int(flatmap.size()) - 1;
 
-            std::sort(flatmap.data(), flatmap.data()+flatmap.size(), 
-                      [](const FlatDie& a, const FlatDie& b) {
-                return a.lo < b.lo && a.hi < b.hi;
-            });
+            rpp::insertion_sort(flatmap.data(), flatmap.size(), 
+                [](const FlatDie& a, const FlatDie& b) {
+                    return a.lo < b.lo && a.hi < b.hi;
+                }
+            );
     //        print_flatmap();
         }
 
-        void print_flatmap()
-        {
-            for (const FlatDie& f : flatmap)
-                f.print();
-            printf("total entries: %zu\n", flatmap.size());
-            printf("total root CU DIE: %zu\n", rootDies.size());
-        }
+        // void print_flatmap()
+        // {
+        //     for (const FlatDie& f : flatmap)
+        //         f.print();
+        //     printf("total entries: %zu\n", flatmap.size());
+        //     printf("total root CU DIE: %zu\n", rootDies.size());
+        // }
 
         void push_die(const FlatDie& f)
         {

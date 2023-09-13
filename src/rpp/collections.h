@@ -8,7 +8,7 @@
 #include <deque>
 #include <unordered_map>
 #include <numeric>
-#include <algorithm> // std::sort
+#include <rpp/sort.h>
 #include <stdexcept>
 
 namespace rpp
@@ -483,9 +483,7 @@ namespace rpp
 
     template<class T, class A> void sort(std::vector<T, A>& v)
     {
-        T* begin = v.data();
-        T* end = begin + v.size();
-        std::sort(begin, end);    
+        rpp::insertion_sort(v.data(), v.size(), [](T& a, T& b) { return a < b; });
     }
 
     /////////////////////////////////////////////////////////////////////////////////////

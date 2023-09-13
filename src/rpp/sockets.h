@@ -1133,20 +1133,20 @@ namespace rpp
 
     /**
      * @returns Main interface of the current system
-     * @param interface ["eth|lan|wlan"] Main interface name regex pattern to 
+     * @param interface ["eth|lan|wlan"] Main interface name substring patterns to match
      * @param af Address family to use, most commonly AF_IPv4 or AF_IPv6
      */
     rpp::ipinterface get_ip_interface(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
 
     /**
      * @returns Main interface IP address of the current system
-     * @param interface ["eth|lan|wlan"] Main interface name regex pattern to match
+     * @param interface ["eth|lan|wlan"] Main interface name substring patterns to match
      */
     std::string get_system_ip(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
 
     /**
      * @returns Main interface Broadcast IP address of the current system
-     * @param interface ["eth|lan|wlan"] Main interface name regex pattern to match
+     * @param interface ["eth|lan|wlan"] Main interface name substring patterns to match
      */
     std::string get_broadcast_ip(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
 

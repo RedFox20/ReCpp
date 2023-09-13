@@ -1,4 +1,3 @@
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1 // for std::codecvt_utf8
 #include "sockets.h"
 #include <rpp/debugging.h>
 #include <stdlib.h>    // malloc
@@ -6,6 +5,7 @@
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
 #include <rpp/strview.h> // _tostring
+#include <rpp/sort.h>
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG
@@ -26,7 +26,6 @@
     #ifdef _MSC_VER
         #pragma comment(lib, "Ws2_32.lib") // link against winsock libraries
         #pragma comment(lib, "Iphlpapi.lib")
-        #include <codecvt>              // std::codecvt_utf8
     #endif
     #define sleep(milliSeconds) Sleep((milliSeconds))
     #define inwin32(...) __VA_ARGS__
@@ -704,7 +703,7 @@ namespace rpp
         }
     #endif
 
-        std::sort(out.begin(), out.end(), [](const ipinterface& a, const ipinterface& b) noexcept
+        rpp::insertion_sort(out.data(), out.size(), [](const ipinterface& a, const ipinterface& b) noexcept
         {
             if (a.gateway.has_address() && !b.gateway.has_address())
                 return true;
@@ -733,7 +732,7 @@ namespace rpp
         auto out = get_interfaces(af);
         if (!name_match.empty())
         {
-            std::sort(out.begin(), out.end(), [&](const ipinterface& a, const ipinterface& b) noexcept
+            rpp::insertion_sort(out.data(), out.size(), [&](const ipinterface& a, const ipinterface& b) noexcept
             {
                 int apos = pattern_match(a.name, name_match);
                 int bpos = pattern_match(b.name, name_match);

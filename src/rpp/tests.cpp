@@ -161,10 +161,10 @@ namespace rpp
 
     struct test_failure
     {
-        std::string testname; // major test name
-        std::string testcase; // failed case name
+        rpp::strview testname; // major test name
+        rpp::strview testcase; // failed case name
         std::string message;
-        std::string file;
+        rpp::strview file;
         int line;
     };
 
@@ -173,14 +173,20 @@ namespace rpp
         int tests_run = 0;
         int tests_failed = 0;
         int asserts_failed = 0;
-        std::vector<test_failure> failures;
+        std::vector<test_failure*> failures;
         std::mutex mutex;
+
+        ~test_results()
+        {
+            for (test_failure* f : failures) delete f;
+        }
     };
 
     struct message
     {
-        int type;
-        std::string msg;
+        uint32_t start_index;
+        uint16_t len;
+        uint8_t type;
     };
 
     struct test::test_func
@@ -191,15 +197,39 @@ namespace rpp
         size_t expectedExType = 0;
         bool autorun = true;
         bool success = false;
-        std::vector<message> messages{};
+    private:
+        rpp::string_buffer message_buf;
+        std::vector<message> messages;
+    public:
+        size_t num_messages() const noexcept { return messages.size(); }
+        const message& get_message(size_t i) const noexcept { return messages[i]; }
+        rpp::strview get_message_text(const message& m) const
+        {
+            const char* start = message_buf.data() + m.start_index;
+            return { start, start + m.len };
+        }
+        void append_message(int type, const char* msg, int len)
+        {
+            std::lock_guard lock {mutex};
+            message m;
+            m.start_index = message_buf.size(); // we start at current stringbuf pos
+            m.len = (uint16_t)len;
+            m.type = (uint8_t)type;
+            messages.push_back(m);
+            message_buf.append(msg, len); // push the string data
+        }
     };
 
     struct test::test_impl
     {
-        std::vector<std::unique_ptr<test_func>> test_functions;
-
+        std::vector<test_func*> test_functions;
         test_results* current_results = nullptr;
         test_func* current_func = nullptr;
+
+        ~test_impl()
+        {
+            for (test_func* fn : test_functions) delete fn;
+        }
     };
 
 
@@ -327,46 +357,49 @@ namespace rpp
 
     void test::add_assert_failure(const char* file, int line, const char* msg, int len)
     {
-        test_failure fail;
-        fail.testname = name;
-        fail.testcase = impl->current_func->name;
-        fail.message = std::string{msg,msg+len};
-        fail.file = std::string{file};
-        fail.line = line;
+        test_failure* fail = new test_failure{};
+        fail->testname = name;
+        fail->testcase = impl->current_func->name;
+        fail->message = std::string{msg,msg+len};
+        fail->file = rpp::strview{file};
+        fail->line = line;
         {
             std::lock_guard lock {impl->current_results->mutex};
             impl->current_results->asserts_failed++;
-            impl->current_results->failures.emplace_back(std::move(fail));
+            impl->current_results->failures.push_back(fail);
         }
     }
 
     void test::add_message(int type, const char* msg, int len)
     {
         if (auto* func = tl_current_test_func)
-        {
-            std::lock_guard lock {func->mutex};
-            func->messages.emplace_back(message{type, {msg, msg+len}});
-        }
+            func->append_message(type, msg, len);
     }
 
     void test::print_error(const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
-        LogTestLabel( console(Red, msg, len) );
+        if (state().verbosity >= TestVerbosity::TestLabels) { 
+            console(Red, msg, len);
+        }
         add_message(2, msg, len);
     }
 
     void test::print_warning(const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
-        LogTestLabel( console(Yellow, msg, len););
+        if (state().verbosity >= TestVerbosity::AllMessages) { 
+            console(Yellow, msg, len);
+        }
         add_message(1, msg, len);
     }
 
     void test::print_info(const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
-        LogTestLabel( console(Default, msg, len); );
+        if (state().verbosity >= TestVerbosity::AllMessages) { 
+            console(Default, msg, len);
+        }
         add_message(0, msg, len);
     }
 
@@ -443,7 +476,7 @@ namespace rpp
 
         if (methodFilter)
         {
-            for (std::unique_ptr<test_func>& fn : impl->test_functions)
+            for (test_func* fn : impl->test_functions)
             {
                 if (fn->name.find(methodFilter))
                 {
@@ -459,7 +492,7 @@ namespace rpp
         }
         else
         {
-            for (std::unique_ptr<test_func>& fn : impl->test_functions)
+            for (test_func* fn : impl->test_functions)
             {
                 if (fn->autorun)
                 {
@@ -485,23 +518,25 @@ namespace rpp
         {
             if (allSuccess)
             {
-                std::string run = std::to_string(numTestsOk) + "/" + std::to_string(numTestsRun);
-                consolef(Green, "TEST %-32s  %-5s  [OK]\n", name.str, run.c_str());
+                char run[64]; snprintf(run, sizeof(run), "%d/%d", numTestsOk, numTestsRun);
+                consolef(Green, "TEST %-32s  %-5s  [OK]\n", name.str, run);
             }
             else
             {
-                std::string run = std::to_string(numTestsFailed) + "/" + std::to_string(numTestsRun);
-                consolef(Red,   "TEST %-32s  %-5s  [FAILED]\n", name.str, run.c_str());
-                for (std::unique_ptr<test_func>& fn : impl->test_functions)
+                char run[64]; snprintf(run, sizeof(run), "%d/%d", numTestsFailed, numTestsRun);
+                consolef(Red,   "TEST %-32s  %-5s  [FAILED]\n", name.str, run);
+                for (test_func* fn : impl->test_functions)
                 {
                     if (fn->success) continue;
                     consolef(Red, "FAIL %s::%s\n", name.str, fn->name.str);
-                    for (const message& m : fn->messages)
+                    for (size_t i = 0; i < fn->num_messages(); ++i)
                     {
+                        const message& m = fn->get_message(i);
+                        rpp::strview msg = fn->get_message_text(m);
                         ConsoleColor c = Default;
                         if      (m.type == 1) c = Yellow;
                         else if (m.type == 2) c = Red;
-                        console(c, m.msg.c_str(), static_cast<int>(m.msg.size())); 
+                        console(c, msg.str, msg.len);
                     }
                 }
             }
@@ -591,26 +626,31 @@ namespace rpp
 
     int test::run_tests(strview testNamePatterns)
     {
-        std::vector<std::string> names;
-        while (strview pattern = testNamePatterns.next(" \t"))
-            names.emplace_back(pattern);
-        return run_tests(names);
-    }
+        char* patterns[128] = { nullptr };
+        int npatterns = 0;
+        patterns[npatterns++] = (char*)"";
 
-    int test::run_tests(const std::vector<std::string>& testNamePatterns)
-    {
-        std::vector<const char*> names;
-        names.push_back("");
-        for (const std::string& name : testNamePatterns) names.push_back(name.c_str());
-        return run_tests(static_cast<int>(names.size()), (char**)names.data());
+        strview pattern;
+        while (testNamePatterns.next_skip_empty(pattern, " \t"))
+        {
+            if (npatterns >= 128) LogError("Too many test patterns");
+            else patterns[npatterns++] = (char*)pattern.data();
+        }
+        return run_tests(npatterns, patterns);
     }
 
     int test::run_tests(const char** testNamePatterns, int numPatterns)
     {
-        std::vector<const char*> names;
-        names.push_back("");
-        names.insert(names.end(), testNamePatterns, testNamePatterns + numPatterns);
-        return run_tests(static_cast<int>(names.size()), (char**)names.data());
+        char* patterns[128] = { nullptr };
+        int npatterns = 0;
+        patterns[npatterns++] = (char*)"";
+
+        for (int i = 0; i < numPatterns; ++i)
+        {
+            if (npatterns >= 128) LogError("Too many test patterns");
+            else patterns[numPatterns++] = (char*)testNamePatterns[i];
+        }
+        return run_tests(npatterns, patterns);
     }
 
     int test::run_tests()
@@ -633,11 +673,12 @@ namespace rpp
     int test::add_test_func(strview name, test_func_type fn, 
                             size_t expectedExHash, bool autorun)
     {
-        auto& func = impl->test_functions.emplace_back(std::make_unique<test_func>());
+        test_func* func = new test_func{};
         func->name = name;
         func->func = fn;
         func->expectedExType = expectedExHash;
         func->autorun = autorun;
+        impl->test_functions.push_back(func);
         return static_cast<int>(impl->test_functions.size()) - 1;
     }
 
@@ -801,10 +842,10 @@ namespace rpp
             else
                 consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
                                results.tests_failed, numTests, failed);
-            for (const test_failure& f : results.failures)
+            for (const test_failure* f : results.failures)
             {
-                if (f.line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f.file.data(), f.line, f.testname.data(), f.testcase.data(), f.message.data());
-                else        consolef(Red, "    %s::%s: %s\n",    f.testname.data(), f.testcase.data(), f.message.data());
+                if (f->line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f->file.data(), f->line, f->testname.data(), f->testcase.data(), f->message.data());
+                else         consolef(Red, "    %s::%s: %s\n", f->testname.data(), f->testcase.data(), f->message.data());
             }
             consolef(Default, "\n");
             return failed;
