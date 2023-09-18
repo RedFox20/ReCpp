@@ -5,7 +5,7 @@
  * 
  * @note This implementation is NOT faster than std::sort, it simply produces smaller binaries.
  */
-#include <cstdint>
+#include <stddef.h> // size_t
 
 namespace rpp
 {

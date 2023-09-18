@@ -360,7 +360,7 @@ TestImpl(test_sockets)
         AssertTrue(recv.good());
         AssertThat(recv.recv_str(), "udp_select"s);
         AssertTrue(recv.good());
-        AssertLessOrEqual(t1.elapsed_ms(), 1.0);
+        AssertLessOrEqual(t1.elapsed_millis(), 1.0);
 
         // no data to receive, should return false
         AssertFalse(recv.select(100, socket::SF_Read));
@@ -379,7 +379,7 @@ TestImpl(test_sockets)
         rpp::Timer t2;
         AssertFalse(recv.select(250, socket::SF_Read));
         AssertTrue(recv.good());
-        AssertGreaterOrEqual(t2.elapsed_ms(), 249.0);
+        AssertGreaterOrEqual(t2.elapsed_millis(), 249.0);
         AssertThat(recv.available(), 0);
         AssertTrue(recv.good());
     }
@@ -403,7 +403,7 @@ TestImpl(test_sockets)
         AssertTrue(recv.good());
         AssertThat(recv.recv_str(), "udp_poll"s);
         AssertTrue(recv.good());
-        AssertLessOrEqual(t1.elapsed_ms(), 1.0);
+        AssertLessOrEqual(t1.elapsed_millis(), 1.0);
 
         // no data to receive, should return false
         AssertFalse(recv.poll(100, socket::PF_Read));
@@ -422,7 +422,7 @@ TestImpl(test_sockets)
         rpp::Timer t2;
         AssertFalse(recv.poll(250, socket::PF_Read));
         AssertTrue(recv.good());
-        AssertGreaterOrEqual(t2.elapsed_ms(), 249.0);
+        AssertGreaterOrEqual(t2.elapsed_millis(), 249.0);
         AssertThat(recv.available(), 0);
         AssertTrue(recv.good());
     }

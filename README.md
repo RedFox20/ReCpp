@@ -403,16 +403,31 @@ Basic timer utilities for measuring time for performance profiling and consisten
     printf("work elapsed: %.2fs\n", elapsed);
 ```
 
+* `rpp::TimePoint` System's most accurate measurement for a single time point.
+  * `TimePoint()` Initializes with `TimePoint::zero()`
+  * `TimePoint TimePoint::now()` Gets the current time
+  * `double elapsed_sec(end)` Fractional seconds elapsed from this time point to end
+  * `uint32_t elapsed_ms(end)` Integer milliseconds elapsed from this time point to end
+  * `uint32_t elapsed_us(end)` Integer microseconds elapsed from this time point to end
+  * `uint32_t elapsed_ns(end)` Integer nanoseconds elapsed from this time point to end
+  * `bool is_valid()` True if TimePoint is not zero
+
 * `rpp::Timer` High accuracy timer for performance profiling or deltaTime measurement.
   * `Timer()` Initializes a new timer by calling start
   * `Timer(StartMode startMode)` Explicitly defines `Timer::NoStart` or `Timer::AutoStart`
   * `void start()` Starts the timer
   * `double elapsed()` Fractional seconds elapsed from start()
-  * `double elapsed_ms()` Fractional milliseconds elapsed from start()
+  * `double elapsed_millis()` Fractional milliseconds elapsed from start()
   * `double next()` Gets the next time sample, since the last call to next() or start() and calls start() again
-  * `double next_ms()` next() converted to milliseconds
+  * `double next_millis()` next() converted to milliseconds
+  * `uint32_t elapsed_ms(end)` Integer milliseconds elapsed from start() until end
+  * `uint32_t elapsed_us(end)` Integer microseconds elapsed from start() until end
+  * `uint32_t elapsed_ns(end)` Integer nanoseconds elapsed from start() until end
+  * `uint32_t elapsed_ms()` Integer milliseconds elapsed from start() until now()
+  * `uint32_t elapsed_us()` Integer microseconds elapsed from start() until now()
+  * `uint32_t elapsed_ns()` Integer nanoseconds elapsed from start() until now()
   * `double measure(Func f)` Measure block execution time as seconds
-  * `double measure_ms(Func f)` Measure block execution time as milliseconds
+  * `double measure_millis(Func f)` Measure block execution time as milliseconds
 
 * `rpp::StopWatch` High accuracy stopwatch for measuring specific events and keeping the results
   * `StopWatch` Creates an uninitialized StopWatch. Reported time is always 0.0
@@ -423,7 +438,7 @@ Basic timer utilities for measuring time for performance profiling and consisten
   * `bool started()` Has the stopwatch been started?
   * `bool stopped()` Has the stopwatch been stopped with a valid time?
   * `double elapsed()` Reports the currently elapsed time.
-  * `double elapsed_ms()` Currently elpased time in milliseconds
+  * `double elapsed_millis()` Currently elpased time in milliseconds
 
 * `rpp::ScopedPerfTimer` Automatically logs performance from constructor to destructor and writes it to log
   * `ScopedPerfTimer(const char* what)` Starts the timer

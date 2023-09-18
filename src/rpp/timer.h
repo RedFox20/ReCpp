@@ -156,24 +156,36 @@ namespace rpp
         double elapsed() const noexcept;
 
         /** @return Fractional milliseconds elapsed from start() */
-        double elapsed_ms() const noexcept { return elapsed() * 1000.0; }
+        double elapsed_millis() const noexcept;
+
+        /** @return Fractional microseconds elapsed from start() */
+        double elapsed_micros() const noexcept;
 
         /** Gets the next time sample, since the last call to next() or start() and calls start() again */
         double next() noexcept;
 
         /** @return next() converted to milliseconds */
-        double next_ms() noexcept { return next() * 1000.0; }
+        double next_millis() noexcept;
 
-        /** @returns integer milliseconds elapsed from this time point until end */
+        /** @returns integer milliseconds elapsed from start() until end */
         uint32_t elapsed_ms(const TimePoint& end) const noexcept { return started.elapsed_ms(end); }
 
-        /** @returns integer microseconds elapsed from this time point until end */
+        /** @returns integer microseconds elapsed from start() until end */
         uint32_t elapsed_us(const TimePoint& end) const noexcept { return started.elapsed_us(end); }
 
-        /** @returns integer nanoseconds elapsed from this time point until end */
+        /** @returns integer nanoseconds elapsed from start() until end */
         uint32_t elapsed_ns(const TimePoint& end) const noexcept { return started.elapsed_ns(end); }
 
-        /** Measure block execution time as seconds */
+        /** @returns integer milliseconds elapsed from start() until now() */
+        uint32_t elapsed_ms() const noexcept { return started.elapsed_ms(TimePoint::now()); }
+
+        /** @returns integer microseconds elapsed from start() until now() */
+        uint32_t elapsed_us() const noexcept { return started.elapsed_us(TimePoint::now()); }
+
+        /** @returns integer microseconds elapsed from start() until now() */
+        uint32_t elapsed_ns() const noexcept { return started.elapsed_ns(TimePoint::now()); }
+
+        /** Measure block execution time in fractional seconds */
         template<class Func> static double measure(const Func& f)
         {
             Timer t;
@@ -181,12 +193,12 @@ namespace rpp
             return t.elapsed();
         }
 
-        /** Measure block execution time as milliseconds */
-        template<class Func> static double measure_ms(const Func& f)
+        /** Measure block execution time in fractional milliseconds */
+        template<class Func> static double measure_millis(const Func& f)
         {
             Timer t;
             f();
-            return t.elapsed_ms();
+            return t.elapsed_millis();
         }
     };
 
@@ -238,7 +250,7 @@ namespace rpp
         double elapsed() const;
 
         /** Currently elapsed time in milliseconds */
-        double elapsed_ms() const { return elapsed() * 1000.0; }
+        double elapsed_millis() const { return elapsed() * 1000.0; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

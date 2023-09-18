@@ -137,7 +137,7 @@ TestImpl(test_concurrent_queue)
         PopResult r;
         rpp::Timer t;
         r.success = queue.wait_pop(r.item, timeout);
-        r.elapsed_ms = t.elapsed_ms();
+        r.elapsed_ms = t.elapsed_millis();
         print_info("wait_pop_timed elapsed: %.2f ms item: %s\n", r.elapsed_ms, r.item.c_str());
         return r;
     }
@@ -197,7 +197,7 @@ TestImpl(test_concurrent_queue)
         PopResult r;
         rpp::Timer t;
         r.success = queue.wait_pop_until(r.item, until);
-        r.elapsed_ms = t.elapsed_ms();
+        r.elapsed_ms = t.elapsed_millis();
         print_info("wait_pop_until elapsed: %.2f ms item: %s\n", r.elapsed_ms, r.item.c_str());
         return r;
     }
@@ -285,7 +285,7 @@ TestImpl(test_concurrent_queue)
         // this should not take longer than ~55ms
         rpp::Timer t;
         AssertFalse(queue.wait_pop(item, 1000ms, cancelCondition));
-        AssertLess(t.elapsed_ms(), 55);
+        AssertLess(t.elapsed_millis(), 55);
     }
 
     // ensure that wait_pop_interval actually checks the cancelCondition
@@ -308,8 +308,8 @@ TestImpl(test_concurrent_queue)
         {
             rpp::Timer t;
             bool result = queue.wait_pop_interval(item, timeout, interval, cancel);
-            double elapsed = t.elapsed_ms();
-            print_info("wait_pop_interval elapsed: %.2f ms item: %s\n", elapsed, item.c_str());
+            double elapsed_ms = t.elapsed_millis();
+            print_info("wait_pop_interval elapsed: %.2f ms item: %s\n", elapsed_ms, item.c_str());
             return result;
         };
 
@@ -387,7 +387,7 @@ TestImpl(test_concurrent_queue)
 
             producer.join();
             consumer.join();
-            double elapsed_ms = t.elapsed_ms();
+            double elapsed_ms = t.elapsed_millis();
             total_time += elapsed_ms;
             print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed_ms, queue.capacity());
         }
@@ -429,7 +429,7 @@ TestImpl(test_concurrent_queue)
 
             producer.join();
             consumer.join();
-            double elapsed_ms = t.elapsed_ms();
+            double elapsed_ms = t.elapsed_millis();
             total_time += elapsed_ms;
             print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed_ms, queue.capacity());
         }

@@ -354,12 +354,27 @@ namespace rpp
         return started.elapsed_sec(end);
     }
 
+    double Timer::elapsed_millis() const noexcept
+    {
+        return elapsed() * 1'000.0;
+    }
+
+    double Timer::elapsed_micros() const noexcept
+    {
+        return elapsed() * 1'000'000.0;
+    }
+
     double Timer::next() noexcept
     {
         TimePoint now = TimePoint::now();
         double t = started.elapsed_sec(now);
         started = now;
         return t;
+    }
+
+    double Timer::next_millis() noexcept
+    {
+        return next() * 1000.0;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

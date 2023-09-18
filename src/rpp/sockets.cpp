@@ -599,11 +599,12 @@ namespace rpp
     #if _WIN32
         InitWinSock();
 
+        ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
         ULONG bufLen = 0;
-        GetAdaptersAddresses(family, GAA_FLAG_INCLUDE_PREFIX, nullptr, nullptr, &bufLen);
+        GetAdaptersAddresses(family, flags, nullptr, nullptr, &bufLen);
         IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)alloca(bufLen);
 
-        if (!GetAdaptersAddresses(family, GAA_FLAG_INCLUDE_PREFIX, nullptr, ipa_addrs, &bufLen))
+        if (!GetAdaptersAddresses(family, flags, nullptr, ipa_addrs, &bufLen))
         {
             int count = 0;
             for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next)
@@ -650,10 +651,6 @@ namespace rpp
 
                 if (ipaa->Flags & IP_ADAPTER_ADDRESS_DNS_ELIGIBLE)
                 {
-                    if (auto* dns = get_first_address(family, ipaa->FirstDnsServerAddress))
-                    {
-                        in.gateway = to_ipaddress(*(saddr*)dns->Address.lpSockaddr);
-                    }
                     if (auto* gateway = get_first_address(family, ipaa->FirstGatewayAddress))
                     {
                         in.gateway = to_ipaddress(*(saddr*)gateway->Address.lpSockaddr);

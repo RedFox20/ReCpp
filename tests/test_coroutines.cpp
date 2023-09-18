@@ -28,14 +28,14 @@ TestImpl(test_coroutines)
     {
         rpp::Timer t1;
         chrono_coro(50).get();
-        double e = t1.elapsed_ms();
+        double e = t1.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
         AssertGreater(e, 49.5);
         AssertLess(e, 55.0);
 
         rpp::Timer t2;
         chrono_coro(15).get();
-        double e2 = t2.elapsed_ms();
+        double e2 = t2.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
         AssertGreater(e2, 14.5);
         AssertLess(e2, 20.0);
@@ -137,7 +137,7 @@ TestImpl(test_coroutines)
             ~destructor_recorder() noexcept { results.push_back(id); }
         };
 
-        co_await [&destructor_ids]() -> cfuture<void>
+        (void)co_await [&destructor_ids]() -> cfuture<void>
         {
             destructor_recorder dr {destructor_ids, 1};
             co_await std::chrono::milliseconds{10};
@@ -145,15 +145,18 @@ TestImpl(test_coroutines)
         AssertThat(destructor_ids.size(), 1u);
         AssertThat(destructor_ids[0], 1);
 
-        co_await [&destructor_ids]() -> cfuture<void>
+        cfuture<std::string> fstr = co_await [&destructor_ids]() -> cfuture<std::string>
         {
             destructor_recorder dr {destructor_ids, 2};
             co_await std::chrono::milliseconds{5};
+            co_return "test";
         };
+        AssertThat(destructor_ids.size(), 1u); // the destructor is not called before calling get()
+        AssertThat(fstr.get(), "test"s);
         AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
 
-        co_await [&destructor_ids]() -> cfuture<void>
+        (void)co_await [&destructor_ids]() -> cfuture<void>
         {
             destructor_recorder dr {destructor_ids, 3};
             co_return;
