@@ -5,14 +5,14 @@
 #include <rpp/sprint.h>
 
 // return -1 if sorted, else index where sorting breaks
-template<class T> int first_unsorted_index(const T* arr, int count)
+template<class T> int first_unsorted_index(const T* arr, size_t count)
 {
-    for (int i = 1; i < count; ++i)
+    for (size_t i = 1; i < count; ++i)
         if (arr[i - 1] > arr[i]) /* prev > next */
             return i;
     return -1;
 }
-template<class T> bool is_sorted(const T* arr, int count)
+template<class T> bool is_sorted(const T* arr, size_t count)
 {
     return first_unsorted_index(arr, count) == -1;
 }
@@ -63,11 +63,9 @@ TestImpl(test_sort)
     {
         std::vector<int> array = array_random_int(32);
         AssertFalse(is_sorted(array.data(), array.size()));
-        AssertFalse(std::is_sorted(array.begin(), array.end()));
 
         rpp::insertion_sort(array.data(), array.size(), [](auto& a, auto& b) { return a < b; });
         AssertEqual(first_unsorted_index(array.data(), array.size()), -1);
-        AssertTrue(std::is_sorted(array.begin(), array.end()));
 
         if (!is_sorted(array.data(), array.size()))
         {
@@ -79,11 +77,9 @@ TestImpl(test_sort)
     {
         std::vector<std::string> array = array_random_str(32);
         AssertFalse(is_sorted(array.data(), array.size()));
-        AssertFalse(std::is_sorted(array.begin(), array.end()));
 
         rpp::insertion_sort(array.data(), array.size(), [](auto& a, auto& b) { return a < b; });
         AssertEqual(first_unsorted_index(array.data(), array.size()), -1);
-        AssertTrue(std::is_sorted(array.begin(), array.end()));
 
         if (!is_sorted(array.data(), array.size()))
         {

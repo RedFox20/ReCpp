@@ -16,11 +16,11 @@ namespace rpp
      * bool(T a, T b) where result is true if a < b, false if a >= b
      */
     template<typename T, typename Comparison>
-    void insertion_sort(T* data, int count, const Comparison& comparison)
+    void insertion_sort(T* data, size_t count, const Comparison& comparison)
     {
-        for (int i = 1; i < count; ++i)
+        for (size_t i = 1; i < count; ++i)
         {
-            int i_being_sorted = i; // index of the element currently being sorted
+            size_t i_being_sorted = i; // index of the element currently being sorted
 
             // keep shifting `i_being_sorted` to lower index until comparison returns true
             while (i_being_sorted > 0 && !comparison(data[i_being_sorted-1], data[i_being_sorted]))

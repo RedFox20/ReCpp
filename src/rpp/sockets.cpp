@@ -582,18 +582,6 @@ namespace rpp
     ////////        IP Interfaces
     ///////////////////////////////////////////////////////////////////////////
 
-#if _WIN32 // msvc or mingw
-    static std::string to_string(const wchar_t* wstr) noexcept
-    {
-    #if _MSC_VER
-        std::wstring_convert<std::codecvt<wchar_t, char, mbstate_t>, wchar_t> cvt;
-        return cvt.to_bytes(wstr, wstr + wcslen(wstr));
-    #else
-        return string{ wstr, wstr + wcslen(wstr) };
-    #endif
-    }
-#endif
-
     template<class ADAPTER_ADDRESS_T>
     ADAPTER_ADDRESS_T* get_first_address(int family, ADAPTER_ADDRESS_T* firstAddress) noexcept
     {
