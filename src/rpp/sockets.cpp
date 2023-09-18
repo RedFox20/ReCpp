@@ -691,15 +691,16 @@ namespace rpp
         }
     #endif
 
-        rpp::insertion_sort(out.data(), out.size(), [](const ipinterface& a, const ipinterface& b) noexcept
-        {
-            if (a.gateway.has_address() && !b.gateway.has_address())
-                return true;
-            if (b.gateway.has_address() && !a.gateway.has_address())
-                return false;
-            return a.addr.compare(b.addr) < 0;
-        });
+        rpp::insertion_sort(out.data(), out.size(), &ipinterface::compare);
         return out;
+    }
+
+    bool ipinterface::compare(const ipinterface& a, const ipinterface& b) noexcept
+    {
+        // gateway should always be first
+        if (a.gateway.has_address() && !b.gateway.has_address()) return true;
+        if (b.gateway.has_address() && !a.gateway.has_address()) return false;
+        return a.addr.compare(b.addr) < 0;
     }
 
     // does a simple pattern match by splitting on certain characters like "|"
@@ -717,14 +718,18 @@ namespace rpp
 
     std::vector<ipinterface> ipinterface::get_interfaces(const std::string& name_match, address_family af) noexcept
     {
-        auto out = get_interfaces(af);
+        std::vector<ipinterface> out = get_interfaces(af);
         if (!name_match.empty())
         {
             rpp::insertion_sort(out.data(), out.size(), [&](const ipinterface& a, const ipinterface& b) noexcept
             {
                 int apos = pattern_match(a.name, name_match);
                 int bpos = pattern_match(b.name, name_match);
-                return apos < bpos;
+                if (apos != -1 && bpos == -1) return true; // match is always first
+                if (bpos != -1 && apos == -1) return false; // non match is always last
+
+                // both match, or none match, use default sorting rule:
+                return ipinterface::compare(a, b);
             });
         }
         return out;

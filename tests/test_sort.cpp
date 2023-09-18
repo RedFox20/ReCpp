@@ -9,7 +9,7 @@ template<class T> int first_unsorted_index(const T* arr, size_t count)
 {
     for (size_t i = 1; i < count; ++i)
         if (arr[i - 1] > arr[i]) /* prev > next */
-            return i;
+            return (int)i;
     return -1;
 }
 template<class T> bool is_sorted(const T* arr, size_t count)
@@ -85,5 +85,32 @@ TestImpl(test_sort)
         {
             print_error("UNSORTED array after insertion_sort: %s\n", rpp::sprint(array).c_str());
         }
+    }
+
+    TestCase(insertion_sort_custom_sort_rule)
+    {
+        struct ipaddrinfo {
+            std::string addr;
+            std::string gateway;
+        };
+
+        std::vector<ipaddrinfo> array {
+            { "192.168.1.102", "" },
+            { "192.168.1.101", "" },
+            { "192.168.1.110", "192.168.1.1" },
+        };
+
+        // first should be gateways
+        // then by regular address
+        rpp::insertion_sort(array.data(), array.size(), [](const ipaddrinfo& a, const ipaddrinfo& b)
+        {
+            if (!a.gateway.empty() && b.gateway.empty()) return true;
+            if (!b.gateway.empty() && a.gateway.empty()) return false;
+            return a.addr < b.addr;
+        });
+
+        AssertEqual(array[0].addr, "192.168.1.110"); // first because it has a gateway
+        AssertEqual(array[1].addr, "192.168.1.101");
+        AssertEqual(array[2].addr, "192.168.1.102");
     }
 };

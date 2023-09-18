@@ -443,6 +443,11 @@ namespace rpp
          * Gets interfaces sorted by name match
          */
         static std::vector<ipinterface> get_interfaces(const std::string& name_match, address_family af = AF_IPv4) noexcept;
+
+        /**
+         * @brief Default comparison function for ipinterfaces, sorts by `gateway` then by `addr`
+         */
+        static bool compare(const ipinterface& a, const ipinterface& b) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////
