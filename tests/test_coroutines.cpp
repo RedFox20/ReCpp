@@ -153,6 +153,7 @@ TestImpl(test_coroutines)
         };
         AssertThat(destructor_ids.size(), 1u); // the destructor is not called before calling get()
         AssertThat(fstr.get(), "test"s);
+        fstr = cfuture<std::string>{}; // release the future
         AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
 
