@@ -547,7 +547,7 @@ namespace rpp /* ReCpp */
 
 #if _WIN32
     // ReSharper disable CppSomeObjectMembersMightNotBeInitialized
-    dir_iterator::dir_iterator(std::string&& dir) : dir{std::move(dir)} noexcept {  // NOLINT
+    dir_iterator::dir_iterator(std::string&& dir) noexcept : dir{std::move(dir)} {  // NOLINT
         char path[512];
         if (this->dir.empty()) { // handle dir=="" special case
             snprintf(path, 512, "./*");
