@@ -109,6 +109,16 @@ namespace rpp
     /**
      * Fast locale agnostic atoi
      * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
+     * @param len Length of the string to parse
+     * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
+     * @return Parsed int
+     */
+    RPPAPI rpp::int64 to_int64(const char* str, int len, const char** end = nullptr) noexcept;
+    inline rpp::int64 to_int64(const char* str, const char** end = nullptr) noexcept { return to_int64(str, 32, end); }
+
+    /**
+     * Fast locale agnostic atoi
+     * @param str Input string, e.g. "-25" or "25", etc.. '+' is not accepted as part of the number
      *            HEX syntax is supported: 0xBA or 0BA will parse hex values instead of regular integers
      * @param len Length of the string to parse
      * @param end (optional) Destination pointer for end of parsed string. Can be NULL.
@@ -758,6 +768,12 @@ namespace rpp
          */
         NOINLINE int next_int() noexcept;
 
+        /** 
+         * Parses next int64 from current Token, example: "1,asvc2,x*3" will parse [1] [2] [3]
+         * @return 0 if there's nothing to parse or a parsed int
+         */
+        NOINLINE rpp::int64 next_int64() noexcept;
+
         /**
          * Safely chomps N chars while there is something to chomp
          */
@@ -885,6 +901,16 @@ namespace rpp
     inline strview& operator>>(strview& s, unsigned& out) noexcept
     {
         out = (unsigned)s.next_int();
+        return s;
+    }
+    inline strview& operator>>(strview& s, rpp::int64& out) noexcept
+    {
+        out = s.next_int64();
+        return s;
+    }
+    inline strview& operator>>(strview& s, rpp::uint64& out) noexcept
+    {
+        out = (rpp::uint64)s.next_int64();
         return s;
     }
     inline strview& operator>>(strview& s, bool& out) noexcept

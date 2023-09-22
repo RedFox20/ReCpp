@@ -380,6 +380,21 @@ namespace rpp
         return 0;
     }
 
+    int64 strview::next_int64() noexcept
+    {
+        auto s = str, e = s + len;
+        for (; s < e; ++s) {
+            char ch = *s; // check if we have the start of a number: "-25" || "25":
+            if (ch == '-' || ('0' <= ch && ch <= '9')) {
+                int64 i = rpp::to_int64(s, &s);
+                str = s; len = int(e - s);
+                return i;
+            }
+        }
+        str = s; len = int(e - s);
+        return 0;
+    }
+
     NOINLINE strview& strview::skip(int nchars) noexcept
     {
         auto s = str;
@@ -566,10 +581,10 @@ namespace rpp
     {
         const char* s = str;
         const char* e = str + len;
-        int64_t power   = 1;
-        int64_t intPart = abs(to_int(s, len, &s));
-        char ch         = *s;
-        int exponent    = 0;
+        int64 power   = 1;
+        int64 intPart = abs(to_int64(s, len, &s));
+        char ch       = *s;
+        int exponent  = 0;
 
         // if input is -0.xxx then intPart will lose the sign info
         // intpart growth will also break if we use neg ints
@@ -607,6 +622,28 @@ namespace rpp
         const char* s = str;
         const char* e = str + len;
         int  intPart  = 0;
+        bool negative = false;
+        char ch       = *s;
+
+        if (ch == '-')
+        { negative = true; ++s; } // change sign and skip '-'
+        else if (ch == '+')  ++s; // ignore '+'
+
+        for (; s < e && '0' <= (ch = *s) && ch <= '9'; ++s) {
+            intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
+        }
+        if (negative) intPart = -intPart; // twiddle sign
+
+        if (end) *end = s; // write end of parsed value
+        return intPart;
+    }
+
+    // optimized for simplicity and performance
+    int64 to_int64(const char* str, int len, const char** end) noexcept
+    {
+        const char* s = str;
+        const char* e = str + len;
+        int64 intPart = 0;
         bool negative = false;
         char ch       = *s;
 
