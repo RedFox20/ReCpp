@@ -1116,19 +1116,9 @@ namespace rpp
             #if EAGAIN != ESOCK(EWOULDBLOCK)
             case EAGAIN:             return 0; // no data available right now
             #endif
-            case ESOCK(ENOTCONN):    return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
-            #if _WIN32 && ESOCK(EADDRNOTAVAIL) != WSAEADDRNOTAVAIL
-            case WSAEADDRNOTAVAIL:
-            #endif
+            case ESOCK(ENOTCONN):      return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
             case ESOCK(EADDRNOTAVAIL): return 0; // address doesn't exist
-            case ESOCK(ECONNRESET):    // connection lost
-            case ESOCK(ECONNREFUSED):  // connect failed
-            case ESOCK(ETIMEDOUT):     // remote end did not respond
-            case ESOCK(ECONNABORTED):  // connection closed
-                if (AutoClose)
-                    close();
-                os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
-                return -1;
+            case ESOCK(ENETUNREACH):   return 0; // network is unreachable
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
@@ -1137,9 +1127,44 @@ namespace rpp
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
+            case ESOCK(ECONNRESET):    // connection lost
+            case ESOCK(ECONNREFUSED):  // connect failed
+            case ESOCK(ECONNABORTED):  // connection closed
+            case ESOCK(ETIMEDOUT):     // remote end did not respond
+            case ESOCK(EHOSTUNREACH):  // no route to host
+                if (AutoClose)
+                    close();
+                os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
+                return -1;
         }
     }
-    
+
+    socket::error socket::last_err_type() const noexcept
+    {
+        int err = LastErr;
+        if (!err) { LastErr = err = os_getsockerr(); }
+        switch (err) {
+            case 0: return SE_NONE;
+            default: return SE_UNKNOWN;
+            case ESOCK(ENETRESET):     return SE_NETRESET;
+            case ESOCK(EMSGSIZE):      return SE_MSGSIZE;
+            case ESOCK(EINPROGRESS):   return SE_INPROGRESS;
+            case ESOCK(EWOULDBLOCK):   return SE_AGAIN;
+            #if EAGAIN != ESOCK(EWOULDBLOCK) // legacy alias to EWOULDBLOCK
+            case EAGAIN:               return SE_AGAIN;
+            #endif
+            case ESOCK(ENOTCONN):      return SE_NOTCONN;
+            case ESOCK(EADDRNOTAVAIL): return SE_ADDRNOTAVAIL;
+            case ESOCK(EADDRINUSE):    return SE_ADDRINUSE;
+            case ESOCK(ECONNRESET):    return SE_CONNRESET;
+            case ESOCK(ECONNREFUSED):  return SE_CONNREFUSED;
+            case ESOCK(ECONNABORTED):  return SE_CONNABORTED;
+            case ESOCK(ETIMEDOUT):     return SE_TIMEDOUT;
+            case ESOCK(EHOSTUNREACH):  return SE_HOSTUNREACH;
+            case ESOCK(ENETUNREACH):   return SE_NETUNREACH;
+        }
+    }
+
     std::string socket::peek_str(int maxCount) noexcept
     {
         int count = available();

@@ -543,6 +543,32 @@ namespace rpp
          */
         std::string last_err() const noexcept;
 
+        /** @return The last OS specific error code */
+        int last_errno() const noexcept { return LastErr; }
+
+        /** @brief Common platform independent socket errors */
+        enum error : int
+        {
+            SE_NONE = 0, // no error
+            SE_UNKNOWN = -1, // unknown error (not a common error)
+            SE_NETRESET = 1, // The network has dropped the connection on reset
+            SE_MSGSIZE = 2, // The message is too large to be sent all at once, as the socket requires
+            SE_INPROGRESS = 3, // A blocking socket is in progress or the service provider is still processing a callback function
+            SE_AGAIN = 4, // The socket is marked as nonblocking and the receive operation would block, use poll()
+            SE_NOTCONN = 5, // this Socket is not Connection oriented! (aka LISTEN SOCKET)
+            SE_ADDRNOTAVAIL = 6, // The remote address is not a valid address (such as ADDR_ANY)
+            SE_ADDRINUSE = 7, // The specified address is already in use
+            SE_CONNRESET = 8, // The remote host reset the connection request
+            SE_CONNREFUSED = 9, // The remote host is actively refusing the connection
+            SE_CONNABORTED = 10, // The connection was aborted by the .NET Framework or the underlying socket provider
+            SE_TIMEDOUT = 11, // The connection attempt timed out, or the connected host has failed to respond
+            SE_HOSTUNREACH = 12, // The remote host cannot be reached from this host at this time
+            SE_NETUNREACH = 13, // The network cannot be reached from this host at this time
+        };
+
+        /** @return The last generalized error type */
+        error last_err_type() const noexcept;
+
         /**
          * @return A human readable description string of the last occurred socket error.
          */
@@ -798,7 +824,7 @@ namespace rpp
         /**
          * Get socket option from the specified optlevel with the specified opt key SO_xxxx
          * @note Reference Socket options: https://msdn.microsoft.com/en-us/library/windows/desktop/ms740525%28v=vs.85%29.aspx
-         * @return getsockopt result for the specified socketopt SO_xxxx or -1 if error occurred (check last_error())
+         * @return getsockopt result for the specified socketopt SO_xxxx or -1 if error occurred (check last_err())
          */
         int get_opt(int optlevel, int socketopt) const noexcept;
 
@@ -806,7 +832,7 @@ namespace rpp
          * Tries to set a socket option in the optlevel for the specified socketopt SO_xxxx
          * @note Reference Socket options: https://msdn.microsoft.com/en-us/library/windows/desktop/ms740525%28v=vs.85%29.aspx
          * @param optlevel Socket option level such as IPPROTO_IP or IPPROTO_TCP.
-         * @return 0 on success, error code otherwise (or check last_error())
+         * @return 0 on success, error code otherwise (or check last_err())
          */
         int set_opt(int optlevel, int socketopt, int value) noexcept;
 
@@ -822,7 +848,7 @@ namespace rpp
          * Control IO handle with the specified IO command
          * @note This function designed for iocmd-s that SET values
          * @note Reference ioctlsocket: https://msdn.microsoft.com/en-us/library/windows/desktop/ms738573%28v=vs.85%29.aspx
-         * @return 0 on success, error code otherwise (or check last_error())
+         * @return 0 on success, error code otherwise (or check last_err())
          */
         int set_ioctl(int iocmd, int value) noexcept;
 
