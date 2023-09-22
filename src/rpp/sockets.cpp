@@ -1164,7 +1164,7 @@ namespace rpp
     socket::error socket::last_os_socket_err_type(int err) noexcept
     {
         int errcode = err ? err : os_getsockerr();
-        switch (err) {
+        switch (errcode) {
             case 0: return SE_NONE;
             default: return SE_UNKNOWN;
             case ESOCK(ENETRESET):     return SE_NETRESET;
