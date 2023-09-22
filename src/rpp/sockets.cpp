@@ -753,19 +753,20 @@ namespace rpp
         return s;
     }
     socket::socket() noexcept
-        : Sock{-1}, Addr{}, LastErr{0}, Shared{false}, Blocking{true}
+        : Sock{-1}, Addr{}, LastErr{0}, Shared{false}, Blocking{true}, AutoClose{true}
         , Category{SC_Unknown}, Type{ST_Unspecified}
     {
     }
     socket::socket(socket&& s) noexcept
         : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}
-        , Shared{s.Shared}, Blocking{s.Blocking}
+        , Shared{s.Shared}, Blocking{s.Blocking}, AutoClose{s.AutoClose}
         , Category{s.Category}, Type{s.Type}
     {
         s.Sock = -1;
         s.Addr.reset();
         s.Shared = false;
         s.Blocking = false;
+        s.AutoClose = false;
         s.Category = SC_Unknown;
         s.Type = ST_Unspecified;
     }
@@ -777,6 +778,7 @@ namespace rpp
         LastErr = s.LastErr;
         Shared = s.Shared;
         Blocking = s.Blocking;
+        AutoClose = s.AutoClose;
         Category = s.Category;
         Type = s.Type;
         s.Sock = -1;
@@ -784,6 +786,7 @@ namespace rpp
         s.LastErr  = 0;
         s.Shared   = false;
         s.Blocking = false;
+        s.AutoClose = false;
         s.Category = SC_Unknown;
         s.Type = ST_Unspecified;
         return *this;
@@ -1100,7 +1103,8 @@ namespace rpp
             default: {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
-                close();
+                if (AutoClose)
+                    close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
@@ -1121,13 +1125,15 @@ namespace rpp
             case ESOCK(ECONNREFUSED):  // connect failed
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(ECONNABORTED):  // connection closed
-                close();
+                if (AutoClose)
+                    close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
-                close();
+                if (AutoClose)
+                    close();
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }

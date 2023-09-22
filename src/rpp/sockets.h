@@ -474,6 +474,7 @@ namespace rpp
         mutable int LastErr; // last error code
         bool Shared;         // if true, Socket is shared and dtor won't call closesocket()
         bool Blocking;       // only relevant on windows, if TRUE, the socket is blocking
+        bool AutoClose;      // automatically closes the socket on disconnect events
         category Category;
         socket_type Type;
 
@@ -511,6 +512,10 @@ namespace rpp
         /** Set this socket as shared, which means closesocket() won't be called */
         void set_shared(bool shared=true) noexcept { Shared = shared; }
         bool is_shared() const noexcept { return Shared != 0; }
+
+        /** Sets whether this socket automatically closes on disconnect events */
+        void set_autoclosing(bool autoclose=true) noexcept { AutoClose = autoclose; }
+        bool is_autoclosing() const noexcept { return AutoClose; }
 
         explicit operator bool() const noexcept { return Sock != INVALID; }
         /** @return TRUE if Sock handle is currently VALID */
