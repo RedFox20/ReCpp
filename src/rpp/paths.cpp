@@ -533,47 +533,56 @@ namespace rpp /* ReCpp */
             dirent* e;
         #endif
     };
-    dir_iterator::impl* dir_iterator::dummy::operator->()
+    dir_iterator::impl* dir_iterator::dummy::operator->() noexcept
     {
 #if _WIN32
         static_assert(sizeof(ffd) == sizeof(impl::ffd), "dir_iterator::dummy size mismatch");
 #endif
         return reinterpret_cast<impl*>(this);
     }
-    const dir_iterator::impl* dir_iterator::dummy::operator->() const
+    const dir_iterator::impl* dir_iterator::dummy::operator->() const noexcept
     {
         return reinterpret_cast<const impl*>(this);
     }
 
 #if _WIN32
     // ReSharper disable CppSomeObjectMembersMightNotBeInitialized
-    dir_iterator::dir_iterator(std::string&& dir) : dir{std::move(dir)} {  // NOLINT
+    dir_iterator::dir_iterator(std::string&& dir) : dir{std::move(dir)} noexcept {  // NOLINT
         char path[512];
         if (this->dir.empty()) { // handle dir=="" special case
             snprintf(path, 512, "./*");
-        }
-        else {
+        } else {
             snprintf(path, 512, "%.*s/*", static_cast<int>(this->dir.length()), this->dir.c_str());
         }
         if ((s->hFind = FindFirstFileA(path, &s->ffd)) == INVALID_HANDLE_VALUE)
             s->hFind = nullptr;
     // ReSharper restore CppSomeObjectMembersMightNotBeInitialized
     }
-    dir_iterator::~dir_iterator() { if (s->hFind) FindClose(s->hFind); }
-    dir_iterator::operator bool()  const { return s->hFind != nullptr; }
-        bool    dir_iterator::next()         { return s->hFind && FindNextFileA(s->hFind, &s->ffd) != 0; }
-        bool    dir_iterator::is_dir() const { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
-        strview dir_iterator::name()   const { return s->hFind ? s->ffd.cFileName : ""_sv; }
+    dir_iterator::~dir_iterator() noexcept { if (s->hFind) FindClose(s->hFind); }
+    dir_iterator::operator bool() const noexcept { return s->hFind != nullptr; }
+    strview dir_iterator::name() const noexcept { return s->hFind ? s->ffd.cFileName : ""_sv; }
+    bool dir_iterator::next() noexcept { return s->hFind && FindNextFileA(s->hFind, &s->ffd) != 0; }
+    bool dir_iterator::is_dir() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+    bool dir_iterator::is_file() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0; }
+    bool dir_iterator::is_symlink() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0; }
+    bool dir_iterator::is_device() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) != 0; }
 #else
-        dir_iterator::dir_iterator(std::string&& dir) : dir{std::move(dir)} {
-            const char* path = this->dir.empty() ? "." : this->dir.c_str();
-            s->e = (s->d=opendir(path)) != nullptr ? readdir(s->d) : nullptr;
-        }
-        dir_iterator::~dir_iterator() { if (s->d) closedir(s->d); }
-        dir_iterator::operator bool()  const { return s->d && s->e; }
-        bool    dir_iterator::next()         { return s->d && (s->e = readdir(s->d)) != nullptr; }
-        bool    dir_iterator::is_dir() const { return s->e && s->e->d_type == DT_DIR; }
-        strview dir_iterator::name()   const { return s->e ? strview{s->e->d_name} : strview{}; }
+    dir_iterator::dir_iterator(std::string&& dir) noexcept : dir{std::move(dir)} {
+        const char* path = this->dir.empty() ? "." : this->dir.c_str();
+        s->e = (s->d=opendir(path)) != nullptr ? readdir(s->d) : nullptr;
+    }
+    dir_iterator::~dir_iterator() noexcept { if (s->d) closedir(s->d); }
+    dir_iterator::operator bool() const noexcept { return s->d && s->e; }
+    strview dir_iterator::name() const noexcept { return s->e ? strview{s->e->d_name} : strview{}; }
+    bool dir_iterator::next() noexcept { return s->d && (s->e = readdir(s->d)) != nullptr; }
+    bool dir_iterator::is_dir() const noexcept { return s->e && s->e->d_type == DT_DIR; }
+    bool dir_iterator::is_file() const noexcept { return s->e && s->e->d_type == DT_REG; }
+    bool dir_iterator::is_symlink() const noexcept { return s->e && s->e->d_type == DT_LNK; }
+    bool dir_iterator::is_device() const noexcept {
+        if (!s->e) return false;
+        int dt = s->e->d_type;
+        return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
+    }
 #endif
 
 
@@ -593,11 +602,12 @@ namespace rpp /* ReCpp */
         std::string currentDir = path_combine(queryRoot, relPath);
         for (dir_entry e : dir_iterator{ currentDir })
         {
-            bool validDir = e.is_dir && e.name != "." && e.name != "..";
-            if ((validDir && dirs) || (!e.is_dir && files)) 
+            bool isDir = e.is_dir();
+            bool validDir = isDir && !e.is_special_dir();
+            if ((validDir && dirs) || (!isDir && files)) 
             {
                 strview dir = abs ? strview{currentDir} : relPath;
-                func(path_combine(dir, e.name), e.is_dir);
+                func(path_combine(dir, e.name), isDir);
             }
             if (validDir && rec)
             {
@@ -691,14 +701,14 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    static void append_slash(char* path, int& len)
+    static void append_slash(char* path, int& len) noexcept
     {
         if (path[len-1] != '/')
             path[len++] = '/';
     }
 
     #if _WIN32
-    static void win32_fixup_path(char* path, int& len)
+    static void win32_fixup_path(char* path, int& len) noexcept
     {
         normalize(path);
         append_slash(path, len);

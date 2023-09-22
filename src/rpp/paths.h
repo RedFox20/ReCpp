@@ -307,8 +307,8 @@ namespace rpp /* ReCpp */
                 void* d;
                 void* e;
             #endif
-            impl* operator->();
-            const impl* operator->() const;
+            impl* operator->() noexcept;
+            const impl* operator->() const noexcept;
         };
 
         dummy s; // iterator state
@@ -317,10 +317,10 @@ namespace rpp /* ReCpp */
         mutable std::string fulldir; // full path to directory we're iterating
 
     public:
-        explicit dir_iterator(const strview& dir) : dir_iterator{ dir.to_string() } {}
-        explicit dir_iterator(const std::string& dir)  : dir_iterator{ std::string{dir}     } {}
-        explicit dir_iterator(std::string&& dir);
-        ~dir_iterator();
+        explicit dir_iterator(const strview& dir) noexcept : dir_iterator{ dir.to_string() } {}
+        explicit dir_iterator(const std::string& dir) noexcept : dir_iterator{ std::string{dir} } {}
+        explicit dir_iterator(std::string&& dir) noexcept;
+        ~dir_iterator() noexcept;
 
         dir_iterator(dir_iterator&& it) = delete;
         dir_iterator(const dir_iterator&) = delete;
@@ -331,22 +331,37 @@ namespace rpp /* ReCpp */
         {
             const dir_iterator* it;
             const strview name;
-            const bool is_dir;
-            entry(const dir_iterator* it) : it{it}, name{ it->name() }, is_dir{ it->is_dir() }
-            {
-            }
-            std::string path()      const { return path_combine(it->path(),      name); }
-            std::string full_path() const { return path_combine(it->full_path(), name); }
+
+            entry(const dir_iterator* it) noexcept : it{it}, name{it->name()}  {}
+            std::string path() const noexcept { return path_combine(it->path(), name); }
+            std::string full_path() const noexcept { return path_combine(it->full_path(), name); }
+
+            /** @returns TRUE if this is a directory */
+            bool is_dir() const noexcept { return it->is_dir(); }
+            /** @returns TRUE if this is a regular file */
+            bool is_file() const noexcept { return it->is_file(); }
+            /** @returns TRUE if this is a symbolic link */
+            bool is_symlink() const noexcept { return it->is_symlink(); }
+            /** @returns TRUE if this is a block device, character device, named pipe or socket */
+            bool is_device() const noexcept { return it->is_device(); }
+
+            /** @returns TRUE if these are the special '.' or '..' dirs */
+            bool is_special_dir() const noexcept { return name == "." || name == ".."; }
+
             // all files and directories that aren't "." or ".." are valid
-            bool is_valid()    const { return !is_dir || (name != "." && name != ".."); }
-            bool add_path_to(std::vector<std::string>& out) const {
+            bool is_valid() const noexcept { return (is_file() || is_dir()) && !is_special_dir(); }
+
+            // dirs that aren't "." or ".." are valid
+            bool is_valid_dir() const noexcept { return is_dir() && !is_special_dir(); }
+
+            bool add_path_to(std::vector<std::string>& out) const noexcept {
                 if (is_valid()) {
                     out.emplace_back(path());
                     return true;
                 }
                 return false;
             }
-            bool add_full_path_to(std::vector<std::string>& out) const {
+            bool add_full_path_to(std::vector<std::string>& out) const noexcept {
                 if (is_valid()) {
                     out.emplace_back(full_path());
                     return true;
@@ -357,28 +372,31 @@ namespace rpp /* ReCpp */
 
         struct iter { // bare minimum for basic looping
             dir_iterator* it;
-            bool operator==(const iter& other) const { return it == other.it; }
-            bool operator!=(const iter& other) const { return it != other.it; }
-            entry operator*() const { return { it }; }
-            iter& operator++() {
+            bool operator==(const iter& other) const noexcept { return it == other.it; }
+            bool operator!=(const iter& other) const noexcept { return it != other.it; }
+            entry operator*() const noexcept { return { it }; }
+            iter& operator++() noexcept {
                 if (!it->next()) it = nullptr;
                 return *this;
             }
         };
 
-        explicit operator bool() const;
-        bool next(); // find next directory entry
-        bool is_dir()  const; // if current entry is a dir
-        strview name() const; // current entry name
-        entry current() const { return { this }; }
-        iter begin()          { return { this }; }
-        iter end()      const { return { nullptr }; }
+        explicit operator bool() const noexcept;
+        bool next() noexcept; // find next directory entry
+        bool is_dir() const noexcept; // if current entry is a dir
+        bool is_file() const noexcept; // if current entry is a file
+        bool is_symlink() const noexcept; // if current entry is a symbolic link
+        bool is_device() const noexcept; // if current entry is a block device, character device, named pipe or socket
+        strview name() const noexcept; // current entry name
+        entry current() const noexcept { return { this }; }
+        iter begin() noexcept { return { this }; }
+        iter end() const noexcept { return { nullptr }; }
 
         // original path used to construct this dir_iterator
-        const std::string& path() const { return dir; }
+        const std::string& path() const noexcept { return dir; }
 
         // full path to directory we're iterating
-        const std::string& full_path() const {
+        const std::string& full_path() const noexcept {
             return fulldir.empty() ? (fulldir = rpp::full_path(dir)) : fulldir;
         }
     };
