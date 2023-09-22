@@ -814,48 +814,6 @@ namespace rpp
         return sock;
     }
 
-    static void os_setsockerr(int err) noexcept
-    {
-        #if _WIN32
-            WSASetLastError(err);
-        #else
-            errno = err;
-        #endif
-    }
-
-    static int os_getsockerr() noexcept
-    {
-        #if _WIN32
-            return WSAGetLastError();
-        #else
-            return errno;
-        #endif
-    }
-
-    std::string socket::last_err() const noexcept
-    {
-        return last_os_socket_err(LastErr);
-    }
-
-    std::string socket::last_os_socket_err(int err) noexcept
-    {
-        char buf[2048];
-        int errcode = err ? err : os_getsockerr();
-        if (errcode == 0)
-            return {};
-        #if _WIN32
-            char* msg = buf + 1024;
-            int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, errcode, 0, msg, 1024, nullptr);
-            if (msg[len - 2] == '\r') msg[len -= 2] = '\0';
-        #else
-            char* msg = strerror(errcode);
-        #endif
-        int errlen = snprintf(buf, sizeof(buf), "error %d: %s", errcode, msg);
-        if (errlen < 0) errlen = (int)strlen(buf);
-        return std::string{ buf, buf + errlen };
-    }
-
-
     int socket::send(const void* buffer, int numBytes) noexcept
     {
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
@@ -1073,12 +1031,41 @@ namespace rpp
         return n > 0;
     }
 
+    static void os_setsockerr(int err) noexcept
+    {
+        #if _WIN32
+            WSASetLastError(err);
+        #else
+            errno = err;
+        #endif
+    }
+
+    static int os_getsockerr() noexcept
+    {
+        #if _WIN32
+            return WSAGetLastError();
+        #else
+            return errno;
+        #endif
+    }
+
+    int socket::last_errno() const noexcept
+    {
+        if (!LastErr) set_errno(); // if it wasn't already set (rare)
+        return LastErr;
+    }
+
+    void socket::set_errno() const noexcept
+    {
+        LastErr = os_getsockerr();
+    }
+
     // properly handles the crazy responses given by the recv() and send() functions
     // returns -1 on critical failure, otherwise it returns bytesAvailable (0...N)
     int socket::handle_txres(long ret) noexcept
     {
         if (ret == 0) { // socket closed gracefully
-            LastErr = os_getsockerr();
+            set_errno();
             close();
             return -1;
         }
@@ -1139,10 +1126,44 @@ namespace rpp
         }
     }
 
+    std::string socket::last_err() const noexcept
+    {
+        return last_os_socket_err(LastErr);
+    }
+
     socket::error socket::last_err_type() const noexcept
     {
-        int err = LastErr;
-        if (!err) { LastErr = err = os_getsockerr(); }
+        return last_os_socket_err_type(LastErr);
+    }
+
+    std::string socket::last_os_socket_err(int err) noexcept
+    {
+        char buf[2048];
+        int errcode = err ? err : os_getsockerr();
+        if (errcode == 0)
+            return {};
+
+        // if it's a known error, use a common shorter message:
+        socket::error errtype = last_os_socket_err_type(errcode);
+        if (errtype > 0)
+            return to_string(errtype);
+
+        // otherwise use a more detailed and localized error message from the OS:
+        #if _WIN32
+            char* msg = buf + 1024;
+            int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, errcode, 0, msg, 1024, nullptr);
+            if (msg[len - 2] == '\r') msg[len -= 2] = '\0';
+        #else
+            char* msg = strerror(errcode);
+        #endif
+        int errlen = snprintf(buf, sizeof(buf), "OSError %d: %s", errcode, msg);
+        if (errlen < 0) errlen = (int)strlen(buf);
+        return std::string{ buf, buf + errlen };
+    }
+
+    socket::error socket::last_os_socket_err_type(int err) noexcept
+    {
+        int errcode = err ? err : os_getsockerr();
         switch (err) {
             case 0: return SE_NONE;
             default: return SE_UNKNOWN;
@@ -1162,6 +1183,28 @@ namespace rpp
             case ESOCK(ETIMEDOUT):     return SE_TIMEDOUT;
             case ESOCK(EHOSTUNREACH):  return SE_HOSTUNREACH;
             case ESOCK(ENETUNREACH):   return SE_NETUNREACH;
+        }
+    }
+
+    std::string socket::to_string(socket::error socket_error) noexcept
+    {
+        switch (socket_error) {
+            default: return "unknown error (" + std::to_string((int)socket_error) + ")";
+            case SE_UNKNOWN:      return "unknown error";
+            case SE_NONE:         return "no error";
+            case SE_NETRESET:     return "network reset (ENETRESET)";
+            case SE_MSGSIZE:      return "message too large (EMSGSIZE)";
+            case SE_INPROGRESS:   return "operation in progress (EINPROGRESS)";
+            case SE_AGAIN:        return "no data available (EAGAIN)";
+            case SE_NOTCONN:      return "not connected (ENOTCONN)";
+            case SE_ADDRNOTAVAIL: return "address not available (EADDRNOTAVAIL)";
+            case SE_ADDRINUSE:    return "address in use (EADDRINUSE)";
+            case SE_CONNRESET:    return "connection reset (ECONNRESET)";
+            case SE_CONNREFUSED:  return "connection refused (ECONNREFUSED)";
+            case SE_CONNABORTED:  return "connection aborted (ECONNABORTED)";
+            case SE_TIMEDOUT:     return "timed out (ETIMEDOUT)";
+            case SE_HOSTUNREACH:  return "host unreachable (EHOSTUNREACH)";
+            case SE_NETUNREACH:   return "network unreachable (ENETUNREACH)";
         }
     }
 
@@ -1190,13 +1233,14 @@ namespace rpp
     int socket::get_opt(int optlevel, int socketopt) const noexcept
     {
         int value = 0; socklen_t len = sizeof(int);
-        bool success = getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) == 0;
-        LastErr = !success ? os_getsockerr() : 0;
-        return !success ? -1 : value;
+        bool ok = getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) == 0;
+        LastErr = ok ? 0 : os_getsockerr();
+        return ok ? value : -1;
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept
     {
-        LastErr = setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) ? os_getsockerr() : 0;
+        bool ok = setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) == 0;
+        LastErr = ok ? 0 : os_getsockerr();
         return LastErr;
     }
 
@@ -1234,7 +1278,7 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &outValue) == 0)
             return 0;
     #endif
-        LastErr = os_getsockerr();
+        set_errno();
         logerronce(LastErr, "(%s) failed: %s", ioctl_string(iocmd), last_err().c_str());
         return LastErr;
     }
@@ -1250,7 +1294,7 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &value) == 0)
             return 0;
     #endif
-        LastErr = os_getsockerr();
+        set_errno();
         return LastErr;
     }
 
@@ -1551,7 +1595,7 @@ namespace rpp
     #endif
         if (r <= 0)
         {
-            LastErr = os_getsockerr();
+            set_errno();
             return false;
         }
 

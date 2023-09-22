@@ -538,14 +538,6 @@ namespace rpp
         std::string name() const noexcept { return Addr.str(); }
         const char* cname() const noexcept { return Addr.cstr(); }
 
-        /**
-         * @return A human readable description string of the last occurred socket error.
-         */
-        std::string last_err() const noexcept;
-
-        /** @return The last OS specific error code */
-        int last_errno() const noexcept { return LastErr; }
-
         /** @brief Common platform independent socket errors */
         enum error : int
         {
@@ -566,13 +558,30 @@ namespace rpp
             SE_NETUNREACH = 13, // The network cannot be reached from this host at this time
         };
 
+        /** @return The last OS specific error code. 
+         *          The user is responsible for manually parsing this depending on platform. */
+        int last_errno() const noexcept;
+
+    private:
+        void set_errno() const noexcept;
+        int handle_errno(int err=0) noexcept;
+        int handle_txres(long ret) noexcept;
+    public:
+
+        /** @return A human readable description string of the last occurred socket error. */
+        std::string last_err() const noexcept;
+
         /** @return The last generalized error type */
         error last_err_type() const noexcept;
 
-        /**
-         * @return A human readable description string of the last occurred socket error.
-         */
+        /** @return A human readable description string of the last occurred OS socket error. */
         static std::string last_os_socket_err(int err=0) noexcept;
+
+        /** @return A cross platform socket::error enumeration */
+        static error last_os_socket_err_type(int err=0) noexcept;
+
+        /** @return A human readable description string of a socket::error */
+        static std::string to_string(error socket_error) noexcept;
 
         /**
          * Send data to remote socket, return number of bytes sent or -1 if socket closed
@@ -716,12 +725,6 @@ namespace rpp
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
          */
         NOINLINE bool recvfrom(ipaddress& from, std::vector<uint8_t>& outBuffer);
-
-    private: 
-        int handle_errno(int err=0) noexcept;
-        int handle_txres(long ret) noexcept;
-
-    public:
 
         /**
          * Peeks the recv buffer with Socket_Available and then builds
