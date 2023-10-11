@@ -1371,29 +1371,25 @@ namespace rpp
         return result == 1; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
     }
 
-    bool socket::set_rcv_buf_size(size_t size) noexcept
+    bool socket::set_buf_size(buffer_option opt, size_t size, bool force) noexcept
     {
-        // NOTE: on linux the kernel doubles SO_RCVBUF for internal bookkeeping
-        //       so to keep things consistent between platforms, we divide by 2 on linux:
-        inunix(size /= 2);
-        return set_opt(SOL_SOCKET, SO_RCVBUF, static_cast<int>(size)) == 0;
-    }
-    int socket::get_rcv_buf_size() const noexcept
-    {
-        int n = get_opt(SOL_SOCKET, SO_RCVBUF);
-        return n >= 0 ? n : 0;
+        int which = (opt == BO_Recv ? SO_RCVBUF : SO_SNDBUF);
+        int command = which;
+        #if __linux__
+            // NOTE: on linux the kernel doubles buffsize for internal bookkeeping
+            //       so to keep things consistent between platforms, we divide by 2 on linux:
+            size /= 2;
+            if (force) command = (opt == BO_Recv ? SO_RCVBUFFORCE : SO_SNDBUFFORCE);
+        #endif
+        if (set_opt(SOL_SOCKET, command, static_cast<int>(size)) != 0)
+            return false;
+        return get_opt(SOL_SOCKET, which) == static_cast<int>(size);
     }
 
-    bool socket::set_snd_buf_size(size_t size) noexcept
+    /** @return Receiver/Send buffer size */
+    int socket::get_buf_size(buffer_option opt) const noexcept
     {
-        // NOTE: on linux the kernel doubles SO_SNDBUF for internal bookkeeping
-        //       so to keep things consistent between platforms, we divide by 2 on linux:
-        inunix(size /= 2);
-        return set_opt(SOL_SOCKET, SO_SNDBUF, static_cast<int>(size)) == 0;
-    }
-    int socket::get_snd_buf_size() const noexcept
-    {
-        int n = get_opt(SOL_SOCKET, SO_SNDBUF);
+        int n = get_opt(SOL_SOCKET, opt == BO_Recv ? SO_RCVBUF : SO_SNDBUF);
         return n >= 0 ? n : 0;
     }
 

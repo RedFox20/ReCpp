@@ -894,23 +894,41 @@ namespace rpp
          */
         bool is_nodelay() const noexcept;
 
+        enum buffer_option
+        {
+            BO_Recv, // SO_RCVBUF
+            BO_Send, // SO_SNDBUF
+        };
+
         /**
-         * Sets the receive buffer size
+         * Sets the receive/send buffer size
+         * @param size Size in bytes
+         * @param force On UNIX platforms, uses SO_RCVBUFFORCE/SO_SNDBUFFORCE to force the size
          * @return TRUE if set size was successful, check socket::last_err() for error message
          */
-        bool set_rcv_buf_size(size_t size) noexcept;
-
-        /** @return Receive buffer size */
-        int get_rcv_buf_size() const noexcept;
-
+        bool set_buf_size(buffer_option opt, size_t size, bool force = false) noexcept;
+        /**
+         * Sets the receive buffer size
+         * @param size Size in bytes
+         * @param force On UNIX platforms, uses SO_RCVBUFFORCE to force the size
+         * @return TRUE if set size was successful, check socket::last_err() for error message
+         */
+        bool set_rcv_buf_size(size_t size, bool force = false) noexcept { return set_buf_size(BO_Recv, size, force); }
         /**
          * Sets the send buffer size
+         * @param size Size in bytes
+         * @param force On UNIX platforms, uses SO_SNDBUFFORCE to force the size
          * @return true if set size was successful, check socket::last_err() for error message
          */
-        bool set_snd_buf_size(size_t size) noexcept;
+        bool set_snd_buf_size(size_t size, bool force = false) noexcept { return set_buf_size(BO_Send, size, force); }
 
+        /** @return Receiver/Send buffer size */
+        int get_buf_size(buffer_option opt) const noexcept;
+        /** @return Receive buffer size */
+        int get_rcv_buf_size() const noexcept { return get_buf_size(BO_Recv); }
         /** @return Send buffer size */
-        int get_snd_buf_size() const noexcept;
+        int get_snd_buf_size() const noexcept { return get_buf_size(BO_Send); }
+
 
         /** @return Remaining space in the socket send buffer. 0 if no space. -1 on error. */
         int get_send_buffer_remaining() const noexcept;
