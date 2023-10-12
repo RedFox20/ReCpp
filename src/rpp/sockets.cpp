@@ -736,26 +736,22 @@ namespace rpp
     /////////        socket
     ///////////////////////////////////////////////////////////////////////////
 
-    socket socket::from_os_handle(int handle, const ipaddress& addr,
-                                  bool shared, bool blocking)
+    socket::socket() noexcept
+        : Sock{-1}, Addr{}, LastErr{0}, Shared{DEFAULT_SHARED}, Blocking{DEFAULT_BLOCKING}, AutoClose{DEFAULT_AUTOCLOSE}
+        , Category{SC_Unknown}, Type{ST_Unspecified}
     {
-        socket s;
+    }
+    socket socket::from_os_handle(int handle, const ipaddress& addr, bool shared, bool blocking)
+    {
+        socket s{}; // set the defaults
         s.Sock = handle;
         s.Addr = addr;
         s.Shared = shared;
         s.Blocking = blocking;
         s.Category = SC_Unknown;
         if (s.update_socket_type() == ST_Unspecified) // validate the socket handle
-        {
-            std::string err = s.last_err();
-            throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + err};
-        }
+            throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + s.last_err()};
         return s;
-    }
-    socket::socket() noexcept
-        : Sock{-1}, Addr{}, LastErr{0}, Shared{false}, Blocking{true}, AutoClose{true}
-        , Category{SC_Unknown}, Type{ST_Unspecified}
-    {
     }
     socket::socket(socket&& s) noexcept
         : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}
@@ -764,9 +760,9 @@ namespace rpp
     {
         s.Sock = -1;
         s.Addr.reset();
-        s.Shared = false;
-        s.Blocking = false;
-        s.AutoClose = false;
+        s.Shared = DEFAULT_SHARED;
+        s.Blocking = DEFAULT_BLOCKING;
+        s.AutoClose = DEFAULT_AUTOCLOSE;
         s.Category = SC_Unknown;
         s.Type = ST_Unspecified;
     }
@@ -784,9 +780,9 @@ namespace rpp
         s.Sock = -1;
         s.Addr.reset();
         s.LastErr  = 0;
-        s.Shared   = false;
-        s.Blocking = false;
-        s.AutoClose = false;
+        s.Shared   = DEFAULT_SHARED;
+        s.Blocking = DEFAULT_BLOCKING;
+        s.AutoClose = DEFAULT_AUTOCLOSE;
         s.Category = SC_Unknown;
         s.Type = ST_Unspecified;
         return *this;
@@ -1670,8 +1666,9 @@ namespace rpp
             return {};
 
         socket client = socket::from_os_handle(handle, ipaddress{handle});
-        // set the client socket as non-blocking, since socket options are not inherited
-        client.set_noblock_nodelay();
+        // set the accepted socket with same options as the listener
+        if (is_nodelay()) client.set_nagle(false);
+        client.set_blocking(is_blocking());
         client.Category = SC_Accept;
         return client;
     }
@@ -1715,7 +1712,10 @@ namespace rpp
 
             // restore proper blocking flags
             set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
-            set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
+
+            if      (opt & SO_NonBlock) set_blocking(false);
+            else if (opt & SO_Blocking) set_blocking(true);
+            else                        set_blocking(Blocking); // use socket default
             return true;
         }
         return false;
@@ -1723,7 +1723,7 @@ namespace rpp
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
         // we need a non-blocking socket to do select right after connect
-        if (create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & ~SO_Blocking)))
+        if (create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & SO_NonBlock)))
         {
             Addr = remoteAddr;
             auto sa = to_saddr(remoteAddr);
@@ -1733,7 +1733,7 @@ namespace rpp
                 if (err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
                 {
                     if (select(millis, SF_Write)) {
-                        if (opt & SO_Blocking)
+                        if (opt & SO_Blocking) // now configure the blocking state
                             set_blocking(true);
                         Category = SC_Client;
                         return true;

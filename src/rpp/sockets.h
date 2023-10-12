@@ -47,10 +47,11 @@ namespace rpp
     {
         SO_None,        // --
         SO_ReuseAddr = (1<<0),  // allows multiple sockets to bind to the same address
-        SO_Blocking  = (1<<1),  // request a blocking socket instead of the default non-blocking
+        SO_Blocking  = (1<<1),  // request a blocking socket instead of socket default
+        SO_NonBlock  = (1<<2),  // request a non-blocking socket instead of socket default, takes priority over SO_Blocking
         // Enables socket load balancing and buffering Nagle algorithm.
         // Will cause delays. Only applies to TCP sockets.
-        SO_Nagle     = (1<<2),
+        SO_Nagle     = (1<<3),
     };
 
     // @return UNIX af => AddressFamily conversion
@@ -469,12 +470,16 @@ namespace rpp
         };
 
         static constexpr int INVALID = -1;
+        static constexpr bool DEFAULT_SHARED = false;
+        static constexpr bool DEFAULT_BLOCKING = true;
+        static constexpr bool DEFAULT_AUTOCLOSE = false;
+
         int Sock;            // Socket handle
         ipaddress Addr;      // remote addr
         mutable int LastErr; // last error code
-        bool Shared;         // if true, Socket is shared and dtor won't call closesocket()
-        bool Blocking;       // only relevant on windows, if TRUE, the socket is blocking
-        bool AutoClose;      // automatically closes the socket on disconnect events
+        bool Shared;         // if true, Socket is shared and dtor won't call closesocket() [default: false]
+        bool Blocking;       // if TRUE, the socket is blocking [default: true], will be updated during create()/connect()
+        bool AutoClose;      // automatically closes the socket on disconnect events [default: false]
         category Category;
         socket_type Type;
 
@@ -867,8 +872,8 @@ namespace rpp
         void set_noblock_nodelay() noexcept;
 
         /**
-         * Configure socket settings: I/O blocking mode off(0) or on(1)
-         * @param socketsBlock (FALSE = NOBLOCK, TRUE = BLOCK)
+         * Configure socket settings: I/O blocking mode off(false) or on(true)
+         * @param socketsBlock (TRUE = BLOCK, FALSE = NOBLOCK)
          * @return TRUE if set succeded, check socket::last_err() for error message
          */
         bool set_blocking(bool socketsBlock) noexcept;
