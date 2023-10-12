@@ -1378,10 +1378,12 @@ namespace rpp
         #if __linux__
             // NOTE: on linux the kernel doubles buffsize for internal bookkeeping
             //       so to keep things consistent between platforms, we divide by 2 on linux:
-            size /= 2;
+            int size_cmd = static_cast<int>(size / 2);
             if (force) command = (opt == BO_Recv ? SO_RCVBUFFORCE : SO_SNDBUFFORCE);
+        #else
+            int size_cmd = static_cast<int>(size);
         #endif
-        if (set_opt(SOL_SOCKET, command, static_cast<int>(size)) != 0)
+        if (set_opt(SOL_SOCKET, command, size_cmd) != 0)
             return false;
         return get_opt(SOL_SOCKET, which) == static_cast<int>(size);
     }
