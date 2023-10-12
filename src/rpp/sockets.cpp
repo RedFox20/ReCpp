@@ -1808,8 +1808,15 @@ namespace rpp
     void load_balancer::set_max_bytes_per_sec(uint32_t maxBytesPerSec) noexcept
     {
         this->maxBytesPerSec = maxBytesPerSec;
-        nanosBetweenBytes = 1'000'000'000 / maxBytesPerSec;
 
+        // the load balancer is disabled when set to rate=0
+        if (maxBytesPerSec == 0)
+        {
+            nanosBetweenBytes = 0;
+            return;
+        }
+
+        nanosBetweenBytes = 1'000'000'000 / maxBytesPerSec;
         // need at least 1ns between bytes
         // for a 280 byte UDP packet, we would have to wait 280ns between packets
         // this would give us a max of 3.5 million packets per second
