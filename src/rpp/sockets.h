@@ -82,13 +82,6 @@ namespace rpp
         int proto_int()  const noexcept { return ipproto_int(Protocol); }
     };
 
-
-    // Sleeps for specified milliseconds duration
-    void RPPAPI thread_sleep(int milliseconds) noexcept;
-
-    // Measure highest accuracy time in seconds for both Windows and Linux
-    double RPPAPI timer_time() noexcept;
-
     /**
      * @brief IP address abstraction, without port
      */
@@ -1017,7 +1010,7 @@ namespace rpp
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
          */
-        bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
+        bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) const noexcept;
 
         /**
          * @brief Enables polling multiple sockets for READ readiness
@@ -1076,21 +1069,15 @@ namespace rpp
         }
 
         /**
-         * Try accepting a new connection from THIS listening socket. Accepted socket set to noblock nodelay.
-         * If there are no pending connections this function returns invalid socket
-         * To wait for a new connection in a blocking way use accept(timeoutMillis)
-         * To wait for a new connection asynchronously use AcceptAsync()
+         * Try accepting a new connection from THIS listening socket.
+         * 
+         * @param timeoutMillis if > 0, polls the socket until timeoutMillis is reached
+         *                      if == 0, tests for a pending connection and returns immediately
+         *                      if < 0, waits forever until a connection is established
+         * 
          * @return Invalid socket if there are no pending connections, otherwise a valid socket handle
          */
-        socket accept() const;
-
-        /**
-         * Blocks until a new connection arrives or the specified timeout is reached.
-         * To block forever, set timeoutMillis to -1
-         * This function will fail automatically if the socket is closed
-         */
-        socket accept(int millis) const;
-
+        socket accept(int timeoutMillis = 0) const noexcept;
 
         /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay

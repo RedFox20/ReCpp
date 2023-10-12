@@ -35,7 +35,6 @@
         extern "C" const char* WSAAPI inet_ntop(int af, void* pAddr, char* pStringBuf, size_t StringBufSize);
     #endif
 #else // UNIX
-    #include <time.h>               // clock_gettime
     #include <unistd.h>             // close()
     #include <pthread.h>            // POSIX threads
     #include <sys/types.h>          // required type definitions
@@ -107,33 +106,6 @@
 namespace rpp
 {
     /////////////////////////////////////////////////////////////////////////////
-    // sleeps for specified milliseconds duration
-    void thread_sleep(int milliseconds) noexcept
-    {
-        sleep(milliseconds);
-    }
-    // measure highest accuracy time in seconds for both Windows and Linux
-    double timer_time() noexcept
-    {
-    #if _WIN32
-        static double timer_freq = 0.0;
-        LARGE_INTEGER t;
-        if (timer_freq == 0.0) // initialize high perf timer frequency
-        {
-            QueryPerformanceFrequency(&t);
-            timer_freq = (double)t.QuadPart;
-        }
-        QueryPerformanceCounter(&t);
-        return (double)t.QuadPart / timer_freq;
-    #else
-        struct timespec tm;
-        clock_gettime(CLOCK_REALTIME, &tm);
-        return tm.tv_sec + (double)tm.tv_nsec / 1000000000.0;
-    #endif
-    }
-
-    ////////////////////////////////////////////////////////////////////
-
 
 #if _WIN32
     static void InitWinSock() noexcept
@@ -1573,7 +1545,7 @@ namespace rpp
         return rescode > 0; // success: > 0, timeout == 0
     }
 
-    bool socket::poll(int timeoutMillis, PollFlag pollFlags) noexcept
+    bool socket::poll(int timeoutMillis, PollFlag pollFlags) const noexcept
     {
         const bool read = (pollFlags & PF_Read) != 0;
         const bool write = (pollFlags & PF_Write) != 0;
@@ -1656,12 +1628,20 @@ namespace rpp
     }
 
 
-    socket socket::accept() const
+    socket socket::accept(int timeoutMillis) const noexcept
     {
-        Assert(type() != socket_type::ST_Datagram, "Cannot use socket::accept() on UDP sockets, use recvfrom instead");
+        if (type() != socket_type::ST_Stream)
+        {
+            LogError("Cannot use socket::accept() on non-TCP sockets, use recvfrom instead");
+            return {};
+        }
 
-        // assume the listener socket is already non-
-        int handle = (int)::accept(Sock, nullptr, nullptr);
+        if (!this->poll(timeoutMillis, PF_Read))
+            return {};
+
+        saddr saddr;
+        socklen_t len = sizeof(saddr);
+        int handle = (int)::accept(Sock, &saddr.sa, &len);
         if (handle == -1)
             return {};
 
@@ -1669,23 +1649,8 @@ namespace rpp
         // set the accepted socket with same options as the listener
         if (is_nodelay()) client.set_nagle(false);
         client.set_blocking(is_blocking());
+        client.set_autoclosing(is_autoclosing());
         client.Category = SC_Accept;
-        return client;
-    }
-
-    socket socket::accept(int millis) const
-    {
-        socket client;
-        const double timeout = millis / 1000.0; // millis to seconds
-        const double start = timer_time();
-        do
-        {
-            if ((client = accept()).good())
-                return client; // success
-            thread_sleep(1); // suspend until next timeslice
-        }
-        while (timeout > 0.0 && (timer_time() - start) < timeout);
-
         return client;
     }
 
