@@ -76,6 +76,38 @@ TestImpl(test_concurrent_queue)
         AssertThat(items.at(2), "item3");
     }
 
+    TestCase(rapid_growth)
+    {
+        constexpr int MAX_SIZE = 40'000;
+        concurrent_queue<std::string> queue;
+        for (int i = 0; i < MAX_SIZE; ++i)
+            queue.push("item");
+        AssertThat(queue.size(), MAX_SIZE);
+
+        int numPopped = 0;
+        std::string item;
+        while (queue.wait_pop(item, 50ms))
+            ++numPopped;
+        AssertThat(numPopped, MAX_SIZE);
+    }
+
+    TestCase(rapid_growth_async)
+    {
+        constexpr int MAX_SIZE = 40'000;
+        concurrent_queue<std::string> queue;
+        auto producer = std::thread([&] {
+            for (int i = 0; i < MAX_SIZE; ++i)
+                queue.push("item");
+        });
+        scope_guard([&]{ producer.join(); });
+
+        int numPopped = 0;
+        std::string item;
+        while (queue.wait_pop(item, 50ms))
+            ++numPopped;
+        AssertThat(numPopped, MAX_SIZE);
+    }
+
     // try_pop() is excellent for polling scenarios
     // if you don't want to wait for an item, but just check
     // if any work could be done, otherwise just continue

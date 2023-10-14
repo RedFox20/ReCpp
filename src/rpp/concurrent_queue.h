@@ -168,13 +168,20 @@ namespace rpp
         /**
          * @brief Thread-safely clears the entire queue and notifies all waiters
          */
-        void clear() noexcept
+        void clear()
         {
             {
                 std::unique_lock<std::mutex> lock = spin_lock(); // may throw
                 clear_unlocked(); // destroy all elements
             }
             Waiter.notify_all(); // notify all waiters that the queue was emptied
+        }
+
+        void reserve(int newCapacity)
+        {
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            if (newCapacity > capacity())
+                grow_to(newCapacity);
         }
 
         /**
@@ -549,6 +556,7 @@ namespace rpp
         void ensure_capacity() noexcept
         {
             const int oldCap = capacity();
+            // we have enough capacity, just shift the items to the front
             if (oldCap > 0 && (Head - ItemsStart) >= (oldCap / 2))
             {
                 // unshift elements to the front of the queue
@@ -562,16 +570,19 @@ namespace rpp
                 int growBy = oldCap ? oldCap : 32;
                 if (growBy > (16*1024)) growBy = 16*1024;
                 const int newCap = oldCap + growBy;
-
-                T* oldStart = ItemsStart;
-                T* newStart = (T*)malloc(newCap * sizeof(T));
-                T* newTail = move_items(Head, Tail, newStart);
-                Head = newStart;
-                Tail = newTail;
-                ItemsStart = newStart;
-                ItemsEnd = newStart + newCap;
-                free(oldStart);
+                grow_to(newCap);
             }
+        }
+        void grow_to(int newCap) noexcept
+        {
+            T* oldStart = ItemsStart;
+            T* newStart = (T*)malloc(newCap * sizeof(T));
+            T* newTail = move_items(Head, Tail, newStart);
+            Head = newStart;
+            Tail = newTail;
+            ItemsStart = newStart;
+            ItemsEnd = newStart + newCap;
+            free(oldStart);
         }
         static T* move_items(T* oldHead, T* oldTail, T* newStart) noexcept
         {
