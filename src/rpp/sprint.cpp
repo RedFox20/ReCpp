@@ -38,7 +38,7 @@ namespace rpp
         return *this;
     }
 
-    void string_buffer::clear()
+    void string_buffer::clear() noexcept
     {
         ptr[len = 0] = '\0';
     }
@@ -83,10 +83,11 @@ namespace rpp
         return result;
     }
 
-    void string_buffer::writef(const char* format, ...)
+    void string_buffer::writef(const char* format, ...) noexcept
     {
+        va_list ap;
+        va_start(ap, format);
         char buffer[8192];
-        va_list ap; va_start(ap, format);
         int n = vsnprintf(buffer, sizeof(buffer), format, ap);
         if (n < 0 || n >= (int)sizeof(buffer))
             n = sizeof(buffer) - 1;
@@ -97,12 +98,12 @@ namespace rpp
     }
 
 
-    void string_buffer::write(const string_buffer& sb) { write(sb.view()); }
-    void string_buffer::write_ptr_begin()      { write("*{");   }
-    void string_buffer::write(std::nullptr_t)  { write("null"); }
-    void string_buffer::write_ptr_end()        { write('}');    }
+    void string_buffer::write(const string_buffer& sb) noexcept { write(sb.view()); }
+    void string_buffer::write_ptr_begin() noexcept     { write("*{");   }
+    void string_buffer::write(std::nullptr_t) noexcept { write("null"); }
+    void string_buffer::write_ptr_end() noexcept       { write('}');    }
 
-    void string_buffer::write(const strview& s)
+    void string_buffer::write(const strview& s) noexcept
     {
         reserve(s.len);
         char* dst = ptr + len;
@@ -111,30 +112,30 @@ namespace rpp
         ptr[len] = '\0';
     }
 
-    void string_buffer::write(char value)
+    void string_buffer::write(char value) noexcept
     {
         reserve(1);
         ptr[len++] = value;
         ptr[len] = '\0';
     }
 
-    void string_buffer::write(bool value)   { write(value ? "true"_sv : "false"_sv); }
-    void string_buffer::write(rpp::byte bv) { reserve(4);  len += _tostring(&ptr[len], bv);    }
-    void string_buffer::write(short value)  { reserve(8);  len += _tostring(&ptr[len], value); }
-    void string_buffer::write(ushort value) { reserve(8);  len += _tostring(&ptr[len], value); }
-    void string_buffer::write(int value)    { reserve(16); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(uint value)   { reserve(16); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(long value)   { reserve(16); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(ulong value)  { reserve(16); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(int64 value)  { reserve(32); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(uint64 value) { reserve(32); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(float value)  { reserve(32); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(double value) { reserve(48); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(bool value)   noexcept { write(value ? "true"_sv : "false"_sv); }
+    void string_buffer::write(rpp::byte bv) noexcept { reserve(4);  len += _tostring(&ptr[len], bv);    }
+    void string_buffer::write(short value)  noexcept { reserve(8);  len += _tostring(&ptr[len], value); }
+    void string_buffer::write(ushort value) noexcept { reserve(8);  len += _tostring(&ptr[len], value); }
+    void string_buffer::write(int value)    noexcept { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(uint value)   noexcept { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(long value)   noexcept { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(ulong value)  noexcept { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(int64 value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(uint64 value) noexcept { reserve(32); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(float value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(double value) noexcept { reserve(48); len += _tostring(&ptr[len], value); }
 
     static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };
     static const char HEXUP[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
     
-    void string_buffer::write_hex(const void* data, int numBytes, format_opt opt)
+    void string_buffer::write_hex(const void* data, int numBytes, format_opt opt) noexcept
     {
         const char* hex = opt == uppercase ? HEXUP : HEX;
         const uint8_t* src = reinterpret_cast<const uint8_t*>(data);
@@ -148,7 +149,7 @@ namespace rpp
         ptr[len] = '\0';
     }
 
-    void string_buffer::write_ptr(const void* p, format_opt opt)
+    void string_buffer::write_ptr(const void* p, format_opt opt) noexcept
     {
         static_assert(sizeof(p) == 8 || sizeof(p) == 4, "sizeof(ptr) expected as 8 or 4");
         reserve(sizeof(p)*2 + 2);
@@ -164,62 +165,62 @@ namespace rpp
         ptr[len] = '\0';
     }
 
-    void string_buffer::writeln()     { write('\n'); }
-    void string_buffer::write_quote() { write('"');  }
-    void string_buffer::write_apos()  { write('\''); }
-    void string_buffer::write_colon() { write(": "); }
-    void string_buffer::write_separator() { write(separator); }
+    void string_buffer::writeln() noexcept     { write('\n'); }
+    void string_buffer::write_quote() noexcept { write('"');  }
+    void string_buffer::write_apos() noexcept  { write('\''); }
+    void string_buffer::write_colon() noexcept { write(": "); }
+    void string_buffer::write_separator() noexcept { write(separator); }
 
-    void string_buffer::pretty_cont_start(int count, bool newlines)
+    void string_buffer::pretty_cont_start(int count, bool newlines) noexcept
     {
         if (count == 0) return write("{}");
         if (count > 4) { write('['); write(count); write("] = { "); }
         else { write("{ "); }
         if (newlines) write('\n');
     }
-    void string_buffer::pretty_cont_item_start(bool newlines)
+    void string_buffer::pretty_cont_item_start(bool newlines) noexcept
     {
         if (newlines) write("  ");
     }
-    void string_buffer::pretty_cont_item_end(int i, int count, bool newlines)
+    void string_buffer::pretty_cont_item_end(int i, int count, bool newlines) noexcept
     {
         if (i < count) write(", ");
         if (newlines) write('\n');
     }
-    void string_buffer::pretty_cont_end(int count)
+    void string_buffer::pretty_cont_end(int count) noexcept
     {
         if (count > 0) write(" }");
     }
     ////////////////////////////////////////////////////////////////////////////////
 
-    int print(FILE* file, strview value) { return (int)fwrite(value.str, value.len, 1, file); }
-    int print(FILE* file, char value)    { return (int)fwrite(&value, 1, 1, file); }
-    int print(FILE* file, rpp::byte value){char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
-    int print(FILE* file, short value)   { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
-    int print(FILE* file, ushort value)  { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
-    int print(FILE* file, int value)     { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
-    int print(FILE* file, uint value)    { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
-    int print(FILE* file, int64 value)   { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
-    int print(FILE* file, uint64 value)  { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, strview value) noexcept { return (int)fwrite(value.str, value.len, 1, file); }
+    int print(FILE* file, char value)    noexcept { return (int)fwrite(&value, 1, 1, file); }
+    int print(FILE* file, rpp::byte value) noexcept{char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, short value)   noexcept { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, ushort value)  noexcept { char buf[8];  return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, int value)     noexcept { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, uint value)    noexcept { char buf[16]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, int64 value)   noexcept { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
+    int print(FILE* file, uint64 value)  noexcept { char buf[32]; return (int)fwrite(buf, _tostring(buf, value), 1, file); }
 
-    int print(strview value)             { return print(stdout, value); }
-    int print(char value)                { return print(stdout, value); }
-    int print(rpp::byte value)           { return print(stdout, value); }
-    int print(short value)               { return print(stdout, value); }
-    int print(ushort value)              { return print(stdout, value); }
-    int print(int value)                 { return print(stdout, value); }
-    int print(uint value)                { return print(stdout, value); }
-    int print(int64 value)               { return print(stdout, value); }
-    int print(uint64 value)              { return print(stdout, value); }
+    int print(strview value)             noexcept { return print(stdout, value); }
+    int print(char value)                noexcept { return print(stdout, value); }
+    int print(rpp::byte value)           noexcept { return print(stdout, value); }
+    int print(short value)               noexcept { return print(stdout, value); }
+    int print(ushort value)              noexcept { return print(stdout, value); }
+    int print(int value)                 noexcept { return print(stdout, value); }
+    int print(uint value)                noexcept { return print(stdout, value); }
+    int print(int64 value)               noexcept { return print(stdout, value); }
+    int print(uint64 value)              noexcept { return print(stdout, value); }
 
-    int println(FILE* file)              { return print(file, '\n'); }
-    int println()                        { return print(stdout, '\n'); }
+    int println(FILE* file)              noexcept { return print(file, '\n'); }
+    int println()                        noexcept { return print(stdout, '\n'); }
 
-    std::string __format(const char* format, ...)
+    std::string __format(const char* format, ...) noexcept
     {
-        char buf[8192];
         va_list ap;
         va_start(ap, format);
+        char buf[8192];
         int n = vsnprintf(buf, sizeof(buf), format, ap);
         if (n < 0 || n >= (int)sizeof(buf)) {
             n = sizeof(buf)-1;
