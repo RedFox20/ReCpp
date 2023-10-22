@@ -212,13 +212,16 @@ namespace rpp
         // however strview(std::string&&) is allowed because it allows passing temporaries as arguments to functions
         strview& operator=(std::string&&) = delete;
 
-        FINLINE RPP_CONSTEXPR_STRLEN strview& operator=(const char* str) noexcept {
-            this->str = str;
-            this->len = static_cast<int>(std::char_traits<char>::length(str));
+        FINLINE RPP_CONSTEXPR_STRLEN strview& operator=(const char* s) noexcept {
+            this->str = s ? s : "";
+            this->len = s ? static_cast<int>(std::char_traits<char>::length(str)) : 0;
             return *this;
         }
         template<int N>
-        FINLINE constexpr strview& operator=(const char (&str)[N]) noexcept { this->str = str; this->len = N-1; return *this; }
+        FINLINE constexpr strview& operator=(const char (&s)[N]) noexcept { 
+            this->str = s; this->len = N-1;
+            return *this;
+        }
 
         /** Creates a new string from this string-strview */
         FINLINE std::string& to_string(std::string& out) const { return out.assign(str, (size_t)len); }
