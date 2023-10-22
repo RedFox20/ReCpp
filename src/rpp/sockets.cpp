@@ -1792,12 +1792,17 @@ namespace rpp
 
     bool load_balancer::can_send() const noexcept
     {
-        return !nextSendTimeout || can_send(TimePoint::now());
+        return can_send(TimePoint::now());
     }
 
+    // DON'T FORGET TO CALL notify_sent() !
     bool load_balancer::can_send(const rpp::TimePoint& now) const noexcept
     {
-        return !nextSendTimeout || lastSendTime.elapsed_ns(now) >= nextSendTimeout;
+        if (!lastSendTime)
+            return true;
+
+        const int32_t waitTimeNs = nextSendTimeout - lastSendTime.elapsed_ns(now);
+        return waitTimeNs <= 0;
     }
 
     void load_balancer::wait_to_send(uint32_t bytesToSend) noexcept
@@ -1811,15 +1816,15 @@ namespace rpp
         }
 
         TimePoint end = start;
-        const uint32_t timeoutNs = nextSendTimeout;
-        const int waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
+        const int32_t timeoutNs = nextSendTimeout;
+        const int32_t waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
         if (waitTimeNs > 0)
         {
-            int remainingNs = waitTimeNs;
+            int32_t remainingNs = waitTimeNs;
 
             // UDP socket sendto also takes a small amount of time
             // so we quit if we have minRemainingNs left
-            constexpr int minRemainingNs = 80;
+            constexpr int32_t minRemainingNs = 80;
             while (remainingNs > minRemainingNs)
             {
                 // if we have very little time remaining

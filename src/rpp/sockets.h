@@ -1209,7 +1209,7 @@ namespace rpp
         uint32_t maxBytesPerSec;
         uint32_t nanosBetweenBytes;
         rpp::TimePoint lastSendTime;
-        uint32_t nextSendTimeout = 0;
+        int32_t nextSendTimeout = 0;
 
     public:
         explicit load_balancer(uint32_t maxBytesPerSec) noexcept
@@ -1228,7 +1228,7 @@ namespace rpp
 
         /**
          * @returns TRUE if the specified number of bytes can be sent
-         * @note The caller must manually call notify_sent() after sending the bytes
+         * @warning The caller MUST MANUALLY call notify_sent() after sending the bytes
          */
         bool can_send() const noexcept;
         bool can_send(const rpp::TimePoint& now) const noexcept;
