@@ -312,7 +312,7 @@ namespace rpp
          * @brief Attempts to peek an item without popping it. This will copy the item!
          * @returns TRUE if an item was available and was copied to outItem
          */
-        [[nodiscard]] bool peek(T& outItem) noexcept
+        [[nodiscard]] bool peek(T& outItem) const noexcept
         {
             if (empty())
                 return false;
@@ -334,6 +334,22 @@ namespace rpp
                 std::this_thread::yield();
             }
             return false;
+        }
+
+        /**
+         * @brief Attempts to wait until an item is available.
+         * @param timeout Maximum time to wait before returning FALSE
+         * @returns TRUE if an item is available to peek or pop
+         */
+        [[nodiscard]] bool wait_available(duration timeout) const
+        {
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            #if _MSC_VER // on Win32 wait_for is faster
+                (void)Waiter.wait_for(lock, timeout); // may throw
+            #else // on GCC wait_until is faster
+                (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
+            #endif
+            return !empty();
         }
 
         /**
