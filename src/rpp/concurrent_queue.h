@@ -30,7 +30,7 @@ namespace rpp
         T* ItemsEnd = nullptr;
 
         mutable std::mutex Mutex;
-        rpp::condition_variable Waiter;
+        mutable rpp::condition_variable Waiter;
 
     public:
 
