@@ -577,7 +577,7 @@ namespace rpp
             }
             return lock;
         }
-        void wait_notify(std::unique_lock<std::mutex>& lock, duration timeout)
+        void wait_notify(std::unique_lock<std::mutex>& lock, duration timeout) const
         {
         #if _MSC_VER // on Win32 wait_for is faster
             (void)Waiter.wait_for(lock, timeout); // may throw
