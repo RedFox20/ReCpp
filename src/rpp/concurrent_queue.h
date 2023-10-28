@@ -344,7 +344,7 @@ namespace rpp
         [[nodiscard]] bool wait_available(duration timeout) const
         {
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
-            wait_notify(timeout); // may throw
+            wait_notify(lock, timeout); // may throw
             return !empty();
         }
 
@@ -391,7 +391,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
-                wait_notify(timeout); // may throw
+                wait_notify(lock, timeout); // may throw
                 if (empty())
                     return false;
             }
@@ -411,7 +411,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
-                wait_notify(timeout); // may throw
+                wait_notify(lock, timeout); // may throw
                 if (empty())
                     return false;
             }
@@ -577,7 +577,7 @@ namespace rpp
             }
             return lock;
         }
-        void wait_notify(duration timeout)
+        void wait_notify(std::unique_lock<std::mutex>& lock, duration timeout)
         {
         #if _MSC_VER // on Win32 wait_for is faster
             (void)Waiter.wait_for(lock, timeout); // may throw
