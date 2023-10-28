@@ -309,6 +309,34 @@ namespace rpp
         }
 
         /**
+         * @brief Attempts to peek an item without popping it. This will copy the item!
+         * @returns TRUE if an item was available and was copied to outItem
+         */
+        [[nodiscard]] bool peek(T& outItem) noexcept
+        {
+            if (empty())
+                return false;
+
+            if (Mutex.try_lock())
+            {
+                if (empty())
+                {
+                    Mutex.unlock();
+                    return false;
+                }
+                outItem = *Head;
+                Mutex.unlock();
+                return true;
+            }
+            else
+            {
+                // if we failed to lock, yielding here will improve perf by 5-10x
+                std::this_thread::yield();
+            }
+            return false;
+        }
+
+        /**
          * Waits forever until an item is ready to be popped.
          * @warning If no items are present, then this will deadlock!
          * @note This is a convenience method for wait_pop() with no timeout
