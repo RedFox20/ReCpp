@@ -344,11 +344,7 @@ namespace rpp
         [[nodiscard]] bool wait_available(duration timeout) const
         {
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
-            #if _MSC_VER // on Win32 wait_for is faster
-                (void)Waiter.wait_for(lock, timeout); // may throw
-            #else // on GCC wait_until is faster
-                (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
-            #endif
+            wait_notify(timeout); // may throw
             return !empty();
         }
 
@@ -395,15 +391,31 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock(); // may throw
             if (empty())
             {
-            #if _MSC_VER // on Win32 wait_for is faster
-                (void)Waiter.wait_for(lock, timeout); // may throw
-            #else // on GCC wait_until is faster
-                (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
-            #endif
+                wait_notify(timeout); // may throw
                 if (empty())
                     return false;
             }
             pop_unlocked(outItem);
+            return true;
+        }
+
+        /**
+         * Waits up to @param timeout duration until an item is ready and peeks the value
+         * without popping it.
+         * 
+         * @return TRUE if an item was peeked successfully
+         */
+        [[nodiscard]]
+        bool wait_peek(T& outItem, duration timeout) const
+        {
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            if (empty())
+            {
+                wait_notify(timeout); // may throw
+                if (empty())
+                    return false;
+            }
+            outItem = *Head; // copy (may throw)
             return true;
         }
 
@@ -564,6 +576,14 @@ namespace rpp
                 lock.lock();
             }
             return lock;
+        }
+        void wait_notify(duration timeout)
+        {
+        #if _MSC_VER // on Win32 wait_for is faster
+            (void)Waiter.wait_for(lock, timeout); // may throw
+        #else // on GCC wait_until is faster
+            (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
+        #endif
         }
         void push_unlocked(T&& item) noexcept
         {
