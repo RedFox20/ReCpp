@@ -8,6 +8,11 @@ option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 option(BUILD_WITH_MEM_SAFETY "Build Rpp and RppTests with memory safety checks" OFF)
 option(BUILD_WITH_THREAD_SAFETY "Build Rpp and RppTests with thread safety checks" OFF)
 
+# include mama dependencies for platforms that require it
+if(MIPS)
+    include(mama.cmake)
+endif()
+
 if(ANDROID OR ANDROID_NDK)
 elseif(WIN32 OR MSVC)
 elseif(APPLE)
@@ -151,6 +156,11 @@ if(RASPI)
 elseif(MIPS)
     set(LIBDL_LIB "dl")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+    if (BUILD_WITH_LIBDW)
+        # dependencies managed by mamabuild
+        set(LIBDW_LIB ${elfutils_LIB})
+        set(LIBDW_INCLUDE ${elfutils_INCLUDES})
+    endif()
 elseif(OCLEA)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed")
     set(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")

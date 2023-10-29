@@ -6,6 +6,9 @@ class ReCpp(mama.BuildTarget):
     def dependencies(self):
         # if no preference, prefer gcc since its support is better in 2023
         self.prefer_gcc()
+        # for a few specific target we use source-built elfutils for libdw support
+        if self.mips:
+            self.add_git('elfutils', 'https://github.com/RedFox20/elfutils-package.git')
 
     def configure(self):
         if self.windows and os.getenv('APPVEYOR') != None:

@@ -31,6 +31,17 @@
             "cppStandard": "c++20",
             "intelliSenseMode": "linux-clang-arm64",
             "compileCommands": "${workspaceFolder}/build/ReCpp/android/compile_commands.json"
+        },
+        {
+            "name": "mips mipsel",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x64",
+            "compileCommands": "${workspaceFolder}/build/ReCpp/mips/compile_commands.json"
         }
     ],
     "version": 4
