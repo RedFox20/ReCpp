@@ -10,23 +10,23 @@ class ReCpp(mama.BuildTarget):
         if self.mips:
             self.add_git('elfutils', 'https://github.com/RedFox20/elfutils-package.git')
 
+
     def configure(self):
         if self.windows and os.getenv('APPVEYOR') != None:
             self.add_cl_flags('/DAPPVEYOR')
-        def is_enabled(name):
+
+        def enable_from_env(name, enabled='ON', force=False):
             env = os.getenv(name)
-            return env and env == '1' or env == 'ON' or env == 'TRUE'
-        if is_enabled('BUILD_WITH_MEM_SAFETY'):
-            self.add_cmake_options('BUILD_WITH_MEM_SAFETY=ON')
-        if is_enabled('BUILD_WITH_THREAD_SAFETY'):
-            self.add_cmake_options('BUILD_WITH_THREAD_SAFETY=ON')
-        
-        if os.getenv('CXX17') or self.is_enabled_cxx17():
-            self.add_cmake_options('CXX17=TRUE')
-        if os.getenv('CXX20') or self.is_enabled_cxx20():
-            self.add_cmake_options('CXX20=TRUE')
-        if os.getenv('BUILD_TESTS'):
-            self.add_cmake_options('BUILD_TESTS=ON')
+            if force or (env and (env == '1' or env == 'ON' or env == 'TRUE')):
+                self.add_cmake_options(f'{name}={enabled}')
+
+        # enable CMAKE opts if env vars are enabled
+        enable_from_env('BUILD_TESTS', force=self.config.test != '')
+        enable_from_env('BUILD_WITH_MEM_SAFETY')
+        enable_from_env('BUILD_WITH_THREAD_SAFETY')
+        enable_from_env('CXX17', force=self.is_enabled_cxx17())
+        enable_from_env('CXX20', force=self.is_enabled_cxx20())
+
 
     def package(self):
         os.makedirs(self.build_dir('include/rpp/'), exist_ok=True)
@@ -52,9 +52,11 @@ class ReCpp(mama.BuildTarget):
         elif self.macos or self.ios:
             self.export_syslib('-framework Foundation')
 
+
     def deploy(self):
         # deploy directly to build directory
         self.papa_deploy(f'.', src_dir=False)
+
 
     def test(self, args):
         if 'nogdb' in args:
@@ -62,3 +64,4 @@ class ReCpp(mama.BuildTarget):
             self.run_program(self.source_dir('bin'), self.source_dir(f'bin/RppTests {args}'))
         else:
             self.gdb(f"bin/RppTests {args}", src_dir=True)
+

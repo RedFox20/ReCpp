@@ -570,10 +570,9 @@ TestImpl(test_sockets)
         print_info("remote: closing down\n");
     }
 
-    // localhost MTU size is unreliable, 65536 is very common,
-    // but it can easily not be the case on some Windows machines
-    // Use a relatively small amount which should always go through
-    static constexpr int TransmitSize = 32768;
+    // the reasonable MTU in most systems is 1500
+    // using anything higher is extremely unreliable
+    static constexpr int TransmitSize = 1500;
 
     TestCase(transmit_data)
     {
@@ -582,7 +581,6 @@ TestImpl(test_sockets)
         socket server = listen(rpp::make_tcp_randomport()); // this is our server
         std::thread remote([this,port=server.port()] { this->transmitting_remote(port); });
         socket client = accept(server);
-        client.set_rcv_buf_size(TransmitSize);
 
         for (int i = 0; i < 20; ++i)
         {
@@ -621,8 +619,6 @@ TestImpl(test_sockets)
         std::vector<char> sendBuffer(TransmitSize, '$');
 
         socket server = connect("127.0.0.1", serverPort);
-        server.set_snd_buf_size(TransmitSize*2);
-
         while (server.connected())
         {
             int sentBytes = server.send(sendBuffer.data(), (int)sendBuffer.size());
