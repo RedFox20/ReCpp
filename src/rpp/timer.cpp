@@ -161,15 +161,9 @@ namespace rpp
             }
 
             LARGE_INTEGER time; QueryPerformanceCounter(&time);
-
-            // in order to support nanosecond precision,
-            // the internal ticks need to be converted to nanoseconds
-            auto sec = sec_t(time.QuadPart / freq);
-            auto fraction = uint64_t(time.QuadPart % freq);
-            // convert fraction to nanoseconds
-            auto nsec = nsec_t((fraction * NANOS_PER_SEC) / freq);
-
-            return TimePoint{{ sec, nsec }};
+            // convert ticks to nanoseconds
+            int64_t nanos = (uint64_t(time.QuadPart) * uint64_t(NANOS_PER_SEC)) / freq;
+            return TimePoint{ nanos };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
