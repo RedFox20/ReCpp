@@ -23,77 +23,71 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static constexpr long MILLIS_PER_SEC = 1'000L;
-    static constexpr long MICROS_PER_SEC = 1'000'000L;
-    static constexpr long NANOS_PER_SEC  = 1'000'000'000L;
-
-    #if _MSC_VER
-        using sec_t = long;
-    #elif __ANDROID__
-        using sec_t = long;
-    #elif defined(__USE_TIME_BITS64)
-        using sec_t = __time64_t;
-    #else
-        using sec_t = __time_t;
-    #endif
-
-    using nsec_t = long int;
+    static constexpr int64_t MILLIS_PER_SEC = 1'000LL;
+    static constexpr int64_t MICROS_PER_SEC = 1'000'000LL;
+    static constexpr int64_t NANOS_PER_SEC  = 1'000'000'000LL;
+    static constexpr int64_t NANOS_PER_MILLI = 1'000'000LL;
+    static constexpr int64_t NANOS_PER_MICRO = 1'000LL;
 
     /**
      * @brief New Duration API for TimePoint arithmetics
      */
     struct Duration
     {
-        sec_t sec = 0;
-        nsec_t nsec = 0;
+        // this has a maximum resolution of 9223372036 seconds (292.27 years)
+        int64_t nsec = 0;
+
+        Duration() noexcept = default;
+        explicit constexpr Duration(int64_t ns) noexcept : nsec{ns} {}
 
         /** @brief The ZERO Duration */
         static constexpr Duration zero() noexcept { return {}; }
-        explicit operator bool() const noexcept { return is_valid(); }
+        explicit operator bool() const noexcept { return nsec != 0; }
 
         /** @returns true if this Duration has been initialized */
-        bool is_valid() const noexcept { return sec != 0 || nsec != 0; }
-        bool operator==(const Duration& d) const noexcept { return sec == d.sec && nsec == d.nsec; }
-        bool operator!=(const Duration& d) const noexcept { return sec != d.sec || nsec != d.nsec; }
-        bool operator>(const Duration& d) const noexcept { return sec > d.sec || (sec == d.sec && nsec > d.nsec); }
-        bool operator<(const Duration& d) const noexcept { return sec < d.sec || (sec == d.sec && nsec < d.nsec); }
+        bool is_valid() const noexcept { return nsec != 0; }
+        bool operator==(const Duration& d) const noexcept { return nsec == d.nsec; }
+        bool operator!=(const Duration& d) const noexcept { return nsec != d.nsec; }
+        bool operator>(const Duration& d) const noexcept { return nsec > d.nsec; }
+        bool operator<(const Duration& d) const noexcept { return nsec < d.nsec; }
 
 
         /** @returns New Duration from fractional seconds (positive or negative) */
-        static Duration from_seconds(double seconds) noexcept;
+        static Duration from_seconds(double seconds) noexcept { return Duration{ int64_t(seconds * NANOS_PER_SEC) }; }
         /** @returns New Duration from integer milliseconds (positive or negative) */
-        static Duration from_millis(int32_t millis) noexcept;
+        static Duration from_millis(int32_t millis) noexcept { return Duration{ int64_t(millis * NANOS_PER_MILLI) }; }
         /** @returns New Duration from integer microseconds (positive or negative) */
-        static Duration from_micros(int32_t micros) noexcept;
+        static Duration from_micros(int32_t micros) noexcept { return Duration{ int64_t(micros * NANOS_PER_MICRO ) }; }
         /** @returns New Duration from integer nanoseconds (positive or negative) */
-        static Duration from_nanos(int64_t nanos) noexcept;
+        static Duration from_nanos(int64_t nanos) noexcept { return Duration{ nanos }; }
 
 
         /** 
          * @returns fractional seconds (positive or negative) of this Duration
          */
-        double seconds() const noexcept;
+        double seconds() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
         /**
          * @returns integer milliseconds (positive or negative) of this Duration
          * @warning This overflows at 2,147,483,647 milliseconds (2,147,483 seconds, which is 24 days)
          */
-        int32_t millis() const noexcept;
+        int32_t millis() const noexcept { return int32_t(nsec / NANOS_PER_MILLI); }
         /**
          * @returns integer microseconds (positive or negative) of this Duration
          * @warning This overflows at 2,147,483,647 microseconds (2,147 seconds, which is 35 minutes)
          */
-        int32_t micros() const noexcept;
+        int32_t micros() const noexcept { return int32_t(nsec / NANOS_PER_MICRO); }
         /**
          * @returns integer nanoseconds (positive or negative) of this Duration
          * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is 292,471 years)
          */
-        int64_t nanos() const noexcept;
+        int64_t nanos() const noexcept { return nsec; }
 
 
-        Duration operator+(const Duration& d) const noexcept;
-        Duration operator-(const Duration& d) const noexcept;
-        Duration& operator+=(const Duration& d) noexcept;
-        Duration& operator-=(const Duration& d) noexcept;
+        Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
+        Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
+        Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
+        Duration& operator-=(const Duration& d) noexcept { nsec -= d.nsec; return *this; }
+        Duration operator-() const noexcept { return Duration{ -nsec }; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,22 +103,25 @@ namespace rpp
 
         TimePoint() = default;
         constexpr explicit TimePoint(const Duration& d) noexcept : duration{d} {}
+        constexpr explicit TimePoint(int64_t ns) noexcept : duration{ns} {}
 
         /** @brief The ZERO TimePoint */
         static constexpr TimePoint zero() noexcept { return {}; }
 
-        /** @return The internal
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
 
+        /** @returns Duration from this point until end */
+        Duration elapsed(const TimePoint& end) const noexcept { return (end.duration - duration); }
+
         /** @returns fractional seconds elapsed from this time point until end */
-        double elapsed_sec(const TimePoint& end) const noexcept;
+        double elapsed_sec(const TimePoint& end) const noexcept { return (end.duration - duration).seconds(); }
         /** @returns integer milliseconds elapsed from this time point until end */
-        int32_t elapsed_ms(const TimePoint& end) const noexcept;
+        int32_t elapsed_ms(const TimePoint& end) const noexcept { return (end.duration - duration).millis(); }
         /** @returns integer microseconds elapsed from this time point until end */
-        int32_t elapsed_us(const TimePoint& end) const noexcept;
+        int32_t elapsed_us(const TimePoint& end) const noexcept { return (end.duration - duration).micros(); }
         /** @returns integer nanoseconds elapsed from this time point until end */
-        int64_t elapsed_ns(const TimePoint& end) const noexcept;
+        int64_t elapsed_ns(const TimePoint& end) const noexcept { return (end.duration - duration).nanos(); }
 
         /** @returns true if this timepoint has been initialized */
         bool is_valid() const noexcept { return duration.is_valid(); }

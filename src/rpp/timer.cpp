@@ -150,86 +150,6 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    Duration Duration::from_seconds(double seconds) noexcept
-    {
-        auto s = sec_t(seconds);
-        auto ns = nsec_t((seconds - s) * NANOS_PER_SEC);
-        return Duration{ s, ns };
-    }
-    Duration Duration::from_millis(int32_t millis) noexcept
-    {
-        return Duration{ sec_t(millis / 1000),
-                         nsec_t((millis % 1000) * 1'000'000) };
-    }
-    Duration Duration::from_micros(int32_t micros) noexcept
-    {
-        return Duration{ sec_t(micros / MICROS_PER_SEC),
-                         nsec_t((micros % MICROS_PER_SEC) * 1'000) };
-    }
-    Duration Duration::from_nanos(int64_t nanos) noexcept
-    {
-        return Duration{ sec_t(nanos / NANOS_PER_SEC), 
-                         nsec_t(nanos % NANOS_PER_SEC) };
-    }
-
-    double Duration::seconds() const noexcept
-    {
-        return sec + (double(nsec) / NANOS_PER_SEC);
-    }
-    int32_t Duration::millis() const noexcept
-    {
-        return int32_t((sec*1'000) + (nsec / 1'000'000));
-    }
-    int32_t Duration::micros() const noexcept
-    {
-        return int32_t((sec*1'000'000) + (nsec / 1'000));
-    }
-    int64_t Duration::nanos() const noexcept
-    {
-        return int64_t((sec*1'000'000'000LL) + nsec);
-    }
-
-    // if nanosec overflows or undeflows after arithmetic, normalize it
-    #define NORMALIZE_SEC_NSEC(sec, nsec) \
-        if (nsec >= NANOS_PER_SEC) { \
-            nsec -= NANOS_PER_SEC;   \
-            ++sec;                   \
-        } else if (nsec <= -NANOS_PER_SEC) {       \
-            nsec += NANOS_PER_SEC;   \
-            --sec;                   \
-        }
-
-    Duration Duration::operator+(const Duration& d) const noexcept
-    {
-        auto s = sec + d.sec;
-        auto ns = nsec + d.nsec; // (!) can be negative
-        NORMALIZE_SEC_NSEC(s, ns);
-        return { .sec = s, .nsec = ns };
-    }
-    Duration Duration::operator-(const Duration& d) const noexcept
-    {
-        auto s = sec - d.sec;
-        auto ns = nsec - d.nsec; // (!) can be negative
-        NORMALIZE_SEC_NSEC(s, ns);
-        return { .sec = s, .nsec = ns };
-    }
-    Duration& Duration::operator+=(const Duration& d) noexcept
-    {
-        sec += d.sec;
-        nsec += d.nsec; // (!) can be negative
-        NORMALIZE_SEC_NSEC(sec, nsec);
-        return *this;
-    }
-    Duration& Duration::operator-=(const Duration& d) noexcept
-    {
-        sec -= d.sec;
-        nsec -= d.nsec; // (!) can be negative
-        NORMALIZE_SEC_NSEC(sec, nsec);
-        return *this;
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
@@ -249,33 +169,12 @@ namespace rpp
             // convert fraction to nanoseconds
             auto nsec = nsec_t((fraction * NANOS_PER_SEC) / freq);
 
-            return TimePoint{{ .sec = sec, .nsec = nsec }};
+            return TimePoint{{ sec, nsec }};
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
-            // assign them explicitly to catch any errors in platform configuration
-            return TimePoint{{ .sec = sec_t(t.tv_sec), .nsec = nsec_t(t.tv_nsec) }};
+            return TimePoint{ int64_t(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) };
         #endif
-    }
-
-    double TimePoint::elapsed_sec(const TimePoint& end) const noexcept
-    {
-        return (end.duration - this->duration).seconds();
-    }
-
-    int32_t TimePoint::elapsed_ms(const TimePoint& end) const noexcept
-    {
-        return (end.duration - this->duration).millis();
-    }
-
-    int32_t TimePoint::elapsed_us(const TimePoint& end) const noexcept
-    {
-        return (end.duration - this->duration).micros();
-    }
-
-    int64_t TimePoint::elapsed_ns(const TimePoint& end) const noexcept
-    {
-        return (end.duration - this->duration).nanos();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

@@ -101,10 +101,15 @@ TestImpl(test_concurrent_queue)
         });
         scope_guard([&]{ producer.join(); });
 
+        rpp::Timer t;
         int numPopped = 0;
         std::string item;
-        while (queue.wait_pop(item, 50ms))
+        while (numPopped < MAX_SIZE && queue.wait_pop(item, 100ms))
             ++numPopped;
+
+        double elapsed = t.elapsed();
+        double megaitems_per_sec = numPopped / (elapsed * 1'000'000.0);
+        print_info("rapid_growth_async elapsed: %.2f ms %.0f Mitem/s\n", elapsed*1000, megaitems_per_sec);
         AssertThat(numPopped, MAX_SIZE);
     }
 
