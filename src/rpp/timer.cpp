@@ -38,6 +38,8 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    static constexpr long NANOS_PER_SECOND = 1'000'000'000L;
+
     struct Period
     {
         // clock ticks divided by this period_den gives duration in seconds
@@ -56,7 +58,7 @@ namespace rpp
             , period_sec{period}
             , period_ms{period * 1'000}
             , period_us{period * 1'000'000}
-            , period_ns{period * 1'000'000'000}
+            , period_ns{period * NANOS_PER_SECOND}
         {
         }
     };
@@ -78,7 +80,7 @@ namespace rpp
             return { 1.0 / period, period };
         }();
     #elif __linux__
-        static constexpr Period period = { 1'000'000'000, 1.0 / 1'000'000'000.0 };
+        static constexpr Period period = { NANOS_PER_SECOND, 1.0 / double(NANOS_PER_SECOND) };
     #elif __EMSCRIPTEN__
         static constexpr Period period = { 1'000'000, 1.0 / 1'000'000.0 };
     #else
@@ -224,12 +226,11 @@ namespace rpp
     {
         struct timespec deadline;
         clock_gettime(CLOCK_REALTIME, &deadline);
-        constexpr long nanosPerSecond = 1'000'000'000L;
-        deadline.tv_sec  += (nanos / nanosPerSecond);
-        deadline.tv_nsec += (nanos % nanosPerSecond);
+        deadline.tv_sec  += (nanos / NANOS_PER_SECOND);
+        deadline.tv_nsec += (nanos % NANOS_PER_SECOND);
         // normalize tv_nsec by overflowing into tv_sec
-        if (deadline.tv_nsec >= nanosPerSecond) {
-            deadline.tv_nsec -= nanosPerSecond;
+        if (deadline.tv_nsec >= NANOS_PER_SECOND) {
+            deadline.tv_nsec -= NANOS_PER_SECOND;
             deadline.tv_sec++;
         }
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
@@ -271,70 +272,188 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    Duration Duration::from_seconds(double seconds) noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return Duration{ int64_t(seconds * period.period_den) };
+        #else
+            seconds_t s = seconds_t(seconds);
+            nseconds_t ns = nseconds_t((seconds - s) * NANOS_PER_SECOND);
+            return Duration{ s, ns };
+        #endif
+    }
+    Duration Duration::from_millis(int32_t millis) noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return Duration{ int64_t(millis / (1000.0 * period.period_den)) };
+        #else
+            return Duration{
+                seconds_t(millis / 1000),
+                nseconds_t((millis % 1000) * 1'000'000)
+            };
+        #endif
+    }
+    Duration Duration::from_micros(int32_t micros) noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return Duration{ int64_t(micros / (1'000'000.0 * period.period_den)) };
+        #else
+            return Duration{
+                seconds_t(micros / 1'000'000),
+                nseconds_t((micros % 1'000'000) * 1'000) };
+        #endif
+    }
+    Duration Duration::from_nanos(int64_t nanos) noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return Duration{ int64_t(nanos / (1'000'000'000.0 * period.period_den)) };
+        #else
+            return Duration{ 
+                seconds_t(nanos / NANOS_PER_SECOND), 
+                nseconds_t(nanos % NANOS_PER_SECOND)
+            };
+        #endif
+    }
+
+    Duration Duration::operator+(const Duration& d) const noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return { ticks + d.ticks };
+        #else
+            auto s = sec + d.sec;
+            auto ns = nsec + d.nsec; // (!) can be negative
+            if (ns >= NANOS_PER_SECOND) {
+                ns -= NANOS_PER_SECOND;
+                ++s;
+            } else if (ns < 0) {
+                ns += NANOS_PER_SECOND;
+                --s;
+            }
+            return { .sec = s, .nsec = ns };
+        #endif
+    }
+    Duration Duration::operator-(const Duration& d) const noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return { ticks - d.ticks };
+        #else
+            auto s = sec - d.sec;
+            auto ns = nsec - d.nsec; // (!) can be negative
+            if (ns >= NANOS_PER_SECOND) {
+                ns -= NANOS_PER_SECOND;
+                ++s;
+            } else if (ns < 0) {
+                ns += NANOS_PER_SECOND;
+                --s;
+            }
+            return { .sec = s, .nsec = ns };
+        #endif
+    }
+    Duration& Duration::operator+=(const Duration& d) noexcept
+    {
+        #if _WIN32 || __APPLE__
+            ticks += d.ticks;
+        #else
+            sec += d.sec;
+            nsec += d.nsec; // (!) can be negative
+            if (nsec >= NANOS_PER_SECOND) {
+                nsec -= NANOS_PER_SECOND;
+                ++sec;
+            } else if (nsec < 0) {
+                nsec += NANOS_PER_SECOND;
+                --sec;
+            }
+        #endif
+        return *this;
+    }
+    Duration& Duration::operator-=(const Duration& d) noexcept
+    {
+        #if _WIN32 || __APPLE__
+            ticks -= d.ticks;
+        #else
+            sec -= d.sec;
+            nsec -= d.nsec; // (!) can be negative
+            if (nsec >= NANOS_PER_SECOND) {
+                nsec -= NANOS_PER_SECOND;
+                ++sec;
+            } else if (nsec < 0) {
+                nsec += NANOS_PER_SECOND;
+                --sec;
+            }
+        #endif
+        return *this;
+    }
+
+    double Duration::seconds() const noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return ticks * period.period_sec;
+        #else
+            return sec + (nsec * period.period_sec);
+        #endif
+    }
+    int32_t Duration::millis() const noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return int32_t(ticks * period.period_ms);
+        #else
+            return int32_t((sec*1'000) + (nsec / 1'000'000));
+        #endif
+    }
+    int32_t Duration::micros() const noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return int32_t(ticks * period.period_us);
+        #else
+            return int32_t((sec*1'000'000) + (nsec / 1'000));
+        #endif
+    }
+    int64_t Duration::nanos() const noexcept
+    {
+        #if _WIN32 || __APPLE__
+            return int64_t(ticks * period.period_ns);
+        #else
+            return int64_t((sec*1'000'000'000LL) + nsec);
+        #endif
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
             LARGE_INTEGER time;
             QueryPerformanceCounter(&time);
-            return TimePoint{ uint64_t(time.QuadPart) };
+            return TimePoint{{ .ticks = int64_t(time.QuadPart) }};
         #elif __APPLE__
-            return TimePoint{ uint64_t(mach_absolute_time()) };
+            return TimePoint{{ .ticks = int64_t(mach_absolute_time()) }};
         #else
             static_assert(sizeof(struct timespec) == sizeof(TimePoint), "TimePoint size mismatch");
-            union U { 
-                struct timespec t;
-                TimePoint tp;
-                U() noexcept {} // dont initialize anything
-            } u;
-            clock_gettime(CLOCK_REALTIME, &u.t);
-            return u.tp;
+            struct timespec t;
+            clock_gettime(CLOCK_REALTIME, &t);
+            // assign them explicitly to catch any errors in platform configuration
+            return TimePoint{{ .sec = t.tv_sec, .nsec = t.tv_nsec }};
         #endif
     }
 
     double TimePoint::elapsed_sec(const TimePoint& end) const noexcept
     {
-    #if _WIN32 || __APPLE__
-        return (end.ticks - ticks) * period.period_sec;
-    #else
-        return (end.sec - sec) + (end.nanos - nanos) * period.period_sec;
-    #endif
+        return (end.dur - this->dur).seconds();
     }
 
-    uint32_t TimePoint::elapsed_ms(const TimePoint& end) const noexcept
+    int32_t TimePoint::elapsed_ms(const TimePoint& end) const noexcept
     {
-    #if _WIN32 || __APPLE__
-        return uint32_t((end.ticks - ticks) * period.period_ms);
-    #else
-        return uint32_t(
-            (((end.sec - sec))*1'000) +
-            ((end.nanos - nanos) / 1'000'000)
-        );
-    #endif
+        return (end.dur - this->dur).millis();
     }
 
-    uint32_t TimePoint::elapsed_us(const TimePoint& end) const noexcept
+    int32_t TimePoint::elapsed_us(const TimePoint& end) const noexcept
     {
-    #if _WIN32 || __APPLE__
-        return uint32_t((end.ticks - ticks) * period.period_us);
-    #else
-        return uint32_t(
-            (((end.sec - sec))*1'000'000) +
-            ((end.nanos - nanos) / 1'000)
-        );
-    #endif
+        return (end.dur - this->dur).micros();
     }
 
-    // TODO: overflow protections?
-    uint32_t TimePoint::elapsed_ns(const TimePoint& end) const noexcept
+    int64_t TimePoint::elapsed_ns(const TimePoint& end) const noexcept
     {
-    #if _WIN32 || __APPLE__
-        return uint32_t((end.ticks - ticks) * period.period_ns);
-    #else
-        return uint32_t(
-            (((end.sec - sec))*1'000'000'000) +
-            (end.nanos - nanos)
-        );
-    #endif
+        return (end.dur - this->dur).nanos();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

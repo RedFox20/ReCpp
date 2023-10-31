@@ -55,23 +55,94 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * @brief New Duration API for TimePoint arithmetics
+    */
+    struct Duration
+    {
+        #if _WIN32 || __APPLE__
+            int64_t ticks = 0;
+        #else
+            #if __ANDROID__
+                using seconds_t = long;
+            #elif defined(__USE_TIME_BITS64)
+                using seconds_t = __time64_t;
+            #else
+                using seconds_t = __time_t;
+            #endif
+            using nseconds_t = long int;
+
+            seconds_t sec = 0;
+            nseconds_t nsec = 0;
+        #endif
+
+        /** @brief The ZERO Duration */
+        static constexpr Duration zero() noexcept { return {}; }
+        explicit operator bool() const noexcept { return is_valid(); }
+
+        /** @returns true if this Duration has been initialized */
+        bool is_valid() const noexcept {
+            #if _WIN32 || __APPLE__
+                return ticks != 0;
+            #else 
+                return sec != 0 || nsec != 0;
+            #endif
+        }
+        bool operator==(const Duration& d) const noexcept {
+            #if _WIN32 || __APPLE__
+                return ticks == d.ticks;
+            #else
+                return sec == d.sec && nsec == d.nsec;
+            #endif
+        }
+        bool operator!=(const Duration& d) const noexcept {
+            #if _WIN32 || __APPLE__
+                return ticks != d.ticks;
+            #else
+                return sec != d.sec || nsec != d.nsec;
+            #endif
+        }
+        Duration operator+(const Duration& d) const noexcept;
+        Duration operator-(const Duration& d) const noexcept;
+        Duration& operator+=(const Duration& d) noexcept;
+        Duration& operator-=(const Duration& d) noexcept;
+
+        /** @returns New Duration from fractional seconds (positive or negative) */
+        static Duration from_seconds(double seconds) noexcept;
+        /** @returns New Duration from integer milliseconds (positive or negative) */
+        static Duration from_millis(int32_t millis) noexcept;
+        /** @returns New Duration from integer microseconds (positive or negative) */
+        static Duration from_micros(int32_t micros) noexcept;
+        /** @returns New Duration from integer nanoseconds (positive or negative) */
+        static Duration from_nanos(int64_t nanos) noexcept;
+
+        /** @returns fractional seconds (positive or negative) of this Duration */
+        double seconds() const noexcept;
+        /**
+         * @returns integer milliseconds (positive or negative) of this Duration
+         * @warning This overflows at 2,147,483,647 milliseconds (2,147,483 seconds, which is 24 days)
+         */
+        int32_t millis() const noexcept;
+        /**
+         * @returns integer microseconds (positive or negative) of this Duration
+         * @warning This overflows at 2,147,483,647 microseconds (2,147 seconds, which is 35 minutes)
+         */
+        int32_t micros() const noexcept;
+        /** @returns integer nanoseconds (positive or negative) of this Duration */
+        int64_t nanos() const noexcept;
+    };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
      * @brief New TimePoint API for OS specific high accuracy timepoints
      *        which avoids floating point calculations
      */
     struct TimePoint
     {
-        #if _WIN32 || __APPLE__
-            uint64_t ticks = 0;
-        #else
-            #if __ANDROID__
-                long sec = 0;
-            #elif defined(__USE_TIME_BITS64)
-                __time64_t sec = 0;
-            #else
-                __time_t sec = 0;
-            #endif
-                long int nanos = 0;
-        #endif
+        Duration dur;
+
+        TimePoint() = default;
+        constexpr explicit TimePoint(const Duration& d) noexcept : dur{d} {}
 
         /** @brief The ZERO TimePoint */
         static constexpr TimePoint zero() noexcept { return {}; }
@@ -81,45 +152,23 @@ namespace rpp
 
         /** @returns fractional seconds elapsed from this time point until end */
         double elapsed_sec(const TimePoint& end) const noexcept;
-
         /** @returns integer milliseconds elapsed from this time point until end */
-        uint32_t elapsed_ms(const TimePoint& end) const noexcept;
-
+        int32_t elapsed_ms(const TimePoint& end) const noexcept;
         /** @returns integer microseconds elapsed from this time point until end */
-        uint32_t elapsed_us(const TimePoint& end) const noexcept;
-
+        int32_t elapsed_us(const TimePoint& end) const noexcept;
         /** @returns integer nanoseconds elapsed from this time point until end */
-        uint32_t elapsed_ns(const TimePoint& end) const noexcept;
+        int64_t elapsed_ns(const TimePoint& end) const noexcept;
 
         /** @returns true if this timepoint has been initialized */
-        bool is_valid() const noexcept
-        {
-            #if _WIN32 || __APPLE__
-                return ticks != 0;
-            #else 
-                return sec != 0 || nanos != 0;
-            #endif
-        }
+        bool is_valid() const noexcept { return dur.is_valid(); }
+        explicit operator bool() const noexcept { return dur.is_valid(); }
 
-        explicit operator bool() const noexcept { return is_valid(); }
-
-        bool operator==(const TimePoint& t) const noexcept
-        {
-            #if _WIN32 || __APPLE__
-                return ticks == t.ticks;
-            #else
-                return sec == t.sec && nanos == t.nanos;
-            #endif
-        }
-
-        bool operator!=(const TimePoint& t) const noexcept
-        {
-            #if _WIN32 || __APPLE__
-                return ticks != t.ticks;
-            #else
-                return sec != t.sec || nanos != t.nanos;
-            #endif
-        }
+        bool operator==(const TimePoint& t) const noexcept { return dur == t.dur; }
+        bool operator!=(const TimePoint& t) const noexcept { return dur != t.dur; }
+        TimePoint operator+(const Duration& d) const noexcept { return TimePoint{dur + d}; }
+        TimePoint operator-(const Duration& d) const noexcept { return TimePoint{dur - d}; }
+        TimePoint& operator+=(const Duration& d) noexcept { dur += d; return *this; }
+        TimePoint& operator-=(const Duration& d) noexcept { dur -= d; return *this;}
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,36 +203,29 @@ namespace rpp
 
         /** @return Fractional seconds elapsed from start() */
         double elapsed() const noexcept;
-
         /** @return Fractional milliseconds elapsed from start() */
         double elapsed_millis() const noexcept;
-
         /** @return Fractional microseconds elapsed from start() */
         double elapsed_micros() const noexcept;
 
         /** Gets the next time sample, since the last call to next() or start() and calls start() again */
         double next() noexcept;
-
         /** @return next() converted to milliseconds */
         double next_millis() noexcept;
 
         /** @returns integer milliseconds elapsed from start() until end */
-        uint32_t elapsed_ms(const TimePoint& end) const noexcept { return started.elapsed_ms(end); }
-
+        int32_t elapsed_ms(const TimePoint& end) const noexcept { return started.elapsed_ms(end); }
         /** @returns integer microseconds elapsed from start() until end */
-        uint32_t elapsed_us(const TimePoint& end) const noexcept { return started.elapsed_us(end); }
-
+        int32_t elapsed_us(const TimePoint& end) const noexcept { return started.elapsed_us(end); }
         /** @returns integer nanoseconds elapsed from start() until end */
-        uint32_t elapsed_ns(const TimePoint& end) const noexcept { return started.elapsed_ns(end); }
+        int64_t elapsed_ns(const TimePoint& end) const noexcept { return started.elapsed_ns(end); }
 
         /** @returns integer milliseconds elapsed from start() until now() */
-        uint32_t elapsed_ms() const noexcept { return started.elapsed_ms(TimePoint::now()); }
-
+        int32_t elapsed_ms() const noexcept { return started.elapsed_ms(TimePoint::now()); }
         /** @returns integer microseconds elapsed from start() until now() */
-        uint32_t elapsed_us() const noexcept { return started.elapsed_us(TimePoint::now()); }
-
+        int32_t elapsed_us() const noexcept { return started.elapsed_us(TimePoint::now()); }
         /** @returns integer microseconds elapsed from start() until now() */
-        uint32_t elapsed_ns() const noexcept { return started.elapsed_ns(TimePoint::now()); }
+        int64_t elapsed_ns() const noexcept { return started.elapsed_ns(TimePoint::now()); }
 
         /** Measure block execution time in fractional seconds */
         template<class Func> static double measure(const Func& f)

@@ -89,6 +89,103 @@ TestImpl(test_timer)
         }
     }
 
+    // this tests that all of the Duration::seconds() / TimePoint::elapsed_sec() math is correct
+    TestCase(duration_sec_arithmetic)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now();
+        const int millis = 57; // wait a few millis
+        spin_sleep_for(0.001 * millis);
+        rpp::TimePoint t2 = rpp::TimePoint::now();
+
+        double elapsed_sec = t1.elapsed_sec(t2);
+        print_info("elapsed_sec: %fs\n", elapsed_sec);
+
+        // now add fake +1sec to t2 and check elapsed_ns again
+        rpp::TimePoint t3 = t2 + rpp::Duration::from_seconds(1.0);
+        double elapsed_sec2 = t1.elapsed_sec(t3);
+        print_info("elapsed_sec2: %fs\n", elapsed_sec2);
+        AssertEqual(elapsed_sec2, 1.0 + elapsed_sec);
+
+        // remove fake -1sec from t2 and check again:
+        rpp::TimePoint t4 = t2 - rpp::Duration::from_millis(1000);
+        double elapsed_sec3 = t1.elapsed_sec(t4);
+        print_info("elapsed_sec3: %fs\n", elapsed_sec3);
+        AssertEqual(elapsed_sec3, -1.0 + elapsed_sec);
+    }
+
+    // this tests that all of the Duration::millis() / TimePoint::elapsed_ms() math is correct
+    TestCase(duration_millis_arithmetic)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now();
+        const int millis = 15; // wait a few millis
+        spin_sleep_for(0.001 * millis);
+        rpp::TimePoint t2 = rpp::TimePoint::now();
+
+        int32_t elapsed_ms = t1.elapsed_ms(t2);
+        print_info("elapsed_ms: %dms\n", elapsed_ms);
+
+        // now add fake +1sec to t2 and check elapsed_ns again
+        rpp::TimePoint t3 = t2 + rpp::Duration::from_millis(1000);
+        int32_t elapsed_ms2 = t1.elapsed_ms(t3);
+        print_info("elapsed_ms2: %dms\n", elapsed_ms2);
+        AssertEqual(elapsed_ms2, 1'000 + elapsed_ms);
+
+        // remove fake -1sec from t2 and check again:
+        rpp::TimePoint t4 = t2 - rpp::Duration::from_millis(1000);
+        int32_t elapsed_ms3 = t1.elapsed_ms(t4);
+        print_info("elapsed_ms3: %dms\n", elapsed_ms3);
+        AssertEqual(elapsed_ms3, -1'000 + elapsed_ms);
+    }
+
+    // this tests that all of the Duration::micros() / TimePoint::elapsed_us() math is correct
+    TestCase(duration_micros_arithmetic)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now();
+        const int microseconds = 40; // wait a few micros
+        spin_sleep_for(0.000'001 * microseconds);
+        rpp::TimePoint t2 = rpp::TimePoint::now();
+
+        int32_t elapsed_us = t1.elapsed_us(t2);
+        print_info("elapsed_us: %dus\n", elapsed_us);
+
+        // now add fake +1sec to t2 and check elapsed_ns again
+        rpp::TimePoint t3 = t2 + rpp::Duration::from_micros(1'000'000);
+        int32_t elapsed_us2 = t1.elapsed_us(t3);
+        print_info("elapsed_us2: %dus\n", elapsed_us2);
+        AssertEqual(elapsed_us2, 1'000'000 + elapsed_us);
+
+        // remove fake -1sec from t2 and check again:
+        rpp::TimePoint t4 = t2 - rpp::Duration::from_micros(1'000'000);
+        int32_t elapsed_us3 = t1.elapsed_us(t4);
+        print_info("elapsed_us3: %dus\n", elapsed_us3);
+        AssertEqual(elapsed_us3, -1'000'000 + elapsed_us);
+    }
+
+
+    // this tests that all of the Duration::nanos() / TimePoint::elapsed_ns() math is correct
+    TestCase(duration_nanos_arithmetic)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now();
+        const int microseconds = 15; // wait a few micros
+        spin_sleep_for(0.000'001 * microseconds);
+        rpp::TimePoint t2 = rpp::TimePoint::now();
+
+        int64_t elapsed_ns = t1.elapsed_ns(t2);
+        print_info("elapsed_ns: %lldns\n", elapsed_ns);
+
+        // now add fake +1sec to t2 and check elapsed_ns again
+        rpp::TimePoint t3 = t2 + rpp::Duration::from_nanos(1'000'000'000);
+        int64_t elapsed_ns2 = t1.elapsed_ns(t3);
+        print_info("elapsed_ns2: %lldns\n", elapsed_ns2);
+        AssertEqual(elapsed_ns2, 1'000'000'000 + elapsed_ns);
+
+        // remove fake -1sec from t2 and check again:
+        rpp::TimePoint t4 = t2 - rpp::Duration::from_nanos(1'000'000'000);
+        int64_t elapsed_ns3 = t1.elapsed_ns(t4);
+        print_info("elapsed_ns3: %lldns\n", elapsed_ns3);
+        AssertEqual(elapsed_ns3, -1'000'000'000 + elapsed_ns);
+    }
+
     TestCase(basic_stopwatch)
     {
         rpp::StopWatch sw;

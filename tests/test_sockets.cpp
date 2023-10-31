@@ -581,6 +581,7 @@ TestImpl(test_sockets)
         socket server = listen(rpp::make_tcp_randomport()); // this is our server
         std::thread remote([this,port=server.port()] { this->transmitting_remote(port); });
         socket client = accept(server);
+        client.set_nagle(false); // disable nagle
 
         for (int i = 0; i < 20; ++i)
         {
@@ -619,6 +620,8 @@ TestImpl(test_sockets)
         std::vector<char> sendBuffer(TransmitSize, '$');
 
         socket server = connect("127.0.0.1", serverPort);
+        server.set_nagle(false); // disable nagle
+
         while (server.connected())
         {
             int sentBytes = server.send(sendBuffer.data(), (int)sendBuffer.size());
@@ -628,7 +631,7 @@ TestImpl(test_sockets)
                 print_info("remote: failed to send data: %s\n", server.last_err().c_str());
 
             // we need to create a large gap in the data
-            sleep(15);
+            rpp::sleep_ms(15);
         }
         print_info("remote: server disconnected\n");
         print_info("remote: closing down\n");
