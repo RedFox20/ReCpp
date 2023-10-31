@@ -572,6 +572,9 @@ namespace rpp
         /** @return The last generalized error type */
         error last_err_type() const noexcept;
 
+        /** @returns SOL_SOCKET SO_ERROR (OS defined value) */
+        int get_socket_level_error() const noexcept;
+
         /** @return A human readable description string of the last occurred OS socket error. */
         static std::string last_os_socket_err(int err=0) noexcept;
 

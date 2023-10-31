@@ -1104,6 +1104,11 @@ namespace rpp
         return last_os_socket_err_type(LastErr);
     }
 
+    int socket::get_socket_level_error() const noexcept
+    {
+        return get_opt(SOL_SOCKET, SO_ERROR);
+    }
+
     std::string socket::last_os_socket_err(int err) noexcept
     {
         char buf[2048];
@@ -1433,7 +1438,7 @@ namespace rpp
         if (Sock == -1) 
             return false;
 
-        int err = get_opt(SOL_SOCKET, SO_ERROR);
+        int err = get_socket_level_error();
         if (err != 0)
         {
             if (handle_errno(err > 0 ? err : 0) == 0)
@@ -1525,7 +1530,7 @@ namespace rpp
         fd_set* exceptfds = (selectFlags & SF_Except) ? &set : nullptr;
         errno = 0;
         int rescode = ::select(Sock+1, readfds, writefds, exceptfds, &timeout);
-        int err = get_opt(SOL_SOCKET, SO_ERROR);
+        int err = get_socket_level_error();
         if (err != 0)
         {
             // select failed somehow
