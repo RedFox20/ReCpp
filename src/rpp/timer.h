@@ -94,7 +94,9 @@ namespace rpp
 
     /**
      * @brief New TimePoint API for OS specific high accuracy timepoints
-     *        which avoids floating point calculations
+     *        which avoids floating point calculations.
+     * @note This time point is not synchronized to any external clocks
+     *       and is only useful for measuring time deltas.
      */
     struct TimePoint
     {

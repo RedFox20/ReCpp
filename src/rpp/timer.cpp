@@ -153,17 +153,21 @@ namespace rpp
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
-            static uint64_t freq;
+            static int64_t freq;
             if (!freq)
             {
                 LARGE_INTEGER f; QueryPerformanceFrequency(&f);
-                freq = uint64_t(f.QuadPart);
+                freq = int64_t(f.QuadPart);
             }
 
             LARGE_INTEGER time; QueryPerformanceCounter(&time);
             // convert ticks to nanoseconds
-            int64_t nanos = (uint64_t(time.QuadPart) * uint64_t(NANOS_PER_SEC)) / freq;
-            return TimePoint{ nanos };
+            // however, we need to be careful about overflow, which will always happen if we 
+            // multiply by 1'000'000'000, so we need to split it into seconds and fractional seconds
+            int64_t seconds = time.QuadPart / freq;
+            int64_t fraction = time.QuadPart % freq;
+            // convert all to nanoseconds
+            return TimePoint{ (seconds*NANOS_PER_SEC) + ((fraction*NANOS_PER_SEC) / freq) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
