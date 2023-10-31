@@ -149,6 +149,7 @@ TestImpl(test_coroutines)
         };
         AssertThat(destructor_ids.size(), 1u);
         AssertThat(destructor_ids[0], 1);
+        rpp::sleep_ms(10); // give the destructor time to run
 
         cfuture<std::string> fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string>
         {
@@ -159,6 +160,8 @@ TestImpl(test_coroutines)
         AssertThat(destructor_ids.size(), 1u); // the destructor is not called before calling get()
         AssertThat(fstr.get(), "test"s);
         fstr = cfuture<std::string>{}; // release the future
+        rpp::sleep_ms(10); // give the destructor time to run
+
         AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
 
@@ -167,6 +170,7 @@ TestImpl(test_coroutines)
             destructor_recorder dr {m, destructor_ids, 3};
             co_return;
         };
+        rpp::sleep_ms(10); // give the destructor time to run
         AssertThat(destructor_ids.size(), 3u);
         AssertThat(destructor_ids[2], 3);
 

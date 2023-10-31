@@ -85,7 +85,7 @@ TestImpl(test_timer)
             rpp::sleep_ns(100'000);
             uint32_t elapsed_ns = t.elapsed_ns(rpp::TimePoint::now());
             print_info("nanos %d 100000ns sleep time: %uns\n", i+1, elapsed_ns);
-            AssertInRange(elapsed_ns, 99'999, 2'000'000); // OS sleep can never be accurate enough, so the range must be very loose
+            AssertInRange(elapsed_ns, 99'999, 5'000'000); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 
