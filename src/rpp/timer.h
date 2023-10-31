@@ -12,37 +12,6 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Gets the current timestamp from the system's most accurate time measurement
-     */
-    RPPAPI uint64_t time_now() noexcept;
-
-    /**
-     * Gets the time period for the system's most accurate time measurement
-     * To convert time_now() to seconds:  double sec = time_now() * time_period() 
-     */
-    RPPAPI double time_period() noexcept;
-
-    /** Converts fractional seconds to clock ticks that matches time_now() */
-    RPPAPI int64_t from_sec_to_time_ticks(double seconds) noexcept;
-    /** Converts fractional milliseconds to clock ticks that matches time_now() */
-    RPPAPI int64_t from_ms_to_time_ticks(double millis) noexcept;
-    /** Converts fractional microseconds to clock ticks that matches time_now() */
-    RPPAPI int64_t from_us_to_time_ticks(double micros) noexcept;
-    /** Converts fractional nanoseconds to clock ticks that matches time_now() */
-    RPPAPI int64_t from_ns_to_time_ticks(double nanos) noexcept;
-
-    /** Converts clock ticks that matches time_now() into fractional seconds */
-    RPPAPI double time_ticks_to_sec(int64_t ticks) noexcept;
-    /** Converts clock ticks that matches time_now() into fractional milliseconds */
-    RPPAPI double time_ticks_to_ms(int64_t ticks) noexcept;
-    /** Converts clock ticks that matches time_now() into fractional microseconds */
-    RPPAPI double time_ticks_to_us(int64_t ticks) noexcept;
-    /** Converts clock ticks that matches time_now() into fractional nanoseconds */
-    RPPAPI double time_ticks_to_ns(int64_t ticks) noexcept;
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
     /** Let this thread sleep for provided MILLISECONDS */
     RPPAPI void sleep_ms(unsigned int millis) noexcept;
 
@@ -54,57 +23,41 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    static constexpr long MILLIS_PER_SEC = 1'000L;
+    static constexpr long MICROS_PER_SEC = 1'000'000L;
+    static constexpr long NANOS_PER_SEC  = 1'000'000'000L;
+
+    #if _MSC_VER
+        using sec_t = long;
+    #elif __ANDROID__
+        using sec_t = long;
+    #elif defined(__USE_TIME_BITS64)
+        using sec_t = __time64_t;
+    #else
+        using sec_t = __time_t;
+    #endif
+
+    using nsec_t = long int;
+
     /**
      * @brief New Duration API for TimePoint arithmetics
-    */
+     */
     struct Duration
     {
-        #if _WIN32 || __APPLE__
-            int64_t ticks = 0;
-        #else
-            #if __ANDROID__
-                using seconds_t = long;
-            #elif defined(__USE_TIME_BITS64)
-                using seconds_t = __time64_t;
-            #else
-                using seconds_t = __time_t;
-            #endif
-            using nseconds_t = long int;
-
-            seconds_t sec = 0;
-            nseconds_t nsec = 0;
-        #endif
+        sec_t sec = 0;
+        nsec_t nsec = 0;
 
         /** @brief The ZERO Duration */
         static constexpr Duration zero() noexcept { return {}; }
         explicit operator bool() const noexcept { return is_valid(); }
 
         /** @returns true if this Duration has been initialized */
-        bool is_valid() const noexcept {
-            #if _WIN32 || __APPLE__
-                return ticks != 0;
-            #else 
-                return sec != 0 || nsec != 0;
-            #endif
-        }
-        bool operator==(const Duration& d) const noexcept {
-            #if _WIN32 || __APPLE__
-                return ticks == d.ticks;
-            #else
-                return sec == d.sec && nsec == d.nsec;
-            #endif
-        }
-        bool operator!=(const Duration& d) const noexcept {
-            #if _WIN32 || __APPLE__
-                return ticks != d.ticks;
-            #else
-                return sec != d.sec || nsec != d.nsec;
-            #endif
-        }
-        Duration operator+(const Duration& d) const noexcept;
-        Duration operator-(const Duration& d) const noexcept;
-        Duration& operator+=(const Duration& d) noexcept;
-        Duration& operator-=(const Duration& d) noexcept;
+        bool is_valid() const noexcept { return sec != 0 || nsec != 0; }
+        bool operator==(const Duration& d) const noexcept { return sec == d.sec && nsec == d.nsec; }
+        bool operator!=(const Duration& d) const noexcept { return sec != d.sec || nsec != d.nsec; }
+        bool operator>(const Duration& d) const noexcept { return sec > d.sec || (sec == d.sec && nsec > d.nsec); }
+        bool operator<(const Duration& d) const noexcept { return sec < d.sec || (sec == d.sec && nsec < d.nsec); }
+
 
         /** @returns New Duration from fractional seconds (positive or negative) */
         static Duration from_seconds(double seconds) noexcept;
@@ -115,7 +68,10 @@ namespace rpp
         /** @returns New Duration from integer nanoseconds (positive or negative) */
         static Duration from_nanos(int64_t nanos) noexcept;
 
-        /** @returns fractional seconds (positive or negative) of this Duration */
+
+        /** 
+         * @returns fractional seconds (positive or negative) of this Duration
+         */
         double seconds() const noexcept;
         /**
          * @returns integer milliseconds (positive or negative) of this Duration
@@ -127,8 +83,17 @@ namespace rpp
          * @warning This overflows at 2,147,483,647 microseconds (2,147 seconds, which is 35 minutes)
          */
         int32_t micros() const noexcept;
-        /** @returns integer nanoseconds (positive or negative) of this Duration */
+        /**
+         * @returns integer nanoseconds (positive or negative) of this Duration
+         * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is 292,471 years)
+         */
         int64_t nanos() const noexcept;
+
+
+        Duration operator+(const Duration& d) const noexcept;
+        Duration operator-(const Duration& d) const noexcept;
+        Duration& operator+=(const Duration& d) noexcept;
+        Duration& operator-=(const Duration& d) noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,14 +104,16 @@ namespace rpp
      */
     struct TimePoint
     {
-        Duration dur;
+        // public duration object, feel free to set it to whatever you want
+        Duration duration;
 
         TimePoint() = default;
-        constexpr explicit TimePoint(const Duration& d) noexcept : dur{d} {}
+        constexpr explicit TimePoint(const Duration& d) noexcept : duration{d} {}
 
         /** @brief The ZERO TimePoint */
         static constexpr TimePoint zero() noexcept { return {}; }
 
+        /** @return The internal
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
 
@@ -160,15 +127,18 @@ namespace rpp
         int64_t elapsed_ns(const TimePoint& end) const noexcept;
 
         /** @returns true if this timepoint has been initialized */
-        bool is_valid() const noexcept { return dur.is_valid(); }
-        explicit operator bool() const noexcept { return dur.is_valid(); }
+        bool is_valid() const noexcept { return duration.is_valid(); }
+        explicit operator bool() const noexcept { return duration.is_valid(); }
 
-        bool operator==(const TimePoint& t) const noexcept { return dur == t.dur; }
-        bool operator!=(const TimePoint& t) const noexcept { return dur != t.dur; }
-        TimePoint operator+(const Duration& d) const noexcept { return TimePoint{dur + d}; }
-        TimePoint operator-(const Duration& d) const noexcept { return TimePoint{dur - d}; }
-        TimePoint& operator+=(const Duration& d) noexcept { dur += d; return *this; }
-        TimePoint& operator-=(const Duration& d) noexcept { dur -= d; return *this;}
+        bool operator==(const TimePoint& t) const noexcept { return duration == t.duration; }
+        bool operator!=(const TimePoint& t) const noexcept { return duration != t.duration; }
+        bool operator>(const TimePoint& t) const noexcept { return duration > t.duration; }
+        bool operator<(const TimePoint& t) const noexcept { return duration < t.duration; }
+        TimePoint operator+(const Duration& d) const noexcept { return TimePoint{duration + d}; }
+        TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration - d}; }
+        TimePoint& operator+=(const Duration& d) noexcept { duration += d; return *this; }
+        TimePoint& operator-=(const Duration& d) noexcept { duration -= d; return *this;}
+        Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,33 +225,33 @@ namespace rpp
         TimePoint end;
 
         /** Creates an uninitialized StopWatch. Reported time is always 0.0 */
-        StopWatch() = default;
+        StopWatch() noexcept = default;
 
         /** 
          * Sets the initial starting point of the stopwatch and resets the stop point
          * only if the stopwatch hasn't started already
          * @note No effect if started()
          */
-        void start();
+        void start() noexcept;
 
         /**
          * Sets the stop point of the stopwatch only if start point
          * exists and not already stopped
          * @note No effect if !started() || stopped()
          */
-        void stop();
+        void stop() noexcept;
 
         /** Clears the stop point and resumes timing */
-        void resume();
+        void resume() noexcept;
 
         /** Resets both start and stop times */
-        void reset();
+        void reset() noexcept;
 
         /** Has the stopwatch been started? */
-        bool started() const { return begin.is_valid(); }
+        bool started() const noexcept { return begin.is_valid(); }
 
         /** Has the stopwatch been stopped with a valid time? */
-        bool stopped() const { return end.is_valid(); }
+        bool stopped() const noexcept { return end.is_valid(); }
 
         /** 
          * Reports the currently elapsed time. 
@@ -289,10 +259,10 @@ namespace rpp
          * If stopwatch is still running, it will report the currently elapsed time
          * Otherwise reports 0.0
          */
-        double elapsed() const;
+        double elapsed() const noexcept;
 
         /** Currently elapsed time in milliseconds */
-        double elapsed_millis() const { return elapsed() * 1000.0; }
+        double elapsed_millis() const noexcept { return elapsed() * 1000.0; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -336,12 +306,8 @@ namespace rpp
 #if __cplusplus
 extern "C" {
 #endif
-    
-    /**
-     * @return Current time in seconds:  rpp::time_now() * rpp::time_period();
-     */
+    /** @return Current time in fractional seconds */
     RPPAPI double time_now_seconds();
-
 #if __cplusplus
 }
 #endif

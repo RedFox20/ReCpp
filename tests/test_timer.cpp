@@ -2,6 +2,13 @@
 #include <rpp/tests.h>
 #include <thread>
 
+namespace rpp {
+    string_buffer& operator<<(string_buffer& sb, const Duration& d) noexcept
+    {
+        return sb << d.sec << "s " << d.nsec << "ns";
+    }
+}
+
 TestImpl(test_timer)
 {
 
@@ -43,7 +50,6 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_millis_accuracy)
     {
-        print_info("ticks_per_second: %lld\n", rpp::from_sec_to_time_ticks(1.0));
         for (int i = 0; i < 20; ++i)
         {
             rpp::Timer t;
@@ -56,7 +62,6 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_micros_accuracy)
     {
-        print_info("ticks_per_second: %lld\n", rpp::from_sec_to_time_ticks(1.0));
         for (int i = 0; i < 20; ++i)
         {
             rpp::Timer t;
@@ -77,16 +82,117 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_nanos_accuracy)
     {
-        print_info("ticks_per_second: %lld\n", rpp::from_sec_to_time_ticks(1.0));
         for (int i = 0; i < 20; ++i)
         {
             rpp::Timer t;
             // going below 100'000ns is not accurate with clock_nanosleep
             rpp::sleep_ns(100'000);
-            uint32_t elapsed_ns = t.elapsed_ns(rpp::TimePoint::now());
-            print_info("nanos %d 100000ns sleep time: %uns\n", i+1, elapsed_ns);
+            int64_t elapsed_ns = t.elapsed_ns(rpp::TimePoint::now());
+            print_info("nanos %d 100000ns sleep time: %lldns\n", i+1, elapsed_ns);
             AssertInRange(elapsed_ns, 99'999, 5'000'000); // OS sleep can never be accurate enough, so the range must be very loose
         }
+    }
+
+    TestCase(duration_conversion)
+    {
+        rpp::Duration d0 = rpp::Duration::from_nanos(1'000'000'000);
+        AssertEqual(d0.seconds(), 1.0);
+        AssertEqual(d0.millis(), 1'000);
+        AssertEqual(d0.micros(), 1'000'000);
+        AssertEqual(d0.nanos(), 1'000'000'000);
+        AssertEqual(d0, rpp::Duration::from_millis(1000));
+
+        rpp::Duration d1 = rpp::Duration::from_seconds(1.0);
+        AssertEqual(d1.seconds(), 1.0);
+        AssertEqual(d1.millis(), 1'000);
+        AssertEqual(d1.micros(), 1'000'000);
+        AssertEqual(d1.nanos(), 1'000'000'000);
+        AssertEqual(d1, rpp::Duration::from_millis(1000));
+
+        rpp::Duration d2 = rpp::Duration::from_millis(500);
+        AssertEqual(d2.seconds(), 0.5);
+        AssertEqual(d2.millis(), 500);
+        AssertEqual(d2.micros(), 500'000);
+        AssertEqual(d2.nanos(), 500'000'000);
+        AssertEqual(d2, rpp::Duration::from_millis(500));
+
+        rpp::Duration d3 = rpp::Duration::from_micros(100'000);
+        AssertEqual(d3.seconds(), 0.1);
+        AssertEqual(d3.millis(), 100);
+        AssertEqual(d3.micros(), 100'000);
+        AssertEqual(d3.nanos(), 100'000'000);
+        AssertEqual(d3, rpp::Duration::from_millis(100));
+
+        rpp::Duration d4 = rpp::Duration::from_nanos(2'000'000);
+        AssertEqual(d4.seconds(), 0.002);
+        AssertEqual(d4.millis(), 2);
+        AssertEqual(d4.micros(), 2'000);
+        AssertEqual(d4.nanos(), 2'000'000);
+        AssertEqual(d4, rpp::Duration::from_millis(2));
+    }
+
+    TestCase(duration_conversion_negative)
+    {
+        rpp::Duration d0 = rpp::Duration::from_nanos(-1'000'000'000);
+        AssertEqual(d0.seconds(), -1.0);
+        AssertEqual(d0.millis(), -1'000);
+        AssertEqual(d0.micros(), -1'000'000);
+        AssertEqual(d0.nanos(), -1'000'000'000);
+        AssertEqual(d0, rpp::Duration::from_millis(-1000));
+
+        rpp::Duration d1 = rpp::Duration::from_seconds(-1.0);
+        AssertEqual(d1.seconds(), -1.0);
+        AssertEqual(d1.millis(), -1'000);
+        AssertEqual(d1.micros(), -1'000'000);
+        AssertEqual(d1.nanos(), -1'000'000'000);
+        AssertEqual(d1, rpp::Duration::from_millis(-1000));
+
+        rpp::Duration d2 = rpp::Duration::from_millis(-500);
+        AssertEqual(d2.seconds(), -0.5);
+        AssertEqual(d2.millis(), -500);
+        AssertEqual(d2.micros(), -500'000);
+        AssertEqual(d2.nanos(), -500'000'000);
+        AssertEqual(d2, rpp::Duration::from_millis(-500));
+
+        rpp::Duration d3 = rpp::Duration::from_micros(-100'000);
+        AssertEqual(d3.seconds(), -0.1);
+        AssertEqual(d3.millis(), -100);
+        AssertEqual(d3.micros(), -100'000);
+        AssertEqual(d3.nanos(), -100'000'000);
+        AssertEqual(d3, rpp::Duration::from_millis(-100));
+
+        rpp::Duration d4 = rpp::Duration::from_nanos(-2'000'000);
+        AssertEqual(d4.seconds(), -0.002);
+        AssertEqual(d4.millis(), -2);
+        AssertEqual(d4.micros(), -2'000);
+        AssertEqual(d4.nanos(), -2'000'000);
+        AssertEqual(d4, rpp::Duration::from_millis(-2));
+    }
+
+    TestCase(duration_arithmetic)
+    {
+        rpp::Duration d1 = rpp::Duration::from_millis(500);
+        rpp::Duration d2 = rpp::Duration::from_micros(-250'000);
+        rpp::Duration d3 = d1 + d2; // 250ms
+        AssertEqual(d3.seconds(), 0.25);
+        AssertEqual(d3.millis(), 250);
+        AssertEqual(d3.micros(), 250'000);
+        AssertEqual(d3.nanos(), 250'000'000);
+        AssertEqual(d3, rpp::Duration::from_millis(250));
+
+        rpp::Duration d4 = d2 - d1; // -750ms
+        AssertEqual(d4.seconds(), -0.75);
+        AssertEqual(d4.millis(), -750);
+        AssertEqual(d4.micros(), -750'000);
+        AssertEqual(d4.nanos(), -750'000'000);
+        AssertEqual(d4, rpp::Duration::from_millis(-750));
+
+        rpp::Duration d5 = d1 + d1; // 1s
+        AssertEqual(d5.seconds(), 1.0);
+        AssertEqual(d5.millis(), 1'000);
+        AssertEqual(d5.micros(), 1'000'000);
+        AssertEqual(d5.nanos(), 1'000'000'000);
+        AssertEqual(d5, rpp::Duration::from_millis(1000));
     }
 
     // this tests that all of the Duration::seconds() / TimePoint::elapsed_sec() math is correct
@@ -99,15 +205,18 @@ TestImpl(test_timer)
 
         double elapsed_sec = t1.elapsed_sec(t2);
         print_info("elapsed_sec: %fs\n", elapsed_sec);
+        rpp::Duration one_sec = rpp::Duration::from_seconds(1.0);
+        print_info("duration::from_seconds(1.0): %fs\n", one_sec.seconds());
+        AssertEqual(one_sec.seconds(), 1.0);
 
         // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + rpp::Duration::from_seconds(1.0);
+        rpp::TimePoint t3 = t2 + one_sec;
         double elapsed_sec2 = t1.elapsed_sec(t3);
         print_info("elapsed_sec2: %fs\n", elapsed_sec2);
         AssertEqual(elapsed_sec2, 1.0 + elapsed_sec);
 
         // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - rpp::Duration::from_millis(1000);
+        rpp::TimePoint t4 = t2 - one_sec;
         double elapsed_sec3 = t1.elapsed_sec(t4);
         print_info("elapsed_sec3: %fs\n", elapsed_sec3);
         AssertEqual(elapsed_sec3, -1.0 + elapsed_sec);
@@ -123,15 +232,18 @@ TestImpl(test_timer)
 
         int32_t elapsed_ms = t1.elapsed_ms(t2);
         print_info("elapsed_ms: %dms\n", elapsed_ms);
+        rpp::Duration one_sec = rpp::Duration::from_millis(1000);
+        print_info("duration::from_millis(1000): %dms\n", one_sec.millis());
+        AssertEqual(one_sec.millis(), 1'000);
 
         // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + rpp::Duration::from_millis(1000);
+        rpp::TimePoint t3 = t2 + one_sec;
         int32_t elapsed_ms2 = t1.elapsed_ms(t3);
         print_info("elapsed_ms2: %dms\n", elapsed_ms2);
         AssertEqual(elapsed_ms2, 1'000 + elapsed_ms);
 
         // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - rpp::Duration::from_millis(1000);
+        rpp::TimePoint t4 = t2 - one_sec;
         int32_t elapsed_ms3 = t1.elapsed_ms(t4);
         print_info("elapsed_ms3: %dms\n", elapsed_ms3);
         AssertEqual(elapsed_ms3, -1'000 + elapsed_ms);
@@ -147,15 +259,18 @@ TestImpl(test_timer)
 
         int32_t elapsed_us = t1.elapsed_us(t2);
         print_info("elapsed_us: %dus\n", elapsed_us);
+        rpp::Duration one_sec = rpp::Duration::from_micros(1'000'000);
+        print_info("duration::from_micros(1'000'000): %dus\n", one_sec.micros());
+        AssertEqual(one_sec.micros(), 1'000'000);
 
         // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + rpp::Duration::from_micros(1'000'000);
+        rpp::TimePoint t3 = t2 + one_sec;
         int32_t elapsed_us2 = t1.elapsed_us(t3);
         print_info("elapsed_us2: %dus\n", elapsed_us2);
         AssertEqual(elapsed_us2, 1'000'000 + elapsed_us);
 
         // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - rpp::Duration::from_micros(1'000'000);
+        rpp::TimePoint t4 = t2 - one_sec;
         int32_t elapsed_us3 = t1.elapsed_us(t4);
         print_info("elapsed_us3: %dus\n", elapsed_us3);
         AssertEqual(elapsed_us3, -1'000'000 + elapsed_us);
@@ -172,15 +287,18 @@ TestImpl(test_timer)
 
         int64_t elapsed_ns = t1.elapsed_ns(t2);
         print_info("elapsed_ns: %lldns\n", elapsed_ns);
+        rpp::Duration one_sec = rpp::Duration::from_nanos(1'000'000'000);
+        print_info("duration::from_nanos(1'000'000'000): %lldus\n", one_sec.nanos());
+        AssertEqual(one_sec.nanos(), 1'000'000'000LL);
 
         // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + rpp::Duration::from_nanos(1'000'000'000);
+        rpp::TimePoint t3 = t2 + one_sec;
         int64_t elapsed_ns2 = t1.elapsed_ns(t3);
         print_info("elapsed_ns2: %lldns\n", elapsed_ns2);
         AssertEqual(elapsed_ns2, 1'000'000'000 + elapsed_ns);
 
         // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - rpp::Duration::from_nanos(1'000'000'000);
+        rpp::TimePoint t4 = t2 - one_sec;
         int64_t elapsed_ns3 = t1.elapsed_ns(t4);
         print_info("elapsed_ns3: %lldns\n", elapsed_ns3);
         AssertEqual(elapsed_ns3, -1'000'000'000 + elapsed_ns);

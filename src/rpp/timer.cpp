@@ -5,28 +5,16 @@
     #include <Windows.h>
     #include <timeapi.h>
     #pragma comment(lib, "Winmm.lib") // MM time library
-#elif __APPLE__ || __linux__ || __ANDROID__
+#elif __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
     #include <stdio.h>  // fprintf
     #include <unistd.h> // usleep()
-    #if __APPLE__
-        #include <mach/mach.h>
-        #include <mach/mach_time.h>
-    #elif __linux__ || __ANDROID__ 
+    #if __linux__ || __ANDROID__ 
         #include <sys/time.h>
         #if __ANDROID__
             #include <android/log.h>
         #endif
     #endif
     #include <thread>
-#elif __EMSCRIPTEN__
-    #include <unistd.h> // usleep()
-    #include <emscripten.h>
-    #include <thread>
-    #include <chrono>
-    using namespace std::chrono;
-#else
-    #include <chrono>
-    using namespace std::chrono;
 #endif
 
 #if defined(__has_include) && __has_include("debugging.h")
@@ -37,115 +25,6 @@
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    static constexpr long NANOS_PER_SECOND = 1'000'000'000L;
-
-    struct Period
-    {
-        // clock ticks divided by this period_den gives duration in seconds
-        // seconds multiplied by this gives clock ticks
-        double period_den;
-
-        // clock ticks multiplied by this period gives duration in seconds
-        // seconds divided by this gives clock ticks
-        double period_sec;
-        double period_ms;
-        double period_us;
-        double period_ns;
-
-        constexpr Period(double period_den, double period) noexcept
-            : period_den{period_den}
-            , period_sec{period}
-            , period_ms{period * 1'000}
-            , period_us{period * 1'000'000}
-            , period_ns{period * NANOS_PER_SECOND}
-        {
-        }
-    };
-
-    #if _WIN32
-        static const Period period = []() -> Period
-        {
-            LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
-            double period_den = double(freq.QuadPart);
-            return { period_den, 1.0 / period_den };
-        }();
-    #elif __APPLE__
-        static const Period period = []() -> Period
-        {
-            mach_timebase_info_data_t timebase;
-            mach_timebase_info(&timebase);
-            double period = (double(timebase.numer) / timebase.denom / 1e9);
-            return { 1.0 / period, period };
-        }();
-    #elif __linux__
-        static constexpr Period period = { NANOS_PER_SECOND, 1.0 / double(NANOS_PER_SECOND) };
-    #elif __EMSCRIPTEN__
-        static constexpr Period period = { 1'000'000, 1.0 / 1'000'000.0 };
-    #else
-        static const Period period = []() -> Period
-        {
-            double period = double(microseconds::period::num) / microseconds::period::den;
-            return { 1.0 / period, period };
-        }();
-    #endif
-
-    double time_period() noexcept { return period.period_sec; }
-
-    // time now in ticks (not as fast as accurate as TimePoint::now())
-    uint64_t time_now() noexcept
-    {
-        #if _WIN32
-            LARGE_INTEGER time;
-            QueryPerformanceCounter(&time);
-            return time.QuadPart;
-        #elif __APPLE__
-            return mach_absolute_time();
-        #elif __linux__
-            struct timespec t;
-            clock_gettime(CLOCK_REALTIME, &t);
-            return (t.tv_sec * 1'000'000'000ull) + t.tv_nsec;
-        #elif __EMSCRIPTEN__
-            return uint64_t(emscripten_get_now() * 1000);
-        #else
-            return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
-        #endif
-    }
-
-    int64_t from_sec_to_time_ticks(double seconds) noexcept
-    {
-        return int64_t(seconds * period.period_den);
-    }
-    int64_t from_ms_to_time_ticks(double millis) noexcept
-    {
-        return int64_t(millis / 1000.0 * period.period_den);
-    }
-    int64_t from_us_to_time_ticks(double micros) noexcept
-    {
-        return int64_t(micros / 1'000'000.0 * period.period_den);
-    }
-    int64_t from_ns_to_time_ticks(double nanos) noexcept
-    {
-        return int64_t(nanos / 1'000'000'000.0 * period.period_den);
-    }
-
-    double time_ticks_to_sec(int64_t ticks) noexcept
-    {
-        return ticks * period.period_sec;
-    }
-    double time_ticks_to_ms(int64_t ticks) noexcept
-    {
-        return ticks * period.period_ms;
-    }
-    double time_ticks_to_us(int64_t ticks) noexcept
-    {
-        return ticks * period.period_us;
-    }
-    double time_ticks_to_ns(int64_t ticks) noexcept
-    {
-        return ticks * period.period_ns;
-    }
 
 #if _WIN32
     static void periodSleep(MMRESULT& status, DWORD milliseconds)
@@ -183,19 +62,18 @@ namespace rpp
 
         // we need to measure exact suspend start time in case we timed out
         // because the suspension timeout is not accurate at all
-        int64_t startTime = time_now();
+        TimePoint start = TimePoint::now();
 
         // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
-        static const int64_t millisecondTicks = from_ms_to_time_ticks(1.0);
-        static const int64_t suspendThreshold = millisecondTicks * 16; // ms
-        static const int64_t periodThreshold = millisecondTicks * 2; // ms
+        static const Duration suspendThreshold = Duration::from_millis(16);
+        static const Duration periodThreshold = Duration::from_millis(2);
 
         MMRESULT timeBeginStatus = -1;
 
         // convert nanos to time_now() resolution:
-        int64_t endTime = startTime + from_ns_to_time_ticks(double(nanos));
-        int64_t remaining = endTime - time_now();
-        while (remaining > 0)
+        TimePoint endTime = start + Duration::from_nanos(nanos);;
+        Duration remaining = (endTime - TimePoint::now());
+        while (remaining > Duration::zero())
         {
             // suspended sleep, it's quite difficult to get this accurate on Windows compared to other OS's
             if (remaining > suspendThreshold)
@@ -213,7 +91,7 @@ namespace rpp
                 YieldProcessor();
             }
 
-            remaining = endTime - time_now();
+            remaining = endTime - TimePoint::now();
         }
 
         if (timeBeginStatus == TIMERR_NOERROR)
@@ -226,11 +104,11 @@ namespace rpp
     {
         struct timespec deadline;
         clock_gettime(CLOCK_REALTIME, &deadline);
-        deadline.tv_sec  += (nanos / NANOS_PER_SECOND);
-        deadline.tv_nsec += (nanos % NANOS_PER_SECOND);
+        deadline.tv_sec  += (nanos / NANOS_PER_SEC);
+        deadline.tv_nsec += (nanos % NANOS_PER_SEC);
         // normalize tv_nsec by overflowing into tv_sec
-        if (deadline.tv_nsec >= NANOS_PER_SECOND) {
-            deadline.tv_nsec -= NANOS_PER_SECOND;
+        if (deadline.tv_nsec >= NANOS_PER_SEC) {
+            deadline.tv_nsec -= NANOS_PER_SEC;
             deadline.tv_sec++;
         }
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
@@ -274,147 +152,80 @@ namespace rpp
 
     Duration Duration::from_seconds(double seconds) noexcept
     {
-        #if _WIN32 || __APPLE__
-            return Duration{ int64_t(seconds * period.period_den) };
-        #else
-            seconds_t s = seconds_t(seconds);
-            nseconds_t ns = nseconds_t((seconds - s) * NANOS_PER_SECOND);
-            return Duration{ s, ns };
-        #endif
+        auto s = sec_t(seconds);
+        auto ns = nsec_t((seconds - s) * NANOS_PER_SEC);
+        return Duration{ s, ns };
     }
     Duration Duration::from_millis(int32_t millis) noexcept
     {
-        #if _WIN32 || __APPLE__
-            return Duration{ int64_t(millis / (1000.0 * period.period_den)) };
-        #else
-            return Duration{
-                seconds_t(millis / 1000),
-                nseconds_t((millis % 1000) * 1'000'000)
-            };
-        #endif
+        return Duration{ sec_t(millis / 1000),
+                         nsec_t((millis % 1000) * 1'000'000) };
     }
     Duration Duration::from_micros(int32_t micros) noexcept
     {
-        #if _WIN32 || __APPLE__
-            return Duration{ int64_t(micros / (1'000'000.0 * period.period_den)) };
-        #else
-            return Duration{
-                seconds_t(micros / 1'000'000),
-                nseconds_t((micros % 1'000'000) * 1'000) };
-        #endif
+        return Duration{ sec_t(micros / MICROS_PER_SEC),
+                         nsec_t((micros % MICROS_PER_SEC) * 1'000) };
     }
     Duration Duration::from_nanos(int64_t nanos) noexcept
     {
-        #if _WIN32 || __APPLE__
-            return Duration{ int64_t(nanos / (1'000'000'000.0 * period.period_den)) };
-        #else
-            return Duration{ 
-                seconds_t(nanos / NANOS_PER_SECOND), 
-                nseconds_t(nanos % NANOS_PER_SECOND)
-            };
-        #endif
-    }
-
-    Duration Duration::operator+(const Duration& d) const noexcept
-    {
-        #if _WIN32 || __APPLE__
-            return { ticks + d.ticks };
-        #else
-            auto s = sec + d.sec;
-            auto ns = nsec + d.nsec; // (!) can be negative
-            if (ns >= NANOS_PER_SECOND) {
-                ns -= NANOS_PER_SECOND;
-                ++s;
-            } else if (ns < 0) {
-                ns += NANOS_PER_SECOND;
-                --s;
-            }
-            return { .sec = s, .nsec = ns };
-        #endif
-    }
-    Duration Duration::operator-(const Duration& d) const noexcept
-    {
-        #if _WIN32 || __APPLE__
-            return { ticks - d.ticks };
-        #else
-            auto s = sec - d.sec;
-            auto ns = nsec - d.nsec; // (!) can be negative
-            if (ns >= NANOS_PER_SECOND) {
-                ns -= NANOS_PER_SECOND;
-                ++s;
-            } else if (ns < 0) {
-                ns += NANOS_PER_SECOND;
-                --s;
-            }
-            return { .sec = s, .nsec = ns };
-        #endif
-    }
-    Duration& Duration::operator+=(const Duration& d) noexcept
-    {
-        #if _WIN32 || __APPLE__
-            ticks += d.ticks;
-        #else
-            sec += d.sec;
-            nsec += d.nsec; // (!) can be negative
-            if (nsec >= NANOS_PER_SECOND) {
-                nsec -= NANOS_PER_SECOND;
-                ++sec;
-            } else if (nsec < 0) {
-                nsec += NANOS_PER_SECOND;
-                --sec;
-            }
-        #endif
-        return *this;
-    }
-    Duration& Duration::operator-=(const Duration& d) noexcept
-    {
-        #if _WIN32 || __APPLE__
-            ticks -= d.ticks;
-        #else
-            sec -= d.sec;
-            nsec -= d.nsec; // (!) can be negative
-            if (nsec >= NANOS_PER_SECOND) {
-                nsec -= NANOS_PER_SECOND;
-                ++sec;
-            } else if (nsec < 0) {
-                nsec += NANOS_PER_SECOND;
-                --sec;
-            }
-        #endif
-        return *this;
+        return Duration{ sec_t(nanos / NANOS_PER_SEC), 
+                         nsec_t(nanos % NANOS_PER_SEC) };
     }
 
     double Duration::seconds() const noexcept
     {
-        #if _WIN32 || __APPLE__
-            return ticks * period.period_sec;
-        #else
-            return sec + (nsec * period.period_sec);
-        #endif
+        return sec + (double(nsec) / NANOS_PER_SEC);
     }
     int32_t Duration::millis() const noexcept
     {
-        #if _WIN32 || __APPLE__
-            return int32_t(ticks * period.period_ms);
-        #else
-            return int32_t((sec*1'000) + (nsec / 1'000'000));
-        #endif
+        return int32_t((sec*1'000) + (nsec / 1'000'000));
     }
     int32_t Duration::micros() const noexcept
     {
-        #if _WIN32 || __APPLE__
-            return int32_t(ticks * period.period_us);
-        #else
-            return int32_t((sec*1'000'000) + (nsec / 1'000));
-        #endif
+        return int32_t((sec*1'000'000) + (nsec / 1'000));
     }
     int64_t Duration::nanos() const noexcept
     {
-        #if _WIN32 || __APPLE__
-            return int64_t(ticks * period.period_ns);
-        #else
-            return int64_t((sec*1'000'000'000LL) + nsec);
-        #endif
+        return int64_t((sec*1'000'000'000LL) + nsec);
+    }
+
+    // if nanosec overflows or undeflows after arithmetic, normalize it
+    #define NORMALIZE_SEC_NSEC(sec, nsec) \
+        if (nsec >= NANOS_PER_SEC) { \
+            nsec -= NANOS_PER_SEC;   \
+            ++sec;                   \
+        } else if (nsec <= -NANOS_PER_SEC) {       \
+            nsec += NANOS_PER_SEC;   \
+            --sec;                   \
+        }
+
+    Duration Duration::operator+(const Duration& d) const noexcept
+    {
+        auto s = sec + d.sec;
+        auto ns = nsec + d.nsec; // (!) can be negative
+        NORMALIZE_SEC_NSEC(s, ns);
+        return { .sec = s, .nsec = ns };
+    }
+    Duration Duration::operator-(const Duration& d) const noexcept
+    {
+        auto s = sec - d.sec;
+        auto ns = nsec - d.nsec; // (!) can be negative
+        NORMALIZE_SEC_NSEC(s, ns);
+        return { .sec = s, .nsec = ns };
+    }
+    Duration& Duration::operator+=(const Duration& d) noexcept
+    {
+        sec += d.sec;
+        nsec += d.nsec; // (!) can be negative
+        NORMALIZE_SEC_NSEC(sec, nsec);
+        return *this;
+    }
+    Duration& Duration::operator-=(const Duration& d) noexcept
+    {
+        sec -= d.sec;
+        nsec -= d.nsec; // (!) can be negative
+        NORMALIZE_SEC_NSEC(sec, nsec);
+        return *this;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -422,38 +233,49 @@ namespace rpp
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
-            LARGE_INTEGER time;
-            QueryPerformanceCounter(&time);
-            return TimePoint{{ .ticks = int64_t(time.QuadPart) }};
-        #elif __APPLE__
-            return TimePoint{{ .ticks = int64_t(mach_absolute_time()) }};
+            static uint64_t freq;
+            if (!freq)
+            {
+                LARGE_INTEGER f; QueryPerformanceFrequency(&f);
+                freq = uint64_t(f.QuadPart);
+            }
+
+            LARGE_INTEGER time; QueryPerformanceCounter(&time);
+
+            // in order to support nanosecond precision,
+            // the internal ticks need to be converted to nanoseconds
+            auto sec = sec_t(time.QuadPart / freq);
+            auto fraction = uint64_t(time.QuadPart % freq);
+            // convert fraction to nanoseconds
+            auto nsec = nsec_t((fraction * NANOS_PER_SEC) / freq);
+
+            return TimePoint{{ .sec = sec, .nsec = nsec }};
         #else
-            static_assert(sizeof(struct timespec) == sizeof(TimePoint), "TimePoint size mismatch");
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
             // assign them explicitly to catch any errors in platform configuration
-            return TimePoint{{ .sec = t.tv_sec, .nsec = t.tv_nsec }};
+            return TimePoint{{ .sec = sec_t(t.tv_sec), .nsec = nsec_t(t.tv_nsec) }};
         #endif
     }
 
     double TimePoint::elapsed_sec(const TimePoint& end) const noexcept
     {
-        return (end.dur - this->dur).seconds();
+        return (end.duration - this->duration).seconds();
     }
 
     int32_t TimePoint::elapsed_ms(const TimePoint& end) const noexcept
     {
-        return (end.dur - this->dur).millis();
+        return (end.duration - this->duration).millis();
     }
 
     int32_t TimePoint::elapsed_us(const TimePoint& end) const noexcept
     {
-        return (end.dur - this->dur).micros();
+        return (end.duration - this->duration).micros();
     }
 
     int64_t TimePoint::elapsed_ns(const TimePoint& end) const noexcept
     {
-        return (end.dur - this->dur).nanos();
+        return (end.duration - this->duration).nanos();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -535,7 +357,7 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    void StopWatch::start()
+    void StopWatch::start() noexcept
     {
         if (!begin) {
             begin = TimePoint::now();
@@ -543,24 +365,24 @@ namespace rpp
         }
     }
 
-    void StopWatch::stop()
+    void StopWatch::stop() noexcept
     {
         if (begin && !end)
             end = TimePoint::now();
     }
 
-    void StopWatch::resume()
+    void StopWatch::resume() noexcept
     {
         end = {};
     }
 
-    void StopWatch::reset()
+    void StopWatch::reset()noexcept
     {
         begin = {};
         end = {};
     }
 
-    double StopWatch::elapsed() const
+    double StopWatch::elapsed() const noexcept
     {
         if (begin) {
             if (end) {
@@ -578,5 +400,5 @@ namespace rpp
 
 extern "C" double time_now_seconds()
 {
-    return rpp::time_now() * rpp::period.period_sec;
+    return rpp::TimePoint::now().duration.seconds();
 }

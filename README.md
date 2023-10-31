@@ -403,13 +403,24 @@ Basic timer utilities for measuring time for performance profiling and consisten
     printf("work elapsed: %.2fs\n", elapsed);
 ```
 
+* `rpp::Duration` Unified nanosecond precision duration type
+  * `Duration()` Initializes with `Duration::zero()`
+  * `Duration from_seconds(double seconds)` Creates a new duration from fractional seconds
+  * `Duration from_millis(int millis)` Creates a new duration from milliseconds
+  * `Duration from_micros(int micros)` Creates a new duration from microseconds
+  * `Duration from_nanos(int nanos)` Creates a new duration from nanoseconds
+  * `double seconds()` Converts this duration to fractional seconds
+  * `int32_t millis()` Converts this duration to milliseconds
+  * `int32_t micros()` Converts this duration to microseconds
+  * `int64_t nanos()` Converts this duration to nanoseconds
+
 * `rpp::TimePoint` System's most accurate measurement for a single time point.
   * `TimePoint()` Initializes with `TimePoint::zero()`
   * `TimePoint TimePoint::now()` Gets the current time
   * `double elapsed_sec(end)` Fractional seconds elapsed from this time point to end
-  * `uint32_t elapsed_ms(end)` Integer milliseconds elapsed from this time point to end
-  * `uint32_t elapsed_us(end)` Integer microseconds elapsed from this time point to end
-  * `uint32_t elapsed_ns(end)` Integer nanoseconds elapsed from this time point to end
+  * `int32_t elapsed_ms(end)` Integer milliseconds elapsed from this time point to end
+  * `int32_t elapsed_us(end)` Integer microseconds elapsed from this time point to end
+  * `int64_t elapsed_ns(end)` Integer nanoseconds elapsed from this time point to end
   * `bool is_valid()` True if TimePoint is not zero
 
 * `rpp::Timer` High accuracy timer for performance profiling or deltaTime measurement.
@@ -420,12 +431,12 @@ Basic timer utilities for measuring time for performance profiling and consisten
   * `double elapsed_millis()` Fractional milliseconds elapsed from start()
   * `double next()` Gets the next time sample, since the last call to next() or start() and calls start() again
   * `double next_millis()` next() converted to milliseconds
-  * `uint32_t elapsed_ms(end)` Integer milliseconds elapsed from start() until end
-  * `uint32_t elapsed_us(end)` Integer microseconds elapsed from start() until end
-  * `uint32_t elapsed_ns(end)` Integer nanoseconds elapsed from start() until end
-  * `uint32_t elapsed_ms()` Integer milliseconds elapsed from start() until now()
-  * `uint32_t elapsed_us()` Integer microseconds elapsed from start() until now()
-  * `uint32_t elapsed_ns()` Integer nanoseconds elapsed from start() until now()
+  * `int32_t elapsed_ms(end)` Integer milliseconds elapsed from start() until end
+  * `int32_t elapsed_us(end)` Integer microseconds elapsed from start() until end
+  * `int64_t elapsed_ns(end)` Integer nanoseconds elapsed from start() until end
+  * `int32_t elapsed_ms()` Integer milliseconds elapsed from start() until now()
+  * `int32_t elapsed_us()` Integer microseconds elapsed from start() until now()
+  * `int64_t elapsed_ns()` Integer nanoseconds elapsed from start() until now()
   * `double measure(Func f)` Measure block execution time as seconds
   * `double measure_millis(Func f)` Measure block execution time as milliseconds
 
@@ -445,17 +456,10 @@ Basic timer utilities for measuring time for performance profiling and consisten
   * `~ScopedPerfTimer()` Prints out the elapsed time
 
 Global time utilities:
-* `uint64_t time_now()` Gets the current timestamp from the system's most accurate time measurement
-* `double time_period()` Gets the time period for the system's most accurate time measurement
-* `double time_now_seconds()` Current time in seconds:  rpp::time_now() * rpp::time_period()
-* `int64_t from_sec_to_time_ticks(double seconds)` Converts fractional seconds to clock ticks that matches time_now()
-* `int64_t from_ms_to_time_ticks(double millis)` Converts fractional milliseconds int to clock ticks that matches time_now()
-* `int64_t from_us_to_time_ticks(double micros)` Converts fractional microseconds int to clock ticks that matches time_now()
-* `double time_ticks_to_sec(int64_t ticks)` Converts clock ticks that matches time_now() into fractional seconds
-* `double time_ticks_to_ms(int64_t ticks)` Converts clock ticks that matches time_now() into fractional milliseconds
-* `double time_ticks_to_us(int64_t ticks)` Converts clock ticks that matches time_now() into fractional microseconds
+* `double time_now_seconds()` Current time in fractional seconds
 * `void sleep_ms(unsigned int millis)` Let this thread sleep for provided milliseconds
 * `void sleep_us(unsigned int microseconds)` Let this thread sleep for provided MICROSECONDS
+* `void sleep_ns(uint64_t nanoseconds)` Let this thread sleep for provided NANOSECONDS
 
 -----------------------
 -----------------------

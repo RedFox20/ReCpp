@@ -1806,7 +1806,7 @@ namespace rpp
         if (!lastSendTime)
             return true;
 
-        const int32_t waitTimeNs = nextSendTimeout - lastSendTime.elapsed_ns(now);
+        const int64_t waitTimeNs = int64_t(nextSendTimeout) - lastSendTime.elapsed_ns(now);
         return waitTimeNs <= 0;
     }
 
@@ -1821,15 +1821,15 @@ namespace rpp
         }
 
         TimePoint end = start;
-        const int32_t timeoutNs = nextSendTimeout;
-        const int32_t waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
+        const int64_t timeoutNs = int64_t(nextSendTimeout);
+        const int64_t waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
         if (waitTimeNs > 0)
         {
-            int32_t remainingNs = waitTimeNs;
+            int64_t remainingNs = waitTimeNs;
 
             // UDP socket sendto also takes a small amount of time
             // so we quit if we have minRemainingNs left
-            constexpr int32_t minRemainingNs = 80;
+            constexpr int64_t minRemainingNs = 80;
             while (remainingNs > minRemainingNs)
             {
                 // if we have very little time remaining

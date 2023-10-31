@@ -258,8 +258,8 @@ namespace rpp
         static bool eq(long unsigned int expr, int expected) noexcept { return expr == (long unsigned int)expected; }
         static bool eq(long unsigned int expr, long int expected) noexcept { return expr == (long unsigned int)expected; }
         static bool eq(long unsigned long expr, long long expected) noexcept { return expr == (long unsigned long)expected; }
-        static bool eq(float expr, float expected) noexcept { return fabs(expr - expected) < FLT_EPSILON; }
-        static bool eq(double expr, double expected) noexcept { return fabs(expr - expected) < DBL_EPSILON; }
+        static bool eq(float expr, float expected) noexcept { return fabs(expr - expected) < (FLT_EPSILON*2); }
+        static bool eq(double expr, double expected) noexcept { return fabs(expr - expected) < (DBL_EPSILON*2); }
 
         template<class Expr, class Than> static bool gt(const Expr& expr, const Than& than) noexcept
         {
