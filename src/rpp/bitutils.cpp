@@ -1,4 +1,5 @@
 #include "bitutils.h"
+#include "math.h" // min
 #include <cstring> // memcpy
 #include <stdlib.h> // malloc, free
 #include <utility> // std::swap
@@ -178,7 +179,7 @@ namespace rpp
     {
         if (startByteIndex >= capacity)
             return 0;
-        uint32_t bytesToCopy = std::min(count, capacity - startByteIndex);
+        uint32_t bytesToCopy = rpp::min(count, capacity - startByteIndex);
         memcpy(buffer, data + startByteIndex, bytesToCopy);
         return bytesToCopy;
     }
@@ -187,7 +188,7 @@ namespace rpp
     {
         if (startByteIndex >= capacity)
             return 0;
-        uint32_t bytesToCopy = std::min(count, capacity - startByteIndex);
+        uint32_t bytesToCopy = rpp::min(count, capacity - startByteIndex);
         const uint8_t* src = data + startByteIndex;
         for (uint32_t i = 0; i < bytesToCopy; i++)
             buffer[i] = ~src[i];
@@ -204,7 +205,7 @@ namespace rpp
         if (startBit >= maxBits)
             return 0;
 
-        const uint32_t bitsToCopy = std::min(numBits, maxBits - startBit);
+        const uint32_t bitsToCopy = rpp::min(numBits, maxBits - startBit);
 
         // fast path
         if (startBit % 8 == 0 && bitsToCopy % 8 == 0)
