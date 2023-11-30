@@ -1,4 +1,5 @@
 #include "load_balancer.h"
+#include <thread> // std::this_thread::yield
 
 namespace rpp
 {
