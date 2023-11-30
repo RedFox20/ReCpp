@@ -1,4 +1,5 @@
 #include <rpp/sockets.h>
+#include <rpp/load_balancer.h>
 #include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
