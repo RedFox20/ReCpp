@@ -346,7 +346,13 @@ namespace rpp
     } \
 }while(0)
 
-#define AssertEqual AssertThat
+#define AssertEqual(expr, expected) do { \
+    const auto& __expr   = expr;        \
+    const auto& __expect = expected;    \
+    if (!rpp::Compare::eq(__expr, __expect)) { \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); \
+    } \
+}while(0)
 
 #define AssertThrows(expr, exceptionType) do { \
     try {                                      \
