@@ -88,6 +88,14 @@ namespace rpp
         Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
         Duration& operator-=(const Duration& d) noexcept { nsec -= d.nsec; return *this; }
         Duration operator-() const noexcept { return Duration{ -nsec }; }
+
+        /** @brief Divides this duration by an integer */
+        Duration operator/(int32_t d) const noexcept { return Duration{ nsec / d }; }
+        /**
+         * @brief Multiplies this duration by an integer
+         * @warning This can overflow!!!
+         */
+        Duration operator*(int32_t d) const noexcept { return Duration{ nsec * d }; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
