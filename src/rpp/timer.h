@@ -53,6 +53,8 @@ namespace rpp
         bool operator!=(const Duration& d) const noexcept { return nsec != d.nsec; }
         bool operator>(const Duration& d) const noexcept { return nsec > d.nsec; }
         bool operator<(const Duration& d) const noexcept { return nsec < d.nsec; }
+        bool operator>=(const Duration& d) const noexcept { return nsec >= d.nsec; }
+        bool operator<=(const Duration& d) const noexcept { return nsec <= d.nsec; }
 
 
         /** @returns New Duration from fractional seconds (positive or negative) */
@@ -157,14 +159,16 @@ namespace rpp
         bool is_valid() const noexcept { return duration.is_valid(); }
         explicit operator bool() const noexcept { return duration.is_valid(); }
 
-        bool operator==(const TimePoint& t) const noexcept { return duration == t.duration; }
-        bool operator!=(const TimePoint& t) const noexcept { return duration != t.duration; }
-        bool operator>(const TimePoint& t) const noexcept { return duration > t.duration; }
-        bool operator<(const TimePoint& t) const noexcept { return duration < t.duration; }
-        TimePoint operator+(const Duration& d) const noexcept { return TimePoint{duration + d}; }
-        TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration - d}; }
-        TimePoint& operator+=(const Duration& d) noexcept { duration += d; return *this; }
-        TimePoint& operator-=(const Duration& d) noexcept { duration -= d; return *this;}
+        bool operator==(const TimePoint& t) const noexcept { return duration.nsec == t.duration.nsec; }
+        bool operator!=(const TimePoint& t) const noexcept { return duration.nsec != t.duration.nsec; }
+        bool operator>(const TimePoint& t) const noexcept { return duration.nsec > t.duration.nsec; }
+        bool operator<(const TimePoint& t) const noexcept { return duration.nsec < t.duration.nsec; }
+        bool operator>=(const TimePoint& t) const noexcept { return duration.nsec >= t.duration.nsec; }
+        bool operator<=(const TimePoint& t) const noexcept { return duration.nsec <= t.duration.nsec; }
+        TimePoint operator+(const Duration& d) const noexcept { return TimePoint{duration.nsec + d.nsec}; }
+        TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration.nsec - d.nsec}; }
+        TimePoint& operator+=(const Duration& d) noexcept { duration.nsec += d.nsec; return *this; }
+        TimePoint& operator-=(const Duration& d) noexcept { duration.nsec -= d.nsec; return *this;}
         Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
     };
 
