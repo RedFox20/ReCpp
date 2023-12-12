@@ -37,7 +37,7 @@ RPPCAPI void SetLogHandler(LogMessageCallback loghandler);
 
 // legacy ALIAS for SetLogHandler
 RPPCAPI
-#if __cplusplus
+#if __cplusplus && !__clang__
 [[deprecated("Use SetLogHandler() instead")]]
 #endif
 void SetLogErrorHandler(LogMessageCallback loghandler);

@@ -10,7 +10,7 @@ TestImpl(test_debugging)
 
     TestCleanup()
     {
-        SetLogErrorHandler(nullptr);
+        SetLogHandler(nullptr);
     }
 
     TestCase(debug_api)
@@ -22,7 +22,7 @@ TestImpl(test_debugging)
         char  e = '4';
 
         static std::string log_output;
-        SetLogErrorHandler([](LogSeverity sev, const char* err, int len)
+        SetLogHandler([](LogSeverity sev, const char* err, int len)
         {
             (void)sev;
             log_output = std::string{err, err+len};
