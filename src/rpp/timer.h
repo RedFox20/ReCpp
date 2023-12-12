@@ -28,6 +28,9 @@ namespace rpp
     static constexpr int64_t NANOS_PER_SEC  = 1'000'000'000LL;
     static constexpr int64_t NANOS_PER_MILLI = 1'000'000LL;
     static constexpr int64_t NANOS_PER_MICRO = 1'000LL;
+    static constexpr int64_t NANOS_PER_DAY = 86'400'000'000'000LL;
+    static constexpr int64_t NANOS_PER_HOUR = 3'600'000'000'000LL;
+    static constexpr int64_t NANOS_PER_MINUTE = 60'000'000'000LL;
 
     /**
      * @brief New Duration API for TimePoint arithmetics
@@ -61,27 +64,42 @@ namespace rpp
         /** @returns New Duration from integer nanoseconds (positive or negative) */
         static Duration from_nanos(int64_t nanos) noexcept { return Duration{ nanos }; }
 
-
         /** 
-         * @returns fractional seconds (positive or negative) of this Duration
+         * @returns TOTAL fractional seconds (positive or negative) of this Duration
          */
-        double seconds() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
+        double sec() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
         /**
-         * @returns integer milliseconds (positive or negative) of this Duration
+         * @returns TOTAL integer seconds (positive or negative) of this Duration
+         */
+        int32_t seconds() const noexcept { return int32_t(nsec / NANOS_PER_SEC); }
+        /**
+         * @returns TOTAL integer milliseconds (positive or negative) of this Duration
          * @warning This overflows at 2,147,483,647 milliseconds (2,147,483 seconds, which is 24 days)
          */
         int32_t millis() const noexcept { return int32_t(nsec / NANOS_PER_MILLI); }
         /**
-         * @returns integer microseconds (positive or negative) of this Duration
+         * @returns TOTAL integer microseconds (positive or negative) of this Duration
          * @warning This overflows at 2,147,483,647 microseconds (2,147 seconds, which is 35 minutes)
          */
         int32_t micros() const noexcept { return int32_t(nsec / NANOS_PER_MICRO); }
         /**
-         * @returns integer nanoseconds (positive or negative) of this Duration
+         * @returns TOTAL integer nanoseconds (positive or negative) of this Duration
          * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is 292,471 years)
          */
         int64_t nanos() const noexcept { return nsec; }
 
+        /**
+         * @returns TOTAL integer days of this Duration
+         */
+        int32_t days() const noexcept { return int32_t(nsec / NANOS_PER_DAY); }
+        /**
+         * @returns TOTAL integer hours of this Duration
+         */
+        int32_t hours() const noexcept { return int32_t(nsec / NANOS_PER_HOUR); }
+        /**
+         * @returns TOTAL integer minutes of this Duration
+         */
+        int32_t minutes() const noexcept { return int32_t(nsec / NANOS_PER_MINUTE); }
 
         Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
         Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
@@ -125,7 +143,9 @@ namespace rpp
         Duration elapsed(const TimePoint& end) const noexcept { return (end.duration - duration); }
 
         /** @returns fractional seconds elapsed from this time point until end */
-        double elapsed_sec(const TimePoint& end) const noexcept { return (end.duration - duration).seconds(); }
+        double elapsed_sec(const TimePoint& end) const noexcept { return (end.duration - duration).sec(); }
+        /** @returns integer seconds elapsed from this time point until end */
+        int32_t elapsed_s(const TimePoint& end) const noexcept { return (end.duration - duration).seconds(); }
         /** @returns integer milliseconds elapsed from this time point until end */
         int32_t elapsed_ms(const TimePoint& end) const noexcept { return (end.duration - duration).millis(); }
         /** @returns integer microseconds elapsed from this time point until end */
