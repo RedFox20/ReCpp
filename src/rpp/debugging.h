@@ -28,14 +28,19 @@ typedef enum {
     LogSeverityError, // critical error or bug; -- a spectacular failure
 } LogSeverity;
 
-/** Error message callback */
-typedef void (*LogErrorCallback) (LogSeverity severity, const char* err, int len);
+typedef void (*LogMessageCallback) (LogSeverity severity, const char* message, int len);
 typedef void (*LogEventCallback) (const char* eventName, const char* message, int len);
 typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
-
 /** Sets the callback handler for any error messages */
-RPPCAPI void SetLogErrorHandler(LogErrorCallback errorHandler);
+RPPCAPI void SetLogHandler(LogMessageCallback loghandler);
+
+// legacy ALIAS for SetLogHandler
+RPPCAPI
+#if __cplusplus
+[[deprecated("Use SetLogHandler() instead")]]
+#endif
+void SetLogErrorHandler(LogMessageCallback loghandler);
 
 /** Sets the callback handler for event messages  */
 RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler);
@@ -66,7 +71,8 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
 RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
 
 /** Logs an error to the backing error mechanism */
-RPPCAPI void  LogFormatv (LogSeverity severity, const char* format, va_list ap);
+RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap);
+RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len);
 RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;

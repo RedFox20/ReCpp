@@ -25,14 +25,18 @@ static LogSeverity Filter = LogSeverityWarn;
 #else
 static LogSeverity Filter = LogSeverityInfo;
 #endif
-static LogErrorCallback ErrorHandler;
+static LogMessageCallback LogHandler;
 static LogEventCallback EventHandler;
 static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
 
-RPPCAPI void SetLogErrorHandler(LogErrorCallback errorHandler)
+RPPCAPI void SetLogHandler(LogMessageCallback loghandler)
 {
-    ErrorHandler = errorHandler;
+    LogHandler = loghandler;
+}
+RPPCAPI void SetLogErrorHandler(LogMessageCallback loghandler)
+{
+    LogHandler = loghandler;
 }
 RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler)
 {
@@ -55,7 +59,7 @@ RPPCAPI LogSeverity GetLogSeverityFilter()
     return Filter;
 }
 
-static int SafeFormat(char* errBuf, int N, const char* format, va_list ap)
+static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexcept
 {
     int len = vsnprintf(errBuf, size_t(N-1)/*spare room for \n*/, format, ap);
     if (len < 0 || len >= N) { // err: didn't fit
@@ -67,7 +71,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap)
 
 #if __linux__
 // split at $ and remove /long/path/ leaving just "filename.cpp:123 func() $ message"
-static void ShortFilePathMessage(char*& ptr, int& len)
+static void ShortFilePathMessage(char*& ptr, int& len) noexcept
 {
     if (char* middle = strchr(ptr, '$')) {
         for (; middle > ptr; --middle) {
@@ -174,22 +178,33 @@ RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
 {
     if (severity < Filter)
         return;
-    
+
     char errBuf[4096];
     int len = SafeFormat(errBuf, sizeof(errBuf), format, ap);
-    
-    if (ErrorHandler)
+
+    if (LogHandler)
     {
         char* ptr = errBuf;
         #ifdef __linux__
           ShortFilePathMessage(ptr, len);
         #endif
-        ErrorHandler(severity, ptr, len);
+        LogHandler(severity, ptr, len);
     }
     else
     {
         LogWriteToDefaultOutput("ReCpp", severity, errBuf, len);
     }
+}
+
+
+RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len)
+{
+    if (severity < Filter)
+        return;
+    if (LogHandler)
+        LogHandler(severity, message, len);
+    else
+        LogWriteToDefaultOutput("ReCpp", severity, message, len);
 }
 
 #define WrappedLogFormatv(severity, format) \
