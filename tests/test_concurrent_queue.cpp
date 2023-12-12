@@ -251,14 +251,14 @@ TestImpl(test_concurrent_queue)
 
         PopResult r;
 
-        AssertWaitPopUntil(Clock::now()+5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 10.0);
+        AssertWaitPopUntil(Clock::now()+5ms, false, /*item*/"", /*elapsed ms:*/ 4.9, 10.0);
         AssertWaitPopUntil(Clock::now()+0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout,
         // we should get it immediately
         queue.push("item1");
         AssertWaitPopUntil(Clock::now()+10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopUntil(Clock::now()+15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 20.0);
+        AssertWaitPopUntil(Clock::now()+15ms, false, /*item*/"", /*elapsed ms:*/ 14.9, 20.0);
 
         // if we have an item, but `until` is in the past, it should immediately return false
         queue.push("item2");

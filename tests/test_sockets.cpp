@@ -580,16 +580,21 @@ TestImpl(test_sockets)
         print_info("========= TRANSMIT DATA =========\n");
 
         socket server = listen(rpp::make_tcp_randomport()); // this is our server
-        std::thread remote([this,port=server.port()] { this->transmitting_remote(port); });
-        socket client = accept(server);
-        client.set_nagle(false); // disable nagle
+        server.set_nagle(false);
+
+        // remote client lives in a separate thread
+        std::thread remote([this,serverPort=server.port()] { this->transmitting_remote_client(serverPort); });
+
+        // accept the remote client
+        socket remote_client = accept(server);
+        remote_client.set_nagle(false); // disable nagle
 
         for (int i = 0; i < 20; ++i)
         {
-            std::string data = client.recv_str();
+            std::string data = remote_client.recv_str();
             if (data != "")
             {
-                print_info("server: received %d bytes of data from client ", (int)data.length());
+                print_info("server: received %d bytes of data from remote_client ", (int)data.length());
                 AssertThat(data.size(), TransmitSize);
 
                 size_t j = 0;
@@ -611,28 +616,29 @@ TestImpl(test_sockets)
         }
 
         print_info("server: closing down\n");
-        client.close();
+        remote_client.close();
         server.close();
         remote.join();
     }
 
-    void transmitting_remote(int serverPort)
+    void transmitting_remote_client(int serverPort)
     {
-        std::vector<char> sendBuffer(TransmitSize, '$');
+        std::vector<char> buf(TransmitSize, '$');
 
-        socket server = connect("127.0.0.1", serverPort);
-        server.set_nagle(false); // disable nagle
+        // connect to server
+        socket to_server = connect("127.0.0.1", serverPort);
+        to_server.set_nagle(false); // disable nagle
 
-        while (server.connected())
+        while (to_server.connected())
         {
-            int sentBytes = server.send(sendBuffer.data(), (int)sendBuffer.size());
-            if (sentBytes > 0)
-                print_info("remote: sent %d bytes of data\n", sentBytes);
+            int sent = to_server.send(buf.data(), (int)buf.size());
+            if (sent > 0)
+                print_info("remote: sent %d bytes of data\n", sent);
             else
-                print_info("remote: failed to send data: %s\n", server.last_err().c_str());
+                print_info("remote: failed to send data: %s\n", to_server.last_err().c_str());
 
             // we need to create a large gap in the data
-            rpp::sleep_ms(15);
+            rpp::sleep_ms(30);
         }
         print_info("remote: server disconnected\n");
         print_info("remote: closing down\n");
