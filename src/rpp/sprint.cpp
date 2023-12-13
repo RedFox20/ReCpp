@@ -105,6 +105,7 @@ namespace rpp
 
     void string_buffer::write(const strview& s) noexcept
     {
+        if (!s.len) return;
         reserve(s.len);
         char* dst = ptr + len;
         memcpy(dst, s.str, (size_t)s.len);
