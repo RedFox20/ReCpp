@@ -114,11 +114,11 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         FILE*  fout   = severity == LogSeverityError ? stderr : stdout;
 
         AllocaPrintlineBuf(err, len);
-        static std::mutex consoleSync;
+        static std::unique_ptr<std::mutex> consoleSync = std::make_unique<std::mutex>();
         {
-            std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
-            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
-
+            std::unique_lock<std::mutex> guard;
+            if (consoleSync) // lock if mutex not destroyed
+                guard = std::unique_lock<std::mutex>{ *consoleSync, std::try_to_lock };
             SetConsoleTextAttribute(winout, colormap[severity]);
             fwrite(buf, size_t(len + 1), 1, fout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);

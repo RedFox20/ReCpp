@@ -260,11 +260,11 @@ namespace rpp
             "\x1b[33m", // yellow
             "\x1b[31m", // red
         };
-        static std::mutex consoleSync;
+        static std::unique_ptr<std::mutex> consoleSync = std::make_unique<std::mutex>();
         {
-            std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
-            if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
-
+            std::unique_lock<std::mutex> guard;
+            if (consoleSync) // lock if mutex not destroyed
+                guard = std::unique_lock<std::mutex>{ *consoleSync, std::try_to_lock };
             fwrite(colors[color], strlen(colors[color]), 1, cout);
             fwrite(str, size_t(len), 1, cout);
             fwrite(colors[Default], strlen(colors[Default]), 1, cout);
