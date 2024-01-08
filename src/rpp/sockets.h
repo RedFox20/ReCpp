@@ -6,10 +6,10 @@
 #if _MSC_VER
 #  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
 #endif
-#include <string>   // std::string, std::wstring
-#include <vector>   // std::vector
 #include "config.h"
+#include "strview.h" // rpp::strview, std::string
 #include "load_balancer.h" // rpp::load_balancer
+#include <vector>   // std::vector
 
 namespace rpp
 {
@@ -602,6 +602,10 @@ namespace rpp
         template<class T> int send(const std::basic_string<T>& str) noexcept { 
             return this->send(str.data(), static_cast<int>(sizeof(T) * str.size())); 
         }
+        // Send a string view
+        int send(rpp::strview str) noexcept {
+            return this->send(str.data(), str.size());
+        }
 
         /**
          * UDP only. Sends a datagram to the specified ipaddress
@@ -625,6 +629,10 @@ namespace rpp
         /** Send a C++ string */
         template<class T> int sendto(const ipaddress& to, const std::basic_string<T>& str) noexcept {
             return this->sendto(to, str.data(), static_cast<int>(sizeof(T) * str.size()));
+        }
+        // Send a string view
+        int sendto(const ipaddress& to, rpp::strview str) noexcept {
+            return this->sendto(to, str.data(), str.size());
         }
 
         /**
