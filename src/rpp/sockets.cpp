@@ -1554,10 +1554,7 @@ namespace rpp
     {
         const bool read = (pollFlags & PF_Read) != 0;
         const bool write = (pollFlags & PF_Write) != 0;
-        struct pollfd pfd;
-        pfd.fd = Sock;
-        pfd.events = (read ? POLLIN : 0) | (write ? POLLOUT : 0);
-        pfd.revents = 0;
+        struct pollfd pfd = { Sock, short((read ? POLLIN : 0) | (write ? POLLOUT : 0)), 0 };
 
     #if _WIN32 || _WIN64
         int r = WSAPoll(&pfd, 1, timeoutMillis);
@@ -1570,8 +1567,8 @@ namespace rpp
             return false;
         }
 
-        return (read && (pfd.revents & POLLIN))
-            || (write && (pfd.revents & POLLOUT));
+        return (read && (pfd.revents & POLLIN) != 0)
+            || (write && (pfd.revents & POLLOUT) != 0);
     }
 
     bool socket::poll(const std::vector<socket*>& in, std::vector<int>& ready,
@@ -1602,8 +1599,8 @@ namespace rpp
 
         for (int i = 0; i < n; ++i)
         {
-            if ((read && (pfd[i].revents & POLLIN)) ||
-                (write && (pfd[i].revents & POLLOUT)))
+            if ((read && (pfd[i].revents & POLLIN) != 0) ||
+                (write && (pfd[i].revents & POLLOUT) != 0))
             {
                 ready.push_back(i);
             }
@@ -1661,60 +1658,75 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        // a connection only makes sense for TCP.. unless we implement
-        // an UDP application layer to handle connections? out of scope for socket..
-        // need to use SO_Blocking during connect:
-        if (create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt|SO_Blocking)))
+        if (!good())
         {
-            Addr = remoteAddr;
-            auto sa = to_saddr(remoteAddr);
-            if (::connect(Sock, sa, sa.size())) { // did connect fail?
-                int err = os_getsockerr();
-                if (err == ESOCK(EWOULDBLOCK)) {
-                    close();
-                    return false; // You have to call connect again until it works
-                }
-                else if (handle_errno(err) != 0) {
-                    return false;
-                }
-            }
-            Category = SC_Client;
-
-            // restore proper blocking flags
-            set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
-
-            if      (opt & SO_NonBlock) set_blocking(false);
-            else if (opt & SO_Blocking) set_blocking(true);
-            else                        set_blocking(Blocking); // use socket default
-            return true;
+            // need to use SO_Blocking for infinite wait
+            if (!create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt|SO_Blocking)))
+                return false;
         }
-        return false;
+
+        Addr = remoteAddr;
+        auto sa = to_saddr(remoteAddr);
+
+        if (::connect(Sock, sa, sa.size()) != 0)
+        {
+            // connection unsuccessful, the user has to retry or handle error
+            handle_errno();
+            return false;
+        }
+
+        configure_connected_client(opt);
+        return true;
     }
+
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        // we need a non-blocking socket to do select right after connect
-        if (create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & SO_NonBlock)))
+        if (!good())
         {
-            Addr = remoteAddr;
-            auto sa = to_saddr(remoteAddr);
-            if (::connect(Sock, sa, sa.size()) != 0)
+            // need a non-blocking socket to do poll right after connect
+            if (!create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & SO_NonBlock)))
+                return false;
+        }
+
+        Addr = remoteAddr;
+        auto sa = to_saddr(remoteAddr);
+
+        int r = ::connect(Sock, sa, sa.size());
+        if (r != 0)
+        {
+            int err = os_getsockerr();
+            if (err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
             {
-                int err = os_getsockerr();
-                if (err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
+                if (poll(millis, PF_Write))
                 {
-                    if (select(millis, SF_Write)) {
-                        if (opt & SO_Blocking) // now configure the blocking state
-                            set_blocking(true);
-                        Category = SC_Client;
-                        return true;
-                    }
-                    // timeout
+                    // socket is writable, check for errors
+                    r = get_socket_level_error();
                 }
             }
-            handle_errno();
         }
-        close();
-        return false;
+
+        if (r == 0)
+        {
+            configure_connected_client(opt);
+            return true;
+        }
+        else
+        {
+            handle_errno();
+            return false;
+        }
+    }
+
+    void socket::configure_connected_client(socket_option opt) noexcept
+    {
+        Category = SC_Client;
+
+        set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
+
+        // configure blocking flags
+        if      (opt & SO_NonBlock) set_blocking(false);
+        else if (opt & SO_Blocking) set_blocking(true);
+        else                        set_blocking(Blocking); // use socket default
     }
 
     socket socket::connect_to(const ipaddress& remoteAddr, socket_option opt) noexcept
@@ -1723,6 +1735,7 @@ namespace rpp
             return s;
         return {}; // failed
     }
+
     socket socket::connect_to(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
         if (socket s; s.connect(remoteAddr, millis, opt))

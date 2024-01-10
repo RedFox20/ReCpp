@@ -1108,6 +1108,11 @@ namespace rpp
         bool connect(const ipaddress& remoteAddr, int millis,
                      socket_option opt = SO_None) noexcept;
 
+    private:
+        void configure_connected_client(socket_option opt) noexcept;
+
+    public:
+
         /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
