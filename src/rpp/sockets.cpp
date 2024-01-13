@@ -1,11 +1,11 @@
 #include "sockets.h"
-#include <rpp/debugging.h>
+#include "debugging.h"
 #include <stdlib.h>    // malloc
 #include <stdio.h>     // printf
 #include <string.h>    // memcpy,memset,strlen
 #include <assert.h>
-#include <rpp/strview.h> // _tostring
-#include <rpp/sort.h>
+#include "strview.h" // _tostring
+#include "sort.h"
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG

@@ -8,7 +8,7 @@
 #include <deque>
 #include <unordered_map>
 #include <numeric>
-#include <rpp/sort.h>
+#include "sort.h"
 #include <stdexcept>
 
 namespace rpp

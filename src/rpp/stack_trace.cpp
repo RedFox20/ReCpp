@@ -35,7 +35,7 @@
 #    include <vector>
 #    include <unordered_map>
 #    include <mutex>
-#    include <rpp/sort.h> // rpp::insertion_sort
+#    include "sort.h" // rpp::insertion_sort
 #  else
 #    include <dlfcn.h>
 #  endif

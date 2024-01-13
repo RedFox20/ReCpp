@@ -18,7 +18,7 @@
 #  include <unordered_map>
 #endif
 
-#include <rpp/paths.h>
+#include "paths.h"
 
 namespace rpp /* ReCpp */
 {
