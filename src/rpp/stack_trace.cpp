@@ -589,6 +589,7 @@ namespace rpp
     static decltype(SymGetSymFromAddr64)*         pSymGetSymFromAddr64;
     static decltype(SymInitialize)*               pSymInitialize;
     static decltype(SymLoadModule64)*             pSymLoadModule64;
+    static decltype(SymLoadModuleExW)*            pSymLoadModuleExW;
     static decltype(SymSetOptions)*               pSymSetOptions;
     static decltype(StackWalk64)*                 pStackWalk64;
     static decltype(UnDecorateSymbolName)*        pUnDecorateSymbolName;
@@ -618,6 +619,7 @@ namespace rpp
         LoadProc(pSymGetSymFromAddr64,         "SymGetSymFromAddr64");
         LoadProc(pUnDecorateSymbolName,        "UnDecorateSymbolName");
         LoadProc(pSymLoadModule64,             "SymLoadModule64");
+        LoadProc(pSymLoadModuleExW,            "SymLoadModuleExW");
         LoadProc(pSymGetSearchPath,            "SymGetSearchPath");
         LoadProc(pSymGetLineFromInlineContext, "SymGetLineFromInlineContext");
         LoadProc(pSymAddrIncludeInlineTrace,   "SymAddrIncludeInlineTrace");
@@ -645,6 +647,13 @@ namespace rpp
         return GetLastError();
     }
 
+    static DWORD LoadModule(void* hProcess, const WCHAR* img, const WCHAR* mod, uint64_t baseAddr, int size)
+    {
+        if (pSymLoadModuleExW(hProcess, nullptr, img, mod, baseAddr, size, nullptr, 0))
+            return ERROR_SUCCESS;
+        return GetLastError();
+    }
+
     static bool GetModuleListTH32(void* hProcess, uint32_t pid)
     {
         HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
@@ -656,7 +665,11 @@ namespace rpp
         int count = 0;
         while (keepGoing)
         {
+#       if UNICODE
             LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64)me.modBaseAddr, me.modBaseSize);
+        #else
+            LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64)me.modBaseAddr, me.modBaseSize);
+        #endif
             ++count;
             keepGoing = !!Module32Next(hSnap, &me);
         }
@@ -705,7 +718,8 @@ namespace rpp
     {
         IMAGEHLP_MODULE64 m = { sizeof(IMAGEHLP_MODULE64) };
         if (!pSymGetModuleInfo64(hProcess, baseAddr, &m)) return nullptr;
-        return strcpy(nameBuffer, m.ModuleName);
+        strcpy_s(nameBuffer, m.ModuleName);
+        return nameBuffer;
     }
 
     static DWORD InitStackFrame(STACKFRAME64& s, const CONTEXT& c)

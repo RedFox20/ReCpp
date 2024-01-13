@@ -1554,11 +1554,12 @@ namespace rpp
     {
         const bool read = (pollFlags & PF_Read) != 0;
         const bool write = (pollFlags & PF_Write) != 0;
-        struct pollfd pfd = { Sock, short((read ? POLLIN : 0) | (write ? POLLOUT : 0)), 0 };
-
+        const short events = short((read ? POLLIN : 0) | (write ? POLLOUT : 0));
     #if _WIN32 || _WIN64
+        struct pollfd pfd = { SOCKET(Sock), events, 0 };
         int r = WSAPoll(&pfd, 1, timeoutMillis);
     #else
+        struct pollfd pfd = { Sock, events, 0 };
         int r = ::poll(&pfd, 1, timeoutMillis);
     #endif
         if (r <= 0)
