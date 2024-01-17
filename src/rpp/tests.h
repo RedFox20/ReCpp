@@ -334,6 +334,7 @@ namespace rpp
     if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "but expected", false); } \
 }while(0)
 
+// Asserts that expression is true, otherwise displays a custom formatted error message
 #define AssertMsg(expr, fmt, ...) do { \
     if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); } \
 }while(0)
@@ -354,11 +355,32 @@ namespace rpp
     } \
 }while(0)
 
+// Asserts that this expression does the specified exception
 #define AssertThrows(expr, exceptionType) do { \
     try {                                      \
         expr;                                  \
         assert_failed(__FILE__, __LINE__, "%s => expected exception of type %s", #expr, #exceptionType); \
     } catch (const exceptionType&) {} \
+}while(0)
+
+// Asserts that this expression does not throw ANY exceptions
+#define AssertNoThrowAny(expr) do { \
+    try {                           \
+        expr;                       \
+    } catch (const std::exception& e) { \
+        assert_failed(__FILE__, __LINE__, "%s => expected no exceptions but got: %s", #expr, e.what()); \
+    } catch (...) { \
+        assert_failed(__FILE__, __LINE__, "%s => expected no exceptions", #expr); \
+    } \
+}while(0)
+
+// Asserts that this expression does not throw the specified exception type
+#define AssertNoThrowExType(expr, exceptionType) do { \
+    try {                                      \
+        expr;                                  \
+    } catch (const exceptionType&) {           \
+        assert_failed(__FILE__, __LINE__, "%s => expected no exception of type %s", #expr, #exceptionType); \
+    } catch (...) { /**any other ex is ok**/ }\
 }while(0)
 
 #define AssertNotEqual(expr, mustNotEqual) do { \

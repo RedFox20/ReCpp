@@ -954,11 +954,24 @@ namespace rpp
     {
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
+
+        // if the socket is blocking, then MSG_PEEK can cause a blocking operation
+        // which goes against rpp::socket::peek() API specification.
+        // So we use poll() to detect whether the socket is readable first
+        if (Blocking && !poll(0, PF_Read))
+            return 0; // socket is not readable
+
         if (type() == ST_Stream)
+        {
+            // NOTE: if ::recv() returns 0, then the socket was closed gracefully
             return handle_txres(::recv(Sock, (char*)buffer, numBytes, MSG_PEEK));
-        saddr a;
-        socklen_t len = sizeof(a);
-        return handle_txres(::recvfrom(Sock, (char*)buffer, numBytes, MSG_PEEK, &a.sa, &len));
+        }
+        else
+        {
+            saddr a;
+            socklen_t len = sizeof(a);
+            return handle_txres(::recvfrom(Sock, (char*)buffer, numBytes, MSG_PEEK, &a.sa, &len));
+        }
     }
 
     NOINLINE int socket::recvfrom(ipaddress& from, void* buffer, int maxBytes) noexcept
@@ -1034,7 +1047,8 @@ namespace rpp
     {
         if (ret == 0) { // socket closed gracefully
             set_errno();
-            close();
+            if (Type == ST_Stream) // only for TCP streams, connection was closed gracefully
+                close();
             return -1;
         }
         else if (ret == -1) { // socket error?
@@ -1055,6 +1069,7 @@ namespace rpp
         int errcode = err ? err : os_getsockerr();
         LastErr = errcode;
         switch (errcode) {
+            case 0: return 0; // no error
             default: {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
@@ -1433,9 +1448,9 @@ namespace rpp
     }
 
 
-    bool socket::connected() noexcept 
+    bool socket::connected() noexcept
     {
-        if (Sock == -1) 
+        if (Sock == -1)
             return false;
 
         int err = get_socket_level_error();
@@ -1443,14 +1458,15 @@ namespace rpp
         {
             if (handle_errno(err > 0 ? err : 0) == 0)
                 return true; // still connected, but pending something
-
             return false; // it was a fatal error
         }
 
-        if (Category == SC_Client || Category == SC_Accept)
+        // only way to check if a TCP socket is still connected is to try to read
+        // so we use the nonblocking peek() to check for that
+        if (Type == ST_Stream)
         {
             char c;
-            return peek(&c, 1) >= 0;
+            return peek(&c, 1) >= 0; // as long as it didn't return -1, we are connected
         }
         return true;
     }
@@ -1475,10 +1491,18 @@ namespace rpp
 
         Type = stype;
         if (stype == ST_Stream)
-            set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
-        set_blocking(/*socketsBlock:*/(opt & SO_Blocking) != 0);
+        {
+            if (opt & SO_Nagle) set_nagle(true);
+            else                set_nodelay(DEFAULT_NODELAY);
+        }
 
-        if (opt & SO_ReuseAddr) {
+        // configure the blocking mode as required
+        if      (opt & SO_NonBlock) set_blocking(/*socketsBlock:*/false);
+        else if (opt & SO_Blocking) set_blocking(/*socketsBlock:*/true);
+        else                        set_blocking(/*socketsBlock:*/DEFAULT_BLOCKING);
+
+        if (opt & SO_ReuseAddr)
+        {
             if (set_opt(IPPROTO_IP, SO_REUSEADDR, 1)) {
                 return handle_errno() == 0;
             }
@@ -1722,12 +1746,13 @@ namespace rpp
     {
         Category = SC_Client;
 
-        set_nagle(/*enableNagle:*/(opt & SO_Nagle) != 0);
+        if (opt & SO_Nagle) set_nagle(true);
+        else                set_nodelay(DEFAULT_NODELAY);
 
         // configure blocking flags
         if      (opt & SO_NonBlock) set_blocking(false);
         else if (opt & SO_Blocking) set_blocking(true);
-        else                        set_blocking(Blocking); // use socket default
+        else                        set_blocking(Blocking); // use server socket default
     }
 
     socket socket::connect_to(const ipaddress& remoteAddr, socket_option opt) noexcept

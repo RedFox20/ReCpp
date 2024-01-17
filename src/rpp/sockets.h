@@ -452,27 +452,28 @@ namespace rpp
      */
     class RPPAPI socket
     {
-    protected:
-
-        // mostly for debugging
+    public:
         enum category : unsigned char {
             SC_Unknown,
-            SC_Listen,  // this socket is a LISTEN server socket via socket::listen
-            SC_Accept,  // this socket was accepted via socket::accept as a server side client
-            SC_Client,  // this is a Client side connection socket via socket::connect
+            SC_Listen,  // this socket is a LISTEN server socket via socket::listen()
+            SC_Accept,  // this socket was accepted via socket::accept() as a server side client
+            SC_Client,  // this is a Client side connection socket via socket::connect()
         };
 
         static constexpr int INVALID = -1;
-        static constexpr bool DEFAULT_SHARED = false;
-        static constexpr bool DEFAULT_BLOCKING = true;
-        static constexpr bool DEFAULT_AUTOCLOSE = false;
+        static constexpr bool DEFAULT_SHARED    = false; // if true, Socket is shared and dtor won't call closesocket()
+        static constexpr bool DEFAULT_BLOCKING  = true;  // if TRUE, the socket is blocking
+        static constexpr bool DEFAULT_AUTOCLOSE = false; // automatically closes the socket on disconnect events
+        static constexpr bool DEFAULT_NODELAY   = true;  // automatically sets nodelay (nagle disabled) on TCP sockets
+
+    protected:
 
         int Sock;            // Socket handle
         ipaddress Addr;      // remote addr
         mutable int LastErr; // last error code
-        bool Shared;         // if true, Socket is shared and dtor won't call closesocket() [default: false]
-        bool Blocking;       // if TRUE, the socket is blocking [default: true], will be updated during create()/connect()
-        bool AutoClose;      // automatically closes the socket on disconnect events [default: false]
+        bool Shared;         // if true, Socket is shared and dtor won't call closesocket() [@see socket::DEFAULT_SHARED]
+        bool Blocking;       // if TRUE, the socket is blocking [@see socket::DEFAULT_BLOCKING], will be updated during create()/connect()
+        bool AutoClose;      // automatically closes the socket on disconnect events [@see socket::DEFAULT_AUTOCLOSE]
         category Category;
         socket_type Type;
 
@@ -701,9 +702,12 @@ namespace rpp
         }
 
         /**
-         * Peek bytes from remote socket, return number of bytes peeked
-         * Automatically closes socket during critical failure and returns -1
+         * Peek bytes from remote socket, return number of bytes peeked.
+         * Automatically closes TCP socket during critical failure and returns -1
          * If there is no data to peek, this function returns 0
+         * 
+         * If this socket::is_blocking(), then poll(0ms, PF_Read) will be used to
+         * avoid blocking.
          */
         NOINLINE int peek(void* buffer, int numBytes) noexcept;
 
@@ -897,6 +901,9 @@ namespace rpp
          */
         bool set_nagle(bool enableNagle) noexcept;
 
+        /** @see set_nagle() */
+        bool set_nodelay(bool nodelay) noexcept { return set_nagle(!nodelay); }
+
         /**
          * @returns true if socket is set to nodelay: set_nagle(false);, 
          *          check socket::last_err() for error message
@@ -944,6 +951,14 @@ namespace rpp
 
         ////////////////////////////////////////////////////////////////////////////
 
+        /**
+         * @returns The socket category, describing how this socket was first initialized.
+         *          SC_Listen: this socket is a LISTEN server socket via socket::listen().
+         *          SC_Accept: this socket was accepted via socket::accept() as a server side client.
+         *          SC_Client: this is a Client side connection socket via socket::connect().
+         */
+        category category() const noexcept { return Category; }
+
         /** @return The SocketType of the socket */
         socket_type type() const noexcept { return Type; }
 
@@ -970,10 +985,10 @@ namespace rpp
 
         /**
          * @brief Creates a new socket without binding or connecting anything
+         * @warning This will always close() the socket if it was already created, assuming the new settings are different.
          * @param af Address family of the socket
          * @param ipp IP protocol of the socket
-         * @param opt Socket options to set. The socket is NON BLOCKING by default!
-         *             Use SO_Blocking to get classic blocking socket.
+         * @param opt Socket options to set. @see socket_option and @see socket::DEFAULT_BLOCKING
          */
         bool create(address_family af = AF_IPv4,
                     ip_protocol ipp = IPP_TCP,

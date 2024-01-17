@@ -245,10 +245,12 @@ namespace rpp
          */
         NOINLINE const char* to_cstr() const noexcept;
 
-        /** Parses this strview as an integer */
+        /** Parses this strview as an integer, without modifying this strview */
         FINLINE int to_int() const noexcept { return rpp::to_int(str, len); }
         /** Parses this strview as a HEX integer ('0xff' or '0ff' or 'ff') */
         FINLINE int to_int_hex() const noexcept { return to_inthx(str, len); }
+        /** Parses this strview as an int64, without modifying this strview */
+        FINLINE rpp::int64 to_int64() const noexcept { return rpp::to_int64(str, len); }
         /** Parses this strview as a long */
         FINLINE long to_long() const noexcept { return static_cast<long>(rpp::to_int(str, len)); }
         /** Parses this strview as a float */
