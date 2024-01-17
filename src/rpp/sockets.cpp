@@ -9,7 +9,9 @@
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG
-#define RPP_SOCKETS_DBG 1
+#  define RPP_SOCKETS_DBG 1
+#else
+#  define RPP_SOCKETS_DBG 0
 #endif
 
 /**
@@ -1048,7 +1050,10 @@ namespace rpp
         if (ret == 0) { // socket closed gracefully
             set_errno();
             if (Type == ST_Stream) // only for TCP streams, connection was closed gracefully
+            {
+                logdebug("socket closed gracefully");
                 close();
+            }
             return -1;
         }
         else if (ret == -1) { // socket error?
