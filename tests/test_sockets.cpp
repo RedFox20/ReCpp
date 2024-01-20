@@ -673,7 +673,28 @@ TestImpl(test_sockets)
         server.set_nagle(false);
 
         // remote client lives in a separate thread
-        std::thread remote([this,serverPort=server.port()] { this->transmitting_remote_client(serverPort); });
+        std::future<void> remote = std::async(std::launch::async, [&]()
+        {
+            std::vector<char> buf(TransmitSize, '$');
+
+            // connect to server
+            socket to_server = connect("127.0.0.1", server.port());
+            to_server.set_nagle(false); // disable nagle
+
+            while (to_server.connected())
+            {
+                int sent = to_server.send(buf.data(), (int)buf.size());
+                if (sent > 0)
+                    print_info("remote: sent %d bytes of data\n", sent);
+                else
+                    print_info("remote: failed to send data: %s\n", to_server.last_err().c_str());
+
+                // we need to create a large gap in the data
+                rpp::sleep_ms(30);
+            }
+            print_info("remote: server disconnected\n");
+            print_info("remote: closing down\n");
+        });
 
         // accept the remote client
         socket remote_client = accept(server);
@@ -708,30 +729,8 @@ TestImpl(test_sockets)
         print_info("server: closing down\n");
         remote_client.close();
         server.close();
-        remote.join();
-    }
-
-    void transmitting_remote_client(int serverPort)
-    {
-        std::vector<char> buf(TransmitSize, '$');
-
-        // connect to server
-        socket to_server = connect("127.0.0.1", serverPort);
-        to_server.set_nagle(false); // disable nagle
-
-        while (to_server.connected())
-        {
-            int sent = to_server.send(buf.data(), (int)buf.size());
-            if (sent > 0)
-                print_info("remote: sent %d bytes of data\n", sent);
-            else
-                print_info("remote: failed to send data: %s\n", to_server.last_err().c_str());
-
-            // we need to create a large gap in the data
-            rpp::sleep_ms(30);
-        }
-        print_info("remote: server disconnected\n");
-        print_info("remote: closing down\n");
+        print_info("server: waiting for remote thread to finish\n");
+        remote.get();
     }
 
     //////////////////////////////////////////////////////////////////

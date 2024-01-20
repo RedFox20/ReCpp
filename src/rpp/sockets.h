@@ -31,6 +31,14 @@ namespace rpp
         ST_SeqPacket,   // TCP based, similar to ST_Stream but slower, however packet boundaries are respected "TCP datagrams"
     };
 
+    enum RPPAPI socket_category : uint8_t
+    {
+        SC_Unknown, // UDP or other unknown socket 
+        SC_Listen,  // this socket is a LISTEN server socket via socket::listen()
+        SC_Accept,  // this socket was accepted via socket::accept() as a server side client
+        SC_Client,  // this is a Client side connection socket via socket::connect()
+    };
+
     enum RPPAPI ip_protocol : uint8_t
     {
         IPP_DontCare,   // generic IP based protocol, service provider will choose most appropriate
@@ -453,18 +461,22 @@ namespace rpp
     class RPPAPI socket
     {
     public:
-        enum category : unsigned char {
-            SC_Unknown,
-            SC_Listen,  // this socket is a LISTEN server socket via socket::listen()
-            SC_Accept,  // this socket was accepted via socket::accept() as a server side client
-            SC_Client,  // this is a Client side connection socket via socket::connect()
-        };
 
         static constexpr int INVALID = -1;
-        static constexpr bool DEFAULT_SHARED    = false; // if true, Socket is shared and dtor won't call closesocket()
-        static constexpr bool DEFAULT_BLOCKING  = true;  // if TRUE, the socket is blocking
-        static constexpr bool DEFAULT_AUTOCLOSE = false; // automatically closes the socket on disconnect events
-        static constexpr bool DEFAULT_NODELAY   = true;  // automatically sets nodelay (nagle disabled) on TCP sockets
+
+        // if true, Socket is shared and dtor won't call closesocket()
+        static constexpr bool DEFAULT_SHARED = false;
+
+        // if TRUE, the socket is blocking
+        static constexpr bool DEFAULT_BLOCKING = true;
+
+        // Automatically closes the socket on disconnect events.
+        // This is TRUE for sockets created via accept() and connect()/connect_to().
+        static constexpr bool DEFAULT_AUTOCLOSE = false;
+        static constexpr bool DEFAULT_AUTOCLOSE_CLIENT_SOCKETS = false;
+    
+        // automatically sets nodelay (nagle disabled) on TCP sockets
+        static constexpr bool DEFAULT_NODELAY = true;
 
     protected:
 
@@ -474,7 +486,8 @@ namespace rpp
         bool Shared;         // if true, Socket is shared and dtor won't call closesocket() [@see socket::DEFAULT_SHARED]
         bool Blocking;       // if TRUE, the socket is blocking [@see socket::DEFAULT_BLOCKING], will be updated during create()/connect()
         bool AutoClose;      // automatically closes the socket on disconnect events [@see socket::DEFAULT_AUTOCLOSE]
-        category Category;
+        bool Connected;      // for connnection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
+        socket_category Category;
         socket_type Type;
 
     public:
@@ -514,6 +527,9 @@ namespace rpp
 
         /** Sets whether this socket automatically closes on disconnect events */
         void set_autoclosing(bool autoclose=true) noexcept { AutoClose = autoclose; }
+
+        /** @returns true if socket is autoclosing, this is true by default
+         *           for sockets created via accept() and connect() */
         bool is_autoclosing() const noexcept { return AutoClose; }
 
         explicit operator bool() const noexcept { return Sock != INVALID; }
@@ -957,7 +973,7 @@ namespace rpp
          *          SC_Accept: this socket was accepted via socket::accept() as a server side client.
          *          SC_Client: this is a Client side connection socket via socket::connect().
          */
-        category category() const noexcept { return Category; }
+        socket_category category() const noexcept { return Category; }
 
         /** @return The SocketType of the socket */
         socket_type type() const noexcept { return Type; }

@@ -711,7 +711,9 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////
 
     socket::socket() noexcept
-        : Sock{-1}, Addr{}, LastErr{0}, Shared{DEFAULT_SHARED}, Blocking{DEFAULT_BLOCKING}, AutoClose{DEFAULT_AUTOCLOSE}
+        : Sock{-1}, Addr{}, LastErr{0}
+        , Shared{DEFAULT_SHARED}, Blocking{DEFAULT_BLOCKING}
+        , AutoClose{DEFAULT_AUTOCLOSE}, Connected{false}
         , Category{SC_Unknown}, Type{ST_Unspecified}
     {
     }
@@ -729,7 +731,8 @@ namespace rpp
     }
     socket::socket(socket&& s) noexcept
         : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}
-        , Shared{s.Shared}, Blocking{s.Blocking}, AutoClose{s.AutoClose}
+        , Shared{s.Shared}, Blocking{s.Blocking}
+        , AutoClose{s.AutoClose}, Connected{s.Connected}
         , Category{s.Category}, Type{s.Type}
     {
         s.Sock = -1;
@@ -737,6 +740,7 @@ namespace rpp
         s.Shared = DEFAULT_SHARED;
         s.Blocking = DEFAULT_BLOCKING;
         s.AutoClose = DEFAULT_AUTOCLOSE;
+        s.Connected = false;
         s.Category = SC_Unknown;
         s.Type = ST_Unspecified;
     }
@@ -749,6 +753,7 @@ namespace rpp
         Shared = s.Shared;
         Blocking = s.Blocking;
         AutoClose = s.AutoClose;
+        Connected = s.Connected;
         Category = s.Category;
         Type = s.Type;
         s.Sock = -1;
@@ -757,6 +762,7 @@ namespace rpp
         s.Shared   = DEFAULT_SHARED;
         s.Blocking = DEFAULT_BLOCKING;
         s.AutoClose = DEFAULT_AUTOCLOSE;
+        s.Connected = false;
         s.Category = SC_Unknown;
         s.Type = ST_Unspecified;
         return *this;
@@ -769,12 +775,14 @@ namespace rpp
 
     void socket::close() noexcept
     {
-        if (Sock != -1) {
-            if (!Shared) closesocket(Sock);
+        if (Sock != -1)
+        {
+            if (!Shared) { closesocket(Sock); }
             Sock = -1;
             Type = ST_Unspecified;
+            Connected = false;
         }
-        //Addr.clear(); // dont clear the address, so we have info on what we just closed
+        // dont clear the address, so we have info on what we just closed
     }
 
     int socket::release_noclose() noexcept
@@ -1047,7 +1055,8 @@ namespace rpp
     // returns -1 on critical failure, otherwise it returns bytesAvailable (0...N)
     int socket::handle_txres(long ret) noexcept
     {
-        if (ret == 0) { // socket closed gracefully
+        if (ret == 0) // socket closed gracefully
+        {
             set_errno();
             if (Type == ST_Stream) // only for TCP streams, connection was closed gracefully
             {
@@ -1056,7 +1065,8 @@ namespace rpp
             }
             return -1;
         }
-        else if (ret == -1) { // socket error?
+        else if (ret == -1) // socket error?
+        {
             return handle_errno();
         }
         LastErr = 0;
@@ -1078,8 +1088,7 @@ namespace rpp
             default: {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d %s", Sock, errmsg.c_str());
-                if (AutoClose)
-                    close();
+                if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
@@ -1097,8 +1106,7 @@ namespace rpp
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
-                if (AutoClose)
-                    close();
+                if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
@@ -1107,8 +1115,7 @@ namespace rpp
             case ESOCK(ECONNABORTED):  // connection closed
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(EHOSTUNREACH):  // no route to host
-                if (AutoClose)
-                    close();
+                if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
         }
@@ -1452,12 +1459,14 @@ namespace rpp
         #endif
     }
 
+    ////////////////////////////////////////////////////////////////////////////////
 
     bool socket::connected() noexcept
     {
         if (Sock == -1)
             return false;
 
+        // this only catches the most severe errors on the socket
         int err = get_socket_level_error();
         if (err != 0)
         {
@@ -1466,12 +1475,36 @@ namespace rpp
             return false; // it was a fatal error
         }
 
-        // only way to check if a TCP socket is still connected is to try to read
-        // so we use the nonblocking peek() to check for that
-        if (Type == ST_Stream)
+        // Checking for connection status only makes sense for connection oriented sockets.
+        // This only applies for Accepted or Client sockets.
+        // To check if a TCP socket is still connected we use a nonblocking read.
+        // In the case of Blocking sockets, an additional poll() is done.
+        if (Category == SC_Accept || Category == SC_Client) // Accept & Client implies TCP
         {
-            char c;
-            return peek(&c, 1) >= 0; // as long as it didn't return -1, we are connected
+            // if it was already marked as disconnected, it cannot recover again
+            // without a new connection being made
+            if (!Connected)
+                return false;
+
+            // if the socket is blocking, then MSG_PEEK can cause a blocking operation.
+            // So we use poll() to detect whether the socket is readable first.
+            // A subsequent call to `recv()` will return 0, indicating a graceful close.
+        #if _WIN32 || _WIN64
+            struct pollfd pfd = { SOCKET(Sock), POLLRDNORM, 0 };
+            int poll_r = WSAPoll(&pfd, 1, 0);
+        #else
+            struct pollfd pfd = { Sock, POLLRDNORM, 0 };
+            int poll_r = ::poll(&pfd, 1, 0);
+        #endif
+            if (poll_r > 0) // data is available to read
+            {
+                char c;
+                // handle_txres() should take care of the status
+                // and set the Connected flag properly
+                handle_txres(::recv(Sock, &c, 1, MSG_PEEK));
+            }
+            // if poll doesn't trigger, we rely on the Connected flag
+            return Connected;
         }
         return true;
     }
@@ -1597,6 +1630,7 @@ namespace rpp
             return false;
         }
 
+        LastErr = 0; // reset the error to ensure callers of poll() can check for error codes reliably
         return (read && (pfd.revents & POLLIN) != 0)
             || (write && (pfd.revents & POLLOUT) != 0);
     }
@@ -1681,7 +1715,8 @@ namespace rpp
         // set the accepted socket with same options as the listener
         if (is_nodelay()) client.set_nagle(false);
         client.set_blocking(is_blocking());
-        client.set_autoclosing(is_autoclosing());
+        client.set_autoclosing(DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
+        client.Connected = true;
         client.Category = SC_Accept;
         return client;
     }
@@ -1750,6 +1785,8 @@ namespace rpp
     void socket::configure_connected_client(socket_option opt) noexcept
     {
         Category = SC_Client;
+        set_autoclosing(DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
+        Connected = true;
 
         if (opt & SO_Nagle) set_nagle(true);
         else                set_nodelay(DEFAULT_NODELAY);
