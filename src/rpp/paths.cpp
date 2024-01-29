@@ -136,35 +136,41 @@ namespace rpp /* ReCpp */
 
     bool copy_file(const char* sourceFile, const char* destinationFile) noexcept
     {
-#if USE_WINAPI_IO
-        return CopyFileA(sourceFile, destinationFile, /*failIfExists:*/false) == TRUE;
-#else
-        file src{sourceFile, file::READONLY};
-        if (!src) return false;
+        #if USE_WINAPI_IO
+            // CopyFileA always copies the file access rights
+            return CopyFileA(sourceFile, destinationFile, /*failIfExists:*/false) == TRUE;
+        #else
+            file src{sourceFile, file::READONLY};
+            if (!src) return false;
 
-        file dst{destinationFile, file::CREATENEW};
-        if (!dst) return false;
+            file dst{destinationFile, file::CREATENEW};
+            if (!dst) return false;
 
-        int64 size = src.sizel();
-        if (size == 0) return true;
+            // copy the file access rights
+            if (!copy_file_mode(sourceFile, destinationFile))
+                return false;
 
-        constexpr int64 blockSize = 64*1024;
-        char buf[blockSize];
-        int64 totalBytesRead    = 0;
-        int64 totalBytesWritten = 0;
-        for (;;)
-        {
-            int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
-            if (bytesToRead <= 0)
-                break;
-            int bytesRead = src.read(buf, (int)bytesToRead);
-            if (bytesRead <= 0)
-                break;
-            totalBytesRead    += bytesRead;
-            totalBytesWritten += dst.write(buf, bytesRead);
-        }
-        return totalBytesRead == totalBytesWritten;
-#endif
+            // special case: empty file
+            int64 size = src.sizel();
+            if (size == 0) return true;
+
+            constexpr int64 blockSize = 64*1024;
+            char buf[blockSize];
+            int64 totalBytesRead = 0;
+            int64 totalBytesWritten = 0;
+            for (;;)
+            {
+                int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
+                if (bytesToRead <= 0)
+                    break;
+                int bytesRead = src.read(buf, (int)bytesToRead);
+                if (bytesRead <= 0)
+                    break;
+                totalBytesRead += bytesRead;
+                totalBytesWritten += dst.write(buf, bytesRead);
+            }
+            return totalBytesRead == totalBytesWritten;
+        #endif
     }
 
     bool copy_file(const strview sourceFile, const strview destinationFile) noexcept
@@ -172,6 +178,24 @@ namespace rpp /* ReCpp */
         char buf1[1024];
         char buf2[1024];
         return copy_file(sourceFile.to_cstr(buf1), destinationFile.to_cstr(buf2));
+    }
+
+    bool copy_file_mode(const char* sourceFile, const char* destinationFile) noexcept
+    {
+        #if _WIN32
+            DWORD attr = GetFileAttributesA(sourceFile);
+            return attr != DWORD(-1) && SetFileAttributesA(destinationFile, attr) != FALSE;
+        #else
+            struct stat s;
+            return stat(sourceFile, &s) != 0 ? false : chmod(destinationFile, s.st_mode) == 0;
+        #endif
+    }
+
+    bool copy_file_mode(const strview sourceFile, const strview destinationFile) noexcept
+    {
+        char buf1[1024];
+        char buf2[1024];
+        return copy_file_mode(sourceFile.to_cstr(buf1), destinationFile.to_cstr(buf2));
     }
 
     bool copy_file_if_needed(const strview sourceFile, const strview destinationFile) noexcept

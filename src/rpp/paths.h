@@ -103,10 +103,18 @@ namespace rpp /* ReCpp */
 
     /**
      * @brief Copies sourceFile to destinationFile, overwriting the previous file!
+     * @note File access rights are also copied
      * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
      */
     RPPAPI bool copy_file(const char* sourceFile, const char* destinationFile) noexcept;
     RPPAPI bool copy_file(const strview sourceFile, const strview destinationFile) noexcept;
+
+    /**
+     * @brief Copies file access rights from sourceFile to destinationFile
+     * @return TRUE if file access rights were copied successfully
+     */
+    RPPAPI bool copy_file_mode(const char* sourceFile, const char* destinationFile) noexcept;
+    RPPAPI bool copy_file_mode(const strview sourceFile, const strview destinationFile) noexcept;
 
     /**
      * @brief Copies sourceFile to destinationFile IF destinationFile doesn't exist
