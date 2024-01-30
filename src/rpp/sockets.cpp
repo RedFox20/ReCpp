@@ -1371,7 +1371,7 @@ namespace rpp
         return result == 1; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
     }
 
-    bool socket::set_buf_size(buffer_option opt, size_t size, bool force) noexcept
+    bool socket::set_buf_size(buffer_option opt, size_t size, [[maybe_unused]] bool force) noexcept
     {
         int which = (opt == BO_Recv ? SO_RCVBUF : SO_SNDBUF);
         int command = which;
