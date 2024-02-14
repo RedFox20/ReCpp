@@ -153,8 +153,49 @@ namespace rpp
     inline int _tostring(char* buffer, rpp::byte value) noexcept { return _tostring(buffer, (uint)value); }
     inline int _tostring(char* buffer, short value)     noexcept { return _tostring(buffer, (int)value);  }
     inline int _tostring(char* buffer, ushort value)    noexcept { return _tostring(buffer, (uint)value); }
+
+    #if RPP_LONG_SIZE == RPP_INT_SIZE
     inline int _tostring(char* buffer, long value)      noexcept { return _tostring(buffer, (int)value);  }
     inline int _tostring(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint)value); }
+    #else
+    inline int _tostring(char* buffer, long value)      noexcept { return _tostring(buffer, (int64)value);  }
+    inline int _tostring(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint64)value); }
+    #endif
+
+    // NEW to_string() overloads
+
+    /**
+     * C-locale specific, simplified ftoa() that prints pretty human-readable floats
+     * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough for Float/Double.
+     * @param f Float/Double value to convert to string
+     * @param maxDecimals Maximum number of decimal digits to output, default=6
+     * @return Length of the string
+     */
+    inline int to_string(char* buffer, float  value, int maxDecimals = 6) noexcept { return _tostring(buffer, value, maxDecimals); }
+    inline int to_string(char* buffer, double value, int maxDecimals = 6) noexcept { return _tostring(buffer, value, maxDecimals); }
+
+    /**
+     * Fast locale agnostic itoa
+     * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough.
+     * @param value Integer value to convert to string
+     * @return Length of the string
+     */
+    inline int to_string(char* buffer, int    value) noexcept { return _tostring(buffer, value); }
+    inline int to_string(char* buffer, int64  value) noexcept { return _tostring(buffer, value); }
+    inline int to_string(char* buffer, uint   value) noexcept { return _tostring(buffer, value); }
+    inline int to_string(char* buffer, uint64 value) noexcept { return _tostring(buffer, value); }
+
+    inline int to_string(char* buffer, rpp::byte value) noexcept { return _tostring(buffer, (uint)value); }
+    inline int to_string(char* buffer, short value)     noexcept { return _tostring(buffer, (int)value);  }
+    inline int to_string(char* buffer, ushort value)    noexcept { return _tostring(buffer, (uint)value); }
+
+    #if RPP_LONG_SIZE == RPP_INT_SIZE
+    inline int to_string(char* buffer, long value)      noexcept { return _tostring(buffer, (int)value);  }
+    inline int to_string(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint)value); }
+    #else
+    inline int to_string(char* buffer, long value)      noexcept { return _tostring(buffer, (int64)value);  }
+    inline int to_string(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint64)value); }
+    #endif
 
     /**
      * @brief Converts a Wide String to a UTF-8 String
@@ -162,7 +203,7 @@ namespace rpp
     std::string to_string(const wchar_t* str) noexcept;
 
     #ifndef RPP_CONSTEXPR_STRLEN
-    #  if _MSC_VER
+    #  if _MSC_VER && _MSVC_LANG >= 201703L
     #    define RPP_CONSTEXPR_STRLEN constexpr
     #  elif __GNUG__ && __cplusplus >= 201703L
     #    define RPP_CONSTEXPR_STRLEN constexpr
@@ -706,20 +747,21 @@ namespace rpp
         /**
          * Template friendly conversions
          */
-        void convertTo(bool& outValue)    const noexcept { outValue = to_bool();   }
-        void convertTo(int& outValue)     const noexcept { outValue = to_int();    }
-        void convertTo(float& outValue)   const noexcept { outValue = to_float();  }
-        void convertTo(double& outValue)  const noexcept { outValue = to_double(); }
-        void convertTo(std::string& outValue) const noexcept { to_string(outValue); }
-        void convertTo(strview& outValue)     const noexcept { outValue = *this; }
-        
+        void convert_to(bool& outValue)    const noexcept { outValue = to_bool();   }
+        void convert_to(int& outValue)     const noexcept { outValue = to_int();    }
+        void convert_to(float& outValue)   const noexcept { outValue = to_float();  }
+        void convert_to(double& outValue)  const noexcept { outValue = to_double(); }
+        void convert_to(std::string& outValue) const noexcept { to_string(outValue); }
+        void convert_to(strview& outValue)     const noexcept { outValue = *this; }
+
     private:
-        void skipByLength(strview text) noexcept { skip(text.len); }
-        void skipByLength(char)         noexcept { skip(1); }
+        void skip_by_len(strview text) noexcept { skip(text.len); }
+        void skip_by_len(char)         noexcept { skip(1); }
+
     public:
         /**
-         * Calls strview::next(char delim) for each argument and calls strview::convertTo to
-         * convert them to appropriate types.
+         * Calls strview::next(char delim) for each argument and calls strview::convert_to
+         * in order to convert them to appropriate types.
          *
          * @code
          * strview input = "user@email.com;27;3486.37;true"_sv;
@@ -736,15 +778,15 @@ namespace rpp
         void decompose(const Delim& delim, T& outFirst, Rest&... outRest) noexcept
         {
             if (starts_with(delim)) // this is an empty entry, just skip it;
-                skipByLength(delim);
+                skip_by_len(delim);
             else
-                next(delim).convertTo(outFirst);
+                next(delim).convert_to(outFirst);
             decompose(delim, outRest...);
         }
         template<class Delim, class T>
         void decompose(const Delim& delim, T& outFirst) noexcept
         {
-            next(delim).convertTo(outFirst);
+            next(delim).convert_to(outFirst);
         }
 
         /**

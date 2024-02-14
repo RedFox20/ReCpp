@@ -605,8 +605,8 @@ namespace rpp
                 }
                 if (ch < '0' || '9' < ch)
                     break;
-                intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
-                power   = (power   << 3) + (power   << 1);              // power *= 10
+                intPart = (intPart << 3) + (intPart << 1) + int64(ch - '0'); // intPart = intPart*10 + digit
+                power   = (power   << 3) + (power   << 1);                     // power *= 10
             }
         }
         if (end) *end = s; // write end of parsed value
@@ -652,7 +652,7 @@ namespace rpp
         else if (ch == '+')  ++s; // ignore '+'
 
         for (; s < e && '0' <= (ch = *s) && ch <= '9'; ++s) {
-            intPart = (intPart << 3) + (intPart << 1) + (ch - '0'); // intPart = intPart*10 + digit
+            intPart = (intPart << 3) + (intPart << 1) + int64(ch - '0'); // intPart = intPart*10 + digit
         }
         if (negative) intPart = -intPart; // twiddle sign
 
@@ -797,7 +797,7 @@ namespace rpp
         int len = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
         std::string ret;
         ret.resize(len);
-        WideCharToMultiByte(CP_UTF8, 0, str, -1, ret.data(), len, nullptr, nullptr);
+        WideCharToMultiByte(CP_UTF8, 0, str, -1, (char*)ret.data(), len, nullptr, nullptr);
         return ret;
     #else
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;

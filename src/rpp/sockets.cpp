@@ -587,11 +587,13 @@ namespace rpp
 
             for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next)
             {
-                ipinterface& in = out.emplace_back();
+                out.emplace_back();
+                ipinterface& in = out.back();
                 in.name = to_string(ipaa->FriendlyName);
 
                 // prepend DNS suffix to the name, eg "lan"
-                if (std::string suffix = to_string(ipaa->DnsSuffix); !suffix.empty())
+                std::string suffix = to_string(ipaa->DnsSuffix);
+                if (!suffix.empty())
                     in.name = suffix + " " + in.name;
 
                 if (IP_ADAPTER_UNICAST_ADDRESS* unicast = get_first_address(family, ipaa->FirstUnicastAddress))
@@ -1688,7 +1690,8 @@ namespace rpp
 
     socket socket::listen_to(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
-        if (socket s; s.listen(localAddr, ipp, opt))
+        socket s;
+        if (s.listen(localAddr, ipp, opt))
             return s;
         return {};
     }
@@ -1799,14 +1802,16 @@ namespace rpp
 
     socket socket::connect_to(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        if (socket s; s.connect(remoteAddr, opt))
+        socket s;
+        if (s.connect(remoteAddr, opt))
             return s;
         return {}; // failed
     }
 
     socket socket::connect_to(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        if (socket s; s.connect(remoteAddr, millis, opt))
+        socket s;
+        if (s.connect(remoteAddr, millis, opt))
             return s;
         return {}; // failed
     }

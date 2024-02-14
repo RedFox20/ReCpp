@@ -136,6 +136,19 @@
 #  endif
 #endif
 
+// Define the basic size of integer types
+#if _MSC_VER
+#  define RPP_SHORT_SIZE     2
+#  define RPP_INT_SIZE       4
+#  define RPP_LONG_SIZE      4
+#  define RPP_LONG_LONG_SIZE 8
+#else // GCC/Clang
+#  define RPP_SHORT_SIZE     __SIZEOF_SHORT__
+#  define RPP_INT_SIZE       __SIZEOF_INT__
+#  define RPP_LONG_SIZE      __SIZEOF_LONG__
+#  define RPP_LONG_LONG_SIZE __SIZEOF_LONG_LONG__
+#endif // _MSC_VER
+
 #ifdef __cplusplus
 namespace rpp
 {
