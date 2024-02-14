@@ -11,25 +11,25 @@ namespace rpp
      */
     class RPPAPI load_balancer
     {
-        uint32_t maxBytesPerSec;
-        uint32_t nanosBetweenBytes;
+        uint32 maxBytesPerSec;
+        uint32 nanosBetweenBytes;
         rpp::TimePoint lastSendTime;
-        int32_t nextSendTimeout = 0;
+        int32 nextSendTimeout = 0;
 
     public:
-        explicit load_balancer(uint32_t maxBytesPerSec) noexcept
+        explicit load_balancer(uint32 maxBytesPerSec) noexcept
         {
             set_max_bytes_per_sec(maxBytesPerSec);
         }
 
         /** @returns Current bytes per sec limit */
-        uint32_t get_max_bytes_per_sec() const noexcept { return maxBytesPerSec; }
+        uint32 get_max_bytes_per_sec() const noexcept { return maxBytesPerSec; }
 
         /** @brief Sets the new max bytes per second limit */
-        void set_max_bytes_per_sec(uint32_t maxBytesPerSec) noexcept;
+        void set_max_bytes_per_sec(uint32 maxBytesPerSec) noexcept;
 
         /** @returns Average nanoseconds between bytes */
-        uint32_t avg_nanos_between_bytes() const noexcept { return nanosBetweenBytes; }
+        uint32 avg_nanos_between_bytes() const noexcept { return nanosBetweenBytes; }
 
         /**
          * @returns TRUE if the specified number of bytes can be sent
@@ -42,12 +42,12 @@ namespace rpp
          * @brief Blocks until the specified number of bytes can be sent
          *        and notifies the load balancer that we sent the bytes
          */
-        void wait_to_send(uint32_t bytesToSend) noexcept;
+        void wait_to_send(uint32 bytesToSend) noexcept;
 
         /**
          * @brief Notify that we sent this # of bytes
          */
-        void notify_sent(const rpp::TimePoint& now, uint32_t bytesToSend) noexcept;
+        void notify_sent(const rpp::TimePoint& now, uint32 bytesToSend) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////

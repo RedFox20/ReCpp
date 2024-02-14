@@ -5,7 +5,7 @@ namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////
 
-    void load_balancer::set_max_bytes_per_sec(uint32_t maxBytesPerSec) noexcept
+    void load_balancer::set_max_bytes_per_sec(uint32 maxBytesPerSec) noexcept
     {
         this->maxBytesPerSec = maxBytesPerSec;
 
@@ -36,11 +36,11 @@ namespace rpp
         if (!lastSendTime)
             return true;
 
-        const int64_t waitTimeNs = int64_t(nextSendTimeout) - lastSendTime.elapsed_ns(now);
+        const int64 waitTimeNs = int64(nextSendTimeout) - lastSendTime.elapsed_ns(now);
         return waitTimeNs <= 0;
     }
 
-    void load_balancer::wait_to_send(uint32_t bytesToSend) noexcept
+    void load_balancer::wait_to_send(uint32 bytesToSend) noexcept
     {
         TimePoint start = TimePoint::now();
         const rpp::TimePoint timeoutStart = lastSendTime;
@@ -51,15 +51,15 @@ namespace rpp
         }
 
         TimePoint end = start;
-        const int64_t timeoutNs = int64_t(nextSendTimeout);
-        const int64_t waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
+        const int64 timeoutNs = int64(nextSendTimeout);
+        const int64 waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
         if (waitTimeNs > 0)
         {
-            int64_t remainingNs = waitTimeNs;
+            int64 remainingNs = waitTimeNs;
 
             // UDP socket sendto also takes a small amount of time
             // so we quit if we have minRemainingNs left
-            constexpr int64_t minRemainingNs = 80;
+            constexpr int64 minRemainingNs = 80;
             while (remainingNs > minRemainingNs)
             {
                 // if we have very little time remaining
@@ -81,7 +81,7 @@ namespace rpp
         notify_sent(end, bytesToSend);
     }
 
-    void load_balancer::notify_sent(const rpp::TimePoint& now, uint32_t bytesToSend) noexcept
+    void load_balancer::notify_sent(const rpp::TimePoint& now, uint32 bytesToSend) noexcept
     {
         lastSendTime = now;
         nextSendTimeout = bytesToSend * nanosBetweenBytes;
