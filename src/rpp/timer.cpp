@@ -33,9 +33,9 @@ namespace rpp
         {
             status = timeBeginPeriod(1); // set 1ms precision
         }
-        constexpr int64_t mmTicksToMillis = 10000; // 1 tick = 100nsec
+        constexpr int64 mmTicksToMillis = 10000; // 1 tick = 100nsec
         LARGE_INTEGER dueTime;
-        dueTime.QuadPart = int64_t(milliseconds) * -mmTicksToMillis;
+        dueTime.QuadPart = int64(milliseconds) * -mmTicksToMillis;
 
         if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
             SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
@@ -51,7 +51,7 @@ namespace rpp
     // win32 Sleep can be extremely inaccurate because the OS scheduler accuracy is 15.6ms by default
     // to work around that issue, most of the sleep can be done in one big sleep, and the remainder
     // can be spin looped with a Sleep(0) for yielding
-    static void win32_sleep_ns(uint64_t nanos)
+    static void win32_sleep_ns(uint64 nanos)
     {
         if (nanos == 0)
         {
@@ -100,7 +100,7 @@ namespace rpp
         }
     }
 #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-    inline void unix_sleep_ns_abstime(uint64_t nanos)
+    inline void unix_sleep_ns_abstime(uint64 nanos)
     {
         struct timespec deadline;
         clock_gettime(CLOCK_REALTIME, &deadline);
@@ -137,7 +137,7 @@ namespace rpp
         #endif
     }
 
-    void sleep_ns(uint64_t nanos) noexcept
+    void sleep_ns(uint64 nanos) noexcept
     {
         #if _WIN32
             win32_sleep_ns(nanos);
@@ -153,25 +153,25 @@ namespace rpp
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
-            static int64_t freq;
+            static int64 freq;
             if (!freq)
             {
                 LARGE_INTEGER f; QueryPerformanceFrequency(&f);
-                freq = int64_t(f.QuadPart);
+                freq = int64(f.QuadPart);
             }
 
             LARGE_INTEGER time; QueryPerformanceCounter(&time);
             // convert ticks to nanoseconds
             // however, we need to be careful about overflow, which will always happen if we 
             // multiply by 1'000'000'000, so we need to split it into seconds and fractional seconds
-            int64_t seconds = time.QuadPart / freq;
-            int64_t fraction = time.QuadPart % freq;
+            int64 seconds = time.QuadPart / freq;
+            int64 fraction = time.QuadPart % freq;
             // convert all to nanoseconds
             return TimePoint{ (seconds*NANOS_PER_SEC) + ((fraction*NANOS_PER_SEC) / freq) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
-            return TimePoint{ int64_t(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) };
+            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) };
         #endif
     }
 

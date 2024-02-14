@@ -158,8 +158,18 @@ namespace rpp
         using ushort = unsigned short;
         using uint   = unsigned int;
         using ulong  = unsigned long;
+
+    #if RPP_INT_SIZE == 4
+        using int32  = int;
+        using uint32 = unsigned int;
+    #else
+        using int32  = long;
+        using uint32 = unsigned long;
+    #endif
+
         using int64  = long long;
         using uint64 = unsigned long long;
-    #endif
+
+    #endif // RPP_BASIC_INTEGER_TYPEDEFS
 }
 #endif
