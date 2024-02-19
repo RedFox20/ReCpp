@@ -139,6 +139,33 @@ TestImpl(test_concurrent_queue)
         AssertThat(item, "item3");
     }
 
+    TestCase(atomic_flush)
+    {
+        concurrent_queue<std::string> queue;
+        queue.push("item1");
+        queue.push("item2");
+        queue.push("item3");
+
+        // count the number of tasks that were atomically processed
+        std::atomic_int numProcessed = 0;
+        auto worker = std::thread([&]
+        {
+            std::string item;
+            while (queue.pop_atomic_start(item))
+            {
+                rpp::sleep_ms(1); // simulate work
+                ++numProcessed;
+                queue.pop_atomic_end();
+            }
+        });
+        scope_guard([&]{ worker.join(); });
+
+        // flush
+        while (!queue.empty())
+            rpp::sleep_us(100);
+        AssertThat(numProcessed, 3);
+    }
+
     // wait_pop() is best used for producer/consumer scenarios
     // for long-lived service threads that don't have any cancellation mechanism
     TestCase(wait_pop_producer_consumer)

@@ -9,6 +9,7 @@
 #include <cstdio>        // fprintf
 #include <memory>        // std::shared_ptr
 #include <unordered_map> // std::unordered_map for to_string extensions
+#include <atomic>        // std::atomic<T> support
 #include <sstream>
 
 #ifndef RPP_SPRINT_H
@@ -221,6 +222,7 @@ namespace rpp
         FINLINE void write(uint8_t* ptr) noexcept       { this->write_ptr(ptr); }
         template<class T> FINLINE void write(const std::weak_ptr<T>& p) noexcept   { this->write(p.lock()); }
         template<class T> FINLINE void write(const std::shared_ptr<T>& p) noexcept { this->write(p.get());  }
+        template<class T> FINLINE void write(const std::atomic<T>& value) noexcept { this->write(value.load()); }
 
 
         FINLINE string_buffer& operator<<(const std::string& value) noexcept { this->write(strview{ value }); return *this; }
@@ -247,6 +249,7 @@ namespace rpp
         FINLINE string_buffer& operator<<(uint8_t* ptr) noexcept       { this->write_ptr(ptr); return *this; }
         template<class T> FINLINE string_buffer& operator<<(const std::weak_ptr<T>& p) noexcept   { this->write(p.lock()); return *this; }
         template<class T> FINLINE string_buffer& operator<<(const std::shared_ptr<T>& p) noexcept { this->write(p.get());  return *this; }
+        template<class T> FINLINE string_buffer& operator<<(const std::atomic<T>& value) noexcept { this->write(value.load()); return *this; }
 
         template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
         FINLINE string_buffer& operator<<(const T* obj) noexcept { this->write(obj); return *this; }

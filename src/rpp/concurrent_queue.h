@@ -4,6 +4,7 @@
  * Distributed under MIT Software License
  */
 #pragma once
+#include "config.h"
 #include "condition_variable.h"
 #include <vector>
 #include <mutex>
@@ -337,6 +338,72 @@ namespace rpp
         }
 
         /**
+         * @brief Moves the front item without popping it. This will
+         *        allow for proper atomic operations where the item is not removed
+         *        until it has been fully processed.
+         * @code
+         * T item;
+         * if (queue.pop_atomic_start(item))
+         * {
+         *     channel.send(item); // process the item (slow)
+         *     queue.pop_atomic_end(); // remove the processed item from the queue
+         * }
+         * @endcode
+         * @param outItem [out] The front item. Only valid if return value is TRUE
+         * @returns true if an item was moved to outItem
+         */
+        [[nodiscard]] bool pop_atomic_start(T& outItem) noexcept
+        {
+            if (empty())
+                return false;
+
+            if (Mutex.try_lock())
+            {
+                if (empty())
+                {
+                    Mutex.unlock();
+                    return false;
+                }
+                outItem = std::move(*Head);
+                Mutex.unlock();
+                return true;
+            }
+            else
+            {
+                // if we failed to lock, yielding here will improve perf by 5-10x
+                std::this_thread::yield();
+            }
+            return false;
+        }
+
+        /** @see pop_atomic_start() */
+        void pop_atomic_end() noexcept
+        {
+            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            if (!empty())
+                pop_unlocked();
+        }
+
+        /**
+         * @brief Atomically pops and processes an item within a callback.
+         *        The item is removed only if the callback returns TRUE.
+         * @see pop_atomic_start() and pop_atomic_end()
+         * @param callback [in] The callback to process the item, taking 1 argument which Item &&
+         * @returns TRUE if an item was popped and processed
+         */
+        template<class Lambda> FINLINE bool pop_atomic(const Lambda& callback) noexcept
+        {
+            T item;
+            if (pop_atomic_start(item))
+            {
+                callback(std::move(item));
+                pop_atomic_end();
+                return true;
+            }
+            return false;
+        }
+
+        /**
          * @brief Attempts to wait until an item is available.
          * @param timeout Maximum time to wait before returning FALSE
          * @returns TRUE if an item is available to peek or pop
@@ -609,6 +676,17 @@ namespace rpp
         {
             T* head = Head++;
             outItem = std::move(*head);
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                head->~T();
+
+            if (Head == Tail) // clear the queue if Head catches the Tail
+            {
+                clear_unlocked();
+            }
+        }
+        void pop_unlocked() noexcept
+        {
+            T* head = Head++;
             if constexpr (!std::is_trivially_destructible_v<T>)
                 head->~T();
 
