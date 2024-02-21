@@ -304,6 +304,27 @@ TestImpl(test_timer)
         AssertEqual(elapsed_ns3, -1'000'000'000 + elapsed_ns);
     }
 
+    // TestCase(duration_overflow)
+    // {
+    //     // take 2147483647 (int max) seconds and convert to nanos
+    //     rpp::Duration d0 = rpp::Duration::from_seconds(2147483647);
+    //     LogInfo("d0: %lldns", d0.nanos());
+    //     LogInfo("d0.seconds: %lld", d0.seconds());
+    //     LogInfo("d0.millis: %lld", d0.millis());
+    //     LogInfo("d0.micros: %lld", d0.micros());
+    //     LogInfo("d0.days: %lld", d0.days());
+    //     LogInfo("d0.hours: %lld", d0.hours());
+    //     LogInfo("d0.minutes: %lld", d0.minutes());
+
+    //     rpp::Duration d1 = rpp::Duration{1708557168148798124LL};
+    //     LogInfo("d1.seconds: %lld", d1.seconds());
+    //     LogInfo("d1.millis: %lld", d1.millis());
+    //     LogInfo("d1.micros: %lld", d1.micros());
+    //     LogInfo("d1.days: %lld", d1.days());
+    //     LogInfo("d1.hours: %lld", d1.hours());
+    //     LogInfo("d1.minutes: %lld", d1.minutes());
+    // }
+
     TestCase(basic_stopwatch)
     {
         rpp::StopWatch sw;
