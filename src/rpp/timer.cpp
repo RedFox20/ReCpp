@@ -297,5 +297,5 @@ namespace rpp
 
 extern "C" double time_now_seconds()
 {
-    return rpp::TimePoint::now().duration.seconds();
+    return rpp::TimePoint::now().duration.sec();
 }

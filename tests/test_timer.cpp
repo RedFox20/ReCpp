@@ -317,7 +317,7 @@ TestImpl(test_timer)
         LogInfo("d0.hours: %lld", d0.hours());
         LogInfo("d0.minutes: %lld", d0.minutes());
 
-        constexpr rpp::Duration d1 = rpp::Duration{1708732302913202308LL};
+        rpp::Duration d1 = rpp::Duration{1708732302913202308LL};
         LogInfo("d1.seconds: %lld", d1.seconds());
         LogInfo("d1.millis: %lld", d1.millis());
         LogInfo("d1.micros: %lld", d1.micros());
