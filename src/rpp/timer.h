@@ -39,7 +39,7 @@ namespace rpp
         // this has a maximum resolution of 9223372036 seconds (292.27 years)
         int64 nsec = 0;
 
-        Duration() noexcept = default;
+        constexpr Duration() noexcept = default;
         explicit constexpr Duration(int64 ns) noexcept : nsec{ns} {}
 
         /** @brief The ZERO Duration */
@@ -47,78 +47,76 @@ namespace rpp
         explicit operator bool() const noexcept { return nsec != 0; }
 
         /** @returns true if this Duration has been initialized */
-        bool is_valid() const noexcept { return nsec != 0; }
-        bool operator==(const Duration& d) const noexcept { return nsec == d.nsec; }
-        bool operator!=(const Duration& d) const noexcept { return nsec != d.nsec; }
-        bool operator>(const Duration& d) const noexcept { return nsec > d.nsec; }
-        bool operator<(const Duration& d) const noexcept { return nsec < d.nsec; }
-        bool operator>=(const Duration& d) const noexcept { return nsec >= d.nsec; }
-        bool operator<=(const Duration& d) const noexcept { return nsec <= d.nsec; }
+        constexpr bool is_valid() const noexcept { return nsec != 0; }
+        constexpr bool operator==(const Duration& d) const noexcept { return nsec == d.nsec; }
+        constexpr bool operator!=(const Duration& d) const noexcept { return nsec != d.nsec; }
+        constexpr bool operator>(const Duration& d) const noexcept { return nsec > d.nsec; }
+        constexpr bool operator<(const Duration& d) const noexcept { return nsec < d.nsec; }
+        constexpr bool operator>=(const Duration& d) const noexcept { return nsec >= d.nsec; }
+        constexpr bool operator<=(const Duration& d) const noexcept { return nsec <= d.nsec; }
 
 
         /** @returns New Duration from fractional seconds (positive or negative) */
-        static Duration from_seconds(double seconds) noexcept { return Duration{ int64(seconds * NANOS_PER_SEC) }; }
-        static Duration from_seconds(int32 seconds) noexcept { return Duration{ int64(seconds) * NANOS_PER_SEC }; }
-        static Duration from_seconds(int64 seconds) noexcept { return Duration{ seconds * NANOS_PER_SEC }; }
+        static constexpr Duration from_seconds(double seconds) noexcept { return Duration{ int64(seconds * NANOS_PER_SEC) }; }
+        static constexpr Duration from_seconds(int32 seconds) noexcept { return Duration{ int64(seconds) * NANOS_PER_SEC }; }
+        static constexpr Duration from_seconds(int64 seconds) noexcept { return Duration{ seconds * NANOS_PER_SEC }; }
         /** @returns New Duration from integer milliseconds (positive or negative) */
-        static Duration from_millis(int32 millis) noexcept { return Duration{ int64(millis) * NANOS_PER_MILLI }; }
-        static Duration from_millis(int64 millis) noexcept { return Duration{ millis * NANOS_PER_MILLI }; }
+        static constexpr Duration from_millis(int32 millis) noexcept { return Duration{ int64(millis) * NANOS_PER_MILLI }; }
+        static constexpr Duration from_millis(int64 millis) noexcept { return Duration{ millis * NANOS_PER_MILLI }; }
         /** @returns New Duration from integer microseconds (positive or negative) */
-        static Duration from_micros(int32 micros) noexcept { return Duration{ int64(micros) * NANOS_PER_MICRO }; }
-        static Duration from_micros(int64 micros) noexcept { return Duration{ micros * NANOS_PER_MICRO }; }
+        static constexpr Duration from_micros(int32 micros) noexcept { return Duration{ int64(micros) * NANOS_PER_MICRO }; }
+        static constexpr Duration from_micros(int64 micros) noexcept { return Duration{ micros * NANOS_PER_MICRO }; }
         /** @returns New Duration from integer nanoseconds (positive or negative) */
-        static Duration from_nanos(int64 nanos) noexcept { return Duration{ nanos }; }
+        static constexpr Duration from_nanos(int64 nanos) noexcept { return Duration{ nanos }; }
 
         /** 
          * @returns TOTAL fractional seconds (positive or negative) of this Duration
          */
-        double sec() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
+        constexpr double sec() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
         /**
          * @returns TOTAL int64 seconds (positive or negative) of this Duration
          */
-        int64 seconds() const noexcept { return (nsec / NANOS_PER_SEC); }
+        constexpr int64 seconds() const noexcept { return nsec / NANOS_PER_SEC; }
         /**
          * @returns TOTAL int64 milliseconds (positive or negative) of this Duration
-         * @warning This overflows very quickly at 2,147,483,647 milliseconds (2,147,483 seconds, which is only 24 days)
          */
-        int64 millis() const noexcept { return (nsec / NANOS_PER_MILLI); }
+        constexpr int64 millis() const noexcept { return nsec / NANOS_PER_MILLI; }
         /**
          * @returns TOTAL int64 microseconds (positive or negative) of this Duration
-         * @warning This overflows at 2,147,483,647 microseconds (2,147 seconds, which is 35 minutes)
          */
-        int64 micros() const noexcept { return (nsec / NANOS_PER_MICRO); }
+        constexpr int64 micros() const noexcept { return nsec / NANOS_PER_MICRO; }
         /**
          * @returns TOTAL int64 nanoseconds (positive or negative) of this Duration
          * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is 292,471 years)
          */
-        int64 nanos() const noexcept { return nsec; }
+        constexpr int64 nanos() const noexcept { return nsec; }
 
         /**
          * @returns TOTAL int64 days of this Duration
          */
-        int64 days() const noexcept { return (nsec / NANOS_PER_DAY); }
+        constexpr int64 days() const noexcept { return nsec / NANOS_PER_DAY; }
         /**
          * @returns TOTAL int64 hours of this Duration
          */
-        int64 hours() const noexcept { return (nsec / NANOS_PER_HOUR); }
+        constexpr int64 hours() const noexcept { return nsec / NANOS_PER_HOUR; }
         /**
          * @returns TOTAL int64 minutes of this Duration
          */
-        int64 minutes() const noexcept { return (nsec / NANOS_PER_MINUTE); }
+        constexpr int64 minutes() const noexcept { return nsec / NANOS_PER_MINUTE; }
 
-        Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
-        Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
-        Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
-        Duration& operator-=(const Duration& d) noexcept { nsec -= d.nsec; return *this; }
-        Duration operator-() const noexcept { return Duration{ -nsec }; }
+        constexpr Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
+        constexpr Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
+        constexpr Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
+        constexpr Duration& operator-=(const Duration& d) noexcept { nsec -= d.nsec; return *this; }
+        constexpr Duration operator-() const noexcept { return Duration{ -nsec }; }
 
         /** @brief Divides this duration by an integer */
-        Duration operator/(int32 d) const noexcept { return Duration{ nsec / d }; }
+        constexpr Duration operator/(int32 d) const noexcept { return Duration{ nsec / d }; }
         /**
          * @brief Multiplies this duration by an integer
          * @warning This can overflow!!!
          */
-        Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
+        constexpr Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
