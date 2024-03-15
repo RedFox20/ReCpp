@@ -684,7 +684,10 @@ namespace rpp
         while (patterns.next(pattern, '|'))
         {
             if (const char* match = haystack.find(pattern))
-                return int(match - haystack.begin());
+            {
+                int index = int(match - haystack.begin());
+                return index;
+            }
         }
         return -1; // no match
     }
@@ -699,8 +702,9 @@ namespace rpp
                 int apos = pattern_match(a.name, name_match);
                 int bpos = pattern_match(b.name, name_match);
                 if (apos != -1 && bpos == -1) return true; // match is always first
-                if (bpos != -1 && apos == -1) return false; // non match is always last
-
+                if (bpos != -1 && apos == -1) {
+                    return false; // non match is always last
+                }
                 // both match, or none match, use default sorting rule:
                 return ipinterface::compare(a, b);
             });
@@ -1558,23 +1562,26 @@ namespace rpp
     bool socket::bind(const ipaddress& addr) noexcept
     {
         auto sa = to_saddr(addr);
-        if (!::bind(Sock, sa, sa.size()))
+        if (::bind(Sock, sa, sa.size()) == 0)
         {
             Addr = addr;
             return true;
         }
-        return handle_errno() == 0;
+        handle_errno();
+        return false;
     }
 
     bool socket::listen() noexcept
     {
         Assert(type() != socket_type::ST_Datagram, "Cannot use socket::listen() on UDP sockets");
 
-        if (!::listen(Sock, SOMAXCONN)) { // start listening for new clients
+        if (::listen(Sock, SOMAXCONN) == 0) // start listening for new clients
+        {
             Category = SC_Listen;
             return true;
         }
-        return handle_errno() == 0;
+        handle_errno();
+        return false;
     }
 
     bool socket::select(int millis, SelectFlag selectFlags) noexcept
@@ -1844,7 +1851,7 @@ namespace rpp
         if (interfaces.empty())
             return {};
         for (const ipinterface& ip : interfaces)
-            if (pattern_match(ip.name, network_interface))
+            if (pattern_match(ip.name, network_interface) != -1)
                 return ip;
         return interfaces.front();
     }

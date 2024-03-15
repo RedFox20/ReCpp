@@ -1078,6 +1078,7 @@ namespace rpp
         /**
          * STATIC
          * Creates a new listener type socket used for accepting new connections
+         * @returns valid socket if successful, otherwise a default socket{} object
          */
         static socket listen_to(const ipaddress& localAddr,
                                 ip_protocol ipp = IPP_TCP,
@@ -1086,6 +1087,7 @@ namespace rpp
         /**
          * STATIC
          * Creates a new generic socket for sending and receiving UDP datagrams
+         * @returns valid socket if successful, otherwise a default socket{} object
          */
         static socket listen_to_udp(const ipaddress& localAddr, socket_option opt = SO_None) noexcept
         {
@@ -1095,6 +1097,7 @@ namespace rpp
         /**
          * STATIC
          * Creates a new generic socket for sending and receiving UDP datagrams
+         * @returns valid socket if successful, otherwise a default socket{} object
          */
         static socket listen_to_udp(int localPort, socket_option opt = SO_None) noexcept
         {
@@ -1104,6 +1107,7 @@ namespace rpp
         /**
          * STATIC
          * Creates a new generic socket for sending and receiving UDP datagrams
+         * @returns valid socket if successful, otherwise a default socket{} object
          */
         static socket make_udp(const ipaddress& localAddr, socket_option opt = SO_None) noexcept
         {
