@@ -59,6 +59,12 @@ RPPCAPI void SetLogSeverityFilter(LogSeverity filter);
 RPPCAPI LogSeverity GetLogSeverityFilter();
 
 /**
+ * Prefixes all log entries with a time-of-day timestamp in the format of:
+ * hh:mm:ss.MMMms, e.g. 21:24:13.172ms
+*/
+RPPCAPI void LogEnableTimestamps(bool enable);
+
+/**
  * Writes a message to default output. On most platforms this is stdout/stderr
  * On Android this writes to Android log, using the given tag.
  * @note NEWLINE is appended automatically

@@ -1,4 +1,6 @@
 #include "debugging.h"
+#include "timer.h" // rpp::TimePoint
+
 #include <cstdio>
 #include <cstring>
 #include <cstdlib> // alloca
@@ -29,6 +31,7 @@ static LogMessageCallback LogHandler;
 static LogEventCallback EventHandler;
 static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
+static bool EnableTimestamps = false;
 
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler)
 {
@@ -58,14 +61,30 @@ RPPCAPI LogSeverity GetLogSeverityFilter()
 {
     return Filter;
 }
+RPPCAPI void LogEnableTimestamps(bool enable)
+{
+    EnableTimestamps = enable;
+}
 
 static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexcept
 {
-    int len = vsnprintf(errBuf, size_t(N-1)/*spare room for \n*/, format, ap);
-    if (len < 0 || len >= N) { // err: didn't fit
-        len = N-2; // try to recover gracefully
-        errBuf[len] = '\0';
+    char* pbuf = errBuf;
+    int remaining = N;
+    int len = 0;
+    if (EnableTimestamps) {
+        len = rpp::TimePoint::now().to_string(pbuf, remaining-1);
+        pbuf[len++] = ' '; // add separator
+        pbuf += len;
+        remaining -= len;
     }
+
+    int plen = vsnprintf(pbuf, size_t(remaining-1)/*spare room for \n*/, format, ap);
+    if (plen < 0 || plen >= remaining) { // err: didn't fit
+        plen = remaining-2; // try to recover gracefully
+        pbuf[plen] = '\0';
+    }
+    len += plen;
+
     return len;
 }
 

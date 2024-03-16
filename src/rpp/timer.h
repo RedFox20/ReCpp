@@ -4,6 +4,7 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
+#include <string>
 
 #if __cplusplus
 
@@ -117,6 +118,10 @@ namespace rpp
          * @warning This can overflow!!!
          */
         constexpr Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
+
+        /** @brief Converts this Duration into a string */
+        int to_string(char* buf, int bufsize) const noexcept;
+        std::string to_string() const noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,6 +176,10 @@ namespace rpp
         TimePoint& operator+=(const Duration& d) noexcept { duration.nsec += d.nsec; return *this; }
         TimePoint& operator-=(const Duration& d) noexcept { duration.nsec -= d.nsec; return *this;}
         Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
+
+        /** @brief Converts this Duration into a string */
+        int to_string(char* buf, int bufsize) const noexcept { return duration.to_string(buf, bufsize); }
+        std::string to_string() const noexcept { return duration.to_string(); }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

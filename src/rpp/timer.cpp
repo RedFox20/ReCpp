@@ -150,6 +150,43 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    static int time_to_string(int64 ns, char* buf, int bufsize) noexcept
+    {
+        using rpp::int64;
+        int len = 0;
+
+        if (ns < 0)
+        {
+            ns = -ns;
+            buf[len++] = '-';
+        }
+
+        // NOTE: this is not accurate for leap years, but we don't want to display them anyway
+        constexpr int64 NANOS_PER_YEAR = 365LL * rpp::NANOS_PER_DAY;
+        int64 years   = (ns / NANOS_PER_YEAR);        ns -= years * NANOS_PER_YEAR;
+        int64 days    = (ns / rpp::NANOS_PER_DAY);    ns -= days * rpp::NANOS_PER_DAY;
+        int64 hours   = (ns / rpp::NANOS_PER_HOUR);   ns -= hours * rpp::NANOS_PER_HOUR;
+        int64 minutes = (ns / rpp::NANOS_PER_MINUTE); ns -= minutes * rpp::NANOS_PER_MINUTE;
+        int64 seconds = (ns / rpp::NANOS_PER_SEC);    ns -= seconds * rpp::NANOS_PER_SEC;
+        int64 millis  = (ns / rpp::NANOS_PER_MILLI);
+
+        len += snprintf(buf+len, bufsize-len, "%02lld:%02lld:%02lld.%03lldms",
+                        hours, minutes, seconds, millis);
+        return len;
+    }
+    int Duration::to_string(char* buf, int bufsize) const noexcept
+    {
+        return time_to_string(nanos(), buf, bufsize);
+    }
+    std::string Duration::to_string() const noexcept
+    {
+        char buf[128];
+        int len = time_to_string(nanos(), buf, sizeof(buf));
+        return {buf,buf+len};
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
