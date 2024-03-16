@@ -195,6 +195,7 @@ namespace rpp
         std::mutex mutex{};
         test_func_type func { nullptr };
         size_t expectedExType = 0;
+        std::chrono::nanoseconds elapsed_time{};
         bool autorun = true;
         bool success = false;
     private:
@@ -225,6 +226,7 @@ namespace rpp
         std::vector<test_func*> test_functions;
         test_results* current_results = nullptr;
         test_func* current_func = nullptr;
+        std::chrono::nanoseconds elapsed_time{};
 
         ~test_impl()
         {
@@ -452,6 +454,38 @@ namespace rpp
         impl->current_func = nullptr;
     }
 
+    static const char* get_time_str(const std::chrono::nanoseconds& time) noexcept
+    {
+        static thread_local char buffer[128];
+        if (time.count() < 1000ll) // less than 1us, display as 999ns
+        {
+            snprintf(buffer, sizeof(buffer), "%dns", (int)time.count());
+        }
+        else if (time.count() < 1'000'000ll) // less than 1ms, display as 999us
+        {
+            snprintf(buffer, sizeof(buffer), "%dus", (int)(time.count() / 1'000ll));
+        }
+        else if (time.count() < 50'000'000ll) // less than 50ms, display as 49.99ms
+        {
+            snprintf(buffer, sizeof(buffer), "%.2fms", time.count() / 1'000'000.0);
+        }
+        else if (time.count() < 1'000'000'000ll) // less than 1sec, display as 899.9ms
+        {
+            snprintf(buffer, sizeof(buffer), "%.1fms", time.count() / 1'000'000.0);
+        }
+        else if (time.count() < 60'000'000'000ll) // less than 1min, display as 59.91s
+        {
+            snprintf(buffer, sizeof(buffer), "%.2fs", time.count() / 1'000'000'000.0);
+        }
+        else // over 1 min, display as 120m 59s
+        {
+            int minutes = (int)(time.count() / 60'000'000'000ll);
+            int seconds = (int)((time.count() % 60'000'000'000ll) / 1'000'000'000ll);
+            snprintf(buffer, sizeof(buffer), "%dm %ds", minutes, seconds);
+        }
+        return buffer;
+    }
+
     bool test::run_test(test_results& results, strview methodFilter)
     {
         impl->current_results = &results;
@@ -468,6 +502,7 @@ namespace rpp
             consolef(Yellow, "%s\n", title);
         }
 
+        auto t1 = std::chrono::high_resolution_clock::now();
         run_init();
 
         int numTestsRun = 0;
@@ -481,7 +516,7 @@ namespace rpp
                 if (fn->name.find(methodFilter))
                 {
                     if (run_test_func(*fn)) ++numTestsOk;
-                    else                       ++numTestsFailed;
+                    else                    ++numTestsFailed;
                     ++numTestsRun;
                 }
             }
@@ -497,7 +532,7 @@ namespace rpp
                 if (fn->autorun)
                 {
                     if (run_test_func(*fn)) ++numTestsOk;
-                    else                       ++numTestsFailed;
+                    else                    ++numTestsFailed;
                     ++numTestsRun;
                 }
             }
@@ -508,36 +543,42 @@ namespace rpp
         }
 
         run_cleanup();
+        auto t2 = std::chrono::high_resolution_clock::now();
+        impl->elapsed_time = t2 - t1;
 
         bool allSuccess = (numTestsOk == numTestsRun);
-        if (verb >= TestVerbosity::TestLabels)
-        {
-            consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)titleLength)); // "-------------"
-        }
-        else if (verb >= TestVerbosity::Summary)
+        if (verb >= TestVerbosity::Summary)
         {
             if (allSuccess)
             {
                 char run[64]; snprintf(run, sizeof(run), "%d/%d", numTestsOk, numTestsRun);
-                consolef(Green, "TEST %-32s  %-5s  [OK]\n", name.str, run);
+                consolef(Green, "TEST %-32s  %-5s  [OK] %s\n", name.str, run, get_time_str(impl->elapsed_time));
             }
             else
             {
                 char run[64]; snprintf(run, sizeof(run), "%d/%d", numTestsFailed, numTestsRun);
-                consolef(Red,   "TEST %-32s  %-5s  [FAILED]\n", name.str, run);
-                for (test_func* fn : impl->test_functions)
+                consolef(Red,   "TEST %-32s  %-5s  [FAILED] %s\n", name.str, run, get_time_str(impl->elapsed_time));
+            }
+        }
+
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)titleLength)); // "-------------"
+        }
+        else if (verb >= TestVerbosity::Summary && !allSuccess)
+        {
+            for (test_func* fn : impl->test_functions)
+            {
+                if (fn->success) continue;
+                consolef(Red, "FAIL %s::%s\n", name.str, fn->name.str);
+                for (size_t i = 0; i < fn->num_messages(); ++i)
                 {
-                    if (fn->success) continue;
-                    consolef(Red, "FAIL %s::%s\n", name.str, fn->name.str);
-                    for (size_t i = 0; i < fn->num_messages(); ++i)
-                    {
-                        const message& m = fn->get_message(i);
-                        rpp::strview msg = fn->get_message_text(m);
-                        ConsoleColor c = Default;
-                        if      (m.type == 1) c = Yellow;
-                        else if (m.type == 2) c = Red;
-                        console(c, msg.str, msg.len);
-                    }
+                    const message& m = fn->get_message(i);
+                    rpp::strview msg = fn->get_message_text(m);
+                    ConsoleColor c = Default;
+                    if      (m.type == 1) c = Yellow;
+                    else if (m.type == 2) c = Red;
+                    console(c, msg.str, msg.len);
                 }
             }
         }
@@ -558,6 +599,8 @@ namespace rpp
         test.success = false;
         tl_current_test_func = impl->current_func = &test;
         int before = impl->current_results->asserts_failed;
+        auto t1 = std::chrono::high_resolution_clock::now();
+        decltype(t1) t2;
         try
         {
             #if _MSC_VER
@@ -565,6 +608,7 @@ namespace rpp
             #else
                 test.func.mfunc(this);
             #endif
+            t2 = std::chrono::high_resolution_clock::now();
             if (test.expectedExType) // we expected an exception, but none happened?!
             {
                 assert_failed_custom("FAILED with expected EXCEPTION NOT THROWN in %s::%s\n",
@@ -573,6 +617,7 @@ namespace rpp
         }
         catch (const std::exception& e)
         {
+            t2 = std::chrono::high_resolution_clock::now();
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
                 if (verb >= TestVerbosity::AllMessages)
@@ -587,11 +632,21 @@ namespace rpp
                                      name.str, test.name.str, e.what());
             }
         }
-        
+
         tl_current_test_func = impl->current_func = nullptr;
+        test.elapsed_time = t2 - t1;
 
         int totalFailures = impl->current_results->asserts_failed - before;
         test.success = totalFailures <= 0;
+
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            if (test.success)
+                consolef(Green, "%s::%s OK %s\n", name.str, test.name.str, get_time_str(test.elapsed_time));
+            else
+                consolef(Red, "%s::%s FAILED %s\n", name.str, test.name.str, get_time_str(test.elapsed_time));
+        }
+
         return test.success;
     }
 

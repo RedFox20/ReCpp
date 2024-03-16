@@ -188,6 +188,40 @@ TestImpl(test_concurrent_queue)
         consumer.get();
     }
 
+    // wait_pop() is best used for producer/consumer scenarios
+    // for long-lived service threads that don't have any cancellation mechanism
+    // other than basic notify()
+    TestCase(wait_pop_2_producer_consumer)
+    {
+        concurrent_queue<std::string> queue;
+
+        cfuture<void> producer = rpp::async_task([&] {
+            queue.push("item1");
+            queue.push("item2");
+            queue.push("item3");
+            rpp::sleep_ms(5);
+            queue.notify_one(); // notify consumer
+        });
+
+        cfuture<void> consumer = rpp::async_task([&] {
+            std::string item1, item2, item3;
+            AssertTrue(queue.wait_pop(item1));
+            AssertThat(item1, "item1");
+            AssertTrue(queue.wait_pop(item2));
+            AssertThat(item2, "item2");
+            AssertTrue(queue.wait_pop(item3));
+            AssertThat(item3, "item3");
+
+            // enter infinite wait, but we should be notified by the producer
+            std::string item4;
+            AssertFalse(queue.wait_pop(item4));
+            AssertThat(item4, "");
+        });
+
+        producer.get();
+        consumer.get();
+    }
+
     struct PopResult
     {
         std::string item;
