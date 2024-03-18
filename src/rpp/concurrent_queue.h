@@ -10,6 +10,7 @@
 #include <mutex>
 #include <thread> // std::this_thread::yield()
 #include <type_traits> // std::is_trivially_destructible_v
+#include <optional> // std::optional
 
 namespace rpp
 {
@@ -260,7 +261,7 @@ namespace rpp
          */
         void push_no_notify(const T& item) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            std::unique_lock<std::mutex> lock = spin_lock();
             push_unlocked(item);
         }
 
@@ -427,17 +428,21 @@ namespace rpp
         }
 
         /**
-         * Waits forever until an item is ready to be popped.
-         * @warning If no items are present, then this will deadlock!
+         * Waits until an item is available, or until this queue is NOTIFIED
          * @note This is a convenience method for wait_pop() with no timeout
          *       and is most convenient for producer/consumer threads.
          *       @see test_concurrent_queue.cpp TestCase(basic_producer_consumer) for example usage.
+         * @returns The popped item, or std::nullopt if the queue had no items when NOTIFIED
          */
-        [[nodiscard]] T wait_pop() noexcept
+        [[nodiscard]] std::optional<T> wait_pop() noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
             while (empty())
+            {
                 wait_notify(lock);
+                if (empty())
+                    return std::nullopt;
+            }
             T result;
             pop_unlocked(result);
             return result;
@@ -550,7 +555,7 @@ namespace rpp
                 // don't measure `now` again, even if locking took a while
                 // this can make us suspend beyond `until` time, but that's ok
                 duration timeout = until - now;
-                (void)Waiter.wait_for(lock, timeout); // may throw
+                (void)Waiter.wait_for(lock, timeout); // noexcept
             #else // on GCC wait_until is faster
                 (void)Waiter.wait_until(lock, until); // may throw
             #endif
@@ -619,7 +624,7 @@ namespace rpp
         bool wait_pop_interval(T& outItem, duration timeout, duration interval,
                                const WaitUntil& cancelCondition) noexcept(noexcept(cancelCondition()))
         {
-            std::unique_lock<std::mutex> lock = spin_lock(); // may throw
+            std::unique_lock<std::mutex> lock = spin_lock();
             if (empty())
             {
                 duration remaining = timeout;
@@ -630,7 +635,7 @@ namespace rpp
                     if (cancelCondition())
                         return false;
                 #if _MSC_VER // on Win32 wait_for is faster
-                    (void)Waiter.wait_for(lock, interval);
+                    (void)Waiter.wait_for(lock, interval); // noexcept
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, prevTime + interval); // may throw
                 #endif
