@@ -179,9 +179,12 @@ TestImpl(test_concurrent_queue)
         });
 
         cfuture<void> consumer = rpp::async_task([&] {
-            AssertThat(*queue.wait_pop(), "item1");
-            AssertThat(*queue.wait_pop(), "item2");
-            AssertThat(*queue.wait_pop(), "item3");
+            std::string item1 = *queue.wait_pop();
+            AssertThat(item1, "item1");
+            std::string item2 = *queue.wait_pop();
+            AssertThat(item2, "item2");
+            std::string item3 = *queue.wait_pop();
+            AssertThat(item3, "item3");
         });
 
         producer.get();
