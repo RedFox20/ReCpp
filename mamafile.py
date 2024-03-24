@@ -29,11 +29,12 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
-        os.makedirs(self.build_dir('include/rpp/'), exist_ok=True)
         self.copy(self.source_dir('src/rpp/'),
                   self.build_dir('include/rpp/'), filter=['.h','.natvis'])
-        self.export_libs('.', ['ReCpp.lib', 'ReCpp.a'])
-        self.export_includes('include', build_dir=True)
+        if self.windows:
+            self.export_lib(f'{self.cmake_build_type}/ReCpp.lib')
+        else:
+            self.export_lib('libReCpp.a')
 
         if self.raspi or self.oclea:
             self.export_syslib('dl')
