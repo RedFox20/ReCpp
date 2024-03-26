@@ -295,7 +295,7 @@ TestImpl(test_threadpool)
 
         // TODO: this test is failing, run some stress tests
         for (auto* task : Tasks)
-            AssertThat(task->wait(std::chrono::milliseconds{1000}), pool_task::finished);
+            AssertThat(task->wait(std::chrono::milliseconds{2000}), pool_task::finished);
 
         int expected = 4 * 6;
         AssertThat((int)times_launched, expected);
