@@ -26,11 +26,15 @@
 
 namespace rpp
 {
-    template<typename T = void>
-    using coro_handle = RPP_CORO_STD::coroutine_handle<T>;
-
     template<class T = void>
     class NODISCARD cfuture;
+
+
+#if RPP_HAS_COROUTINES
+    template<typename T = void>
+    using coro_handle = RPP_CORO_STD::coroutine_handle<T>;
+#endif // RPP_HAS_COROUTINES
+
 
 #if RPP_HAS_CXX20
     template<typename F>
@@ -44,5 +48,5 @@ namespace rpp
         requires !std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
               && !std::is_same_v<F, std::future<decltype(f.get())>>;
     };
-#endif
+#endif // RPP_HAS_CXX20
 }

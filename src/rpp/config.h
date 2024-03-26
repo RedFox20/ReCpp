@@ -140,7 +140,7 @@
 // Prefixed before function return type:
 // RPP_NORETURN void func() { ... }
 #ifndef RPP_NORETURN
-#  if __cplusplus >= 201103
+#  if !__clang__ && __cplusplus >= 201103
 #    define RPP_NORETURN [[noreturn]]
 #  elif _MSC_VER
 #    define RPP_NORETURN __declspec(noreturn)
