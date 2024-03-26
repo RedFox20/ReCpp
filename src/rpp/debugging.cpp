@@ -24,7 +24,7 @@
 # include <unistd.h>
 #endif
 
-#if __GNUC__
+#if __GNUC__ || __clang__
 # include <signal.h>
 #endif
 
@@ -122,8 +122,12 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
     fflush(stderr);
 
     // trap into debugger
-    #if __clang__ && __has_builtin(__builtin_debugtrap)
-        __builtin_debugtrap();
+    #if __clang__
+        #if __has_builtin(__builtin_debugtrap)
+            __builtin_debugtrap();
+        #else
+            raise(SIGTRAP);
+        #endif
     #elif _MSC_VER
         __debugbreak();
     #elif __GNUC__
