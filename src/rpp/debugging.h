@@ -20,6 +20,10 @@
 #endif
 #if __GNUG__
 #  pragma GCC diagnostic ignored "-Wformat-extra-args"
+#  ifdef NDEBUG
+#  else
+#    include <assert.h> // __assert_fail
+#  endif
 #endif
 
 typedef enum {
@@ -75,6 +79,10 @@ RPPCAPI void LogEnableTimestamps(bool enable);
  */
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len);
 RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
+
+// Provides a generic assertion fail, which calls std::terminate
+RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
+                                        unsigned int line, const char* function);
 
 /** Logs an error to the backing error mechanism */
 RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap);
@@ -158,17 +166,20 @@ RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __d
 #    define __assertion_failure(fmt,...) \
     __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  else
-#    define  __assertion_failure(fmt,...) assert(false)
+#    define  __assertion_failure(fmt,...) do { \
+        RppAssertFail(_rpp_assert_format(fmt, ##__VA_ARGS__), __FILE__, __LINE__, __FUNCTION__); } while (0)
 #  endif
 #elif _MSC_VER // Windows VC++
 #  ifndef _DEBUG
-#    define __assertion_failure(fmt,...) do { __debugbreak(); } while (0)
+#    define __assertion_failure(fmt,...) do { \
+        __debugbreak(); RppAssertFail(_rpp_assert_format(fmt, ##__VA_ARGS__), __FILE__, __LINE__, __FUNCTION__); } while (0)
 #  else // MSVC++ debug assert is quite unique since it supports Format strings. Wish all toolchains did that:
 #    define __assertion_failure(fmt,...) do { \
     _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt _rpp_wrap_args(__VA_ARGS__) ); } while (0)
 #  endif
 #elif defined __GNUC__ // other clang, mingw or linux gcc
-#  define  __assertion_failure(fmt,...) assert(false)
+#  define  __assertion_failure(fmt,...) do { \
+    RppAssertFail(_rpp_assert_format(fmt, ##__VA_ARGS__), __FILE__, __LINE__, __FUNCTION__); } while (0)
 #else
 #  error Debugging Assert not defined for this compiler toolkit!
 #endif

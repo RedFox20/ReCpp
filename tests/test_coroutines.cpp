@@ -41,6 +41,7 @@ TestImpl(test_coroutines)
         AssertLess(e2, 20.0);
     }
 
+
     rpp::cfuture<std::string> string_coro()
     {
         co_await std::chrono::milliseconds{1};
@@ -50,6 +51,7 @@ TestImpl(test_coroutines)
     {
         AssertThat(string_coro().get(), "string from coro"s);
     }
+
 
     cfuture<void> void_coro(std::string& result)
     {
@@ -65,6 +67,7 @@ TestImpl(test_coroutines)
         f.get();
         AssertThat(result, "string from coro"s);
     }
+
 
     cfuture<std::string> as_async(std::string s)
     {
@@ -83,6 +86,7 @@ TestImpl(test_coroutines)
         AssertThat(multi_stage_coro().get(), "123_456_789"s);
     }
 
+
     cfuture<std::string> future_string_coro()
     {
         co_return co_await async_task([] {
@@ -94,6 +98,7 @@ TestImpl(test_coroutines)
         AssertThat(future_string_coro().get(), "future string"s);
     }
 
+
     cfuture<std::string> exceptional_coro()
     {
         co_await std::chrono::milliseconds{1};
@@ -101,7 +106,6 @@ TestImpl(test_coroutines)
         throw std::runtime_error{"aargh!"};
         co_return "aargh!";
     }
-
     cfuture<std::string> exception_handling_coro()
     {
         std::string s = co_await as_async("abc");
@@ -126,6 +130,7 @@ TestImpl(test_coroutines)
         AssertThat(exception_handling_coro().get(), "abcdef"s);
     }
 
+
     cfuture<std::vector<int>> destructor_sequence_coro()
     {
         std::mutex m;
@@ -142,41 +147,36 @@ TestImpl(test_coroutines)
             }
         };
 
-        (void)co_await [&m, &destructor_ids]() -> cfuture<void>
+        co_await [&m, &destructor_ids]() -> cfuture<void>
         {
             destructor_recorder dr {m, destructor_ids, 1};
             co_await std::chrono::milliseconds{10};
         };
         AssertThat(destructor_ids.size(), 1u);
         AssertThat(destructor_ids[0], 1);
-        rpp::sleep_ms(10); // give the destructor time to run
 
-        cfuture<std::string> fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string>
+        std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string>
         {
             destructor_recorder dr {m, destructor_ids, 2};
             co_await std::chrono::milliseconds{5};
             co_return "test";
         };
-        AssertThat(destructor_ids.size(), 1u); // the destructor is not called before calling get()
-        AssertThat(fstr.get(), "test"s);
-        fstr = cfuture<std::string>{}; // release the future
-        rpp::sleep_ms(10); // give the destructor time to run
+        AssertThat(fstr, "test"s);
+        AssertThat(destructor_ids.size(), 2u);
 
         AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
 
-        (void)co_await [&m, &destructor_ids]() -> cfuture<void>
+        co_await [&m, &destructor_ids]() -> cfuture<void>
         {
             destructor_recorder dr {m, destructor_ids, 3};
             co_return;
         };
-        rpp::sleep_ms(10); // give the destructor time to run
         AssertThat(destructor_ids.size(), 3u);
         AssertThat(destructor_ids[2], 3);
 
         co_return destructor_ids;
     }
-
     TestCase(ensure_destructors_are_called_sequentially)
     {
         auto f = destructor_sequence_coro();
@@ -186,5 +186,49 @@ TestImpl(test_coroutines)
         AssertThat(destructor_ids[1], 2);
         AssertThat(destructor_ids[2], 3);
     }
+
+
+    cfuture<void> std_future_void_coro()
+    {
+        co_await std::chrono::milliseconds{10};
+        co_return;
+    }
+    TestCase(std_future_void_coro)
+    {
+        std_future_void_coro().get();
+    }
+
+
+    cfuture<std::string> std_future_string_coro()
+    {
+        std::string s = co_await std::async(std::launch::async, [] {
+            return "future string"s;
+        });
+        co_return s;
+    }
+    TestCase(std_future_string_coro)
+    {
+        std::string s = std_future_string_coro().get();
+        AssertThat(s, "future string"s);
+    }
+
+
+    cfuture<std::string> std_future_lambda_coro()
+    {
+        // await on a lambda which returns a future
+        std::string s = co_await []() -> std::future<std::string> {
+            return std::async(std::launch::async, [] {
+                return "future string"s;
+            });
+        };
+        co_return s;
+    }
+
+    TestCase(std_future_lambda_coro)
+    {
+        std::string s = std_future_lambda_coro().get();
+        AssertThat(s, "future string"s);
+    }
+
 #endif
 };

@@ -5,24 +5,9 @@
  */
 #include "config.h"
 #include "thread_pool.h"
-
-#if RPP_HAS_CXX20 && defined(__has_include) // Coroutines support for C++20
-    #if __has_include(<coroutine>)
-        #include <coroutine>
-        #define RPP_HAS_COROUTINES 1
-        #define RPP_CORO_STD std
-    #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang
-        #include <experimental/coroutine>
-        #define RPP_HAS_COROUTINES 1
-        #define RPP_CORO_STD std::experimental
-    #else
-        #define RPP_HAS_COROUTINES 0
-        #define RPP_CORO_STD
-    #endif
-#else
-    #define RPP_HAS_COROUTINES 0
-    #define RPP_CORO_STD
-#endif
+#include "debugging.h"
+#include "traits.h"
+#include "future_types.h"
 
 #if RPP_HAS_COROUTINES
 #include <chrono>
@@ -32,9 +17,17 @@
 
 namespace rpp
 {
-    template<typename T = void>
-    using coro_handle = RPP_CORO_STD::coroutine_handle<T>;
+    template<typename F>
+    concept IsFunctionReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && IsFuture<decltype(f())>;
+    };
 
+    template<typename F>
+    concept IsFunctionNotReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && NotFuture<decltype(f())>;
+    };
 
     /**
      * @brief Allows to asynchronously co_await on any lambdas via rpp::parallel_task()
@@ -42,19 +35,26 @@ namespace rpp
      *     using namespace rpp::coro_operators;
      *     co_await [&]{ downloadFile(url); };
      * @endcode
+     * A more complex example with nested coroutines:
+     * @code
+     *     using namespace rpp::coro_operators;
+     *     co_await [&]() -> cfuture<string> {
+     *         std::string localPath = co_await downloadFile(url);
+     *         co_return localPath;
+     *     };
+     * @endcode
      */
-    template<typename Task>
-        requires std::is_invocable_v<Task>
-    struct lambda_awaiter
+    template<typename T>
+    struct functor_awaiter
     {
-        Task action;
-        using T = decltype(action());
+        rpp::delegate<T()> action;
+        std::conditional_t<std::is_same_v<T, void>, void*, T> result {}; // avoid unused variable warning
 
-        std::conditional_t<std::is_same_v<T, void>, void*, T> result {};
         std::exception_ptr ex {};
         rpp::pool_task* poolTask = nullptr;
 
-        explicit lambda_awaiter(Task&& task) noexcept : action{std::move(task)} {}
+        explicit functor_awaiter(rpp::delegate<T()>&& action) noexcept
+            : action{std::move(action)} {}
 
         // is the task ready?
         bool await_ready() const noexcept
@@ -72,13 +72,9 @@ namespace rpp
                 try
                 {
                     if constexpr (!std::is_same_v<T, void>)
-                    {
                         result = std::move(action());
-                    }
                     else
-                    {
                         action();
-                    }
                 }
                 catch (...)
                 {
@@ -91,16 +87,103 @@ namespace rpp
         T await_resume()
         {
             if (ex)
-            {
                 std::rethrow_exception(ex);
-            }
             if constexpr (!std::is_same_v<T, void>)
-            {
-                return std::move(result);
-            }
+                return std::move(*result);
         }
     };
 
+    template<IsFuture Future>
+    struct functor_awaiter_fut
+    {
+        rpp::delegate<Future()> action;
+        Future f {};
+        std::exception_ptr ex {};
+        rpp::pool_task* poolTask = nullptr;
+
+        explicit functor_awaiter_fut(rpp::delegate<Future()>&& action) noexcept
+            : action{std::move(action)} {}
+
+        // is the task ready?
+        bool await_ready() const noexcept
+        {
+            if (!poolTask) // task hasn't even been created yet!
+                return false;
+            return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
+        }
+        // suspension point that launches the background async task
+        void await_suspend(rpp::coro_handle<> cont) noexcept
+        {
+            if (poolTask) std::terminate(); // avoid task explosion
+            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
+            {
+                try
+                {
+                    f = action(); // get the future from the lambda
+                    f.wait(); // wait for the nested coroutine to finish (can throw)
+                }
+                catch (...)
+                {
+                    ex = std::current_exception();
+                }
+                cont.resume(); // call await_resume() and continue on this background thread
+            });
+        }
+        // similar to future<T>, either gets the result T, or throws the caught exception
+        auto await_resume()
+        {
+            if (ex)
+                std::rethrow_exception(ex);
+            return f.get();
+        }
+    };
+
+    // TODO: should reimplement this using coroutine traits
+    // TODO: https://en.cppreference.com/w/cpp/coroutine/coroutine_traits
+    template<typename T>
+    struct std_future_awaiter
+    {
+        std::future<T> f;
+        std::exception_ptr ex {};
+        rpp::pool_task* poolTask = nullptr;
+
+        // NOTE: there is no safe way to grab the reference normally
+        //       so we always MOVE the future into this awaiter
+        explicit std_future_awaiter(std::future<T>&& f) noexcept
+            : f{std::move(f)} {}
+
+        // is the task ready?
+        bool await_ready() const noexcept
+        {
+            if (!poolTask) // task hasn't even been created yet!
+                return false;
+            return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
+        }
+        // suspension point that launches the background async task
+        void await_suspend(rpp::coro_handle<> cont) noexcept
+        {
+            if (poolTask) std::terminate(); // avoid task explosion
+            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
+            {
+                try
+                {
+                    f.wait(); // wait for the nested coroutine to finish (can throw)
+                }
+                catch (...)
+                {
+                    ex = std::current_exception();
+                }
+                cont.resume(); // call await_resume() and continue on this background thread
+            });
+        }
+        // similar to future<T>, either gets the result T, or throws the caught exception
+        auto await_resume()
+        {
+            if (ex)
+                std::rethrow_exception(ex);
+            return f.get();
+        }
+    };
 
     /**
      * @brief Awaiter object for std::chrono durations
@@ -149,17 +232,88 @@ namespace rpp
     inline namespace coro_operators
     {
         /**
+         * @brief Allows to asynchronously co_await on any delegate via rpp::parallel_task()
+         * @note This overload is for delegates that dont return a future
+         * @code
+         *     using namespace rpp::coro_operators;
+         *     rpp::delegate<string()> action = [&]{ return downloadFile(url); };
+         *     string localPath = co_await action;
+         * @endcode
+         */
+        template<NotFuture T> auto operator co_await(rpp::delegate<T()>&& action) noexcept
+        {
+            return functor_awaiter<T>{ std::move(action) };
+        }
+
+        /**
+         * @brief Allows to co_await on any delegate which returns a future
+         * @note The delegate must return a future type
+         * @code
+         *     using namespace rpp::coro_operators;
+         *     rpp::delegate<cfuture<string>()> action = [&]() -> cfuture<string> {
+         *         string localPath = co_await downloadFile(url);
+         *         co_return localPath;
+         *     };
+         *     string path = co_await action;
+         * @endcode
+         */
+        template<IsFuture F> auto operator co_await(rpp::delegate<F()>&& action) noexcept
+        {
+            return functor_awaiter_fut<F>{ std::move(action) };
+        }
+
+        /**
          * @brief Allows to asynchronously co_await on any lambdas via rpp::parallel_task()
+         * @note This overload is for functions that dont return a future
          * @code
          *     using namespace rpp::coro_operators;
          *     co_await [&]{ downloadFile(url); };
          * @endcode
          */
-        template<typename Task>
-            requires std::is_invocable_v<Task>
-        lambda_awaiter<Task> operator co_await(Task&& task) noexcept
+        template<IsFunctionNotReturningFuture F> auto operator co_await(F&& action) noexcept
         {
-            return lambda_awaiter<Task>{ std::move(task) };
+            return functor_awaiter<ret_type<F>>{ std::move(action) };
+        }
+
+        /**
+         * @brief Allows to co_await on a lambda which returns a future
+         * @note The lambda must return a future type
+         * @code
+         *     using namespace rpp::coro_operators;
+         *     string path = co_await [&]() -> cfuture<string> {
+         *         string localPath = co_await downloadFile(url);
+         *         co_return localPath;
+         *     };
+         * @endcode
+         */
+        template<IsFunctionReturningFuture FF> auto operator co_await(FF&& action) noexcept
+        {
+            using F = decltype(action());
+            return functor_awaiter_fut<F>{ std::move(action) };
+        }
+
+        template<typename T>
+        FINLINE constexpr rpp::cfuture<T>& operator co_await(rpp::cfuture<T>& future) noexcept
+        {
+            return future;
+        }
+
+        template<typename T>
+        FINLINE constexpr rpp::cfuture<T>&& operator co_await(rpp::cfuture<T>&& future) noexcept
+        {
+            return (rpp::cfuture<T>&&)future;
+        }
+
+        template<typename T>
+        auto operator co_await(std::future<T>& future) noexcept
+        {
+            return std_future_awaiter<T>{ std::move(future) };
+        }
+
+        template<typename T>
+        auto operator co_await(std::future<T>&& future) noexcept
+        {
+            return std_future_awaiter<T>{ std::move(future) };
         }
 
         /**

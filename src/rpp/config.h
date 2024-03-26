@@ -136,6 +136,21 @@
 #  endif
 #endif
 
+// Define the noreturn attribute
+// Prefixed before function return type:
+// RPP_NORETURN void func() { ... }
+#ifndef RPP_NORETURN
+#  if __cplusplus >= 201103
+#    define RPP_NORETURN [[noreturn]]
+#  elif _MSC_VER
+#    define RPP_NORETURN __declspec(noreturn)
+#  elif __GNUC__ || __clang__
+#    define RPP_NORETURN __attribute__((noreturn))
+#  else
+#    define RPP_NORETURN
+#  endif
+#endif
+
 // Define the basic size of integer types
 #if _MSC_VER
 #  define RPP_SHORT_SIZE     2

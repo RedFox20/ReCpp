@@ -4,16 +4,13 @@
  * Copyright (c) 2017-2018, 2023, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include <future>
 #include "thread_pool.h"
-#include "coroutines.h"
-#include <type_traits>
+#include "future_types.h"
+#include "traits.h"
+#include "debugging.h" // __assertion_failure
 
 namespace rpp
 {
-    template<class T = void>
-    class NODISCARD cfuture;
-
     ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -75,7 +72,7 @@ namespace rpp
     {
         using T = decltype(task());
         cpromise<T> p;
-        std::shared_future<T> f = p.get_future().share();
+        cfuture<T> f = p.get_future();
         rpp::parallel_task([move_args(p, task)]() mutable noexcept
         {
             try {
@@ -85,56 +82,6 @@ namespace rpp
             }
         });
         return f;
-    }
-
-
-    ////////////////////////////////////////////////////////////////////////////////
-
-
-    namespace
-    {
-        template<typename T>
-        struct function_traits : function_traits<decltype(&T::operator())> {
-        };
-
-        template<typename R, typename... Args>
-        struct function_traits<R(Args...)> { // function type
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-        
-        template<typename R, typename... Args>
-        struct function_traits<R (*)(Args...)> { // function pointer
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-
-        template<typename R, typename... Args>
-        struct function_traits<std::function<R(Args...)>> {
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-        
-        template<typename T, typename R, typename... Args>
-        struct function_traits<R (T::*)(Args...)> { // member func ptr
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-
-        template<typename T, typename R, typename... Args>
-        struct function_traits<R (T::*)(Args...) const> {  // const member func ptr
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-
-        template<typename T>
-        using ret_type = typename function_traits<T>::ret_type;
-
-        template<typename T>
-        using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
-    
-        template<typename Future>
-        using future_type = std::decay_t<decltype(std::declval<Future>().get())>;
     }
 
 
@@ -181,23 +128,32 @@ namespace rpp
      * @endcode
      */
     template<typename T>
-    class NODISCARD cfuture : public std::shared_future<T>
+    class NODISCARD cfuture : public std::future<T>
     {
-        using super = std::shared_future<T>;
     public:
+        using super = std::future<T>;
+        using value_type = T;
         cfuture() noexcept = default;
-        cfuture(std::future<T>&& f)        noexcept : super{std::move(f)} {}
-        cfuture(std::shared_future<T>&& f) noexcept : super{std::move(f)} {}
-        cfuture(cfuture&& f)      noexcept : super{std::move(f)} {}
-        cfuture(const cfuture& f) noexcept : super{f} {}
-        cfuture& operator=(std::future<T>&& f)        noexcept { super::operator=(std::move(f)); return *this; }
-        cfuture& operator=(std::shared_future<T>&& f) noexcept { super::operator=(std::move(f)); return *this; }
-        cfuture& operator=(cfuture&& f)          noexcept { super::operator=(std::move(f)); return *this; }
-        cfuture& operator=(const cfuture& f)     noexcept { super::operator=(f); return *this; }
-        ~cfuture() noexcept // always block if future is still incomplete
+        cfuture(std::future<T>&& f) noexcept : super{std::move(f)} {}
+        cfuture(cfuture&& f)        noexcept : super{std::move(f)} {}
+        cfuture& operator=(std::future<T>&& f) noexcept { super::operator=(std::move(f)); return *this; }
+        cfuture& operator=(cfuture&& f)        noexcept { super::operator=(std::move(f)); return *this; }
+
+        /**
+         * @warning If the future is not waited before destruction, program will std::terminate()
+         */
+        ~cfuture() noexcept
         {
             if (this->valid())
-                this->wait();
+            {
+                // NOTE: This is a fail-fast strategy to catch programming bugs
+                //       and this happens if you forget to await a future before destruction.
+                //       The default behavior of std::future<T> is to silently block in the destructor,
+                //       however in ReCpp we terminate immediately to force the programmer to fix the bug.
+                //       https://stackoverflow.com/questions/23455104/why-is-the-destructor-of-a-future-returned-from-stdasync-blocking
+                __assertion_failure("cfuture<T> was not awaited before destruction");
+                std::terminate(); // always terminate
+            }
         }
 
         /**
@@ -390,32 +346,6 @@ namespace rpp
             }
         }
 
-        /**
-         * @brief Calls get() and then forcefully moves out the shared_future result value
-         * This is useful for handling temporary cfuture<T> objects, or `mycoro().get_value()` calls.
-         */
-        [[nodiscard]] T get_value() const
-        {
-            return std::move((T&&)super::get()); // force-steal the internal shared_future result
-        }
-
-        /**
-         * Gets the shared reference to the result.
-         * @see get_value() if you want to explicitly move the value out of the future
-         */
-        [[nodiscard]] const T& get() const &
-        {
-            return super::get();
-        }
-
-        /**
-         * When called on a temporary cfuture<T>, forcefully steals the internal result
-         */
-        [[nodiscard]] T get() const &&
-        {
-            return std::move((T&&)super::get()); // force-steal the internal shared_future result
-        }
-
     #if RPP_HAS_COROUTINES // C++20 coro support
 
         // checks if the future is already finished
@@ -435,16 +365,12 @@ namespace rpp
             });
         }
 
-        // gets the result and will rethrow any exceptions from the cfuture
-        const T& await_resume() const &
+        /**
+         * @returns The result and will rethrow any exceptions from the cfuture
+         */
+        [[nodiscard]] FINLINE T await_resume()
         {
             return super::get();
-        }
-
-        // when called on temporary cfuture objects, the result has to be forcefully moved out
-        [[nodiscard]] T await_resume() const &&
-        {
-            return std::move((T&&)super::get()); // force-steal the internal shared_future result
         }
 
         /**
@@ -467,7 +393,7 @@ namespace rpp
             /**
              * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
              */
-            rpp::cfuture<T> get_return_object() noexcept { return this->get_future().share(); }
+            rpp::cfuture<T> get_return_object() noexcept { return this->get_future(); }
             RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
             RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
             void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
@@ -491,23 +417,32 @@ namespace rpp
      * Composable Futures with Coroutine support. See docs in cfuture<T>.
      */
     template<>
-    class NODISCARD cfuture<void> : public std::shared_future<void>
+    class NODISCARD cfuture<void> : public std::future<void>
     {
-        using super = shared_future<void>;
     public:
+        using super = future<void>;
+        using value_type = void;
         cfuture() noexcept = default;
-        cfuture(std::future<void>&& f)   noexcept : super{std::move(f)} {}
-        cfuture(shared_future<void>&& f) noexcept : super{std::move(f)} {}
-        cfuture(cfuture&& f)      noexcept : super{std::move(f)} {}
-        cfuture(const cfuture& f) noexcept : super{f} {} // NOLINT
-        cfuture& operator=(std::future<void>&& f)   noexcept { super::operator=(std::move(f)); return *this; }
-        cfuture& operator=(shared_future<void>&& f) noexcept { super::operator=(std::move(f)); return *this; }
-        cfuture& operator=(cfuture&& f)      noexcept { super::operator=(std::move(f)); return *this; }
-        cfuture& operator=(const cfuture& f) noexcept { super::operator=(f); return *this; }
-        ~cfuture() noexcept // always block if future is still incomplete
+        cfuture(std::future<void>&& f) noexcept : super{std::move(f)} {}
+        cfuture(cfuture&& f)           noexcept : super{std::move(f)} {}
+        cfuture& operator=(std::future<void>&& f) noexcept { super::operator=(std::move(f)); return *this; }
+        cfuture& operator=(cfuture&& f)           noexcept { super::operator=(std::move(f)); return *this; }
+
+        /**
+         * @warning If the future is not waited before destruction, program will std::terminate()
+         */
+        ~cfuture() noexcept
         {
             if (this->valid())
-                this->wait();
+            {
+                // NOTE: This is a fail-fast strategy to catch programming bugs
+                //       and this happens if you forget to await a future before destruction.
+                //       The default behavior of std::future<T> is to silently block in the destructor,
+                //       however in ReCpp we terminate immediately to force the programmer to fix the bug.
+                //       https://stackoverflow.com/questions/23455104/why-is-the-destructor-of-a-future-returned-from-stdasync-blocking
+                __assertion_failure("cfuture<void> was not awaited before destruction");
+                std::terminate(); // always terminate
+            }
         }
 
         /**
@@ -702,9 +637,11 @@ namespace rpp
             });
         }
 
-        void await_resume() const
+        /**
+         * @briefWaits for the final result and will rethrow any exceptions from the cfuture
+         */
+        FINLINE void await_resume()
         {
-            // get() waits for the final result and will rethrow any exceptions from the cfuture
             this->get();
         }
 
@@ -723,7 +660,7 @@ namespace rpp
          */
         struct promise_type : rpp::cpromise<void>
         {
-            rpp::cfuture<void> get_return_object() noexcept { return this->get_future().share(); }
+            rpp::cfuture<void> get_return_object() noexcept { return this->get_future(); }
             RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
             RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
             void return_void() noexcept { this->set_value(); }
@@ -787,72 +724,15 @@ namespace rpp
 
     /** @brief Blocks and gathers the results from all of the futures */
     template<typename T>
-    std::vector<T> get_all(const std::vector<cfuture<T>>& vf)
+    std::vector<T> get_all(std::vector<cfuture<T>>& vf)
     {
         std::vector<T> all;
         all.reserve(vf.size());
-        for (const cfuture<T>& f : vf)
+        for (cfuture<T>& f : vf)
         {
             all.emplace_back(f.get());
         }
         return all;
-    }
-
-    /**
-     * Used to launch multiple parallel Tasks and then gather
-     * the results. It assumes that launcher already started its
-     * own future task, which makes it more flexible.
-     * @code
-     *     std::vector<Result> results = rpp::get_tasks(dataList,
-     *         [&](SomeData& data) {
-     *             return rpp::async_task([&]{
-     *                 return heavyComputation(data);
-     *             };
-     *         });
-     * @endcode
-     */
-    template<typename U, typename Launcher>
-    auto get_tasks(std::vector<U>& items, const Launcher& futureLauncher)
-        -> std::vector< future_type<ret_type<Launcher>> >
-    {
-        using T = future_type<ret_type<Launcher>>;
-        std::vector<cfuture<T>> futures;
-        futures.reserve(items.size());
-
-        for (U& item : items)
-        {
-            futures.emplace_back(futureLauncher(item));
-        }
-
-        return get_all(futures);
-    }
-
-    /**
-     * Used to launch multiple parallel Tasks and then gather
-     * the results. It uses rpp::async_task to launch the futures.
-     * @code
-     *     std::vector<Result> results = rpp::get_async_tasks(dataList,
-     *         [&](SomeData& data) {
-     *             return heavyComputation(data);
-     *         });
-     * @endcode
-     */
-    template<typename U, typename Callback>
-    auto get_async_tasks(std::vector<U>& items, const Callback& futureCallback)
-        -> std::vector< ret_type<Callback> >
-    {
-        using T = ret_type<Callback>;
-        std::vector<cfuture<T>> futures;
-        futures.reserve(items.size());
-
-        for (U& item : items)
-        {
-            futures.emplace_back(rpp::async_task([&] {
-                return futureCallback(item);
-            }));
-        }
-
-        return get_all(futures);
     }
 
     /**

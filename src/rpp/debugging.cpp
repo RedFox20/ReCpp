@@ -1,10 +1,12 @@
 #include "debugging.h"
 #include "timer.h" // rpp::TimePoint
+#include "stack_trace.h"
 
 #include <cstdio>
 #include <cstring>
 #include <cstdlib> // alloca
 #include <mutex>
+
 #if __ANDROID__
 # include <android/log.h>
 #endif
@@ -22,10 +24,15 @@
 # include <unistd.h>
 #endif
 
+#if __GNUC__
+# include <signal.h>
+#endif
+
+
 #ifdef QUIETLOG
-static LogSeverity Filter = LogSeverityWarn;
+    static LogSeverity Filter = LogSeverityWarn;
 #else
-static LogSeverity Filter = LogSeverityInfo;
+    static LogSeverity Filter = LogSeverityInfo;
 #endif
 static LogMessageCallback LogHandler;
 static LogEventCallback EventHandler;
@@ -105,6 +112,26 @@ static void ShortFilePathMessage(char*& ptr, int& len) noexcept
     }
 }
 #endif
+
+RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
+                                        unsigned int line, const char* function)
+{
+    _LogError("%s:%u %s: Assertion failed: %s", file, line, function, message);
+    // show a nice stack trace if possible
+    rpp::print_trace();
+    fflush(stderr);
+
+    // trap into debugger
+    #if __clang__ && __has_builtin(__builtin_debugtrap)
+        __builtin_debugtrap();
+    #elif _MSC_VER
+        __debugbreak();
+    #elif __GNUC__
+        raise(SIGTRAP);
+    #endif
+
+    std::terminate();
+}
 
 // this ensures default output newline is atomic with the rest of the error string
 #define AllocaPrintlineBuf(err, len) \

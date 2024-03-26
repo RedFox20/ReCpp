@@ -275,55 +275,19 @@ TestImpl(test_future)
         AssertThat(continuationCalled, true);
     }
 
-    TestCase(sharing_future_string)
+    TestCase(invalidates_after_get)
     {
         cfuture<std::string> f1 = async_task([] {
             return "future string"s;
         });
-        cfuture<std::string> f2 = f1;  // NOLINT
         AssertThat(f1.get(), "future string"s);
-        AssertThat(f2.get(), "future string"s);
+        AssertThat(f1.valid(), false);
     }
 
-    TestCase(sharing_future_void)
+    TestCase(invalidates_after_get_void)
     {
         cfuture<void> f1 = async_task([] { });
-        cfuture<void> f2 = f1;
         f1.get();
-        f2.get(); // already OK if this doesn't throw exception
-    }
-
-    TestCase(get_tasks_string)
-    {
-        std::vector<std::string> items = {
-            "stringA",
-            "stringB",
-            "stringC"
-        };
-        std::vector<std::string> Tasks = rpp::get_tasks(items, [&](std::string& s) {
-            return rpp::async_task([&] {
-                return "future " + s;
-            });
-        });
-        AssertThat(Tasks.size(), 3u);
-        AssertThat(Tasks[0], "future stringA"s);
-        AssertThat(Tasks[1], "future stringB"s);
-        AssertThat(Tasks[2], "future stringC"s);
-    }
-
-    TestCase(get_async_tasks)
-    {
-        std::vector<std::string> items = {
-            "stringA",
-            "stringB",
-            "stringC"
-        };
-        std::vector<std::string> Tasks = rpp::get_async_tasks(items, [&](std::string& s) {
-            return "future " + s;
-        });
-        AssertThat(Tasks.size(), 3u);
-        AssertThat(Tasks[0], "future stringA"s);
-        AssertThat(Tasks[1], "future stringB"s);
-        AssertThat(Tasks[2], "future stringC"s);
+        AssertThat(f1.valid(), false);
     }
 };
