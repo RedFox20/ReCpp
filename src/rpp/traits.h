@@ -46,12 +46,6 @@ namespace rpp
             using arg_types = std::tuple<Args...>;
         };
 
-        /**
-         * @brief Function/functor return type
-         */
-        template<typename T>
-        using ret_type = typename function_traits<T>::ret_type;
-
         template<typename T>
         using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
     }

@@ -192,6 +192,11 @@ namespace rpp
         return result;
     }
 
+    bool pool_task::wait_check(std::exception_ptr* outErr) noexcept
+    {
+        return wait(duration{0}, std::nothrow, outErr) == wait_result::finished;
+    }
+
     pool_task::wait_result pool_task::kill(int timeoutMillis) noexcept
     {
         if (killed) {

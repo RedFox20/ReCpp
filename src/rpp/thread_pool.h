@@ -170,6 +170,13 @@ namespace rpp
         wait_result wait();
         wait_result wait(std::nothrow_t, std::exception_ptr* outErr = nullptr) noexcept;
 
+        /**
+         * @brief Checks if the task has finished without waiting
+         * @param outErr if the task has finished with an exception, this will be set to the exception
+         * @returns TRUE if the task has finished, FALSE if it's still running
+         */
+        bool wait_check(std::exception_ptr* outErr = nullptr) noexcept;
+
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 

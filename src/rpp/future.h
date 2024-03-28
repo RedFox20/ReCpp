@@ -181,7 +181,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task>
-        cfuture<ret_type<Task>> then(Task&& task) noexcept
+        auto then(Task&& task) noexcept -> cfuture<decltype(task(this->get()))>
         {
             return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 return task(f.get());
@@ -208,8 +208,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task, class ExceptHA>
-        cfuture<ret_type<Task>>
-        then(Task&& task, ExceptHA&& exhA) noexcept
+        auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
@@ -219,8 +218,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB>
-        cfuture<ret_type<Task>>
-        then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -232,8 +230,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        cfuture<ret_type<Task>>
-        then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept
+        auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -247,8 +244,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
-        cfuture<ret_type<Task>>
-        then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept
+        auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -368,7 +364,7 @@ namespace rpp
         /**
          * @returns The result and will rethrow any exceptions from the cfuture
          */
-        [[nodiscard]] FINLINE T await_resume()
+        [[nodiscard]] inline T await_resume()
         {
             return super::get();
         }
@@ -450,8 +446,15 @@ namespace rpp
          */
         cfuture<void> then() noexcept { return { std::move(*this) }; }
 
+        /**
+         * Standard continuation of a void future:
+         * connectToServer(auth).then([=] {
+         *     auto r = sendUserCredentials();
+         *     return getLoginResponse(r);
+         * });
+         */
         template<typename Task>
-        cfuture<ret_type<Task>> then(Task&& task) noexcept
+        auto then(Task&& task) noexcept -> cfuture<decltype(task())>
         {
             return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
@@ -480,7 +483,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task, class ExceptHA>
-        cfuture<ret_type<Task>> then(Task&& task, ExceptHA&& exhA) noexcept
+        auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
@@ -490,8 +493,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB>
-        cfuture<ret_type<Task>>
-        then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -503,8 +505,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        cfuture<ret_type<Task>>
-        then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -518,8 +519,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
-        cfuture<ret_type<Task>>
-        then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept
+        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -640,7 +640,7 @@ namespace rpp
         /**
          * @briefWaits for the final result and will rethrow any exceptions from the cfuture
          */
-        FINLINE void await_resume()
+        inline void await_resume()
         {
             this->get();
         }
@@ -679,7 +679,7 @@ namespace rpp
      * @endcode
      */
     template<typename T>
-    cfuture<void> cfuture<T>::then() noexcept
+    inline cfuture<void> cfuture<T>::then() noexcept
     {
         return rpp::async_task([f=std::move(*this)]() mutable {
             (void)f.get();
@@ -688,7 +688,7 @@ namespace rpp
 
     /** @brief Creates a future<T> which is already completed. Useful for some chaining edge cases. */
     template<typename T>
-    cfuture<T> make_ready_future(T&& value)
+    inline cfuture<T> make_ready_future(T&& value)
     {
         std::promise<T> p;
         p.set_value(std::move(value));
@@ -705,7 +705,7 @@ namespace rpp
 
     /** @brief Creates a future<T> which is already errored with the exception. Useful for some chaining edge cases. */
     template<typename T, typename E>
-    cfuture<T> make_exceptional_future(E&& e)
+    inline cfuture<T> make_exceptional_future(E&& e)
     {
         std::promise<T> p;
         p.set_exception(std::make_exception_ptr(std::forward<E>(e)));
@@ -714,7 +714,7 @@ namespace rpp
 
     /** @brief Given a vector of futures, waits blockingly on all of them to be completed, without getting the values. */
     template<typename T>
-    void wait_all(const std::vector<cfuture<T>>& vf)
+    inline void wait_all(const std::vector<cfuture<T>>& vf)
     {
         for (const cfuture<T>& f : vf)
         {
@@ -724,7 +724,7 @@ namespace rpp
 
     /** @brief Blocks and gathers the results from all of the futures */
     template<typename T>
-    std::vector<T> get_all(std::vector<cfuture<T>>& vf)
+    inline std::vector<T> get_all(std::vector<cfuture<T>>& vf)
     {
         std::vector<T> all;
         all.reserve(vf.size());
@@ -748,7 +748,7 @@ namespace rpp
      * @endcode
      */
     template<typename U, typename Launcher>
-    void run_tasks(std::vector<U>& items, const Launcher& futureLauncher)
+    inline void run_tasks(std::vector<U>& items, const Launcher& futureLauncher)
     {
         std::vector<cfuture<void>> futures;
         futures.reserve(items.size());

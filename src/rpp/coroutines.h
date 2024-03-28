@@ -48,8 +48,7 @@ namespace rpp
     struct functor_awaiter
     {
         rpp::delegate<T()> action;
-        std::conditional_t<std::is_same_v<T, void>, void*, T> result {}; // avoid unused variable warning
-
+        T result {};
         std::exception_ptr ex {};
         rpp::pool_task* poolTask = nullptr;
 
@@ -59,9 +58,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            if (!poolTask) // task hasn't even been created yet!
-                return false;
-            return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
+            return poolTask && poolTask->wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -69,27 +66,49 @@ namespace rpp
             if (poolTask) std::terminate(); // avoid task explosion
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
             {
-                try
-                {
-                    if constexpr (!std::is_same_v<T, void>)
-                        result = std::move(action());
-                    else
-                        action();
-                }
-                catch (...)
-                {
-                    ex = std::current_exception();
-                }
+                try { result = std::move(action()); }
+                catch (...) { ex = std::current_exception(); }
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
         // similar to future<T>, either gets the result T, or throws the caught exception
         T await_resume()
         {
-            if (ex)
-                std::rethrow_exception(ex);
-            if constexpr (!std::is_same_v<T, void>)
-                return std::move(*result);
+            if (ex) std::rethrow_exception(ex);
+            return std::move(result);
+        }
+    };
+
+    template<>
+    struct functor_awaiter<void>
+    {
+        rpp::delegate<void()> action;
+
+        std::exception_ptr ex {};
+        rpp::pool_task* poolTask = nullptr;
+
+        explicit functor_awaiter(rpp::delegate<void()>&& action) noexcept
+            : action{std::move(action)} {}
+
+        // is the task ready?
+        bool await_ready() const noexcept
+        {
+            return poolTask && poolTask->wait_check();
+        }
+        // suspension point that launches the background async task
+        void await_suspend(rpp::coro_handle<> cont) noexcept
+        {
+            if (poolTask) std::terminate(); // avoid task explosion
+            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable {
+                try { action(); }
+                catch (...) { ex = std::current_exception(); }
+                cont.resume(); // call await_resume() and continue on this background thread
+            });
+        }
+        // similar to future<void>, rethrows the caught exception or does nothing
+        void await_resume()
+        {
+            if (ex) std::rethrow_exception(ex);
         }
     };
 
@@ -107,9 +126,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            if (!poolTask) // task hasn't even been created yet!
-                return false;
-            return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
+            return poolTask && poolTask->wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -117,23 +134,17 @@ namespace rpp
             if (poolTask) std::terminate(); // avoid task explosion
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
             {
-                try
-                {
+                try {
                     f = action(); // get the future from the lambda
                     f.wait(); // wait for the nested coroutine to finish (can throw)
-                }
-                catch (...)
-                {
-                    ex = std::current_exception();
-                }
+                } catch (...) { ex = std::current_exception(); }
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
         // similar to future<T>, either gets the result T, or throws the caught exception
         auto await_resume()
         {
-            if (ex)
-                std::rethrow_exception(ex);
+            if (ex) std::rethrow_exception(ex);
             return f.get();
         }
     };
@@ -155,9 +166,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            if (!poolTask) // task hasn't even been created yet!
-                return false;
-            return poolTask->wait(rpp::pool_task::duration{0}) != rpp::pool_task::wait_result::timeout;
+            return poolTask && poolTask->wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -165,22 +174,15 @@ namespace rpp
             if (poolTask) std::terminate(); // avoid task explosion
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
             {
-                try
-                {
-                    f.wait(); // wait for the nested coroutine to finish (can throw)
-                }
-                catch (...)
-                {
-                    ex = std::current_exception();
-                }
+                try { f.wait(); /* wait for the nested coroutine to finish (can throw) */ }
+                catch (...) { ex = std::current_exception(); }
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
         // similar to future<T>, either gets the result T, or throws the caught exception
-        auto await_resume()
+        T await_resume()
         {
-            if (ex)
-                std::rethrow_exception(ex);
+            if (ex) std::rethrow_exception(ex);
             return f.get();
         }
     };
@@ -240,7 +242,8 @@ namespace rpp
          *     string localPath = co_await action;
          * @endcode
          */
-        template<NotFuture T> auto operator co_await(rpp::delegate<T()>&& action) noexcept
+        template<NotFuture T>
+        inline functor_awaiter<T> operator co_await(rpp::delegate<T()>&& action) noexcept
         {
             return functor_awaiter<T>{ std::move(action) };
         }
@@ -257,7 +260,8 @@ namespace rpp
          *     string path = co_await action;
          * @endcode
          */
-        template<IsFuture F> auto operator co_await(rpp::delegate<F()>&& action) noexcept
+        template<IsFuture F>
+        inline functor_awaiter_fut<F> operator co_await(rpp::delegate<F()>&& action) noexcept
         {
             return functor_awaiter_fut<F>{ std::move(action) };
         }
@@ -270,9 +274,10 @@ namespace rpp
          *     co_await [&]{ downloadFile(url); };
          * @endcode
          */
-        template<IsFunctionNotReturningFuture F> auto operator co_await(F&& action) noexcept
+        template<IsFunctionNotReturningFuture F>
+        inline auto operator co_await(F&& action) noexcept -> functor_awaiter<decltype(action())>
         {
-            return functor_awaiter<ret_type<F>>{ std::move(action) };
+            return functor_awaiter<decltype(action())>{ std::move(action) };
         }
 
         /**
@@ -286,32 +291,32 @@ namespace rpp
          *     };
          * @endcode
          */
-        template<IsFunctionReturningFuture FF> auto operator co_await(FF&& action) noexcept
+        template<IsFunctionReturningFuture FF>
+        inline auto operator co_await(FF&& action) noexcept -> functor_awaiter_fut<decltype(action())>
         {
-            using F = decltype(action());
-            return functor_awaiter_fut<F>{ std::move(action) };
+            return functor_awaiter_fut<decltype(action())>{ std::move(action) };
         }
 
         template<typename T>
-        FINLINE constexpr rpp::cfuture<T>& operator co_await(rpp::cfuture<T>& future) noexcept
+        inline rpp::cfuture<T>& operator co_await(rpp::cfuture<T>& future) noexcept
         {
             return future;
         }
 
         template<typename T>
-        FINLINE constexpr rpp::cfuture<T>&& operator co_await(rpp::cfuture<T>&& future) noexcept
+        rpp::cfuture<T>&& operator co_await(rpp::cfuture<T>&& future) noexcept
         {
             return (rpp::cfuture<T>&&)future;
         }
 
         template<typename T>
-        auto operator co_await(std::future<T>& future) noexcept
+        inline std_future_awaiter<T> operator co_await(std::future<T>& future) noexcept
         {
             return std_future_awaiter<T>{ std::move(future) };
         }
 
         template<typename T>
-        auto operator co_await(std::future<T>&& future) noexcept
+        inline std_future_awaiter<T> operator co_await(std::future<T>&& future) noexcept
         {
             return std_future_awaiter<T>{ std::move(future) };
         }
@@ -324,7 +329,7 @@ namespace rpp
          * @endcode
          */
         template<typename Rep, typename Period>
-        auto operator co_await(const std::chrono::duration<Rep, Period>& duration) noexcept
+        inline auto operator co_await(const std::chrono::duration<Rep, Period>& duration) noexcept
         {
             return chrono_awaiter<>{ duration };
         }
