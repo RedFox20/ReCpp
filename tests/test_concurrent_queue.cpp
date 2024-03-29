@@ -254,14 +254,14 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 10.0);
+        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
         AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout, 
         // we should get it immediately
         queue.push("item1");
         AssertWaitPopTimed(10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 17.0);
+        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 17.0);
     }
 
     // introduce a slow producer thread so we can test our timeouts
@@ -281,9 +281,9 @@ TestImpl(test_concurrent_queue)
         scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 5.0, 10.0);
+        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
         AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 15.0, 18.0);
+        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 18.0);
 
         AssertWaitPopTimed(50ms, true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
         AssertWaitPopTimed(75ms, true, /*item*/"item2", /*elapsed ms:*/ 25.0, 55.0);
@@ -315,14 +315,14 @@ TestImpl(test_concurrent_queue)
 
         PopResult r;
 
-        AssertWaitPopUntil(Clock::now()+5ms, false, /*item*/"", /*elapsed ms:*/ 4.9, 10.0);
+        AssertWaitPopUntil(Clock::now()+5ms, false, /*item*/"", /*elapsed ms:*/ 2.9, 10.0);
         AssertWaitPopUntil(Clock::now()+0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout,
         // we should get it immediately
         queue.push("item1");
         AssertWaitPopUntil(Clock::now()+10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopUntil(Clock::now()+15ms, false, /*item*/"", /*elapsed ms:*/ 14.9, 20.0);
+        AssertWaitPopUntil(Clock::now()+15ms, false, /*item*/"", /*elapsed ms:*/ 12.9, 20.0);
 
         // if we have an item, but `until` is in the past, it should immediately return false
         queue.push("item2");

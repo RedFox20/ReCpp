@@ -9,9 +9,13 @@
  * Copyright (c) 2023, Jorma Rebane
  * Distributed under MIT Software License
  */
-#if _MSC_VER
+#if USE_RPP_CONDITION_VARIABLE
 #define WIN32_LEAN_AND_MEAN 1
 #include <Windows.h>
+#include <realtimeapiset.h>
+#include <timeapi.h>
+#pragma comment(lib, "Winmm.lib") // MM time library
+#pragma comment(lib, "Mincore.lib")
 
 namespace rpp
 {
@@ -19,6 +23,7 @@ namespace rpp
     //                    which will show false positive test failures; always disable this before testing
     #define DEBUG_CVAR 0
     #define USE_SRWLOCK 0
+    #define USE_WAITABLE_EVENTS 0
 
     #if DEBUG_CVAR
         #define IN_CVAR_DEBUG(expr) expr
@@ -60,20 +65,46 @@ namespace rpp
     condition_variable::condition_variable() noexcept
     {
         mtx = std::make_shared<mutex_type>();
+    #if USE_WAITABLE_EVENTS
+        handle.impl = CreateEventA(nullptr, /*manual reset*/false, /*initial state*/false, nullptr);
+    #else
         // Win32 COND VARS are allocated once and never deleted
         InitializeConditionVariable(CONDVAR(handle));
+    #endif
     }
 
-    condition_variable::~condition_variable() noexcept = default;
+    condition_variable::~condition_variable() noexcept
+    {
+    #if USE_WAITABLE_EVENTS
+        if (handle.impl)
+        {
+            CloseHandle(handle.impl);
+            handle.impl = nullptr;
+        }
+    #endif
+        if (timer)
+        {
+            CloseHandle(timer);
+            timer = nullptr;
+        }
+    }
 
     void condition_variable::notify_one() noexcept
     {
+    #if USE_WAITABLE_EVENTS
+        SetEvent(handle.impl);
+    #else
         WakeConditionVariable(CONDVAR(handle));
+    #endif
     }
 
     void condition_variable::notify_all() noexcept
     {
+    #if USE_WAITABLE_EVENTS
+        SetEvent(handle.impl);
+    #else
         WakeAllConditionVariable(CONDVAR(handle));
+    #endif
     }
 
     void condition_variable::_lock(mutex_type* m) noexcept
@@ -88,13 +119,26 @@ namespace rpp
 
     bool condition_variable::_is_signaled(mutex_type* m) noexcept
     {
+        // gets current state and resets the event
+    #if USE_WAITABLE_EVENTS
+        return WaitForSingleObject(handle.impl, 0) == WAIT_OBJECT_0;
+    #else
         BOOL result = IN_CSLOCK(SleepConditionVariableCS(CONDVAR(handle), m, 0))
                       IN_SRWLOCK(SleepConditionVariableSRW(CONDVAR(handle), m, 0, 0));
         return result;
+    #endif
     }
 
     std::cv_status condition_variable::_wait_suspended_unlocked(mutex_type* m, unsigned long timeoutMs) noexcept
     {
+    #if USE_WAITABLE_EVENTS
+        m->unlock();
+        std::cv_status status = std::cv_status::timeout;
+        if (WaitForSingleObject(handle.impl, timeoutMs) == WAIT_OBJECT_0)
+            status = std::cv_status::no_timeout;
+        m->lock();
+        return status;
+    #else
         BOOL result = IN_CSLOCK(SleepConditionVariableCS(CONDVAR(handle), m, timeoutMs))
                       IN_SRWLOCK(SleepConditionVariableSRW(CONDVAR(handle), m, timeoutMs, 0));
         if (!result)
@@ -105,74 +149,60 @@ namespace rpp
                 return std::cv_status::timeout;
         }
         return std::cv_status::no_timeout;
+    #endif
     }
-
-    IN_CVAR_DEBUG(inline double to_ms(const condition_variable::duration& dur) noexcept
-                  { return std::chrono::duration<double>{dur}.count() * 1000; })
 
     // NOTE: the granularity of WinAPI SleepConditionVariable is ~15.6ms
     //       which is the default scheduling rate on Windows systems, and windows is not a realtime OS
+    //       This method attempts to use a multimedia timer to achieve higher precision sleeps
     std::cv_status condition_variable::_wait_for_unlocked(mutex_type* m, const duration& rel_time) noexcept
     {
+        // -- mutex m is acquired --
+        if (_is_signaled(m))
+            return std::cv_status::no_timeout;
+
+        const int64_t wait_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(rel_time).count();
+        if (wait_nanos <= 0)
+            return std::cv_status::timeout;
+
+        MMRESULT mmStatus = timeBeginPeriod(1);
+
+    #if USE_WAITABLE_EVENTS
+        if (!timer) timer = CreateWaitableTimer(nullptr, /*manual reset*/true, nullptr);
+
+        LARGE_INTEGER dueTime;
+        dueTime.QuadPart = -(wait_nanos / 100); // negative means relative time
+        SetWaitableTimer(timer, &dueTime, 0, nullptr, nullptr, 0);
+
+        // the order is important here, if both events are signaled, the lowest index is returned
+        HANDLE handles[2] = { handle.impl, timer  };
         std::cv_status status = std::cv_status::timeout;
 
-        // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
-        constexpr duration suspendThreshold = std::chrono::milliseconds{16};
-        constexpr duration periodThreshold = std::chrono::milliseconds{2};
-        constexpr duration zero = duration{0};
+        int wait_ms = static_cast<int>(wait_nanos / 1'000'000);
+        m->unlock();
+        int r = WaitForMultipleObjects(2, handles, /*wait all*/false, wait_ms);
+        m->lock();
 
-        duration dur = rel_time;
-        time_point endTime = clock::now() + dur;
-
-        if (dur > suspendThreshold)
+        if (r == WAIT_OBJECT_0) // event signaled 
         {
-            // we need to measure exact suspend start time in case we timed out
-            // because the suspension timeout is not accurate at all
-            time_point suspendStart = clock::now();
+            status = std::cv_status::no_timeout;
+            IN_CVAR_DEBUG(printf("condvar: event signaled\n"));
+        }
+        else if (r == WAIT_OBJECT_0 + 1) // timeout timer signaled, check the state
+        {
+            status = std::cv_status::timeout;
+            IN_CVAR_DEBUG(printf("condvar: timeout timer, status=%d\n", status));
+        }
+    #else
+        int wait_ms = static_cast<int>(wait_nanos / 1'000'000);
+        std::cv_status status = _wait_suspended_unlocked(m, static_cast<DWORD>(wait_ms));
+    #endif
 
-            int64_t timeout = std::chrono::duration_cast<std::chrono::milliseconds>(dur - suspendThreshold).count();
-            if (timeout < 0) timeout = 0;
-
-            status = _wait_suspended_unlocked(m, static_cast<DWORD>(timeout));
-            if (status == std::cv_status::timeout)
-                dur = endTime - clock::now();
-
-            IN_CVAR_DEBUG(duration totalElapsed = (clock::now() - suspendStart);
-                          printf("suspended wait %p dur=%.2fms elapsed: %.2fms %s\n",
-                                  CONDVAR(handle), to_ms(rel_time), to_ms(totalElapsed),
-                                  status == std::cv_status::no_timeout ? "SIGNALED" : "timeout"));
-            if (dur <= zero)
-                return status;
+        if (mmStatus == TIMERR_NOERROR)
+        {
+            timeEndPeriod(1);
         }
 
-        // spin loop is required because timeout is too short, or suspended wait timed out
-        if (status == std::cv_status::timeout)
-        {
-            duration remaining = dur;
-            IN_CVAR_DEBUG(time_point spinStart = clock::now());
-
-            // always enter the loop at least once, in case this is a 0-timeout condition check
-            do
-            {
-                if (_is_signaled(m))
-                {
-                    status = std::cv_status::no_timeout;
-                    break;
-                }
-
-                // on low-cpu count systems, SleepEx can lock us out for an indefinite period,
-                // so we're using yield for precision sleep here
-                YieldProcessor();
-
-                remaining = endTime - clock::now();
-            }
-            while (remaining > zero);
-
-            IN_CVAR_DEBUG(duration totalElapsed = (clock::now() - spinStart);
-                          printf("spinwait %p spin=%.2fms elapsed: %.2fms %s\n",
-                                  CONDVAR(handle), to_ms(dur), to_ms(totalElapsed),
-                                  status == std::cv_status::no_timeout ? "SIGNALED" : "timeout"));
-        }
         return status;
     }
 

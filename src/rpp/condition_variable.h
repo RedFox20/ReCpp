@@ -19,7 +19,10 @@
 
 namespace rpp
 {
-#if !_MSC_VER
+
+#define USE_RPP_CONDITION_VARIABLE 1
+
+#if !USE_RPP_CONDITION_VARIABLE || !_MSC_VER
 
     // for non-windows platforms use the standard condition variable
     using condition_variable = std::condition_variable;
@@ -70,6 +73,7 @@ namespace rpp
 
         std::shared_ptr<mutex_type> mtx;
         struct { native_handle_type impl; } handle { nullptr };
+        native_handle_type timer = nullptr; // for high-precision waits
 
     public:
         condition_variable() noexcept;
