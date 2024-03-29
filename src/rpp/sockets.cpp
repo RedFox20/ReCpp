@@ -1706,6 +1706,11 @@ namespace rpp
 
     socket socket::accept(int timeoutMillis) const noexcept
     {
+        if (!good())
+        {
+            LogError("Cannot use socket::accept() on closed sockets");
+            return {};
+        }
         if (type() != socket_type::ST_Stream)
         {
             LogError("Cannot use socket::accept() on non-TCP sockets, use recvfrom instead");
@@ -1827,7 +1832,7 @@ namespace rpp
 
     socket make_udp_randomport(socket_option opt) noexcept
     {
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 100; ++i) {
             int port = (rand() % (65536 - 8000));
             if (socket s = socket::make_udp({AF_IPv4, port}, opt))
                 return s;
@@ -1837,7 +1842,7 @@ namespace rpp
 
     socket make_tcp_randomport(socket_option opt) noexcept
     {
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 100; ++i) {
             int port = (rand() % (65536 - 8000));
             if (socket s = socket::listen_to({AF_IPv4, port}, IPP_TCP, opt))
                 return s;

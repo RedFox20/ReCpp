@@ -1048,6 +1048,9 @@ namespace rpp
         /**
          * @brief Calls poll() or WSAPoll() on this socket
          * This is faster than select()
+         * @warning After calling poll(), you MUST read all available data from the socket
+         *          before calling poll again.
+         *          poll() will only react if there is NEW data available
          * @param timeoutMillis Timeout in milliseconds to suspend until the socket is signaled
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
