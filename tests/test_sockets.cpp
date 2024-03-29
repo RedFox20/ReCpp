@@ -571,7 +571,7 @@ TestImpl(test_sockets)
         });
 
         rpp::Timer t;
-        char buffer[rpp::max(2048, MSG_SIZE)];
+        char buffer[4096];
         int num_received = 0;
         while (num_received < NUM_MESSAGES && t.elapsed_ms() < 5000)
         {
@@ -618,7 +618,7 @@ TestImpl(test_sockets)
         });
 
         rpp::Timer t;
-        char buffer[rpp::max(2048, MSG_SIZE)];
+        char buffer[4096];
         int num_received1 = 0;
         int num_received2 = 0;
         std::vector<socket*> sockets = { &recv1, &recv2 };
@@ -672,7 +672,7 @@ TestImpl(test_sockets)
         });
         auto receiver = rpp::async_task([&]()
         {
-            char buffer[rpp::max(2048, MSG_SIZE)];
+            char buffer[4096];
             int num_received = 0;
             while (num_received < NUM_MESSAGES && t.elapsed_ms() < 5000)
             {
