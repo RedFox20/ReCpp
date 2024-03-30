@@ -195,6 +195,7 @@ namespace rpp
         }
     #else
         int wait_ms = static_cast<int>(wait_nanos / 1'000'000);
+        if (wait_ms <= 0) wait_ms = 1;
         std::cv_status status = _wait_suspended_unlocked(m, static_cast<DWORD>(wait_ms));
     #endif
 

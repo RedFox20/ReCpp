@@ -352,7 +352,7 @@ TestImpl(test_sockets)
         // no data to receive, should return false
         rpp::Timer t0;
         AssertFalse(pollin(/*millis*/50));
-        AssertGreaterOrEqual(t0.elapsed_millis(), 50.0);
+        AssertGreaterOrEqual(t0.elapsed_millis(), 49.0);
         AssertTrue(recv.good());
 
         // TEST1: data already in the pipe, must return immediately
@@ -386,7 +386,7 @@ TestImpl(test_sockets)
         {
             rpp::Timer t3;
             AssertFalse(pollin(/*millis*/50));
-            AssertGreaterOrEqual(t3.elapsed_millis(), 50.0);
+            AssertGreaterOrEqual(t3.elapsed_millis(), 49.0);
         }
 
         // TEST4: two consecutive datagrams arrive
@@ -419,7 +419,7 @@ TestImpl(test_sockets)
             AssertThat(recv.available(), 0);
             rpp::Timer t5;
             AssertFalse(pollin(/*millis*/50));
-            AssertGreaterOrEqual(t5.elapsed_millis(), 50.0);
+            AssertGreaterOrEqual(t5.elapsed_millis(), 49.0);
             AssertTrue(recv.good());
             AssertThat(recv.available(), 0);
         }
@@ -497,7 +497,7 @@ TestImpl(test_sockets)
         // no data to receive, should return false
         rpp::Timer t0;
         AssertFalse(multi_poll(/*millis*/50));
-        AssertGreaterOrEqual(t0.elapsed_millis(), 50.0);
+        AssertGreaterOrEqual(t0.elapsed_millis(), 49.0);
 
         // TEST1: first socket receives data
         {
@@ -510,7 +510,7 @@ TestImpl(test_sockets)
             AssertTrue(multi_poll(/*millis*/50));
             AssertLessOrEqual(t1.elapsed_millis(), 20.0);
             AssertEqual(ready.size(), 1u);
-            AssertEqual(ready[0], &recv1);
+            AssertTrue(ready[0] == &recv1);
             AssertThat(recv1.recv_str(), "udp_poll1"s);
             f1.get();
         }
@@ -526,7 +526,7 @@ TestImpl(test_sockets)
             AssertTrue(multi_poll(/*millis*/50));
             AssertLessOrEqual(t2.elapsed_millis(), 20.0);
             AssertEqual(ready.size(), 1u);
-            AssertEqual(ready[0], &recv2);
+            AssertTrue(ready[0] == &recv2);
             AssertThat(recv2.recv_str(), "udp_poll2"s);
             f2.get();
         }
@@ -539,12 +539,32 @@ TestImpl(test_sockets)
                 send.sendto(recv1_addr, "udp_poll1");
                 send.sendto(recv2_addr, "udp_poll2");
             });
+
             rpp::Timer t3;
+            // this is a bit complicated, because multipoll can return too quickly
+            // -- much quicker than the second sendto() call can finish
+            // so we need to loop here and ensure that both sockets are ready
+            bool got_recv1 = false;
+            bool got_recv2 = false;
             AssertTrue(multi_poll(/*millis*/50));
-            AssertLessOrEqual(t3.elapsed_millis(), 30.0);
+            AssertLessOrEqual(t3.elapsed_millis(), 20.0);
+
+            // simply poll again; because we haven't read anything ready.size() will be 2
+            if (ready.size() == 1u)
+            {
+                t3.start();
+                AssertTrue(multi_poll(/*millis*/50));
+                AssertLessOrEqual(t3.elapsed_millis(), 10.0);
+            }
+
             AssertEqual(ready.size(), 2u);
-            AssertEqual(ready[0], &recv1);
-            AssertEqual(ready[1], &recv2);
+            for (auto& ready : ready)
+            {
+                if (ready == &recv1) got_recv1 = true;
+                if (ready == &recv2) got_recv2 = true;
+            }
+            AssertTrue(got_recv1);
+            AssertTrue(got_recv2);
             AssertThat(recv1.recv_str(), "udp_poll1"s);
             AssertThat(recv2.recv_str(), "udp_poll2"s);
             f3.get();

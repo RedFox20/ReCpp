@@ -27,30 +27,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 #if _WIN32
-    static void periodSleep(MMRESULT& status, DWORD milliseconds)
-    {
-        if (status == -1)
-        {
-            status = timeBeginPeriod(1); // set 1ms precision
-        }
-        constexpr int64 mmTicksToMillis = 10000; // 1 tick = 100nsec
-        LARGE_INTEGER dueTime;
-        dueTime.QuadPart = int64(milliseconds) * -mmTicksToMillis;
-
-        if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
-            SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
-        {
-            WaitForSingleObject(hTimer, INFINITE);
-            CloseHandle(hTimer);
-        }
-        else
-        {
-            SleepEx(milliseconds, /*alertable*/TRUE);
-        }
-    }
-    // win32 Sleep can be extremely inaccurate because the OS scheduler accuracy is 15.6ms by default
-    // to work around that issue, most of the sleep can be done in one big sleep, and the remainder
-    // can be spin looped with a Sleep(0) for yielding
+    // uses multimedia timer API-s to sleep more accurately
     static void win32_sleep_ns(uint64 nanos)
     {
         if (nanos == 0)
@@ -60,38 +37,21 @@ namespace rpp
             return;
         }
 
-        // we need to measure exact suspend start time in case we timed out
-        // because the suspension timeout is not accurate at all
-        TimePoint start = TimePoint::now();
+        MMRESULT timeBeginStatus = timeBeginPeriod(1); // set 1ms precision
+        LARGE_INTEGER dueTime;
+        dueTime.QuadPart = -int64(nanos / 100);
 
-        // for long waits, we first do a long suspended sleep, minus the windows timer tick rate
-        static const Duration suspendThreshold = Duration::from_millis(16);
-        static const Duration periodThreshold = Duration::from_millis(2);
-
-        MMRESULT timeBeginStatus = -1;
-
-        // convert nanos to time_now() resolution:
-        TimePoint endTime = start + Duration::from_nanos(nanos);;
-        Duration remaining = (endTime - TimePoint::now());
-        while (remaining > Duration::zero())
+        if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL))
         {
-            // suspended sleep, it's quite difficult to get this accurate on Windows compared to other OS's
-            if (remaining > suspendThreshold)
-            {
-                periodSleep(timeBeginStatus, 5);
-            }
-            else if (remaining > periodThreshold)
-            {
-                periodSleep(timeBeginStatus, 1/*ms*/);
-            }
-            else // spin loop is required because timeout is too short
-            {
-                // on low-cpu count systems, SleepEx can lock us out for an indefinite period,
-                // so we're using yield for precision sleep here
-                YieldProcessor();
-            }
-
-            remaining = endTime - TimePoint::now();
+            if (SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
+                WaitForSingleObject(hTimer, INFINITE);
+            else
+                SleepEx(static_cast<int>(nanos / 1'000'000), /*alertable*/TRUE);
+            CloseHandle(hTimer);
+        }
+        else
+        {
+            SleepEx(static_cast<int>(nanos / 1'000'000), /*alertable*/TRUE);
         }
 
         if (timeBeginStatus == TIMERR_NOERROR)
