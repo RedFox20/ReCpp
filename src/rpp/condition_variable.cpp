@@ -9,7 +9,7 @@
  * Copyright (c) 2023, Jorma Rebane
  * Distributed under MIT Software License
  */
-#if USE_RPP_CONDITION_VARIABLE
+#if _MSC_VER
 #define WIN32_LEAN_AND_MEAN 1
 #include <Windows.h>
 #include <realtimeapiset.h>

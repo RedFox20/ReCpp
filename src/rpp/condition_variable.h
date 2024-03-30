@@ -20,9 +20,7 @@
 namespace rpp
 {
 
-#define USE_RPP_CONDITION_VARIABLE 1
-
-#if !USE_RPP_CONDITION_VARIABLE || !_MSC_VER
+#if !_MSC_VER
 
     // for non-windows platforms use the standard condition variable
     using condition_variable = std::condition_variable;
