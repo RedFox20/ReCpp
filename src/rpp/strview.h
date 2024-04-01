@@ -73,6 +73,7 @@ namespace rpp
 
     // This is same as memchr, but optimized for very small control strings
     RPPAPI bool strcontains(const char* str, int len, char ch) noexcept;
+    RPPAPI bool strcontainsi(const char* str, int len, char ch) noexcept;
     /**
      * @note Same as strpbrk, except we're not dealing with 0-term strings
      * @note This function is optimized for 4-8 char str and 3-4 char control.
@@ -408,6 +409,12 @@ namespace rpp
         FINLINE bool contains(char c) const noexcept { return memchr(str, c, (size_t)len) != nullptr; }
         /** @return TRUE if the strview contains this string */
         FINLINE bool contains(const strview& s) const noexcept { return find(s) != nullptr; }
+
+        /** @return TRUE if the strview contains this char (ignoring case) */
+        FINLINE bool containsi(char c) const noexcept { return strcontainsi(str, len, c); }
+        /** @return TRUE if the strview contains this string (ignoring case) */
+        FINLINE bool containsi(const strview& s) const noexcept { return find_icase(s) != nullptr; }
+
         /** @return TRUE if the strview contains any of the chars */
         NOINLINE bool contains_any(const char* chars, int nchars) const noexcept {
             return strcontains(str, len, chars, nchars) != nullptr;
@@ -420,6 +427,7 @@ namespace rpp
         FINLINE const char* find(char c) const noexcept {
             return (const char*)memchr(str, c, (size_t)len);
         }
+
         /** @return Pointer to start of substring if found, NULL otherwise */
         NOINLINE const char* find(const char* substr, int sublen) const noexcept;
         FINLINE const char* find(const strview& substr) const noexcept { 
@@ -429,6 +437,11 @@ namespace rpp
             return find(substr, N - 1); 
         }
 
+        /** @return Pointer to start of substring (ignoring case), NULL otherwise */
+        NOINLINE const char* find_icase(const char* substr, int sublen) const noexcept;
+        FINLINE const char* find_icase(const strview& substr) const noexcept { 
+            return find_icase(substr.str, substr.len); 
+        }
 
         strview find_sv(const strview& substr) const noexcept {
             const char* s = find(substr);

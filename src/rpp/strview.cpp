@@ -25,6 +25,14 @@ namespace rpp
         for (int i = 0; i < len; ++i) if (str[i] == ch) return true; // found it.
         return false;
     }
+    bool strcontainsi(const char* str, int len, char ch) noexcept {
+        for (int i = 0; i < len; ++i) if (::toupper(str[i]) == ::toupper(ch)) return true; // found it.
+        return false;
+    }
+    const char* strfindi(const char* str, int len, char ch) noexcept {
+        for (int i = 0; i < len; ++i) if (::toupper(str[i]) == ::toupper(ch)) return &str[i]; // found it.
+        return nullptr;
+    }
     /**
      * @note Same as strpbrk, except we're not dealing with 0-term strings
      * @note This function is optimized for 4-8 char str and 3-4 char control.
@@ -198,6 +206,29 @@ namespace rpp
 
                 size_t haylen = hayend - haystr;
                 if (haylen >= n && memcmp(haystr, needle, n) == 0)
+                    return haystr; // it's a match
+                ++haystr; // no match, reset search from next char
+            }
+        }
+        return nullptr;
+    }
+
+    const char* strview::find_icase(const char* substr, int sublen) const noexcept
+    {
+        if (size_t n = sublen) //// @note lots of micro-optimization here
+        {
+            const char* needle = substr;
+            const char* haystr = str;
+            const char* hayend = haystr + len;
+            int firstChar = *needle;
+            while (haystr < hayend)
+            {
+                haystr = static_cast<const char*>(strfindi(haystr, hayend - haystr, firstChar));
+                if (!haystr) 
+                    return nullptr; // definitely not found
+
+                size_t haylen = hayend - haystr;
+                if (haylen >= n && strequalsi(haystr, needle, n))
                     return haystr; // it's a match
                 ++haystr; // no match, reset search from next char
             }
