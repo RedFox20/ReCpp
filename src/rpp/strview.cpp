@@ -215,7 +215,7 @@ namespace rpp
 
     const char* strview::find_icase(const char* substr, int sublen) const noexcept
     {
-        if (size_t n = sublen) //// @note lots of micro-optimization here
+        if (sublen) //// @note lots of micro-optimization here
         {
             const char* needle = substr;
             const char* haystr = str;
@@ -223,12 +223,12 @@ namespace rpp
             int firstChar = *needle;
             while (haystr < hayend)
             {
-                haystr = static_cast<const char*>(strfindi(haystr, hayend - haystr, firstChar));
+                haystr = static_cast<const char*>(strfindi(haystr, int(hayend - haystr), firstChar));
                 if (!haystr) 
                     return nullptr; // definitely not found
 
-                size_t haylen = hayend - haystr;
-                if (haylen >= n && strequalsi(haystr, needle, n))
+                int haylen = hayend - haystr;
+                if (haylen >= sublen && strequalsi(haystr, needle, sublen))
                     return haystr; // it's a match
                 ++haystr; // no match, reset search from next char
             }
