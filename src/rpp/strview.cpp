@@ -228,7 +228,7 @@ namespace rpp
                     return nullptr; // definitely not found
 
                 size_t haylen = hayend - haystr;
-                if (haylen >= sublen && strequalsi(haystr, needle, int(n)))
+                if (haylen >= n && strequalsi(haystr, needle, int(n)))
                     return haystr; // it's a match
                 ++haystr; // no match, reset search from next char
             }
