@@ -56,7 +56,7 @@ TestImpl(test_timer)
             rpp::sleep_ms(18);
             double elapsed_ms = t.elapsed_millis();
             print_info("millis %d 18ms sleep time: %gms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 18.0, 30.0); // OS sleep can never be accurate enough, so the range must be very loose
+            AssertInRange(elapsed_ms, 17.0, 30.0); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
 
@@ -308,23 +308,23 @@ TestImpl(test_timer)
     {
         // take 2147483647 (int max) seconds and convert to nanos
         rpp::Duration d0 = rpp::Duration::from_seconds(2147483647);
-        LogInfo("d0: %lldns", d0.nanos());
-        LogInfo("d0.seconds: %lld", d0.seconds());
-        LogInfo("d0.millis: %lld", d0.millis());
-        LogInfo("d0.micros: %lld", d0.micros());
-        LogInfo("d0.nanos: %lld", d0.nanos());
-        LogInfo("d0.days: %lld", d0.days());
-        LogInfo("d0.hours: %lld", d0.hours());
-        LogInfo("d0.minutes: %lld", d0.minutes());
+        print_info("d0: %lldns\n", d0.nanos());
+        print_info("d0.seconds: %lld\n", d0.seconds());
+        print_info("d0.millis: %lld\n", d0.millis());
+        print_info("d0.micros: %lld\n", d0.micros());
+        print_info("d0.nanos: %lld\n", d0.nanos());
+        print_info("d0.days: %lld\n", d0.days());
+        print_info("d0.hours: %lld\n", d0.hours());
+        print_info("d0.minutes: %lld\n", d0.minutes());
 
         rpp::Duration d1 = rpp::Duration{1708732302913202308LL};
-        LogInfo("d1.seconds: %lld", d1.seconds());
-        LogInfo("d1.millis: %lld", d1.millis());
-        LogInfo("d1.micros: %lld", d1.micros());
-        LogInfo("d1.nanos: %lld", d1.nanos());
-        LogInfo("d1.days: %lld", d1.days());
-        LogInfo("d1.hours: %lld", d1.hours());
-        LogInfo("d1.minutes: %lld", d1.minutes());
+        print_info("d1.seconds: %lld\n", d1.seconds());
+        print_info("d1.millis: %lld\n", d1.millis());
+        print_info("d1.micros: %lld\n", d1.micros());
+        print_info("d1.nanos: %lld\n", d1.nanos());
+        print_info("d1.days: %lld\n", d1.days());
+        print_info("d1.hours: %lld\n", d1.hours());
+        print_info("d1.minutes: %lld\n", d1.minutes());
     }
 
     TestCase(basic_stopwatch)

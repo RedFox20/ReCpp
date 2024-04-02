@@ -550,14 +550,16 @@ TestImpl(test_sockets)
             AssertLessOrEqual(t3.elapsed_millis(), 20.0);
 
             // simply poll again; because we haven't read anything ready.size() will be 2
-            if (ready.size() == 1u)
+            size_t ready_size = ready.size();
+            if (ready_size == 1u)
             {
                 t3.start();
                 AssertTrue(multi_poll(/*millis*/50));
+                ready_size = ready.size();
                 AssertLessOrEqual(t3.elapsed_millis(), 10.0);
             }
 
-            AssertEqual(ready.size(), 2u);
+            AssertEqual(ready_size, 2u);
             for (auto& ready : ready)
             {
                 if (ready == &recv1) got_recv1 = true;

@@ -28,8 +28,9 @@ namespace rpp
     static constexpr int64 NANOS_PER_SEC  = 1'000'000'000LL;
     static constexpr int64 NANOS_PER_MILLI = 1'000'000LL;
     static constexpr int64 NANOS_PER_MICRO = 1'000LL;
-    static constexpr int64 NANOS_PER_DAY = 86'400'000'000'000LL;
-    static constexpr int64 NANOS_PER_HOUR = 3'600'000'000'000LL;
+    static constexpr int64 NANOS_PER_YEAR   = 31'557'600'000'000'000LL;
+    static constexpr int64 NANOS_PER_DAY    = 86'400'000'000'000LL;
+    static constexpr int64 NANOS_PER_HOUR   = 3'600'000'000'000LL;
     static constexpr int64 NANOS_PER_MINUTE = 60'000'000'000LL;
 
     /**
@@ -90,9 +91,11 @@ namespace rpp
         constexpr int64 micros() const noexcept { return nsec / NANOS_PER_MICRO; }
         /**
          * @returns TOTAL int64 nanoseconds (positive or negative) of this Duration
-         * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is 292,471 years)
+         * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is ~292 years)
          */
         constexpr int64 nanos() const noexcept { return nsec; }
+        
+        static constexpr int SECONDS_PER_YEAR = 31'557'600;
 
         /**
          * @returns TOTAL int64 days of this Duration
@@ -182,8 +185,8 @@ namespace rpp
         Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
 
         /** @brief Converts this Duration into a string */
-        int to_string(char* buf, int bufsize) const noexcept { return duration.to_string(buf, bufsize); }
-        std::string to_string() const noexcept { return duration.to_string(); }
+        int to_string(char* buf, int bufsize) const noexcept;
+        std::string to_string() const noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

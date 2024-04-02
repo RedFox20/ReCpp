@@ -110,39 +110,161 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static int time_to_string(int64 ns, char* buf, int bufsize) noexcept
+    static int duration_to_string(int64 ns, char* buf, int bufsize) noexcept
     {
-        using rpp::int64;
-        int len = 0;
+        if (bufsize < 25)
+            return 0; // won't fit
 
+        char* end = buf;
         if (ns < 0)
         {
             ns = -ns;
-            buf[len++] = '-';
+            *end++ = '-';
         }
 
-        // NOTE: this is not accurate for leap years, but we don't want to display them anyway
-        constexpr int64 NANOS_PER_YEAR = 365LL * rpp::NANOS_PER_DAY;
-        int64 years   = (ns / NANOS_PER_YEAR);        ns -= years * NANOS_PER_YEAR;
-        int64 days    = (ns / rpp::NANOS_PER_DAY);    ns -= days * rpp::NANOS_PER_DAY;
-        int64 hours   = (ns / rpp::NANOS_PER_HOUR);   ns -= hours * rpp::NANOS_PER_HOUR;
-        int64 minutes = (ns / rpp::NANOS_PER_MINUTE); ns -= minutes * rpp::NANOS_PER_MINUTE;
-        int64 seconds = (ns / rpp::NANOS_PER_SEC);    ns -= seconds * rpp::NANOS_PER_SEC;
-        int64 millis  = (ns / rpp::NANOS_PER_MILLI);
+        if (ns >= NANOS_PER_YEAR)
+        {
+            int years = int(ns / NANOS_PER_YEAR);
+            ns -= years * NANOS_PER_YEAR;
 
-        len += snprintf(buf+len, bufsize-len, "%02lld:%02lld:%02lld.%03lldms",
-                        hours, minutes, seconds, millis);
-        return len;
+            *end++ = (years / 1000) + '0';
+            *end++ = ((years / 100) % 10) + '0';
+            *end++ = ((years / 10) % 10) + '0';
+            *end++ = (years % 10) + '0';
+            *end++ = 'y';
+            *end++ = '-';
+        }
+
+        if (ns >= NANOS_PER_DAY)
+        {
+            int days = int(ns / NANOS_PER_DAY);
+            ns -= days * NANOS_PER_DAY;
+
+            *end++ = (days / 100) + '0';
+            *end++ = ((days / 10) % 10) + '0';
+            *end++ = (days % 10) + '0';
+            *end++ = 'd';
+            *end++ = ' ';
+        }
+
+        int hours = int(ns / NANOS_PER_HOUR);
+        ns -= hours * NANOS_PER_HOUR;
+        *end++ = (hours / 10) + '0';
+        *end++ = (hours % 10) + '0';
+        *end++ = ':';
+
+        int minutes = int(ns / NANOS_PER_MINUTE);
+        ns -= minutes * NANOS_PER_MINUTE;
+        *end++ = (minutes / 10) + '0';
+        *end++ = (minutes % 10) + '0';
+        *end++ = ':';
+
+        int seconds = int(ns / NANOS_PER_SEC);
+        ns -= seconds * NANOS_PER_SEC;
+        *end++ = (seconds / 10) + '0';
+        *end++ = (seconds % 10) + '0';
+        *end++ = '.';
+
+        int millis = int(ns / NANOS_PER_MILLI);
+        *end++ = ((millis / 100) % 10) + '0';
+        *end++ = ((millis / 10) % 10) + '0';
+        *end++ = (millis % 10) + '0';
+        *end = '\0';
+        return int(end - buf);
     }
+
     int Duration::to_string(char* buf, int bufsize) const noexcept
     {
-        return time_to_string(nanos(), buf, bufsize);
+        return duration_to_string(nanos(), buf, bufsize);
     }
+
     std::string Duration::to_string() const noexcept
     {
-        char buf[128];
-        int len = time_to_string(nanos(), buf, sizeof(buf));
-        return {buf,buf+len};
+        char buf[64];
+        int len = duration_to_string(nanos(), buf, sizeof(buf));
+        return {buf, buf+len};
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    // YYYY-MM-DD HH:MM:SS.mmm
+    static int datetime_to_string(int64 ns, char* buf, int bufsize) noexcept
+    {
+        if (bufsize < 28)
+            return 0; // won't fit
+
+        // for datetime we must use the same OS functions that we use for TimePoint::now()
+        // in order to get the accurate system time as a string
+    #if _WIN32
+        // for windows we used GetSystemTimePreciseAsFileTime(&filetime);
+        // which gives us the current time in 100ns ticks since 1601-01-01
+        // we can convert this to a string using FileTimeToSystemTime
+        ULARGE_INTEGER time; time.QuadPart = ns / 100LL;
+        FILETIME time_as_filetime;
+        time_as_filetime.dwLowDateTime = time.LowPart;
+        time_as_filetime.dwHighDateTime = time.HighPart;
+        SYSTEMTIME utc_time;
+        if (!FileTimeToSystemTime(&time_as_filetime, &utc_time))
+            return 0; // conversion failed
+
+        // now format to YYYY-MM-DD HH:MM:SS.mmm
+        char* end = buf;
+        // YYYY-MM-DD
+        for (int year = utc_time.wYear; year > 0; year /= 10)
+            *end++ = (year % 10) + '0';
+        *end++ = '-';
+        *end++ = (utc_time.wMonth / 10) + '0';
+        *end++ = (utc_time.wMonth % 10) + '0';
+        *end++ = '-';
+        *end++ = (utc_time.wDay / 10) + '0';
+        *end++ = (utc_time.wDay % 10) + '0';
+        *end++ = ' ';
+        // HH:MM:SS.mmm
+        *end++ = (utc_time.wHour / 10) + '0';
+        *end++ = (utc_time.wHour % 10) + '0';
+        *end++ = ':';
+        *end++ = (utc_time.wMinute / 10) + '0';
+        *end++ = (utc_time.wMinute % 10) + '0';
+        *end++ = ':';
+        *end++ = (utc_time.wSecond) + '0';
+        *end++ = (utc_time.wSecond) + '0';
+        *end++ = '.';
+        *end++ = ((utc_time.wMilliseconds / 100) % 10) + '0';
+        *end++ = ((utc_time.wMilliseconds / 10) % 10) + '0';
+        *end++ = (utc_time.wMilliseconds % 10) + '0';
+        *end = '\0';
+        return int(end - buf);
+    #else
+        // for linux we used clock_gettime(CLOCK_REALTIME, &t);
+        // which gives us the current time in seconds and nanoseconds
+        // we can convert this to a string using the standard C functions
+        time_t seconds = ns / NANOS_PER_SEC;
+        int64 nanos = ns % NANOS_PER_SEC;
+        struct tm* utc_time = gmtime(&seconds);
+
+        // Format the date and time in the buffer
+        char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", utc_time);
+
+        // append the milliseconds
+        int millis = nanos / 1'000'000;
+        *end++ = ((millis / 100) % 10) + '0';
+        *end++ = ((millis / 10) % 10) + '0';
+        *end++ = (millis % 10) + '0';
+        *end = '\0';
+        return int(end - buf);
+    #endif
+    }
+
+    int TimePoint::to_string(char* buf, int bufsize) const noexcept
+    {
+        return duration_to_string(duration.nanos(), buf, bufsize);
+    }
+
+    std::string TimePoint::to_string() const noexcept
+    {
+        char buf[64];
+        int len = duration_to_string(duration.nanos(), buf, sizeof(buf));
+        return {buf, buf+len};
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,21 +272,17 @@ namespace rpp
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
-            static int64 freq;
-            if (!freq)
-            {
-                LARGE_INTEGER f; QueryPerformanceFrequency(&f);
-                freq = int64(f.QuadPart);
-            }
-
-            LARGE_INTEGER time; QueryPerformanceCounter(&time);
-            // convert ticks to nanoseconds
-            // however, we need to be careful about overflow, which will always happen if we 
-            // multiply by 1'000'000'000, so we need to split it into seconds and fractional seconds
-            int64 seconds = time.QuadPart / freq;
-            int64 fraction = time.QuadPart % freq;
-            // convert all to nanoseconds
-            return TimePoint{ (seconds*NANOS_PER_SEC) + ((fraction*NANOS_PER_SEC) / freq) };
+            // this should be the highest precision clock available on Windows
+            // which is still synchronized with the system clock
+            // 100ns ticks since 1601-01-01
+            // https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
+            FILETIME filetime;
+            GetSystemTimePreciseAsFileTime(&filetime);
+            ULARGE_INTEGER time;
+            time.LowPart = filetime.dwLowDateTime;
+            time.HighPart = filetime.dwHighDateTime;
+            // convert 100ns ticks to nanoseconds, this would overflow in 292 years
+            return TimePoint{ int64(time.QuadPart * 100LL) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);

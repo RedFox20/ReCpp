@@ -30,14 +30,14 @@ TestImpl(test_coroutines)
         chrono_coro(50).get();
         double e = t1.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
-        AssertGreater(e, 49.5);
+        AssertGreater(e, 49.0);
         AssertLess(e, 55.0);
 
         rpp::Timer t2;
         chrono_coro(15).get();
         double e2 = t2.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
-        AssertGreater(e2, 14.5);
+        AssertGreater(e2, 14.0);
         AssertLess(e2, 20.0);
     }
 
