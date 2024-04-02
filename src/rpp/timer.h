@@ -45,6 +45,8 @@ namespace rpp
 
         /** @brief The ZERO Duration */
         static constexpr Duration zero() noexcept { return {}; }
+        static constexpr Duration max() noexcept { return Duration{ int64(INT64_MAX) }; }
+        static constexpr Duration min() noexcept { return Duration{ int64(INT64_MIN) }; }
         explicit operator bool() const noexcept { return nsec != 0; }
 
         /** @returns true if this Duration has been initialized */
@@ -143,6 +145,8 @@ namespace rpp
 
         /** @brief The ZERO TimePoint */
         static constexpr TimePoint zero() noexcept { return {}; }
+        static constexpr TimePoint max() noexcept { return TimePoint{ int64(INT64_MAX) }; }
+        static constexpr TimePoint min() noexcept { return TimePoint{ int64(INT64_MIN) }; }
 
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
