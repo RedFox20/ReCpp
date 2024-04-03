@@ -172,7 +172,7 @@ namespace rpp
         // public duration object, feel free to set it to whatever you want
         Duration duration;
 
-        TimePoint() = default;
+        constexpr TimePoint() = default;
         constexpr explicit TimePoint(const Duration& d) noexcept : duration{d} {}
         constexpr explicit TimePoint(int64 ns) noexcept : duration{ns} {}
 
@@ -189,35 +189,38 @@ namespace rpp
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
 
+        /** @returns only the HH:MM:SS.NANOS part of the Duration */
+        constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }
+
         /** @returns Duration from this point until end */
-        Duration elapsed(const TimePoint& end) const noexcept { return (end.duration - duration); }
+        constexpr Duration elapsed(const TimePoint& end) const noexcept { return (end.duration - duration); }
 
         /** @returns fractional seconds elapsed from this time point until end */
-        double elapsed_sec(const TimePoint& end) const noexcept { return (end.duration - duration).sec(); }
+        constexpr double elapsed_sec(const TimePoint& end) const noexcept { return (end.duration - duration).sec(); }
         /** @returns integer seconds elapsed from this time point until end */
-        int64 elapsed_s(const TimePoint& end) const noexcept { return (end.duration - duration).seconds(); }
+        constexpr int64 elapsed_s(const TimePoint& end) const noexcept { return (end.duration - duration).seconds(); }
         /** @returns integer milliseconds elapsed from this time point until end */
-        int64 elapsed_ms(const TimePoint& end) const noexcept { return (end.duration - duration).millis(); }
+        constexpr int64 elapsed_ms(const TimePoint& end) const noexcept { return (end.duration - duration).millis(); }
         /** @returns integer microseconds elapsed from this time point until end */
-        int64 elapsed_us(const TimePoint& end) const noexcept { return (end.duration - duration).micros(); }
+        constexpr int64 elapsed_us(const TimePoint& end) const noexcept { return (end.duration - duration).micros(); }
         /** @returns integer nanoseconds elapsed from this time point until end */
-        int64 elapsed_ns(const TimePoint& end) const noexcept { return (end.duration - duration).nanos(); }
+        constexpr int64 elapsed_ns(const TimePoint& end) const noexcept { return (end.duration - duration).nanos(); }
 
         /** @returns true if this timepoint has been initialized */
-        bool is_valid() const noexcept { return duration.is_valid(); }
-        explicit operator bool() const noexcept { return duration.is_valid(); }
+        constexpr bool is_valid() const noexcept { return duration.is_valid(); }
+        constexpr explicit operator bool() const noexcept { return duration.is_valid(); }
 
-        bool operator==(const TimePoint& t) const noexcept { return duration.nsec == t.duration.nsec; }
-        bool operator!=(const TimePoint& t) const noexcept { return duration.nsec != t.duration.nsec; }
-        bool operator>(const TimePoint& t) const noexcept { return duration.nsec > t.duration.nsec; }
-        bool operator<(const TimePoint& t) const noexcept { return duration.nsec < t.duration.nsec; }
-        bool operator>=(const TimePoint& t) const noexcept { return duration.nsec >= t.duration.nsec; }
-        bool operator<=(const TimePoint& t) const noexcept { return duration.nsec <= t.duration.nsec; }
-        TimePoint operator+(const Duration& d) const noexcept { return TimePoint{duration.nsec + d.nsec}; }
-        TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration.nsec - d.nsec}; }
-        TimePoint& operator+=(const Duration& d) noexcept { duration.nsec += d.nsec; return *this; }
-        TimePoint& operator-=(const Duration& d) noexcept { duration.nsec -= d.nsec; return *this;}
-        Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
+        constexpr bool operator==(const TimePoint& t) const noexcept { return duration.nsec == t.duration.nsec; }
+        constexpr bool operator!=(const TimePoint& t) const noexcept { return duration.nsec != t.duration.nsec; }
+        constexpr bool operator>(const TimePoint& t) const noexcept { return duration.nsec > t.duration.nsec; }
+        constexpr bool operator<(const TimePoint& t) const noexcept { return duration.nsec < t.duration.nsec; }
+        constexpr bool operator>=(const TimePoint& t) const noexcept { return duration.nsec >= t.duration.nsec; }
+        constexpr bool operator<=(const TimePoint& t) const noexcept { return duration.nsec <= t.duration.nsec; }
+        constexpr TimePoint operator+(const Duration& d) const noexcept { return TimePoint{duration.nsec + d.nsec}; }
+        constexpr TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration.nsec - d.nsec}; }
+        constexpr TimePoint& operator+=(const Duration& d) noexcept { duration.nsec += d.nsec; return *this; }
+        constexpr TimePoint& operator-=(const Duration& d) noexcept { duration.nsec -= d.nsec; return *this;}
+        constexpr Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
 
         /** @brief Converts this Duration into a string */
         int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
