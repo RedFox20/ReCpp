@@ -265,6 +265,14 @@ namespace rpp
             });
         }
 
+        template<typename U>
+        auto then(cfuture<U>&& next) noexcept -> cfuture<U>
+        {
+            return rpp::async_task([f=std::move(*this), n=std::move(next)]() mutable {
+                { (void)f.get(); } // wait for this future to complete
+                return n.get(); // return the result of the next future
+            });
+        }
 
         /**
          * Similar to .then() continuation, but doesn't return an std::future
@@ -543,6 +551,15 @@ namespace rpp
                 catch (ExceptB& b) { return exhB(b); }
                 catch (ExceptC& c) { return exhC(c); }
                 catch (ExceptD& d) { return exhD(d); }
+            });
+        }
+
+        template<typename U>
+        auto then(cfuture<U>&& next) noexcept -> cfuture<U>
+        {
+            return rpp::async_task([f=std::move(*this), n=std::move(next)]() mutable {
+                { f.get(); } // wait for this future to complete
+                return n.get(); // return the result of the next future
             });
         }
 
