@@ -11,6 +11,7 @@
 #include <thread> // std::this_thread::yield()
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional
+#include <atomic> // std::atomic_bool
 
 namespace rpp
 {
@@ -33,6 +34,8 @@ namespace rpp
 
         mutable std::mutex Mutex;
         mutable rpp::condition_variable Waiter;
+        // special state flag for all waiters to immediately exit the queue
+        std::atomic_bool cleared = false;
 
     public:
 
@@ -175,6 +178,7 @@ namespace rpp
             {
                 std::unique_lock<std::mutex> lock = spin_lock();
                 clear_unlocked(); // destroy all elements
+                cleared = true; // set the cleared flag
             }
             Waiter.notify_all(); // notify all waiters that the queue was emptied
         }
@@ -411,8 +415,7 @@ namespace rpp
         [[nodiscard]] bool wait_available() const noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
-            wait_notify(lock);
-            return !empty();
+            return wait_notify(lock);
         }
 
         /**
@@ -423,8 +426,7 @@ namespace rpp
         [[nodiscard]] bool wait_available(duration timeout) const noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
-            wait_notify(lock, timeout);
-            return !empty();
+            return wait_notify_for(lock, timeout);
         }
 
         /**
@@ -439,8 +441,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock();
             while (empty())
             {
-                wait_notify(lock);
-                if (empty())
+                if (!wait_notify(lock))
                     return std::nullopt;
             }
             T result;
@@ -459,8 +460,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock();
             if (empty())
             {
-                wait_notify(lock);
-                if (empty())
+                if (!wait_notify(lock))
                     return false;
             }
             pop_unlocked(outItem);
@@ -493,8 +493,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock();
             if (empty())
             {
-                wait_notify(lock, timeout);
-                if (empty())
+                if (!wait_notify_for(lock, timeout))
                     return false;
             }
             pop_unlocked(outItem);
@@ -513,8 +512,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock();
             if (empty())
             {
-                wait_notify(lock, timeout);
-                if (empty())
+                if (!wait_notify_for(lock, timeout))
                     return false;
             }
             outItem = *Head; // copy (may throw)
@@ -551,15 +549,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock();
             if (empty())
             {
-            #if _MSC_VER // on Win32 wait_for is faster
-                // don't measure `now` again, even if locking took a while
-                // this can make us suspend beyond `until` time, but that's ok
-                duration timeout = until - now;
-                (void)Waiter.wait_for(lock, timeout); // noexcept
-            #else // on GCC wait_until is faster
-                (void)Waiter.wait_until(lock, until); // may throw
-            #endif
-                if (empty())
+                if (!wait_notify_until(lock, until))
                     return false;
             }
             pop_unlocked(outItem);
@@ -639,8 +629,8 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, prevTime + interval); // may throw
                 #endif
-                    if (!empty())
-                        break; // got data
+                    if (!empty()) break; // got data
+                    if (cleared) return false; // give up immediately
 
                     time_point now = clock::now();
                     remaining -= (now - prevTime);
@@ -678,17 +668,48 @@ namespace rpp
             }
             return std::unique_lock<std::mutex>{Mutex, std::adopt_lock};
         }
-        void wait_notify(std::unique_lock<std::mutex>& lock) const noexcept
+        // waits until any wakeup signal and returns true if there is an item
+        bool wait_notify(std::unique_lock<std::mutex>& lock) const noexcept
         {
             (void)Waiter.wait(lock); // noexcept
+            return !empty();
         }
-        void wait_notify(std::unique_lock<std::mutex>& lock, duration timeout) const noexcept
+        // wait_notify with a timeout, returns true if there is an item
+        bool wait_notify_for(std::unique_lock<std::mutex>& lock, duration timeout) const noexcept
         {
-        #if _MSC_VER // on Win32 wait_for is faster
-            (void)Waiter.wait_for(lock, timeout); // noexcept
-        #else // on GCC wait_until is faster
-            (void)Waiter.wait_until(lock, clock::now() + timeout); // may throw
-        #endif
+            auto now = clock::now();
+            auto end = now + timeout;
+            do {
+                #if _MSC_VER // on Win32 wait_for is faster
+                    duration remaining = end - now;
+                    (void)Waiter.wait_for(lock, remaining); // noexcept
+                #else // on GCC wait_until is faster
+                    (void)Waiter.wait_until(lock, end); // may throw
+                #endif
+                if (!empty()) return true; // got an item
+                if (cleared) return false; // give up immediately
+                now = clock::now();
+            } while (now < end); // handle spurious wakeups
+            return false;
+        }
+        bool wait_notify_until(std::unique_lock<std::mutex>& lock, time_point now, time_point until) const noexcept
+        {
+            time_point now;
+            #if _MSC_VER
+                now = clock::now();
+            #endif
+            do {
+                #if _MSC_VER // on Win32 wait_for is faster
+                    duration remaining = until - now;
+                    (void)Waiter.wait_for(lock, remaining); // noexcept
+                #else // on GCC wait_until is faster
+                    (void)Waiter.wait_until(lock, until); // may throw
+                #endif
+                if (!empty()) return true; // got an item
+                if (cleared) return false; // give up immediately
+                now = clock::now();
+            } while (now < until); // handle spurious wakeups
+            return false;
         }
         void push_unlocked(T&& item) noexcept
         {
@@ -752,6 +773,7 @@ namespace rpp
                 const int newCap = oldCap + growBy;
                 grow_to(newCap);
             }
+            cleared = false; // reset the cleared flag
         }
         void grow_to(int newCap) noexcept
         {

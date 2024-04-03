@@ -633,7 +633,7 @@ TestImpl(test_sockets)
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
-                send.poll(1, socket::PF_Write);
+                send.poll(15, socket::PF_Write);
                 send.sendto(recv1_addr, std::string(MSG_SIZE, 'x'));
                 send.sendto(recv2_addr, std::string(MSG_SIZE, 'x'));
             }

@@ -105,7 +105,9 @@ TestImpl(test_concurrent_queue)
         int numPopped = 0;
         std::string item;
         while (numPopped < MAX_SIZE && queue.wait_pop(item, 100ms))
+        {
             ++numPopped;
+        }
 
         double elapsed = t.elapsed();
         double megaitems_per_sec = numPopped / (elapsed * 1'000'000.0);
