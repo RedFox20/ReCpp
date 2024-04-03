@@ -597,6 +597,8 @@ namespace rpp
          * @param timeout Total timeout for the entire wait loop, granularity
          *                is defined by @param interval
          * @param interval Interval for checking the cancellation condition
+         *  NOTE: this is just a hint and there is no guarantee to make this accurate without
+         *        affecting system performance. A 1ms interval could be anywhere from 1ms to 15ms.
          * @param cancelCondition Cancellation condition, CANCEL if cancelCondition()==true
          * @return TRUE if an item was popped,
          *         FALSE if no item popped due to: timeout or cancellation

@@ -445,9 +445,9 @@ TestImpl(test_concurrent_queue)
         AssertTrue(wait_pop_interval(item, 55ms, 1ms, [&] { return ++counter4 >= 55; }));
         AssertThat(item, "item3");
         // we should never have reached the limit of 55
-        // we should have reached at least 49 checks, but the previous tests also produce some
-        // timing side effects, and OS sleeps are never accurate enough, so relax the requirements by A LOT
-        AssertInRange(int(counter4), 30, 54);
+        // however there is NO guarantee that the sleep will be 1ms, that's just a minimum hint
+        // most likely it will sleep in 1-5ms range, so we lower the min range
+        AssertInRange(int(counter4), 15, 54);
     }
 
     TestCase(wait_pop_cross_thread_perf)
