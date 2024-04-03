@@ -146,6 +146,12 @@ namespace rpp
         {
             if (this->valid())
             {
+                // check if we have waited for the future before destruction
+                if (await_ready())
+                {
+                    try { (void)this->get(); }
+                    catch (std::exception& e) { __assertion_failure("cfuture<T> threw exception in destructor: %s", e.what()); }
+                }
                 // NOTE: This is a fail-fast strategy to catch programming bugs
                 //       and this happens if you forget to await a future before destruction.
                 //       The default behavior of std::future<T> is to silently block in the destructor,
@@ -342,13 +348,13 @@ namespace rpp
             }
         }
 
-    #if RPP_HAS_COROUTINES // C++20 coro support
-
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
             return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
+
+    #if RPP_HAS_COROUTINES // C++20 coro support
 
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -431,6 +437,12 @@ namespace rpp
         {
             if (this->valid())
             {
+                // check if we have waited for the future before destruction
+                if (await_ready())
+                {
+                    try { (void)this->get(); }
+                    catch (std::exception& e) { __assertion_failure("cfuture<void> threw exception in destructor: %s", e.what()); }
+                }
                 // NOTE: This is a fail-fast strategy to catch programming bugs
                 //       and this happens if you forget to await a future before destruction.
                 //       The default behavior of std::future<T> is to silently block in the destructor,
@@ -618,13 +630,13 @@ namespace rpp
             }
         }
 
-    #if RPP_HAS_COROUTINES // C++20 coroutine support
-
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
             return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
+
+    #if RPP_HAS_COROUTINES // C++20 coroutine support
 
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
