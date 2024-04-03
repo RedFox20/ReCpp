@@ -692,7 +692,7 @@ namespace rpp
             } while (now < end); // handle spurious wakeups
             return false;
         }
-        bool wait_notify_until(std::unique_lock<std::mutex>& lock, time_point now, time_point until) const noexcept
+        bool wait_notify_until(std::unique_lock<std::mutex>& lock, time_point until) const noexcept
         {
             time_point now;
             #if _MSC_VER
