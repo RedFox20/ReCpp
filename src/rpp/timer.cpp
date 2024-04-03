@@ -278,13 +278,13 @@ namespace rpp
 
     int TimePoint::to_string(char* buf, int bufsize) const noexcept
     {
-        return duration_to_string(duration.nanos(), buf, bufsize);
+        return datetime_to_string(duration.nanos(), buf, bufsize);
     }
 
     std::string TimePoint::to_string() const noexcept
     {
         char buf[64];
-        int len = duration_to_string(duration.nanos(), buf, sizeof(buf));
+        int len = datetime_to_string(duration.nanos(), buf, sizeof(buf));
         return {buf, buf+len};
     }
 
