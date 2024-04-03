@@ -584,7 +584,9 @@ namespace rpp
                     if (nextWait >= spawned) nextWait = 0;
 
                     auto& wait = active[nextWait];
-                    auto result = wait.task.wait(std::chrono::milliseconds{15}, std::nothrow, &err);
+                    // this 1ms wait is necessary, however it slightly slows down the loop
+                    // during high contention, so we don't burn CPU trying to get a task
+                    auto result = wait.task.wait(std::chrono::milliseconds{1}, std::nothrow, &err);
                     if (result == wait_result::finished)
                     {
                         // try to run next range on the same worker that just finished
