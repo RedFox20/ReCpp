@@ -1,4 +1,6 @@
 #include "timer.h"
+#include <time.h> // gmtime, mktime
+#include "strview.h"
 
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -27,19 +29,49 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 #if _WIN32
+    static FINLINE uint64 to_uint64(const FILETIME& f) noexcept
+    {
+        ULARGE_INTEGER time;
+        time.LowPart = f.dwLowDateTime;
+        time.HighPart = f.dwHighDateTime;
+        return time.QuadPart;
+    }
+    static FINLINE FILETIME to_filetime(uint64 ticks) noexcept
+    {
+        FILETIME filetime;
+        ULARGE_INTEGER time; time.QuadPart = ticks;
+        filetime.dwLowDateTime = time.LowPart;
+        filetime.dwHighDateTime = time.HighPart;
+        return filetime;
+    }
+    static FINLINE int64 ticks_to_ns(uint64 ticks) noexcept
+    {
+        return ticks * 100LL;
+    }
+
     // this should be the highest precision clock available on Windows
     // which is still synchronized with the system clock
     // 100ns ticks since 1601-01-01
     // https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
-    static ULONGLONG win32_system_time() noexcept
+    static FINLINE uint64 get_time_ticks() noexcept
     {
         FILETIME filetime;
         GetSystemTimePreciseAsFileTime(&filetime);
-        ULARGE_INTEGER time;
-        time.LowPart = filetime.dwLowDateTime;
-        time.HighPart = filetime.dwHighDateTime;
-        return time.QuadPart;
+        return to_uint64(filetime);
     }
+
+    static constexpr uint64 LINUX_EPOCH_TICKS = 116444736000000000ull; // 1970-01-01 - 1601-1-1
+
+    // convert the high precision system time to a unix epoch time
+    static uint64 ticks_since_epoch() noexcept
+    {
+        FILETIME filetime;
+        GetSystemTimePreciseAsFileTime(&filetime);
+        uint64 ticks_from_epoch = to_uint64(filetime) - LINUX_EPOCH_TICKS;
+        // convert 100ns ticks to nanoseconds
+        return ticks_from_epoch;
+    }
+
     // uses multimedia timer API-s to sleep more accurately
     static void win32_sleep_ns(uint64 nanos)
     {
@@ -50,7 +82,7 @@ namespace rpp
             return;
         }
 
-        uint64 start = win32_system_time();
+        uint64 start_ticks = ticks_since_epoch();
         MMRESULT timeBeginStatus = timeBeginPeriod(1); // set 1ms precision
         bool waited_enough = false;
 
@@ -66,7 +98,7 @@ namespace rpp
         }
 
         // calculate remaining time to sleep
-        uint64 elapsed_ns = (win32_system_time() - start) * 100LL;
+        uint64 elapsed_ns = ticks_to_ns(ticks_since_epoch() - start_ticks);
         if (elapsed_ns < nanos)
         {
             uint64 remaining_ns = nanos - elapsed_ns;
@@ -131,160 +163,215 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static int duration_to_string(int64 ns, char* buf, int bufsize) noexcept
+    static int print_fraction(int64 ns, char* out, int fraction_digits) noexcept
+    {
+        if      (fraction_digits < 1) fraction_digits = 1;
+        else if (fraction_digits > 9) fraction_digits = 9;
+        int number = 0;
+        switch (fraction_digits)
+        {
+            case 1: number = int(ns / 100'000'000); break;
+            case 2: number = int(ns / 10'000'000); break;
+            case 3: number = int(ns / 1'000'000); break;
+            case 4: number = int(ns / 100'000); break;
+            case 5: number = int(ns / 10'000); break;
+            case 6: number = int(ns / 1'000); break;
+            case 7: number = int(ns / 100); break;
+            case 8: number = int(ns / 10); break;
+            case 9: number = int(ns); break;
+        }
+        char buf[16];
+        int len = rpp::to_string(buf, number);
+        for (int i = 0, pad = fraction_digits - len; i < pad; ++i) // pad with zeroes
+            *out++ = '0';
+        for (int i = 0; i < len; ++i)
+            *out++ = buf[i];
+        return fraction_digits;
+    }
+
+    static int print_2digits(int value, char* out, char sep) noexcept
+    {
+        *out++ = (value / 10) + '0';
+        *out++ = (value % 10) + '0';
+        *out++ = sep;
+        return 3;
+    }
+
+    static int print_digits(int value, char* out, char sep) noexcept
+    {
+        int len = 0;
+        value = abs(value);
+        do {
+            out[len++] = (value % 10) + '0';
+            value /= 10;
+        } while (value > 0);
+
+        // reverse the string
+        char* ptr = out;
+        char* end = out + len;
+        while (ptr < end) { char tmp = *ptr; *ptr++ = *--end; *end = tmp; }
+        out[len++] = sep;
+        return len;
+    }
+
+    NOINLINE static int duration_to_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
         if (bufsize < 25)
             return 0; // won't fit
-
         char* end = buf;
-        if (ns < 0)
-        {
-            ns = -ns;
-            *end++ = '-';
-        }
-
-        if (ns >= NANOS_PER_YEAR)
-        {
+        if (ns < 0) { ns = -ns; *end++ = '-'; }
+        if (ns >= NANOS_PER_YEAR) {
             int years = int(ns / NANOS_PER_YEAR);
             ns -= years * NANOS_PER_YEAR;
-
-            *end++ = (years / 1000) + '0';
-            *end++ = ((years / 100) % 10) + '0';
-            *end++ = ((years / 10) % 10) + '0';
-            *end++ = (years % 10) + '0';
-            *end++ = 'y';
-            *end++ = '-';
+            end += print_digits(years, end, '-');
         }
-
-        if (ns >= NANOS_PER_DAY)
-        {
+        if (ns >= NANOS_PER_DAY) {
             int days = int(ns / NANOS_PER_DAY);
             ns -= days * NANOS_PER_DAY;
-
-            *end++ = (days / 100) + '0';
-            *end++ = ((days / 10) % 10) + '0';
-            *end++ = (days % 10) + '0';
-            *end++ = 'd';
-            *end++ = ' ';
+            end += print_digits(days, end, '-');
         }
-
         int hours = int(ns / NANOS_PER_HOUR);
         ns -= hours * NANOS_PER_HOUR;
-        *end++ = (hours / 10) + '0';
-        *end++ = (hours % 10) + '0';
-        *end++ = ':';
-
+        end += print_2digits(hours, end, ':');
         int minutes = int(ns / NANOS_PER_MINUTE);
         ns -= minutes * NANOS_PER_MINUTE;
-        *end++ = (minutes / 10) + '0';
-        *end++ = (minutes % 10) + '0';
-        *end++ = ':';
-
+        end += print_2digits(minutes, end, ':');
         int seconds = int(ns / NANOS_PER_SEC);
         ns -= seconds * NANOS_PER_SEC;
-        *end++ = (seconds / 10) + '0';
-        *end++ = (seconds % 10) + '0';
-        *end++ = '.';
-
-        int millis = int(ns / NANOS_PER_MILLI);
-        *end++ = ((millis / 100) % 10) + '0';
-        *end++ = ((millis / 10) % 10) + '0';
-        *end++ = (millis % 10) + '0';
+        end += print_2digits(seconds, end, '.');
+        // print fraction digits depending on the requested precision 3, 6 or 9
+        end += print_fraction(ns, end, fraction_digits);
         *end = '\0';
         return int(end - buf);
     }
 
-    int Duration::to_string(char* buf, int bufsize) const noexcept
+    int Duration::to_string(char* buf, int bufsize, int fraction_digits) const noexcept
     {
-        return duration_to_string(nanos(), buf, bufsize);
+        return duration_to_string(nanos(), buf, bufsize, fraction_digits);
     }
 
-    std::string Duration::to_string() const noexcept
+    std::string Duration::to_string(int fraction_digits) const noexcept
     {
         char buf[64];
-        int len = duration_to_string(nanos(), buf, sizeof(buf));
+        int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // YYYY-MM-DD HH:MM:SS.mmm
-    static int datetime_to_string(int64 ns, char* buf, int bufsize) noexcept
+    NOINLINE static int datetime_to_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
         if (bufsize < 28)
             return 0; // won't fit
 
         // for datetime we must use the same OS functions that we use for TimePoint::now()
         // in order to get the accurate system time as a string
-    #if _WIN32
+
+    #if _MSC_VER
         // for windows we used GetSystemTimePreciseAsFileTime(&filetime);
         // which gives us the current time in 100ns ticks since 1601-01-01
         // we can convert this to a string using FileTimeToSystemTime
-        ULARGE_INTEGER time; time.QuadPart = ns / 100LL;
-        FILETIME time_as_filetime;
-        time_as_filetime.dwLowDateTime = time.LowPart;
-        time_as_filetime.dwHighDateTime = time.HighPart;
+        // convert nanoseconds to 100ns ticks
+        int64 systime_ticks = LINUX_EPOCH_TICKS + (ns / 100LL);
+        FILETIME filetime = to_filetime(systime_ticks);
         SYSTEMTIME utc_time;
-        if (!FileTimeToSystemTime(&time_as_filetime, &utc_time))
-            return 0; // conversion failed
+        if (FileTimeToSystemTime(&filetime, &utc_time))
+        {
+            // now format to YYYY-MM-DD HH:MM:SS.mmm
+            char* end = buf;
+            end += print_digits(utc_time.wYear, end, '-');
+            end += print_2digits(utc_time.wMonth, end, '-');
+            end += print_2digits(utc_time.wDay, end, ' ');
+            end += print_2digits(utc_time.wHour, end, ':');
+            end += print_2digits(utc_time.wMinute, end, ':');
+            end += print_2digits(utc_time.wSecond, end, '.');
+            end += print_fraction(ns % NANOS_PER_SEC, end, fraction_digits);
+            *end = '\0';
+            return int(end - buf);
+        }
+    #endif
 
-        // now format to YYYY-MM-DD HH:MM:SS.mmm
-        char* end = buf;
-        // YYYY-MM-DD
-        for (int year = utc_time.wYear; year > 0; year /= 10)
-            *end++ = (year % 10) + '0';
-        *end++ = '-';
-        *end++ = (utc_time.wMonth / 10) + '0';
-        *end++ = (utc_time.wMonth % 10) + '0';
-        *end++ = '-';
-        *end++ = (utc_time.wDay / 10) + '0';
-        *end++ = (utc_time.wDay % 10) + '0';
-        *end++ = ' ';
-        // HH:MM:SS.mmm
-        *end++ = (utc_time.wHour / 10) + '0';
-        *end++ = (utc_time.wHour % 10) + '0';
-        *end++ = ':';
-        *end++ = (utc_time.wMinute / 10) + '0';
-        *end++ = (utc_time.wMinute % 10) + '0';
-        *end++ = ':';
-        *end++ = (utc_time.wSecond) + '0';
-        *end++ = (utc_time.wSecond) + '0';
-        *end++ = '.';
-        *end++ = ((utc_time.wMilliseconds / 100) % 10) + '0';
-        *end++ = ((utc_time.wMilliseconds / 10) % 10) + '0';
-        *end++ = (utc_time.wMilliseconds % 10) + '0';
-        *end = '\0';
-        return int(end - buf);
-    #else
         // for linux we used clock_gettime(CLOCK_REALTIME, &t);
         // which gives us the current time in seconds and nanoseconds
         // we can convert this to a string using the standard C functions
         time_t seconds = ns / NANOS_PER_SEC;
         int64 nanos = ns % NANOS_PER_SEC;
-        struct tm* utc_time = gmtime(&seconds);
+        struct tm* tm_utc = gmtime(&seconds);
 
         // Format the date and time in the buffer
-        char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", utc_time);
-
-        // append the milliseconds
-        int millis = nanos / 1'000'000;
-        *end++ = ((millis / 100) % 10) + '0';
-        *end++ = ((millis / 10) % 10) + '0';
-        *end++ = (millis % 10) + '0';
+        char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", tm_utc);
+        *end++ = '.';
+        end += print_fraction(nanos, end, fraction_digits);
         *end = '\0';
         return int(end - buf);
-    #endif
     }
 
-    int TimePoint::to_string(char* buf, int bufsize) const noexcept
+    static std::tm gmtime_safe(const time_t& time) noexcept
     {
-        return datetime_to_string(duration.nanos(), buf, bufsize);
+        std::tm time_tm;
+        #if _MSC_VER // MSVC++
+            gmtime_s(&time_tm, &time); // arguments reversed for some reason
+        #else
+            gmtime_r(&time, &time_tm);
+        #endif
+        return time_tm;
     }
 
-    std::string TimePoint::to_string() const noexcept
+    TimePoint::TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept
+    {
+        #if _WIN32
+            // use system time
+            SYSTEMTIME systime;
+            systime.wYear = year;
+            systime.wMonth = month;
+            systime.wDay = day;
+            systime.wHour = hour;
+            systime.wMinute = minute;
+            systime.wSecond = second;
+            systime.wMilliseconds = 0;
+
+            FILETIME filetime;
+            if (SystemTimeToFileTime(&systime, &filetime))
+            {
+                uint64 ticks_from_epoch = to_uint64(filetime) - LINUX_EPOCH_TICKS;
+                duration = Duration{ticks_to_ns(ticks_from_epoch) + nanos};
+                return;
+            }
+        #endif
+
+        // TODO: this won't handle system time changes correctly
+        static time_t timezone_offset = []() -> time_t
+        {
+            time_t local_now = time(nullptr);
+            std::tm utc_tm = gmtime_safe(local_now);
+            time_t utc_now = mktime(&utc_tm);
+            time_t diff = local_now - utc_now;
+            return diff;
+        }();
+
+        std::tm tm {};
+        tm.tm_year = year - 1900; // [0, 60] since 1900
+        tm.tm_mon  = month - 1;   // [0, 11] since Jan
+        tm.tm_mday = day;         // [1, 31]
+        tm.tm_hour = hour;        // [0, 23] since midnight
+        tm.tm_min  = minute;      // [0, 59] after the hour
+        tm.tm_sec  = second;      // [0, 60] after the min allows for 1 positive leap second
+        tm.tm_isdst = 0;          // [-1...] -1 for unknown, 0 for not DST, any positive value if DST.
+
+        time_t seconds = mktime(&tm) + timezone_offset;
+        duration = Duration{int64(seconds * NANOS_PER_SEC + nanos)};
+    }
+
+    int TimePoint::to_string(char* buf, int bufsize, int fraction_digits) const noexcept
+    {
+        return datetime_to_string(duration.nanos(), buf, bufsize, fraction_digits);
+    }
+
+    std::string TimePoint::to_string(int fraction_digits) const noexcept
     {
         char buf[64];
-        int len = datetime_to_string(duration.nanos(), buf, sizeof(buf));
+        int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
 
@@ -294,7 +381,7 @@ namespace rpp
     {
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
-            return TimePoint{ int64(win32_system_time() * 100LL) };
+            return TimePoint{ ticks_to_ns(ticks_since_epoch()) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);

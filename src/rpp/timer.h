@@ -44,6 +44,17 @@ namespace rpp
         constexpr Duration() noexcept = default;
         explicit constexpr Duration(int64 ns) noexcept : nsec{ns} {}
 
+        /**
+         * @brief Constructs a new Duration from hours, minutes, seconds, nanos
+         */
+        constexpr Duration(int64 hours, int64 minutes, int64 seconds, int64 nanos) noexcept
+            : nsec{ (hours   * NANOS_PER_HOUR)
+                  + (minutes * NANOS_PER_MINUTE)
+                  + (seconds * NANOS_PER_SEC)
+                  + nanos }
+        {
+        }
+
         /** @brief The ZERO Duration */
         static constexpr Duration zero() noexcept { return {}; }
         static constexpr Duration max() noexcept { return Duration{ int64(INT64_MAX) }; }
@@ -64,14 +75,30 @@ namespace rpp
         static constexpr Duration from_seconds(double seconds) noexcept { return Duration{ int64(seconds * NANOS_PER_SEC) }; }
         static constexpr Duration from_seconds(int32 seconds) noexcept { return Duration{ int64(seconds) * NANOS_PER_SEC }; }
         static constexpr Duration from_seconds(int64 seconds) noexcept { return Duration{ seconds * NANOS_PER_SEC }; }
+
         /** @returns New Duration from integer milliseconds (positive or negative) */
         static constexpr Duration from_millis(int32 millis) noexcept { return Duration{ int64(millis) * NANOS_PER_MILLI }; }
         static constexpr Duration from_millis(int64 millis) noexcept { return Duration{ millis * NANOS_PER_MILLI }; }
+
         /** @returns New Duration from integer microseconds (positive or negative) */
         static constexpr Duration from_micros(int32 micros) noexcept { return Duration{ int64(micros) * NANOS_PER_MICRO }; }
         static constexpr Duration from_micros(int64 micros) noexcept { return Duration{ micros * NANOS_PER_MICRO }; }
+
         /** @returns New Duration from integer nanoseconds (positive or negative) */
         static constexpr Duration from_nanos(int64 nanos) noexcept { return Duration{ nanos }; }
+
+        /** @returns New Duration from integer days (positive or negative) */
+        static constexpr Duration from_days(int32 days) noexcept { return Duration{ int64(days) * NANOS_PER_DAY }; }
+        static constexpr Duration from_days(int64 days) noexcept { return Duration{ days * NANOS_PER_DAY }; }
+
+        /** @returns New Duration from integer minutes (positive or negative) */
+        static constexpr Duration from_minutes(int32 minutes) noexcept { return Duration{ int64(minutes) * NANOS_PER_MINUTE }; }
+        static constexpr Duration from_minutes(int64 minutes) noexcept { return Duration{ minutes * NANOS_PER_MINUTE }; }
+
+        /** @returns New Duration from integer hours (positive or negative) */
+        static constexpr Duration from_hours(double hours) noexcept { return Duration{ int64(hours * NANOS_PER_HOUR) }; }
+        static constexpr Duration from_hours(int32 hours) noexcept { return Duration{ int64(hours) * NANOS_PER_HOUR }; }
+        static constexpr Duration from_hours(int64 hours) noexcept { return Duration{ hours * NANOS_PER_HOUR }; }
 
         /** 
          * @returns TOTAL fractional seconds (positive or negative) of this Duration
@@ -125,8 +152,8 @@ namespace rpp
         constexpr Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
 
         /** @brief Converts this Duration into a string */
-        int to_string(char* buf, int bufsize) const noexcept;
-        std::string to_string() const noexcept;
+        int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
+        std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,8 +161,11 @@ namespace rpp
     /**
      * @brief New TimePoint API for OS specific high accuracy timepoints
      *        which avoids floating point calculations.
-     * @note This time point is not synchronized to any external clocks
-     *       and is only useful for measuring time deltas.
+     *
+     * @note This TimePoint is synchronized to UNIX epoch since 1970,
+     *       however it is not designed for datetime calculations.
+     *       The main purpose of this TimePoint is to provide high accuracy time measurements.
+     *       For datetime calculations use the DateTime class.
      */
     struct TimePoint
     {
@@ -145,6 +175,11 @@ namespace rpp
         TimePoint() = default;
         constexpr explicit TimePoint(const Duration& d) noexcept : duration{d} {}
         constexpr explicit TimePoint(int64 ns) noexcept : duration{ns} {}
+
+        /**
+         * @brief Constructs a new TimePoint from year, month, day, hour, minute, second, nanos
+         */
+        NOINLINE TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept;
 
         /** @brief The ZERO TimePoint */
         static constexpr TimePoint zero() noexcept { return {}; }
@@ -185,8 +220,8 @@ namespace rpp
         Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
 
         /** @brief Converts this Duration into a string */
-        int to_string(char* buf, int bufsize) const noexcept;
-        std::string to_string() const noexcept;
+        int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
+        std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

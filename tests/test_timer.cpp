@@ -375,4 +375,30 @@ TestImpl(test_timer)
             spin_sleep_for(0.05);
         }
     }
+
+    TestCase(duration_to_string)
+    {
+        auto d1 = rpp::Duration(18, 56, 10, 523'000'000);
+        auto d2 = rpp::Duration(19, 57, 11, 523'001'000);
+        AssertEqual(rpp::Duration{}.to_string(6), "00:00:00.000000");
+        AssertEqual(d1.to_string(6), "18:56:10.523000");
+        AssertEqual(d2.to_string(6), "19:57:11.523001");
+        AssertEqual((d2 - d1).to_string(6),  "01:01:01.000001");
+        AssertEqual((d1 - d2).to_string(6), "-01:01:01.000001");
+    }
+
+    TestCase(timepoint_to_string)
+    {
+        auto t1 = rpp::TimePoint(2021, 1, 1, 12, 34, 56, 789'010'000LL);
+        auto t2 = rpp::TimePoint(2021, 1, 1, 12, 34, 56, 789'021'000LL);
+        AssertEqual(t1.to_string(6), "2021-01-01 12:34:56.789010");
+        AssertEqual(t2.to_string(6), "2021-01-01 12:34:56.789021");
+        AssertEqual((t2 - t1).to_string(6),  "00:00:00.000011");
+        AssertEqual((t1 - t2).to_string(6), "-00:00:00.000011");
+
+        auto t3 = rpp::TimePoint(2024, 3, 4, 9, 8, 7, 123'456'789LL);
+        AssertEqual(t3.to_string(3), "2024-03-04 09:08:07.123");
+        AssertEqual(t3.to_string(6), "2024-03-04 09:08:07.123456");
+        AssertEqual(t3.to_string(9), "2024-03-04 09:08:07.123456789");
+    }
 };
