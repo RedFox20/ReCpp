@@ -35,14 +35,11 @@ namespace rpp
     #pragma pack(pop)
 #endif
 
-    void set_this_thread_name(const char* name)
+    void set_this_thread_name(rpp::strview name) noexcept
     {
-        #if __APPLE__
-            pthread_setname_np(name);
-        #elif __linux__
-            pthread_setname_np(pthread_self(), name);
-        #elif _WIN32
-            THREADNAME_INFO info { 0x1000, name, DWORD(-1), 0 };
+        #if _MSC_VER
+            char threadName[33];
+            THREADNAME_INFO info { 0x1000, name.to_cstr(threadName, sizeof(threadName)), DWORD(-1), 0 };
             #pragma warning(push)
             #pragma warning(disable: 6320 6322)
                 const DWORD MS_VC_EXCEPTION = 0x406D1388;
@@ -50,7 +47,16 @@ namespace rpp
                     RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
                 } __except (1){}
             #pragma warning(pop)
+        #else
+            // pthread limit is 16 chars
+            char threadName[17];
+            #if __APPLE__
+                pthread_setname_np(name.to_cstr(threadName, sizeof(threadName)));
+            #elif __linux__
+                pthread_setname_np(pthread_self(), name.to_cstr(threadName, sizeof(threadName)));
+            #endif
         #endif
+
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -71,74 +77,9 @@ namespace rpp
 #  define UnhandledEx(fmt, ...) fprintf(stderr, "pool_task::unhandled_exception $ " fmt "\n", ##__VA_ARGS__)
 #endif
 
-    pool_task::pool_task()
-    {
-        // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
-        th = std::thread{[this] { run(); }};
-    }
+    ///////////////////////////////////////////////////////////////////////////////
 
-    pool_task::~pool_task() noexcept
-    {
-        kill();
-    }
-
-    void pool_task::max_idle_time(float maxIdleSeconds) noexcept { maxIdleTime = maxIdleSeconds; }
-
-    bool pool_task::run_range(int start, int end, const action<int, int>& newTask) noexcept
-    {
-        std::lock_guard<std::mutex> lock{m};
-        if (taskRunning) // handle this nasty race condition
-            return false;
-
-        trace.clear();
-        error = nullptr;
-        if (auto tracer = TraceProvider)
-            trace = tracer();
-
-        genericTask  = {};
-        rangeTask    = newTask;
-        rangeStart   = start;
-        rangeEnd     = end;
-
-        if (killed) {
-            TaskDebug("resurrecting %s", name);
-            killed = false;
-            (void)join_or_detach(finished);
-            th = std::thread{[this] { run(); }}; // restart thread if needed
-        }
-        taskRunning = true;
-        cv.notify_one();
-        return true;
-    }
-
-    bool pool_task::run_generic(task_delegate<void()>&& newTask) noexcept
-    {
-        std::lock_guard<std::mutex> lock{m};
-        if (taskRunning) // handle this nasty race condition
-            return false;
-
-        trace.clear();
-        error = nullptr;
-        if (auto tracer = TraceProvider)
-            trace = tracer();
-
-        genericTask  = std::move(newTask);
-        rangeTask    = {};
-        rangeStart   = 0;
-        rangeEnd     = 0;
-
-        if (killed) {
-            TaskDebug("resurrecting %s", name);
-            killed = false;
-            (void)join_or_detach(finished);
-            th = std::thread{[this] { run(); }}; // restart thread if needed
-        }
-        taskRunning = true;
-        cv.notify_one();
-        return true;
-    }
-
-    pool_task::wait_result pool_task::wait(duration timeout)
+    wait_result pool_task_handle::wait(duration timeout) const
     {
         std::exception_ptr err;
         wait_result result = wait(timeout, std::nothrow, &err);
@@ -146,28 +87,33 @@ namespace rpp
         return result;
     }
 
-    pool_task::wait_result pool_task::wait(duration timeout, std::nothrow_t,
-                                           std::exception_ptr* outErr) noexcept
+    wait_result pool_task_handle::wait(duration timeout, std::nothrow_t,
+                                       std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        std::unique_lock<std::mutex> lock{m};
-        while (taskRunning && !killed)
+        if (auto p = s; p && !p->finished)
         {
-            if (cv.wait_for(lock, timeout) == std::cv_status::timeout)
+            std::unique_lock<std::mutex> lock{p->m};
+            while (!s->finished)
             {
-                result = wait_result::timeout;
-                break;
+                if (p->cv.wait_for(lock, timeout) == std::cv_status::timeout)
+                {
+                    // even if we time out, check if the task finished
+                    if (!p->finished)
+                        result = wait_result::timeout;
+                    break;
+                }
             }
-        }
-        // NOTE: this is thread safe only thanks to the unique lock above
-        if (auto e = error; outErr != nullptr && !*outErr)
-        {
-            *outErr = e;
+            // NOTE: this is thread safe only thanks to the unique lock above
+            if (auto e = p->error; outErr != nullptr && !*outErr)
+            {
+                *outErr = e;
+            }
         }
         return result;
     }
 
-    pool_task::wait_result pool_task::wait()
+    wait_result pool_task_handle::wait() const
     {
         std::exception_ptr err;
         wait_result result = wait(std::nothrow, &err);
@@ -175,47 +121,134 @@ namespace rpp
         return result;
     }
 
-    pool_task::wait_result pool_task::wait(std::nothrow_t, std::exception_ptr* outErr) noexcept
+    wait_result pool_task_handle::wait(std::nothrow_t, std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        std::unique_lock<std::mutex> lock{m};
-        while (taskRunning && !killed)
+        if (auto p = s; p && !p->finished)
         {
-            cv.wait(lock);
-            // loop back and see if we finished
-        }
-        // NOTE: this is thread safe only thanks to the unique lock above
-        if (auto e = error; outErr != nullptr && !*outErr)
-        {
-            *outErr = e;
+            std::unique_lock<std::mutex> lock{p->m};
+            while (!s->finished)
+            {
+                p->cv.wait(lock);
+                // loop back and see if we finished
+            }
+            // NOTE: this is thread safe only thanks to the unique lock above
+            if (auto e = p->error; outErr != nullptr && !*outErr)
+            {
+                *outErr = e;
+            }
         }
         return result;
     }
 
-    bool pool_task::wait_check(std::exception_ptr* outErr) noexcept
+    bool pool_task_handle::wait_check(std::exception_ptr* outErr) const noexcept
     {
         return wait(duration{0}, std::nothrow, outErr) == wait_result::finished;
     }
 
-    pool_task::wait_result pool_task::kill(int timeoutMillis) noexcept
+    void pool_task_handle::signal_finished() noexcept
+    {
+        if (auto p = s)
+        {
+            std::lock_guard<std::mutex> lock{p->m};
+            p->finished = true;
+            p->cv.notify_all();
+            this->s = nullptr; // clear the state
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+    pool_worker::pool_worker()
+    {
+        // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
+        th = std::thread{[this] { run(); }};
+    }
+
+    pool_worker::~pool_worker() noexcept
+    {
+        kill();
+    }
+
+    void pool_worker::max_idle_time(float max_idle_seconds) noexcept { max_idle_timeout = max_idle_seconds; }
+
+    pool_task_handle pool_worker::run_range(int start, int end, const action<int, int>& newTask) noexcept
+    {
+        std::lock_guard<std::mutex> lock{start_mutex};
+        // we always need to double-check if a task is already running
+        if (current_task)
+            return nullptr;
+
+        current_task = pool_task_handle{};
+        if (auto tracer = TraceProvider)
+            current_task.s->trace = tracer();
+
+        generic_task = {};
+        range_task   = newTask;
+        range_start  = start;
+        range_end    = end;
+
+        if (killed)
+        {
+            TaskDebug("resurrecting %s", name);
+            killed = false;
+            (void)join_or_detach(wait_result::finished);
+            th = std::thread{[this] { run(); }}; // restart thread if needed
+        }
+        new_task_cv.notify_one();
+        return current_task;
+    }
+
+    pool_task_handle pool_worker::run_generic(task_delegate<void()>&& newTask) noexcept
+    {
+        std::lock_guard<std::mutex> lock{start_mutex};
+        // we always need to double-check if a task is already running
+        if (current_task)
+            return nullptr;
+
+        current_task = pool_task_handle{};
+        if (auto tracer = TraceProvider)
+            current_task.s->trace = tracer();
+
+        generic_task = std::move(newTask);
+        range_task   = {};
+        range_start  = 0;
+        range_end    = 0;
+
+        if (killed)
+        {
+            TaskDebug("resurrecting %s", name);
+            killed = false;
+            (void)join_or_detach(wait_result::finished);
+            th = std::thread{[this] { run(); }}; // restart thread if needed
+        }
+        new_task_cv.notify_one();
+        return current_task;
+    }
+
+    wait_result pool_worker::kill(int timeoutMillis) noexcept
     {
         if (killed) {
-            return join_or_detach(finished);
+            return join_or_detach(wait_result::finished);
         }
-        { std::unique_lock<std::mutex> lock{m};
+        { std::unique_lock<std::mutex> lock{start_mutex};
             TaskDebug("%s", name);
             killed = true;
+            new_task_cv.notify_all();
         }
-        cv.notify_all();
-        wait_result result = wait(std::chrono::milliseconds{timeoutMillis}, std::nothrow);
+
+        // wait for runner to finish current task before joining the thread
+        wait_result result = wait_result::finished;
+        if (auto task = current_task)
+            result = task.wait(std::chrono::milliseconds{timeoutMillis}, std::nothrow);
         return join_or_detach(result);
     }
 
-    pool_task::wait_result pool_task::join_or_detach(wait_result result) noexcept
+    wait_result pool_worker::join_or_detach(wait_result result) noexcept
     {
         if (th.joinable())
         {
-            if (result == timeout)
+            if (result == wait_result::timeout)
             {
                 TaskDebug("detaching %s", name);
                 th.detach();
@@ -236,7 +269,7 @@ namespace rpp
         return result;
     }
 
-    void pool_task::run() noexcept
+    void pool_worker::run() noexcept
     {
         static int pool_task_id;
         snprintf(name, sizeof(name), "rpp_task_%d", pool_task_id++);
@@ -246,29 +279,28 @@ namespace rpp
         {
             try
             {
-                decltype(rangeTask)   range;
-                decltype(genericTask) generic;
-                
+                decltype(range_task)   range;
+                decltype(generic_task) generic;
+
                 // consume the Tasks atomically
-                { std::unique_lock<std::mutex> lock{m};
+                { std::unique_lock<std::mutex> lock{start_mutex};
                     TaskDebug("%s wait for task", name);
-                    if (!wait_for_task(lock)) {
+                    if (!wait_for_new_job(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
                         killed = true;
-                        taskRunning = false;
-                        cv.notify_all();
                         return;
                     }
-                    range   = rangeTask;
-                    generic = std::move(genericTask);
-                    rangeTask   = {};
-                    genericTask = {};
-                    taskRunning = true;
+                    // copy the new task state
+                    range   = range_task;
+                    generic = std::move(generic_task);
+                    range_task   = {};
+                    generic_task = {};
+                    Assert(current_task != nullptr, "current_task must not be null");
                 }
                 if (range)
                 {
                     //TaskDebug("%s(range_task[%d,%d))", name, rangeStart, rangeEnd);
-                    range(rangeStart, rangeEnd);
+                    range(range_start, range_end);
                 }
                 else
                 {
@@ -280,43 +312,41 @@ namespace rpp
             catch (const std::exception& e) { unhandled_exception(e.what()); }
             catch (const char* e)           { unhandled_exception(e);        }
             catch (...)                     { unhandled_exception("");       }
-            { std::lock_guard<std::mutex> lock{m};
-                taskRunning = false;
-                cv.notify_all();
+
+            // cleanup the current task
+            { std::lock_guard<std::mutex> lock{start_mutex};
+                current_task.signal_finished();
             }
         }
     }
 
-    void pool_task::unhandled_exception(const char* what) noexcept
+    void pool_worker::unhandled_exception(const char* what) noexcept
     {
         //if (trace.empty()) UnhandledEx("%s", what);
         //else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
         (void)what;
-        error = std::current_exception();
+        if (auto task = current_task)
+            task.s->error = std::current_exception();
+
     }
 
-    bool pool_task::got_task() const noexcept
-    {
-        return (bool)rangeTask || (bool)genericTask;
-    }
-
-    bool pool_task::wait_for_task(std::unique_lock<std::mutex>& lock) noexcept
+    bool pool_worker::wait_for_new_job(std::unique_lock<std::mutex>& lock) noexcept
     {
         for (;;)
         {
             if (killed)
                 return false;
-            if (got_task())
+            if (current_task)
                 return true;
-            if (maxIdleTime > 0.000001f)
+            if (max_idle_timeout > 0.000001f)
             {
-                auto wait = std::chrono::duration_cast<duration>(fseconds_t(maxIdleTime));
-                if (cv.wait_for(lock, wait) == std::cv_status::timeout)
-                    return got_task(); // make sure to check for task even if it timeouts
+                auto wait = std::chrono::duration_cast<duration>(fseconds_t(max_idle_timeout));
+                if (new_task_cv.wait_for(lock, wait) == std::cv_status::timeout)
+                    return (bool)current_task; // make sure to check for task even if it timeouts
             }
             else
             {
-                cv.wait(lock);
+                new_task_cv.wait(lock);
             }
         }
     }
@@ -381,7 +411,7 @@ namespace rpp
     {
         // defined destructor to prevent aggressive inlining and to manually control task destruction
         std::lock_guard<std::mutex> lock{TasksMutex};
-        Tasks.clear();
+        Workers.clear();
     }
     
     void thread_pool::set_max_parallelism(int max_parallelism) noexcept
@@ -403,7 +433,7 @@ namespace rpp
     {
         std::lock_guard<std::mutex> lock{TasksMutex};
         int active = 0;
-        for (auto& task : Tasks) 
+        for (auto& task : Workers) 
             if (task->running()) ++active;
         return active;
     }
@@ -412,26 +442,26 @@ namespace rpp
     {
         std::lock_guard<std::mutex> lock{TasksMutex};
         int idle = 0;
-        for (auto& task : Tasks)
+        for (auto& task : Workers)
             if (!task->running()) ++idle;
         return idle;
     }
 
     int thread_pool::total_tasks() const noexcept
     {
-        return static_cast<int>(Tasks.size());
+        return static_cast<int>(Workers.size());
     }
 
     int thread_pool::clear_idle_tasks() noexcept
     {
         std::lock_guard<std::mutex> lock{TasksMutex};
         int cleared = 0;
-        for (size_t i = 0; i < Tasks.size();)
+        for (size_t i = 0; i < Workers.size();)
         {
-            if (!Tasks[i]->running())
+            if (!Workers[i]->running())
             {
-                swap(Tasks[i], Tasks.back()); // erase_swap_last pattern
-                Tasks.pop_back();
+                swap(Workers[i], Workers.back()); // erase_swap_last pattern
+                Workers.pop_back();
                 ++cleared;
             }
             else ++i;
@@ -443,7 +473,7 @@ namespace rpp
     {
         std::lock_guard<std::mutex> lock{TasksMutex};
         TaskMaxIdleTime = maxIdleSeconds;
-        for (auto& task : Tasks)
+        for (auto& task : Workers)
             task->max_idle_time(TaskMaxIdleTime);
     }
 
@@ -453,23 +483,23 @@ namespace rpp
             std::terminate(); \
         }
 
-    std::unique_ptr<pool_task> thread_pool::start_range_task(int rangeStart, int rangeEnd,
-                                                             const action<int, int>& rangeTask) noexcept
+    thread_pool::parallel_for_task
+    thread_pool::start_range_task(int range_start, int range_end,
+                                  const action<int, int>& range_task) noexcept
     {
         {
             std::lock_guard<std::mutex> lock{TasksMutex};
-            for (int i = (int)Tasks.size() - 1; i >= 0; --i)
+            for (int i = (int)Workers.size() - 1; i >= 0; --i)
             {
-                auto& taskRef = Tasks[i];
-                pool_task* pTask = taskRef.get();
-                if (!pTask->running())
+                auto& worker_ref = Workers[i];
+                pool_worker* worker = worker_ref.get();
+                if (!worker->running())
                 {
-                    if (pTask->run_range(rangeStart, rangeEnd, rangeTask))
+                    if (pool_task_handle task = worker->run_range(range_start, range_end, range_task))
                     {
-                        pTask->max_idle_time(TaskMaxIdleTime);
-                        auto t = std::move(taskRef);
-                        Tasks.erase(Tasks.begin()+i);
-                        return t;
+                        worker_ptr t = std::move(worker_ref);
+                        Workers.erase(Workers.begin()+i);
+                        return parallel_for_task{ std::move(t), std::move(task) };
                     }
                     // else: race condition (someone else held pointer to the task and restarted it)
                 }
@@ -477,12 +507,12 @@ namespace rpp
         }
 
         // in this case we don't need any locking, because the task is not added to Pool
-        auto t = std::make_unique<pool_task>();
-        auto* task = t.get();
-        task->max_idle_time(TaskMaxIdleTime);
-        bool success = task->run_range(rangeStart, rangeEnd, rangeTask);
-        AssertTerminate(success, "brand new pool_task->run_range() failed");
-        return t;
+        auto w = std::make_unique<pool_worker>();
+        auto* worker = w.get();
+        worker->max_idle_time(TaskMaxIdleTime);
+        pool_task_handle task = worker->run_range(range_start, range_end, range_task);
+        AssertTerminate(task != nullptr, "brand new pool_task->run_range() failed");
+        return parallel_for_task{ std::move(w), std::move(task) };
     }
 
     void thread_pool::parallel_for(int rangeStart, int rangeEnd, int maxRangeSize,
@@ -525,8 +555,9 @@ namespace rpp
             return;
         }
 
-        auto active = static_cast<std::unique_ptr<pool_task>*>(
-                                alloca(sizeof(std::unique_ptr<pool_task>) * maxTasks));
+        auto* active = static_cast<parallel_for_task*>(
+            alloca(maxTasks * sizeof(parallel_for_task))
+        );
 
         std::exception_ptr err;
         uint32_t spawned = 0; // actual number of spawned Tasks
@@ -541,9 +572,7 @@ namespace rpp
             if (spawned < maxTasks)
             {
                 // placement new on stack
-                new (&active[spawned]) std::unique_ptr<pool_task>{
-                    start_range_task(start, end, rangeTask)
-                };
+                new (&active[spawned]) parallel_for_task{start_range_task(start, end, rangeTask)};
                 ++spawned;
             }
             else
@@ -555,11 +584,17 @@ namespace rpp
                     if (nextWait >= spawned) nextWait = 0;
 
                     auto& wait = active[nextWait];
-                    wait->wait(std::chrono::milliseconds{1}, std::nothrow, &err);
-                    if (wait->run_range(start, end, rangeTask))
-                        break; // great!
-
-                    // boo! race condition, try again
+                    auto result = wait.task.wait(std::chrono::milliseconds{15}, std::nothrow, &err);
+                    if (result == wait_result::finished)
+                    {
+                        // try to run next range on the same worker that just finished
+                        if (auto task = wait.worker->run_range(start, end, rangeTask))
+                        {
+                            wait.task = std::move(task);
+                            break; // great!
+                        }
+                        // boo! race condition, try again
+                    }
                 }
             }
         }
@@ -570,45 +605,46 @@ namespace rpp
         // wait on all the spawned tasks to finish
         for (uint32_t i = 0; i < spawned; ++i)
         {
-            active[i]->wait(std::nothrow, &err);
+            active[i].task.wait(std::nothrow, &err);
         }
 
         // and finally throw them back into the pool
         {
             std::lock_guard<std::mutex> lock{TasksMutex};
             for (uint32_t i = 0; i < spawned; ++i)
-                Tasks.emplace_back(std::move(active[i]));
+            {
+                Workers.emplace_back(std::move(active[i].worker));
+                active[i].~parallel_for_task(); // manually clean up since we used alloca
+            }
         }
 
         if (err) std::rethrow_exception(err);
     }
 
-    pool_task* thread_pool::parallel_task(task_delegate<void()>&& genericTask) noexcept
+    pool_task_handle thread_pool::parallel_task(task_delegate<void()>&& generic_task) noexcept
     {
         { std::lock_guard<std::mutex> lock{TasksMutex};
-            for (std::unique_ptr<pool_task>& t : Tasks)
+            for (worker_ptr& t : Workers)
             {
-                pool_task* task = t.get();
-                if (!task->running())
+                pool_worker* worker = t.get();
+                if (!worker->running())
                 {
-                    if (task->run_generic(std::move(genericTask)))
-                    {
+                    if (auto task = worker->run_generic(std::move(generic_task)))
                         return task;
-                    }
                     // else: race condition (someone else held pointer to the task and restarted it)
                 }
             }
         }
         
         // create and run a new task atomically
-        auto t = std::make_unique<pool_task>();
-        auto* task = t.get();
-        task->max_idle_time(TaskMaxIdleTime);
-        bool success = task->run_generic(std::move(genericTask));
-        AssertTerminate(success, "brand new pool_task->run_generic() failed");
+        auto w = std::make_unique<pool_worker>();
+        auto* worker = w.get();
+        worker->max_idle_time(TaskMaxIdleTime);
+        auto task = worker->run_generic(std::move(generic_task));
+        AssertTerminate(task != nullptr, "brand new pool_task->run_generic() failed");
 
         std::lock_guard<std::mutex> lock{TasksMutex};
-        Tasks.emplace_back(std::move(t));
+        Workers.emplace_back(std::move(w));
         return task;
     }
 }

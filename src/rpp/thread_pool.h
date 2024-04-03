@@ -1,17 +1,19 @@
 #pragma once
 /**
- * Fast cross-platform thread-pool, Copyright (c) 2017-2018, Jorma Rebane
+ * Fast cross-platform thread-pool, Copyright (c) 2017-2024, Jorma Rebane
  * Distributed under MIT Software License
  */
 #if _MSC_VER
 #  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
 #endif
+#include "config.h"
+#include "condition_variable.h"
+#include "delegate.h"
+#include "strview.h"
 #include <vector>
 #include <thread>
 #include <string>
-#include "condition_variable.h"
-#include "delegate.h"
-#include "config.h"
+#include <future>
 
 namespace rpp
 {
@@ -48,17 +50,17 @@ namespace rpp
         }
 
     public:
-        action() : Callee(nullptr), Function(nullptr) {}
-        action(void* callee, Func function) : Callee(callee), Function(function) {}
+        action() noexcept : Callee{nullptr}, Function{nullptr} {}
+        action(void* callee, Func function) noexcept : Callee{callee}, Function{function} {}
 
         template<class T, void (T::*TMethod)(TArgs...)>
-        static action from_function(T* callee)
+        static action from_function(T* callee) noexcept
         {
             return { (void*)callee, &proxy<T, TMethod> };
         }
 
         template<class T, void (T::*TMethod)(TArgs...)const>
-        static action from_function(const T* callee)
+        static action from_function(const T* callee) noexcept
         {
             return { (void*)callee, &proxy<T, TMethod> };
         }
@@ -68,7 +70,7 @@ namespace rpp
             (*Function)(Callee, args...);
         }
 
-        explicit operator bool() const { return Callee != nullptr; }
+        explicit operator bool() const noexcept { return Callee != nullptr; }
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -94,64 +96,41 @@ namespace rpp
     /**
      * @brief Sets the debug name for this thread
      */
-    RPPAPI void set_this_thread_name(const char* name);
+    RPPAPI void set_this_thread_name(rpp::strview name) noexcept;
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * A simple thread-pool task. Can run owning generic Tasks using standard function<> and
-     * also range non-owning Tasks which use the impossibly fast delegate callback system.
-     */
-    class RPPAPI pool_task
+    enum class wait_result : int
     {
-        std::mutex m;
-        rpp::condition_variable cv;
-        std::thread th;
-        char name[32];
+        finished, // task finished successfully
+        timeout,  // waiting on task timed out
+    };
 
-        rpp::task_delegate<void()> genericTask;
-        rpp::action<int, int> rangeTask;
-        int rangeStart  = 0;
-        int rangeEnd    = 0;
-        float maxIdleTime = 15;
-
-        std::string trace;
-        std::exception_ptr error;
-        volatile bool taskRunning = false; // an active task is being executed
-        volatile bool killed      = false; // this pool_task is being destroyed/has been destroyed
+    /**
+     * A waitable pool task handle that can thread safely passed around
+     */
+    class RPPAPI pool_task_handle
+    {
+        struct state
+        {
+            mutable std::mutex m;
+            rpp::condition_variable cv;
+            std::string trace;
+            std::exception_ptr error;
+            std::atomic_bool finished = false;
+        };
+        std::shared_ptr<state> s;
 
     public:
-
-        enum wait_result
-        {
-            finished,
-            timeout,
-        };
-
         using duration = std::chrono::high_resolution_clock::duration;
 
-        bool running()  const noexcept { return taskRunning; }
-        const char* start_trace() const noexcept { return trace.empty() ? nullptr : trace.c_str(); }
+        pool_task_handle(std::nullptr_t) noexcept : s{} {}
+        pool_task_handle() : s{std::make_shared<state>()} {}
 
-        pool_task();
-        ~pool_task() noexcept;
-        NOCOPY_NOMOVE(pool_task)
-
-        // Sets the maximum idle time before this pool task is abandoned to free up thread handles
-        // @param maxIdleSeconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
-        void max_idle_time(float maxIdleSeconds = 15) noexcept;
-
-        // assigns a new parallel for task to run
-        // @warning This range task does not retain any resources, so you must ensure
-        //          it survives until end of the loop
-        // undefined behaviour if called when already running
-        // @return TRUE if run started successfully (task was not already running)
-        [[nodiscard]] bool run_range(int start, int end, const action<int, int>& newTask) noexcept;
-
-        // assigns a new generic task to run
-        // undefined behaviour if called when already running
-        // @return TRUE if run started successfully (task was not already running)
-        [[nodiscard]] bool run_generic(task_delegate<void()>&& newTask) noexcept;
+        explicit operator bool() const noexcept { return s.get() != nullptr; }
+        bool operator!=(std::nullptr_t) const noexcept { return s.get() != nullptr; }
+        bool operator==(const pool_task_handle& other) const noexcept { return s.get() == other.s.get(); }
+        bool operator!=(const pool_task_handle& other) const noexcept { return s.get() != other.s.get(); }
 
         // wait for task to finish with timeout
         // if timeout duration is 0, then task completion is checked atomically
@@ -159,23 +138,78 @@ namespace rpp
         //       This is similar to std::future behaviour
         // @param outErr [out] if outErr != null && *outErr != null, then *outErr
         //                     is initialized with the caught exception (if any)
-        wait_result wait(duration timeout);
-        wait_result wait(duration timeout, std::nothrow_t, std::exception_ptr* outErr = nullptr) noexcept;
+        wait_result wait(duration timeout) const;
+        wait_result wait(duration timeout, std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
 
         // wait for task to finish (no timeout)
         // @note Throws any unhandled exceptions from background thread
         //       This is similar to std::future behaviour
         // @param outErr [out] if outErr != null && *outErr != null, then *outErr
         //                     is initialized with the caught exception (if any)
-        wait_result wait();
-        wait_result wait(std::nothrow_t, std::exception_ptr* outErr = nullptr) noexcept;
+        wait_result wait() const;
+        wait_result wait(std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
 
         /**
          * @brief Checks if the task has finished without waiting
          * @param outErr if the task has finished with an exception, this will be set to the exception
          * @returns TRUE if the task has finished, FALSE if it's still running
          */
-        bool wait_check(std::exception_ptr* outErr = nullptr) noexcept;
+        bool wait_check(std::exception_ptr* outErr = nullptr) const noexcept;
+    
+    private:
+        friend class pool_worker;
+        void signal_finished() noexcept;
+    };
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * A simple thread-pool task. Can run owning generic Tasks using standard function<> and
+     * also range non-owning Tasks which use the impossibly fast delegate callback system.
+     */
+    class RPPAPI pool_worker
+    {
+        std::mutex start_mutex; // mutex to synchronize start/stop of the task
+        std::condition_variable new_task_cv;
+        std::thread th;
+        char name[32];
+
+        rpp::task_delegate<void()> generic_task;
+        rpp::action<int, int> range_task;
+        int range_start  = 0;
+        int range_end    = 0;
+        float max_idle_timeout = 15.0f;
+
+        pool_task_handle current_task{nullptr};
+        std::atomic_bool killed = false; // this pool_worker is being destroyed/has been destroyed
+
+    public:
+        using duration = pool_task_handle::duration;
+
+        pool_worker();
+        ~pool_worker() noexcept;
+        NOCOPY_NOMOVE(pool_worker)
+
+        /**
+         * @return TRUE if pool_worker is running a task
+         */
+        bool running() const noexcept { return (bool)current_task; }
+
+        // Sets the maximum idle time before this pool task is abandoned to free up thread handles
+        // @param max_idle_seconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
+        void max_idle_time(float max_idle_seconds = 15) noexcept;
+
+        // assigns a new parallel for task to run
+        // @warning This range task does not retain any resources, so you must ensure
+        //          it survives until end of the loop
+        // undefined behaviour if called when already running
+        // @return TRUE if run started successfully (task was not already running)
+        [[nodiscard]] pool_task_handle run_range(int start, int end, const action<int, int>& newTask) noexcept;
+
+        // assigns a new generic task to run
+        // undefined behaviour if called when already running
+        // @return TRUE if run started successfully (task was not already running)
+        [[nodiscard]] pool_task_handle run_generic(task_delegate<void()>&& newTask) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
@@ -183,9 +217,8 @@ namespace rpp
     private:
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
-        bool got_task() const noexcept;
-        bool wait_for_task(std::unique_lock<std::mutex>& lock) noexcept;
-        wait_result join_or_detach(wait_result result = finished) noexcept;
+        bool wait_for_new_job(std::unique_lock<std::mutex>& lock) noexcept;
+        wait_result join_or_detach(wait_result result = wait_result::finished) noexcept;
     };
 
 
@@ -201,14 +234,21 @@ namespace rpp
      */
     class RPPAPI thread_pool
     {
+        using worker_ptr = std::unique_ptr<pool_worker>;
+
+        struct parallel_for_task
+        {
+            worker_ptr worker;
+            pool_task_handle task;
+        };
+
         std::mutex TasksMutex;
-        std::vector<std::unique_ptr<pool_task>> Tasks;
+        std::vector<worker_ptr> Workers;
         float TaskMaxIdleTime = 15; // new task timeout in seconds
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for
 
     public:
-
-        using duration = pool_task::duration;
+        using duration = pool_task_handle::duration;
 
         // the default global thread pool
         static thread_pool& global();
@@ -266,8 +306,9 @@ namespace rpp
     private:
         // starts a single range task atomically
         // the task is removed from TaskPool to avoid concurrency issues with regular parallel tasks
-        std::unique_ptr<pool_task> start_range_task(int rangeStart, int rangeEnd, 
-                                                    const action<int, int>& rangeTask) noexcept;
+        parallel_for_task
+        start_range_task(int rangeStart, int rangeEnd,
+                         const action<int, int>& rangeTask) noexcept;
     
     public:
     
@@ -302,7 +343,7 @@ namespace rpp
         }
 
         // runs a generic parallel task
-        pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept;
+        pool_task_handle parallel_task(task_delegate<void()>&& genericTask) noexcept;
 
         /**
          * Enables tracing of parallel task calls. This makes it possible
@@ -382,7 +423,7 @@ namespace rpp
      * });
      * @endcode
      */
-    inline pool_task* parallel_task(task_delegate<void()>&& genericTask) noexcept
+    inline pool_task_handle parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
         return thread_pool::global().parallel_task(std::move(genericTask));
     }
@@ -466,28 +507,28 @@ namespace rpp
      * @endcode
      */
     template<class Func, class A>
-    pool_task* parallel_task(Func&& func, A&& a)
+    pool_task_handle parallel_task(Func&& func, A&& a)
     {
         return thread_pool::global().parallel_task([move_args(func, a)]() mutable {
             func(forward_args(a));
         });
     }
     template<class Func, class A, class B>
-    pool_task* parallel_task(Func&& func, A&& a, B&& b)
+    pool_task_handle parallel_task(Func&& func, A&& a, B&& b)
     {
         return thread_pool::global().parallel_task([move_args(func, a, b)]() mutable {
             func(forward_args(a, b));
         });
     }
     template<class Func, class A, class B, class C>
-    pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c)
+    pool_task_handle parallel_task(Func&& func, A&& a, B&& b, C&& c)
     {
         return thread_pool::global().parallel_task([move_args(func, a, b, c)]() mutable {
             func(forward_args(a, b, c));
         });
     }
     template<class Func, class A, class B, class C, class D>
-    pool_task* parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
+    pool_task_handle parallel_task(Func&& func, A&& a, B&& b, C&& c, D&& d)
     {
         return thread_pool::global().parallel_task([move_args(func, a, b, c, d)]() mutable {
             func(forward_args(a, b, c, d));

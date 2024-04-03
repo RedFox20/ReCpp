@@ -277,15 +277,15 @@ namespace rpp
          * Copies this str[len] string into a C-string array
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
          */
-        NOINLINE const char* to_cstr(char* buf, int max) const noexcept;
+        NOINLINE NODISCARD const char* to_cstr(char* buf, int max) const noexcept;
         template<int N>
-        FINLINE const char* to_cstr(char (&buf)[N]) const noexcept { return to_cstr(buf, N); }
+        FINLINE NODISCARD const char* to_cstr(char (&buf)[N]) const noexcept { return to_cstr(buf, N); }
         /** 
          * Copies this str[len] into a max of 512 byte static thread-local C-string array 
          * Result is only valid until next call to this method
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
          */
-        NOINLINE const char* to_cstr() const noexcept;
+        NOINLINE NODISCARD const char* to_cstr() const noexcept;
 
         /** Parses this strview as an integer, without modifying this strview */
         FINLINE int to_int() const noexcept { return rpp::to_int(str, len); }

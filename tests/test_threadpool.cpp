@@ -8,6 +8,15 @@ using namespace rpp;
 using namespace std::this_thread;
 using namespace std::chrono_literals;
 
+namespace rpp
+{
+    inline rpp::string_buffer& operator<<(rpp::string_buffer& sb, rpp::wait_result wr)
+    {
+        sb << (wr == wait_result::finished ? "finished" : "timeout");
+        return sb;
+    }
+}
+
 
 TestImpl(test_threadpool)
 {
@@ -222,29 +231,29 @@ TestImpl(test_threadpool)
     TestCaseExpectedEx(parallel_task_exception, std::logic_error)
     {
         int times_launched = 0; // this makes sure the threadpool loop doesn't retrigger our task
-        auto* task = rpp::parallel_task([&]() {
+        auto task = rpp::parallel_task([&]() {
             AssertThat(times_launched, 0);
             ++times_launched;
             throw std::logic_error("aaargh!");
         });
-        task->wait(); // @note this should rethrow
+        task.wait(); // @note this should rethrow
     }
 
     TestCase(parallel_task_reentrance)
     {
         int times_launched = 0;
-        auto* task = rpp::parallel_task([&] {
+        auto task = rpp::parallel_task([&] {
             ++times_launched;
             ::sleep_for(10ms);
         });
-        task->wait();
+        task.wait();
         AssertThat(times_launched, 1);
 
         task = rpp::parallel_task([&] {
             ++times_launched;
             ::sleep_for(10ms);
         });
-        task->wait();
+        task.wait();
         AssertThat(times_launched, 2);
     }
 
@@ -255,7 +264,9 @@ TestImpl(test_threadpool)
         AssertThat(thread_pool::global().active_tasks(), 0);
 
         std::atomic_int times_launched {0};
-        rpp::parallel_task([&] { times_launched += 1; })->wait(std::chrono::milliseconds{1000});
+        rpp::parallel_task([&] {
+            times_launched += 1; 
+        }).wait(std::chrono::milliseconds{1000});
         AssertThat((int)times_launched, 1);
 
         print_info("Waiting for pool tasks to die naturally...\n");
@@ -264,7 +275,7 @@ TestImpl(test_threadpool)
         print_info("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 
-        })->wait(std::chrono::milliseconds{1000});
+        }).wait(std::chrono::milliseconds{1000});
         AssertThat((int)times_launched, 2);
 
         thread_pool::global().max_task_idle_time(2);
@@ -273,9 +284,10 @@ TestImpl(test_threadpool)
     TestCase(parallel_task_nested_nodeadlocks)
     {
         std::atomic_int times_launched {0};
+
         auto func = [&]() {
             times_launched += 1;
-            pool_task* subtasks[5] = {
+            std::vector<pool_task_handle> subtasks {
                 parallel_task([&]() { times_launched += 1; }),
                 parallel_task([&]() { times_launched += 1; }),
                 parallel_task([&]() { times_launched += 1; }),
@@ -283,10 +295,10 @@ TestImpl(test_threadpool)
                 parallel_task([&]() { times_launched += 1; }),
             };
 
-            for (auto* task : subtasks)
-                AssertThat(task->wait(std::chrono::milliseconds{1000}), pool_task::finished);
+            for (auto& task : subtasks)
+                AssertThat(task.wait(std::chrono::milliseconds{1000}), wait_result::finished);
         };
-        pool_task* Tasks[4] = {
+        std::vector<pool_task_handle> main_tasks = {
             parallel_task(func),
             parallel_task(func),
             parallel_task(func),
@@ -294,8 +306,8 @@ TestImpl(test_threadpool)
         };
 
         // TODO: this test is failing, run some stress tests
-        for (auto* task : Tasks)
-            AssertThat(task->wait(std::chrono::milliseconds{2000}), pool_task::finished);
+        for (auto& task : main_tasks)
+            AssertThat(task.wait(std::chrono::milliseconds{2000}), wait_result::finished);
 
         int expected = 4 * 6;
         AssertThat((int)times_launched, expected);

@@ -27,6 +27,19 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 #if _WIN32
+    // this should be the highest precision clock available on Windows
+    // which is still synchronized with the system clock
+    // 100ns ticks since 1601-01-01
+    // https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
+    static ULONGLONG win32_system_time() noexcept
+    {
+        FILETIME filetime;
+        GetSystemTimePreciseAsFileTime(&filetime);
+        ULARGE_INTEGER time;
+        time.LowPart = filetime.dwLowDateTime;
+        time.HighPart = filetime.dwHighDateTime;
+        return time.QuadPart;
+    }
     // uses multimedia timer API-s to sleep more accurately
     static void win32_sleep_ns(uint64 nanos)
     {
@@ -37,21 +50,29 @@ namespace rpp
             return;
         }
 
+        uint64 start = win32_system_time();
         MMRESULT timeBeginStatus = timeBeginPeriod(1); // set 1ms precision
-        LARGE_INTEGER dueTime;
-        dueTime.QuadPart = -int64(nanos / 100);
+        bool waited_enough = false;
 
         if (HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL))
         {
+            int64 max_ticks = nanos / 100LL; // convert nanos to 100ns ticks
+            LARGE_INTEGER dueTime; dueTime.QuadPart = -max_ticks;
             if (SetWaitableTimer(hTimer, &dueTime, 0, NULL, NULL, 0))
                 WaitForSingleObject(hTimer, INFINITE);
             else
-                SleepEx(static_cast<int>(nanos / 1'000'000), /*alertable*/TRUE);
+                waited_enough = false;
             CloseHandle(hTimer);
         }
-        else
+
+        // calculate remaining time to sleep
+        uint64 elapsed_ns = (win32_system_time() - start) * 100LL;
+        if (elapsed_ns < nanos)
         {
-            SleepEx(static_cast<int>(nanos / 1'000'000), /*alertable*/TRUE);
+            uint64 remaining_ns = nanos - elapsed_ns;
+            int ms = static_cast<int>(remaining_ns / 1'000'000);
+            if (ms <= 0) ms = 1;
+            SleepEx(ms, /*alertable*/TRUE);
         }
 
         if (timeBeginStatus == TIMERR_NOERROR)
@@ -272,17 +293,8 @@ namespace rpp
     TimePoint TimePoint::now() noexcept
     {
         #if _WIN32
-            // this should be the highest precision clock available on Windows
-            // which is still synchronized with the system clock
-            // 100ns ticks since 1601-01-01
-            // https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
-            FILETIME filetime;
-            GetSystemTimePreciseAsFileTime(&filetime);
-            ULARGE_INTEGER time;
-            time.LowPart = filetime.dwLowDateTime;
-            time.HighPart = filetime.dwHighDateTime;
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
-            return TimePoint{ int64(time.QuadPart * 100LL) };
+            return TimePoint{ int64(win32_system_time() * 100LL) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);

@@ -95,11 +95,11 @@ TestImpl(test_concurrent_queue)
     {
         constexpr int MAX_SIZE = 40'000;
         concurrent_queue<std::string> queue;
-        auto producer = std::thread([&] {
+        cfuture<> producer = rpp::async_task([&] {
             for (int i = 0; i < MAX_SIZE; ++i)
                 queue.push("item");
         });
-        scope_guard([&]{ producer.join(); });
+        scope_guard([&]{ producer.get(); });
 
         rpp::Timer t;
         int numPopped = 0;
@@ -148,7 +148,7 @@ TestImpl(test_concurrent_queue)
 
         // count the number of tasks that were atomically processed
         std::atomic_int numProcessed = 0;
-        auto worker = std::thread([&]
+        cfuture<> worker = rpp::async_task([&]
         {
             std::string item;
             while (queue.pop_atomic_start(item))
@@ -158,7 +158,7 @@ TestImpl(test_concurrent_queue)
                 queue.pop_atomic_end();
             }
         });
-        scope_guard([&]{ worker.join(); });
+        scope_guard([&]{ worker.get(); });
 
         // flush
         while (!queue.empty())
@@ -172,13 +172,13 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
 
-        cfuture<void> producer = rpp::async_task([&] {
+        cfuture<> producer = rpp::async_task([&] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
         });
 
-        cfuture<void> consumer = rpp::async_task([&] {
+        cfuture<> consumer = rpp::async_task([&] {
             std::string item1 = *queue.wait_pop();
             AssertThat(item1, "item1");
             std::string item2 = *queue.wait_pop();
@@ -198,7 +198,7 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
 
-        cfuture<void> producer = rpp::async_task([&] {
+        cfuture<> producer = rpp::async_task([&] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
@@ -206,7 +206,7 @@ TestImpl(test_concurrent_queue)
             queue.notify_one(); // notify consumer
         });
 
-        cfuture<void> consumer = rpp::async_task([&] {
+        cfuture<> consumer = rpp::async_task([&] {
             std::string item1, item2, item3;
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
@@ -268,7 +268,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_with_timeout_slow_producer)
     {
         concurrent_queue<std::string> queue;
-        auto slow_producer = std::thread([&] {
+        rpp::cfuture<> slow_producer = rpp::async_task([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -278,7 +278,7 @@ TestImpl(test_concurrent_queue)
             spin_sleep_for(100*MS);
             queue.push("item4");
         });
-        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
+        scope_guard([&]{ slow_producer.get(); });
 
         PopResult r;
         AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
@@ -335,7 +335,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_until_stops_on_timeout)
     {
         concurrent_queue<std::string> queue;
-        auto slow_producer = std::thread([&] {
+        rpp::cfuture<> slow_producer = rpp::async_task([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -343,7 +343,7 @@ TestImpl(test_concurrent_queue)
             spin_sleep_for(50*MS);
             queue.push("item3");
         });
-        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
+        scope_guard([&]{ slow_producer.get(); }); // Clang doesn't have jthread yet o_O
 
         PopResult r;
 
@@ -360,7 +360,7 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
-        auto slow_producer = std::thread([&] {
+        rpp::cfuture<> slow_producer = rpp::async_task([&] {
             spin_sleep_for(50*MS);
             queue.push("item1");
             spin_sleep_for(50*MS);
@@ -371,7 +371,7 @@ TestImpl(test_concurrent_queue)
             finished = true;
             queue.notify(); // notify any waiting threads
         });
-        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
+        scope_guard([&]{ slow_producer.get(); });
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
@@ -394,7 +394,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_interval)
     {
         concurrent_queue<std::string> queue;
-        auto slow_producer = std::thread([&]
+        rpp::cfuture<> slow_producer = rpp::async_task([&]
         {
             spin_sleep_for(50*MS);
             queue.push("item1");
@@ -403,7 +403,7 @@ TestImpl(test_concurrent_queue)
             spin_sleep_for(50*MS);
             queue.push("item3");
         });
-        scope_guard([&]{ slow_producer.join(); }); // Clang doesn't have jthread yet o_O
+        scope_guard([&]{ slow_producer.get(); });
 
         auto wait_pop_interval = [&](std::string& item, auto timeout, auto interval, auto cancel)
         {
@@ -451,7 +451,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_cross_thread_perf)
     {
         constexpr int num_iterations = 10;
-        constexpr int num_items = 1'000'000;
+        constexpr int num_items = 100'000;
         constexpr int total_items = num_iterations * num_items;
         double total_time = 0.0;
         for (int i = 0; i < num_iterations; ++i)
@@ -459,14 +459,14 @@ TestImpl(test_concurrent_queue)
             concurrent_queue<std::string> queue;
             rpp::Timer t;
 
-            std::thread producer = std::thread([&] {
+            rpp::cfuture<> producer = rpp::async_task([&] {
                 for (int i = 0; i < num_items; ++i) {
                     queue.push("item");
                     if (i % 1000 == 0) // yield every 1000 items
                         std::this_thread::yield();
                 }
             });
-            std::thread consumer = std::thread([&] {
+            rpp::cfuture<> consumer = rpp::async_task([&] {
                 int num_received = 0;
                 std::string item;
                 // std::deque<std::string> items;
@@ -486,38 +486,38 @@ TestImpl(test_concurrent_queue)
                 }
             });
 
-            producer.join();
-            consumer.join();
-            double elapsed_ms = t.elapsed_millis();
-            total_time += elapsed_ms;
-            print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed_ms, queue.capacity());
+            producer.get();
+            consumer.get();
+            double elapsed = t.elapsed();
+            total_time += elapsed;
+            print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed*1000, queue.capacity());
         }
 
         double avg_time = total_time / num_iterations;
-        double megaitems_per_sec = total_items / (avg_time * 1000.0);
-        print_info("AVERAGE wait_pop consumer elapsed: %.2f ms  %.0f Mitems/s\n", avg_time, megaitems_per_sec);
+        double items_per_sec = double(total_items) / total_time;
+        double Mitems_per_sec = items_per_sec / 1'000'000.0;
+        print_info("AVERAGE wait_pop consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
     }
 
     TestCase(wait_pop_interval_cross_thread_perf)
     {
         constexpr int num_iterations = 10;
-        constexpr int num_items = 1'000'000;
+        constexpr int num_items = 100'000;
         constexpr int total_items = num_iterations * num_items;
         double total_time = 0.0;
         for (int i = 0; i < num_iterations; ++i)
         {
             concurrent_queue<std::string> queue;
-            constexpr int num_items = 1'000'000;
             rpp::Timer t;
 
-            std::thread producer = std::thread([&] {
+            rpp::cfuture<> producer = rpp::async_task([&] {
                 for (int i = 0; i < num_items; ++i) {
                     queue.push("item");
                     if (i % 1000 == 0) // yield every 1000 items
                         std::this_thread::yield();
                 }
             });
-            std::thread consumer = std::thread([&] {
+            rpp::cfuture<> consumer = rpp::async_task([&] {
                 int num_received = 0;
                 std::string item;
                 while (num_received < num_items) {
@@ -528,15 +528,16 @@ TestImpl(test_concurrent_queue)
                 }
             });
 
-            producer.join();
-            consumer.join();
-            double elapsed_ms = t.elapsed_millis();
-            total_time += elapsed_ms;
-            print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed_ms, queue.capacity());
+            producer.get();
+            consumer.get();
+            double elapsed = t.elapsed();
+            total_time += elapsed;
+            print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed*1000, queue.capacity());
         }
 
         double avg_time = total_time / num_iterations;
-        double megaitems_per_sec = total_items / (avg_time * 1000.0);
-        print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.0f Mitems/s\n", avg_time, megaitems_per_sec);
+        double items_per_sec = double(total_items) / total_time;
+        double Mitems_per_sec = items_per_sec / 1'000'000.0;
+        print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
     }
 };

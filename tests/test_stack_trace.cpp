@@ -52,9 +52,9 @@ TestImpl(test_stack_trace)
     }
     TestCaseExpectedEx(trace_ex_from_parallel_task, traced_exception)
     {
-        auto* task = rpp::parallel_task([] {
+        auto task = rpp::parallel_task([] {
             throw traced_exception{ "TracedException from parallel_task" };
         });
-        task->wait(); // @note this will throw the exception from parallel task
+        task.wait(); // @note this will throw the exception from parallel task
     }
 };

@@ -50,7 +50,7 @@ namespace rpp
         rpp::delegate<T()> action;
         T result {};
         std::exception_ptr ex {};
-        rpp::pool_task* poolTask = nullptr;
+        rpp::pool_task_handle poolTask {nullptr};
 
         explicit functor_awaiter(rpp::delegate<T()>&& action) noexcept
             : action{std::move(action)} {}
@@ -58,7 +58,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            return poolTask && poolTask->wait_check();
+            return poolTask && poolTask.wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -85,7 +85,7 @@ namespace rpp
         rpp::delegate<void()> action;
 
         std::exception_ptr ex {};
-        rpp::pool_task* poolTask = nullptr;
+        rpp::pool_task_handle poolTask {nullptr};
 
         explicit functor_awaiter(rpp::delegate<void()>&& action) noexcept
             : action{std::move(action)} {}
@@ -93,7 +93,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            return poolTask && poolTask->wait_check();
+            return poolTask && poolTask.wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -118,7 +118,7 @@ namespace rpp
         rpp::delegate<Future()> action;
         Future f {};
         std::exception_ptr ex {};
-        rpp::pool_task* poolTask = nullptr;
+        rpp::pool_task_handle poolTask {nullptr};
 
         explicit functor_awaiter_fut(rpp::delegate<Future()>&& action) noexcept
             : action{std::move(action)} {}
@@ -126,7 +126,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            return poolTask && poolTask->wait_check();
+            return poolTask && poolTask.wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -156,7 +156,7 @@ namespace rpp
     {
         std::future<T> f;
         std::exception_ptr ex {};
-        rpp::pool_task* poolTask = nullptr;
+        rpp::pool_task_handle poolTask {nullptr};
 
         // NOTE: there is no safe way to grab the reference normally
         //       so we always MOVE the future into this awaiter
@@ -166,7 +166,7 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            return poolTask && poolTask->wait_check();
+            return poolTask && poolTask.wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
