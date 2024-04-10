@@ -671,28 +671,30 @@ namespace rpp /* ReCpp */
     bool dir_iterator::is_symlink() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0; }
     bool dir_iterator::is_device() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) != 0; }
 #else
-    dir_iterator::dir_iterator(std::string&& dir) noexcept : dir{std::move(dir)} {
+    dir_iterator::dir_iterator(std::string&& dir) noexcept : dir{std::move(dir)}
+    {
         const char* path = this->dir.empty() ? "." : this->dir.c_str();
-        s->e = (s->d=opendir(path)) != nullptr ? readdir(s->d) : nullptr;
+        s->d = opendir(path);
+        s->e = s->d != nullptr ? readdir(s->d) : nullptr;
     }
     dir_iterator::~dir_iterator() noexcept { if (s->d) closedir(s->d); }
     dir_iterator::operator bool() const noexcept { return s->d && s->e; }
     strview dir_iterator::name() const noexcept { return s->e ? strview{s->e->d_name} : strview{}; }
-    bool dir_iterator::next() noexcept { return s->d && (s->e = readdir(s->d)) != nullptr; }
+    bool dir_iterator::next() noexcept {return s->d && (s->e = readdir(s->d)) != nullptr; }
     bool dir_iterator::is_dir() const noexcept {
         if (s->e && s->e->d_type) return s->e->d_type == DT_DIR;
         struct stat st;
-        return ::stat(full_path().c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+        return ::stat(path_combine(full_path(), name()).c_str(), &st) == 0 && S_ISDIR(st.st_mode);
     }
     bool dir_iterator::is_file() const noexcept {
         if (s->e && s->e->d_type) return s->e->d_type == DT_REG;
         struct stat st;
-        return ::stat(full_path().c_str(), &st) == 0 && S_ISREG(st.st_mode);
+        return ::stat(path_combine(full_path(), name()).c_str(), &st) == 0 && S_ISREG(st.st_mode);
     }
     bool dir_iterator::is_symlink() const noexcept {
         if (s->e && s->e->d_type) return s->e->d_type == DT_LNK;
         struct stat st;
-        return ::stat(full_path().c_str(), &st) == 0 && S_ISLNK(st.st_mode);
+        return ::stat(path_combine(full_path(), name()).c_str(), &st) == 0 && S_ISLNK(st.st_mode);
     }
     bool dir_iterator::is_device() const noexcept {
         if (s->e && s->e->d_type) {
@@ -700,7 +702,7 @@ namespace rpp /* ReCpp */
             return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
         }
         struct stat st;
-        if (::stat(full_path().c_str(), &st) == 0) {
+        if (::stat(path_combine(full_path(), name()).c_str(), &st) == 0) {
             auto m = st.st_mode;
             return S_ISBLK(m) || S_ISCHR(m) || S_ISFIFO(m) || S_ISSOCK(m);
         }

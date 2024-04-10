@@ -247,6 +247,10 @@ TestImpl(test_file_io)
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test2.txt")));
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test3.txt")));
 
+        fullpaths = list_files_fullpath("folder", ".txt");
+        AssertThat(fullpaths.size(), 1u);
+        Assert(contains(fullpaths, path_combine(fullpath,"folder/test1.txt")));
+
         // TEST: list_files_fullpath_recursive
         std::vector<std::string> fullpaths2 = list_files_fullpath_recursive("", ".txt");
         AssertThat(fullpaths2.size(), 3u);
