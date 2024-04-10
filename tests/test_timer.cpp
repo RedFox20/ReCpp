@@ -397,8 +397,15 @@ TestImpl(test_timer)
         AssertEqual((t1 - t2).to_string(6), "-00:00:00.000011");
 
         auto t3 = rpp::TimePoint(2024, 3, 4, 9, 8, 7, 123'456'789LL);
+        AssertEqual(t3.to_string(0), "2024-03-04 09:08:07");
+        AssertEqual(t3.to_string(1), "2024-03-04 09:08:07.1");
+        AssertEqual(t3.to_string(2), "2024-03-04 09:08:07.12");
         AssertEqual(t3.to_string(3), "2024-03-04 09:08:07.123");
+        AssertEqual(t3.to_string(4), "2024-03-04 09:08:07.1234");
+        AssertEqual(t3.to_string(5), "2024-03-04 09:08:07.12345");
         AssertEqual(t3.to_string(6), "2024-03-04 09:08:07.123456");
+        AssertEqual(t3.to_string(7), "2024-03-04 09:08:07.1234567");
+        AssertEqual(t3.to_string(8), "2024-03-04 09:08:07.12345678");
         AssertEqual(t3.to_string(9), "2024-03-04 09:08:07.123456789");
     }
 };

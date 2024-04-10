@@ -92,14 +92,15 @@ TestImpl(test_debugging)
         log_output.clear();
 
         ::LogEnableTimestamps(true);
-        rpp::TimePoint start = rpp::TimePoint::now();
+        rpp::TimePoint time = rpp::TimePoint::now();
         LogInfo("TimestampTest");
         ::LogEnableTimestamps(false);
 
-        std::string timestamp = rpp::strview{log_output}.split_first('$');
+        std::string timestamp = rpp::strview{log_output}.split_first('$').trim();
         std::string message = rpp::strview{log_output}.split_second('$');
 
-        AssertGreater(timestamp.size(), 12);
+        AssertGreater(timestamp.size(), 11);
+        AssertEqual(timestamp, time.to_string(3));
         AssertEqual(message, " TimestampTest");
     }
 

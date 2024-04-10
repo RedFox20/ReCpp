@@ -163,7 +163,7 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static int print_fraction(int64 ns, char* out, int fraction_digits) noexcept
+    NOINLINE static int print_fraction(int64 ns, char* out, int fraction_digits) noexcept
     {
         if      (fraction_digits < 1) fraction_digits = 1;
         else if (fraction_digits > 9) fraction_digits = 9;
@@ -182,14 +182,23 @@ namespace rpp
         }
         char buf[16];
         int len = rpp::to_string(buf, number);
+        // now write out the result
+        *out++ = '.';
         for (int i = 0, pad = fraction_digits - len; i < pad; ++i) // pad with zeroes
             *out++ = '0';
         for (int i = 0; i < len; ++i)
             *out++ = buf[i];
-        return fraction_digits;
+        return fraction_digits + 1;
     }
 
-    static int print_2digits(int value, char* out, char sep) noexcept
+    inline static int print_2digits(int value, char* out) noexcept
+    {
+        *out++ = (value / 10) + '0';
+        *out++ = (value % 10) + '0';
+        return 2;
+    }
+
+    inline static int print_2digits(int value, char* out, char sep) noexcept
     {
         *out++ = (value / 10) + '0';
         *out++ = (value % 10) + '0';
@@ -197,7 +206,7 @@ namespace rpp
         return 3;
     }
 
-    static int print_digits(int value, char* out, char sep) noexcept
+    NOINLINE static int print_digits(int value, char* out, char sep) noexcept
     {
         int len = 0;
         value = abs(value);
@@ -238,9 +247,11 @@ namespace rpp
         end += print_2digits(minutes, end, ':');
         int seconds = int(ns / NANOS_PER_SEC);
         ns -= seconds * NANOS_PER_SEC;
-        end += print_2digits(seconds, end, '.');
-        // print fraction digits depending on the requested precision 3, 6 or 9
-        end += print_fraction(ns, end, fraction_digits);
+        end += print_2digits(seconds, end);
+
+        if (fraction_digits > 0)
+            end += print_fraction(ns, end, fraction_digits);
+
         *end = '\0';
         return int(end - buf);
     }
@@ -286,7 +297,8 @@ namespace rpp
             end += print_2digits(utc_time.wHour, end, ':');
             end += print_2digits(utc_time.wMinute, end, ':');
             end += print_2digits(utc_time.wSecond, end, '.');
-            end += print_fraction(ns % NANOS_PER_SEC, end, fraction_digits);
+            if (fraction_digits > 0)
+                end += print_fraction(ns % NANOS_PER_SEC, end, fraction_digits);
             *end = '\0';
             return int(end - buf);
         }
@@ -301,8 +313,8 @@ namespace rpp
 
         // Format the date and time in the buffer
         char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", tm_utc);
-        *end++ = '.';
-        end += print_fraction(nanos, end, fraction_digits);
+        if (fraction_digits > 0)
+            end += print_fraction(nanos, end, fraction_digits);
         *end = '\0';
         return int(end - buf);
     }
