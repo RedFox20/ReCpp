@@ -12,6 +12,7 @@
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
+    #define USE_WINAPI_IO 1 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64
@@ -115,13 +116,24 @@ namespace rpp /* ReCpp */
     #endif
     }
 
+#if USE_WINAPI_IO
+    static time_t to_time_t(const FILETIME& ft) noexcept
+    {
+        ULARGE_INTEGER ull = { { ft.dwLowDateTime, ft.dwHighDateTime } };
+        return ull.QuadPart / 10000000ULL - 11644473600ULL;
+    }
+#endif
+
     bool file_info(const char* filename, int64*  filesize, time_t* created, 
                                          time_t* accessed, time_t* modified) noexcept
     {
     #if USE_WINAPI_IO
         WIN32_FILE_ATTRIBUTE_DATA data;
         if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data)) {
-            if (filesize) *filesize = LARGE_INTEGER{ {data.nFileSizeLow,(LONG)data.nFileSizeHigh} }.QuadPart;
+            if (filesize) {
+                LARGE_INTEGER li; li.LowPart = data.nFileSizeLow; li.HighPart = data.nFileSizeHigh;
+                *filesize = li.QuadPart;
+            }
             if (created)  *created  = to_time_t(data.ftCreationTime);
             if (accessed) *accessed = to_time_t(data.ftLastAccessTime);
             if (modified) *modified = to_time_t(data.ftLastWriteTime);
@@ -138,6 +150,38 @@ namespace rpp /* ReCpp */
         }
     #endif
         return false;
+    }
+
+    bool file_info(intptr_t fd, int64*  filesize, time_t* created,
+                                time_t* accessed, time_t* modified) noexcept
+    {
+        if (!fd)
+            return false;
+    #if USE_WINAPI_IO
+        FILETIME c, a, m;
+        if (GetFileTime((HANDLE)fd, created?&c:nullptr,accessed?&a: nullptr, modified?&m: nullptr)) {
+            if (filesize) {
+                LARGE_INTEGER li;
+                GetFileSizeEx((HANDLE)fd, &li);
+                *filesize = li.QuadPart;
+            }
+            if (created)  *created  = to_time_t(c);
+            if (accessed) *accessed = to_time_t(a);
+            if (modified) *modified = to_time_t(m);
+            return true;
+        }
+        return false;
+    #else
+        struct stat s;
+        if (stat64((int)fd, &s)) {
+            if (filesize) *filesize = (int64)s.st_size;
+            if (created)  *created  = s.st_ctime;
+            if (accessed) *accessed = s.st_atime;
+            if (modified) *modified = s.st_mtime;
+            return true;
+        }
+        return false;
+    #endif
     }
 
     int file_size(const char* filename) noexcept
@@ -689,10 +733,10 @@ namespace rpp /* ReCpp */
                 {
                     strview dir = abs ? strview{currentDir} : relPath;
                     func(path_combine(dir, e.name), /*isDir*/true);
-                    if (rec)
-                    {
-                        traverse_dir2(queryRoot, path_combine(relPath, e.name), dirs, files, rec, abs, func);
-                    }
+                }
+                if (rec)
+                {
+                    traverse_dir2(queryRoot, path_combine(relPath, e.name), dirs, files, rec, abs, func);
                 }
             }
             else // file, symlink or device

@@ -530,38 +530,13 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-#if USE_WINAPI_IO
-    static time_t to_time_t(const FILETIME& ft)
-    {
-        ULARGE_INTEGER ull = { { ft.dwLowDateTime, ft.dwHighDateTime } };
-        return ull.QuadPart / 10000000ULL - 11644473600ULL;
-    }
-#endif
-
     bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
-        if (!Handle)
-            return false;
-    #if USE_WINAPI_IO
-        FILETIME c, a, m;
-        if (GetFileTime((HANDLE)Handle, outCreated?&c:nullptr,outAccessed?&a: nullptr, outModified?&m: nullptr)) {
-            if (outCreated)  *outCreated  = to_time_t(c);
-            if (outAccessed) *outAccessed = to_time_t(a);
-            if (outModified) *outModified = to_time_t(m);
-            return true;
-        }
-        return false;
-    #else
-        struct stat s;
-        if (fstat(fileno((FILE*)Handle), &s)) {
-            //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
-            if (outCreated)  *outCreated  = s.st_ctime;
-            if (outAccessed) *outAccessed = s.st_atime;
-            if (outModified) *outModified = s.st_mtime;
-            return true;
-        }
-        return false;
-    #endif
+        intptr_t fd = intptr_t(Handle);
+        #if !USE_WINAPI_IO
+            fd = fileno((FILE*)Handle);
+        #endif
+        return rpp::file_info(fd, nullptr, outCreated, outAccessed, outModified);
     }
     time_t file::time_created()  const noexcept { time_t t; return time_info(&t, nullptr, nullptr) ? t : time_t(0); }
     time_t file::time_accessed() const noexcept { time_t t; return time_info(nullptr, &t, nullptr) ? t : time_t(0); }

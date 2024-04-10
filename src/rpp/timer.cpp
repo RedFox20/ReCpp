@@ -296,7 +296,7 @@ namespace rpp
             end += print_2digits(utc_time.wDay, end, ' ');
             end += print_2digits(utc_time.wHour, end, ':');
             end += print_2digits(utc_time.wMinute, end, ':');
-            end += print_2digits(utc_time.wSecond, end, '.');
+            end += print_2digits(utc_time.wSecond, end);
             if (fraction_digits > 0)
                 end += print_fraction(ns % NANOS_PER_SEC, end, fraction_digits);
             *end = '\0';

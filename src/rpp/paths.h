@@ -72,8 +72,20 @@ namespace rpp /* ReCpp */
      * @param modified (optional) If not null, writes the last file modification date
      * @return TRUE if the file exists and required data was retrieved from the OS
      */
-    bool file_info(const char* filename, int64*  filesize, time_t* created, 
+    bool file_info(const char* filename, int64*  filesize, time_t* created,
                                          time_t* accessed, time_t* modified) noexcept;
+
+    /**
+     * @brief Gets basic information of a file
+     * @param fd File handle, either Winapi HANDLE or POSIX fd
+     * @param filesize (optional) If not null, writes the long size of the file
+     * @param created  (optional) If not null, writes the file creation date
+     * @param accessed (optional) If not null, writes the last file access date
+     * @param modified (optional) If not null, writes the last file modification date
+     * @return TRUE if the file exists and required data was retrieved from the OS
+     */
+    bool file_info(intptr_t fd, int64*  filesize, time_t* created,
+                                time_t* accessed, time_t* modified) noexcept;
 
     /**
      * @return Short size of a file
