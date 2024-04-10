@@ -328,6 +328,9 @@ namespace rpp
         /** @return TRUE if the strview ends with a null terminator */
         FINLINE bool is_nullterm() const noexcept { return str[len] == '\0'; }
 
+        /** @returns TRUE if this strview starts with a number-like prefix, eg "-1" or "+7" */
+        NOINLINE bool is_numberlike() const noexcept;
+
         /** Trims the start of the string from any whitespace */
         NOINLINE strview& trim_start() noexcept;
         /** Trims start from this char */

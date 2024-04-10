@@ -111,7 +111,17 @@ namespace rpp
         for (; s < e && *const_cast<char*>(s) <= ' '; ++s) {} // loop while is whitespace
         return s == e;
     }
-    
+
+    bool strview::is_numberlike() const noexcept
+    {
+        if (len == 0) return false;
+        int offset = 0;
+        if (str[0] == '-' || str[0] == '+')
+            ++offset;
+        char ch = str[offset];
+        return '0' <= ch && ch <= '9';
+    }
+
     int strview::compare(const char* s, int n) const noexcept
     {
         int len1 = len;
