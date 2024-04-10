@@ -626,16 +626,27 @@ namespace rpp /* ReCpp */
         std::string currentDir = path_combine(queryRoot, relPath);
         for (dir_entry e : dir_iterator{ currentDir })
         {
-            bool isDir = e.is_dir();
-            bool validDir = isDir && !e.is_special_dir();
-            if ((validDir && dirs) || (!isDir && files)) 
+            if (e.is_special_dir())
+                continue; // skip . and ..
+            if (e.is_dir())
             {
-                strview dir = abs ? strview{currentDir} : relPath;
-                func(path_combine(dir, e.name), isDir);
+                if (dirs)
+                {
+                    strview dir = abs ? strview{currentDir} : relPath;
+                    func(path_combine(dir, e.name), /*isDir*/true);
+                    if (rec)
+                    {
+                        traverse_dir2(queryRoot, path_combine(relPath, e.name), dirs, files, rec, abs, func);
+                    }
+                }
             }
-            if (validDir && rec)
+            else // file, symlink or device
             {
-                traverse_dir2(queryRoot, path_combine(relPath, e.name), dirs, files, rec, abs, func);
+                if (files)
+                {
+                    strview dir = abs ? strview{currentDir} : relPath;
+                    func(path_combine(dir, e.name), /*isDir*/false);
+                }
             }
         }
     }
