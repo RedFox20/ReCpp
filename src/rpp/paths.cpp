@@ -173,7 +173,7 @@ namespace rpp /* ReCpp */
         return false;
     #else
         struct stat s;
-        if (stat64((int)fd, &s)) {
+        if (_fstat64((int)fd, &s)) {
             if (filesize) *filesize = (int64)s.st_size;
             if (created)  *created  = s.st_ctime;
             if (accessed) *accessed = s.st_atime;
