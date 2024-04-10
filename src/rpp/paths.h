@@ -29,22 +29,39 @@ namespace rpp /* ReCpp */
      */
     RPPAPI bool file_exists(const char* filename) noexcept;
     RPPAPI bool file_exists(const wchar_t* filename) noexcept;
-    inline bool file_exists(const std::string& filename) noexcept { return file_exists(filename.c_str());   }
+    inline bool file_exists(const std::string& filename) noexcept { return file_exists(filename.c_str()); }
     inline bool file_exists(const strview filename) noexcept { return file_exists(filename.to_cstr()); }
+
+    /**
+     * @return TRUE if the file is a symlink
+     */
+    RPPAPI bool is_symlink(const char* filename) noexcept;
+    RPPAPI bool is_symlink(const wchar_t* filename) noexcept;
+    inline bool is_symlink(const std::string& filename) noexcept { return is_symlink(filename.c_str()); }
+    inline bool is_symlink(const strview filename) noexcept { return is_symlink(filename.to_cstr()); }
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
     RPPAPI bool folder_exists(const char* folder) noexcept;
-    inline bool folder_exists(const std::string& folder) noexcept { return folder_exists(folder.c_str());   }
+    inline bool folder_exists(const std::string& folder) noexcept { return folder_exists(folder.c_str()); }
     inline bool folder_exists(const strview folder) noexcept { return folder_exists(folder.to_cstr()); }
 
     /**
      * @return TRUE if either a file or a folder exists at the given path
      */
     RPPAPI bool file_or_folder_exists(const char* fileOrFolder) noexcept;
-    inline bool file_or_folder_exists(const std::string& folder) noexcept { return file_or_folder_exists(folder.c_str());   }
+    inline bool file_or_folder_exists(const std::string& folder) noexcept { return file_or_folder_exists(folder.c_str()); }
     inline bool file_or_folder_exists(const strview folder) noexcept { return file_or_folder_exists(folder.to_cstr()); }
+
+    /**
+     * @brief Creates a symbolic link to a file or folder
+     * @param target Destination where the link will point to
+     * @param link   Name of the link to create
+     */
+    RPPAPI bool create_symlink(const char* target, const char* link) noexcept;
+    inline bool create_symlink(const std::string& target, const std::string& link) noexcept { return create_symlink(target.c_str(), link.c_str()); }
+    inline bool create_symlink(const strview target, const strview link) noexcept { return create_symlink(target.to_cstr(), link.to_cstr()); }
 
     /**
      * @brief Gets basic information of a file
@@ -62,35 +79,35 @@ namespace rpp /* ReCpp */
      * @return Short size of a file
      */
     RPPAPI int file_size(const char* filename) noexcept;
-    inline int file_size(const std::string& filename) noexcept { return file_size(filename.c_str());   }
+    inline int file_size(const std::string& filename) noexcept { return file_size(filename.c_str()); }
     inline int file_size(const strview filename) noexcept { return file_size(filename.to_cstr()); }
 
     /**
      * @return Long size of a file
      */
     RPPAPI int64 file_sizel(const char* filename) noexcept;
-    inline int64 file_sizel(const std::string& filename) noexcept { return file_sizel(filename.c_str());   }
+    inline int64 file_sizel(const std::string& filename) noexcept { return file_sizel(filename.c_str()); }
     inline int64 file_sizel(const strview filename) noexcept { return file_sizel(filename.to_cstr()); }
 
     /**
      * @return File creation date
      */
     RPPAPI time_t file_created(const char* filename) noexcept;
-    inline time_t file_created(const std::string& filename) noexcept { return file_created(filename.c_str());   }
+    inline time_t file_created(const std::string& filename) noexcept { return file_created(filename.c_str()); }
     inline time_t file_created(const strview filename) noexcept { return file_created(filename.to_cstr()); }
 
     /**
      * @return Last file access date
      */
     RPPAPI time_t file_accessed(const char* filename) noexcept;
-    inline time_t file_accessed(const std::string& filename) noexcept { return file_accessed(filename.c_str());   }
+    inline time_t file_accessed(const std::string& filename) noexcept { return file_accessed(filename.c_str()); }
     inline time_t file_accessed(const strview filename) noexcept { return file_accessed(filename.to_cstr()); }
 
     /**
      * @return Last file modification date
      */
     RPPAPI time_t file_modified(const char* filename) noexcept;
-    inline time_t file_modified(const std::string& filename) noexcept { return file_modified(filename.c_str());   }
+    inline time_t file_modified(const std::string& filename) noexcept { return file_modified(filename.c_str()); }
     inline time_t file_modified(const strview filename) noexcept { return file_modified(filename.to_cstr()); }
 
     /**

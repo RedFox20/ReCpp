@@ -40,7 +40,7 @@ namespace rpp /* ReCpp */
             return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
         #else
             struct stat s;
-            return stat(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
+            return ::stat(filename, &s) == 0 && !S_ISDIR(s.st_mode);
         #endif
     }
 
@@ -51,9 +51,33 @@ namespace rpp /* ReCpp */
             return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
         #elif _MSC_VER
             struct _stat64 s;
-            return _wstat64(filename, &s) ? false : (s.st_mode & S_IFDIR) == 0;
+            return _wstat64(filename, &s) == 0 && S_ISDIR(s.st_mode);
         #else
             return file_exists(rpp::to_string(filename).c_str());
+        #endif
+    }
+
+    bool is_symlink(const char* filename) noexcept
+    {
+        #if USE_WINAPI_IO
+            DWORD attr = GetFileAttributesA(filename);
+            return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_REPARSE_POINT);
+        #else
+            struct stat s;
+            return ::stat(filename, &s) == 0 && S_ISLNK(s.st_mode);
+        #endif
+    }
+
+    bool is_symlink(const wchar_t* filename) noexcept
+    {
+        #if USE_WINAPI_IO
+            DWORD attr = GetFileAttributesW(filename);
+            return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_REPARSE_POINT);
+        #elif _MSC_VER
+            struct _stat64 s;
+            return _wstat64(filename, &s) == 0 && S_ISLNK(s.st_mode);
+        #else
+            return is_symlink(rpp::to_string(filename).c_str());
         #endif
     }
 
@@ -64,7 +88,7 @@ namespace rpp /* ReCpp */
             return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_DIRECTORY);
         #else
             struct stat s;
-            return ::stat(folder, &s) ? false : (s.st_mode & S_IFDIR) != 0;
+            return ::stat(folder, &s) == 0 && S_ISDIR(s.st_mode);
         #endif
     }
 
@@ -75,8 +99,20 @@ namespace rpp /* ReCpp */
             return attr != DWORD(-1);
         #else
             struct stat s;
-            return stat(fileOrFolder, &s) == 0;
+            return ::stat(fileOrFolder, &s) == 0;
         #endif
+    }
+
+    bool create_symlink(const char* target, const char* link) noexcept
+    {
+    #if _WIN32
+        DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+        if (folder_exists(target))
+            flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
+        return CreateSymbolicLinkA(link, target, flags) == TRUE;
+    #else
+        return symlink(target, link) == 0;
+    #endif
     }
 
     bool file_info(const char* filename, int64*  filesize, time_t* created, 
@@ -599,13 +635,32 @@ namespace rpp /* ReCpp */
     dir_iterator::operator bool() const noexcept { return s->d && s->e; }
     strview dir_iterator::name() const noexcept { return s->e ? strview{s->e->d_name} : strview{}; }
     bool dir_iterator::next() noexcept { return s->d && (s->e = readdir(s->d)) != nullptr; }
-    bool dir_iterator::is_dir() const noexcept { return s->e && s->e->d_type == DT_DIR; }
-    bool dir_iterator::is_file() const noexcept { return s->e && s->e->d_type == DT_REG; }
-    bool dir_iterator::is_symlink() const noexcept { return s->e && s->e->d_type == DT_LNK; }
+    bool dir_iterator::is_dir() const noexcept {
+        if (s->e && s->e->d_type) return s->e->d_type == DT_DIR;
+        struct stat st;
+        return ::stat(full_path().c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+    }
+    bool dir_iterator::is_file() const noexcept {
+        if (s->e && s->e->d_type) return s->e->d_type == DT_REG;
+        struct stat st;
+        return ::stat(full_path().c_str(), &st) == 0 && S_ISREG(st.st_mode);
+    }
+    bool dir_iterator::is_symlink() const noexcept {
+        if (s->e && s->e->d_type) return s->e->d_type == DT_LNK;
+        struct stat st;
+        return ::stat(full_path().c_str(), &st) == 0 && S_ISLNK(st.st_mode);
+    }
     bool dir_iterator::is_device() const noexcept {
-        if (!s->e) return false;
-        int dt = s->e->d_type;
-        return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
+        if (s->e && s->e->d_type) {
+            int dt = s->e->d_type;
+            return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
+        }
+        struct stat st;
+        if (::stat(full_path().c_str(), &st) == 0) {
+            auto m = st.st_mode;
+            return S_ISBLK(m) || S_ISCHR(m) || S_ISFIFO(m) || S_ISSOCK(m);
+        }
+        return false;
     }
 #endif
 
@@ -657,13 +712,13 @@ namespace rpp /* ReCpp */
         if (abs)
         {
             std::string fullpath = full_path(dir.empty() ? "." : dir);
-            if (fullpath.empty())
-                return; // folder does not exist
-            
-            traverse_dir2(fullpath, strview{}, dirs, files, rec, abs, func);
-            return;
+            if (!fullpath.empty()) // folder does not exist
+                traverse_dir2(fullpath, strview{}, dirs, files, rec, abs, func);
         }
-        traverse_dir2(dir, strview{}, dirs, files, rec, abs, func);
+        else
+        {
+            traverse_dir2(dir, strview{}, dirs, files, rec, abs, func);
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////
