@@ -351,9 +351,19 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), false);
 
-        sw.reset();
+        sw.clear();
         AssertThat(sw.started(), false);
         AssertThat(sw.stopped(), false);
+
+        sw.start();
+        AssertThat(sw.started(), true);
+        AssertThat(sw.stopped(), false);
+        auto prev_begin = sw.begin;
+
+        sw.restart();
+        AssertThat(sw.started(), true);
+        AssertThat(sw.stopped(), false);
+        AssertNotEqual(sw.begin, prev_begin);
     }
 
     TestCase(scoped_perf_timer)

@@ -499,9 +499,15 @@ namespace rpp
         end = {};
     }
 
-    void StopWatch::reset()noexcept
+    void StopWatch::clear()noexcept
     {
         begin = {};
+        end = {};
+    }
+
+    void StopWatch::restart() noexcept
+    {
+        begin = TimePoint::now();
         end = {};
     }
 

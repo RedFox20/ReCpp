@@ -330,8 +330,11 @@ namespace rpp
         /** Clears the stop point and resumes timing */
         void resume() noexcept;
 
-        /** Resets both start and stop times */
-        void reset() noexcept;
+        /** Clears both start and stop times */
+        void clear() noexcept;
+
+        /** Clears the timer and starts it again */
+        void restart() noexcept;
 
         /** Has the stopwatch been started? */
         bool started() const noexcept { return begin.is_valid(); }
