@@ -446,7 +446,8 @@ Basic timer utilities for measuring time for performance profiling and consisten
   * `void start()` Sets the initial starting point of the stopwatch and resets the stop point only if the stopwatch hasn't started already
   * `void stop()` Sets the stop point of the stopwatch only if start point exists and not already stopped
   * `void resume()` Clears the stop point and resumes timing
-  * `void reset()` Resets both start and stop times
+  * `void clear()` Clears both start and stop times
+  * `void restart()` Clears both start and stop times and starts the stopwatch
   * `bool started()` Has the stopwatch been started?
   * `bool stopped()` Has the stopwatch been stopped with a valid time?
   * `double elapsed()` Reports the currently elapsed time.

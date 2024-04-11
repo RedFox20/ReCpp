@@ -313,6 +313,9 @@ namespace rpp
         /** Creates an uninitialized StopWatch. Reported time is always 0.0 */
         StopWatch() noexcept = default;
 
+        /** @brief Creates a new StopWatch and starts it immediately */
+        static StopWatch start_new() noexcept { StopWatch sw; sw.start(); return sw; }
+
         /** 
          * Sets the initial starting point of the stopwatch and resets the stop point
          * only if the stopwatch hasn't started already
