@@ -19,6 +19,11 @@ namespace rpp
         /// @brief Resident set size (RSS) is the actual physical memory
         //         currently mapped to the process.
         uint64 physical_mem = 0;
+
+        double virtual_size_kb() const noexcept { return virtual_size / 1'000.0; }
+        double physical_mem_kb() const noexcept { return physical_mem / 1'000.0; }
+        double virtual_size_mb() const noexcept { return virtual_size / 1'000'000.0; }
+        double physical_mem_mb() const noexcept { return physical_mem / 1'000'000.0; }
     };
 
     /**

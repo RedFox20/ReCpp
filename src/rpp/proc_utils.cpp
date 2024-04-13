@@ -36,6 +36,7 @@ namespace rpp
         // resident   (2) resident set size (inaccurate; same as VmRSS in /proc/pid/status)
         if (rpp::file f { "/proc/self/statm", rpp::file::READONLY })
         {
+            f.seek(0, SEEK_SET); // seeking to 0 will force OS to re-generate the data
             char buffer[1024];
             int len = f.read(buffer, sizeof(buffer));
             if (len > 0)
