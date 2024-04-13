@@ -29,16 +29,18 @@ namespace rpp
         template<class Container>
         element_range(Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
 
-        T* begin() { return first;    }
-        T* end()   { return sentinel; }
-        const T* begin() const { return first;    }
-        const T* end()   const { return sentinel; }
-        bool empty() const { return first == sentinel; }
-        int  size()  const { return int(sentinel-first); }
-              T& operator[](int index)       { return first[index]; }
-        const T& operator[](int index) const { return first[index]; }
-              T* data()       { return first; }
-        const T* data() const { return first; }
+        T* begin() noexcept { return first;    }
+        T* end()   noexcept { return sentinel; }
+        const T* begin() const noexcept { return first;    }
+        const T* end()   const noexcept { return sentinel; }
+        bool empty() const noexcept { return first == sentinel; }
+        size_t size() const noexcept { return size_t(sentinel-first); }
+              T& operator[](int index)       noexcept { return first[index]; }
+        const T& operator[](int index) const noexcept { return first[index]; }
+              T* data()       noexcept { return first; }
+        const T* data() const noexcept { return first; }
+
+        std::vector<T> to_vec() const noexcept { return {first, sentinel}; }
     };
 
     template<class T> struct element_range<const T>
@@ -55,12 +57,14 @@ namespace rpp
         template<class Container>
         element_range(const Container& c) noexcept : first{&*c.begin()}, sentinel{&*c.end()} {}
 
-        const T* begin() const { return first;    }
-        const T* end()   const { return sentinel; }
-        bool empty() const { return first == sentinel; }
-        int  size()  const { return int(sentinel-first); }
-        const T& operator[](int index) const { return first[index]; }
-        const T* data() const { return first; }
+        const T* begin() const noexcept { return first;    }
+        const T* end()   const noexcept { return sentinel; }
+        bool empty() const noexcept { return first == sentinel; }
+        size_t size() const noexcept { return size_t(sentinel-first); }
+        const T& operator[](int index) const noexcept { return first[index]; }
+        const T* data() const noexcept { return first; }
+
+        std::vector<T> to_vec() const noexcept { return {first, sentinel}; }
     };
 
     template<class T>           element_range<T> range(T* data, T* end)      noexcept { return { data, end  }; }
@@ -79,10 +83,44 @@ namespace rpp
     template<class T, size_t N> element_range<const T> range(const std::array<T, N>&  v, size_t n) noexcept { return { v.data(), n }; }
     template<class T, class A>  element_range<const T> range(const std::vector<T, A>& v, size_t n) noexcept { return { v.data(), n }; }
 
+    template<class Container>
+    using element_type_with_const = std::remove_reference_t<decltype(*std::declval<Container>().begin())>;
+
     template<class C>
-    auto range(C& container) -> element_range<std::remove_reference_t<decltype(*container.begin())>>
+    element_range<element_type_with_const<C>> range(C& container) noexcept
     {
         return { &*container.begin(), &*container.end() };
+    }
+
+    /**
+     * @brief Create a sub-range of the given container starting at the given index
+     * @param start The starting index of the range
+     */
+    template<class C>
+    element_range<element_type_with_const<C>> slice(C& container, size_t start) noexcept
+    {
+        using T = element_type_with_const<C>; // element type, such as `string` or `const string`
+        auto data = container.data();
+        auto begin = data + start;
+        auto end = data + container.size();
+        return begin < end ? element_range<T>{ begin, end } : element_range<T>{};
+    }
+
+    /**
+     * @brief Create a sub-range of the given container starting at the given index and with a count limit
+     *        If the count exceeds the container size, the range will be clamped to the container size.
+     * @param start The starting index of the range
+     * @param count The maximum number of elements in the range
+     */
+    template<class C>
+    element_range<element_type_with_const<C>> slice(C& container, size_t start, size_t count) noexcept
+    {
+        using T = element_type_with_const<C>; // element type, such as `string` or `const string`
+        auto data = container.data();
+        auto begin = data + start;
+        auto max_end = data + container.size();
+        auto end = (begin + count) < max_end ? (begin + count) : max_end;
+        return begin < end ? element_range<T>{ begin, end } : element_range<T>{};
     }
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -484,6 +522,18 @@ namespace rpp
     template<class T, class A> void sort(std::vector<T, A>& v)
     {
         rpp::insertion_sort(v.data(), v.size(), [](T& a, T& b) { return a < b; });
+    }
+
+    template<typename T, typename Comparison>
+    void sort(std::vector<T>& v, const Comparison& comparison)
+    {
+        rpp::insertion_sort(v.data(), v.size(), comparison);
+    }
+
+    template<typename T, typename Comparison>
+    void sort(element_range<T> v, const Comparison& comparison)
+    {
+        rpp::insertion_sort(v.data(), v.size(), comparison);
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
