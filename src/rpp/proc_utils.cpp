@@ -1,7 +1,8 @@
 #include "proc_utils.h"
 #if _MSC_VER
 #  define WIN32_LEAN_AND_MEAN
-#  include <Windows.h>
+#  include <Windows.h> // WINAPI
+#  include <Psapi.h> // PROCESS_MEMORY_COUNTERS, GetProcessMemoryInfo
 #elif __APPLE__
 #  include <mach/mach.h>
 #else // linux and Android
