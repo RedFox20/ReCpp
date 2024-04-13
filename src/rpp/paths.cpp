@@ -119,8 +119,10 @@ namespace rpp /* ReCpp */
 #if USE_WINAPI_IO
     static time_t to_time_t(const FILETIME& ft) noexcept
     {
-        ULARGE_INTEGER ull = { { ft.dwLowDateTime, ft.dwHighDateTime } };
-        return ull.QuadPart / 10000000ULL - 11644473600ULL;
+        ULARGE_INTEGER time;
+        time.LowPart = ft.dwLowDateTime;
+        time.HighPart = ft.dwHighDateTime;
+        return time.QuadPart / 10000000ULL - 11644473600ULL;
     }
 #endif
 

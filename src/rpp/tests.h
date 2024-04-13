@@ -124,7 +124,23 @@ namespace rpp
          * @note Does not rely on timer.h implementation
          * @param seconds Seconds to sleep, should be very accurate
          */
-        static void spin_sleep_for(double seconds);
+        static void spin_sleep_for(double seconds) noexcept;
+
+        /**
+         * @brief Spin sleep for a number of milliseconds
+         * Spin sleep is more accurate than std::this_thread::sleep_for
+         * @note Does not rely on timer.h implementation
+         * @param milliseconds Milliseconds to sleep, should be very accurate
+         */
+        static void spin_sleep_for_ms(uint64_t milliseconds) noexcept;
+
+        /**
+         * @brief Spin sleep for a number of microseconds
+         * Spin sleep is more accurate than std::this_thread::sleep_for
+         * @note Does not rely on timer.h implementation
+         * @param microseconds Microseconds to sleep, should be very accurate
+         */
+        static void spin_sleep_for_us(uint64_t microseconds) noexcept;
 
         // main entry/initialization point for the test class
         virtual void init_test() {}

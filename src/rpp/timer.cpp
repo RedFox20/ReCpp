@@ -62,14 +62,18 @@ namespace rpp
 
     static constexpr uint64 LINUX_EPOCH_TICKS = 116444736000000000ull; // 1970-01-01 - 1601-1-1
 
+    /// @note Reused from other WINAPI modules
+    static FINLINE uint64 get_ticks_since_epoch(FILETIME& filetime) noexcept
+    {
+        return to_uint64(filetime) - LINUX_EPOCH_TICKS;
+    }
+
     // convert the high precision system time to a unix epoch time
     static uint64 ticks_since_epoch() noexcept
     {
         FILETIME filetime;
         GetSystemTimePreciseAsFileTime(&filetime);
-        uint64 ticks_from_epoch = to_uint64(filetime) - LINUX_EPOCH_TICKS;
-        // convert 100ns ticks to nanoseconds
-        return ticks_from_epoch;
+        return get_ticks_since_epoch(filetime);
     }
 
     // uses multimedia timer API-s to sleep more accurately
@@ -346,7 +350,7 @@ namespace rpp
             FILETIME filetime;
             if (SystemTimeToFileTime(&systime, &filetime))
             {
-                uint64 ticks_from_epoch = to_uint64(filetime) - LINUX_EPOCH_TICKS;
+                uint64 ticks_from_epoch = get_ticks_since_epoch(filetime);
                 duration = Duration{ticks_to_ns(ticks_from_epoch) + nanos};
                 return;
             }

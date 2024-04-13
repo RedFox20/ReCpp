@@ -1,4 +1,5 @@
 #include <rpp/timer.h>
+#include <rpp/proc_utils.h>
 #include <rpp/tests.h>
 #include <thread>
 
@@ -29,7 +30,7 @@ TestImpl(test_timer)
         for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
-            spin_sleep_for(0.05);
+            spin_sleep_for_ms(50);
             double elapsed = t.elapsed();
             print_info("timer %d 50ms spin_sleep timer result: %fs\n", i+1, elapsed);
             AssertInRange(elapsed, 0.05, 0.05 + sigma_s);
@@ -41,7 +42,7 @@ TestImpl(test_timer)
         for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
-            spin_sleep_for(0.05);
+            spin_sleep_for_ms(50);
             double elapsed_ms = t.elapsed_millis();
             print_info("timer_ms %d 50ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
             AssertInRange(elapsed_ms, 50.0, 50.0 + sigma_ms);
@@ -200,7 +201,7 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
         const int millis = 57; // wait a few millis
-        spin_sleep_for(0.001 * millis);
+        spin_sleep_for_ms(millis);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
         double elapsed_sec = t1.elapsed_sec(t2);
@@ -227,7 +228,7 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
         const int millis = 15; // wait a few millis
-        spin_sleep_for(0.001 * millis);
+        spin_sleep_for_ms(millis);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
         rpp::Duration elapsed1 = t1.elapsed(t2);
@@ -254,7 +255,7 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
         const int microseconds = 40; // wait a few micros
-        spin_sleep_for(0.000'001 * microseconds);
+        spin_sleep_for_us(microseconds);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
         rpp::Duration elapsed1 = t1.elapsed(t2);
@@ -282,7 +283,7 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
         const int microseconds = 15; // wait a few micros
-        spin_sleep_for(0.000'001 * microseconds);
+        spin_sleep_for_us(microseconds);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
         int64_t elapsed_ns = t1.elapsed_ns(t2);
@@ -338,7 +339,7 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), false);
 
-        spin_sleep_for(0.1);
+        spin_sleep_for_ms(100);
 
         sw.stop();
         AssertThat(sw.started(), true);
@@ -370,19 +371,19 @@ TestImpl(test_timer)
     {
         {
             auto spt = rpp::ScopedPerfTimer{};
-            spin_sleep_for(0.05);
+            spin_sleep_for_ms(50);
         }
         {
             auto spt = rpp::ScopedPerfTimer { __FUNCTION__ }; // backwards compatibility
-            spin_sleep_for(0.05);
+            spin_sleep_for_ms(50);
         }
         {
             auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__ };
-            spin_sleep_for(0.05);
+            spin_sleep_for_ms(50);
         }
         {
             auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__, "detail-item" };
-            spin_sleep_for(0.05);
+            spin_sleep_for_ms(50);
         }
     }
 
@@ -417,5 +418,33 @@ TestImpl(test_timer)
         AssertEqual(t3.to_string(7), "2024-03-04 09:08:07.1234567");
         AssertEqual(t3.to_string(8), "2024-03-04 09:08:07.12345678");
         AssertEqual(t3.to_string(9), "2024-03-04 09:08:07.123456789");
+    }
+
+    TestCase(proc_cpu_times)
+    {
+        rpp::proc_cpu_info t1 = rpp::proc_total_cpu_usage();
+        const int spin_us = 50'000;
+        spin_sleep_for_us(spin_us); // spin wait for accurate time counts
+        rpp::proc_cpu_info t2 = rpp::proc_total_cpu_usage();
+
+        print_info("#1 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t1.cpu_time_us/1000.0, t1.user_time_us/1000.0, t1.kernel_time_us/1000.0);
+        print_info("#2 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t2.cpu_time_us/1000.0, t2.user_time_us/1000.0, t2.kernel_time_us/1000.0);
+        rpp::int64 kernel_delta = t2.kernel_time_us - t1.kernel_time_us;
+        rpp::int64 user_delta = t2.user_time_us - t1.user_time_us;
+        rpp::int64 cpu_delta = t2.cpu_time_us - t1.cpu_time_us;
+        print_info("# diff all:%.1fms usr:%.1fms sys:%.1fms\n", cpu_delta/1000.0, user_delta/1000.0, kernel_delta/1000.0);
+
+        AssertGreater(t1.kernel_time_us, 0u);
+        AssertGreater(t1.user_time_us, 0u);
+        AssertGreater(t1.cpu_time_us, 0u);
+        AssertGreater(t2.kernel_time_us, 0u);
+        AssertGreater(t2.user_time_us, 0u);
+        AssertGreater(t2.cpu_time_us, t1.cpu_time_us);
+
+        // since calculations are done using system clock, most time should be spent in kernel
+        AssertGreaterOrEqual(t2.cpu_time_us, t1.cpu_time_us + spin_us);
+        AssertLessOrEqual(t2.cpu_time_us, t1.cpu_time_us + spin_us + 5'000);
+
+        AssertGreater(kernel_delta, user_delta);
     }
 };

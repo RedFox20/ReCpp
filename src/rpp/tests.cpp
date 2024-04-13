@@ -661,21 +661,29 @@ namespace rpp
 #endif
     }
 
-    void test::spin_sleep_for(double seconds)
+    void test::spin_sleep_for(double seconds) noexcept
+    {
+        spin_sleep_for_us(static_cast<uint64_t>(seconds * 1'000'000.0));
+    }
+
+    void test::spin_sleep_for_ms(uint64_t milliseconds) noexcept
+    {
+        spin_sleep_for_us(milliseconds * 1000ull);
+    }
+
+    void test::spin_sleep_for_us(uint64_t microseconds) noexcept
     {
         namespace time = std::chrono;
+        auto sleep_time = time::nanoseconds(microseconds * 1000ull);
         // NOTE: high_resolution_clock might not be available on some target systems
         //       which would require a fallback to rolling our own.
         //       However, we want to avoid using rpp/timer.h here, since that would
         //       introduce a circular dependency in the testing framework and not test
         //       the timer.h implementation.
-        auto t1 = time::high_resolution_clock::now();
-        while (true)
-        {
-            time::duration<double> elapsed = time::high_resolution_clock::now() - t1;
-            if (elapsed.count() >= seconds) {
+        auto start = time::high_resolution_clock::now();
+        while (true) {
+            if ((time::high_resolution_clock::now() - start) >= sleep_time)
                 break;
-            }
         }
     }
 

@@ -271,13 +271,13 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item1");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item2");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item3");
-            spin_sleep_for(100*MS);
+            spin_sleep_for_ms(100);
             queue.push("item4");
         });
         scope_guard([&]{ slow_producer.get(); });
@@ -338,11 +338,11 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item1");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item2");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item3");
         });
         scope_guard([&]{ slow_producer.get(); }); // Clang doesn't have jthread yet o_O
@@ -363,13 +363,13 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item1");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item2");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item3");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             finished = true;
             queue.notify(); // notify any waiting threads
         });
@@ -398,11 +398,11 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&]
         {
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item1");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item2");
-            spin_sleep_for(50*MS);
+            spin_sleep_for_ms(50);
             queue.push("item3");
         });
         scope_guard([&]{ slow_producer.get(); });

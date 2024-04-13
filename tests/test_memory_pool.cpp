@@ -1,4 +1,6 @@
 #include <rpp/memory_pool.h>
+#include <rpp/proc_utils.h>
+#include <rpp/scope_guard.h>
 #include <rpp/tests.h>
 using namespace std::literals;
 
@@ -156,5 +158,38 @@ TestImpl(memory_pool)
         std::string* strings = pool.construct_array<std::string>(10, "hello");
         for (int i = 0; i < 10; ++i)
             AssertThat(strings[i], "hello");
+    }
+
+    TestCase(proc_mem_usage_works)
+    {
+        rpp::proc_mem_info info = rpp::proc_current_mem_used();
+        AssertGreater(info.virtual_size, 0ull);
+        AssertGreater(info.physical_mem, 0ull);
+
+        print_info("#1 Virtual Size: %llu KB\n", info.virtual_size / 1000);
+        print_info("#1 Physical Mem: %llu KB\n", info.physical_mem / 1000);
+
+
+        // allocate enough bytes to cause virtual size to increase
+        size_t num_bytes = 10 * 1000 * 1000;
+        print_info("-- Allocating %llu KB --\n", num_bytes / 1000);
+
+        char* mem = (char*)malloc(num_bytes);
+        scope_guard([mem] { free(mem); });
+
+        for (size_t i = 0; i < num_bytes; ++i)
+            mem[i] = 1; // touch every page to commit the memory
+
+        rpp::proc_mem_info info2 = rpp::proc_current_mem_used();
+
+        print_info("#2 Virtual Size: %llu KB\n", info2.virtual_size / 1000);
+        print_info("#2 Physical Mem: %llu KB\n", info2.physical_mem / 1000);
+
+        AssertGreater(info2.virtual_size, info.virtual_size);
+        AssertGreater(info2.physical_mem, info.physical_mem);
+
+        // ensure it's within reasonable range
+        AssertLess(info2.virtual_size - info.virtual_size, size_t(num_bytes*1.1));
+        AssertLess(info2.physical_mem - info.physical_mem, size_t(num_bytes*1.1));
     }
 };
