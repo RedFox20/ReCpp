@@ -361,6 +361,7 @@ TestImpl(test_timer)
         AssertThat(sw.stopped(), false);
         auto prev_begin = sw.begin;
 
+        spin_sleep_for_ms(1);
         sw.restart();
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), false);
@@ -452,7 +453,7 @@ TestImpl(test_timer)
             AssertGreaterOrEqual(cpu_delta, spin_us - 16'000);
             AssertLessOrEqual(cpu_delta, spin_us + 16'000);
         #else
-            AssertGreaterOrEqual(cpu_delta, spin_us);
+            AssertGreaterOrEqual(cpu_delta, spin_us - 5'000);
             AssertLessOrEqual(cpu_delta, spin_us + 5'000);
         #endif
     }

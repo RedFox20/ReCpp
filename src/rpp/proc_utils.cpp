@@ -31,20 +31,43 @@ namespace rpp
             result.physical_mem = static_cast<uint64>(info.resident_size);
         }
     #else
+        // // https://man7.org/linux/man-pages/man5/proc.5.html
+        // // size       (1) total program size (same as VmSize in /proc/pid/status)
+        // // resident   (2) resident set size (inaccurate; same as VmRSS in /proc/pid/status)
+        // if (rpp::file f { "/proc/self/statm", rpp::file::READONLY })
+        // {
+        //     f.seek(0, SEEK_SET); // seeking to 0 will force OS to re-generate the data
+        //     char buffer[1024];
+        //     int len = f.read(buffer, sizeof(buffer));
+        //     if (len > 0)
+        //     {
+        //         static int page_size = getpagesize();
+        //         strview contents { buffer, len };
+        //         result.virtual_size = contents.next_int64() * page_size;
+        //         result.physical_mem = contents.next_int64() * page_size;
+        //     }
+        // }
+
         // https://man7.org/linux/man-pages/man5/proc.5.html
-        // size       (1) total program size (same as VmSize in /proc/pid/status)
-        // resident   (2) resident set size (inaccurate; same as VmRSS in /proc/pid/status)
-        if (rpp::file f { "/proc/self/statm", rpp::file::READONLY })
+        // (23) vsize  %lu  Virtual memory size in bytes.
+        // (24) rss  %ld  Resident Set Size: number of pages the process has in real memory.
+        // this is more stable than /proc/self/statm - due to OS differences
+        if (rpp::file f { "/proc/self/stat", rpp::file::READONLY })
         {
-            f.seek(0, SEEK_SET); // seeking to 0 will force OS to re-generate the data
-            char buffer[1024];
+            char buffer[2048];
             int len = f.read(buffer, sizeof(buffer));
             if (len > 0)
             {
                 static int page_size = getpagesize();
+                int field_id = 0;
                 strview contents { buffer, len };
-                result.virtual_size = contents.next_int64() * page_size;
-                result.physical_mem = contents.next_int64() * page_size;
+                strview token;
+                while (contents.next(token, ' '))
+                {
+                    ++field_id; // counting from (1)
+                    if      (field_id == 23) result.virtual_size = token.to_int64();
+                    else if (field_id == 24) result.physical_mem = token.to_int64() * page_size;
+                }
             }
         }
     #endif
