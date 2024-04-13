@@ -673,54 +673,17 @@ namespace rpp
 
     void test::spin_sleep_for_us(uint64_t microseconds) noexcept
     {
-        namespace time = std::chrono;
-        auto sleep_time = time::nanoseconds(microseconds * 1000ull);
         // NOTE: high_resolution_clock might not be available on some target systems
         //       which would require a fallback to rolling our own.
         //       However, we want to avoid using rpp/timer.h here, since that would
         //       introduce a circular dependency in the testing framework and not test
         //       the timer.h implementation.
+        namespace time = std::chrono;
         auto start = time::high_resolution_clock::now();
-        while (true) {
-            if ((time::high_resolution_clock::now() - start) >= sleep_time)
-                break;
-        }
-    }
-
-    int test::run_tests(strview testNamePatterns)
-    {
-        char* patterns[128] = { nullptr };
-        int npatterns = 0;
-        patterns[npatterns++] = (char*)"";
-
-        strview pattern;
-        while (testNamePatterns.next_skip_empty(pattern, " \t"))
+        auto end = start + time::nanoseconds(microseconds * 1000ull);
+        while (time::high_resolution_clock::now() < end)
         {
-            if (npatterns >= 128) LogError("Too many test patterns");
-            else patterns[npatterns++] = (char*)pattern.data();
         }
-        return run_tests(npatterns, patterns);
-    }
-
-    int test::run_tests(const char** testNamePatterns, int numPatterns)
-    {
-        char* patterns[128] = { nullptr };
-        int npatterns = 0;
-        patterns[npatterns++] = (char*)"";
-
-        for (int i = 0; i < numPatterns; ++i)
-        {
-            if (npatterns >= 128) LogError("Too many test patterns");
-            else patterns[numPatterns++] = (char*)testNamePatterns[i];
-        }
-        return run_tests(npatterns, patterns);
-    }
-
-    int test::run_tests()
-    {
-        char empty[1] = "";
-        char* argv[1] = { empty };
-        return run_tests(1, argv);
     }
 
     void test::cleanup_all_tests()
@@ -798,10 +761,30 @@ namespace rpp
         {
             if (it->starts_with("--verbosity"))
             {
-                state().verbosity = (TestVerbosity)it->skip_after('=').to_int();
+                if (*it == "--verbosity") // --verbosity 3
+                {
+                    it = args.erase(it);
+                    if (it == args.end()) break;
+                    state().verbosity = (TestVerbosity)it->to_int();
+                    it = args.erase(it);
+                }
+                else // --verbosity=3
+                {
+                    state().verbosity = (TestVerbosity)it->skip_after('=').to_int();
+                    it = args.erase(it);
+                }
+            }
+            else if (*it == "-v" || *it == "-vv")
+            {
+                // Summary is the default, so -v will bump it once, -vv will be super verbose
+                state().verbosity = *it == "-v" ? TestVerbosity::TestLabels
+                                                : TestVerbosity::AllMessages;
                 it = args.erase(it);
             }
-            else ++it;
+            else
+            {
+                ++it;
+            }
         }
     }
 
@@ -921,6 +904,42 @@ namespace rpp
         if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed!\n\n");
         else               consolef(Green, "\nSUCCESS: All %d tests passed!\n\n", numTests);
         return 0;
+    }
+
+    int test::run_tests(strview testNamePatterns)
+    {
+        char* patterns[128] = { nullptr };
+        int npatterns = 0;
+        patterns[npatterns++] = (char*)"";
+
+        strview pattern;
+        while (testNamePatterns.next_skip_empty(pattern, " \t"))
+        {
+            if (npatterns >= 128) LogError("Too many test patterns");
+            else patterns[npatterns++] = (char*)pattern.data();
+        }
+        return run_tests(npatterns, patterns);
+    }
+
+    int test::run_tests(const char** testNamePatterns, int numPatterns)
+    {
+        char* patterns[128] = { nullptr };
+        int npatterns = 0;
+        patterns[npatterns++] = (char*)"";
+
+        for (int i = 0; i < numPatterns; ++i)
+        {
+            if (npatterns >= 128) LogError("Too many test patterns");
+            else patterns[numPatterns++] = (char*)testNamePatterns[i];
+        }
+        return run_tests(npatterns, patterns);
+    }
+
+    int test::run_tests()
+    {
+        char empty[1] = "";
+        char* argv[1] = { empty };
+        return run_tests(1, argv);
     }
 
     int test::run_tests(int argc, char* argv[])

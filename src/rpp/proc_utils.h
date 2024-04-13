@@ -7,6 +7,9 @@
 
 namespace rpp
 {
+    /**
+     * Process memory usage information - for profiling stats.
+     */
     struct proc_mem_info
     {
         /// @brief Total virtual memory reserved for this process.
@@ -23,23 +26,36 @@ namespace rpp
      */
     proc_mem_info proc_current_mem_used() noexcept;
 
-    struct proc_cpu_info
+
+    /**
+     * CPU usage information - for profiling stats.
+     */
+    struct cpu_usage_info
     {
-        /// @brief Total CPU time used by this process in microseconds.
+        /// @brief Total CPU time used in microseconds.
         ///        User + Kernel.
         uint64 cpu_time_us = 0;
 
-        /// @brief Total CPU time used by this process in user mode in microseconds.
+        /// @brief Total CPU time used in user mode in microseconds.
         uint64 user_time_us = 0;
 
-        /// @brief Total CPU time used by this process in kernel mode in microseconds.
+        /// @brief Total CPU time used in kernel mode in microseconds.
         uint64 kernel_time_us = 0;
+
+        double cpu_time_ms() const noexcept { return cpu_time_us / 1'000.0; }
+        double user_time_ms() const noexcept { return user_time_us / 1'000.0; }
+        double kernel_time_ms() const noexcept { return kernel_time_us / 1'000.0; }
+
+        double cpu_time_sec() const noexcept { return cpu_time_us / 1'000'000.0; }
+        double user_time_sec() const noexcept { return user_time_us / 1'000'000.0; }
+        double kernel_time_sec() const noexcept { return kernel_time_us / 1'000'000.0; }
     };
 
     /**
-     * @return Total CPU time used by this process in microseconds.
+     * @return Total CPU time used by this PROCESS in microseconds.
      * @brief To calculate CPU usage %, call this function twice over a known time interval.
      */
-    proc_cpu_info proc_total_cpu_usage() noexcept;
+    cpu_usage_info proc_total_cpu_usage() noexcept;
+
 
 } // namespace rpp

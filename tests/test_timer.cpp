@@ -422,13 +422,13 @@ TestImpl(test_timer)
 
     TestCase(proc_cpu_times)
     {
-        rpp::proc_cpu_info t1 = rpp::proc_total_cpu_usage();
+        rpp::cpu_usage_info t1 = rpp::proc_total_cpu_usage();
         const int spin_us = 50'000;
         spin_sleep_for_us(spin_us); // spin wait for accurate time counts
-        rpp::proc_cpu_info t2 = rpp::proc_total_cpu_usage();
+        rpp::cpu_usage_info t2 = rpp::proc_total_cpu_usage();
 
-        print_info("#1 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t1.cpu_time_us/1000.0, t1.user_time_us/1000.0, t1.kernel_time_us/1000.0);
-        print_info("#2 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t2.cpu_time_us/1000.0, t2.user_time_us/1000.0, t2.kernel_time_us/1000.0);
+        print_info("#1 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t1.cpu_time_ms(), t1.user_time_ms(), t1.kernel_time_ms());
+        print_info("#2 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t2.cpu_time_ms(), t2.user_time_ms(), t2.kernel_time_ms());
         rpp::int64 kernel_delta = t2.kernel_time_us - t1.kernel_time_us;
         rpp::int64 user_delta = t2.user_time_us - t1.user_time_us;
         rpp::int64 cpu_delta = t2.cpu_time_us - t1.cpu_time_us;
@@ -442,9 +442,15 @@ TestImpl(test_timer)
         AssertGreater(t2.cpu_time_us, t1.cpu_time_us);
 
         // since calculations are done using system clock, most time should be spent in kernel
-        AssertGreaterOrEqual(t2.cpu_time_us, t1.cpu_time_us + spin_us);
-        AssertLessOrEqual(t2.cpu_time_us, t1.cpu_time_us + spin_us + 5'000);
-
         AssertGreater(kernel_delta, user_delta);
+
+        #if _MSC_VER
+            // TODO: Windows CPU usage timing accuracy is 15.6ms, so we need to relax the timings
+            AssertGreaterOrEqual(cpu_delta, spin_us - 16'000);
+            AssertLessOrEqual(cpu_delta, spin_us + 16'000);
+        #else
+            AssertGreaterOrEqual(cpu_delta, spin_us);
+            AssertLessOrEqual(cpu_delta, spin_us + 5'000);
+        #endif
     }
 };

@@ -60,9 +60,9 @@ namespace rpp
     }
     #endif
 
-    proc_cpu_info proc_total_cpu_usage() noexcept
+    cpu_usage_info proc_total_cpu_usage() noexcept
     {
-        proc_cpu_info r;
+        cpu_usage_info r;
     #if _MSC_VER
         FILETIME creation_time, exit_time, kernel_time, user_time;
         GetProcessTimes(GetCurrentProcess(), &creation_time, &exit_time, &kernel_time, &user_time);
