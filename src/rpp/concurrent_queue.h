@@ -666,7 +666,12 @@ namespace rpp
                 }
 
                 // suspend until we can lock the mutex
-                Mutex.lock(); // may throw if deadlock is detected or system runs out of resources
+                try {
+                    Mutex.lock(); // may throw if deadlock
+                } catch (...) {
+                    // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
+                    return std::unique_lock<std::mutex>{Mutex, std::defer_lock};
+                }
             }
             return std::unique_lock<std::mutex>{Mutex, std::adopt_lock};
         }
