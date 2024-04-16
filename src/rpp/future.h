@@ -359,7 +359,7 @@ namespace rpp
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
-            return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+            return this->valid() && this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
 
     #if RPP_HAS_COROUTINES // C++20 coro support
@@ -367,6 +367,12 @@ namespace rpp
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
+            // if this future is invalid, resume immediately without spawning a background task
+            if (!this->valid())
+            {
+                cont.resume();
+                return;
+            }
             rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
@@ -650,7 +656,7 @@ namespace rpp
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
-            return this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+            return this->valid() && this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
 
     #if RPP_HAS_COROUTINES // C++20 coroutine support
@@ -658,6 +664,12 @@ namespace rpp
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
+            // if this future is invalid, resume immediately without spawning a background task
+            if (!this->valid())
+            {
+                cont.resume();
+                return;
+            }
             rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
