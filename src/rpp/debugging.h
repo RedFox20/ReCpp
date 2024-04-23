@@ -65,8 +65,16 @@ RPPCAPI LogSeverity GetLogSeverityFilter();
 /**
  * Prefixes all log entries with a time-of-day timestamp in the format of:
  * hh:mm:ss.MMMms, e.g. 21:24:13.172ms
-*/
-RPPCAPI void LogEnableTimestamps(bool enable);
+ * @param enable True to enable timestamps, false to disable
+ * @param precision[3] The number of decimal places to show: 3 for milliseconds, 6 for micros.
+ */
+RPPCAPI void LogEnableTimestamps(bool enable, int precision = 3);
+
+/**
+ * Adds a time offset to the log timestamps. This is useful for syncing logs.
+ * The offset is in nanoseconds.
+ */
+RPPCAPI void LogSetTimeOffset(rpp::int64 offset_nanos);
 
 /**
  * Writes a message to default output. On most platforms this is stdout/stderr

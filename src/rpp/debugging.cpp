@@ -39,6 +39,8 @@ static LogEventCallback EventHandler;
 static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
 static bool EnableTimestamps = false;
+static int TimePrecision = 3;
+static rpp::int64 TimeOffset;
 
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler)
 {
@@ -68,9 +70,14 @@ RPPCAPI LogSeverity GetLogSeverityFilter()
 {
     return Filter;
 }
-RPPCAPI void LogEnableTimestamps(bool enable)
+RPPCAPI void LogEnableTimestamps(bool enable, int precision)
 {
     EnableTimestamps = enable;
+    TimePrecision = std::clamp(precision, 0, 9);
+}
+RPPCAPI void LogSetTimeOffset(rpp::int64 offset)
+{
+    TimeOffset = offset;
 }
 
 static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexcept
@@ -79,7 +86,9 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     int remaining = N;
     int len = 0;
     if (EnableTimestamps) {
-        len = rpp::TimePoint::now().to_string(pbuf, remaining-1);
+        rpp::TimePoint now = rpp::TimePoint::now();
+        now.duration.nsec += TimeOffset;
+        len = now.to_string(pbuf, remaining-1, TimePrecision);
         pbuf[len++] = ' '; // add separator
         pbuf += len;
         remaining -= len;
