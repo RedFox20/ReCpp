@@ -732,14 +732,7 @@ namespace rpp
         }
         ~multicast_delegate() noexcept
         {
-            if (ptr)
-            {
-                int    size = ptr->size;
-                deleg* data = ptr->data;
-                for (int i = 0; i < size; ++i)
-                    data[i].~deleg();
-                free(ptr);
-            }
+            clear();
         }
 
         multicast_delegate(multicast_delegate&& d) noexcept : ptr{d.ptr}
@@ -770,8 +763,15 @@ namespace rpp
         /** @brief Destructs the event container and frees all used memory */
         void clear() noexcept
         {
-            this->~multicast_delegate();
-            ptr = nullptr;
+            if (ptr)
+            {
+                int    size = ptr->size;
+                deleg* data = ptr->data;
+                for (int i = 0; i < size; ++i)
+                    data[i].~deleg();
+                free(ptr);
+                ptr = nullptr;
+            }
         }
 
         /** @return TRUE if there are callable delegates */
@@ -782,14 +782,14 @@ namespace rpp
         /** @return Number of currently registered event delegates */
         int size() const noexcept { return ptr ? ptr->size : 0; }
 
-              deleg* begin()       { return ptr ? ptr->data : nullptr; }
-        const deleg* begin() const { return ptr ? ptr->data : nullptr; }
-              deleg* end()       { return ptr ? ptr->data + ptr->size : nullptr; }
-        const deleg* end() const { return ptr ? ptr->data + ptr->size : nullptr; }
+              deleg* begin() noexcept       { return ptr ? ptr->data : nullptr; }
+        const deleg* begin() const noexcept { return ptr ? ptr->data : nullptr; }
+              deleg* end() noexcept       { return ptr ? ptr->data + ptr->size : nullptr; }
+        const deleg* end() const noexcept { return ptr ? ptr->data + ptr->size : nullptr; }
 
     private:
 
-        void grow()
+        void grow() noexcept
         {
             if (!ptr)
             {
@@ -830,18 +830,23 @@ namespace rpp
          */
         void remove(const deleg& d) noexcept
         {
-            int    size = ptr->size;
-            deleg* data = ptr->data;
+            container* c = ptr;
+            if (!c) return;
+
+            int    size = c->size;
+            deleg* data = c->data;
             for (int i = 0; i < size; ++i)
             {
                 if (data[i] == d)
                 {
+                    --c->size;
+                    data[i] = deleg{}; // reset the delegate (dealloc if needed)
+
                     int unshift = size - (i + 1);
-                    if (unshift > 0) {
+                    if (unshift > 0) { // unshift N elements from end of array if needed
                         memmove(reinterpret_cast<void*>(&data[i]), reinterpret_cast<void*>(&data[i + 1]),
-                                sizeof(deleg)*unshift); // unshift
+                                sizeof(deleg)*unshift);
                     }
-                    --ptr->size;
                     return;
                 }
             }
@@ -850,37 +855,37 @@ namespace rpp
 
         template<class Class> void add(void* obj, void (Class::*member_function)(Args...)) noexcept
         {
-            add(deleg(obj, member_function));
+            add(deleg{obj, member_function});
         }
         template<class IClass, class FClass> void add(IClass& obj, void (FClass::*member_function)(Args...)) noexcept
         {
-            add(deleg(obj, member_function));
+            add(deleg{obj, member_function});
         }
         template<class Class> void add(void* obj, void (Class::*member_function)(Args...)const) noexcept
         {
-            add(deleg(obj, member_function));
+            add(deleg{obj, member_function});
         }
         template<class IClass, class FClass> void add(IClass& obj, void (FClass::*member_function)(Args...)const) noexcept
         {
-            add(deleg(obj, member_function));
+            add(deleg{obj, member_function});
         }
 
 
         template<class Class> void remove(void* obj, void (Class::*member_function)(Args...)) noexcept
         {
-            remove(deleg(obj, member_function));
+            remove(deleg{obj, member_function});
         }
         template<class IClass, class FClass> void remove(IClass& obj, void (FClass::*member_function)(Args...))
         {
-            remove(deleg(obj, member_function));
+            remove(deleg{obj, member_function});
         }
         template<class Class> void remove(void* obj, void (Class::*member_function)(Args...)const) noexcept
         {
-            remove(deleg(obj, member_function));
+            remove(deleg{obj, member_function});
         }
         template<class IClass, class FClass> void remove(IClass& obj, void (FClass::*member_function)(Args...)const)
         {
-            remove(deleg(obj, member_function));
+            remove(deleg{obj, member_function});
         }
 
 
@@ -916,8 +921,10 @@ namespace rpp
     template<class... Args>
     void multicast_delegate<Args...>::operator()(Args... args) const
     {
-        int    size = ptr->size;
-        deleg* data = ptr->data;
+        container* c = ptr;
+        if (!c) return;
+        int    size = c->size;
+        deleg* data = c->data;
         for (int i = 0; i < size; ++i)
         {
             data[i](static_cast<multicast_fwd_t<Args>>(args)...);
@@ -927,8 +934,10 @@ namespace rpp
     template<class... Args>
     void multicast_delegate<Args...>::invoke(Args... args) const
     {
-        int    size = ptr->size;
-        deleg* data = ptr->data;
+        container* c = ptr;
+        if (!c) return;
+        int    size = c->size;
+        deleg* data = c->data;
         for (int i = 0; i < size; ++i)
         {
             data[i](static_cast<multicast_fwd_t<Args>>(args)...);
