@@ -73,7 +73,7 @@ RPPCAPI LogSeverity GetLogSeverityFilter()
 RPPCAPI void LogEnableTimestamps(bool enable, int precision)
 {
     EnableTimestamps = enable;
-    TimePrecision = std::clamp(precision, 0, 9);
+    TimePrecision = precision;
 }
 RPPCAPI void LogSetTimeOffset(rpp::int64 offset)
 {
