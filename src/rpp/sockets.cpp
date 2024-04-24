@@ -1776,13 +1776,11 @@ namespace rpp
         if (r != 0)
         {
             int err = os_getsockerr();
-            if (err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
+            if (err == ESOCK(EALREADY) || err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
             {
-                if (poll(millis, PF_Write))
-                {
-                    // socket is writable, check for errors
-                    r = get_socket_level_error();
-                }
+                poll(millis, PF_Write);
+                // always check for error on the socket
+                r = get_socket_level_error();
             }
         }
 
