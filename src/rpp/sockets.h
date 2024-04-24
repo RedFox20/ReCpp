@@ -486,7 +486,7 @@ namespace rpp
         bool Shared;         // if true, Socket is shared and dtor won't call closesocket() [@see socket::DEFAULT_SHARED]
         bool Blocking;       // if TRUE, the socket is blocking [@see socket::DEFAULT_BLOCKING], will be updated during create()/connect()
         bool AutoClose;      // automatically closes the socket on disconnect events [@see socket::DEFAULT_AUTOCLOSE]
-        bool Connected;      // for connnection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
+        bool Connected; // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
 
@@ -965,6 +965,16 @@ namespace rpp
         /** @return Remaining space in the socket send buffer. 0 if no space. -1 on error. */
         int get_send_buffer_remaining() const noexcept;
 
+        /**
+         * @brief Sets the socket SO_LINGER option.
+         * When enabled, a close() will not return until all queued messages for the
+         * socket have been successfully sent or the linger timeout has been reached. Otherwise,
+         * the call returns immediately and the closing is done in the background.
+         * @param active TRUE to enable linger option, FALSE to disable
+         * @param seconds The linger timeout in seconds (0 = immediate close with ENETRESET)
+         */
+        bool set_linger(bool active, int seconds) noexcept;
+
         ////////////////////////////////////////////////////////////////////////////
 
         /**
@@ -1225,14 +1235,16 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Makes an UDP socket with a random port
+     * Creates am INADDR_ANY UDP socket with a random port
+     * @param bind_address Address to bind to, default is INADDR_ANY
      */
-    RPPAPI socket make_udp_randomport(socket_option opt = SO_None) noexcept;
+    RPPAPI socket make_udp_randomport(socket_option opt = SO_None, raw_address bind_address = raw_address{AF_IPv4}) noexcept;
 
     /**
-     * Creates a loopback (127.0.0.1) TCP Listener with a random port number
+     * Creates an INADDR_ANY TCP Listener with a random port number
+     * @param bind_address Address to bind to, default is INADDR_ANY
      */
-    RPPAPI socket make_tcp_randomport(socket_option opt = SO_None) noexcept;
+    RPPAPI socket make_tcp_randomport(socket_option opt = SO_None, raw_address bind_address = raw_address{AF_IPv4}) noexcept;
 
     /**
      * @returns Main interface of the current system

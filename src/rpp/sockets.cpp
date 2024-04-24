@@ -718,9 +718,12 @@ namespace rpp
 
     socket::socket() noexcept
         : Sock{-1}, Addr{}, LastErr{0}
-        , Shared{DEFAULT_SHARED}, Blocking{DEFAULT_BLOCKING}
-        , AutoClose{DEFAULT_AUTOCLOSE}, Connected{false}
-        , Category{SC_Unknown}, Type{ST_Unspecified}
+        , Shared{DEFAULT_SHARED}
+        , Blocking{DEFAULT_BLOCKING}
+        , AutoClose{DEFAULT_AUTOCLOSE}
+        , Connected{false}
+        , Category{SC_Unknown}
+        , Type{ST_Unspecified}
     {
     }
     socket socket::from_os_handle(int handle, const ipaddress& addr, bool shared, bool blocking)
@@ -735,49 +738,28 @@ namespace rpp
             throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + s.last_err()};
         return s;
     }
-    socket::socket(socket&& s) noexcept
-        : Sock{s.Sock}, Addr{s.Addr}, LastErr{s.LastErr}
-        , Shared{s.Shared}, Blocking{s.Blocking}
-        , AutoClose{s.AutoClose}, Connected{s.Connected}
-        , Category{s.Category}, Type{s.Type}
+    socket::socket(socket&& s) noexcept : socket{}/*create with defaults*/
     {
-        s.Sock = -1;
-        s.Addr.reset();
-        s.Shared = DEFAULT_SHARED;
-        s.Blocking = DEFAULT_BLOCKING;
-        s.AutoClose = DEFAULT_AUTOCLOSE;
-        s.Connected = false;
-        s.Category = SC_Unknown;
-        s.Type = ST_Unspecified;
+        this->operator=(std::move(s)); // reuse move operator
     }
     socket& socket::operator=(socket&& s) noexcept
     {
-        close();
-        Sock   = s.Sock;
-        Addr   = s.Addr;
-        LastErr = s.LastErr;
-        Shared = s.Shared;
-        Blocking = s.Blocking;
-        AutoClose = s.AutoClose;
-        Connected = s.Connected;
-        Category = s.Category;
-        Type = s.Type;
-        s.Sock = -1;
-        s.Addr.reset();
-        s.LastErr  = 0;
-        s.Shared   = DEFAULT_SHARED;
-        s.Blocking = DEFAULT_BLOCKING;
-        s.AutoClose = DEFAULT_AUTOCLOSE;
-        s.Connected = false;
-        s.Category = SC_Unknown;
-        s.Type = ST_Unspecified;
+        std::swap(Sock, s.Sock);
+        std::swap(Addr, s.Addr);
+        std::swap(LastErr, s.LastErr);
+        std::swap(Shared, s.Shared);
+        std::swap(Blocking, s.Blocking);
+        std::swap(AutoClose, s.AutoClose);
+        std::swap(Category, s.Category);
+        std::swap(Type, s.Type);
+        std::swap(Connected, s.Connected);
+        // s.Connected = Connected.exchange(s.Connected);
         return *this;
     }
     socket::~socket() noexcept
     {
         close();
     }
-
 
     void socket::close() noexcept
     {
@@ -786,6 +768,7 @@ namespace rpp
             if (!Shared) { closesocket(Sock); }
             Sock = -1;
             Type = ST_Unspecified;
+            Category = SC_Unknown;
             Connected = false;
         }
         // dont clear the address, so we have info on what we just closed
@@ -1414,6 +1397,16 @@ namespace rpp
         return -1; // unknown
     }
 
+    bool socket::set_linger(bool active, int seconds) noexcept
+    {
+        struct linger l;
+        l.l_onoff = active ? 1 : 0;
+        l.l_linger = seconds;
+        bool ok = setsockopt(Sock, SOL_SOCKET, SO_LINGER, (char*)&l, sizeof(l)) == 0;
+        LastErr = ok ? 0 : os_getsockerr();
+        return ok;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
 
     socket_type socket::update_socket_type() noexcept
@@ -1481,6 +1474,12 @@ namespace rpp
             return false; // it was a fatal error
         }
 
+        if (Type == ST_Datagram)
+            return true; // UDP is always connected (no connection state to check)
+
+        if (Category == SC_Listen)
+            return true; // Listening sockets are always connected
+
         // Checking for connection status only makes sense for connection oriented sockets.
         // This only applies for Accepted or Client sockets.
         // To check if a TCP socket is still connected we use a nonblocking read.
@@ -1512,7 +1511,9 @@ namespace rpp
             // if poll doesn't trigger, we rely on the Connected flag
             return Connected;
         }
-        return true;
+
+        // an unknown socket category, assume it's NOT connection oriented
+        return false;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1830,21 +1831,21 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    socket make_udp_randomport(socket_option opt) noexcept
+    socket make_udp_randomport(socket_option opt, raw_address bind_address) noexcept
     {
         for (int i = 0; i < 100; ++i) {
             int port = (rand() % (65536 - 8000));
-            if (socket s = socket::make_udp({AF_IPv4, port}, opt))
+            if (socket s = socket::make_udp(ipaddress{bind_address, port}, opt))
                 return s;
         }
         return {};
     }
 
-    socket make_tcp_randomport(socket_option opt) noexcept
+    socket make_tcp_randomport(socket_option opt, raw_address bind_address) noexcept
     {
         for (int i = 0; i < 100; ++i) {
             int port = (rand() % (65536 - 8000));
-            if (socket s = socket::listen_to({AF_IPv4, port}, IPP_TCP, opt))
+            if (socket s = socket::listen_to(ipaddress{bind_address, port}, IPP_TCP, opt))
                 return s;
         }
         return {};
