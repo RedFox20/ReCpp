@@ -197,6 +197,7 @@ namespace rpp
         size_t expectedExType = 0;
         std::chrono::nanoseconds elapsed_time{};
         bool autorun = true;
+        bool did_run = false;
         bool success = false;
     private:
         rpp::string_buffer message_buf;
@@ -569,7 +570,8 @@ namespace rpp
         {
             for (test_func* fn : impl->test_functions)
             {
-                if (fn->success) continue;
+                if (!fn->did_run || fn->success)
+                    continue;
                 consolef(Red, "FAIL %s::%s\n", name.str, fn->name.str);
                 for (size_t i = 0; i < fn->num_messages(); ++i)
                 {
@@ -597,6 +599,7 @@ namespace rpp
         }
 
         test.success = false;
+        test.did_run = true;
         tl_current_test_func = impl->current_func = &test;
         int before = impl->current_results->asserts_failed;
         auto t1 = std::chrono::high_resolution_clock::now();

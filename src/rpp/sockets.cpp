@@ -738,6 +738,13 @@ namespace rpp
             throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + s.last_err()};
         return s;
     }
+    socket socket::from_err_code(int last_err, const ipaddress& addr) noexcept
+    {
+        socket s;
+        s.Addr = addr;
+        s.LastErr = last_err;
+        return s;
+    }
     socket::socket(socket&& s) noexcept : socket{}/*create with defaults*/
     {
         this->operator=(std::move(s)); // reuse move operator
@@ -1079,8 +1086,7 @@ namespace rpp
         switch (errcode) {
             case 0: return 0; // no error
             default: {
-                indebug(auto errmsg = socket::last_os_socket_err(errcode));
-                logerror("socket fh:%d %s", Sock, errmsg.c_str());
+                logerror("socket fh:%d %s", Sock, last_os_socket_err(errcode).c_str());
                 if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
@@ -1099,12 +1105,12 @@ namespace rpp
             case ESOCK(EISCONN):       return 0; // socket is already connected
             case ESOCK(EINTR):         return 0; // the operation was interrupted
             case ESOCK(EADDRINUSE): {
-                indebug(auto errmsg = socket::last_os_socket_err(errcode));
-                logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
+                logerror("socket fh:%d EADDRINUSE %s", Sock, last_os_socket_err(errcode).c_str());
                 if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
+            case ESOCK(EBADF):         // invalid socket
             case ESOCK(EFAULT):        // invalid address
             case ESOCK(EPROTOTYPE):    // invalid socket arguments
             case ESOCK(EPROTONOSUPPORT): // invalid protocol
@@ -1758,7 +1764,7 @@ namespace rpp
         socket s;
         if (s.listen(localAddr, ipp, opt))
             return s;
-        return {};
+        return socket::from_err_code(s.LastErr, localAddr);
     }
 
 
@@ -1767,16 +1773,16 @@ namespace rpp
         if (!good())
         {
             LogError("Cannot use socket::accept() on closed sockets");
-            return {};
+            return socket::from_err_code(ESOCK(EBADF));
         }
         if (type() != socket_type::ST_Stream)
         {
             LogError("Cannot use socket::accept() on non-TCP sockets, use recvfrom instead");
-            return {};
+            return socket::from_err_code(ESOCK(EPROTOTYPE));
         }
 
         if (!this->poll(timeoutMillis, PF_Read)) // poll will handle any errors
-            return {};
+            return socket::from_err_code(LastErr);
 
         saddr saddr;
         socklen_t len = sizeof(saddr);
@@ -1784,7 +1790,7 @@ namespace rpp
         if (handle == -1)
         {
             handle_errno();
-            return {};
+            return socket::from_err_code(LastErr);
         }
 
         socket client = socket::from_os_handle(handle, ipaddress{handle});
@@ -1860,7 +1866,6 @@ namespace rpp
                     configure_connected_client(opt);
                     return true;
                 }
-                logdebug("socket fh:%d async connect() error: %s", Sock, socket::last_os_socket_err(so_err).c_str());
                 handle_errno(so_err);
                 return false;
             }
@@ -1872,7 +1877,7 @@ namespace rpp
             }
         }
 
-        // handle unfamiliar errors
+        logerror("socket fh:%d async connect error: %s", Sock, last_os_socket_err(err).c_str());
         handle_errno(err);
         return false;
     }
@@ -1897,7 +1902,7 @@ namespace rpp
         socket s;
         if (s.connect(remoteAddr, opt))
             return s;
-        return {}; // failed
+        return socket::from_err_code(s.LastErr, remoteAddr);
     }
 
     socket socket::connect_to(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
@@ -1905,29 +1910,31 @@ namespace rpp
         socket s;
         if (s.connect(remoteAddr, millis, opt))
             return s;
-        return {}; // failed
+        return socket::from_err_code(s.LastErr, remoteAddr);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
 
     socket make_udp_randomport(socket_option opt, raw_address bind_address) noexcept
     {
+        socket s;
         for (int i = 0; i < 100; ++i) {
             int port = (rand() % (65536 - 8000));
-            if (socket s = socket::make_udp(ipaddress{bind_address, port}, opt))
-                return s;
+            s = socket::make_udp(ipaddress{bind_address, port}, opt);
+            if (s.good()) return s;
         }
-        return {};
+        return s; // keeps the error code and address of the last attempt
     }
 
     socket make_tcp_randomport(socket_option opt, raw_address bind_address) noexcept
     {
+        socket s;
         for (int i = 0; i < 100; ++i) {
             int port = (rand() % (65536 - 8000));
-            if (socket s = socket::listen_to(ipaddress{bind_address, port}, IPP_TCP, opt))
-                return s;
+            s = socket::listen_to(ipaddress{bind_address, port}, IPP_TCP, opt);
+            if (s.good()) return s;
         }
-        return {};
+        return s; // keeps the error code and address of the last attempt
     }
 
     ipinterface get_ip_interface(const std::string& network_interface, address_family af)

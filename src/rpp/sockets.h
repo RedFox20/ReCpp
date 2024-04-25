@@ -505,6 +505,13 @@ namespace rpp
         static socket from_os_handle(int handle, const ipaddress& addr,
                                      bool shared=false, bool blocking=true);
 
+        /**
+         * @brief Creates an invalid socket object with the last_err() set to the given error code
+         * @param last_err Last error code to set
+         * @param addr[optional] Address information of the failure
+         */
+        static socket from_err_code(int last_err, const ipaddress& addr = {}) noexcept;
+
         /* Creates a default socket object */
         socket() noexcept;
         ~socket() noexcept;
