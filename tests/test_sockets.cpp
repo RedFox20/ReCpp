@@ -810,7 +810,7 @@ TestImpl(test_sockets)
         int port = s.port();
         return create("server: listening on " + std::to_string(port), std::move(s));
     }
-    socket accept(const socket& server)
+    socket accept(socket& server)
     {
         return create("server: accepted client", server.accept(5000/*ms*/));
     }
@@ -818,6 +818,14 @@ TestImpl(test_sockets)
     {
         return create("remote: connected to "+ip+":"+std::to_string(port),
                       socket::connect_to({ip, port}, 5000/*ms*/, opt));
+    }
+
+    TestCase(tcp_connect_to_nonexisting_server_fails)
+    {
+        socket client = socket::connect_to({"127.0.0.1", 12345}, 50/*ms*/);
+        AssertFalse(client.good());
+        print_info("connect result: %s\n", client.last_err().c_str());
+        AssertNotEqual(client.last_err_type(), rpp::socket::SE_NONE);
     }
 
     /**

@@ -1092,6 +1092,8 @@ namespace rpp
             case ESOCK(ENOTCONN):      return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
             case ESOCK(EADDRNOTAVAIL): return 0; // address doesn't exist
             case ESOCK(ENETUNREACH):   return 0; // network is unreachable
+            case ESOCK(EISCONN):       return 0; // socket is already connected
+            case ESOCK(EINTR):         return 0; // the operation was interrupted
             case ESOCK(EADDRINUSE): {
                 indebug(auto errmsg = socket::last_os_socket_err(errcode));
                 logerror("socket fh:%d EADDRINUSE %s", Sock, errmsg.c_str());
@@ -1099,11 +1101,16 @@ namespace rpp
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
             }
+            case ESOCK(EFAULT):        // invalid address
+            case ESOCK(EPROTOTYPE):    // invalid socket arguments
+            case ESOCK(EPROTONOSUPPORT): // invalid protocol
+            case ESOCK(EAFNOSUPPORT):  // invalid address family
             case ESOCK(ECONNRESET):    // connection lost
             case ESOCK(ECONNREFUSED):  // connect failed
             case ESOCK(ECONNABORTED):  // connection closed
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(EHOSTUNREACH):  // no route to host
+            case ESOCK(ESHUTDOWN):     // socket was shut down
                 if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
@@ -1155,7 +1162,7 @@ namespace rpp
         int errcode = err ? err : os_getsockerr();
         switch (errcode) {
             case 0: return SE_NONE;
-            default: return SE_UNKNOWN;
+            default: return (socket::error)errcode;
             case ESOCK(ENETRESET):     return SE_NETRESET;
             case ESOCK(EMSGSIZE):      return SE_MSGSIZE;
             case ESOCK(EINPROGRESS):   return SE_INPROGRESS;
@@ -1172,6 +1179,15 @@ namespace rpp
             case ESOCK(ETIMEDOUT):     return SE_TIMEDOUT;
             case ESOCK(EHOSTUNREACH):  return SE_HOSTUNREACH;
             case ESOCK(ENETUNREACH):   return SE_NETUNREACH;
+            case ESOCK(EBADF):         return SE_BADSOCKET;
+            case ESOCK(ENOTSOCK):      return SE_BADSOCKET;
+            case ESOCK(EISCONN):       return SE_ALREADYCONN;
+            case ESOCK(EFAULT):        return SE_ADDRFAULT;
+            case ESOCK(EINTR):         return SE_INTERRUPTED;
+            case ESOCK(EPROTOTYPE):    return SE_SOCKTYPE;
+            case ESOCK(EPROTONOSUPPORT): return SE_SOCKTYPE;
+            case ESOCK(EAFNOSUPPORT):  return SE_SOCKFAMILY;
+            case ESOCK(ESHUTDOWN):     return SE_SHUTDOWN;
         }
     }
 
@@ -1194,6 +1210,13 @@ namespace rpp
             case SE_TIMEDOUT:     return "timed out (ETIMEDOUT)";
             case SE_HOSTUNREACH:  return "host unreachable (EHOSTUNREACH)";
             case SE_NETUNREACH:   return "network unreachable (ENETUNREACH)";
+            case SE_BADSOCKET:    return "bad socket (EBADF)";
+            case SE_ALREADYCONN:  return "already connected (EISCONN)";
+            case SE_ADDRFAULT:    return "invalid address (EFAULT)";
+            case SE_INTERRUPTED:  return "operation interrupted (EINTR)";
+            case SE_SOCKTYPE:     return "invalid socket family and proto (EPROTOTYPE)";
+            case SE_SOCKFAMILY:   return "unsupported socket family (EAFNOSUPPORT)";
+            case SE_SHUTDOWN:     return "socket was shut down (ESHUTDOWN)";
         }
     }
 
@@ -1622,11 +1645,13 @@ namespace rpp
         return rescode > 0; // success: > 0, timeout == 0
     }
 
-    bool socket::poll(int timeoutMillis, PollFlag pollFlags) const noexcept
+    bool socket::poll(int timeoutMillis, PollFlag pollFlags) noexcept
     {
-        const bool read = (pollFlags & PF_Read) != 0;
-        const bool write = (pollFlags & PF_Write) != 0;
-        const short events = short((read ? POLLIN : 0) | (write ? POLLOUT : 0));
+        const short events = short(
+            ((pollFlags & PF_Read) ? POLLIN : 0) |
+            ((pollFlags & PF_Write) ? POLLOUT : 0)
+        );
+
     #if _WIN32 || _WIN64
         struct pollfd pfd = { SOCKET(Sock), events, 0 };
         int r = WSAPoll(&pfd, 1, timeoutMillis);
@@ -1639,10 +1664,7 @@ namespace rpp
             set_errno();
             return false;
         }
-
-        LastErr = 0; // reset the error to ensure callers of poll() can check for error codes reliably
-        return (read && (pfd.revents & POLLIN) != 0)
-            || (write && (pfd.revents & POLLOUT) != 0);
+        return on_poll_result(pfd.revents, pollFlags);
     }
 
     bool socket::poll(const std::vector<socket*>& in, std::vector<int>& ready,
@@ -1652,9 +1674,10 @@ namespace rpp
         const int n = (int)in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
 
-        const bool read = (pollFlags & PF_Read) != 0;
-        const bool write = (pollFlags & PF_Write) != 0;
-        const short events = (read ? POLLIN : 0) | (write ? POLLOUT : 0);
+        const short events = short(
+            ((pollFlags & PF_Read) ? POLLIN : 0) |
+            ((pollFlags & PF_Write) ? POLLOUT : 0)
+        );
 
         for (int i = 0; i < n; ++i)
         {
@@ -1673,14 +1696,44 @@ namespace rpp
 
         for (int i = 0; i < n; ++i)
         {
-            if ((read && (pfd[i].revents & POLLIN) != 0) ||
-                (write && (pfd[i].revents & POLLOUT) != 0))
-            {
+            if (in[i]->on_poll_result(pfd[i].revents, pollFlags))
                 ready.push_back(i);
-            }
         }
 
         return !ready.empty();
+    }
+
+    bool socket::on_poll_result(int revents, PollFlag pollFlags) noexcept
+    {
+        if ((revents & POLLNVAL) != 0) // dead socket
+        {
+            LastErr = ESOCK(EBADF);
+            return false;
+        }
+
+        if ((revents & POLLHUP) != 0) // TCP FIN
+        {
+            // the other side has GRACEFULLY closed the connection
+            // this is not an error, but the socket is no longer connected
+            handle_errno(ESOCK(ESHUTDOWN));
+            return false;
+        }
+
+        if ((revents & POLLERR) != 0) // some other socket error
+        {
+            handle_errno(get_socket_level_error());
+            return false;
+        }
+
+        LastErr = 0; // clear errors
+
+        if ((revents & POLLIN) && (pollFlags & PF_Read))
+            return true;
+        if ((revents & POLLOUT) && (pollFlags & PF_Write))
+            return true;
+
+        // timeout, do not consider this as an error
+        return false;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1705,7 +1758,7 @@ namespace rpp
     }
 
 
-    socket socket::accept(int timeoutMillis) const noexcept
+    socket socket::accept(int timeoutMillis) noexcept
     {
         if (!good())
         {
@@ -1718,14 +1771,17 @@ namespace rpp
             return {};
         }
 
-        if (!this->poll(timeoutMillis, PF_Read))
+        if (!this->poll(timeoutMillis, PF_Read)) // poll will handle any errors
             return {};
 
         saddr saddr;
         socklen_t len = sizeof(saddr);
         int handle = (int)::accept(Sock, &saddr.sa, &len);
         if (handle == -1)
+        {
+            handle_errno();
             return {};
+        }
 
         socket client = socket::from_os_handle(handle, ipaddress{handle});
         // set the accepted socket with same options as the listener
@@ -1764,36 +1820,57 @@ namespace rpp
     {
         if (!good())
         {
-            // need a non-blocking socket to do poll right after connect
+            // needs to be a non-blocking socket to do connect() + poll()
             if (!create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & SO_NonBlock)))
                 return false;
+        }
+        else
+        {
+            // needs to be a non-blocking socket to do connect() + poll()
+            if (is_blocking())
+                set_blocking(false);
         }
 
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
 
-        int r = ::connect(Sock, sa, sa.size());
-        if (r != 0)
-        {
-            int err = os_getsockerr();
-            if (err == ESOCK(EALREADY) || err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
-            {
-                poll(millis, PF_Write);
-                // always check for error on the socket
-                r = get_socket_level_error();
-            }
-        }
-
-        if (r == 0)
+        LastErr = 0;
+        if (::connect(Sock, sa, sa.size()) == 0)
         {
             configure_connected_client(opt);
             return true;
         }
-        else
+
+        int err = os_getsockerr(); // read errno
+        // EALREADY: nonblocking connect is already in progress, second connect has no effect
+        // EINPROGRESS|EWOULDBLOCK: nonblocking connect is in progress, use poll() to wait for completion
+        if (err == ESOCK(EALREADY) || err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
         {
-            handle_errno();
-            return false;
+            if (poll(millis, PF_Write))
+            {
+                // the socket is writable, but according to connect() manual,
+                // SO_ERROR needs to be checked for the final status
+                int so_err = get_socket_level_error();
+                if (so_err == 0)
+                {
+                    configure_connected_client(opt);
+                    return true;
+                }
+                logdebug("socket fh:%d async connect() error: %s", Sock, socket::last_os_socket_err(so_err).c_str());
+                handle_errno(so_err);
+                return false;
+            }
+            else
+            {
+                // if poll timed out (no LastErr), then use the EINPROGRESS / EALREADY error codes
+                if (!LastErr) LastErr = err;
+                return false;
+            }
         }
+
+        // handle unfamiliar errors
+        handle_errno(err);
+        return false;
     }
 
     void socket::configure_connected_client(socket_option opt) noexcept

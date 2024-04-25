@@ -486,7 +486,7 @@ namespace rpp
         bool Shared;         // if true, Socket is shared and dtor won't call closesocket() [@see socket::DEFAULT_SHARED]
         bool Blocking;       // if TRUE, the socket is blocking [@see socket::DEFAULT_BLOCKING], will be updated during create()/connect()
         bool AutoClose;      // automatically closes the socket on disconnect events [@see socket::DEFAULT_AUTOCLOSE]
-        bool Connected; // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
+        bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
 
@@ -571,6 +571,13 @@ namespace rpp
             SE_TIMEDOUT = 11, // The connection attempt timed out, or the connected host has failed to respond
             SE_HOSTUNREACH = 12, // The remote host cannot be reached from this host at this time
             SE_NETUNREACH = 13, // The network cannot be reached from this host at this time
+            SE_BADSOCKET = 14, // invalid socket
+            SE_ALREADYCONN = 15, // socket is already connected and cannot connect again
+            SE_ADDRFAULT = 16, // the addr argument is not in a valid part of the user address space
+            SE_INTERRUPTED = 17, // The blocking call was canceled via a signal
+            SE_SOCKTYPE = 18, // The socket family and protocol do not match
+            SE_SOCKFAMILY = 19, // The address family is not supported by OS implementation
+            SE_SHUTDOWN = 20, // The socket has been shut down
         };
 
         /** @return The last OS specific error code. 
@@ -1065,7 +1072,7 @@ namespace rpp
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
          */
-        bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) const noexcept;
+        bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
         /**
          * @brief Enables polling multiple sockets for READ readiness
@@ -1073,11 +1080,16 @@ namespace rpp
          * @param ready Indexes of sockets that are ready for reading
          * @param timeoutMillis Maximum time to wait for a socket to be ready
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
-         * @returns true if at least one socket is ready for reading
+         * @returns true if at least one socket is ready for reading, false on timeout or error
+         *          To handle errors, you must check each socket last_err() individually
          */
         static bool poll(const std::vector<socket*>& in, std::vector<int>& ready,
                          int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
+    private:
+        bool on_poll_result(int revents, PollFlag pollFlags) noexcept;
+
+    public:
         ////////////////////////////////////////////////////////////////////////////
 
         /**
@@ -1129,6 +1141,7 @@ namespace rpp
 
         /**
          * Try accepting a new connection from THIS listening socket.
+         * If a fatal error happens, and AutoClosing is enabled, this can close the socket.
          * 
          * @param timeoutMillis if > 0, polls the socket until timeoutMillis is reached
          *                      if == 0, tests for a pending connection and returns immediately
@@ -1136,7 +1149,7 @@ namespace rpp
          * 
          * @return Invalid socket if there are no pending connections, otherwise a valid socket handle
          */
-        socket accept(int timeoutMillis = 0) const noexcept;
+        socket accept(int timeoutMillis = 0) noexcept;
 
         /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay
