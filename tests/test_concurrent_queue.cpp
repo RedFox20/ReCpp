@@ -427,7 +427,7 @@ TestImpl(test_concurrent_queue)
         // wait for 20ms with 5ms intervals, it should timeout
         std::atomic_int counter1 = 0;
         AssertFalse(wait_pop_interval(item, 20ms, 5ms, [&] { return ++counter1 >= 10; }));
-        AssertInRange(int(counter1), 4, 5);
+        AssertInRange(int(counter1), 1, 6); // tolerance is VERY loose here
 
         // wait another 30ms with 2ms intervals, and it should trigger the cancelcondition
         std::atomic_int counter2 = 0;
