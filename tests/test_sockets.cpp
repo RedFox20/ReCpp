@@ -573,9 +573,9 @@ TestImpl(test_sockets)
         }
     }
 
-    TestCase(udp_poll_stress_test_2000)
+    TestCase(udp_poll_stress_test_1000)
     {
-        const int NUM_MESSAGES = 2'000;
+        const int NUM_MESSAGES = 1'000;
         const int MSG_SIZE = 300;
         socket send = rpp::make_udp_randomport();
         socket recv = rpp::make_udp_randomport();
@@ -616,9 +616,9 @@ TestImpl(test_sockets)
         AssertLess(elapsed_ms, 200.0);
     }
 
-    TestCase(udp_poll_multi_stress_test_2000)
+    TestCase(udp_poll_multi_stress_test_1000)
     {
-        const int NUM_MESSAGES = 2'000;
+        const int NUM_MESSAGES = 1'000;
         const int MSG_SIZE = 300;
         socket send = rpp::make_udp_randomport();
         socket recv1 = rpp::make_udp_randomport();

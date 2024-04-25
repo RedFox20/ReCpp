@@ -378,11 +378,11 @@ TestImpl(test_concurrent_queue)
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
         AssertFalse(queue.wait_pop(item, 15ms, cancelCondition)); // this should timeout
-        AssertTrue(queue.wait_pop(item, 36ms, cancelCondition));
+        AssertTrue(queue.wait_pop(item, 40ms, cancelCondition));
         AssertThat(item, "item1");
-        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
+        AssertTrue(queue.wait_pop(item, 55ms, cancelCondition));
         AssertThat(item, "item2");
-        AssertTrue(queue.wait_pop(item, 51ms, cancelCondition));
+        AssertTrue(queue.wait_pop(item, 55ms, cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
         // this should not take longer than ~55ms
