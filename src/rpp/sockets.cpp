@@ -765,7 +765,11 @@ namespace rpp
     {
         if (Sock != -1)
         {
-            if (!Shared) { closesocket(Sock); }
+            if (!Shared)
+            {
+                ::shutdown(Sock, /*SHUT_RDWR*/2); // send FIN
+                closesocket(Sock);
+            }
             Sock = -1;
             Type = ST_Unspecified;
             Category = SC_Unknown;
