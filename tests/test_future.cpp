@@ -229,6 +229,74 @@ TestImpl(test_future)
         AssertThat(result, 42);
     }
 
+    TestCase(chain_async_futures_void)
+    {
+        bool task1Called = false;
+        bool task2Called = false;
+        bool task3Called = false;
+
+        cfuture<void> tasks;
+        tasks.chain_async(
+            [&]{ task1Called = true; }
+        ).chain_async(
+            [&]{ task2Called = true; throw std::runtime_error("task2 failed"); }
+        ).chain_async(
+            [&]{ task3Called = true; }
+        );
+        tasks.get(); // waits until task3 is completed to be completed in sequence
+
+        AssertThat(task1Called, true);
+        AssertThat(task2Called, true);
+        AssertThat(task3Called, true);
+    }
+
+    TestCase(chain_async_futures_T)
+    {
+        bool task1Called = false;
+        bool task2Called = false;
+        bool task3Called = false;
+
+        cfuture<std::string> tasks;
+        tasks.chain_async(
+            [&]() -> std::string { task1Called = true; return "task1"; }
+        ).chain_async(
+            [&]() -> std::string { task2Called = true; throw std::runtime_error("task2 failed"); }
+        ).chain_async(
+            [&]() -> std::string { task3Called = true; return "task3"; }
+        );
+        // waits until task3 is completed to be completed in sequence
+        std::string result = tasks.get();
+
+        AssertThat(task1Called, true);
+        AssertThat(task2Called, true);
+        AssertThat(task3Called, true);
+        AssertThat(result, "task3");
+    }
+
+    TestCase(chain_async_futures_continue_completed)
+    {
+        bool task1Called = false;
+        bool task2Called = false;
+        bool task3Called = false;
+
+        cfuture<void> tasks;
+        tasks.chain_async(
+            [&]{ task1Called = true; }
+        ).chain_async(
+            [&]{ task2Called = true; }
+        );
+        tasks.wait(); // waits until tasks are completed in sequence
+
+        AssertThat(task1Called, true);
+        AssertThat(task2Called, true);
+
+        tasks.chain_async(
+            [&]{ task3Called = true; }
+        );
+        tasks.get();
+        AssertThat(task3Called, true);
+    }
+
     TestCase(ready_future)
     {
         auto future = make_ready_future(42);

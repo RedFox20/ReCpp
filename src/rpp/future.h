@@ -356,6 +356,53 @@ namespace rpp
             }
         }
 
+        /**
+         * @brief Asynchronously chains several tasks together by using rpp::async_task().
+         *        if this future is valid, then a REGULAR continuation is scheduled, to avoid running
+         *        tasks in parallel.
+         *        if this future is invalid, it will be initialized into a valid async future.
+         * @note If a future throws an exception in the chain, the exception is swallowed !!!
+         * @returns Updated reference to this future
+         * 
+         * @code
+         * cfuture<void> tasks;
+         * tasks.chain_async([&]{
+         *     task1();
+         * }).chain_async([&]{
+         *     throw runtime_error("task2 failed");
+         * }).chain_async([&]{
+         *     task3();
+         * });
+         * tasks.get(); // waits until task3 is completed to be completed in sequence
+         * @endcode
+         */
+        template<typename Task>
+        cfuture& chain_async(Task&& task) noexcept
+        {
+            if (!this->valid()) {
+                *this = rpp::async_task(std::move(task));
+            } else {
+                *this = rpp::async_task([f=std::move(*this), task=std::move(task)]() mutable {
+                    try { (void)f.get(); } catch (...) {} // swallow exceptions before running next task
+                    return task();
+                });
+            }
+            return *this;
+        }
+
+        cfuture& chain_async(cfuture&& next) noexcept
+        {
+            if (!this->valid()) {
+                *this = std::move(next);
+            } else {
+                *this = rpp::async_task([f=std::move(*this), next=std::move(next)]() mutable {
+                    try { (void)f.get(); } catch (...) {} // swallow exceptions before running next task
+                    return next.get();
+                });
+            }
+            return *this;
+        }
+
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
@@ -635,6 +682,53 @@ namespace rpp
                 catch (ExceptC& c) { (void)exhC(c); }
                 catch (ExceptD& d) { (void)exhD(d); }
             });
+        }
+
+        /**
+         * @brief Asynchronously chains several tasks together by using rpp::async_task().
+         *        if this future is valid, then a REGULAR continuation is scheduled, to avoid running
+         *        tasks in parallel.
+         *        if this future is invalid, it will be initialized into a valid async future.
+         * @note If a future throws an exception in the chain, the exception is swallowed !!!
+         * @returns Updated reference to this future
+         * 
+         * @code
+         * cfuture<void> tasks;
+         * tasks.chain_async([&]{
+         *     task1();
+         * }).chain_async([&]{
+         *     throw runtime_error("task2 failed");
+         * }).chain_async([&]{
+         *     task3();
+         * });
+         * tasks.get(); // waits until task3 is completed to be completed in sequence
+         * @endcode
+         */
+        template<typename Task>
+        cfuture& chain_async(Task&& task) noexcept
+        {
+            if (!this->valid()) {
+                *this = rpp::async_task(std::move(task));
+            } else {
+                *this = rpp::async_task([f=std::move(*this), task=std::move(task)]() mutable {
+                    try { (void)f.get(); } catch (...) {} // swallow exceptions before running next task
+                    return task();
+                });
+            }
+            return *this;
+        }
+
+        cfuture& chain_async(cfuture&& next) noexcept
+        {
+            if (!this->valid()) {
+                *this = std::move(next);
+            } else {
+                *this = rpp::async_task([f=std::move(*this), next=std::move(next)]() mutable {
+                    try { (void)f.get(); } catch (...) {} // swallow exceptions before running next task
+                    return next.get();
+                });
+            }
+            return *this;
         }
 
         /**
