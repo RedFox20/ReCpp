@@ -11,17 +11,18 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
       # giving false positives, annoying, disable for now
       #- run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
-      - run: CXX20=1 BUILD_TESTS=1 pipenv run mama clang verbose build
-      - run: pipenv run mama clang verbose test="nogdb --verbosity=3"
+      - run: CXX20=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama clang verbose build
+      - run: pipenv run mama clang verbose test="nogdb -vv"
+      - run: gcovr --sort-percentage -r src build/ReCpp/linux
       # do a second run with thread sanitizer
       # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
-      # - run: pipenv run mama clang verbose test="nogdb --verbosity=3"
+      # - run: pipenv run mama clang verbose test="nogdb -vv"
   clang-ubuntu-cpp17:
     description: Ubuntu Clang C++17 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -30,14 +31,15 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
       # giving false positives, annoying, disable for now
       #- run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 pipenv run mama clang verbose build
-      - run: CXX17=1 BUILD_TESTS=1 pipenv run mama clang verbose build
-      - run: pipenv run mama clang verbose test="nogdb --verbosity=3"
+      - run: CXX17=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama clang verbose build
+      - run: pipenv run mama clang verbose test="nogdb -vv"
+      - run: gcovr --sort-percentage -r src build/ReCpp/linux
   gcc-ubuntu-cpp20:
     description: Ubuntu GCC C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -46,15 +48,16 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 BUILD_TESTS=1 pipenv run mama gcc verbose build
-      - run: pipenv run mama gcc verbose test="nogdb --verbosity=3"
+      - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama gcc verbose build
+      - run: pipenv run mama gcc verbose test="nogdb -vv"
+      - run: gcovr --sort-percentage -r src build/ReCpp/linux
       # do a second run with thread sanitizer
       # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
-      # - run: pipenv run mama clang verbose test="nogdb --verbosity=3"
+      # - run: pipenv run mama clang verbose test="nogdb -vv"
   gcc-ubuntu-cpp17:
     description: Ubuntu GCC C++17 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -63,12 +66,13 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 BUILD_TESTS=1 pipenv run mama gcc verbose build
-      - run: pipenv run mama gcc verbose test="nogdb --verbosity=3"
+      - run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama gcc verbose build
+      - run: pipenv run mama gcc verbose test="nogdb -vv"
+      - run: gcovr --sort-percentage -r src build/ReCpp/linux
   msvc-win64-cpp20:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:
@@ -96,7 +100,7 @@ jobs:
           name: Tests
           command: |
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
-              mama windows verbose test="--verbosity=3"
+              mama windows verbose test="-vv"
   msvc-win64-cpp17:
     description: Windows MSVC C++17 VS2022 x64 Build
     executor:
@@ -118,7 +122,7 @@ jobs:
           name: Tests
           command: |
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
-              mama windows verbose test="--verbosity=3"
+              mama windows verbose test="-vv"
   gcc-mipsel-cpp20:
     description: MIPSEL C++20 GCC Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM

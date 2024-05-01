@@ -7,6 +7,7 @@ option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly impr
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 option(BUILD_WITH_MEM_SAFETY "Build Rpp and RppTests with memory safety checks" OFF)
 option(BUILD_WITH_THREAD_SAFETY "Build Rpp and RppTests with thread safety checks" OFF)
+option(BUILD_WITH_CODE_COVERAGE "Build with code coverage for unit tests" OFF)
 
 # include mama dependencies for platforms that require it
 if(MIPS)
@@ -86,6 +87,11 @@ if(CLANG OR GCC)
         add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -fPIE -pie)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
     endif()
+    if(BUILD_WITH_CODE_COVERAGE)
+        message("Building with code coverage")
+        add_compile_options(--coverage)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    endif()
 elseif(MSVC)
     message("Configure for VisualC++")
     # /wd4996 - Disable deprecation warning
@@ -138,6 +144,9 @@ elseif(MSVC)
         if(CMAKE_BUILD_TYPE STREQUAL "Debug") # enable Runtime Checks in Debug mode
             add_compile_options(/RTC1)
         endif()
+    endif()
+    if(BUILD_WITH_CODE_COVERAGE)
+        message(WARNING "Code coverage not supported on MSVC")
     endif()
 endif()
 

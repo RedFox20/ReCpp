@@ -15,17 +15,13 @@ class ReCpp(mama.BuildTarget):
         if self.windows and os.getenv('APPVEYOR') != None:
             self.add_cl_flags('/DAPPVEYOR')
 
-        def enable_from_env(name, enabled='ON', force=False):
-            env = os.getenv(name)
-            if force or (env and (env == '1' or env == 'ON' or env == 'TRUE')):
-                self.add_cmake_options(f'{name}={enabled}')
-
         # enable CMAKE opts if env vars are enabled
-        enable_from_env('BUILD_TESTS', force=self.config.test != '')
-        enable_from_env('BUILD_WITH_MEM_SAFETY')
-        enable_from_env('BUILD_WITH_THREAD_SAFETY')
-        enable_from_env('CXX17', force=self.is_enabled_cxx17())
-        enable_from_env('CXX20', force=self.is_enabled_cxx20())
+        self.enable_from_env('BUILD_TESTS', force=self.config.test != '')
+        self.enable_from_env('BUILD_WITH_MEM_SAFETY')
+        self.enable_from_env('BUILD_WITH_THREAD_SAFETY')
+        self.enable_from_env('BUILD_WITH_CODE_COVERAGE')
+        self.enable_from_env('CXX17', force=self.is_enabled_cxx17())
+        self.enable_from_env('CXX20', force=self.is_enabled_cxx20())
 
 
     def package(self):
