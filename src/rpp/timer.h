@@ -255,7 +255,7 @@ namespace rpp
         void start() noexcept { started = TimePoint::now(); }
 
         /** @brief Resets the timer to a custom time point */
-        void reset(const TimePoint& time) noexcept { started = time; }
+        void reset(const TimePoint& time = TimePoint::zero()) noexcept { started = time; }
 
         /** @return Fractional seconds elapsed from start() */
         double elapsed() const noexcept;
