@@ -254,6 +254,9 @@ namespace rpp
         /** Starts the timer */
         void start() noexcept { started = TimePoint::now(); }
 
+        /** Stops the timer */
+        void stop() noexcept { started = TimePoint::zero(); }
+
         /** @brief Resets the timer to a custom time point */
         void reset(const TimePoint& time) noexcept { started = time; }
 
