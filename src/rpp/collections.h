@@ -408,12 +408,12 @@ namespace rpp
 
     template<class T, class Selector> T* find_smallest(element_range<T> v, const Selector& selector) noexcept
     {
-        int count = v.size();
-        if (count == 0)
+        size_t count = v.size();
+        if (!count)
             return nullptr;
         T* selected = &v[0];
         auto currentValue = selector(*selected);
-        for (int i = 1; i < count; ++i) {
+        for (size_t i = 1; i < count; ++i) {
             auto value = selector(v[i]);
             if (value < currentValue) {
                 currentValue = value;
@@ -430,12 +430,12 @@ namespace rpp
 
     template<class T, class Selector> T* find_largest(element_range<T> v, const Selector& selector) noexcept
     {
-        int count = v.size();
-        if (count == 0)
+        size_t count = v.size();
+        if (!count)
             return nullptr;
         T* selected = &v[0];
         auto currentValue = selector(*selected);
-        for (int i = 1; i < count; ++i) {
+        for (size_t i = 1; i < count; ++i) {
             auto value = selector(v[i]);
             if (value > currentValue) {
                 currentValue = value;
