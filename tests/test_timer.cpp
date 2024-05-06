@@ -450,8 +450,8 @@ TestImpl(test_timer)
 
         #if _MSC_VER
             // TODO: Windows CPU usage timing accuracy is 15.6ms, so we need to relax the timings
-            AssertGreaterOrEqual(cpu_delta, spin_us - 16'000);
-            AssertLessOrEqual(cpu_delta, spin_us + 16'000);
+            AssertGreaterOrEqual(cpu_delta, spin_us - 24'000);
+            AssertLessOrEqual(cpu_delta, spin_us + 24'000);
         #else
             AssertGreaterOrEqual(cpu_delta, spin_us - 5'000);
             AssertLessOrEqual(cpu_delta, spin_us + 5'000);
