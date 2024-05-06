@@ -57,28 +57,24 @@ namespace rpp
 
         concurrent_queue(concurrent_queue&& q) noexcept
         {
-            {
-                // safely swap the states from q to default empty state
-                std::lock_guard lock { q.Mutex };
-                std::swap(Head, q.Head);
-                std::swap(Tail, q.Tail);
-                std::swap(ItemsStart, q.ItemsStart);
-                std::swap(ItemsEnd, q.ItemsEnd);
-            }
+            // safely swap the states from q to default empty state
+            std::lock_guard lock { q.Mutex };
+            std::swap(Head, q.Head);
+            std::swap(Tail, q.Tail);
+            std::swap(ItemsStart, q.ItemsStart);
+            std::swap(ItemsEnd, q.ItemsEnd);
             // notify only the old queue
             q.Waiter.notify_all();
         }
 
         concurrent_queue& operator=(concurrent_queue&& q) noexcept
         {
-            {
-                // safely swap the states of both queues
-                std::scoped_lock dual_lock { Mutex, q.Mutex };
-                std::swap(Head, q.Head);
-                std::swap(Tail, q.Tail);
-                std::swap(ItemsStart, q.ItemsStart);
-                std::swap(ItemsEnd, q.ItemsEnd);
-            }
+            // safely swap the states of both queues
+            std::scoped_lock dual_lock { Mutex, q.Mutex };
+            std::swap(Head, q.Head);
+            std::swap(Tail, q.Tail);
+            std::swap(ItemsStart, q.ItemsStart);
+            std::swap(ItemsEnd, q.ItemsEnd);
             // notify all waiters for both queues
             q.Waiter.notify_all();
             Waiter.notify_all();
@@ -135,6 +131,7 @@ namespace rpp
          */
         void notify() noexcept
         {
+            std::lock_guard lock { Mutex };
             Waiter.notify_all(); // does not need to be locked
         }
 
@@ -143,6 +140,7 @@ namespace rpp
          */
         void notify_one() noexcept
         {
+            std::lock_guard lock { Mutex };
             Waiter.notify_one(); // does not need to be locked
         }
 
@@ -163,10 +161,8 @@ namespace rpp
         template<class ChangeWaitFlags>
         void notify(const ChangeWaitFlags& changeWaitFlags) noexcept(noexcept(changeWaitFlags()))
         {
-            {
-                std::unique_lock<std::mutex> lock = spin_lock();
-                changeWaitFlags();
-            }
+            std::unique_lock<std::mutex> lock = spin_lock();
+            changeWaitFlags();
             Waiter.notify_all();
         }
 
@@ -175,11 +171,9 @@ namespace rpp
          */
         void clear() noexcept
         {
-            {
-                std::unique_lock<std::mutex> lock = spin_lock();
-                clear_unlocked(); // destroy all elements
-                cleared = true; // set the cleared flag
-            }
+            std::unique_lock<std::mutex> lock = spin_lock();
+            clear_unlocked(); // destroy all elements
+            cleared = true; // set the cleared flag
             Waiter.notify_all(); // notify all waiters that the queue was emptied
         }
 
@@ -232,10 +226,8 @@ namespace rpp
          */
         void push(T&& item) noexcept
         {
-            {
-                std::unique_lock<std::mutex> lock = spin_lock();
-                push_unlocked(std::move(item));
-            }
+            std::unique_lock<std::mutex> lock = spin_lock();
+            push_unlocked(std::move(item));
             Waiter.notify_one();
         }
 
@@ -244,10 +236,8 @@ namespace rpp
          */
         void push(const T& item) noexcept
         {
-            {
-                std::unique_lock<std::mutex> lock = spin_lock();
-                push_unlocked(item);
-            }
+            std::unique_lock<std::mutex> lock = spin_lock();
+            push_unlocked(item);
             Waiter.notify_one();
         }
 
