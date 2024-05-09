@@ -38,7 +38,7 @@ namespace rpp
         }
 
         /** @returns Current semaphore count (thread-unsafe) */
-        int count() const { return value; }
+        int count() const noexcept { return value; }
 
         /**
          * @brief Sets the semaphore count to newCount and notifies one waiting thread
@@ -46,6 +46,7 @@ namespace rpp
          */
         void reset(int newCount = 0)
         {
+            std::lock_guard<std::mutex> lock{ m };
             value = newCount;
             if (newCount > 0)
             {
@@ -58,10 +59,8 @@ namespace rpp
          */
         void notify()
         {
-            {
-                std::lock_guard<std::mutex> lock{ m };
-                ++value;
-            }
+            std::lock_guard<std::mutex> lock{ m };
+            ++value;
             cv.notify_one();
         }
 
@@ -70,20 +69,13 @@ namespace rpp
          */
         bool notify_once()
         {
-            bool shouldNotify;
-            {
-                std::lock_guard<std::mutex> lock{ m };
-                shouldNotify = value <= 0;
-                if (shouldNotify)
-                {
-                    ++value;
-                }
-            }
-
+            std::lock_guard<std::mutex> lock{ m };
+            bool shouldNotify = value <= 0;
             if (shouldNotify)
             {
-                cv.notify_one();
+                ++value;
             }
+            cv.notify_one();
             return shouldNotify;
         }
 
