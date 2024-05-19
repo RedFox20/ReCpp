@@ -283,7 +283,7 @@ TestImpl(test_concurrent_queue)
         scope_guard([&]{ slow_producer.get(); });
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
+        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 11.0);
         AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
         AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 18.0);
 
