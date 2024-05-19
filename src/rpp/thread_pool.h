@@ -98,6 +98,11 @@ namespace rpp
      */
     RPPAPI void set_this_thread_name(rpp::strview name) noexcept;
 
+    /**
+     * @returns Current thread ID as a 64-bit integer
+     */
+    RPPAPI uint64 get_thread_id() noexcept;
+
     //////////////////////////////////////////////////////////////////////////////////////////
 
     enum class wait_result : int

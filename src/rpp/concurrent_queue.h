@@ -64,7 +64,7 @@ namespace rpp
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
             // notify only the old queue
-            q.Waiter.notify_all();
+            q.notify_all_unlocked();
         }
 
         concurrent_queue& operator=(concurrent_queue&& q) noexcept
@@ -76,8 +76,8 @@ namespace rpp
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
             // notify all waiters for both queues
-            q.Waiter.notify_all();
-            Waiter.notify_all();
+            q.notify_all_unlocked();
+            notify_all_unlocked();
             return *this;
         }
 
@@ -98,28 +98,28 @@ namespace rpp
         /**
          * @returns Capacity of the queue (unsafe)
          */
-        [[nodiscard]] int capacity() const noexcept
+        [[nodiscard]] size_t capacity() const noexcept
         {
-            return (int)(ItemsEnd - ItemsStart);
+            return (ItemsEnd - ItemsStart);
         }
 
         /**
          * @returns Approximate size of the queue (unsafe)
          */
-        [[nodiscard]] int size() const noexcept
+        [[nodiscard]] size_t size() const noexcept
         {
-            return (int)(Tail - Head);
+            return (Tail - Head);
         }
 
         /**
          * @returns Synchronized current size of the queue,
          *          however using this value is not atomic
          */
-        [[nodiscard]] int safe_size() const noexcept
+        [[nodiscard]] size_t safe_size() const noexcept
         {
             if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
             {
-                int sz = size();
+                size_t sz = size();
                 Mutex.unlock();
                 return sz;
             }
@@ -132,7 +132,7 @@ namespace rpp
         void notify() noexcept
         {
             std::lock_guard lock { Mutex };
-            Waiter.notify_all(); // does not need to be locked
+            notify_all_unlocked();
         }
 
         /**
@@ -141,7 +141,7 @@ namespace rpp
         void notify_one() noexcept
         {
             std::lock_guard lock { Mutex };
-            Waiter.notify_one(); // does not need to be locked
+            notify_one_unlocked();
         }
 
         /**
@@ -163,7 +163,7 @@ namespace rpp
         {
             std::unique_lock<std::mutex> lock = spin_lock();
             changeWaitFlags();
-            Waiter.notify_all();
+            notify_all_unlocked();
         }
 
         /**
@@ -174,7 +174,7 @@ namespace rpp
             std::unique_lock<std::mutex> lock = spin_lock();
             clear_unlocked(); // destroy all elements
             cleared = true; // set the cleared flag
-            Waiter.notify_all(); // notify all waiters that the queue was emptied
+            notify_all_unlocked(); // notify all waiters that the queue was emptied
         }
 
         void reserve(int newCapacity) noexcept
@@ -228,7 +228,7 @@ namespace rpp
         {
             std::unique_lock<std::mutex> lock = spin_lock();
             push_unlocked(std::move(item));
-            Waiter.notify_one();
+            notify_one_unlocked();
         }
 
         /**
@@ -238,7 +238,7 @@ namespace rpp
         {
             std::unique_lock<std::mutex> lock = spin_lock();
             push_unlocked(item);
-            Waiter.notify_one();
+            notify_one_unlocked();
         }
 
         /**
@@ -429,11 +429,8 @@ namespace rpp
         [[nodiscard]] std::optional<T> wait_pop() noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
-            while (empty())
-            {
-                if (!wait_notify(lock))
-                    return std::nullopt;
-            }
+            if (!wait_notify(lock))
+                return std::nullopt;
             T result;
             pop_unlocked(result);
             return result;
@@ -448,11 +445,8 @@ namespace rpp
         bool wait_pop(T& outItem) noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
-            if (empty())
-            {
-                if (!wait_notify(lock))
-                    return false;
-            }
+            if (!wait_notify(lock))
+                return false;
             pop_unlocked(outItem);
             return true;
         }
@@ -481,11 +475,8 @@ namespace rpp
         bool wait_pop(T& outItem, duration timeout) noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
-            if (empty())
-            {
-                if (!wait_notify_for(lock, timeout))
-                    return false;
-            }
+            if (!wait_notify_for(lock, timeout))
+                return false;
             pop_unlocked(outItem);
             return true;
         }
@@ -500,11 +491,8 @@ namespace rpp
         bool wait_peek(T& outItem, duration timeout) const noexcept
         {
             std::unique_lock<std::mutex> lock = spin_lock();
-            if (empty())
-            {
-                if (!wait_notify_for(lock, timeout))
-                    return false;
-            }
+            if (!wait_notify_for(lock, timeout))
+                return false;
             outItem = *Head; // copy (may throw)
             return true;
         }
@@ -537,11 +525,8 @@ namespace rpp
                 return false;
 
             std::unique_lock<std::mutex> lock = spin_lock();
-            if (empty())
-            {
-                if (!wait_notify_until(lock, until))
-                    return false;
-            }
+            if (!wait_notify_until(lock, until))
+                return false;
             pop_unlocked(outItem);
             return true;
         }
@@ -595,7 +580,7 @@ namespace rpp
          * @code
          *   string item;
          *   auto interval = std::chrono::milliseconds{100};
-         *   if (queue.wait_pop_interval(item, [this]{ return this->cancelled || this->finished; })
+         *   if (queue.wait_pop_interval(item, timeout, interval, [this]{ return this->cancelled || this->finished; })
          *   {
          *       // item is valid
          *   }
@@ -668,12 +653,14 @@ namespace rpp
         // waits until any wakeup signal and returns true if there is an item
         bool wait_notify(std::unique_lock<std::mutex>& lock) const noexcept
         {
+            if (!empty()) return true; // wait is not needed
             (void)Waiter.wait(lock); // noexcept
             return !empty();
         }
         // wait_notify with a timeout, returns true if there is an item
-        bool wait_notify_for(std::unique_lock<std::mutex>& lock, duration timeout) const noexcept
+        bool wait_notify_for(std::unique_lock<std::mutex>& lock, const duration& timeout) const noexcept
         {
+            if (!empty()) return true; // wait is not needed
             auto now = clock::now();
             auto end = now + timeout;
             do {
@@ -689,8 +676,9 @@ namespace rpp
             } while (now < end); // handle spurious wakeups
             return false;
         }
-        bool wait_notify_until(std::unique_lock<std::mutex>& lock, time_point until) const noexcept
+        bool wait_notify_until(std::unique_lock<std::mutex>& lock, const time_point& until) const noexcept
         {
+            if (!empty()) return true; // wait is not needed
             time_point now;
             #if _MSC_VER
                 now = clock::now();
@@ -707,6 +695,14 @@ namespace rpp
                 now = clock::now();
             } while (now < until); // handle spurious wakeups
             return false;
+        }
+        void notify_one_unlocked() noexcept
+        {
+            Waiter.notify_one();
+        }
+        void notify_all_unlocked() noexcept
+        {
+            Waiter.notify_all();
         }
         void push_unlocked(T&& item) noexcept
         {
@@ -753,9 +749,9 @@ namespace rpp
         }
         void ensure_capacity() noexcept
         {
-            const int oldCap = capacity();
+            const size_t oldCap = capacity();
             // we have enough capacity, just shift the items to the front
-            if (oldCap > 0 && (Head - ItemsStart) >= (oldCap / 2))
+            if (oldCap > 0 && size_t(Head - ItemsStart) >= (oldCap / 2))
             {
                 // unshift elements to the front of the queue
                 T* newStart = ItemsStart;
@@ -765,14 +761,14 @@ namespace rpp
             }
             else // grow
             {
-                int growBy = oldCap ? oldCap : 32;
+                size_t growBy = oldCap ? oldCap : 32;
                 if (growBy > (16*1024)) growBy = 16*1024;
-                const int newCap = oldCap + growBy;
+                const size_t newCap = oldCap + growBy;
                 grow_to(newCap);
             }
             cleared = false; // reset the cleared flag
         }
-        void grow_to(int newCap) noexcept
+        void grow_to(size_t newCap) noexcept
         {
             T* oldStart = ItemsStart;
             T* newStart = (T*)malloc(newCap * sizeof(T));
@@ -787,7 +783,7 @@ namespace rpp
         {
             if constexpr (std::is_trivially_move_assignable_v<T>)
             {
-                int count = (oldTail - oldHead);
+                size_t count = (oldTail - oldHead);
                 memmove(newStart, oldHead, count * sizeof(T));
                 return newStart + count;
             }

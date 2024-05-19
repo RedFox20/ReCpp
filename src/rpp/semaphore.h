@@ -1,5 +1,6 @@
 #pragma once
 #include "condition_variable.h"
+#include "debugging.h"
 #include <mutex>
 #include <atomic>
 
@@ -14,7 +15,8 @@ namespace rpp
     {
         std::mutex m;
         rpp::condition_variable cv;
-        int value = 0;
+        std::atomic_int value{0}; // atomic int to ensure cache coherency
+        const int max_value = 0x7FFFFFFF;
 
     public:
 
@@ -25,17 +27,21 @@ namespace rpp
         };
 
         /**
-         * Creates a default semaphore with count = 0
+         * Creates a default semaphore with count = 0 and mav_value = 0x7FFFFFFF
          */
         semaphore() = default;
 
         /**
          * @param initialCount Initial semaphore count
          */
-        explicit semaphore(int initialCount)
+        explicit semaphore(int initialCount, int maxCount = 0x7FFFFFFF)
+            : max_value{maxCount}
         {
             reset(initialCount);
         }
+
+        /** @brief Returns the internal mutex used by notify() and wait() */
+        std::mutex& mutex() noexcept { return m; }
 
         /** @returns Current semaphore count (thread-unsafe) */
         int count() const noexcept { return value; }
@@ -47,7 +53,8 @@ namespace rpp
         void reset(int newCount = 0)
         {
             std::lock_guard<std::mutex> lock{ m };
-            value = newCount;
+            if (0 <= newCount && newCount <= max_value)
+                value = newCount;
             if (newCount > 0)
             {
                 cv.notify_one();
@@ -60,22 +67,26 @@ namespace rpp
         void notify()
         {
             std::lock_guard<std::mutex> lock{ m };
-            ++value;
-            cv.notify_one();
+            if (value < 0) LogError("count=%d must not be negative", value.load());
+            if (value < max_value)
+                ++value;
+            cv.notify_one(); // always notify, to wakeup any waiting threads
         }
 
         /**
-         * @brief Only notifies one thread if count <= 0
+         * @brief Only notifies one thread if count == 0 (not signaled yet)
+         * @returns true if the semaphore was notified
          */
         bool notify_once()
         {
             std::lock_guard<std::mutex> lock{ m };
+            if (value < 0) LogError("count=%d must not be negative", value.load());
             bool shouldNotify = value <= 0;
             if (shouldNotify)
             {
                 ++value;
+                cv.notify_one();
             }
-            cv.notify_one();
             return shouldNotify;
         }
 
@@ -100,6 +111,7 @@ namespace rpp
         void wait()
         {
             std::unique_lock<std::mutex> lock{ m };
+            if (value < 0) LogError("count=%d must not be negative", value.load());
             while (value <= 0) // wait until value is actually set
             {
                 cv.wait(lock);
@@ -112,16 +124,18 @@ namespace rpp
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
         template<class Rep, class Period>
-        wait_result wait(std::chrono::duration<Rep, Period> timeout)
+        wait_result wait(const std::chrono::duration<Rep, Period>& timeout)
         {
             std::unique_lock<std::mutex> lock{ m };
+            if (value < 0) LogError("count=%d must not be negative", value.load());
+            auto until = std::chrono::high_resolution_clock::now() + timeout;
             while (value <= 0)
             {
-                if (cv.wait_for(lock, timeout) == std::cv_status::timeout)
+                if (cv.wait_until(lock, until) == std::cv_status::timeout)
                     return semaphore::timeout;
             }
             --value;
-            return notified;
+            return semaphore::notified;
         }
 
         /**
@@ -135,17 +149,12 @@ namespace rpp
          */
         void wait_barrier_while(std::atomic_bool& taskIsRunning)
         {
-            if (!taskIsRunning)
-            {
-                taskIsRunning = true;
-                return;
-            }
-
             std::unique_lock<std::mutex> lock{ m };
             while (taskIsRunning)
             {
                 cv.wait(lock);
             }
+            // reset the flag to true
             taskIsRunning = true;
         }
 
@@ -160,17 +169,12 @@ namespace rpp
          */
         void wait_barrier_until(std::atomic_bool& hasFinished)
         {
-            if (hasFinished)
-            {
-                hasFinished = false;
-                return;
-            }
-
             std::unique_lock<std::mutex> lock{ m };
             while (!hasFinished)
             {
                 cv.wait(lock);
             }
+            // reset the flag to false
             hasFinished = false;
         }
     };
@@ -180,7 +184,7 @@ namespace rpp
     /**
      * @return TRUE if @flag == @expectedValue and atomically sets @flag to @newValue
      */
-    inline bool atomic_test_and_set(std::atomic_bool& flag, bool expectedValue = true, bool newValue = false)
+    inline bool atomic_test_and_set(std::atomic_bool& flag, bool expectedValue = true, bool newValue = false) noexcept
     {
         return flag.compare_exchange_weak(expectedValue, newValue);
     }

@@ -18,7 +18,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////
 
     static pool_trace_provider TraceProvider;
-    
+
 #if _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
     #  define WIN32_LEAN_AND_MEAN 1
@@ -56,7 +56,15 @@ namespace rpp
                 pthread_setname_np(pthread_self(), name.to_cstr(threadName, sizeof(threadName)));
             #endif
         #endif
+    }
 
+    uint64 get_thread_id() noexcept
+    {
+        #if _WIN32
+            return GetCurrentThreadId();
+        #else
+            return (uint64)pthread_self();
+        #endif
     }
 
     ///////////////////////////////////////////////////////////////////////////////

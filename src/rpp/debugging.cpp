@@ -50,6 +50,10 @@ RPPCAPI void SetLogErrorHandler(LogMessageCallback loghandler)
 {
     LogHandler = loghandler;
 }
+RPPCAPI LogMessageCallback GetLogHandler()
+{
+    return LogHandler;
+}
 RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler)
 {
     EventHandler = eventHandler;

@@ -38,6 +38,7 @@ typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 /** Sets the callback handler for any error messages */
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler);
+RPPCAPI LogMessageCallback GetLogHandler();
 
 // legacy ALIAS for SetLogHandler
 RPPCAPI

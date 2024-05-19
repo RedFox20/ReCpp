@@ -35,8 +35,8 @@ namespace rpp
         const T* end()   const noexcept { return sentinel; }
         bool empty() const noexcept { return first == sentinel; }
         size_t size() const noexcept { return size_t(sentinel-first); }
-              T& operator[](int index)       noexcept { return first[index]; }
-        const T& operator[](int index) const noexcept { return first[index]; }
+              T& operator[](size_t index)       noexcept { return first[index]; }
+        const T& operator[](size_t index) const noexcept { return first[index]; }
               T* data()       noexcept { return first; }
         const T* data() const noexcept { return first; }
 
