@@ -145,7 +145,7 @@ jobs:
       - run: make configure-cmake
       - run: make configure-pip3
       - run: pip3 install mama
-      - run: CXX17=1 mama android verbose build
+      - run: CXX17=1 BUILD_TESTS=1 mama android verbose build
   clang-android-cpp20:
     description: Android C++20 Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -156,7 +156,7 @@ jobs:
       - run: make configure-cmake
       - run: make configure-pip3
       - run: pip3 install mama
-      - run: CXX20=1 mama android verbose build
+      - run: CXX20=1 BUILD_TESTS=1 mama android verbose build
 
 workflows:
   build_all:

@@ -1,6 +1,7 @@
 #include <rpp/semaphore.h>
 #include <rpp/timer.h>
 #include <rpp/tests.h>
+#include <thread>
 using namespace rpp;
 using millis = std::chrono::milliseconds;
 
@@ -151,7 +152,7 @@ TestImpl(test_semaphore)
             spin_sleep_for_us(100);
         }
 
-        spin_sleep_for_us(5000);
+        spin_sleep_for_us(15000);
         working = false;
         sem.notify(); // notify finished
         worker.join();
