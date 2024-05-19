@@ -128,11 +128,14 @@ namespace rpp
         {
             std::unique_lock<std::mutex> lock{ m };
             if (value < 0) LogError("count=%d must not be negative", value.load());
-            auto until = std::chrono::high_resolution_clock::now() + timeout;
-            while (value <= 0)
+            if (value <= 0)
             {
-                if (cv.wait_until(lock, until) == std::cv_status::timeout)
-                    return semaphore::timeout;
+                auto until = std::chrono::high_resolution_clock::now() + timeout;
+                while (value <= 0)
+                {
+                    if (cv.wait_until(lock, until) == std::cv_status::timeout)
+                        return semaphore::timeout;
+                }
             }
             --value;
             return semaphore::notified;
