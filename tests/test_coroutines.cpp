@@ -163,8 +163,6 @@ TestImpl(test_coroutines)
         };
         AssertThat(fstr, "test"s);
         AssertThat(destructor_ids.size(), 2u);
-
-        AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
 
         co_await [&m, &destructor_ids]() -> cfuture<void>

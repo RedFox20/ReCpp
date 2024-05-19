@@ -102,6 +102,7 @@ namespace rpp
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable {
                 try { action(); }
                 catch (...) { ex = std::current_exception(); }
+                action.reset(); // deallocate the lambda before resuming
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
@@ -138,6 +139,7 @@ namespace rpp
                     f = action(); // get the future from the lambda
                     f.wait(); // wait for the nested coroutine to finish (can throw)
                 } catch (...) { ex = std::current_exception(); }
+                action.reset(); // deallocate the lambda before resuming
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
