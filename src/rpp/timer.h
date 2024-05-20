@@ -77,10 +77,12 @@ namespace rpp
         static constexpr Duration from_seconds(int64 seconds) noexcept { return Duration{ seconds * NANOS_PER_SEC }; }
 
         /** @returns New Duration from integer milliseconds (positive or negative) */
+        static constexpr Duration from_millis(double millis) noexcept { return Duration{ int64(millis * NANOS_PER_MILLI) }; }
         static constexpr Duration from_millis(int32 millis) noexcept { return Duration{ int64(millis) * NANOS_PER_MILLI }; }
         static constexpr Duration from_millis(int64 millis) noexcept { return Duration{ millis * NANOS_PER_MILLI }; }
 
         /** @returns New Duration from integer microseconds (positive or negative) */
+        static constexpr Duration from_micros(double micros) noexcept { return Duration{ int64(micros * NANOS_PER_MICRO) }; }
         static constexpr Duration from_micros(int32 micros) noexcept { return Duration{ int64(micros) * NANOS_PER_MICRO }; }
         static constexpr Duration from_micros(int64 micros) noexcept { return Duration{ micros * NANOS_PER_MICRO }; }
 
