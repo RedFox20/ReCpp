@@ -73,6 +73,84 @@ namespace rpp { namespace jni {
 
     //////////////////////////////////////////////////////////////////////////////////////
 
+    std::string JString::str() const noexcept
+    {
+        return ToString(getEnv(), s.get());
+    }
+
+    JString MakeString(const char* text) noexcept
+    {
+        return MakeRef(getEnv()->NewStringUTF(text));
+    }
+
+    std::string ToString(JNIEnv* env, jstring s) noexcept
+    {
+        if (!s) return {};
+        jsize len = env->GetStringUTFLength(s);
+        std::string result((size_t)len, ' ');
+        env->GetStringUTFRegion(s, 0, len, (char*) result.data());
+        return result;
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    ElementsRef::ElementsRef(jarray a, JniType t) noexcept
+        : arr{a}, type{t}
+    {
+        auto* env = getEnv();
+        switch (t) {
+            case JniType::Object:  e = nullptr; break;
+            case JniType::Boolean: e = env->GetBooleanArrayElements((jbooleanArray)a, nullptr); break;
+            case JniType::Byte:    e = env->GetByteArrayElements((jbyteArray)a, nullptr); break;
+            case JniType::Char:    e = env->GetCharArrayElements((jcharArray)a, nullptr); break;
+            case JniType::Short:   e = env->GetShortArrayElements((jshortArray)a, nullptr); break;
+            case JniType::Int:     e = env->GetIntArrayElements((jintArray)a, nullptr); break;
+            case JniType::Long:    e = env->GetLongArrayElements((jlongArray)a, nullptr); break;
+            case JniType::Float:   e = env->GetFloatArrayElements((jfloatArray)a, nullptr); break;
+            case JniType::Double:  e = env->GetDoubleArrayElements((jdoubleArray)a, nullptr); break;
+        }
+    }
+
+    ElementsRef::~ElementsRef() noexcept
+    {
+        if (!e)
+            return;
+        auto* env = getEnv();
+        switch (type) {
+            case JniType::Object: break;
+            case JniType::Boolean: env->ReleaseBooleanArrayElements((jbooleanArray)arr, (jboolean*)e, 0); break;
+            case JniType::Byte:    env->ReleaseByteArrayElements((jbyteArray)arr, (jbyte*)e, 0); break;
+            case JniType::Char:    env->ReleaseCharArrayElements((jcharArray)arr, (jchar*)e, 0); break;
+            case JniType::Short:   env->ReleaseShortArrayElements((jshortArray)arr, (jshort*)e, 0); break;
+            case JniType::Int:     env->ReleaseIntArrayElements((jintArray)arr, (jint*)e, 0); break;
+            case JniType::Long:    env->ReleaseLongArrayElements((jlongArray)arr, (jlong*)e, 0); break;
+            case JniType::Float:   env->ReleaseFloatArrayElements((jfloatArray)arr, (jfloat*)e, 0); break;
+            case JniType::Double:  env->ReleaseDoubleArrayElements((jdoubleArray)arr, (jdouble*)e, 0); break;
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    JString JArray::getStringAt(int index) const noexcept
+    {
+        return JString{ (jstring)getObjectAt(index) };
+    }
+
+    JArray MakeArray(const std::vector<const char*>& strings)
+    {
+        JNIEnv* env = getEnv();
+        Class stringClass{"java/lang/String"};
+        jobjectArray arr = env->NewObjectArray(strings.size(), stringClass, 0);
+        if (!arr) JniThrow("Failed to create java.lang.String[]");
+        for (size_t i = 0; i < strings.size(); ++i)
+        {
+            env->SetObjectArrayElement(arr, i, env->NewStringUTF(strings[i]));
+        }
+        return JArray{ MakeRef((jarray)arr), JniType::Object };
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////
+
     Class::Class(const char* className) : Class{className, std::nothrow}
     {
         if (!clazz) JniThrow("Class not found: '%s'", className);
@@ -157,22 +235,22 @@ namespace rpp { namespace jni {
     {
         va_list args;
         va_start(args, instance);
-        jobject result = instance
-                         ? clazz.env->CallObjectMethodV(instance, method, args)
-                         : clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args);
-        va_end(args);
-        return Ref<jobject>{result};
-    }
-
-    std::string Method::StringObj(jobject instance, ...) noexcept
-    {
-        va_list args;
-        va_start(args, instance);
         Ref<jobject> obj { instance
                          ? clazz.env->CallObjectMethodV(instance, method, args)
                          : clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
         va_end(args);
-        return obj ? to_string(clazz.env, obj.as<jstring>()) : std::string{};
+        return obj;
+    }
+
+    JString Method::String(jobject instance, ...) noexcept
+    {
+        va_list args;
+        va_start(args, instance);
+        Ref<jstring> str { instance
+                         ? (jstring)clazz.env->CallObjectMethodV(instance, method, args)
+                         : (jstring)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
+        va_end(args);
+        return JString{ std::move(str) };
     }
 
     jboolean Method::Boolean(jobject instance, ...) noexcept
@@ -263,9 +341,18 @@ namespace rpp { namespace jni {
         return result;
     }
 
+    JArray Method::Array(JniType type, jobject instance, ...) noexcept
+    {
+        va_list args;
+        va_start(args, instance);
+        Ref<jarray> arr { instance
+                        ? (jarray)clazz.env->CallObjectMethodV(instance, method, args)
+                        : (jarray)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
+        va_end(args);
+        return { std::move(arr), type };
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////
-
 
     Field::Field(Class& clazz, jfieldID field, const char* name, const char* type) noexcept
         : clazz(clazz), field(field), name(name), type(type)
@@ -280,11 +367,12 @@ namespace rpp { namespace jni {
         return Ref<jobject>{obj};
     }
 
-    std::string Field::String(jobject instance) noexcept
+    JString Field::String(jobject instance) noexcept
     {
-        if (Ref<jobject> obj = Object(instance))
-            return to_string(clazz.env, obj.as<jstring>());
-        return {};
+        jstring str = instance
+                    ? (jstring)clazz.env->GetObjectField(instance, field)
+                    : (jstring)clazz.env->GetStaticObjectField(clazz.clazz, field);
+        return JString{str};
     }
 
     jboolean Field::Boolean(jobject instance) noexcept
@@ -345,32 +433,6 @@ namespace rpp { namespace jni {
 
     //////////////////////////////////////////////////////////////////////////////////////
 
-    Ref<jstring> String(const char* text)
-    {
-        return MakeRef(getEnv()->NewStringUTF(text));
-    }
-
-    Ref<jobjectArray> Array(const std::vector<const char*>& strings)
-    {
-        JNIEnv* env = getEnv();
-        Class stringClass{"java/lang/String"};
-        jobjectArray arr = env->NewObjectArray(strings.size(), stringClass, 0);
-        if (!arr) JniThrow("Failed to create java.lang.String[]");
-        for (size_t i = 0; i < strings.size(); ++i)
-        {
-            env->SetObjectArrayElement(arr, i, env->NewStringUTF(strings[i]));
-        }
-        return MakeRef(arr);
-    }
-
-    std::string to_string(JNIEnv* env, jstring s)
-    {
-        if (!s) return {};
-        jsize len = env->GetStringUTFLength(s);
-        std::string result((size_t)len, ' ');
-        env->GetStringUTFRegion(s, 0, len, (char*) result.data());
-        return result;
-    }
 }} // namespace rpp::jni
-//////////////////////////////////////////////////////////////////////////////////////
+
 #endif // !__ANDROID__
