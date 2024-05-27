@@ -182,9 +182,12 @@ namespace rpp { namespace jni {
 
     //////////////////////////////////////////////////////////////////////////////////////
 
-    Class::Class(const char* className) : Class{className, std::nothrow}
+    Class::Class(const char* className)
     {
+        env = getEnv();
+        clazz = MakeRef(env->FindClass(className));
         if (!clazz) JniThrow("Class not found: '%s'", className);
+        name = className;
     }
 
     Class::Class(const char* className, std::nothrow_t) noexcept
