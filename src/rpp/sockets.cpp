@@ -1919,6 +1919,10 @@ namespace rpp
 
     bool socket::bind_to_interface(uint64_t network_handle) noexcept
     {
+        // sanity check
+        if (!good())
+            return false;
+        
 #if __ANDROID__ && __ANDROID_API__ >= 23
         if (android_setsocknetwork((net_handle_t)network_handle, Sock) != 0)
         {
