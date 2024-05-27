@@ -1917,13 +1917,12 @@ namespace rpp
         return socket::from_err_code(s.LastErr, remoteAddr);
     }
 
-    bool socket::bind_to_interface(uint64_t network_handle) noexcept
+    bool socket::bind_to_interface([[maybe_unused]] uint64_t network_handle) noexcept
     {
-        // sanity check
         if (!good())
             return false;
-        
-#if __ANDROID__ && __ANDROID_API__ >= 23
+
+    #if __ANDROID__ && __ANDROID_API__ >= 23
         if (android_setsocknetwork((net_handle_t)network_handle, Sock) != 0)
         {
             set_errno();
@@ -1931,15 +1930,15 @@ namespace rpp
             return false;
         }
         return true;
-#else
+    #else
         // TODO: implement for other platforms
         return false;
-#endif
+    #endif
     }
 
     bool socket::bind_to_interface(const std::string& interface) noexcept
     {
-        if (Sock == -1 || interface.empty())
+        if (!good() || interface.empty())
             return false;
 
         std::optional<uint64_t> network_handle = get_network_handle(interface);
@@ -1950,6 +1949,15 @@ namespace rpp
         }
 
         return bind_to_interface(*network_handle);
+    }
+
+    void socket::unbind_interface() noexcept
+    {
+    #if __ANDROID__ && __ANDROID_API__ >= 23
+        bind_to_interface(0); // 0=NETWORK_UNSPECIFIED
+    #else
+        // TODO: implement for other platforms
+    #endif
     }
 
     ////////////////////////////////////////////////////////////////////////////////

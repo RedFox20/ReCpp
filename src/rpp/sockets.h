@@ -1214,7 +1214,12 @@ namespace rpp
          * @return TRUE if the socket was successfully bound to the interface
          */
         bool bind_to_interface(const std::string& network_interface) noexcept;
-        
+
+        /**
+         * Clears any previous bind_to_interface
+         */
+        void unbind_interface() noexcept;
+
         /**
          * Starts an Async IO operation to accept a new connection until a connection
          * arrives or the specified timeout is reached
