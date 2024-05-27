@@ -10,6 +10,7 @@
 #include "strview.h" // rpp::strview, std::string
 #include "load_balancer.h" // rpp::load_balancer
 #include <vector>   // std::vector
+#include <optional> // std::optional
 
 namespace rpp
 {
@@ -1301,9 +1302,9 @@ namespace rpp
     /**
      * Get the network handle for a specific network interface name using platform specific API
      * @param network_interface Interface name to get the handle for (e.g "eth0", "wlan0" etc.)
-     * @return uint64_t Network handle for the specified interface
+     * @returns Network handle for the specified interface or std::nullopt if not found
      */
-    uint64_t get_network_handle(const std::string& network_interface) noexcept;
+    std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 

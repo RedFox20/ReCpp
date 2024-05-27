@@ -1938,14 +1938,14 @@ namespace rpp
         if (Sock == -1 || interface.empty())
             return false;
 
-        uint64_t network_handle = get_network_handle(interface);
-        if (network_handle == 0)
+        std::optional<uint64_t> network_handle = get_network_handle(interface);
+        if (!network_handle)
         {
             logerror("Failed to get network handle for interface: %s", interface.c_str());
             return false;
         }
 
-        return bind_to_interface(network_handle);
+        return bind_to_interface(*network_handle);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1993,7 +1993,7 @@ namespace rpp
         return get_ip_interface(network_interface, af).broadcast.str();
     }
 
-    uint64_t get_network_handle(const std::string& network_interface) noexcept
+    std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept
     {
 #if __ANDROID__ && __ANDROID_API__ >= 21
         using namespace rpp::jni;
@@ -2030,16 +2030,16 @@ namespace rpp
                     }
                 }
             }
-            return 0;
+            return std::nullopt;
         }
         catch (const std::exception& e)
         {
             logerror("Failed to get network handle for interface: %s", e.what());
-            return 0;
+            return std::nullopt;
         }
 #else
         // TODO: implement for other platforms
-        return 0;
+        return std::nullopt;
 #endif
     }
 
