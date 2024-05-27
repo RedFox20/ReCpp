@@ -242,6 +242,17 @@ namespace rpp { namespace jni {
         return obj;
     }
 
+    Ref<jobjectArray> Method::Array(jobject instance, ...) noexcept
+    {
+        va_list args;
+        va_start(args, instance);
+        jobjectArray result = instance
+                            ? (jobjectArray)clazz.env->CallObjectMethodV(instance, method, args)
+                            : (jobjectArray)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args);
+        va_end(args);
+        return Ref<jobjectArray>{result};
+    }
+
     JString Method::String(jobject instance, ...) noexcept
     {
         va_list args;

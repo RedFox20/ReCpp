@@ -328,6 +328,7 @@ namespace rpp { namespace jni {
         // if instance is nullptr, it assumes static method
         void         Void(jobject instance, ...) noexcept;
         Ref<jobject> Object(jobject instance, ...) noexcept;
+        Ref<jobjectArray> Array(jobject instance, ...) noexcept;
         JString      String(jobject instance, ...) noexcept;
         jboolean     Boolean(jobject instance, ...) noexcept;
         jbyte        Byte(jobject instance, ...) noexcept;
