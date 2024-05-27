@@ -85,6 +85,15 @@ namespace rpp { namespace jni {
         }
     }
 
+    void ClearException() noexcept
+    {
+        auto* env = getEnv();
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+    }
+
     #define JniThrow(format, ...) do {   \
             if (env->ExceptionCheck()) {     \
                 env->ExceptionDescribe();    \
@@ -182,57 +191,62 @@ namespace rpp { namespace jni {
     {
         env = getEnv();
         clazz = MakeRef(env->FindClass(className));
+        if (!clazz) ClearException();
         name = className;
     }
 
     Method Class::Method(const char* methodName, const char* signature)
     {
-        auto method = this->Method(methodName, signature, std::nothrow);
+        jmethodID method = env->GetMethodID(clazz, methodName, signature);
         if (!method) JniThrow("Method '%s' not found in '%s'", methodName, name);
-        return method;
+        return {*this, method, methodName, signature};
     }
 
     Method Class::SMethod(const char* methodName, const char* signature)
     {
-        auto method = this->SMethod(methodName, signature, std::nothrow);
+        jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
         if (!method) JniThrow("Static method '%s' not found in '%s'", methodName, name);
-        return method;
+        return {*this, method, methodName, signature};
     }
 
     Method Class::Method(const char* methodName, const char* signature, std::nothrow_t) noexcept
     {
         jmethodID method = env->GetMethodID(clazz, methodName, signature);
+        if (!method) ClearException();
         return {*this, method, methodName, signature};
     }
 
     Method Class::SMethod(const char* methodName, const char* signature, std::nothrow_t) noexcept
     {
         jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
+        if (!method) ClearException();
         return {*this, method, methodName, signature};
     }
 
     Field Class::Field(const char* fieldName, const char* type)
     {
-        auto field = this->Field(fieldName, type, std::nothrow);
+        jfieldID field = env->GetFieldID(clazz, fieldName, type);
         if (!field) JniThrow("Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
-        return field;
+        return {*this, field, fieldName, type};
     }
 
     Field Class::SField(const char* fieldName, const char* type)
     {
-        auto field = this->SField(fieldName, type, std::nothrow);
+        jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
         if (!field) JniThrow("Static Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
-        return field;
+        return {*this, field, fieldName, type};
     }
 
     Field Class::Field(const char* fieldName, const char* type, std::nothrow_t) noexcept
     {
         jfieldID field = env->GetFieldID(clazz, fieldName, type);
+        if (!field) ClearException();
         return {*this, field, fieldName, type};
     }
     Field Class::SField(const char* fieldName, const char* type, std::nothrow_t) noexcept
     {
         jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
+        if (!field) ClearException();
         return {*this, field, fieldName, type};
     }
 
