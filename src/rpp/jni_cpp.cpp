@@ -52,6 +52,14 @@ namespace rpp { namespace jni {
         return androidActivity;
     }
 
+    void initMainActivity(jobject globalHandle)
+    {
+        if (!androidActivity)
+        {
+            androidActivity = globalHandle;
+        }
+    }
+
 
     void checkForJNIException(const char* message)
     {

@@ -42,6 +42,13 @@ namespace rpp { namespace jni {
     jobject getActivity(const char* mainActivityClass = nullptr);
 
     /**
+     * @brief Manually the main activity object for the app
+     * @param globalHandle The global reference to the main activity object
+     * @warning The main activity can only be configured once per app init
+     */
+    void initMainActivity(jobject globalHandle);
+
+    /**
      * @brief Checks for pending JNI exceptions and rethrows them as a C++ exception
      * @param message Exception message to show
      */
