@@ -89,7 +89,6 @@ namespace rpp { namespace jni {
     {
         auto* env = getEnv();
         if (env->ExceptionCheck()) {
-            env->ExceptionDescribe();
             env->ExceptionClear();
         }
     }
