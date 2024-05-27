@@ -1998,37 +1998,45 @@ namespace rpp
 #if __ANDROID__ && __ANDROID_API__ >= 21
         using namespace rpp::jni;
 
-        Class Activity{"android/app/Activity"};
-        Class ConnectivityManager{"android/net/ConnectivityManager"};
-        Class LinkProperties{"android/net/LinkProperties"};
-        Class Network{"android/net/Network"};
-
-        Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
-        Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
-        Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
-        Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
-        Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
-
-        Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), String("connectivity").get());
-
-        Ref<jobjectArray> networks = getAllNetworks.Array(connectivityManager);
-        jsize length = getEnv()->GetArrayLength(networks.get());
-
-        for (jsize i = 0; i < length; ++i)
+        try
         {
-            Ref<jobject> network{getEnv()->GetObjectArrayElement(networks, i)};
-            Ref<jobject> linkProperties = getLinkProperties.Object(connectivityManager, network);
+            Class Activity{"android/app/Activity"};
+            Class ConnectivityManager{"android/net/ConnectivityManager"};
+            Class LinkProperties{"android/net/LinkProperties"};
+            Class Network{"android/net/Network"};
 
-            if (linkProperties)
+            Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
+            Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
+            Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
+            Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
+
+            Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get());
+
+            JArray networks = getAllNetworks.Array(JniType::Object, connectivityManager);
+            jsize length = networks.getLength();
+
+            for (jsize i = 0; i < length; ++i)
             {
-                std::string interfaceName = getInterfaceName.String(linkProperties);
-                if (network_interface == interfaceName)
+                Ref<jobject> network{networks.getObjectAt(i)};
+                Ref<jobject> linkProperties = getLinkProperties.Object(connectivityManager, network.get());
+
+                if (linkProperties)
                 {
-                    return static_cast<uint64_t>(getNetworkHandle.Long(network));
+                    std::string interfaceName = getInterfaceName.String(linkProperties).str();
+                    if (network_interface == interfaceName)
+                    {
+                        return static_cast<uint64_t>(getNetworkHandle.Long(network));
+                    }
                 }
             }
+            return 0;
         }
-        return 0;
+        catch (const std::exception& e)
+        {
+            logerror("Failed to get network handle for interface: %s", e.what());
+            return 0;
+        }
 #else
         // TODO: implement for other platforms
         return 0;

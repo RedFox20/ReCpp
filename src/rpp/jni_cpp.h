@@ -42,7 +42,7 @@ namespace rpp { namespace jni {
     jobject getActivity(const char* mainActivityClass = nullptr);
 
     /**
-     * @brief Manually the main activity object for the app
+     * @brief Manually sets the main activity object for the app
      * @param globalHandle The global reference to the main activity object
      * @warning The main activity can only be configured once per app init
      */
@@ -335,7 +335,6 @@ namespace rpp { namespace jni {
         // if instance is nullptr, it assumes static method
         void         Void(jobject instance, ...) noexcept;
         Ref<jobject> Object(jobject instance, ...) noexcept;
-        Ref<jobjectArray> Array(jobject instance, ...) noexcept;
         JString      String(jobject instance, ...) noexcept;
         jboolean     Boolean(jobject instance, ...) noexcept;
         jbyte        Byte(jobject instance, ...) noexcept;
