@@ -55,10 +55,14 @@
     #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
     // on __ANDROID__ this requires API level 24
-    #if __ANDROID__ && __ANDROID_API__ < 24
-        #error "<ifaddrs.h> requires ANDROID_API level 24"
-    #else
-        #include <ifaddrs.h>        // getifaddrs / freeifaddrs
+    #if __ANDROID__
+        #include "jni_cpp.h"
+        #include <android/multinetwork.h> // android_setsocknetwork
+        #if __ANDROID_API__ < 24
+            #error "<ifaddrs.h> requires ANDROID_API level 24"
+        #else
+            #include <ifaddrs.h>        // getifaddrs / freeifaddrs
+        #endif
     #endif
     #define sleep(milliSeconds) ::usleep((milliSeconds) * 1000)
     #define inwin32(...) /*nothing*/ 
@@ -1913,6 +1917,41 @@ namespace rpp
         return socket::from_err_code(s.LastErr, remoteAddr);
     }
 
+    bool socket::bind_to_interface(uint64_t network_handle) noexcept
+    {
+        // sanity check
+        if (!good())
+            return false;
+        
+#if __ANDROID__ && __ANDROID_API__ >= 23
+        if (android_setsocknetwork((net_handle_t)network_handle, Sock) != 0)
+        {
+            set_errno();
+            logerror("Failed to bind socket to network handle: %s", last_err().c_str());
+            return false;
+        }
+        return true;
+#else
+        // TODO: implement for other platforms
+        return false;
+#endif
+    }
+
+    bool socket::bind_to_interface(const std::string& interface) noexcept
+    {
+        if (Sock == -1 || interface.empty())
+            return false;
+
+        std::optional<uint64_t> network_handle = get_network_handle(interface);
+        if (!network_handle)
+        {
+            logerror("Failed to get network handle for interface: %s", interface.c_str());
+            return false;
+        }
+
+        return bind_to_interface(*network_handle);
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
 
     socket make_udp_randomport(socket_option opt, raw_address bind_address) noexcept
@@ -1956,6 +1995,56 @@ namespace rpp
     std::string get_broadcast_ip(const std::string& network_interface, address_family af)
     {
         return get_ip_interface(network_interface, af).broadcast.str();
+    }
+
+    std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept
+    {
+#if __ANDROID__ && __ANDROID_API__ >= 21
+        using namespace rpp::jni;
+
+        try
+        {
+            Class Activity{"android/app/Activity"};
+            Class ConnectivityManager{"android/net/ConnectivityManager"};
+            Class LinkProperties{"android/net/LinkProperties"};
+            Class Network{"android/net/Network"};
+
+            Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
+            Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
+            Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
+            Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
+
+            Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get());
+
+            JArray networks = getAllNetworks.Array(JniType::Object, connectivityManager);
+            jsize length = networks.getLength();
+
+            for (jsize i = 0; i < length; ++i)
+            {
+                Ref<jobject> network{networks.getObjectAt(i)};
+                Ref<jobject> linkProperties = getLinkProperties.Object(connectivityManager, network.get());
+
+                if (linkProperties)
+                {
+                    std::string interfaceName = getInterfaceName.String(linkProperties).str();
+                    if (network_interface == interfaceName)
+                    {
+                        return static_cast<uint64_t>(getNetworkHandle.Long(network));
+                    }
+                }
+            }
+            return std::nullopt;
+        }
+        catch (const std::exception& e)
+        {
+            logerror("Failed to get network handle for interface: %s", e.what());
+            return std::nullopt;
+        }
+#else
+        // TODO: implement for other platforms
+        return std::nullopt;
+#endif
     }
 
     ////////////////////////////////////////////////////////////////////////////////

@@ -10,6 +10,7 @@
 #include "strview.h" // rpp::strview, std::string
 #include "load_balancer.h" // rpp::load_balancer
 #include <vector>   // std::vector
+#include <optional> // std::optional
 
 namespace rpp
 {
@@ -1200,7 +1201,20 @@ namespace rpp
         static socket connect_to(const ipaddress& remoteAddr, int millis,
                                  socket_option opt = SO_None) noexcept;
 
+        /**
+         * Manually binds a socket to a specific interface using the interface handle
+         * @param network_handle Network handle for the interface to bind to
+         * @return TRUE if the socket was successfully bound to the interface
+         */
+        bool bind_to_interface(uint64_t network_handle) noexcept;
 
+        /**
+         * Manually binds a socket to a specific interface using the interface name
+         * @param network_interface Interface name to bind to (e.g "eth0", "wlan0" etc.)
+         * @return TRUE if the socket was successfully bound to the interface
+         */
+        bool bind_to_interface(const std::string& network_interface) noexcept;
+        
         /**
          * Starts an Async IO operation to accept a new connection until a connection
          * arrives or the specified timeout is reached
@@ -1284,6 +1298,13 @@ namespace rpp
      * @param interface ["eth|lan|wlan"] Main interface name substring patterns to match
      */
     std::string get_broadcast_ip(const std::string& network_interface = "eth|lan|wlan", address_family af = AF_IPv4);
+
+    /**
+     * Get the network handle for a specific network interface name using platform specific API
+     * @param network_interface Interface name to get the handle for (e.g "eth0", "wlan0" etc.)
+     * @returns Network handle for the specified interface or std::nullopt if not found
+     */
+    std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
