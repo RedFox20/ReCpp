@@ -40,8 +40,22 @@ namespace rpp { namespace jni {
             {
                 if (auto mainClass = Class{mainActivityClass})
                 {
-                    auto activity = mainClass.SField("currentActivity", "Landroid/app/Activity;").Object();
-                    androidActivity = activity.to_global();
+                    if (auto currentActivity = mainClass.SField("currentActivity", "Landroid/app/Activity;", std::nothrow))
+                    {
+                        androidActivity = currentActivity.Object().to_global();
+                    }
+                    else if (auto activity = mainClass.SField("activity", "Landroid/app/Activity;", std::nothrow))
+                    {
+                        androidActivity = activity.Object().to_global();
+                    }
+                    else if (auto activity = mainClass.SMethod("activity", "()Landroid/app/Activity;", std::nothrow))
+                    {
+                        androidActivity = activity.Object(nullptr).to_global();
+                    }
+                    else
+                    {
+                        LogError("failed to init main activity");
+                    }
                 }
             }
             catch (const std::exception& e)
