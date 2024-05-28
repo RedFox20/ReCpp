@@ -42,15 +42,15 @@ namespace rpp { namespace jni {
                 {
                     if (auto currentActivity = mainClass.SField("currentActivity", "Landroid/app/Activity;", std::nothrow))
                     {
-                        androidActivity = currentActivity.Object().to_global().as<jobject>();
+                        androidActivity = currentActivity.Object().toGlobal().as<jobject>();
                     }
                     else if (auto activity = mainClass.SField("activity", "Landroid/app/Activity;", std::nothrow))
                     {
-                        androidActivity = activity.Object().to_global().as<jobject>();
+                        androidActivity = activity.Object().toGlobal().as<jobject>();
                     }
                     else if (auto activity = mainClass.SMethod("activity", "()Landroid/app/Activity;", std::nothrow))
                     {
-                        androidActivity = activity.Object(nullptr).to_global().as<jobject>();
+                        androidActivity = activity.Object(nullptr).toGlobal().as<jobject>();
                     }
                     else
                     {
@@ -185,7 +185,7 @@ namespace rpp { namespace jni {
     {
         env = getEnv();
         clazz = MakeRef<jclass>(env->FindClass(className));
-        clazz.make_global();
+        clazz.makeGlobal();
         if (!clazz) JniThrow("Class not found: '%s'", className);
         name = className;
     }
@@ -194,7 +194,7 @@ namespace rpp { namespace jni {
     {
         env = getEnv();
         clazz = MakeRef<jclass>(env->FindClass(className));
-        clazz.make_global();
+        clazz.makeGlobal();
         if (!clazz) ClearException();
         name = className;
     }

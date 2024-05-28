@@ -137,7 +137,7 @@ namespace rpp { namespace jni {
         /**
          * @brief Converts this Local Ref to a Global Ref and resets this Ref
          */
-        Ref<JObject> to_global() noexcept
+        Ref<JObject> toGlobal() noexcept
         {
             Ref<JObject> g;
             if (obj)
@@ -152,7 +152,7 @@ namespace rpp { namespace jni {
         /**
          * @brief Converts this Local Ref to a Global Ref
          */
-        void make_global() noexcept
+        void makeGlobal() noexcept
         {
             if (!isGlobal && obj) {
                 auto* env = getEnv();
