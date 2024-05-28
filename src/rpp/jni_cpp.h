@@ -86,10 +86,7 @@ namespace rpp { namespace jni {
         }
         Ref(const Ref& r) noexcept : isGlobal{r.isGlobal}
         {
-            if (r.isGlobal)
-                obj = getEnv()->NewGlobalRef(r.obj);
-            else
-                obj = getEnv()->NewLocalRef(r.obj);
+            copy(r);
         }
         Ref& operator=(Ref&& r) noexcept
         {
@@ -102,10 +99,9 @@ namespace rpp { namespace jni {
             if (this != &r)
             {
                 // reconstruct
-                auto* env = getEnv();
                 reset();
                 isGlobal = r.isGlobal;
-                obj = isGlobal ? env->NewGlobalRef(r.obj) : env->NewLocalRef(r.obj);
+                copy(r);
             }
             return *this;
         }
@@ -144,14 +140,14 @@ namespace rpp { namespace jni {
         /**
          * @brief Converts this Local Ref to a Global Ref and resets this Ref
          */
-        Ref<JObject> to_global() noexcept
+        JObject to_global() noexcept
         {
-            Ref<JObject> g;
-            if (obj)
-            {
-                g.obj = getEnv()->NewGlobalRef(obj);
-                g.isGlobal = true;
-                reset();
+            JObject g = nullptr;
+            if (obj) {
+                auto* env = getEnv();
+                g = env->NewGlobalRef(obj);
+                env->DeleteLocalRef(obj);
+                obj = nullptr;
             }
             return g;
         }
@@ -167,6 +163,17 @@ namespace rpp { namespace jni {
                 env->DeleteLocalRef(obj);
                 obj = g;
                 isGlobal = true;
+            }
+        }
+
+    private:
+        void copy(const Ref& r) noexcept
+        {
+            if (r.obj) {
+                if (r.isGlobal)
+                    obj = getEnv()->NewGlobalRef(r.obj);
+                else
+                    obj = getEnv()->NewLocalRef(r.obj);
             }
         }
     };
