@@ -159,6 +159,7 @@ namespace rpp { namespace jni {
                 g.obj = obj;
                 g.isGlobal = true;
                 obj = nullptr;
+                isGlobal = false;
             }
             return g;
         }
