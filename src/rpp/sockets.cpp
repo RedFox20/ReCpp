@@ -2031,38 +2031,44 @@ namespace rpp
 
     std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept
     {
-#if __ANDROID__ && __ANDROID_API__ >= 21
+    #if __ANDROID__ && __ANDROID_API__ >= 21
         using namespace rpp::jni;
 
         try
         {
+            auto* mainActivity = getActivity();
+            if (!mainActivity)
+            {
+                logerror("get_network_handle failed: mainActivity uninitialized");
+                return std::nullopt;
+            }
+
             static thread_local Class Activity{"android/app/Activity"};
             static thread_local Class ConnectivityManager{"android/net/ConnectivityManager"};
             static thread_local Class LinkProperties{"android/net/LinkProperties"};
             static thread_local Class Network{"android/net/Network"};
 
-            static thread_local Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
-            static thread_local Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
-            static thread_local Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
-            static thread_local Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
-            static thread_local Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
+            static thread_local Method getSystemService = Activity.method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            static thread_local Method getAllNetworks = ConnectivityManager.method("getAllNetworks", "()[Landroid/net/Network;");
+            static thread_local Method getLinkProperties = ConnectivityManager.method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
+            static thread_local Method getInterfaceName = LinkProperties.method("getInterfaceName", "()Ljava/lang/String;");
+            static thread_local Method getNetworkHandle = Network.method("getNetworkHandle", "()J");
+            static thread_local Ref<jobject> connectivityManager = getSystemService.globalObjectF(mainActivity, JString::from("connectivity"));
 
-            static thread_local Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get()).toGlobal();
-
-            JArray networks = getAllNetworks.Array(JniType::Object, connectivityManager);
+            JArray networks = getAllNetworks.arrayF(JniType::Object, connectivityManager);
             jsize length = networks.getLength();
 
             for (jsize i = 0; i < length; ++i)
             {
-                Ref<jobject> network{networks.getObjectAt(i)};
-                Ref<jobject> linkProperties = getLinkProperties.Object(connectivityManager, network.get());
+                Ref<jobject> network { networks.getObjectAt(i) };
+                Ref<jobject> linkProperties = getLinkProperties.objectF(connectivityManager, network);
 
                 if (linkProperties)
                 {
-                    std::string interfaceName = getInterfaceName.String(linkProperties).str();
+                    std::string interfaceName = getInterfaceName.stringF(linkProperties).str();
                     if (network_interface == interfaceName)
                     {
-                        return static_cast<uint64_t>(getNetworkHandle.Long(network));
+                        return static_cast<uint64_t>(getNetworkHandle.longF(network));
                     }
                 }
             }
@@ -2070,14 +2076,14 @@ namespace rpp
         }
         catch (const std::exception& e)
         {
-            logerror("Failed to get network handle for interface: %s", e.what());
+            logerror("get_network_handle %s failed: %s", network_interface.c_str(), e.what());
             return std::nullopt;
         }
-#else
+    #else
         // TODO: implement for other platforms
         (void)network_interface;
         return std::nullopt;
-#endif
+    #endif
     }
 
     ////////////////////////////////////////////////////////////////////////////////

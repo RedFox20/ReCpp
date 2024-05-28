@@ -5,11 +5,13 @@
 #if __ANDROID__
 #include "jni_cpp.h"
 #include "debugging.h"
+#include <android/log.h>
 
 namespace rpp { namespace jni {
     //////////////////////////////////////////////////////////////////////////////////////
     static JavaVM* javaVM;
-    static jobject androidActivity;
+    static thread_local jobject androidActivity; // needs to be thread_local
+    static std::string mainActivityClassName;
 
     jint initVM(JavaVM* vm) noexcept
     {
@@ -34,36 +36,48 @@ namespace rpp { namespace jni {
 
     jobject getActivity(const char* mainActivityClass)
     {
-        if (mainActivityClass && !androidActivity)
+        if (androidActivity)
+            return androidActivity;
+
+        // if we enter from another thread, attempt to reuse the previous initialize activity name
+        const char* activityName = mainActivityClass ? mainActivityClass : mainActivityClassName.c_str();
+        if (!activityName || !*activityName)
         {
-            try
-            {
-                if (auto mainClass = Class{mainActivityClass})
-                {
-                    if (auto currentActivity = mainClass.SField("currentActivity", "Landroid/app/Activity;", std::nothrow))
-                    {
-                        androidActivity = currentActivity.Object().toGlobal();
-                    }
-                    else if (auto activity = mainClass.SField("activity", "Landroid/app/Activity;", std::nothrow))
-                    {
-                        androidActivity = activity.Object().toGlobal();
-                    }
-                    else if (auto activity = mainClass.SMethod("activity", "()Landroid/app/Activity;", std::nothrow))
-                    {
-                        androidActivity = activity.Object(nullptr).toGlobal();
-                    }
-                    else
-                    {
-                        LogError("failed to init main activity");
-                    }
-                }
-            }
-            catch (const std::exception& e)
-            {
-                LogError("failed to init main activity: %s", e.what());
-            }
+            LogError("failed to init main activity: mainActivityClassName is empty");
+            return nullptr;
         }
-        return androidActivity;
+
+        if (auto mainClass = Class{activityName, std::nothrow})
+        {
+            if (auto currentActivity = mainClass.staticField("currentActivity", "Landroid/app/Activity;", std::nothrow))
+            {
+                androidActivity = currentActivity.getGlobalObject();
+            }
+            else if (auto activity = mainClass.staticField("activity", "Landroid/app/Activity;", std::nothrow))
+            {
+                androidActivity = activity.getGlobalObject();
+            }
+            else if (auto activity = mainClass.staticField("activity", "()Landroid/app/Activity;", std::nothrow))
+            {
+                androidActivity = activity.getGlobalObject();
+            }
+            else
+            {
+                LogError("failed to detect main activity field or method in %s", activityName);
+                return nullptr;
+            }
+
+            // if init succeeded, save the activity name for future use
+            if (androidActivity)
+            {
+                mainActivityClassName = activityName;
+                return androidActivity;
+            }
+            LogError("main activity field or method in %s returned null", activityName);
+            return nullptr;
+        }
+        LogError("failed to find main activity class: %s", activityName);
+        return nullptr;
     }
 
     void initMainActivity(jobject globalHandle)
@@ -105,15 +119,15 @@ namespace rpp { namespace jni {
 
     std::string JString::str() const noexcept
     {
-        return ToString(getEnv(), s.get());
+        return toString(getEnv(), s.get());
     }
 
-    JString MakeString(const char* text) noexcept
+    JString JString::from(const char* text) noexcept
     {
-        return MakeRef(getEnv()->NewStringUTF(text));
+        return makeRef(getEnv()->NewStringUTF(text));
     }
 
-    std::string ToString(JNIEnv* env, jstring s) noexcept
+    std::string toString(JNIEnv* env, jstring s) noexcept
     {
         if (!s) return {};
         jsize len = env->GetStringUTFLength(s);
@@ -166,7 +180,7 @@ namespace rpp { namespace jni {
         return JString{ (jstring)getObjectAt(index) };
     }
 
-    JArray MakeArray(const std::vector<const char*>& strings)
+    JArray JArray::from(const std::vector<const char*>& strings)
     {
         JNIEnv* env = getEnv();
         Class stringClass{"java/lang/String"};
@@ -176,7 +190,7 @@ namespace rpp { namespace jni {
         {
             env->SetObjectArrayElement(arr, i, env->NewStringUTF(strings[i]));
         }
-        return JArray{ MakeRef((jarray)arr), JniType::Object };
+        return JArray{ makeRef((jarray)arr), JniType::Object };
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -184,8 +198,7 @@ namespace rpp { namespace jni {
     Class::Class(const char* className)
     {
         env = getEnv();
-        clazz = MakeRef<jclass>(env->FindClass(className));
-        clazz.makeGlobal();
+        clazz = makeGlobalRef<jclass>(env->FindClass(className));
         if (!clazz) JniThrow("Class not found: '%s'", className);
         name = className;
     }
@@ -193,86 +206,83 @@ namespace rpp { namespace jni {
     Class::Class(const char* className, std::nothrow_t) noexcept
     {
         env = getEnv();
-        clazz = MakeRef<jclass>(env->FindClass(className));
-        clazz.makeGlobal();
+        clazz = makeGlobalRef<jclass>(env->FindClass(className));
         if (!clazz) ClearException();
         name = className;
     }
 
-    Method Class::Method(const char* methodName, const char* signature)
+    Method Class::method(const char* methodName, const char* signature)
     {
         jmethodID method = env->GetMethodID(clazz, methodName, signature);
         if (!method) JniThrow("Method '%s' not found in '%s'", methodName, name);
-        return {*this, method, methodName, signature};
+        return {*this, method, methodName, signature, /*isStatic*/false};
     }
-
-    Method Class::SMethod(const char* methodName, const char* signature)
-    {
-        jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
-        if (!method) JniThrow("Static method '%s' not found in '%s'", methodName, name);
-        return {*this, method, methodName, signature};
-    }
-
-    Method Class::Method(const char* methodName, const char* signature, std::nothrow_t) noexcept
+    Method Class::method(const char* methodName, const char* signature, std::nothrow_t) noexcept
     {
         jmethodID method = env->GetMethodID(clazz, methodName, signature);
         if (!method) ClearException();
-        return {*this, method, methodName, signature};
+        return {*this, method, methodName, signature, /*isStatic*/false};
     }
 
-    Method Class::SMethod(const char* methodName, const char* signature, std::nothrow_t) noexcept
+    Method Class::staticMethod(const char* methodName, const char* signature)
+    {
+        jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
+        if (!method) JniThrow("Static method '%s' not found in '%s'", methodName, name);
+        return {*this, method, methodName, signature, /*isStatic*/true};
+    }
+
+    Method Class::staticMethod(const char* methodName, const char* signature, std::nothrow_t) noexcept
     {
         jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
         if (!method) ClearException();
-        return {*this, method, methodName, signature};
+        return {*this, method, methodName, signature, /*isStatic*/true};
     }
 
-    Field Class::Field(const char* fieldName, const char* type)
+    Field Class::field(const char* fieldName, const char* type)
     {
         jfieldID field = env->GetFieldID(clazz, fieldName, type);
         if (!field) JniThrow("Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
-        return {*this, field, fieldName, type};
+        return {*this, field, fieldName, type, /*isStatic*/false};
     }
-
-    Field Class::SField(const char* fieldName, const char* type)
-    {
-        jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
-        if (!field) JniThrow("Static Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
-        return {*this, field, fieldName, type};
-    }
-
-    Field Class::Field(const char* fieldName, const char* type, std::nothrow_t) noexcept
+    Field Class::field(const char* fieldName, const char* type, std::nothrow_t) noexcept
     {
         jfieldID field = env->GetFieldID(clazz, fieldName, type);
         if (!field) ClearException();
-        return {*this, field, fieldName, type};
+        return {*this, field, fieldName, type, /*isStatic*/false};
     }
-    Field Class::SField(const char* fieldName, const char* type, std::nothrow_t) noexcept
+
+    Field Class::staticField(const char* fieldName, const char* type)
+    {
+        jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
+        if (!field) JniThrow("Static Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
+        return {*this, field, fieldName, type, /*isStatic*/true};
+    }
+    Field Class::staticField(const char* fieldName, const char* type, std::nothrow_t) noexcept
     {
         jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
         if (!field) ClearException();
-        return {*this, field, fieldName, type};
+        return {*this, field, fieldName, type, /*isStatic*/true};
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
 
-
-    Method::Method(Class& clazz, jmethodID method, const char* name, const char* signature) noexcept
-        : clazz{clazz}, method{method}, name{name}, signature{signature}
+    Method::Method(Class& clazz, jmethodID method, const char* name, const char* signature, bool isStatic) noexcept
+        : clazz{clazz}, method{method}, name{name}, signature{signature}, isStatic{isStatic}
     {
     }
 
-    void Method::Void(jobject instance, ...) noexcept
-    {
-        va_list args;
-        va_start(args, instance);
-        if (instance) clazz.env->CallVoidMethodV(instance, method, args);
-        else clazz.env->CallStaticVoidMethodV(clazz.clazz, method, args);
-        va_end(args);
-    }
+    #define CheckMethodInstance(instance, retval) do { \
+        if (!isStatic && !instance) { \
+            __android_log_print(ANDROID_LOG_ERROR, "ReCpp", "NonStatic jni::Method %s called with null instance", name); \
+            return retval; \
+        } else if (isStatic && instance) { \
+            __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Method %s called with instance=%p", name, instance); \
+        } \
+    } while(0)
 
-    Ref<jobject> Method::Object(jobject instance, ...) noexcept
+    Ref<jobject> Method::objectV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         Ref<jobject> obj { instance
@@ -282,8 +292,9 @@ namespace rpp { namespace jni {
         return obj;
     }
 
-    JString Method::String(jobject instance, ...) noexcept
+    JString Method::stringV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         Ref<jstring> str { instance
@@ -293,8 +304,31 @@ namespace rpp { namespace jni {
         return JString{ std::move(str) };
     }
 
-    jboolean Method::Boolean(jobject instance, ...) noexcept
+    JArray Method::arrayV(JniType type, jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
+        va_list args;
+        va_start(args, instance);
+        Ref<jarray> arr { instance
+                            ? (jarray)clazz.env->CallObjectMethodV(instance, method, args)
+                            : (jarray)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
+        va_end(args);
+        return { std::move(arr), type };
+    }
+
+    void Method::voidV(jobject instance, ...) noexcept
+    {
+        CheckMethodInstance(instance, );
+        va_list args;
+        va_start(args, instance);
+        if (instance) clazz.env->CallVoidMethodV(instance, method, args);
+        else clazz.env->CallStaticVoidMethodV(clazz.clazz, method, args);
+        va_end(args);
+    }
+
+    jboolean Method::booleanV(jobject instance, ...) noexcept
+    {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jboolean result = instance
@@ -304,8 +338,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jbyte Method::Byte(jobject instance, ...) noexcept
+    jbyte Method::byteV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jbyte result = instance
@@ -315,8 +350,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jchar Method::Char(jobject instance, ...) noexcept
+    jchar Method::charV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jchar result = instance
@@ -326,8 +362,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jshort Method::Short(jobject instance, ...) noexcept
+    jshort Method::shortV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jshort result = instance
@@ -337,8 +374,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jint Method::Int(jobject instance, ...) noexcept
+    jint Method::intV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jint result = instance
@@ -348,8 +386,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jlong Method::Long(jobject instance, ...) noexcept
+    jlong Method::longV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jlong result = instance
@@ -359,8 +398,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jfloat Method::Float(jobject instance, ...) noexcept
+    jfloat Method::floatV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jfloat result = instance
@@ -370,8 +410,9 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    jdouble Method::Double(jobject instance, ...) noexcept
+    jdouble Method::doubleV(jobject instance, ...) noexcept
     {
+        CheckMethodInstance(instance, {});
         va_list args;
         va_start(args, instance);
         jdouble result = instance
@@ -381,94 +422,111 @@ namespace rpp { namespace jni {
         return result;
     }
 
-    JArray Method::Array(JniType type, jobject instance, ...) noexcept
-    {
-        va_list args;
-        va_start(args, instance);
-        Ref<jarray> arr { instance
-                        ? (jarray)clazz.env->CallObjectMethodV(instance, method, args)
-                        : (jarray)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
-        va_end(args);
-        return { std::move(arr), type };
-    }
-
     //////////////////////////////////////////////////////////////////////////////////////
 
-    Field::Field(Class& clazz, jfieldID field, const char* name, const char* type) noexcept
-        : clazz(clazz), field(field), name(name), type(type)
+    Field::Field(Class& clazz, jfieldID field, const char* name, const char* type, bool isStatic) noexcept
+        : clazz{clazz}, field{field}, name{name}, type{type}, isStatic{isStatic}
     {
     }
 
-    Ref<jobject> Field::Object(jobject instance) noexcept
+    #define CheckFieldInstance(instance, retval) do { \
+        if (!isStatic && !instance) { \
+            __android_log_print(ANDROID_LOG_ERROR, "ReCpp", "NonStatic jni::Field %s called with null instance", name); \
+            return retval; \
+        } else if (isStatic && instance) { \
+            __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Field %s called with instance=%p", name, instance); \
+        } \
+    } while(0)
+
+    Ref<jobject> Field::getObject(jobject instance) noexcept
     {
-        jobject obj = instance
-                    ? clazz.env->GetObjectField(instance, field)
-                    : clazz.env->GetStaticObjectField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        jobject obj = isStatic
+                    ? clazz.env->GetStaticObjectField(clazz.clazz, field)
+                    : clazz.env->GetObjectField(instance, field);
         return Ref<jobject>{obj};
     }
 
-    JString Field::String(jobject instance) noexcept
+    JString Field::getString(jobject instance) noexcept
     {
-        jstring str = instance
-                    ? (jstring)clazz.env->GetObjectField(instance, field)
-                    : (jstring)clazz.env->GetStaticObjectField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        jstring str = isStatic
+                    ? (jstring)clazz.env->GetStaticObjectField(clazz.clazz, field)
+                    : (jstring)clazz.env->GetObjectField(instance, field);
         return JString{str};
     }
 
-    jboolean Field::Boolean(jobject instance) noexcept
+    JArray Field::getArray(JniType type, jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetBooleanField(instance, field)
-            : clazz.env->GetStaticBooleanField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        jarray arr = isStatic
+                   ? (jarray)clazz.env->GetStaticObjectField(clazz.clazz, field)
+                   : (jarray)clazz.env->GetObjectField(instance, field);
+        return JArray{arr, type};
     }
 
-    jbyte Field::Byte(jobject instance) noexcept
+    jboolean Field::getBoolean(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetByteField(instance, field)
-            : clazz.env->GetStaticByteField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticBooleanField(clazz.clazz, field)
+            : clazz.env->GetBooleanField(instance, field);
     }
 
-    jchar Field::Char(jobject instance) noexcept
+    jbyte Field::getByte(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetCharField(instance, field)
-            : clazz.env->GetStaticCharField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticByteField(clazz.clazz, field)
+            : clazz.env->GetByteField(instance, field);
     }
 
-    jshort Field::Short(jobject instance) noexcept
+    jchar Field::getChar(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetShortField(instance, field)
-            : clazz.env->GetStaticShortField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticCharField(clazz.clazz, field)
+            : clazz.env->GetCharField(instance, field);
     }
 
-    jint Field::Int(jobject instance) noexcept
+    jshort Field::getShort(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetIntField(instance, field)
-            : clazz.env->GetStaticIntField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticShortField(clazz.clazz, field)
+            : clazz.env->GetShortField(instance, field);
     }
 
-    jlong Field::Long(jobject instance) noexcept
+    jint Field::getInt(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetLongField(instance, field)
-            : clazz.env->GetStaticLongField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticIntField(clazz.clazz, field)
+            : clazz.env->GetIntField(instance, field);
     }
 
-    jfloat Field::Float(jobject instance) noexcept
+    jlong Field::getLong(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetFloatField(instance, field)
-            : clazz.env->GetStaticFloatField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticLongField(clazz.clazz, field)
+            : clazz.env->GetLongField(instance, field);
     }
 
-    jdouble Field::Double(jobject instance) noexcept
+    jfloat Field::getFloat(jobject instance) noexcept
     {
-        return instance
-            ? clazz.env->GetDoubleField(instance, field)
-            : clazz.env->GetStaticDoubleField(clazz.clazz, field);
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ?  clazz.env->GetStaticFloatField(clazz.clazz, field)
+            : clazz.env->GetFloatField(instance, field);
+    }
+
+    jdouble Field::getDouble(jobject instance) noexcept
+    {
+        CheckFieldInstance(instance, {});
+        return isStatic
+            ? clazz.env->GetStaticDoubleField(clazz.clazz, field)
+            : clazz.env->GetDoubleField(instance, field);
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
