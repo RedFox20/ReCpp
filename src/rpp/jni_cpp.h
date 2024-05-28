@@ -65,12 +65,10 @@ namespace rpp { namespace jni {
     template<class JObject>
     struct Ref
     {
-        JObject obj;
+        JObject obj = nullptr;
         bool isGlobal = false;
 
-        Ref() noexcept : obj{nullptr}
-        {
-        }
+        Ref() noexcept = default;
         // must be explicit, because it functions like unique_ptr
         explicit Ref(JObject obj) noexcept : obj{obj}
         {
@@ -84,7 +82,7 @@ namespace rpp { namespace jni {
             r.obj = nullptr;
             r.isGlobal = false;
         }
-        Ref(const Ref& r) noexcept : isGlobal{r.isGlobal}
+        Ref(const Ref& r) noexcept
         {
             copy(r);
         }
@@ -100,7 +98,6 @@ namespace rpp { namespace jni {
             {
                 // reconstruct
                 reset();
-                isGlobal = r.isGlobal;
                 copy(r);
             }
             return *this;
@@ -169,6 +166,7 @@ namespace rpp { namespace jni {
     private:
         void copy(const Ref& r) noexcept
         {
+            isGlobal = r.isGlobal;
             if (r.obj) {
                 if (r.isGlobal)
                     obj = reinterpret_cast<JObject>(getEnv()->NewGlobalRef(r.obj));
