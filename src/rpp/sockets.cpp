@@ -2036,18 +2036,18 @@ namespace rpp
 
         try
         {
-            static Class Activity{"android/app/Activity"};
-            static Class ConnectivityManager{"android/net/ConnectivityManager"};
-            static Class LinkProperties{"android/net/LinkProperties"};
-            static Class Network{"android/net/Network"};
+            Class Activity{"android/app/Activity"};
+            Class ConnectivityManager{"android/net/ConnectivityManager"};
+            Class LinkProperties{"android/net/LinkProperties"};
+            Class Network{"android/net/Network"};
 
-            static Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
-            static Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
-            static Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
-            static Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
-            static Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
+            Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
+            Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
+            Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
+            Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
 
-            static jobject connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get()).to_global();
+            Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get());
 
             JArray networks = getAllNetworks.Array(JniType::Object, connectivityManager);
             jsize length = networks.getLength();

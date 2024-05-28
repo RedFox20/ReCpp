@@ -185,7 +185,6 @@ namespace rpp { namespace jni {
     {
         env = getEnv();
         clazz = MakeRef(env->FindClass(className));
-        clazz.make_global();
         if (!clazz) JniThrow("Class not found: '%s'", className);
         name = className;
     }
@@ -194,7 +193,6 @@ namespace rpp { namespace jni {
     {
         env = getEnv();
         clazz = MakeRef(env->FindClass(className));
-        clazz.make_global();
         if (!clazz) ClearException();
         name = className;
     }
