@@ -62,32 +62,36 @@ namespace rpp { namespace jni {
 
     // JNI Local objects need to be deleted to avoid errors,
     // this is a smart pointer to automatically manage those references
+    // WARNING: Only global references can be stored across JNI calls
+    //          thread_local is mandatory for Global refs
     template<class JObject>
     struct Ref
     {
-        JObject obj;
+        JObject obj = nullptr;
+        bool isGlobal = false;
 
-        Ref() noexcept : obj{nullptr}
-        {
-        }
+        Ref() noexcept = default;
         // must be explicit, because it functions like unique_ptr
         explicit Ref(JObject obj) noexcept : obj{obj}
         {
         }
         ~Ref() noexcept
         {
-            if (obj) getEnv()->DeleteLocalRef(obj);
+            reset();
         }
-        Ref(Ref&& r) noexcept : obj{r.obj}
+        Ref(Ref&& r) noexcept : obj{r.obj}, isGlobal{r.isGlobal}
         {
             r.obj = nullptr;
+            r.isGlobal = false;
         }
-        Ref(const Ref& r) noexcept : obj{ getEnv()->NewLocalRef(r.obj) }
+        Ref(const Ref& r) noexcept
         {
+            copy(r);
         }
         Ref& operator=(Ref&& r) noexcept
         {
             std::swap(obj, r.obj);
+            std::swap(isGlobal, r.isGlobal);
             return *this;
         }
         Ref& operator=(const Ref& r) noexcept
@@ -95,9 +99,8 @@ namespace rpp { namespace jni {
             if (this != &r)
             {
                 // reconstruct
-                auto* env = getEnv();
-                if (obj) env->DeleteLocalRef(obj);
-                obj = env->NewLocalRef(r.obj);
+                reset();
+                copy(r);
             }
             return *this;
         }
@@ -113,8 +116,12 @@ namespace rpp { namespace jni {
         {
             if (obj)
             {
-                getEnv()->DeleteLocalRef(obj);
+                if (isGlobal)
+                    getEnv()->DeleteGlobalRef(obj);
+                else
+                    getEnv()->DeleteLocalRef(obj);
                 obj = nullptr;
+                isGlobal = false;
             }
         }
 
@@ -122,25 +129,52 @@ namespace rpp { namespace jni {
         template<class T> Ref<T> releaseAs() noexcept
         {
             Ref<T> ref;
-            ref.obj = (T)obj;
+            ref.obj = reinterpret_cast<T>(obj);
+            ref.isGlobal = isGlobal;
             obj = nullptr;
+            isGlobal = false;
             return ref;
         }
 
         /**
          * @brief Converts this Local Ref to a Global Ref and resets this Ref
-         * A global ref must be managed manually by the user
          */
-        JObject to_global() noexcept
+        Ref<JObject> toGlobal() noexcept
         {
-            JObject g = nullptr;
-            if (obj) {
-                auto* env = getEnv();
-                g = env->NewGlobalRef(obj);
-                env->DeleteLocalRef(obj);
-                obj = nullptr;
+            Ref<JObject> g;
+            if (obj)
+            {
+                g.obj = reinterpret_cast<JObject>(getEnv()->NewGlobalRef(obj));
+                g.isGlobal = true;
+                reset();
             }
             return g;
+        }
+
+        /**
+         * @brief Converts this Local Ref to a Global Ref
+         */
+        void makeGlobal() noexcept
+        {
+            if (!isGlobal && obj) {
+                auto* env = getEnv();
+                JObject g = reinterpret_cast<JObject>(env->NewGlobalRef(obj));
+                env->DeleteLocalRef(obj);
+                obj = g;
+                isGlobal = true;
+            }
+        }
+
+    private:
+        void copy(const Ref& r) noexcept
+        {
+            isGlobal = r.isGlobal;
+            if (r.obj) {
+                if (r.isGlobal)
+                    obj = reinterpret_cast<JObject>(getEnv()->NewGlobalRef(r.obj));
+                else
+                    obj = getEnv()->NewLocalRef(r.obj);
+            }
         }
     };
 

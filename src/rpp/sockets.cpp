@@ -58,14 +58,14 @@
     #if __ANDROID__ && __ANDROID_API__ < 24
         #error "<ifaddrs.h> requires ANDROID_API level 24"
     #else
-        #include <ifaddrs.h>    
+        #include <ifaddrs.h>
     #endif
     #if __ANDROID__
         #include "jni_cpp.h"
         #include <android/multinetwork.h> // android_setsocknetwork
     #endif
     #define sleep(milliSeconds) ::usleep((milliSeconds) * 1000)
-    #define inwin32(...) /*nothing*/ 
+    #define inwin32(...) /*nothing*/
     #define inunix(...) __VA_ARGS__
      // map linux socket calls to winsock calls via macros
     #define closesocket(fd) ::close(fd)
@@ -149,7 +149,7 @@ namespace rpp
     }
     socket_type to_socktype(ip_protocol ipp) noexcept
     {
-        static socket_type defaults[] = { 
+        static socket_type defaults[] = {
             ST_Unspecified, ST_Raw, ST_Raw, ST_Stream, ST_Stream, ST_Datagram, ST_Raw, ST_RDM
         };
         return defaults[ipp];
@@ -222,14 +222,14 @@ namespace rpp
         Addr4 = ipv4;
     }
 
-    raw_address::raw_address(address_family af, const void* ipv6, 
+    raw_address::raw_address(address_family af, const void* ipv6,
                              unsigned long flowInfo, unsigned long scopeId) noexcept : raw_address{af}
     {
         memcpy(Addr6, ipv6, sizeof(Addr6));
         FlowInfo = flowInfo;
         ScopeId = scopeId;
     }
-    
+
     raw_address::raw_address(address_family af, const char* ip_address) noexcept : raw_address{af}
     {
         resolve_addr(af, ip_address);
@@ -648,9 +648,9 @@ namespace rpp
             }
             out.reserve(count);
 
-            for (auto ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next) 
+            for (auto ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next)
             {
-                if (!family || ifa->ifa_addr->sa_family == family) 
+                if (!family || ifa->ifa_addr->sa_family == family)
                 {
                     ipinterface& in = out.emplace_back();
                     in.name = std::string{ifa->ifa_name};
@@ -868,7 +868,7 @@ namespace rpp
         #endif
         }
     }
-    
+
     int socket::skip(int bytesToSkip) noexcept
     {
         if (bytesToSkip <= 0)
@@ -1023,7 +1023,7 @@ namespace rpp
             outBuffer.resize(n);
         return n > 0;
     }
-    
+
     bool socket::recvfrom(ipaddress& from, std::vector<uint8_t>& outBuffer)
     {
         int count = available();
@@ -1473,7 +1473,7 @@ namespace rpp
     address_family socket::family() const noexcept {
         return Addr.Address.Family;
     }
-    ip_protocol socket::ipproto() const noexcept 
+    ip_protocol socket::ipproto() const noexcept
     {
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
@@ -2036,18 +2036,18 @@ namespace rpp
 
         try
         {
-            static Class Activity{"android/app/Activity"};
-            static Class ConnectivityManager{"android/net/ConnectivityManager"};
-            static Class LinkProperties{"android/net/LinkProperties"};
-            static Class Network{"android/net/Network"};
+            static thread_local Class Activity{"android/app/Activity"};
+            static thread_local Class ConnectivityManager{"android/net/ConnectivityManager"};
+            static thread_local Class LinkProperties{"android/net/LinkProperties"};
+            static thread_local Class Network{"android/net/Network"};
 
-            static Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
-            static Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
-            static Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
-            static Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
-            static Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
+            static thread_local Method getSystemService = Activity.Method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            static thread_local Method getAllNetworks = ConnectivityManager.Method("getAllNetworks", "()[Landroid/net/Network;");
+            static thread_local Method getLinkProperties = ConnectivityManager.Method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
+            static thread_local Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
+            static thread_local Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
 
-            static jobject connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get()).to_global();
+            static thread_local Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get()).toGlobal();
 
             JArray networks = getAllNetworks.Array(JniType::Object, connectivityManager);
             jsize length = networks.getLength();
