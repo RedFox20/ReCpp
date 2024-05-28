@@ -11,6 +11,7 @@
 #include "load_balancer.h" // rpp::load_balancer
 #include <vector>   // std::vector
 #include <optional> // std::optional
+#include <mutex>    // std::recursive_mutex
 
 namespace rpp
 {
@@ -457,7 +458,20 @@ namespace rpp
 
 
     /**
-     * A lightweight C++ Socket object with basic error handling and resource safety
+     * A lightweight C++ Socket object with basic error handling and resource safety.
+     * This is an extremely thin wrapper around low-level OS sockets.
+     * 
+     * @note Since 2024 version, this is now automatically thread-safe, since
+     *       all cases where performance is critical, multi-threading contexts are utilized.
+     * 
+     * UNIX sockets are not thread-safe when writing to the same socket from multiple threads.
+     *   - Calling select()/poll() from two or more threads is unsafe
+     *   - UDP not safe for send() and recv()
+     *   - TCP send() mostly safe, but ordering of data is not guaranteed,
+     *         recv() is not safe, since it can read data from multiple threads
+     * 
+     * On Windows, two threads calling send() at the same time is unsafe
+     *    - Calling select()/poll() from two threads is unsafe
      */
     class RPPAPI socket
     {
@@ -490,6 +504,7 @@ namespace rpp
         bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
+        std::recursive_mutex m;
 
     public:
 
@@ -521,6 +536,12 @@ namespace rpp
 
         socket(const socket&) = delete;            // no copy construct
         socket& operator=(const socket&) = delete; // no copy assign
+
+        /**
+         * @returns The internal recursive mutex.
+         * Use this mutex if you need to lock the socket for multiple operations.
+         */
+        std::recursive_mutex& mutex() noexcept { return m; }
 
         /** Closes the connection (if any) and returns this socket to a default state */
         void close() noexcept;
@@ -617,8 +638,9 @@ namespace rpp
         static std::string to_string(error socket_error) noexcept;
 
         /**
-         * Send data to remote socket, return number of bytes sent or -1 if socket closed
-         * Automatically closes socket during critical failure
+         * Send data to the bound remote address
+         * if AutoClosing == true, then automatically closes socket during critical failure
+         * @returns Number of bytes sent, or -1 on failure (check last_err())
          */
         NOINLINE int send(const void* buffer, int numBytes) noexcept;
 
@@ -739,6 +761,10 @@ namespace rpp
          * 
          * If this socket::is_blocking(), then poll(0ms, PF_Read) will be used to
          * avoid blocking.
+         * 
+         * @warning peek() is inherently not thread safe, so make sure you acquire lock
+         *          during peek()+recv() operation, otherwise another thread could read
+         *          the peeked datagram before you call recv().
          */
         NOINLINE int peek(void* buffer, int numBytes) noexcept;
 
@@ -1054,6 +1080,8 @@ namespace rpp
         };
 
         /**
+         * @warning select() from two threads is inherently thread-unsafe - you have been warned!
+         * 
          * @brief Tries to select this socket for conditions
          * Select suspends the thread until this Socket file descriptor is signaled
          * @param timeoutMillis The maximum time to wait for the socket to be signaled
@@ -1071,6 +1099,8 @@ namespace rpp
         };
 
         /**
+         * @warning poll() from two threads is inherently thread-unsafe - you have been warned!
+         * 
          * @brief Calls poll() or WSAPoll() on this socket
          * This is faster than select()
          * @warning After calling poll(), you MUST read all available data from the socket
@@ -1219,56 +1249,6 @@ namespace rpp
          * Clears any previous bind_to_interface
          */
         void unbind_interface() noexcept;
-
-        /**
-         * Starts an Async IO operation to accept a new connection until a connection
-         * arrives or the specified timeout is reached
-         * To pend asynchronously forever, set timeoutMillis to -1
-         * The callback(socket s) receives accepted Socket object
-         */
-        //template<class Func> void accept_async(Func&& func, int millis = -1) noexcept
-        //{
-        //    // TODO: rewrite using new rpp coroutines
-        //    //struct async {
-        //    //    socket* listener;
-        //    //    Func callback;
-        //    //    int millis;
-        //    //    static void accept(async* arg) {
-        //    //        socket* listener = arg->listener;
-        //    //        auto    callback = arg->callback;
-        //    //        int     timeout  = arg->millis;
-        //    //        delete arg; // delete before callback (in case of exception)
-        //    //        callback(std::move(listener->accept(timeout)));
-        //    //    }
-        //    //};
-        //    //if (auto* arg = new async{ this, std::forward<Func>(func), millis })
-        //    //    spawn_thread((void(*)(void*))&async::accept, arg);
-        //}
-        /**
-         * Connects to a remote socket and sets the socket as nonblocking and TCP nodelay
-         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
-         * @param func The callback(socket s) receives accepted Socket object
-         * @param millis Timeout value if the server takes too long to respond
-         */
-        //template<class Func> void connect_async(const ipaddress& remoteAddr, Func&& func, int millis, socket_option opt = SO_None) noexcept
-        //{
-        //    // TODO: rewrite using new rpp coroutines
-        //    //struct async {
-        //    //    ipaddress remoteAddr;
-        //    //    Func callback;
-        //    //    int millis;
-        //    //    socket_option opt;
-        //    //    static void connect(async* arg) {
-        //    //        async a { std::move(*arg) };
-        //    //        delete arg; // delete before callback (in case of an exception)
-        //    //        a.callback(std::move(socket::connect_to(a.remoteAddr, a.millis, a.opt)));
-        //    //    }
-        //    //};
-        //    //close();
-        //    //Addr = remoteAddr;
-        //    //if (auto* arg = new async{ remoteAddr, std::forward<Func>(func), millis, opt })
-        //    //    spawn_thread((void(*)(void*))&async::connect, arg);
-        //}
     };
 
     ////////////////////////////////////////////////////////////////////////////////
