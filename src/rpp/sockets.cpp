@@ -2047,7 +2047,7 @@ namespace rpp
             static Method getInterfaceName = LinkProperties.Method("getInterfaceName", "()Ljava/lang/String;");
             static Method getNetworkHandle = Network.Method("getNetworkHandle", "()J");
 
-            static Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get());
+            static Ref<jobject> connectivityManager = getSystemService.Object(getActivity(), MakeString("connectivity").get()).to_global();
 
             JArray networks = getAllNetworks.Array(JniType::Object, connectivityManager);
             jsize length = networks.getLength();
