@@ -2075,6 +2075,7 @@ namespace rpp
         }
 #else
         // TODO: implement for other platforms
+        (void)network_interface;
         return std::nullopt;
 #endif
     }
