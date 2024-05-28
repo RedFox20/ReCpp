@@ -1074,6 +1074,7 @@ namespace rpp
         enum SelectFlag
         {
             SF_Read   = (1<<0), // select if characters available for reading, i.e. read() won't block
+            /// @warning SF_Write will not trigger on Windows sockets if send()/sendto() did not return SE_AGAIN (EWOULDBLOCK)
             SF_Write  = (1<<1), // select if a send() will not block or a connection was established
             SF_Except = (1<<2), // select for any exceptional IO conditions, such as MSG_OOB
             SF_ReadWrite = SF_Read|SF_Write, //
@@ -1081,6 +1082,8 @@ namespace rpp
 
         /**
          * @warning select() from two threads is inherently thread-unsafe - you have been warned!
+         * 
+         * @warning SF_Write will not trigger on Windows sockets if send()/sendto() did not return SE_AGAIN (EWOULDBLOCK)
          * 
          * @brief Tries to select this socket for conditions
          * Select suspends the thread until this Socket file descriptor is signaled
@@ -1094,6 +1097,7 @@ namespace rpp
         enum PollFlag
         {
             PF_Read = (1<<0), // poll if socket is ready for reading
+            /// @warning PF_Write will not trigger on Windows sockets if send()/sendto() did not return SE_AGAIN (EWOULDBLOCK)
             PF_Write = (1<<1), // poll if socket is ready for writing
             PF_ReadWrite = PF_Read|PF_Write, // poll if socket is ready for reading or writing
         };
@@ -1106,6 +1110,9 @@ namespace rpp
          * @warning After calling poll(), you MUST read all available data from the socket
          *          before calling poll again.
          *          poll() will only react if there is NEW data available
+         * 
+         * @warning PF_Write will not trigger on Windows sockets if send()/sendto() did not return SE_AGAIN (EWOULDBLOCK)
+         * 
          * @param timeoutMillis Timeout in milliseconds to suspend until the socket is signaled
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
