@@ -147,19 +147,11 @@ namespace rpp { namespace jni {
         Ref<JObject> to_global() noexcept
         {
             Ref<JObject> g;
-            if (!isGlobal) {
-                if (obj) {
-                    auto* env = getEnv();
-                    g.obj = (JObject) env->NewGlobalRef(obj);
-                    env->DeleteLocalRef(obj);
-                    obj = nullptr;
-                    g.isGlobal = true;
-                }
-            } else {
-                g.obj = obj;
+            if (obj)
+            {
+                g.obj = getEnv()->NewGlobalRef(obj);
                 g.isGlobal = true;
-                obj = nullptr;
-                isGlobal = false;
+                reset();
             }
             return g;
         }
