@@ -130,7 +130,7 @@ namespace rpp { namespace jni {
         template<class T> Ref<T> releaseAs() noexcept
         {
             Ref<T> ref;
-            ref.obj = (T)obj;
+            ref.obj = reinterpret_cast<T>(obj);
             ref.isGlobal = isGlobal;
             obj = nullptr;
             isGlobal = false;
@@ -140,14 +140,14 @@ namespace rpp { namespace jni {
         /**
          * @brief Converts this Local Ref to a Global Ref and resets this Ref
          */
-        JObject to_global() noexcept
+        Ref<JObject> to_global() noexcept
         {
-            JObject g = nullptr;
-            if (obj) {
-                auto* env = getEnv();
-                g = env->NewGlobalRef(obj);
-                env->DeleteLocalRef(obj);
-                obj = nullptr;
+            Ref<JObject> g;
+            if (obj)
+            {
+                g.obj = reinterpret_cast<JObject>(getEnv()->NewGlobalRef(obj));
+                g.isGlobal = true;
+                reset();
             }
             return g;
         }
@@ -159,7 +159,7 @@ namespace rpp { namespace jni {
         {
             if (!isGlobal && obj) {
                 auto* env = getEnv();
-                JObject g = (JObject) env->NewGlobalRef(obj);
+                JObject g = reinterpret_cast<JObject>(env->NewGlobalRef(obj));
                 env->DeleteLocalRef(obj);
                 obj = g;
                 isGlobal = true;
@@ -171,7 +171,7 @@ namespace rpp { namespace jni {
         {
             if (r.obj) {
                 if (r.isGlobal)
-                    obj = getEnv()->NewGlobalRef(r.obj);
+                    obj = reinterpret_cast<JObject>(getEnv()->NewGlobalRef(r.obj));
                 else
                     obj = getEnv()->NewLocalRef(r.obj);
             }
