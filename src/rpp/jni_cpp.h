@@ -77,22 +77,19 @@ namespace rpp { namespace jni {
         }
         ~Ref() noexcept
         {
-            if (obj)
-            {
-                if (isGlobal)
-                    getEnv()->DeleteGlobalRef(obj);
-                else
-                    getEnv()->DeleteLocalRef(obj);
-            }
+            reset();
         }
         Ref(Ref&& r) noexcept : obj{r.obj}, isGlobal{r.isGlobal}
         {
             r.obj = nullptr;
             r.isGlobal = false;
         }
-        // local only ref copy
-        Ref(const Ref& r) noexcept : obj{getEnv()->NewLocalRef(r.obj)}, isGlobal{false}
+        Ref(const Ref& r) noexcept : isGlobal{r.isGlobal}
         {
+            if (r.isGlobal)
+                obj = getEnv()->NewGlobalRef(r.obj);
+            else
+                obj = getEnv()->NewLocalRef(r.obj);
         }
         Ref& operator=(Ref&& r) noexcept
         {
@@ -100,16 +97,15 @@ namespace rpp { namespace jni {
             std::swap(isGlobal, r.isGlobal);
             return *this;
         }
-        // local only ref copy
         Ref& operator=(const Ref& r) noexcept
         {
             if (this != &r)
             {
                 // reconstruct
                 auto* env = getEnv();
-                if (obj) isGlobal ? env->DeleteGlobalRef(obj) : env->DeleteLocalRef(obj);
-                isGlobal = false;
-                obj = env->NewLocalRef(r.obj);
+                reset();
+                isGlobal = r.isGlobal;
+                obj = isGlobal ? env->NewGlobalRef(r.obj) : env->NewLocalRef(r.obj);
             }
             return *this;
         }
@@ -147,24 +143,28 @@ namespace rpp { namespace jni {
 
         /**
          * @brief Converts this Local Ref to a Global Ref and resets this Ref
-         * A global ref must be managed manually by the user
          */
-        JObject to_global() noexcept
+        Ref<JObject> to_global() noexcept
         {
+            Ref<JObject> g;
             if (!isGlobal) {
-                JObject g = nullptr;
                 if (obj) {
                     auto* env = getEnv();
-                    g = (JObject) env->NewGlobalRef(obj);
+                    g.obj = (JObject) env->NewGlobalRef(obj);
                     env->DeleteLocalRef(obj);
                     obj = nullptr;
+                    g.isGlobal = true;
                 }
-                return g;
             } else {
-                return obj;
+                g.obj = obj;
+                g.isGlobal = true;
+                obj = nullptr;
             }
         }
 
+        /**
+         * @brief Converts this Local Ref to a Global Ref
+         */
         void make_global() noexcept
         {
             if (!isGlobal && obj) {
@@ -468,6 +468,6 @@ namespace rpp { namespace jni {
         jdouble      Double(jobject instance = nullptr) noexcept;
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
 }} // namespace rpp::jni
 #endif // __ANDROID__
