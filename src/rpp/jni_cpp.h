@@ -66,6 +66,7 @@ namespace rpp { namespace jni {
     struct Ref
     {
         JObject obj;
+        bool isGlobal = false;
 
         Ref() noexcept : obj{nullptr}
         {
@@ -76,27 +77,38 @@ namespace rpp { namespace jni {
         }
         ~Ref() noexcept
         {
-            if (obj) getEnv()->DeleteLocalRef(obj);
+            if (obj)
+            {
+                if (isGlobal)
+                    getEnv()->DeleteGlobalRef(obj);
+                else
+                    getEnv()->DeleteLocalRef(obj);
+            }
         }
-        Ref(Ref&& r) noexcept : obj{r.obj}
+        Ref(Ref&& r) noexcept : obj{r.obj}, isGlobal{r.isGlobal}
         {
             r.obj = nullptr;
+            r.isGlobal = false;
         }
-        Ref(const Ref& r) noexcept : obj{ getEnv()->NewLocalRef(r.obj) }
+        // local only ref copy
+        Ref(const Ref& r) noexcept : obj{getEnv()->NewLocalRef(r.obj)}, isGlobal{false}
         {
         }
         Ref& operator=(Ref&& r) noexcept
         {
             std::swap(obj, r.obj);
+            std::swap(isGlobal, r.isGlobal);
             return *this;
         }
+        // local only ref copy
         Ref& operator=(const Ref& r) noexcept
         {
             if (this != &r)
             {
                 // reconstruct
                 auto* env = getEnv();
-                if (obj) env->DeleteLocalRef(obj);
+                if (obj) isGlobal ? env->DeleteGlobalRef(obj) : env->DeleteLocalRef(obj);
+                isGlobal = false;
                 obj = env->NewLocalRef(r.obj);
             }
             return *this;
@@ -113,8 +125,12 @@ namespace rpp { namespace jni {
         {
             if (obj)
             {
-                getEnv()->DeleteLocalRef(obj);
+                if (isGlobal)
+                    getEnv()->DeleteGlobalRef(obj);
+                else
+                    getEnv()->DeleteLocalRef(obj);
                 obj = nullptr;
+                isGlobal = false;
             }
         }
 
@@ -123,7 +139,9 @@ namespace rpp { namespace jni {
         {
             Ref<T> ref;
             ref.obj = (T)obj;
+            ref.isGlobal = isGlobal;
             obj = nullptr;
+            isGlobal = false;
             return ref;
         }
 
@@ -133,14 +151,29 @@ namespace rpp { namespace jni {
          */
         JObject to_global() noexcept
         {
-            JObject g = nullptr;
-            if (obj) {
-                auto* env = getEnv();
-                g = env->NewGlobalRef(obj);
-                env->DeleteLocalRef(obj);
-                obj = nullptr;
+            if (!isGlobal) {
+                JObject g = nullptr;
+                if (obj) {
+                    auto* env = getEnv();
+                    g = (JObject) env->NewGlobalRef(obj);
+                    env->DeleteLocalRef(obj);
+                    obj = nullptr;
+                }
+                return g;
+            } else {
+                return obj;
             }
-            return g;
+        }
+
+        void make_global() noexcept
+        {
+            if (!isGlobal && obj) {
+                auto* env = getEnv();
+                JObject g = (JObject) env->NewGlobalRef(obj);
+                env->DeleteLocalRef(obj);
+                obj = g;
+                isGlobal = true;
+            }
         }
     };
 
@@ -435,6 +468,6 @@ namespace rpp { namespace jni {
         jdouble      Double(jobject instance = nullptr) noexcept;
     };
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
 }} // namespace rpp::jni
 #endif // __ANDROID__
