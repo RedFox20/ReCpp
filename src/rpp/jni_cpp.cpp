@@ -42,15 +42,15 @@ namespace rpp { namespace jni {
                 {
                     if (auto currentActivity = mainClass.SField("currentActivity", "Landroid/app/Activity;", std::nothrow))
                     {
-                        androidActivity = currentActivity.Object().toGlobal().as<jobject>();
+                        androidActivity = currentActivity.Object().toGlobal();
                     }
                     else if (auto activity = mainClass.SField("activity", "Landroid/app/Activity;", std::nothrow))
                     {
-                        androidActivity = activity.Object().toGlobal().as<jobject>();
+                        androidActivity = activity.Object().toGlobal();
                     }
                     else if (auto activity = mainClass.SMethod("activity", "()Landroid/app/Activity;", std::nothrow))
                     {
-                        androidActivity = activity.Object(nullptr).toGlobal().as<jobject>();
+                        androidActivity = activity.Object(nullptr).toGlobal();
                     }
                     else
                     {

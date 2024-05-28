@@ -62,6 +62,8 @@ namespace rpp { namespace jni {
 
     // JNI Local objects need to be deleted to avoid errors,
     // this is a smart pointer to automatically manage those references
+    // WARNING: Only global references can be stored across JNI calls
+    //          thread_local is mandatory for Global refs
     template<class JObject>
     struct Ref
     {
