@@ -48,12 +48,15 @@ namespace rpp
                 } __except (1){}
             #pragma warning(pop)
         #else
-            // pthread limit is 16 chars
-            char threadName[17];
+            // pthread limit is 16 chars, including null terminator
+            char threadName[16];
+            size_t n = name.size() < 15 ? name.size() : 15;
+            memcpy(threadName, name.data(), n);
+            threadName[n] = '\0';
             #if __APPLE__
-                pthread_setname_np(name.to_cstr(threadName, sizeof(threadName)));
+                pthread_setname_np(threadName);
             #elif __linux__
-                pthread_setname_np(pthread_self(), name.to_cstr(threadName, sizeof(threadName)));
+                pthread_setname_np(pthread_self(), threadName);
             #endif
         #endif
     }
