@@ -465,7 +465,7 @@ namespace rpp
         detail = detail ? detail : "";
         prefix = prefix ? prefix : "";
 
-        #if HAS_DEBUGGING_H
+        #if !__ANDROID__ && HAS_DEBUGGING_H
             LogInfo("%s %s%s%s elapsed: %.3fms", prefix, location, padDetail, detail, elapsed_ms);
         #else
             constexpr const char format[] = "$ %s %s%s%s elapsed: %.3fms\n";
