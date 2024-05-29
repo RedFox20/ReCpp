@@ -62,6 +62,7 @@
     #endif
     #if __ANDROID__
         #include "jni_cpp.h"
+        #include <android/log.h>
         #include <android/multinetwork.h> // android_setsocknetwork
     #endif
     #define sleep(milliSeconds) ::usleep((milliSeconds) * 1000)
@@ -2036,24 +2037,24 @@ namespace rpp
 
         try
         {
-            auto* mainActivity = getActivity();
+            auto* mainActivity = getMainActivity();
             if (!mainActivity)
             {
                 logerror("get_network_handle failed: mainActivity uninitialized");
                 return std::nullopt;
             }
 
-            static thread_local Class Activity{"android/app/Activity"};
-            static thread_local Class ConnectivityManager{"android/net/ConnectivityManager"};
-            static thread_local Class LinkProperties{"android/net/LinkProperties"};
-            static thread_local Class Network{"android/net/Network"};
+            static Class Activity{"android/app/Activity"};
+            static Class ConnectivityManager{"android/net/ConnectivityManager"};
+            static Class LinkProperties{"android/net/LinkProperties"};
+            static Class Network{"android/net/Network"};
 
-            static thread_local Method getSystemService = Activity.method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
-            static thread_local Method getAllNetworks = ConnectivityManager.method("getAllNetworks", "()[Landroid/net/Network;");
-            static thread_local Method getLinkProperties = ConnectivityManager.method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
-            static thread_local Method getInterfaceName = LinkProperties.method("getInterfaceName", "()Ljava/lang/String;");
-            static thread_local Method getNetworkHandle = Network.method("getNetworkHandle", "()J");
-            static thread_local Ref<jobject> connectivityManager = getSystemService.globalObjectF(mainActivity, JString::from("connectivity"));
+            static Method getSystemService = Activity.method("getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            static Method getAllNetworks = ConnectivityManager.method("getAllNetworks", "()[Landroid/net/Network;");
+            static Method getLinkProperties = ConnectivityManager.method("getLinkProperties", "(Landroid/net/Network;)Landroid/net/LinkProperties;");
+            static Method getInterfaceName = LinkProperties.method("getInterfaceName", "()Ljava/lang/String;");
+            static Method getNetworkHandle = Network.method("getNetworkHandle", "()J");
+            static Ref<jobject> connectivityManager = getSystemService.globalObjectF(mainActivity, JString::from("connectivity"));
 
             JArray networks = getAllNetworks.arrayF(JniType::Object, connectivityManager);
             jsize length = networks.getLength();

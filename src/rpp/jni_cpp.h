@@ -13,8 +13,9 @@ namespace rpp { namespace jni {
 
     /**
      * Explicitly initializes JVM and JNI Environment
+     * @param env Optionally provide an already attached JNIEnv
      */
-    jint initVM(JavaVM* vm) noexcept;
+    jint initVM(JavaVM* vm, JNIEnv* env = nullptr) noexcept;
 
     /**
      * @brief if RPP_DEFINE_JNI_ONLOAD is defined, then JNI_OnLoad will be defined
@@ -28,8 +29,11 @@ namespace rpp { namespace jni {
     #endif // RPP_DEFINE_JNI_ONLOAD
 
     /**
-     * @brief Gets the JNI environment for the current thread
+     * @brief Gets the JNI environment for the CURRENT THREAD ONLY
      * @warning You must first call `initVM()` or define RPP_DEFINE_JNI_ONLOAD
+     *
+     * @warning JNIEnv is only valid per-thread, so do not store this globally,
+     *          except if using thread_local storage.
      */
     JNIEnv* getEnv() noexcept;
 
@@ -39,14 +43,21 @@ namespace rpp { namespace jni {
      *        if null, then returns the previously configured main activity
      * @warning The main activity can only be configured once per app init
     */
-    jobject getActivity(const char* mainActivityClass = nullptr);
+    jobject getMainActivity(const char* mainActivityClass = nullptr);
 
     /**
-     * @brief Manually sets the main activity object for the app
-     * @param globalHandle The global reference to the main activity object
-     * @warning The main activity can only be configured once per app init
+     * @brief Manually sets the main activity object for the app.
+     *        The ref count is increased and ref is internally converted to a Global Ref,
+     *        so the caller of this function just needs to perform usual ref management.
+     * @code
+     *     jobject activity = myGetJniActivityLocalRef(...);
+     *     rpp::jni::initMainActivity(activity);
+     *     env->DeleteLocalRef(activity);
+     * @endcode
+     * @param mainActivityRef Reference to the main activity object
+     * @warning The main activity can only be configured once per application
      */
-    void initMainActivity(jobject globalHandle);
+    void initMainActivity(jobject mainActivityRef) noexcept;
 
     /**
      * @brief Checks for pending JNI exceptions and rethrows them as a C++ exception
@@ -60,84 +71,101 @@ namespace rpp { namespace jni {
     struct Method;
     struct Field;
 
-    // JNI Local objects need to be deleted to avoid errors,
-    // this is a smart pointer to automatically manage those references
-    // WARNING: Only global references can be stored across JNI calls
-    //          thread_local is mandatory for Global refs
-    template<class JObject>
-    struct Ref
+    struct JniRef
     {
-        JObject obj = nullptr;
+        jobject obj = nullptr;
         bool isGlobal = false;
 
-        Ref() noexcept = default;
-        // must be explicit, because it functions like unique_ptr
-        explicit Ref(JObject obj) noexcept : obj{obj} {}
-        // initialize from a previousl untracked object
-        Ref(JObject obj, bool isGlobal) noexcept : obj{obj} {}
-        ~Ref() noexcept { reset(); }
+        JniRef() = default;
+        explicit JniRef(jobject localOrGlobalRef) noexcept;
+        ~JniRef() noexcept { reset(); }
 
-        Ref(Ref&& r) noexcept : obj{r.obj}, isGlobal{r.isGlobal}
+        void reset() noexcept;
+        void reset(const JniRef& r) noexcept;
+        /** @brief Converts this Local Ref to a Global Ref (if needed) */
+        void makeGlobal() noexcept;
+
+        JniRef(const JniRef& r) noexcept
         {
-            r.obj = nullptr;
-            r.isGlobal = false;
+            reset(r);
         }
-        Ref(const Ref& r) noexcept
+        JniRef& operator=(const JniRef& r) noexcept
         {
-            copy(r);
+            if (this != &r) reset(r);
+            return *this;
         }
-        Ref& operator=(Ref&& r) noexcept
+
+        JniRef(JniRef&& r) noexcept
+        {
+            std::swap(obj, r.obj);
+            std::swap(isGlobal, r.isGlobal);
+        }
+        JniRef& operator=(JniRef&& r) noexcept
         {
             std::swap(obj, r.obj);
             std::swap(isGlobal, r.isGlobal);
             return *this;
         }
-        Ref& operator=(const Ref& r) noexcept
-        {
-            if (this != &r)
-            {
-                reset();
-                copy(r);
-            }
-            return *this;
-        }
+    };
 
-        // implicit conversion of Ref<JObject> to JObject
-        operator JObject() const noexcept { return obj; }
-        JObject get() const noexcept { return obj; }
+    /**
+     *  JNI LocalRef need to be deleted to avoid running out of allowed references.
+     *  This is a smart pointer to automatically manage LocalRef-s and GlobalRef-s.
+     *
+     *  @warning Only GlobalRef can be stored across JNI calls!
+     *  @warning LocalRefs are only valid on a single thread and until code execution
+     *           returns to JVM context
+     */
+    template<class JObject>
+    struct Ref : public JniRef
+    {
+        using JniRef::JniRef;
 
         /**
-         * @brief reinterpret_casts the object to another type
+         * @brief Initialize from a previous untracked object.
+         * It can be a LocalRef, GlobalRef or Invalid ref.
+         */
+        explicit Ref(JObject localOrGlobalRef) noexcept
+            : JniRef{localOrGlobalRef}
+        {
+        }
+
+        /**
+         * @brief Initialize from a previously untracked object.
+         * The type is specified by @param global.
+         */
+        Ref(JObject o, bool global) noexcept
+        {
+            obj = o;
+            isGlobal = global;
+        }
+
+        /**
+         * @return Gets the raw internal JNI jobject.
+         * @warning Implicit operators are forbidden since they can cause ownership bugs.
+         */
+        JObject get() const noexcept { return static_cast<JObject>(obj); }
+
+        /**
+         * @brief static_cast the object to another type
          * @warning This is unsafe and the returned object is not tracked or type-checked!
          */
-        template<class T> T as() const noexcept { return reinterpret_cast<T>(obj); }
+        template<class T> T as() const noexcept { return static_cast<T>(obj); }
         explicit operator bool() const noexcept { return obj != nullptr; }
-
-        void reset() noexcept
-        {
-            if (obj)
-            {
-                auto* env = getEnv();
-                if (isGlobal) env->DeleteGlobalRef(obj);
-                else          env->DeleteLocalRef(obj);
-                obj = nullptr;
-                isGlobal = false;
-            }
-        }
 
         /**
          * @brief Converts the Ref<JObject> to a Ref<T> and resets this Ref
          */
         template<class T> Ref<T> releaseAs() noexcept
         {
-            Ref<T> ref { reinterpret_cast<T>(obj), isGlobal };
+            Ref<T> ref { static_cast<T>(obj), isGlobal };
             obj = nullptr;
             isGlobal = false;
             return ref;
         }
 
         /**
-         * @returns Global Ref from this Ref<T>
+         * @returns A new Global Ref from this Ref<T>
          */
         Ref<JObject> toGlobal() noexcept
         {
@@ -145,59 +173,38 @@ namespace rpp { namespace jni {
             if (obj)
             {
                 // even if it's already global, we need to increase the global refcount
-                g.obj = reinterpret_cast<JObject>(getEnv()->NewGlobalRef(obj));
+                g.obj = static_cast<JObject>(getEnv()->NewGlobalRef(obj));
                 g.isGlobal = true;
             }
             return g;
         }
-
-        /**
-         * @brief Converts this Local Ref to a Global Ref (if needed)
-         */
-        void makeGlobal() noexcept
-        {
-            if (obj && !isGlobal)
-            {
-                auto* env = getEnv();
-                JObject g = reinterpret_cast<JObject>(env->NewGlobalRef(obj));
-                // decrease the local refcount
-                env->DeleteLocalRef(obj);
-                obj = g;
-                isGlobal = true;
-            }
-        }
-
-    private:
-        void copy(const Ref& r) noexcept
-        {
-            isGlobal = r.isGlobal;
-            if (r.obj)
-            {
-                auto* env = getEnv();
-                if (r.isGlobal) obj = reinterpret_cast<JObject>(env->NewGlobalRef(r.obj));
-                else            obj = reinterpret_cast<JObject>(env->NewLocalRef(r.obj));
-            }
-        }
     };
 
     /**
-     * @brief Makes a new Local Ref of a JNI object
-     * @warning DO NOT STORE LocalRef into static/global storage!
+     * @brief Takes immeidate ownership of a JNI object and makes a new LocalRef of it.
+     * LocalRefs are limited within default JVM context and this can help manage them.
+     * @warning DO NOT STORE LocalRef into static/global storage!!!
+     * @param untrackedLocalOrGlobalRef jobject to turn into a smart LocalRef
+     *        - it can be a LocalRef or GlobalRef but is expected to be untracked
      */
-    template<class JObject> Ref<JObject> makeRef(JObject obj) noexcept
+    template<class JObject>
+    Ref<JObject> makeRef(JObject untrackedLocalOrGlobalRef) noexcept
     {
-        return Ref<JObject>{obj};
+        return Ref<JObject>{untrackedLocalOrGlobalRef};
     }
 
     /**
-     * @brief Makes a new Global Ref of a JNI object
+     * @brief Takes immeidate ownership of a JNI object and makes a new GlobalRef of it.
      * Global Refs can be used across JNI calls and are not automaticaly GC-ed
-     * @warning Global Refs must be stored in thread_local storage!!
+     * @note GlobalRefs can be safely stored in global static state
+     * @param untrackedLocalOrGlobalRef jobject to turn into a smart GlobalRef
+     *        - it can be a LocalRef or a GlobalRef but is expected to be untracked
      */
-    template<class JObject> Ref<JObject> makeGlobalRef(JObject obj) noexcept
+    template<class JObject>
+    Ref<JObject> makeGlobalRef(JObject untrackedLocalOrGlobalRef) noexcept
     {
-        Ref<JObject> r{obj};
-        r.makeGlobal();
+        Ref<JObject> r{untrackedLocalOrGlobalRef};
+        r.makeGlobal(); // no-op if already global
         return r;
     }
 
@@ -229,14 +236,13 @@ namespace rpp { namespace jni {
         JString(Ref<jstring>&& s) noexcept : s{std::move(s)} {}
         explicit JString(jstring s) noexcept : s{s} {}
 
-        operator jstring() const noexcept { return s.get(); }
         jstring get() const noexcept { return s.get(); }
         explicit operator bool() const noexcept { return (bool)s; }
 
         /** @returns New GlobalRef JString that can be stored into global state */
         JString toGlobal() noexcept { return { s.toGlobal() }; }
 
-        int getLength() const noexcept { return s ? getEnv()->GetStringLength(s) : 0; }
+        int getLength() const noexcept { return s ? getEnv()->GetStringLength(s.get()) : 0; }
 
         /** @returns jstring converted to C++ std::string */
         std::string str() const noexcept;
@@ -324,9 +330,7 @@ namespace rpp { namespace jni {
         }
         ~JArray() noexcept = default;
 
-        // implicit conversion to jarray
-        operator jarray() const noexcept { return array; }
-        jarray get() const noexcept { return array; }
+        jarray get() const noexcept { return array.get(); }
         explicit operator bool() const noexcept { return (bool)array; }
 
         /** @returns New GlobalRef JArray that can be stored into global state */
@@ -334,7 +338,7 @@ namespace rpp { namespace jni {
 
         int getLength() const noexcept
         {
-            return array ? getEnv()->GetArrayLength(array) : 0;
+            return array ? getEnv()->GetArrayLength(array.get()) : 0;
         }
         jobject getObjectAt(int index) const noexcept
         {
@@ -362,19 +366,18 @@ namespace rpp { namespace jni {
 
     /**
      * @brief JNI Class wrapper for accessing methods and fields
-     * @note The clazz is a GlobalRef, so it can be stored in global thread_local storage
+     * @note The clazz is a GlobalRef, so it can be stored in global storage
      */
     struct Class
     {
-        JNIEnv* env;
-        Ref<jclass> clazz;
+        Ref<jclass> clazz; // Always a GlobalRef (required by JNI)
         const char* name;
 
         Class(const char* className);
         Class(const char* className, std::nothrow_t) noexcept;
 
-        operator jclass() const { return clazz; }
-        explicit operator bool() const { return clazz != nullptr; }
+        jclass get() const noexcept { return clazz.get(); }
+        explicit operator bool() const noexcept { return (bool)clazz; }
 
         jni::Method method(const char* methodName, const char* signature);
         jni::Method method(const char* methodName, const char* signature, std::nothrow_t) noexcept;
@@ -394,6 +397,16 @@ namespace rpp { namespace jni {
     template<class T> inline T unwrap(const Ref<T>& ref) noexcept { return ref.get(); }
     inline jstring unwrap(const JString& str) noexcept { return str.get(); }
     inline jarray unwrap(const JArray& arr) noexcept { return arr.get(); }
+
+    // a parameter which accepts jobject or JniRef
+    struct JniRefParam
+    {
+        jobject o;
+        JniRefParam(jobject o) noexcept : o{o} {}
+        JniRefParam(JniRef&& r) noexcept : o{r.obj} {}
+        JniRefParam(const JniRef& r) noexcept : o{r.obj} {}
+        JniRefParam(std::nullptr_t) noexcept : o{nullptr} {}
+    };
 
     /**
      * @brief JNI Method wrapper for calling Java methods
@@ -428,59 +441,59 @@ namespace rpp { namespace jni {
         jdouble      doubleV(jobject instance, ...) noexcept;
 
         /** @brief Invokes method which returns LocalRef Object */
-        template<class...Args> Ref<jobject> objectF(jobject instance, const Args&... args) noexcept
+        template<class...Args> Ref<jobject> objectF(JniRefParam instance, const Args&... args) noexcept
         {
-            return objectV(instance, unwrap(args)...);
+            return objectV(instance.o, unwrap(args)...);
         }
         /** @brief Invokes method which return GlobalRef Object */
-        template<class...Args> Ref<jobject> globalObjectF(jobject instance, const Args&... args) noexcept
+        template<class...Args> Ref<jobject> globalObjectF(JniRefParam instance, const Args&... args) noexcept
         {
-            return objectV(instance, unwrap(args)...).toGlobal();
+            return objectV(instance.o, unwrap(args)...).toGlobal();
         }
-        template<class...Args> JString stringF(jobject instance, const Args&... args) noexcept
+        template<class...Args> JString stringF(JniRefParam instance, const Args&... args) noexcept
         {
-            return stringV(instance, unwrap(args)...);
+            return stringV(instance.o, unwrap(args)...);
         }
-        template<class...Args> JArray arrayF(JniType type, jobject instance, const Args&... args) noexcept
+        template<class...Args> JArray arrayF(JniType type, JniRefParam instance, const Args&... args) noexcept
         {
-            return arrayV(type, instance, unwrap(args)...);
+            return arrayV(type, instance.o, unwrap(args)...);
         }
 
-        template<class...Args> void voidF(jobject instance, const Args&... args) noexcept
+        template<class...Args> void voidF(JniRefParam instance, const Args&... args) noexcept
         {
-            voidV(instance, unwrap(args)...);
+            voidV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jboolean booleanF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jboolean booleanF(JniRefParam instance, const Args&... args) noexcept
         {
-            return booleanV(instance, unwrap(args)...);
+            return booleanV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jbyte byteF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jbyte byteF(JniRefParam instance, const Args&... args) noexcept
         {
-            return byteV(instance, unwrap(args)...);
+            return byteV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jchar charF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jchar charF(JniRefParam instance, const Args&... args) noexcept
         {
-            return charV(instance, unwrap(args)...);
+            return charV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jshort shortF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jshort shortF(JniRefParam instance, const Args&... args) noexcept
         {
-            return shortV(instance, unwrap(args)...);
+            return shortV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jint intF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jint intF(JniRefParam instance, const Args&... args) noexcept
         {
-            return intV(instance, unwrap(args)...);
+            return intV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jlong longF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jlong longF(JniRefParam instance, const Args&... args) noexcept
         {
-            return longV(instance, unwrap(args)...);
+            return longV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jfloat floatF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jfloat floatF(JniRefParam instance, const Args&... args) noexcept
         {
-            return floatV(instance, unwrap(args)...);
+            return floatV(instance.o, unwrap(args)...);
         }
-        template<class...Args> jdouble doubleF(jobject instance, const Args&... args) noexcept
+        template<class...Args> jdouble doubleF(JniRefParam instance, const Args&... args) noexcept
         {
-            return doubleV(instance, unwrap(args)...);
+            return doubleV(instance.o, unwrap(args)...);
         }
     };
 
@@ -503,7 +516,7 @@ namespace rpp { namespace jni {
         // access this field with the specified type;
         // if instance is nullptr, it assumes static field
         Ref<jobject> getObject(jobject instance = nullptr) noexcept;
-        Ref<jobject> getGlobalObject(jobject instance = nullptr) noexcept { return getObject(instance).toGlobal(); }
+        Ref<jobject> getGlobalObject(jobject instance = nullptr) noexcept;
         JString      getString(jobject instance = nullptr) noexcept;
         JArray       getArray(JniType type, jobject instance = nullptr) noexcept;
         jboolean     getBoolean(jobject instance = nullptr) noexcept;

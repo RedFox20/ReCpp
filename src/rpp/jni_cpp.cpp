@@ -4,90 +4,115 @@
  */
 #if __ANDROID__
 #include "jni_cpp.h"
-#include "debugging.h"
 #include <android/log.h>
 
-namespace rpp { namespace jni {
+namespace rpp { namespace jni
+{
     //////////////////////////////////////////////////////////////////////////////////////
-    static JavaVM* javaVM;
-    static thread_local jobject androidActivity; // needs to be thread_local
-    static std::string mainActivityClassName;
 
-    jint initVM(JavaVM* vm) noexcept
+    #define JniWarn(fmt, ...)  __android_log_print(ANDROID_LOG_WARN, "ReCpp", fmt, ##__VA_ARGS__);
+    #define JniError(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, "ReCpp", fmt, ##__VA_ARGS__);
+
+    // uses printf style formatting to build an exception message
+    #define ThrowFmt(format, ...) do { \
+        char __err_fmt[1024]; \
+        snprintf(__err_fmt, sizeof(__err_fmt), format, ##__VA_ARGS__); \
+        throw std::runtime_error(__err_fmt); \
+    } while(0)
+
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    static JavaVM* javaVM;
+    static thread_local JNIEnv* jniEnv; // env ptr is only valid per-thread
+    static Ref<jobject> mainActivity; // GlobalRef
+
+    jint initVM(JavaVM* vm, JNIEnv* env) noexcept
     {
         javaVM = vm;
-        getEnv();
+        jniEnv = env ? env : getEnv();
         return JNI_VERSION_1_6;
+    }
+
+    static void attachEnv(JNIEnv** pEnv) noexcept
+    {
+        if (!javaVM)
+        {
+            JniError("getEnv() used before JNI_OnLoad(). Avoid calling JNI methods in static initializers.");
+            return;
+        }
+
+        // check if there is an attached Env? If not, try to attach it
+        if (javaVM->GetEnv((void**)pEnv, JNI_VERSION_1_6) != JNI_OK)
+        {
+            jint status = javaVM->AttachCurrentThread(pEnv, nullptr);
+            if (status != JNI_OK || *pEnv == nullptr)
+            {
+                JniError("getEnv() AttachCurrentThread failed: status %d", status);
+            }
+        }
+
+        if (*pEnv == nullptr)
+        {
+            JniError("getEnv() failed to get a valid JNIEnv");
+        }
     }
 
     JNIEnv* getEnv() noexcept
     {
-        static thread_local JNIEnv* env = [] // init once for each thread
-        {
-            Assert(javaVM, "getEnv() used before JNI_OnLoad(). Avoid calling JNI methods in static initializers.");
-            JNIEnv* e = nullptr;
-            if (javaVM->GetEnv((void**)&e, JNI_VERSION_1_6) != JNI_OK)
-                javaVM->AttachCurrentThread(&e, nullptr);
-            Assert(e, "javaVM->AttachCurrentThread() returned null JNIEnv*");
-            return e;
-        }();
-        return env;
+        if (!jniEnv) attachEnv(&jniEnv);
+        return jniEnv;
     }
 
-    jobject getActivity(const char* mainActivityClass)
+    jobject getMainActivity(const char* mainActivityClass)
     {
-        if (androidActivity)
-            return androidActivity;
+        if (mainActivity)
+            return mainActivity.get();
 
-        // if we enter from another thread, attempt to reuse the previous initialize activity name
-        const char* activityName = mainActivityClass ? mainActivityClass : mainActivityClassName.c_str();
-        if (!activityName || !*activityName)
+        try
         {
-            LogError("failed to init main activity: mainActivityClassName is empty");
-            return nullptr;
-        }
+            std::string activityName = mainActivityClass ? mainActivityClass : "";
+            if (activityName.empty())
+                ThrowFmt("mainActivityClassName is empty");
 
-        if (auto mainClass = Class{activityName, std::nothrow})
-        {
-            if (auto currentActivity = mainClass.staticField("currentActivity", "Landroid/app/Activity;", std::nothrow))
+            auto mainClass = Class{activityName.c_str()};
+
+            // https://github.com/qt/qtbase/blob/5.15/src/android/jar/src/org/qtproject/qt5/android/QtNative.java#L142
+            //    prototype:  public static Activity activity() { .. }
+            if (auto activity = mainClass.staticMethod("activity", "()Landroid/app/Activity;"))
             {
-                androidActivity = currentActivity.getGlobalObject();
+                mainActivity = activity.globalObjectF(nullptr);
+                if (!mainActivity) ThrowFmt("Class %s STATIC METHOD `activity()` returned null", activityName.c_str());
             }
-            else if (auto activity = mainClass.staticField("activity", "Landroid/app/Activity;", std::nothrow))
+            else if (auto field = mainClass.staticField("currentActivity", "Landroid/app/Activity;"))
             {
-                androidActivity = activity.getGlobalObject();
+                mainActivity = field.getGlobalObject();
+                if (!mainActivity) ThrowFmt("Class %s STATIC FIELD `currentActivity` returned null", activityName.c_str());
             }
-            else if (auto activity = mainClass.staticField("activity", "()Landroid/app/Activity;", std::nothrow))
+            else if (auto field = mainClass.staticField("activity", "Landroid/app/Activity;"))
             {
-                androidActivity = activity.getGlobalObject();
+                mainActivity = field.getGlobalObject();
+                if (!mainActivity) ThrowFmt("Class %s STATIC FIELD `activity` returned null", activityName.c_str());
             }
             else
             {
-                LogError("failed to detect main activity field or method in %s", activityName);
-                return nullptr;
+                ThrowFmt("no recognized main activity field or method in %s", activityName.c_str());
             }
-
-            // if init succeeded, save the activity name for future use
-            if (androidActivity)
-            {
-                mainActivityClassName = activityName;
-                return androidActivity;
-            }
-            LogError("main activity field or method in %s returned null", activityName);
-            return nullptr;
+            return mainActivity.get();
         }
-        LogError("failed to find main activity class: %s", activityName);
+        catch (const std::exception& e)
+        {
+            JniError("getMainActivity failed: %s", e.what());
+        }
         return nullptr;
     }
 
-    void initMainActivity(jobject globalHandle)
+    void initMainActivity(jobject mainActivityRef) noexcept
     {
-        if (!androidActivity)
+        if (!mainActivity)
         {
-            androidActivity = globalHandle;
+            mainActivity = makeGlobalRef(mainActivityRef);
         }
     }
-
 
     void checkForJNIException(const char* message)
     {
@@ -112,8 +137,68 @@ namespace rpp { namespace jni {
                 env->ExceptionDescribe();    \
                 env->ExceptionClear();       \
             }                                \
-            ThrowErr(format, ##__VA_ARGS__); \
+            ThrowFmt(format, ##__VA_ARGS__); \
         } while (0)
+
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    JniRef::JniRef(jobject localOrGlobalRef) noexcept
+        : JniRef{} // default init
+    {
+        if (!localOrGlobalRef)
+            return;
+        jobjectRefType type = getEnv()->GetObjectRefType(localOrGlobalRef);
+        if (type == JNILocalRefType) {
+            obj = localOrGlobalRef;
+        } else if (type == JNIGlobalRefType) {
+            obj = localOrGlobalRef;
+            isGlobal = true;
+        } else {
+            JniError("jni::Ref<T>() invalid reference: %p", localOrGlobalRef);
+        }
+    }
+
+    void JniRef::reset() noexcept
+    {
+        if (obj)
+        {
+            auto* env = getEnv();
+            if (isGlobal) env->DeleteGlobalRef(obj);
+            else          env->DeleteLocalRef(obj);
+            obj = nullptr;
+            isGlobal = false;
+        }
+    }
+
+    void JniRef::reset(const JniRef& r) noexcept
+    {
+        if (obj)
+        {
+            reset();
+        }
+
+        if (r.obj)
+        {
+            auto* env = getEnv();
+            if (r.isGlobal) obj = env->NewGlobalRef(r.obj);
+            else            obj = env->NewLocalRef(r.obj);
+        }
+        isGlobal = r.isGlobal;
+    }
+
+    void JniRef::makeGlobal() noexcept
+    {
+        if (obj && !isGlobal)
+        {
+            auto* env = getEnv();
+            jobject globalRef = env->NewGlobalRef(obj);
+            // decrease the local refcount because it was !global
+            env->DeleteLocalRef(obj);
+
+            obj = globalRef;
+            isGlobal = true;
+        }
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////
 
@@ -184,7 +269,7 @@ namespace rpp { namespace jni {
     {
         JNIEnv* env = getEnv();
         Class stringClass{"java/lang/String"};
-        jobjectArray arr = env->NewObjectArray(strings.size(), stringClass, 0);
+        jobjectArray arr = env->NewObjectArray(strings.size(), stringClass.get(), 0);
         if (!arr) JniThrow("Failed to create java.lang.String[]");
         for (size_t i = 0; i < strings.size(); ++i)
         {
@@ -197,7 +282,7 @@ namespace rpp { namespace jni {
 
     Class::Class(const char* className)
     {
-        env = getEnv();
+        auto* env = getEnv();
         clazz = makeGlobalRef<jclass>(env->FindClass(className));
         if (!clazz) JniThrow("Class not found: '%s'", className);
         name = className;
@@ -205,61 +290,94 @@ namespace rpp { namespace jni {
 
     Class::Class(const char* className, std::nothrow_t) noexcept
     {
-        env = getEnv();
+        auto* env = getEnv();
         clazz = makeGlobalRef<jclass>(env->FindClass(className));
         if (!clazz) ClearException();
         name = className;
     }
 
+    #define SignatureError(fmt, ...) do { \
+        JniError(fmt, ##__VA_ARGS__); \
+        if (throwOnError) { ThrowFmt(fmt, ##__VA_ARGS__); } \
+    } while(0)
+
+    static void checkMethodSignature(Class& c, const char* methodName, const char* signature, bool throwOnError)
+    {
+        if (!signature || !signature[0] || signature[0] != '(')
+            SignatureError("jni::Method %s for Class %s has invalid signature: %s", methodName, c.name, signature);
+    }
+
+    static void checkFieldSignature(Class& c, const char* fieldName, const char* signature, bool throwOnError)
+    {
+        if (!signature || !signature[0] || signature[0] == '(')
+            SignatureError("jni::Field %s for Class %s has invalid signature: %s", fieldName, c.name, signature);
+    }
+
     Method Class::method(const char* methodName, const char* signature)
     {
-        jmethodID method = env->GetMethodID(clazz, methodName, signature);
+        checkMethodSignature(*this, methodName, signature, /*throwOnError*/true);
+        auto* env = getEnv();
+        jmethodID method = env->GetMethodID(clazz.get(), methodName, signature);
         if (!method) JniThrow("Method '%s' not found in '%s'", methodName, name);
         return {*this, method, methodName, signature, /*isStatic*/false};
     }
     Method Class::method(const char* methodName, const char* signature, std::nothrow_t) noexcept
     {
-        jmethodID method = env->GetMethodID(clazz, methodName, signature);
+        checkMethodSignature(*this, methodName, signature, /*throwOnError*/false);
+        auto* env = getEnv();
+        jmethodID method = env->GetMethodID(clazz.get(), methodName, signature);
         if (!method) ClearException();
         return {*this, method, methodName, signature, /*isStatic*/false};
     }
 
     Method Class::staticMethod(const char* methodName, const char* signature)
     {
-        jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
+        checkMethodSignature(*this, methodName, signature, /*throwOnError*/true);
+        auto* env = getEnv();
+        jmethodID method = env->GetStaticMethodID(clazz.get(), methodName, signature);
         if (!method) JniThrow("Static method '%s' not found in '%s'", methodName, name);
         return {*this, method, methodName, signature, /*isStatic*/true};
     }
 
     Method Class::staticMethod(const char* methodName, const char* signature, std::nothrow_t) noexcept
     {
-        jmethodID method = env->GetStaticMethodID(clazz, methodName, signature);
+        checkMethodSignature(*this, methodName, signature, /*throwOnError*/false);
+        auto* env = getEnv();
+        jmethodID method = env->GetStaticMethodID(clazz.get(), methodName, signature);
         if (!method) ClearException();
         return {*this, method, methodName, signature, /*isStatic*/true};
     }
 
     Field Class::field(const char* fieldName, const char* type)
     {
-        jfieldID field = env->GetFieldID(clazz, fieldName, type);
+        checkFieldSignature(*this, fieldName, type, /*throwOnError*/true);
+        auto* env = getEnv();
+        jfieldID field = env->GetFieldID(clazz.get(), fieldName, type);
         if (!field) JniThrow("Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
         return {*this, field, fieldName, type, /*isStatic*/false};
     }
     Field Class::field(const char* fieldName, const char* type, std::nothrow_t) noexcept
     {
-        jfieldID field = env->GetFieldID(clazz, fieldName, type);
+        checkFieldSignature(*this, fieldName, type, /*throwOnError*/false);
+        auto* env = getEnv();
+        jfieldID field = env->GetFieldID(clazz.get(), fieldName, type);
         if (!field) ClearException();
         return {*this, field, fieldName, type, /*isStatic*/false};
     }
 
     Field Class::staticField(const char* fieldName, const char* type)
     {
-        jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
+        checkFieldSignature(*this, fieldName, type, /*throwOnError*/true);
+        auto* env = getEnv();
+        jfieldID field = env->GetStaticFieldID(clazz.get(), fieldName, type);
         if (!field) JniThrow("Static Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
         return {*this, field, fieldName, type, /*isStatic*/true};
     }
     Field Class::staticField(const char* fieldName, const char* type, std::nothrow_t) noexcept
     {
-        jfieldID field = env->GetStaticFieldID(clazz, fieldName, type);
+        checkFieldSignature(*this, fieldName, type, /*throwOnError*/false);
+        auto* env = getEnv();
+        jfieldID field = env->GetStaticFieldID(clazz.get(), fieldName, type);
         if (!field) ClearException();
         return {*this, field, fieldName, type, /*isStatic*/true};
     }
@@ -274,7 +392,7 @@ namespace rpp { namespace jni {
     #define CheckMethodInstance(instance, retval) do { \
         if (!isStatic && !instance) { \
             __android_log_print(ANDROID_LOG_ERROR, "ReCpp", "NonStatic jni::Method %s called with null instance", name); \
-            return retval; \
+            /*return retval;*/ \
         } else if (isStatic && instance) { \
             __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Method %s called with instance=%p", name, instance); \
         } \
@@ -283,143 +401,143 @@ namespace rpp { namespace jni {
     Ref<jobject> Method::objectV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        Ref<jobject> obj { instance
-                         ? clazz.env->CallObjectMethodV(instance, method, args)
-                         : clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jobject o = isStatic
+                  ? env->CallStaticObjectMethodV(clazz.get(), method, args)
+                  : env->CallObjectMethodV(instance, method, args);
         va_end(args);
-        return obj;
+        return Ref<jobject>{o};
     }
 
     JString Method::stringV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        Ref<jstring> str { instance
-                         ? (jstring)clazz.env->CallObjectMethodV(instance, method, args)
-                         : (jstring)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jstring s = isStatic
+                  ? (jstring)env->CallStaticObjectMethodV(clazz.get(), method, args)
+                  : (jstring)env->CallObjectMethodV(instance, method, args);
         va_end(args);
-        return JString{ std::move(str) };
+        return JString{ s };
     }
 
     JArray Method::arrayV(JniType type, jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        Ref<jarray> arr { instance
-                            ? (jarray)clazz.env->CallObjectMethodV(instance, method, args)
-                            : (jarray)clazz.env->CallStaticObjectMethodV(clazz.clazz, method, args)};
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jarray a = isStatic
+               ? (jarray)env->CallStaticObjectMethodV(clazz.get(), method, args)
+               : (jarray)env->CallObjectMethodV(instance, method, args);
         va_end(args);
-        return { std::move(arr), type };
+        return { a, type };
     }
 
     void Method::voidV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, );
-        va_list args;
-        va_start(args, instance);
-        if (instance) clazz.env->CallVoidMethodV(instance, method, args);
-        else clazz.env->CallStaticVoidMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        if (isStatic) env->CallStaticVoidMethodV(clazz.get(), method, args);
+        else          env->CallVoidMethodV(instance, method, args);
         va_end(args);
     }
 
     jboolean Method::booleanV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jboolean result = instance
-                        ? clazz.env->CallBooleanMethodV(instance, method, args)
-                        : clazz.env->CallStaticBooleanMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jboolean v = isStatic
+                   ? env->CallStaticBooleanMethodV(clazz.get(), method, args)
+                   : env->CallBooleanMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jbyte Method::byteV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jbyte result = instance
-                     ? clazz.env->CallByteMethodV(instance, method, args)
-                     : clazz.env->CallStaticByteMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jbyte v = isStatic
+                ? env->CallStaticByteMethodV(clazz.get(), method, args)
+                : env->CallByteMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jchar Method::charV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jchar result = instance
-                     ? clazz.env->CallCharMethodV(instance, method, args)
-                     : clazz.env->CallStaticCharMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jchar v = isStatic
+                ? env->CallStaticCharMethodV(clazz.get(), method, args)
+                : env->CallCharMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jshort Method::shortV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jshort result = instance
-                      ? clazz.env->CallShortMethodV(instance, method, args)
-                      : clazz.env->CallStaticShortMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jshort v = isStatic
+                 ? env->CallStaticShortMethodV(clazz.get(), method, args)
+                 : env->CallShortMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jint Method::intV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jint result = instance
-                      ? clazz.env->CallIntMethodV(instance, method, args)
-                      : clazz.env->CallStaticIntMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jint v = isStatic
+               ? env->CallStaticIntMethodV(clazz.get(), method, args)
+               : env->CallIntMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jlong Method::longV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jlong result = instance
-                     ? clazz.env->CallLongMethodV(instance, method, args)
-                     : clazz.env->CallStaticLongMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jlong v = isStatic
+                ? env->CallStaticLongMethodV(clazz.get(), method, args)
+                : env->CallLongMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jfloat Method::floatV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jfloat result = instance
-                      ? clazz.env->CallFloatMethodV(instance, method, args)
-                      : clazz.env->CallStaticFloatMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jfloat v = isStatic
+                 ? env->CallStaticFloatMethodV(clazz.get(), method, args)
+                 : env->CallFloatMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     jdouble Method::doubleV(jobject instance, ...) noexcept
     {
         CheckMethodInstance(instance, {});
-        va_list args;
-        va_start(args, instance);
-        jdouble result = instance
-                       ? clazz.env->CallDoubleMethodV(instance, method, args)
-                       : clazz.env->CallStaticDoubleMethodV(clazz.clazz, method, args);
+        va_list args; va_start(args, instance);
+        auto* env = getEnv();
+        jdouble v = isStatic
+                  ? env->CallStaticDoubleMethodV(clazz.get(), method, args)
+                  : env->CallDoubleMethodV(instance, method, args);
         va_end(args);
-        return result;
+        return v;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -441,92 +559,113 @@ namespace rpp { namespace jni {
     Ref<jobject> Field::getObject(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         jobject obj = isStatic
-                    ? clazz.env->GetStaticObjectField(clazz.clazz, field)
-                    : clazz.env->GetObjectField(instance, field);
+                    ? env->GetStaticObjectField(clazz.get(), field)
+                    : env->GetObjectField(instance, field);
         return Ref<jobject>{obj};
+    }
+
+    Ref<jobject> Field::getGlobalObject(jobject instance) noexcept
+    {
+        CheckFieldInstance(instance, {});
+        auto* env = getEnv();
+        jobject obj = isStatic
+                    ? env->GetStaticObjectField(clazz.get(), field)
+                    : env->GetObjectField(instance, field);
+        return makeGlobalRef(obj);
     }
 
     JString Field::getString(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         jstring str = isStatic
-                    ? (jstring)clazz.env->GetStaticObjectField(clazz.clazz, field)
-                    : (jstring)clazz.env->GetObjectField(instance, field);
+                    ? (jstring)env->GetStaticObjectField(clazz.get(), field)
+                    : (jstring)env->GetObjectField(instance, field);
         return JString{str};
     }
 
     JArray Field::getArray(JniType type, jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         jarray arr = isStatic
-                   ? (jarray)clazz.env->GetStaticObjectField(clazz.clazz, field)
-                   : (jarray)clazz.env->GetObjectField(instance, field);
+                   ? (jarray)env->GetStaticObjectField(clazz.get(), field)
+                   : (jarray)env->GetObjectField(instance, field);
         return JArray{arr, type};
     }
 
     jboolean Field::getBoolean(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticBooleanField(clazz.clazz, field)
-            : clazz.env->GetBooleanField(instance, field);
+            ? env->GetStaticBooleanField(clazz.get(), field)
+            : env->GetBooleanField(instance, field);
     }
 
     jbyte Field::getByte(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticByteField(clazz.clazz, field)
-            : clazz.env->GetByteField(instance, field);
+            ? env->GetStaticByteField(clazz.get(), field)
+            : env->GetByteField(instance, field);
     }
 
     jchar Field::getChar(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticCharField(clazz.clazz, field)
-            : clazz.env->GetCharField(instance, field);
+            ? env->GetStaticCharField(clazz.get(), field)
+            : env->GetCharField(instance, field);
     }
 
     jshort Field::getShort(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticShortField(clazz.clazz, field)
-            : clazz.env->GetShortField(instance, field);
+            ? env->GetStaticShortField(clazz.get(), field)
+            : env->GetShortField(instance, field);
     }
 
     jint Field::getInt(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticIntField(clazz.clazz, field)
-            : clazz.env->GetIntField(instance, field);
+            ? env->GetStaticIntField(clazz.get(), field)
+            : env->GetIntField(instance, field);
     }
 
     jlong Field::getLong(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticLongField(clazz.clazz, field)
-            : clazz.env->GetLongField(instance, field);
+            ? env->GetStaticLongField(clazz.get(), field)
+            : env->GetLongField(instance, field);
     }
 
     jfloat Field::getFloat(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ?  clazz.env->GetStaticFloatField(clazz.clazz, field)
-            : clazz.env->GetFloatField(instance, field);
+            ? env->GetStaticFloatField(clazz.get(), field)
+            : env->GetFloatField(instance, field);
     }
 
     jdouble Field::getDouble(jobject instance) noexcept
     {
         CheckFieldInstance(instance, {});
+        auto* env = getEnv();
         return isStatic
-            ? clazz.env->GetStaticDoubleField(clazz.clazz, field)
-            : clazz.env->GetDoubleField(instance, field);
+            ? env->GetStaticDoubleField(clazz.get(), field)
+            : env->GetDoubleField(instance, field);
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
