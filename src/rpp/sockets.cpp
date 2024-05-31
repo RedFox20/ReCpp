@@ -1709,7 +1709,6 @@ namespace rpp
         const int n = (int)in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
         
-        const bool read = (pollFlags & PF_Read);
         const short events = short(
             ((pollFlags & PF_Read) ? POLLIN : 0) |
             ((pollFlags & PF_Write) ? POLLOUT : 0)
