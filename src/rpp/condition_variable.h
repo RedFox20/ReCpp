@@ -157,13 +157,13 @@ namespace rpp
          * @param stop_waiting predicate which returns ​false if the waiting should be continued
          */
         template<class Mutex, class Predicate>
-        void wait(std::unique_lock<Mutex>& lock, 
-                  const Predicate& stop_waiting) noexcept(stop_waiting())
+        void wait(std::unique_lock<Mutex>& lock,
+                  const Predicate& stop_waiting) noexcept
         {
             while (!stop_waiting())
                 wait(lock);
         }
-        
+
         /**
          * @brief Blocks the current thread until the condition variable
          *        is awakened or after the specified timeout duration.
