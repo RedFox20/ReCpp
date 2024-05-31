@@ -8,7 +8,7 @@ using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
 
-using mutex = rpp::pool_worker::mutex;
+using mutex_t = rpp::pool_worker::mutex;
 
 TestImpl(test_coroutines)
 {
@@ -136,12 +136,12 @@ TestImpl(test_coroutines)
 
     cfuture<std::vector<int>> destructor_sequence_coro()
     {
-        mutex m;
+        mutex_t m;
         std::vector<int> destructor_ids;
 
         struct destructor_recorder
         {
-            mutex& m;
+            mutex_t& m;
             std::vector<int>& results;
             const int id;
             ~destructor_recorder() noexcept {

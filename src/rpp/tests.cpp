@@ -686,7 +686,6 @@ namespace rpp
         auto end = start + time::nanoseconds(microseconds * 1000ull);
         while (time::high_resolution_clock::now() < end)
         {
-            std::this_thread::yield();
         }
     }
 

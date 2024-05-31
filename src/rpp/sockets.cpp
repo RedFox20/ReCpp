@@ -1694,7 +1694,7 @@ namespace rpp
         struct pollfd pfd = { Sock, events, 0 };
         int r = ::poll(&pfd, 1, timeoutMillis);
     #endif
-        if (r <= 0)
+        if (r < 0)
         {
             set_errno();
             return false;
@@ -1708,7 +1708,7 @@ namespace rpp
         ready.clear();
         const int n = (int)in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
-        
+
         const short events = short(
             ((pollFlags & PF_Read) ? POLLIN : 0) |
             ((pollFlags & PF_Write) ? POLLOUT : 0)
@@ -1733,10 +1733,6 @@ namespace rpp
         for (int i = 0; i < n; ++i)
         {
             if (in[i]->on_poll_result(pfd[i].revents, pollFlags))
-                ready.push_back(i);
-            // BUGFIX: it is possible for poll() to NOT report READ events correctly
-            //         this will always check available() status to ensure we don't miss data
-            else if ((pollFlags & PF_Read) && in[i]->available() > 0)
                 ready.push_back(i);
         }
 
@@ -1767,8 +1763,14 @@ namespace rpp
 
         LastErr = 0; // clear errors
 
-        if ((revents & POLLIN) && (pollFlags & PF_Read))
-            return true;
+        if (pollFlags & PF_Read)
+        {
+            // BUGFIX: it's possible for poll() to miss some READ events
+            //         so double-check with available() to be sure
+            if ((revents & POLLIN) || available() > 0)
+                return true;
+        }
+
         if ((revents & POLLOUT) && (pollFlags & PF_Write))
             return true;
 
