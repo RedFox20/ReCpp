@@ -14,6 +14,7 @@
 #include <vector>
 #include <thread>
 #include <string>
+#include <atomic> // std::atomic_bool
 
 namespace rpp
 {
