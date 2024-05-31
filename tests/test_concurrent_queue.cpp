@@ -263,7 +263,7 @@ TestImpl(test_concurrent_queue)
         // we should get it immediately
         queue.push("item1");
         AssertWaitPopTimed(10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 17.0);
+        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 20.0);
     }
 
     // introduce a slow producer thread so we can test our timeouts

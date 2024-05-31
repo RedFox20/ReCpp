@@ -37,6 +37,7 @@ namespace rpp
     {
         std::vector<test_info> global_tests;
         TestVerbosity verbosity = TestVerbosity::Summary;
+        bool repeat = false;
     };
 
     /**
@@ -176,7 +177,7 @@ namespace rpp
         int asserts_failed = 0;
         std::vector<test_failure*> failures;
         std::chrono::nanoseconds elapsed_time{};
-        rpp::mutex mutex;
+        std::shared_ptr<rpp::mutex> mutex = std::make_shared<rpp::mutex>();
 
         ~test_results()
         {
@@ -367,7 +368,7 @@ namespace rpp
         fail->file = rpp::strview{file};
         fail->line = line;
         {
-            std::lock_guard lock {impl->current_results->mutex};
+            std::lock_guard lock {*impl->current_results->mutex};
             impl->current_results->asserts_failed++;
             impl->current_results->failures.push_back(fail);
         }
@@ -547,7 +548,7 @@ namespace rpp
         auto t2 = std::chrono::high_resolution_clock::now();
         impl->elapsed_time = t2 - t1;
 
-        bool allSuccess = (numTestsOk == numTestsRun);
+        const bool allSuccess = (numTestsOk == numTestsRun);
         if (verb >= TestVerbosity::Summary)
         {
             if (allSuccess)
@@ -757,12 +758,37 @@ namespace rpp
         }
     }
 
+    static void print_help()
+    {
+        consolef(Default, "Usage: test_runner [options] [testname] [testname.testcase]\n");
+        consolef(Default, "Options:\n");
+        consolef(Default, "  -h, --help        Print this help message\n");
+        consolef(Default, "  -v, -vv           Increase verbosity level [none:0 default:1 -v:2 -vv:3]\n");
+        consolef(Default, "  --verbosity=3     Set verbosity level [default:1(Summary) 2(Labels) 3(All)]\n");
+        consolef(Default, "  -r, --repeat      Repeat tests until a failure occurs\n");
+        consolef(Default, "  testname           Run test suite (loose match)\n");
+        consolef(Default, "  -testname          Exclude test suite (loose match)\n");
+        consolef(Default, "  test:testname      Run test suite (exact match)\n");
+        consolef(Default, "  -test:testname     Exclude test suite (exact match)\n");
+        consolef(Default, "  testname.testcase  Run a specific test case\n");
+        consolef(Default, "  -testname.testcase Exclude a specific test case\n");
+        consolef(Default, "  *                  Run all tests\n");
+        consolef(Default, "  testname.*         Run all test cases in a suite\n");
+        consolef(Default, "  testname -testname.testcase  Run all tests except a specific case\n");
+        
+    }
+
     // parses for any flags and removes the from the args vector
     static void parse_flags(std::vector<strview>& args)
     {
         for (auto it = args.begin(); it != args.end(); )
         {
-            if (it->starts_with("--verbosity"))
+            if (*it == "-h" || *it == "--help")
+            {
+                print_help();
+                std::exit(0);
+            }
+            else if (it->starts_with("--verbosity"))
             {
                 if (*it == "--verbosity") // --verbosity 3
                 {
@@ -782,6 +808,11 @@ namespace rpp
                 // Summary is the default, so -v will bump it once, -vv will be super verbose
                 state().verbosity = *it == "-v" ? TestVerbosity::TestLabels
                                                 : TestVerbosity::AllMessages;
+                it = args.erase(it);
+            }
+            else if (*it == "-r" || *it == "--repeat")
+            {
+                state().repeat = true;
                 it = args.erase(it);
             }
             else
@@ -821,7 +852,8 @@ namespace rpp
                 testName.chomp_first();
             }
 
-            const bool exactMatch = testName.starts_with("test_");
+            const bool exactMatch = testName.starts_with("test:");
+            testName = exactMatch ? testName.skip_after(':') : testName;
             LogTestLabel(
                 if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", arg.len, arg.str);
                 else            consolef(Yellow, "Filtering substr tests '%.*s'\n", arg.len, arg.str);
@@ -830,8 +862,8 @@ namespace rpp
             bool match = false;
             for (test_info& t : state().global_tests)
             {
-                if ((exactMatch && t.name == testName) ||
-                    (!exactMatch && t.name.find(testName)))
+                if ((exactMatch && t.name.equalsi(testName)) ||
+                    (!exactMatch && t.name.containsi(testName)))
                 {
                     t.case_filter = specific;
                     if (disableTest) disabled.insert(t.name);
@@ -975,10 +1007,22 @@ namespace rpp
         else
             enable_all_autorun_tests();
 
-        test_results results;
+        test_results results{};
+        int returnCode = -1;
         try
         {
-            run_all_marked_tests(results);
+            while (true)
+            {
+                run_all_marked_tests(results);
+                returnCode = print_final_summary(results);
+                if (returnCode == 0 && state().repeat)
+                {
+                    // cleanup all state and go for another loop
+                    results = {};
+                    continue;
+                }
+                break;
+            }
         }
         catch (const std::exception& e)
         {
@@ -986,7 +1030,6 @@ namespace rpp
             return 1;
         }
 
-        int returnCode = print_final_summary(results);
         #if _WIN32 && _MSC_VER
             #if _CRTDBG_MAP_ALLOC
                 _CrtDumpMemoryLeaks();

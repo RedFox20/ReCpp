@@ -13,6 +13,7 @@
 #  include <memory> // shared_ptr
 #  include <chrono> // time_point
 #  include "mutex.h"
+#  include "debugging.h"
 #endif
 
 #include <condition_variable> // std::cv_status
@@ -88,15 +89,64 @@ namespace rpp
          * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
          */
         template<class Mutex>
-        void wait(std::unique_lock<Mutex>& lock) noexcept
+        void wait(std::unique_lock<Mutex>& locked_lock) noexcept
         {
-            mutex_type_wrapper cs {mtx}; // for immunity to *this destruction
-            std::unique_lock csGuard {cs}; // critical section
-            unlock_guard unlockOuter {lock}; // unlock the outer lock, and relock when we exit the scope
+            if (!locked_lock.owns_lock())
+            {
+                LogError("unique_lock not owned by calling thread, calling lock() to avoid crash");
+                locked_lock.lock();
+            }
+
+            mutex_type_wrapper cs { mtx }; // shared_ptr for immunity to *this destruction
+
+            // critical section lock is needed to avoid race condition between notify() and wait()
+            // otherwise the notify() may signal just before entering wait() and the signal is lost
+            // leading to a deadlocked wait
+            cs.lock(); // lock critical section
+            locked_lock.unlock(); // unlock the outer lock, and relock when we exit the scope
 
             (void)_wait_suspended_unlocked(cs.get(), 0xFFFFFFFF/*INFINITE*/);
 
-            csGuard.unlock(); // unlock critical section before relocking outer
+            cs.unlock(); // unlock critical section before relocking outer
+            locked_lock.lock(); // relock the outer lock
+        }
+
+        /**
+         * @brief Blocks the current thread until the condition variable is awakened.
+         *
+         * @details Atomically releases lock, blocks the current executing thread,
+         *          and adds it to the list of threads waiting on *this.
+         *          The thread will be unblocked when notify_all() or notify_one() is executed,
+         *          or when the relative timeout rel_time expires. It may also be unblocked spuriously.
+         *          When unblocked, regardless of the reason, lock is reacquired and wait_for() exits.
+         *
+         * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
+         * @param rel_time an object of type std::chrono::duration representing the maximum time to spend waiting.
+         *                 Note that rel_time must be small enough not to overflow when added to
+         *                 clock::now().
+         *
+         * @returns std::cv_status::timeout if the relative timeout specified by rel_time expired,
+         *          std::cv_status::no_timeout otherwise.
+         */
+        template<class Mutex>
+        [[nodiscard]]
+        std::cv_status wait_for(std::unique_lock<Mutex>& locked_lock, const duration& rel_time) noexcept
+        {
+            if (!locked_lock.owns_lock())
+            {
+                LogError("unique_lock not owned by calling thread, calling lock() to avoid crash");
+                locked_lock.lock();
+            }
+
+            mutex_type_wrapper cs { mtx }; // shared_ptr for immunity to *this destruction
+            cs.lock(); // lock critical section
+            locked_lock.unlock(); // unlock the outer lock, and relock when we exit the scope
+
+            std::cv_status status = _wait_for_unlocked(cs.get(), rel_time);
+
+            cs.unlock(); // unlock critical section before relocking outer
+            locked_lock.lock(); // relock the outer lock
+            return status;
         }
 
         /**
@@ -159,37 +209,6 @@ namespace rpp
                 if (wait_until(lock, abs_time) == std::cv_status::timeout)
                     return stop_waiting();
             return true;
-        }
-
-        /**
-         * @brief Blocks the current thread until the condition variable is awakened.
-         *
-         * @details Atomically releases lock, blocks the current executing thread,
-         *          and adds it to the list of threads waiting on *this.
-         *          The thread will be unblocked when notify_all() or notify_one() is executed,
-         *          or when the relative timeout rel_time expires. It may also be unblocked spuriously.
-         *          When unblocked, regardless of the reason, lock is reacquired and wait_for() exits.
-         *
-         * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
-         * @param rel_time an object of type std::chrono::duration representing the maximum time to spend waiting.
-         *                 Note that rel_time must be small enough not to overflow when added to
-         *                 clock::now().
-         *
-         * @returns std::cv_status::timeout if the relative timeout specified by rel_time expired,
-         *          std::cv_status::no_timeout otherwise.
-         */
-        template<class Mutex>
-        [[nodiscard]] 
-        std::cv_status wait_for(std::unique_lock<Mutex>& lock, const duration& rel_time) noexcept
-        {
-            mutex_type_wrapper cs {mtx}; // for immunity to *this destruction
-            std::unique_lock csGuard {cs}; // critical section guard
-            unlock_guard unlockOuter {lock}; // unlock the outer lock, and relock when we exit the scope
-
-            std::cv_status status = _wait_for_unlocked(cs.get(), rel_time);
-
-            csGuard.unlock(); // unlock critical section before relocking outer
-            return status;
         }
 
         /**

@@ -13,15 +13,8 @@ namespace rpp
             mutex() noexcept;
             ~mutex() noexcept;
 
-            mutex(mutex&& m) noexcept : mtx{m.mtx.ctx}
-            {
-                m.mtx.ctx = nullptr;
-            }
-            mutex& operator=(mutex&& m) noexcept
-            {
-                std::swap(mtx.ctx, m.mtx.ctx);
-                return *this;
-            }
+            mutex(mutex&&) = delete;
+            mutex& operator=(mutex&&) = delete;
 
             mutex(const mutex&) = delete;
             mutex& operator=(const mutex&) = delete;

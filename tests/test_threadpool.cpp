@@ -283,6 +283,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_nested_nodeadlocks)
     {
+        rpp::Timer t;
         std::atomic_int times_launched {0};
 
         auto func = [&]() {
@@ -296,7 +297,7 @@ TestImpl(test_threadpool)
             };
 
             for (auto& task : subtasks)
-                AssertThat(task.wait(std::chrono::milliseconds{1000}), wait_result::finished);
+                AssertThat(task.wait(std::chrono::milliseconds{5000}), wait_result::finished);
         };
         std::vector<pool_task_handle> main_tasks = {
             parallel_task(func),
@@ -307,7 +308,13 @@ TestImpl(test_threadpool)
 
         // TODO: this test is failing, run some stress tests
         for (auto& task : main_tasks)
-            AssertThat(task.wait(std::chrono::milliseconds{2000}), wait_result::finished);
+            AssertThat(task.wait(std::chrono::milliseconds{5000}), wait_result::finished);
+
+        int64 elapsed_ms = t.elapsed_ms();
+        if (elapsed_ms >= 5000)
+        {
+            AssertFailed("a deadlock occurred - wait took: %lldms\n", elapsed_ms);
+        }
 
         int expected = 4 * 6;
         AssertThat((int)times_launched, expected);

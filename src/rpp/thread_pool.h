@@ -116,10 +116,14 @@ namespace rpp
      */
     class RPPAPI pool_task_handle
     {
+    public:
+        using mutex = rpp::mutex;
+        using condition_variable = rpp::condition_variable;
+
         struct state
         {
-            mutable std::mutex m;
-            std::condition_variable cv;
+            mutable mutex m;
+            condition_variable cv;
             std::string trace;
             std::exception_ptr error;
             std::atomic_bool finished = false;
@@ -175,8 +179,8 @@ namespace rpp
     class RPPAPI pool_worker
     {
     public:
-        using mutex = std::mutex;
-        using condition_variable = std::condition_variable;
+        using mutex = pool_task_handle::mutex;
+        using condition_variable = pool_task_handle::condition_variable;
     private:
         mutex start_mutex; // mutex to synchronize start/stop of the task
         condition_variable new_task_cv;

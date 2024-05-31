@@ -13,8 +13,11 @@ namespace rpp
      */
     class semaphore
     {
-        std::mutex m;
-        std::condition_variable cv;
+    public:
+        using mutex = rpp::mutex;
+        using condition_variable = rpp::condition_variable;
+        mutex m;
+        condition_variable cv;
         std::atomic_int value{0}; // atomic int to ensure cache coherency
         const int max_value = 0x7FFFFFFF;
 
@@ -41,7 +44,7 @@ namespace rpp
         }
 
         /** @brief Returns the internal mutex used by notify() and wait() */
-        std::mutex& mutex() noexcept { return m; }
+        mutex& mutex() noexcept { return m; }
 
         /** @returns Current semaphore count (thread-unsafe) */
         int count() const noexcept { return value; }

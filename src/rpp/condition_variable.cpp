@@ -22,7 +22,7 @@ namespace rpp
     // NOTE on debugging: enabling this will cause extra delays in the timing logic,
     //                    which will show false positive test failures; always disable this before testing
     #define DEBUG_CVAR 0
-    #define USE_SRWLOCK 0
+    #define USE_SRWLOCK 1
     #define USE_WAITABLE_EVENTS 0
 
     #if DEBUG_CVAR
@@ -91,20 +91,26 @@ namespace rpp
 
     void condition_variable::notify_one() noexcept
     {
+        mtx->lock();
     #if USE_WAITABLE_EVENTS
         SetEvent(handle.impl);
     #else
         WakeConditionVariable(CONDVAR(handle));
     #endif
+        mtx->unlock();
     }
 
     void condition_variable::notify_all() noexcept
     {
+        // this lock is needed, otherwise waiters might lock mutex and enter wait state
+        // right after this signal is sent, causing a deadlock
+        mtx->lock();
     #if USE_WAITABLE_EVENTS
         SetEvent(handle.impl);
     #else
         WakeAllConditionVariable(CONDVAR(handle));
     #endif
+        mtx->unlock();
     }
 
     void condition_variable::_lock(mutex_type* m) noexcept

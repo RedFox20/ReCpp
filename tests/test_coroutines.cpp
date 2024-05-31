@@ -156,7 +156,7 @@ TestImpl(test_coroutines)
             destructor_recorder dr {m, destructor_ids, 1};
             co_await std::chrono::milliseconds{10};
         };
-        printf("t1 elapsed: %f\n", t1.elapsed_millis());
+        print_warning("dtor sequence #1 elapsed: %.2fms\n", t1.elapsed_millis());
         AssertThat(destructor_ids.size(), 1u);
         AssertThat(destructor_ids[0], 1);
 
@@ -167,7 +167,7 @@ TestImpl(test_coroutines)
             co_await std::chrono::milliseconds{5};
             co_return "test";
         };
-        printf("t2 elapsed: %f\n", t2.elapsed_millis());
+        print_warning("dtor sequence #2 elapsed: %.2fms\n", t2.elapsed_millis());
         AssertThat(fstr, "test"s);
         AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
@@ -178,7 +178,7 @@ TestImpl(test_coroutines)
             destructor_recorder dr {m, destructor_ids, 3};
             co_return;
         };
-        printf("t3 elapsed: %f\n", t3.elapsed_millis());
+        print_warning("dtor sequence #3 elapsed: %.2fms\n", t3.elapsed_millis());
         AssertThat(destructor_ids.size(), 3u);
         AssertThat(destructor_ids[2], 3);
 

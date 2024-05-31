@@ -7,9 +7,7 @@
 #if __APPLE__ || __linux__
 # include <pthread.h>
 #endif
-#if __has_include("debugging.h")
-# include "debugging.h"
-#endif
+#include "debugging.h"
 
 #define POOL_TASK_DEBUG 0
 
@@ -112,6 +110,8 @@ namespace rpp
                     // even if we time out, check if the task finished
                     if (!p->finished)
                         result = wait_result::timeout;
+                    else
+                        LogWarning("pool_task_handle::wait() timeout, but task was finished (notify failed)");
                     break;
                 }
             }

@@ -36,7 +36,7 @@ namespace rpp
         using clock = std::chrono::high_resolution_clock;
         using duration = clock::duration;
         using time_point = clock::time_point;
-        using mutex = std::mutex;
+        using mutex = rpp::mutex;
         using condition_variable = rpp::condition_variable;
 
     private:
