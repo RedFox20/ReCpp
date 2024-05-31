@@ -1,7 +1,7 @@
 #pragma once
 #include "condition_variable.h"
 #include "debugging.h"
-#include <mutex>
+#include "mutex.h"
 #include <atomic>
 
 namespace rpp
@@ -14,7 +14,7 @@ namespace rpp
     class semaphore
     {
         std::mutex m;
-        rpp::condition_variable cv;
+        std::condition_variable cv;
         std::atomic_int value{0}; // atomic int to ensure cache coherency
         const int max_value = 0x7FFFFFFF;
 
@@ -52,7 +52,7 @@ namespace rpp
          */
         void reset(int newCount = 0)
         {
-            std::lock_guard<std::mutex> lock{ m };
+            std::lock_guard lock{ m };
             if (0 <= newCount && newCount <= max_value)
                 value = newCount;
             if (newCount > 0)
@@ -66,7 +66,7 @@ namespace rpp
          */
         void notify()
         {
-            std::lock_guard<std::mutex> lock{ m };
+            std::lock_guard lock{ m };
             if (value < 0) LogError("count=%d must not be negative", value.load());
             if (value < max_value)
                 ++value;
@@ -79,7 +79,7 @@ namespace rpp
          */
         bool notify_once()
         {
-            std::lock_guard<std::mutex> lock{ m };
+            std::lock_guard lock{ m };
             if (value < 0) LogError("count=%d must not be negative", value.load());
             bool shouldNotify = value <= 0;
             if (shouldNotify)
@@ -96,7 +96,7 @@ namespace rpp
          */
         bool try_wait()
         {
-            std::unique_lock<std::mutex> lock{ m };
+            std::lock_guard lock{ m };
             if (value > 0)
             {
                 --value;
@@ -110,7 +110,7 @@ namespace rpp
          */
         void wait()
         {
-            std::unique_lock<std::mutex> lock{ m };
+            std::unique_lock lock{ m };
             if (value < 0) LogError("count=%d must not be negative", value.load());
             while (value <= 0) // wait until value is actually set
             {
@@ -126,7 +126,7 @@ namespace rpp
         template<class Rep, class Period>
         wait_result wait(const std::chrono::duration<Rep, Period>& timeout)
         {
-            std::unique_lock<std::mutex> lock{ m };
+            std::unique_lock lock{ m };
             if (value < 0) LogError("count=%d must not be negative", value.load());
             if (value <= 0)
             {
@@ -152,7 +152,7 @@ namespace rpp
          */
         void wait_barrier_while(std::atomic_bool& taskIsRunning)
         {
-            std::unique_lock<std::mutex> lock{ m };
+            std::unique_lock lock{ m };
             while (taskIsRunning)
             {
                 cv.wait(lock);
@@ -172,7 +172,7 @@ namespace rpp
          */
         void wait_barrier_until(std::atomic_bool& hasFinished)
         {
-            std::unique_lock<std::mutex> lock{ m };
+            std::unique_lock lock{ m };
             while (!hasFinished)
             {
                 cv.wait(lock);

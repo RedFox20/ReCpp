@@ -4,6 +4,8 @@
 #include <cstdio>  // fprintf
 #include <cstring> // strlen
 
+#include "mutex.h"
+
 #if _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN 1
@@ -15,7 +17,6 @@
 #  include <TlHelp32.h>
 #  include <Psapi.h>
 #  include <vector>
-#  include <mutex>
 #else
 #  include <cstdlib>  // malloc/free
 #  include <cxxabi.h> // __cxa_demangle
@@ -34,7 +35,6 @@
 #    include <unistd.h> // getpid
 #    include <vector>
 #    include <unordered_map>
-#    include <mutex>
 #    include "sort.h" // rpp::insertion_sort
 #  else
 #    include <dlfcn.h>
@@ -393,8 +393,8 @@ namespace rpp
         auto it = moduleDies.find(mod);
         if (it == moduleDies.end())
         {
-            static std::mutex sync;
-            std::lock_guard<std::mutex> guard {sync};
+            static rpp::mutex sync;
+            std::lock_guard guard {sync};
             map = &moduleDies[mod];
             map->init(mod);
         }
@@ -511,7 +511,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Windows implementation
 
-    static std::mutex DbgHelpMutex; // DbgHelp.dll is single-threaded
+    static rpp::mutex DbgHelpMutex; // DbgHelp.dll is single-threaded
 
     static void OnDebugError(const char* what, int lastError, uint64_t offset)
     {
@@ -803,7 +803,7 @@ namespace rpp
         if (messageLen) fmt.writeln(message, messageLen);
 
         // DbgHelp.dll is single-threaded, so we need to synchronize here
-        std::lock_guard<std::mutex> guard { DbgHelpMutex };
+        std::lock_guard guard { DbgHelpMutex };
 
         for (int frameNum = 0; frameNum < maxDepth; ++frameNum)
         {

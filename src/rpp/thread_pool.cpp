@@ -104,7 +104,7 @@ namespace rpp
         wait_result result = wait_result::finished;
         if (auto p = s; p && !p->finished)
         {
-            std::unique_lock<std::mutex> lock{p->m};
+            std::unique_lock lock{p->m};
             while (!s->finished)
             {
                 if (p->cv.wait_for(lock, timeout) == std::cv_status::timeout)
@@ -137,7 +137,7 @@ namespace rpp
         wait_result result = wait_result::finished;
         if (auto p = s; p && !p->finished)
         {
-            std::unique_lock<std::mutex> lock{p->m};
+            std::unique_lock lock{p->m};
             while (!s->finished)
             {
                 p->cv.wait(lock);
@@ -161,7 +161,7 @@ namespace rpp
     {
         if (auto p = s)
         {
-            std::lock_guard<std::mutex> lock{p->m};
+            std::lock_guard lock{p->m};
             p->finished = true;
             p->cv.notify_all();
             this->s = nullptr; // clear the state
@@ -185,7 +185,7 @@ namespace rpp
 
     pool_task_handle pool_worker::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
-        std::lock_guard<std::mutex> lock{start_mutex};
+        std::lock_guard lock{start_mutex};
         // we always need to double-check if a task is already running
         if (current_task)
             return nullptr;
@@ -212,7 +212,7 @@ namespace rpp
 
     pool_task_handle pool_worker::run_generic(task_delegate<void()>&& newTask) noexcept
     {
-        std::lock_guard<std::mutex> lock{start_mutex};
+        std::lock_guard lock{start_mutex};
         // we always need to double-check if a task is already running
         if (current_task)
             return nullptr;
@@ -242,7 +242,8 @@ namespace rpp
         if (killed) {
             return join_or_detach(wait_result::finished);
         }
-        { std::unique_lock<std::mutex> lock{start_mutex};
+        {
+            std::lock_guard lock{start_mutex};
             TaskDebug("%s", name);
             killed = true;
             new_task_cv.notify_all();
@@ -294,7 +295,8 @@ namespace rpp
                 decltype(generic_task) generic;
 
                 // consume the Tasks atomically
-                { std::unique_lock<std::mutex> lock{start_mutex};
+                {
+                    std::unique_lock lock{start_mutex};
                     TaskDebug("%s wait for task", name);
                     if (!wait_for_new_job(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
@@ -325,7 +327,8 @@ namespace rpp
             catch (...)                     { unhandled_exception("");       }
 
             // cleanup the current task
-            { std::lock_guard<std::mutex> lock{start_mutex};
+            {
+                std::lock_guard lock{start_mutex};
                 current_task.signal_finished();
             }
         }
@@ -341,7 +344,7 @@ namespace rpp
 
     }
 
-    bool pool_worker::wait_for_new_job(std::unique_lock<std::mutex>& lock) noexcept
+    bool pool_worker::wait_for_new_job(std::unique_lock<mutex>& lock) noexcept
     {
         for (;;)
         {
@@ -404,7 +407,7 @@ namespace rpp
 
     void thread_pool::set_task_tracer(pool_trace_provider traceProvider)
     {
-        std::lock_guard<std::mutex> lock{ TasksMutex };
+        std::lock_guard lock{ TasksMutex };
         TraceProvider = traceProvider;
     }
 
@@ -421,7 +424,7 @@ namespace rpp
     thread_pool::~thread_pool() noexcept
     {
         // defined destructor to prevent aggressive inlining and to manually control task destruction
-        std::lock_guard<std::mutex> lock{TasksMutex};
+        std::lock_guard lock{TasksMutex};
         Workers.clear();
     }
     
@@ -442,7 +445,7 @@ namespace rpp
 
     int thread_pool::active_tasks() noexcept
     {
-        std::lock_guard<std::mutex> lock{TasksMutex};
+        std::lock_guard lock{TasksMutex};
         int active = 0;
         for (auto& task : Workers) 
             if (task->running()) ++active;
@@ -451,7 +454,7 @@ namespace rpp
 
     int thread_pool::idle_tasks() noexcept
     {
-        std::lock_guard<std::mutex> lock{TasksMutex};
+        std::lock_guard lock{TasksMutex};
         int idle = 0;
         for (auto& task : Workers)
             if (!task->running()) ++idle;
@@ -465,7 +468,7 @@ namespace rpp
 
     int thread_pool::clear_idle_tasks() noexcept
     {
-        std::lock_guard<std::mutex> lock{TasksMutex};
+        std::lock_guard lock{TasksMutex};
         int cleared = 0;
         for (size_t i = 0; i < Workers.size();)
         {
@@ -479,10 +482,10 @@ namespace rpp
         }
         return cleared;
     }
-    
+
     void thread_pool::max_task_idle_time(float maxIdleSeconds) noexcept
     {
-        std::lock_guard<std::mutex> lock{TasksMutex};
+        std::lock_guard lock{TasksMutex};
         TaskMaxIdleTime = maxIdleSeconds;
         for (auto& task : Workers)
             task->max_idle_time(TaskMaxIdleTime);
@@ -499,7 +502,7 @@ namespace rpp
                                   const action<int, int>& range_task) noexcept
     {
         {
-            std::lock_guard<std::mutex> lock{TasksMutex};
+            std::lock_guard lock{TasksMutex};
             for (int i = (int)Workers.size() - 1; i >= 0; --i)
             {
                 auto& worker_ref = Workers[i];
@@ -623,7 +626,7 @@ namespace rpp
 
         // and finally throw them back into the pool
         {
-            std::lock_guard<std::mutex> lock{TasksMutex};
+            std::lock_guard lock{TasksMutex};
             for (uint32_t i = 0; i < spawned; ++i)
             {
                 Workers.emplace_back(std::move(active[i].worker));
@@ -636,7 +639,7 @@ namespace rpp
 
     pool_task_handle thread_pool::parallel_task(task_delegate<void()>&& generic_task) noexcept
     {
-        { std::lock_guard<std::mutex> lock{TasksMutex};
+        { std::lock_guard lock{TasksMutex};
             for (worker_ptr& t : Workers)
             {
                 pool_worker* worker = t.get();
@@ -656,7 +659,7 @@ namespace rpp
         auto task = worker->run_generic(std::move(generic_task));
         AssertTerminate(task != nullptr, "brand new pool_task->run_generic() failed");
 
-        std::lock_guard<std::mutex> lock{TasksMutex};
+        std::lock_guard lock{TasksMutex};
         Workers.emplace_back(std::move(w));
         return task;
     }

@@ -11,8 +11,8 @@
  */
 #if _MSC_VER
 #  include <memory> // shared_ptr
-#  include <mutex>  // mutex
 #  include <chrono> // time_point
+#  include "mutex.h"
 #endif
 
 #include <condition_variable> // std::cv_status
@@ -55,20 +55,6 @@ namespace rpp
             void unlock() noexcept { _unlock(mtx.get()); }
         };
 
-        template<class Mutex> struct unlock_guard final {
-            std::unique_lock<Mutex>& mtx;
-            explicit unlock_guard(std::unique_lock<Mutex>& mtx) : mtx{mtx} {
-                mtx.unlock();
-            }
-            ~unlock_guard() noexcept /* terminates */ { // MSVC++ defined
-                // relock mutex or terminate()
-                // condition_variable_any wait functions are required to terminate if
-                // the mutex cannot be relocked;
-                // we slam into noexcept here for easier user debugging.
-                mtx.lock();
-            }
-        };
-
         std::shared_ptr<mutex_type> mtx;
         struct { native_handle_type impl; } handle { nullptr };
         native_handle_type timer = nullptr; // for high-precision waits
@@ -76,7 +62,7 @@ namespace rpp
     public:
         condition_variable() noexcept;
         ~condition_variable() noexcept;
-        
+
         condition_variable& operator=(condition_variable&&) = delete;
         condition_variable& operator=(const condition_variable&) = delete;
 

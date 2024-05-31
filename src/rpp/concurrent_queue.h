@@ -6,8 +6,8 @@
 #pragma once
 #include "config.h"
 #include "condition_variable.h"
+#include "mutex.h"
 #include <vector>
-#include <mutex>
 #include <thread> // std::this_thread::yield()
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional
@@ -32,17 +32,20 @@ namespace rpp
         T* ItemsStart = nullptr;
         T* ItemsEnd = nullptr;
 
-        mutable std::mutex Mutex;
-        mutable rpp::condition_variable Waiter;
+    public:
+        using clock = std::chrono::high_resolution_clock;
+        using duration = clock::duration;
+        using time_point = clock::time_point;
+        using mutex = std::mutex;
+        using condition_variable = rpp::condition_variable;
+
+    private:
+        mutable mutex Mutex;
+        mutable condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
         std::atomic_bool cleared = false;
 
     public:
-
-        using clock = std::chrono::high_resolution_clock;
-        using duration = clock::duration;
-        using time_point = clock::time_point;
-
         concurrent_queue() = default;
         ~concurrent_queue() noexcept
         {
@@ -84,7 +87,7 @@ namespace rpp
         /**
          * @brief Returns the internal mutex for this queue
          */
-        [[nodiscard]] std::mutex& sync() const noexcept
+        [[nodiscard]] mutex& sync() const noexcept
         {
             return Mutex;
         }
@@ -161,7 +164,7 @@ namespace rpp
         template<class ChangeWaitFlags>
         void notify(const ChangeWaitFlags& changeWaitFlags) noexcept(noexcept(changeWaitFlags()))
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             changeWaitFlags();
             notify_all_unlocked();
         }
@@ -171,7 +174,7 @@ namespace rpp
          */
         void clear() noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             clear_unlocked(); // destroy all elements
             cleared = true; // set the cleared flag
             notify_all_unlocked(); // notify all waiters that the queue was emptied
@@ -179,7 +182,7 @@ namespace rpp
 
         void reserve(int newCapacity) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (newCapacity > capacity())
                 grow_to(newCapacity);
         }
@@ -189,7 +192,7 @@ namespace rpp
          */
         [[nodiscard]] std::vector<T> atomic_copy() const noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             return std::vector<T>{Head, Tail};
         }
 
@@ -226,7 +229,7 @@ namespace rpp
          */
         void push(T&& item) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             push_unlocked(std::move(item));
             notify_one_unlocked();
         }
@@ -236,7 +239,7 @@ namespace rpp
          */
         void push(const T& item) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             push_unlocked(item);
             notify_one_unlocked();
         }
@@ -246,7 +249,7 @@ namespace rpp
          */
         void push_no_notify(T&& item) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             push_unlocked(std::move(item));
         }
 
@@ -255,7 +258,7 @@ namespace rpp
          */
         void push_no_notify(const T& item) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             push_unlocked(item);
         }
 
@@ -266,7 +269,7 @@ namespace rpp
         [[nodiscard]] T pop()
         {
             T item;
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (empty())
                 throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
             pop_unlocked(item);
@@ -374,7 +377,7 @@ namespace rpp
         /** @see pop_atomic_start() */
         void pop_atomic_end() noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (!empty())
                 pop_unlocked();
         }
@@ -404,7 +407,7 @@ namespace rpp
          */
         [[nodiscard]] bool wait_available() const noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             return wait_notify(lock);
         }
 
@@ -415,7 +418,7 @@ namespace rpp
          */
         [[nodiscard]] bool wait_available(duration timeout) const noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             return wait_notify_for(lock, timeout);
         }
 
@@ -428,7 +431,7 @@ namespace rpp
          */
         [[nodiscard]] std::optional<T> wait_pop() noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (!wait_notify(lock))
                 return std::nullopt;
             T result;
@@ -444,7 +447,7 @@ namespace rpp
         [[nodiscard]]
         bool wait_pop(T& outItem) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (!wait_notify(lock))
                 return false;
             pop_unlocked(outItem);
@@ -474,7 +477,7 @@ namespace rpp
         [[nodiscard]]
         bool wait_pop(T& outItem, duration timeout) noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (!wait_notify_for(lock, timeout))
                 return false;
             pop_unlocked(outItem);
@@ -490,7 +493,7 @@ namespace rpp
         [[nodiscard]]
         bool wait_peek(T& outItem, duration timeout) const noexcept
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (!wait_notify_for(lock, timeout))
                 return false;
             outItem = *Head; // copy (may throw)
@@ -524,7 +527,7 @@ namespace rpp
             if (now > until)
                 return false;
 
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (!wait_notify_until(lock, until))
                 return false;
             pop_unlocked(outItem);
@@ -591,7 +594,7 @@ namespace rpp
         bool wait_pop_interval(T& outItem, duration timeout, duration interval,
                                const WaitUntil& cancelCondition) noexcept(noexcept(cancelCondition()))
         {
-            std::unique_lock<std::mutex> lock = spin_lock();
+            auto lock = spin_lock();
             if (empty())
             {
                 duration remaining = timeout;
@@ -628,7 +631,7 @@ namespace rpp
         }
 
     private:
-        std::unique_lock<std::mutex> spin_lock() const noexcept
+        std::unique_lock<mutex> spin_lock() const noexcept
         {
             // spin until we can lock the mutex
             if (!Mutex.try_lock())
@@ -637,7 +640,7 @@ namespace rpp
                 {
                     std::this_thread::yield(); // yielding here will improve perf massively
                     if (Mutex.try_lock())
-                        return std::unique_lock<std::mutex>{Mutex, std::adopt_lock};
+                        return std::unique_lock{Mutex, std::adopt_lock};
                 }
 
                 // suspend until we can lock the mutex
@@ -645,20 +648,20 @@ namespace rpp
                     Mutex.lock(); // may throw if deadlock
                 } catch (...) {
                     // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
-                    return std::unique_lock<std::mutex>{Mutex, std::defer_lock};
+                    return std::unique_lock{Mutex, std::defer_lock};
                 }
             }
-            return std::unique_lock<std::mutex>{Mutex, std::adopt_lock};
+            return std::unique_lock{Mutex, std::adopt_lock};
         }
         // waits until any wakeup signal and returns true if there is an item
-        bool wait_notify(std::unique_lock<std::mutex>& lock) const noexcept
+        bool wait_notify(std::unique_lock<mutex>& lock) const noexcept
         {
             if (!empty()) return true; // wait is not needed
             (void)Waiter.wait(lock); // noexcept
             return !empty();
         }
         // wait_notify with a timeout, returns true if there is an item
-        bool wait_notify_for(std::unique_lock<std::mutex>& lock, const duration& timeout) const noexcept
+        bool wait_notify_for(std::unique_lock<mutex>& lock, const duration& timeout) const noexcept
         {
             if (!empty()) return true; // wait is not needed
             auto now = clock::now();
@@ -676,7 +679,7 @@ namespace rpp
             } while (now < end); // handle spurious wakeups
             return false;
         }
-        bool wait_notify_until(std::unique_lock<std::mutex>& lock, const time_point& until) const noexcept
+        bool wait_notify_until(std::unique_lock<mutex>& lock, const time_point& until) const noexcept
         {
             if (!empty()) return true; // wait is not needed
             time_point now;

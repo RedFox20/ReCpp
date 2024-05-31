@@ -34,17 +34,17 @@ TestImpl(test_threadpool)
 
     static int parallelism_count(int numIterations)
     {
-        std::mutex m;
+        rpp::mutex m;
         std::unordered_set<std::thread::id> ids;
         parallel_for(0, numIterations, 0, [&](int start, int end)
         {
             (void)start; (void)end;
             ::sleep_for(1ms);
-            { std::lock_guard<std::mutex> lock{m};
+            { std::lock_guard lock{m};
                 ids.insert(::get_id());
             }
         });
-        std::lock_guard<std::mutex> lock{m};
+        std::lock_guard lock{m};
         return (int)ids.size();
     }
 

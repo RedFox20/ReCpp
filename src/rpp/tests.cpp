@@ -1,6 +1,6 @@
 ﻿#include "tests.h"
 #include <memory>
-#include <mutex>
+#include <rpp/mutex.h>
 #include <unordered_set>
 #include <chrono> // high_resolution_clock
 #include <cstdarg>
@@ -174,7 +174,8 @@ namespace rpp
         int tests_failed = 0;
         int asserts_failed = 0;
         std::vector<test_failure*> failures;
-        std::mutex mutex;
+        std::chrono::nanoseconds elapsed_time{};
+        rpp::mutex mutex;
 
         ~test_results()
         {
@@ -192,7 +193,7 @@ namespace rpp
     struct test::test_func
     {
         strview name;
-        std::mutex mutex{};
+        rpp::mutex mutex{};
         test_func_type func { nullptr };
         size_t expectedExType = 0;
         std::chrono::nanoseconds elapsed_time{};
@@ -212,7 +213,7 @@ namespace rpp
         }
         void append_message(int type, const char* msg, int len)
         {
-            std::lock_guard<std::mutex> lock {mutex};
+            std::lock_guard lock {mutex};
             message m;
             m.start_index = message_buf.size(); // we start at current stringbuf pos
             m.len = (uint16_t)len;
@@ -263,11 +264,9 @@ namespace rpp
             "\x1b[33m", // yellow
             "\x1b[31m", // red
         };
-        static std::unique_ptr<std::mutex> consoleSync = std::make_unique<std::mutex>();
+        static rpp::mutex consoleSync;
         {
-            std::unique_lock<std::mutex> guard;
-            if (consoleSync) // lock if mutex not destroyed
-                guard = std::unique_lock<std::mutex>{ *consoleSync, std::try_to_lock };
+            std::lock_guard lock { consoleSync };
             fwrite(colors[color], strlen(colors[color]), 1, cout);
             fwrite(str, size_t(len), 1, cout);
             fwrite(colors[Default], strlen(colors[Default]), 1, cout);
@@ -299,9 +298,9 @@ namespace rpp
                 "\x1b[33m", // yellow
                 "\x1b[31m", // red
             };
-            static std::mutex consoleSync;
+            static rpp::mutex consoleSync;
             {
-                std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
+                std::unique_lock guard{ consoleSync, std::defer_lock };
                 if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
 
                 fwrite(colors[color], strlen(colors[color]), 1, cout);
@@ -367,7 +366,7 @@ namespace rpp
         fail->file = rpp::strview{file};
         fail->line = line;
         {
-            std::lock_guard<std::mutex> lock {impl->current_results->mutex};
+            std::lock_guard lock {impl->current_results->mutex};
             impl->current_results->asserts_failed++;
             impl->current_results->failures.push_back(fail);
         }
@@ -686,6 +685,7 @@ namespace rpp
         auto end = start + time::nanoseconds(microseconds * 1000ull);
         while (time::high_resolution_clock::now() < end)
         {
+            std::this_thread::yield();
         }
     }
 
@@ -866,6 +866,7 @@ namespace rpp
 
     void run_all_marked_tests(test_results& results)
     {
+        auto t1 = std::chrono::high_resolution_clock::now();
         for (test_info& t : state().global_tests)
         {
             if (t.test_enabled)
@@ -878,6 +879,9 @@ namespace rpp
                 results.tests_run++;
             }
         }
+
+        auto t2 = std::chrono::high_resolution_clock::now();
+        results.elapsed_time = t2 - t1;
     }
 
     static int print_final_summary(const test_results& results)
@@ -887,10 +891,10 @@ namespace rpp
         if (failed > 0)
         {
             if (numTests == 1)
-                consolef(Red, "\nWARNING: Test failed with %d assertions!\n", failed);
+                consolef(Red, "\nWARNING: Test failed with %d assertions! %s\n", failed, get_time_str(results.elapsed_time));
             else
-                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions!\n",
-                               results.tests_failed, numTests, failed);
+                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions! %s\n",
+                               results.tests_failed, numTests, failed, get_time_str(results.elapsed_time));
             for (const test_failure* f : results.failures)
             {
                 if (f->line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f->file.data(), f->line, f->testname.data(), f->testcase.data(), f->message.data());
@@ -904,8 +908,8 @@ namespace rpp
             consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n\n", (int)state().global_tests.size());
             return 1;
         }
-        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed!\n\n");
-        else               consolef(Green, "\nSUCCESS: All %d tests passed!\n\n", numTests);
+        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed! %s\n\n", get_time_str(results.elapsed_time));
+        else               consolef(Green, "\nSUCCESS: All %d tests passed! %s\n\n", numTests, get_time_str(results.elapsed_time));
         return 0;
     }
 

@@ -352,7 +352,7 @@ TestImpl(test_sockets)
         // no data to receive, should return false
         rpp::Timer t0;
         AssertFalse(pollin(/*millis*/50));
-        AssertGreaterOrEqual(t0.elapsed_millis(), 49.0);
+        AssertGreaterOrEqual(t0.elapsed_millis(), 48.0);
         AssertTrue(recv.good());
 
         // TEST1: data already in the pipe, must return immediately

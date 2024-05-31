@@ -3,6 +3,7 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include <Windows.h> // WINAPI
 #  include <Psapi.h> // PROCESS_MEMORY_COUNTERS, GetProcessMemoryInfo
+#  include <cstdio> // fprintf
 #elif __APPLE__
 #  include <mach/mach.h>
 #else // linux and Android
@@ -89,11 +90,13 @@ namespace rpp
         cpu_usage_info r;
     #if _MSC_VER
         FILETIME creation_time, exit_time, kernel_time, user_time;
-        GetProcessTimes(GetCurrentProcess(), &creation_time, &exit_time, &kernel_time, &user_time);
-        // convert 100ns intervals to microseconds
-        r.kernel_time_us = to_uint64(kernel_time) / 10;
-        r.user_time_us   = to_uint64(user_time) / 10;
-        r.cpu_time_us    = r.kernel_time_us + r.user_time_us;
+        if (GetProcessTimes(GetCurrentProcess(), &creation_time, &exit_time, &kernel_time, &user_time))
+        {
+            // convert 100ns intervals to microseconds
+            r.kernel_time_us = to_uint64(kernel_time) / 10;
+            r.user_time_us   = to_uint64(user_time) / 10;
+            r.cpu_time_us    = r.kernel_time_us + r.user_time_us;
+        }
     #else // linux
         struct rusage usg;
         getrusage(RUSAGE_SELF, &usg);

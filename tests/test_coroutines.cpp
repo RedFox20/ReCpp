@@ -133,12 +133,12 @@ TestImpl(test_coroutines)
 
     cfuture<std::vector<int>> destructor_sequence_coro()
     {
-        std::mutex m;
+        rpp::mutex m;
         std::vector<int> destructor_ids;
 
         struct destructor_recorder
         {
-            std::mutex& m;
+            rpp::mutex& m;
             std::vector<int>& results;
             const int id;
             ~destructor_recorder() noexcept {
@@ -147,29 +147,35 @@ TestImpl(test_coroutines)
             }
         };
 
+        rpp::Timer t1;
         co_await [&m, &destructor_ids]() -> cfuture<void>
         {
             destructor_recorder dr {m, destructor_ids, 1};
             co_await std::chrono::milliseconds{10};
         };
+        printf("t1 elapsed: %f\n", t1.elapsed_millis());
         AssertThat(destructor_ids.size(), 1u);
         AssertThat(destructor_ids[0], 1);
 
+        rpp::Timer t2;
         std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string>
         {
             destructor_recorder dr {m, destructor_ids, 2};
             co_await std::chrono::milliseconds{5};
             co_return "test";
         };
+        printf("t2 elapsed: %f\n", t2.elapsed_millis());
         AssertThat(fstr, "test"s);
         AssertThat(destructor_ids.size(), 2u);
         AssertThat(destructor_ids[1], 2);
 
+        rpp::Timer t3;
         co_await [&m, &destructor_ids]() -> cfuture<void>
         {
             destructor_recorder dr {m, destructor_ids, 3};
             co_return;
         };
+        printf("t3 elapsed: %f\n", t3.elapsed_millis());
         AssertThat(destructor_ids.size(), 3u);
         AssertThat(destructor_ids[2], 3);
 

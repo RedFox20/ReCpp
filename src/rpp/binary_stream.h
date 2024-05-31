@@ -6,7 +6,7 @@
 #include "strview.h"
 #include "minmax.h"
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
-#  include <mutex>
+#  include "mutex.h"
 #  include "sockets.h"
 #endif
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
@@ -580,7 +580,7 @@ namespace rpp
     /**
      * Almost identical to lock_guard, but allows move semantics
      */
-    template<class Mutex = std::mutex> struct scoped_guard
+    template<class Mutex = rpp::mutex> struct scoped_guard
     {
         Mutex* Mut;
         explicit scoped_guard(Mutex& m) : Mut(&m) { m.lock(); }
@@ -606,15 +606,15 @@ namespace rpp
     class RPPAPI shared_socket_writer : public socket_writer
     {
     protected:
-        std::mutex Mutex;
+        rpp::mutex Mutex;
     public:
         using socket_writer::socket_writer;
 
         // Acquire a scoped lock_guard on this socket writer's mutex
         // Ex:     auto&& lock = writer.guard();
         //
-        scoped_guard<std::mutex> guard() noexcept {
-            return scoped_guard<std::mutex>{ Mutex };
+        scoped_guard<rpp::mutex> guard() noexcept {
+            return scoped_guard<rpp::mutex>{ Mutex };
         }
     };
 
@@ -629,15 +629,15 @@ namespace rpp
     class RPPAPI shared_socket_reader : public socket_reader
     {
     protected:
-        std::mutex Mutex;
+        rpp::mutex Mutex;
     public:
         using socket_reader::socket_reader;
 
         // Acquire a scoped lock_guard on this socket reader's mutex
         // Ex:     auto&& lock = reader.guard();
         //
-        scoped_guard<std::mutex> guard() noexcept {
-            return scoped_guard<std::mutex>{ Mutex };
+        scoped_guard<rpp::mutex> guard() noexcept {
+            return scoped_guard<rpp::mutex>{ Mutex };
         }
     };
 

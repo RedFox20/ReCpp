@@ -1,11 +1,11 @@
 #include "debugging.h"
 #include "timer.h" // rpp::TimePoint
 #include "stack_trace.h"
+#include "mutex.h"
 
 #include <cstdio>
 #include <cstring>
 #include <cstdlib> // alloca
-#include <mutex>
 
 #if __ANDROID__
 # include <android/log.h>
@@ -177,11 +177,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         FILE*  fout   = severity == LogSeverityError ? stderr : stdout;
 
         AllocaPrintlineBuf(err, len);
-        static std::unique_ptr<std::mutex> consoleSync = std::make_unique<std::mutex>();
+        static rpp::mutex consoleSync;
         {
-            std::unique_lock<std::mutex> guard;
-            if (consoleSync) // lock if mutex not destroyed
-                guard = std::unique_lock<std::mutex>{ *consoleSync, std::try_to_lock };
+            std::lock_guard lock { consoleSync };
             SetConsoleTextAttribute(winout, colormap[severity]);
             fwrite(buf, size_t(len + 1), 1, fout); // fwrite to sync with unix-like shells
             SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
@@ -200,10 +198,10 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                         "\x1b[93m", // Warning: bright yellow
                         "\x1b[91m", // Error  : bright red
                 };
-                static std::mutex consoleSync;
-                std::unique_lock<std::mutex> guard{ consoleSync, std::defer_lock };
+                static rpp::mutex consoleSync;
+                std::unique_lock guard{ consoleSync, std::defer_lock };
                 if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
-            
+
                 fwrite(colors[severity], strlen(colors[severity]), 1, fout);
                 fwrite(buf, size_t(len) + 1, 1, fout);
                 fwrite(clearColor, sizeof(clearColor)-1, 1, fout);

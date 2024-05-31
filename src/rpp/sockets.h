@@ -11,7 +11,7 @@
 #include "load_balancer.h" // rpp::load_balancer
 #include <vector>   // std::vector
 #include <optional> // std::optional
-#include <mutex>    // std::recursive_mutex
+#include "mutex.h"
 
 namespace rpp
 {
@@ -495,6 +495,7 @@ namespace rpp
 
     protected:
 
+        rpp::recursive_mutex Mtx; // recursive mutex for thread safe read/write operations
         int Sock;            // Socket handle
         ipaddress Addr;      // remote addr
         mutable int LastErr; // last error code
@@ -504,7 +505,6 @@ namespace rpp
         bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
-        std::recursive_mutex m;
 
     public:
 
@@ -541,7 +541,7 @@ namespace rpp
          * @returns The internal recursive mutex.
          * Use this mutex if you need to lock the socket for multiple operations.
          */
-        std::recursive_mutex& mutex() noexcept { return m; }
+        rpp::recursive_mutex& mutex() noexcept { return Mtx; }
 
         /** Closes the connection (if any) and returns this socket to a default state */
         void close() noexcept;

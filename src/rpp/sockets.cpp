@@ -722,7 +722,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////
 
     socket::socket() noexcept
-        : Sock{-1}, Addr{}, LastErr{0}
+        : Mtx{}, Sock{-1}, Addr{}, LastErr{0}
         , Shared{DEFAULT_SHARED}
         , Blocking{DEFAULT_BLOCKING}
         , AutoClose{DEFAULT_AUTOCLOSE}
@@ -745,7 +745,7 @@ namespace rpp
     }
     socket socket::from_err_code(int last_err, const ipaddress& addr) noexcept
     {
-        socket s;
+        socket s{};
         s.Addr = addr;
         s.LastErr = last_err;
         return s;
@@ -756,6 +756,8 @@ namespace rpp
     }
     socket& socket::operator=(socket&& s) noexcept
     {
+        // lock both mutexes, but do not swap them
+        std::scoped_lock lock { Mtx, s.Mtx };
         std::swap(Sock, s.Sock);
         std::swap(Addr, s.Addr);
         std::swap(LastErr, s.LastErr);
@@ -765,7 +767,6 @@ namespace rpp
         std::swap(Category, s.Category);
         std::swap(Type, s.Type);
         std::swap(Connected, s.Connected);
-        // s.Connected = Connected.exchange(s.Connected);
         return *this;
     }
     socket::~socket() noexcept
@@ -775,7 +776,7 @@ namespace rpp
 
     void socket::close() noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (Sock != -1)
         {
             if (!Shared)
@@ -793,7 +794,7 @@ namespace rpp
 
     int socket::release_noclose() noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         int sock = Sock;
         Sock = -1;
         return sock;
@@ -803,7 +804,7 @@ namespace rpp
     {
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         return handle_txres(::send(Sock, (const char*)buffer, numBytes, 0));
     }
     int socket::send(const char* str)    noexcept { return send(str, (int)strlen(str)); }
@@ -819,7 +820,7 @@ namespace rpp
 
         saddr a = to_saddr(to);
         socklen_t len = sizeof(a);
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         return handle_txres(::sendto(Sock, (const char*)buffer, numBytes, 0, &a.sa, len));
     }
     int socket::sendto(const ipaddress& to, const char* str)    noexcept { return sendto(to, str, (int)strlen(str)); }
@@ -828,7 +829,7 @@ namespace rpp
 
     void socket::flush() noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         flush_send_buf();
         flush_recv_buf();
     }
@@ -837,7 +838,7 @@ namespace rpp
     {
         if (type() == ST_Stream)
         {
-            std::lock_guard<std::recursive_mutex> lock { m };
+            std::lock_guard lock { Mtx };
             // flush write buffer (hack only available for TCP sockets)
             bool nagleEnabled = !is_nodelay();
             if (nagleEnabled)
@@ -848,7 +849,7 @@ namespace rpp
 
     void socket::flush_recv_buf() noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (type() == ST_Stream)
         {
             skip(available());
@@ -875,7 +876,7 @@ namespace rpp
         if (bytesToSkip <= 0)
             return 0;
 
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         int remaining = bytesToSkip;
         int skipped = 0;
         char dump[4096];
@@ -978,7 +979,7 @@ namespace rpp
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
 
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         // if the socket is blocking, then MSG_PEEK can cause a blocking operation
         // which goes against rpp::socket::peek() API specification.
         // So we use poll() to detect whether the socket is readable first
@@ -1005,7 +1006,7 @@ namespace rpp
         if (maxBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
 
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         saddr a;
         socklen_t len = sizeof(a);
         int res = handle_txres(::recvfrom(Sock, (char*)buffer, maxBytes, 0, &a.sa, &len));
@@ -1276,7 +1277,7 @@ namespace rpp
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         bool ok = setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) == 0;
         LastErr = ok ? 0 : os_getsockerr();
         return LastErr;
@@ -1323,7 +1324,7 @@ namespace rpp
 
     int socket::set_ioctl(int iocmd, int value) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         LastErr = 0;
     #if _WIN32
         u_long val = value;
@@ -1354,7 +1355,7 @@ namespace rpp
 
     bool socket::set_blocking(bool socketsBlock) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
     #if _WIN32
         u_long val = socketsBlock?0:1; // FIONBIO: !=0 nonblock, 0 block
         if (ioctlsocket(Sock, FIONBIO, &val) == 0)
@@ -1423,7 +1424,7 @@ namespace rpp
         #else
             int size_cmd = static_cast<int>(size);
         #endif
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (set_opt(SOL_SOCKET, command, size_cmd) != 0)
             return false;
         return get_opt(SOL_SOCKET, which) == static_cast<int>(size);
@@ -1451,7 +1452,7 @@ namespace rpp
 
     bool socket::set_linger(bool active, int seconds) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         struct linger l;
         l.l_onoff = active ? 1 : 0;
         l.l_linger = seconds;
@@ -1559,7 +1560,7 @@ namespace rpp
                 char c;
                 // handle_txres() should take care of the status
                 // and set the Connected flag properly
-                std::lock_guard<std::recursive_mutex> lock { m };
+                std::lock_guard lock { Mtx };
                 handle_txres(::recv(Sock, &c, 1, MSG_PEEK));
             }
             // if poll doesn't trigger, we rely on the Connected flag
@@ -1574,7 +1575,7 @@ namespace rpp
 
     bool socket::create(address_family af, ip_protocol ipp, socket_option opt) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         inwin32(InitWinSock());
         close();
 
@@ -1617,7 +1618,7 @@ namespace rpp
 
     bool socket::bind(const ipaddress& addr) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         auto sa = to_saddr(addr);
         if (::bind(Sock, sa, sa.size()) == 0)
         {
@@ -1630,7 +1631,7 @@ namespace rpp
 
     bool socket::listen() noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         Assert(type() != socket_type::ST_Datagram, "Cannot use socket::listen() on UDP sockets");
 
         if (::listen(Sock, SOMAXCONN) == 0) // start listening for new clients
@@ -1707,7 +1708,8 @@ namespace rpp
         ready.clear();
         const int n = (int)in.size();
         struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
-
+        
+        const bool read = (pollFlags & PF_Read);
         const short events = short(
             ((pollFlags & PF_Read) ? POLLIN : 0) |
             ((pollFlags & PF_Write) ? POLLOUT : 0)
@@ -1725,12 +1727,17 @@ namespace rpp
     #else
         int r = ::poll(pfd, n, timeoutMillis);
     #endif
-        if (r <= 0)
+        if (r < 0)
             return false;
 
+        // BUGFIX: we don't trust the poll() return value, we double-check all of the sockets
         for (int i = 0; i < n; ++i)
         {
             if (in[i]->on_poll_result(pfd[i].revents, pollFlags))
+                ready.push_back(i);
+            // BUGFIX: it is possible for poll() to NOT report READ events correctly
+            //         this will always check available() status to ensure we don't miss data
+            else if ((pollFlags & PF_Read) && in[i]->available() > 0)
                 ready.push_back(i);
         }
 
@@ -1775,7 +1782,7 @@ namespace rpp
 
     bool socket::listen(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (!create(localAddr.Address.Family, ipp, opt) || !bind(localAddr))
             return false;
 
@@ -1809,7 +1816,7 @@ namespace rpp
         if (!this->poll(timeoutMillis, PF_Read)) // poll will handle any errors
             return socket::from_err_code(LastErr);
 
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         saddr saddr;
         socklen_t len = sizeof(saddr);
         int handle = (int)::accept(Sock, &saddr.sa, &len);
@@ -1831,7 +1838,7 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (!good())
         {
             // need to use SO_Blocking for infinite wait
@@ -1855,19 +1862,17 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (!good())
         {
             // needs to be a non-blocking socket to do connect() + poll()
             if (!create(remoteAddr.Address.Family, IPP_TCP, socket_option(opt & SO_NonBlock)))
                 return false;
         }
-        else
-        {
-            // needs to be a non-blocking socket to do connect() + poll()
-            if (is_blocking())
-                set_blocking(false);
-        }
+
+        // needs to be a non-blocking socket to do connect() + poll()
+        if (is_blocking())
+            set_blocking(false);
 
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
@@ -1943,7 +1948,7 @@ namespace rpp
 
     bool socket::bind_to_interface([[maybe_unused]] uint64_t network_handle) noexcept
     {
-        std::lock_guard<std::recursive_mutex> lock { m };
+        std::lock_guard lock { Mtx };
         if (!good())
             return false;
 

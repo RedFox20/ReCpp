@@ -119,7 +119,7 @@ namespace rpp
         struct state
         {
             mutable std::mutex m;
-            rpp::condition_variable cv;
+            std::condition_variable cv;
             std::string trace;
             std::exception_ptr error;
             std::atomic_bool finished = false;
@@ -174,8 +174,12 @@ namespace rpp
      */
     class RPPAPI pool_worker
     {
-        std::mutex start_mutex; // mutex to synchronize start/stop of the task
-        std::condition_variable new_task_cv;
+    public:
+        using mutex = std::mutex;
+        using condition_variable = std::condition_variable;
+    private:
+        mutex start_mutex; // mutex to synchronize start/stop of the task
+        condition_variable new_task_cv;
         std::thread th;
         char name[32];
 
@@ -222,7 +226,7 @@ namespace rpp
     private:
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
-        bool wait_for_new_job(std::unique_lock<std::mutex>& lock) noexcept;
+        bool wait_for_new_job(std::unique_lock<mutex>& lock) noexcept;
         wait_result join_or_detach(wait_result result = wait_result::finished) noexcept;
     };
 
@@ -247,7 +251,7 @@ namespace rpp
             pool_task_handle task;
         };
 
-        std::mutex TasksMutex;
+        pool_worker::mutex TasksMutex;
         std::vector<worker_ptr> Workers;
         float TaskMaxIdleTime = 15; // new task timeout in seconds
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for
