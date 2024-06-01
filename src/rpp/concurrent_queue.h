@@ -5,13 +5,13 @@
  */
 #pragma once
 #include "config.h"
-#include "condition_variable.h"
-#include "mutex.h"
+#include "semaphore.h"
 #include <vector>
 #include <thread> // std::this_thread::yield()
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional
 #include <atomic> // std::atomic_bool
+#include <cstring> // memmove
 
 namespace rpp
 {
@@ -29,19 +29,19 @@ namespace rpp
         // of [ItemsStart, ItemsEnd) and the items are always contiguous in memory.
         T* Head = nullptr;
         T* Tail = nullptr;
-        T* ItemsStart = nullptr;
+        T* ItemsStart = nullptr; // storage for the items
         T* ItemsEnd = nullptr;
 
     public:
         using clock = std::chrono::high_resolution_clock;
         using duration = clock::duration;
         using time_point = clock::time_point;
-        using mutex = rpp::mutex;
-        using condition_variable = rpp::condition_variable;
 
     private:
-        mutable mutex Mutex;
-        mutable condition_variable Waiter;
+        using mutex_t = rpp::mutex;
+        using lock_t = rpp::semaphore::lock_t;
+        mutable mutex_t Mutex;
+        mutable rpp::condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
         std::atomic_bool Cleared = false;
 
@@ -61,7 +61,7 @@ namespace rpp
         concurrent_queue(concurrent_queue&& q) noexcept
         {
             // safely swap the states from q to default empty state
-            std::lock_guard lock { q.Mutex };
+            std::lock_guard lock { q.mutex() };
             std::swap(Head, q.Head);
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
@@ -73,7 +73,7 @@ namespace rpp
         concurrent_queue& operator=(concurrent_queue&& q) noexcept
         {
             // safely swap the states of both queues
-            std::scoped_lock dual_lock { Mutex, q.Mutex };
+            std::scoped_lock dual_lock { mutex(), q.mutex() };
             std::swap(Head, q.Head);
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
@@ -87,13 +87,18 @@ namespace rpp
         /**
          * @brief Returns the internal mutex for this queue
          */
-        [[nodiscard]] mutex& sync() const noexcept
+        [[nodiscard]] FINLINE mutex_t& mutex() const noexcept
         {
             return Mutex;
         }
 
+        [[nodiscard]] FINLINE lock_t spin_lock() const noexcept
+        {
+            return rpp::semaphore::spin_lock(Mutex);
+        }
+
         /** @returns TRUE if this queue is empty */
-        [[nodiscard]] bool empty() const noexcept
+        [[nodiscard]] FINLINE bool empty() const noexcept
         {
             return Head == Tail;
         }
@@ -101,7 +106,7 @@ namespace rpp
         /**
          * @returns Capacity of the queue (unsafe)
          */
-        [[nodiscard]] size_t capacity() const noexcept
+        [[nodiscard]] FINLINE size_t capacity() const noexcept
         {
             return (ItemsEnd - ItemsStart);
         }
@@ -109,7 +114,7 @@ namespace rpp
         /**
          * @returns Approximate size of the queue (unsafe)
          */
-        [[nodiscard]] size_t size() const noexcept
+        [[nodiscard]] FINLINE size_t size() const noexcept
         {
             return (Tail - Head);
         }
@@ -120,10 +125,10 @@ namespace rpp
          */
         [[nodiscard]] size_t safe_size() const noexcept
         {
-            if (Mutex.try_lock()) // @note try_lock() for noexcept guarantee
+            if (mutex().try_lock()) // @note try_lock() for noexcept guarantee
             {
                 size_t sz = size();
-                Mutex.unlock();
+                mutex().unlock();
                 return sz;
             }
             return size();
@@ -134,7 +139,7 @@ namespace rpp
          */
         void notify() noexcept
         {
-            std::lock_guard lock { Mutex };
+            auto lock = spin_lock();
             notify_all_unlocked();
         }
 
@@ -143,7 +148,7 @@ namespace rpp
          */
         void notify_one() noexcept
         {
-            std::lock_guard lock { Mutex };
+            auto lock = spin_lock();
             notify_one_unlocked();
         }
 
@@ -196,6 +201,56 @@ namespace rpp
             return std::vector<T>{Head, Tail};
         }
 
+        /** @brief A no-op proxy for iterating an already locked queue */
+        struct iterator_proxy
+        {
+            concurrent_queue* Queue;
+            [[nodiscard]] FINLINE T* begin() noexcept { return Queue->Head; }
+            [[nodiscard]] FINLINE T* end()   noexcept { return Queue->Tail; }
+            [[nodiscard]] FINLINE const T* begin() const noexcept { return Queue->Head; }
+            [[nodiscard]] FINLINE const T* end()   const noexcept { return Queue->Tail; }
+        };
+
+        /** @brief A safe iterator for the queue - which holds a lock until iteration is complete */
+        struct iterator_lock : public iterator_proxy
+        {
+            lock_t Lock;
+            [[nodiscard]] FINLINE lock_t& lock() noexcept { return Lock; }
+            [[nodiscard]] FINLINE T* erase(T* it) noexcept { return this->Queue->erase(Lock, it); }
+        };
+
+        /** @brief creates a safe iterator for the queue */
+        FINLINE       iterator_lock iterator()       noexcept { return { this, spin_lock() }; }
+        FINLINE const iterator_lock iterator() const noexcept { return { this, spin_lock() }; }
+
+        /** @brief Creates a safe iterator for the queue, using a previously acquired lock */
+        FINLINE       iterator_proxy iterator(lock_t& lock)       noexcept { if (!lock.owns_lock()) { lock.lock(); } return { this }; }
+        FINLINE const iterator_proxy iterator(lock_t& lock) const noexcept { if (!lock.owns_lock()) { lock.lock(); } return { this }; }
+
+        /**
+         * @brief Erases an item from the queue and shifts all items after it
+         * @param lock Mandatory queue.mutex() lock to ensure iteration is thread-safe
+         * @param it The item to erase
+         * @returns Iterator position of the next item after the erased item
+         *          (behavior identical to std::vector::erase())
+         */
+        T* erase(lock_t& lock, T* it) noexcept
+        {
+            // if the lock is not held, or the iterator is out of bounds, then return the end
+            if (!lock.owns_lock() || it < Head || it >= Tail)
+                return Tail;
+
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                it->~T();
+
+            // shift all items after the erased item
+            for (T* i = it + 1; i < Tail; ++i)
+                *(i - 1) = std::move(*i);
+
+            --Tail;
+            return it;
+        }
+
         /**
          * @brief Attempts to pop all pending items from the queue without waiting
          */
@@ -204,16 +259,16 @@ namespace rpp
             if (empty())
                 return false;
 
-            if (Mutex.try_lock())
+            if (mutex().try_lock())
             {
                 if (T* head = Head, *tail = Tail; head != tail)
                 {
                     outItems.assign(head, tail);
                     clear_unlocked();
-                    Mutex.unlock();
+                    mutex().unlock();
                     return true;
                 }
-                Mutex.unlock();
+                mutex().unlock();
                 return false;
             }
             else
@@ -288,15 +343,15 @@ namespace rpp
             if (empty())
                 return false;
 
-            if (Mutex.try_lock())
+            if (mutex().try_lock())
             {
                 if (empty())
                 {
-                    Mutex.unlock();
+                    mutex().unlock();
                     return false;
                 }
                 pop_unlocked(outItem);
-                Mutex.unlock();
+                mutex().unlock();
                 return true;
             }
             else
@@ -316,15 +371,15 @@ namespace rpp
             if (empty())
                 return false;
 
-            if (Mutex.try_lock())
+            if (mutex().try_lock())
             {
                 if (empty())
                 {
-                    Mutex.unlock();
+                    mutex().unlock();
                     return false;
                 }
                 outItem = *Head;
-                Mutex.unlock();
+                mutex().unlock();
                 return true;
             }
             else
@@ -355,15 +410,15 @@ namespace rpp
             if (empty())
                 return false;
 
-            if (Mutex.try_lock())
+            if (mutex().try_lock())
             {
                 if (empty())
                 {
-                    Mutex.unlock();
+                    mutex().unlock();
                     return false;
                 }
                 outItem = std::move(*Head);
-                Mutex.unlock();
+                mutex().unlock();
                 return true;
             }
             else
@@ -631,37 +686,15 @@ namespace rpp
         }
 
     private:
-        std::unique_lock<mutex> spin_lock() const noexcept
-        {
-            // spin until we can lock the mutex
-            if (!Mutex.try_lock())
-            {
-                for (int i = 0; i < 10; ++i)
-                {
-                    std::this_thread::yield(); // yielding here will improve perf massively
-                    if (Mutex.try_lock())
-                        return std::unique_lock{Mutex, std::adopt_lock};
-                }
-
-                // suspend until we can lock the mutex
-                try {
-                    Mutex.lock(); // may throw if deadlock
-                } catch (...) {
-                    // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
-                    return std::unique_lock{Mutex, std::defer_lock};
-                }
-            }
-            return std::unique_lock{Mutex, std::adopt_lock};
-        }
         // waits until any wakeup signal and returns true if there is an item
-        bool wait_notify(std::unique_lock<mutex>& lock) const noexcept
+        bool wait_notify(lock_t& lock) const noexcept
         {
             if (!empty()) return true; // wait is not needed
             (void)Waiter.wait(lock); // noexcept
             return !empty();
         }
         // wait_notify with a timeout, returns true if there is an item
-        bool wait_notify_for(std::unique_lock<mutex>& lock, const duration& timeout) const noexcept
+        bool wait_notify_for(lock_t& lock, const duration& timeout) const noexcept
         {
             if (!empty()) return true; // wait is not needed
             auto now = clock::now();
@@ -679,7 +712,7 @@ namespace rpp
             } while (now < end); // handle spurious wakeups
             return false;
         }
-        bool wait_notify_until(std::unique_lock<mutex>& lock, const time_point& until) const noexcept
+        bool wait_notify_until(lock_t& lock, const time_point& until) const noexcept
         {
             if (!empty()) return true; // wait is not needed
             time_point now;
@@ -787,7 +820,7 @@ namespace rpp
             if constexpr (std::is_trivially_move_assignable_v<T>)
             {
                 size_t count = (oldTail - oldHead);
-                memmove(newStart, oldHead, count * sizeof(T));
+                ::memmove(newStart, oldHead, count * sizeof(T));
                 return newStart + count;
             }
             else

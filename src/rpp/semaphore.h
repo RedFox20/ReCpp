@@ -15,14 +15,16 @@ namespace rpp
     class semaphore
     {
     public:
-        mutable rpp::mutex m;
+        using mutex_t = rpp::mutex;
+        using lock_t = std::unique_lock<mutex_t>;
+
+    private:
+        mutable mutex_t m;
         rpp::condition_variable cv;
         std::atomic_int value{0}; // atomic int to ensure cache coherency
         const int max_value = 0x7FFFFFFF;
-        using lock_t = std::unique_lock<rpp::mutex>;
 
     public:
-
         enum wait_result
         {
             notified, // semaphore was notified
@@ -63,13 +65,13 @@ namespace rpp
 
 
         /** @brief Returns the internal mutex used by notify() and wait() */
-        [[nodiscard]] FINLINE rpp::mutex& mutex() noexcept { return m; }
+        [[nodiscard]] FINLINE mutex_t& mutex() noexcept { return m; }
 
 
-        /**
-         * @brief Attempts to spin-loop and acquire the internal mutex
-         */
-        NOINLINE lock_t spin_lock() const noexcept
+        /** @brief Attempts to spin-loop and acquire the internal mutex */
+        [[nodiscard]] FINLINE lock_t spin_lock() const noexcept { return spin_lock(m); }
+
+        static NOINLINE lock_t spin_lock(mutex_t& m) noexcept
         {
             if (!m.try_lock()) // spin until we can lock the mutex
             {

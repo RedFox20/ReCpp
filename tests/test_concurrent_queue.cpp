@@ -76,6 +76,71 @@ TestImpl(test_concurrent_queue)
         AssertThat(items.at(2), "item3");
     }
 
+    TestCase(iterate_locked)
+    {
+        concurrent_queue<std::string> queue;
+        queue.push("item1");
+        queue.push("item2");
+        queue.push("item3");
+
+        std::vector<std::string> items;
+        for (const std::string& item : queue.iterator())
+            items.push_back(item);
+        AssertThat(items.size(), 3);
+        AssertThat(items.at(0), "item1");
+        AssertThat(items.at(1), "item2");
+        AssertThat(items.at(2), "item3");
+    }
+
+    TestCase(iterate_external_lock)
+    {
+        concurrent_queue<std::string> queue;
+        queue.push("item1");
+        queue.push("item2");
+        queue.push("item3");
+
+        std::vector<std::string> items;
+        {
+            std::unique_lock lock = queue.spin_lock();
+            for (const std::string& item : queue.iterator(lock))
+                items.push_back(item);
+        }
+        AssertThat(items.size(), 3);
+        AssertThat(items.at(0), "item1");
+        AssertThat(items.at(1), "item2");
+        AssertThat(items.at(2), "item3");
+    }
+
+    TestCase(can_erase_every_second_item)
+    {
+        concurrent_queue<int> queue;
+        std::vector<int> expected;
+
+        for (int i = 0; i < 1000; ++i)
+        {
+            queue.push(i);
+            if (i % 2 != 0) expected.push_back(i);
+        }
+
+        {
+            auto iterator = queue.iterator();
+            for (auto it = iterator.begin(); it != iterator.end(); )
+            {
+                if (*it % 2 == 0)
+                    it = iterator.erase(it);
+                else
+                    ++it;
+            }
+        }
+
+        std::vector<int> items;
+        for (int item : queue.iterator())
+            items.push_back(item);
+
+        AssertThat(items.size(), 500);
+        AssertEqual(items, expected);
+    }
+
     TestCase(rapid_growth)
     {
         constexpr int MAX_SIZE = 40'000;
