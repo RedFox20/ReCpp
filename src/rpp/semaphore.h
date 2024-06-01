@@ -44,7 +44,7 @@ namespace rpp
         }
 
         /** @returns Current semaphore count (thread-unsafe) */
-        int count() const noexcept { return value; }
+        FINLINE int count() const noexcept { return value; }
 
         /**
          * @brief Sets the semaphore count to newCount and notifies one waiting thread
@@ -63,13 +63,13 @@ namespace rpp
 
 
         /** @brief Returns the internal mutex used by notify() and wait() */
-        rpp::mutex& mutex() noexcept { return m; }
+        [[nodiscard]] FINLINE rpp::mutex& mutex() noexcept { return m; }
 
 
         /**
          * @brief Attempts to spin-loop and acquire the internal mutex
          */
-        lock_t spin_lock() const noexcept
+        NOINLINE lock_t spin_lock() const noexcept
         {
             if (!m.try_lock()) // spin until we can lock the mutex
             {
@@ -97,12 +97,12 @@ namespace rpp
          * 
          * This should be the default preferred way to notify a semaphore
          */
-        void notify()
+        FINLINE void notify()
         {
             lock_t lock { m };
             notify(lock);
         }
-        void notify(lock_t& lock) noexcept
+        NOINLINE void notify(lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("notify(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -114,12 +114,12 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> void notify(const Callback& callback)
+        template<class Callback> FINLINE void notify(const Callback& callback)
         {
             lock_t lock { m };
             notify<Callback>(lock, callback);
         }
-        template<class Callback> void notify(lock_t& lock, const Callback& callback) noexcept
+        template<class Callback> FINLINE void notify(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify(lock);
@@ -132,12 +132,12 @@ namespace rpp
          * This should only be used for special cases where all waiting threads need to be notified,
          * it will inherently cause contention issues.
          */
-        void notify_all()
+        FINLINE void notify_all()
         {
             lock_t lock { m };
             notify_all(lock);
         }
-        void notify_all(lock_t& lock) noexcept
+        NOINLINE void notify_all(lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("notify_all(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -149,12 +149,12 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> void notify_all(const Callback& callback)
+        template<class Callback> FINLINE void notify_all(const Callback& callback)
         {
             lock_t lock { m };
             notify_all<Callback>(lock, callback);
         }
-        template<class Callback> void notify_all(lock_t& lock, const Callback& callback) noexcept
+        template<class Callback> FINLINE void notify_all(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify_all(lock);
@@ -165,12 +165,12 @@ namespace rpp
          * @brief Only notifies one thread if count == 0 (not signaled yet)
          * @returns true if the semaphore was notified
          */
-        bool notify_once()
+        FINLINE bool notify_once()
         {
             lock_t lock { m };
             return notify_once(lock);
         }
-        bool notify_once(lock_t& lock) noexcept
+        NOINLINE bool notify_once(lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("notify_once(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -187,12 +187,12 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> void notify_once(const Callback& callback)
+        template<class Callback> FINLINE void notify_once(const Callback& callback)
         {
             lock_t lock { m };
             notify_once<Callback>(lock, callback);
         }
-        template<class Callback> void notify_once(lock_t& lock, const Callback& callback) noexcept
+        template<class Callback> FINLINE void notify_once(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify_once(lock);
@@ -219,7 +219,7 @@ namespace rpp
          * @brief Waits and loops forever, until the semaphore is signaled, then decrements the count.
          * @warning This can cause a deadlock if the semaphore is never signaled
          */
-        void wait()
+        FINLINE void wait()
         {
             lock_t lock { m };
             wait(lock);
@@ -235,12 +235,12 @@ namespace rpp
          * @brief Waits and loops forever, until the semaphore is signaled, BUT DOES NOT DECREMENT THE COUNT
          * @warning This can cause a deadlock if the semaphore is never signaled
          */
-        void wait_no_unset()
+        FINLINE void wait_no_unset()
         {
             lock_t lock { m };
             wait_no_unset(lock);
         }
-        void wait_no_unset(lock_t& lock) noexcept
+        NOINLINE void wait_no_unset(lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("wait(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -254,12 +254,12 @@ namespace rpp
          * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        wait_result wait(const std::chrono::nanoseconds& timeout)
+        FINLINE wait_result wait(const std::chrono::nanoseconds& timeout)
         {
             lock_t lock { m };
             return wait(lock, timeout);
         }
-        wait_result wait(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
+        NOINLINE wait_result wait(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
         {
             auto result = wait_no_unset(lock, timeout);
             if (result == semaphore::notified)
@@ -276,12 +276,12 @@ namespace rpp
          * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        wait_result wait_no_unset(const std::chrono::nanoseconds& timeout)
+        FINLINE wait_result wait_no_unset(const std::chrono::nanoseconds& timeout)
         {
             lock_t lock { m };
             return wait_no_unset(lock, timeout);
         }
-        wait_result wait_no_unset(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
+        NOINLINE wait_result wait_no_unset(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
         {
             if (value < 0) LogError("count=%d must not be negative", value.load());
             if (value <= 0)
@@ -304,7 +304,7 @@ namespace rpp
          * @endcode
          * @param taskIsRunning Reference to atomic flag to wait on
          */
-        void wait_barrier_while(std::atomic_bool& taskIsRunning)
+        NOINLINE void wait_barrier_while(std::atomic_bool& taskIsRunning)
         {
             lock_t lock { m };
             while (taskIsRunning)
@@ -324,7 +324,7 @@ namespace rpp
          * @endcode
          * @param hasFinished Reference to atomic flag to wait on
          */
-        void wait_barrier_until(std::atomic_bool& hasFinished)
+        NOINLINE void wait_barrier_until(std::atomic_bool& hasFinished)
         {
             lock_t lock { m };
             while (!hasFinished)
@@ -349,7 +349,7 @@ namespace rpp
         semaphore_flag() noexcept : semaphore{0, 1} {}
 
         /** @returns TRUE if the semaphore is signaled */
-        bool is_set() const noexcept { return count() > 0; }
+        [[nodiscard]] FINLINE bool is_set() const noexcept { return count() > 0; }
 
         using semaphore::mutex;
         using semaphore::spin_lock;
