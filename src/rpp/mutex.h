@@ -6,10 +6,10 @@ namespace rpp
 #if _MSC_VER
     #define USE_CUSTOM_WINDOWS_MUTEX 1
     #if USE_CUSTOM_WINDOWS_MUTEX
-        struct mutex
+        class mutex
         {
             struct { void* ctx; } mtx;
-
+        public:
             mutex() noexcept;
             ~mutex() noexcept;
 
@@ -24,13 +24,13 @@ namespace rpp
             void unlock() noexcept;
 
             // this mutex is always valid and not copyable
-            void* native_handle() const noexcept { return (void*)&mtx.ctx; }
+            void* native_handle() const noexcept { return (void*)&mtx; }
         };
 
-        struct recursive_mutex
+        class recursive_mutex
         {
             void* mtx;
-
+        public:
             recursive_mutex() noexcept;
             ~recursive_mutex() noexcept;
 
@@ -47,6 +47,8 @@ namespace rpp
             bool try_lock() noexcept;
             void lock();
             void unlock() noexcept;
+
+            void* native_handle() const noexcept { return mtx; }
         };
     #else // USE_CUSTOM_WINDOWS_MUTEX
         using mutex = std::mutex;

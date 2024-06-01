@@ -112,6 +112,8 @@ namespace rpp
         timeout,  // waiting on task timed out
     };
 
+    class pool_worker;
+
     /**
      * A waitable pool task handle that can thread safely passed around
      */
@@ -122,6 +124,8 @@ namespace rpp
             rpp::semaphore_flag finished;
             std::string trace;
             std::exception_ptr error;
+            pool_worker* worker = nullptr;
+            state(pool_worker* w) noexcept : worker{w} {}
         };
         std::shared_ptr<state> s;
 
@@ -129,7 +133,7 @@ namespace rpp
         using duration = std::chrono::high_resolution_clock::duration;
 
         pool_task_handle(std::nullptr_t) noexcept : s{} {}
-        pool_task_handle() : s{std::make_shared<state>()} {}
+        pool_task_handle(pool_worker* w) noexcept : s{std::make_shared<state>(w)} {}
 
         bool valid() const noexcept { return s.get() != nullptr; }
         explicit operator bool() const noexcept { return s.get() != nullptr; }

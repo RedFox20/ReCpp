@@ -54,7 +54,7 @@ namespace rpp
          */
         void reset(int newCount = 0)
         {
-            std::lock_guard lock { m };
+            auto lock = spin_lock();
             if (0 <= newCount && newCount <= max_value)
                 value = newCount;
             if (newCount > 0)
@@ -101,7 +101,7 @@ namespace rpp
          */
         FINLINE void notify()
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             notify(lock);
         }
         NOINLINE void notify(lock_t& lock) noexcept
@@ -118,7 +118,7 @@ namespace rpp
          */
         template<class Callback> FINLINE void notify(const Callback& callback)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             notify<Callback>(lock, callback);
         }
         template<class Callback> FINLINE void notify(lock_t& lock, const Callback& callback) noexcept
@@ -136,7 +136,7 @@ namespace rpp
          */
         FINLINE void notify_all()
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             notify_all(lock);
         }
         NOINLINE void notify_all(lock_t& lock) noexcept
@@ -153,7 +153,7 @@ namespace rpp
          */
         template<class Callback> FINLINE void notify_all(const Callback& callback)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             notify_all<Callback>(lock, callback);
         }
         template<class Callback> FINLINE void notify_all(lock_t& lock, const Callback& callback) noexcept
@@ -169,7 +169,7 @@ namespace rpp
          */
         FINLINE bool notify_once()
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             return notify_once(lock);
         }
         NOINLINE bool notify_once(lock_t& lock) noexcept
@@ -191,7 +191,7 @@ namespace rpp
          */
         template<class Callback> FINLINE void notify_once(const Callback& callback)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             notify_once<Callback>(lock, callback);
         }
         template<class Callback> FINLINE void notify_once(lock_t& lock, const Callback& callback) noexcept
@@ -207,7 +207,7 @@ namespace rpp
          */
         bool try_wait()
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             if (value > 0)
             {
                 --value;
@@ -223,7 +223,7 @@ namespace rpp
          */
         FINLINE void wait()
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             wait(lock);
         }
         void wait(lock_t& lock) noexcept
@@ -239,7 +239,7 @@ namespace rpp
          */
         FINLINE void wait_no_unset()
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             wait_no_unset(lock);
         }
         NOINLINE void wait_no_unset(lock_t& lock) noexcept
@@ -258,7 +258,7 @@ namespace rpp
          */
         FINLINE wait_result wait(const std::chrono::nanoseconds& timeout)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             return wait(lock, timeout);
         }
         NOINLINE wait_result wait(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
@@ -280,7 +280,7 @@ namespace rpp
          */
         FINLINE wait_result wait_no_unset(const std::chrono::nanoseconds& timeout)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             return wait_no_unset(lock, timeout);
         }
         NOINLINE wait_result wait_no_unset(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
@@ -308,7 +308,7 @@ namespace rpp
          */
         NOINLINE void wait_barrier_while(std::atomic_bool& taskIsRunning)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             while (taskIsRunning)
             {
                 cv.wait(lock);
@@ -328,7 +328,7 @@ namespace rpp
          */
         NOINLINE void wait_barrier_until(std::atomic_bool& hasFinished)
         {
-            lock_t lock { m };
+            auto lock = spin_lock();
             while (!hasFinished)
             {
                 cv.wait(lock);
