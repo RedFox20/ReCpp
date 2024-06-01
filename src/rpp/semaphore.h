@@ -3,6 +3,7 @@
 #include "debugging.h"
 #include "mutex.h"
 #include <atomic>
+#include <thread> // std::this_thread::yield()
 
 namespace rpp
 {
