@@ -259,7 +259,7 @@ namespace rpp
             for (; diffAt < actual.size() && diffAt < expected.size(); ++diffAt)
                 if (actual[diffAt] != expected[diffAt])
                     break;
-            ssize_t printFrom = rpp::max<ssize_t>(0, (ssize_t)diffAt - 2);
+            int64 printFrom = rpp::max<int64>(0, (int64)diffAt - 2);
             std::string sActual = as_short_string(actual, printFrom, diffAt);
             std::string sExpect = as_short_string(expected, printFrom, diffAt);
             std::string sActualItem = diffAt < actual.size() ? as_short_string(actual[diffAt]) : "";
