@@ -2,7 +2,8 @@
 #include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
-using namespace rpp;
+#include <deque>
+
 using millis = std::chrono::milliseconds;
 
 TestImpl(test_semaphore)
@@ -158,5 +159,50 @@ TestImpl(test_semaphore)
         worker.join();
 
         AssertEqual(num_notified, num_notifies_sent);
+    }
+
+    // this is a much more intensive test
+    TestCase(can_transfer_data_between_two_threads)
+    {
+        std::vector<std::string> producer_data; // for later comparison
+        std::deque<std::string> producer_queue;
+        std::vector<std::string> consumer_data;
+        rpp::mutex producer_mutex;
+        rpp::semaphore sem;
+
+        std::atomic_bool working = true;
+        std::thread producer([&] {
+            const int max_data = 10'000;
+            for (int i = 0; i < max_data; ++i) {
+                { std::lock_guard lock { producer_mutex };
+                    producer_data.push_back("data_" + std::to_string(i));
+                    producer_queue.push_back(producer_data.back());
+                }
+                sem.notify();
+            }
+        });
+
+        std::thread consumer([&] {
+            constexpr auto timeout = millis{5000}; // use a huge timeout to make bugs obvious
+            while (working) {
+                if (sem.wait(timeout) == rpp::semaphore::notified) {
+                    if (!working) break; // stopped
+                    std::lock_guard lock { producer_mutex };
+                    consumer_data.emplace_back(std::move(producer_queue.front()));
+                    producer_queue.pop_front();
+                } else AssertFailed("semaphore was not notified");
+            }
+        });
+
+        producer.join();
+        // we need to a tiny amount of time for consumer to finish receiving all of the data
+        rpp::sleep_ms(15);
+
+        working = false;
+        sem.notify(); // notify finished
+        consumer.join();
+
+        AssertEqual(consumer_data.size(), producer_data.size());
+        AssertEqual(consumer_data, producer_data);
     }
 };

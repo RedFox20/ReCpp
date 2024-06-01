@@ -538,15 +538,18 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    //// std::reduce available in C++17, this is for C++14
-    //template<class T, class Reduce> auto reduce(
-    //    const std::vector<T>& v, Reduce reduce) -> decltype(reduce())
-    //{
-    //    decltype(reduce()) result {};
-    //    for (auto& item : v)
-    //        result += reduce(item);
-    //    return result;
-    //}
+    // can be removed in C++20
+    template<class T, class A>
+    inline bool operator==(const std::vector<T, A>& a, const std::vector<T, A>& b) noexcept
+    {
+        return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin());
+    }
+
+    template<class T, class A>
+    inline bool operator!=(const std::vector<T, A>& a, const std::vector<T, A>& b) noexcept
+    {
+        return !(a == b);
+    }
 
     /////////////////////////////////////////////////////////////////////////////////////
 }

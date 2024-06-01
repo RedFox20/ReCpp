@@ -13,6 +13,7 @@
 #include <typeinfo>
 #include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
 #include <rpp/debugging.h> // for adapting debugging API-s with tests API
+#include <rpp/math.h> // rpp::min, rpp::max
 
 namespace rpp
 {
@@ -198,15 +199,34 @@ namespace rpp
          */
         static void set_verbosity(TestVerbosity verbosity);
 
-        template<class T> static std::string as_short_string(const T& obj, int maxLen = 512)
+        template<class T>
+        static std::string as_short_string(const T& obj, int maxLen = 512)
         {
             rpp::string_buffer sb;
             sb << obj;
-            if (sb.size() > maxLen)
+            if (sb.size() > maxLen) { sb.resize(maxLen); sb << "..."; } // truncate
+            return sb.str();
+        }
+
+        // specialized difference printer for std::vector
+        template<class T, class A>
+        static std::string as_short_string(const std::vector<T, A>& v, size_t startIndex, size_t markerIndex,
+                                           int maxLenPerT = 32, int maxLen = 1024)
+        {
+            rpp::string_buffer sb;
+            sb << "[ ";
+            if (startIndex > 0) sb << "..., ";
+            size_t i;
+            for (i = startIndex; i < v.size(); ++i)
             {
-                sb.resize(maxLen);
-                sb << "...";
+                if (i > startIndex) sb << ", ";
+                if (i == markerIndex) sb << ">>>> ";
+                sb << i << ':' << '\'' << as_short_string(v[i], maxLenPerT) << '\'';
+                if (i == markerIndex) sb << " <<<<";
             }
+            if (i == markerIndex && i >= v.size()) sb << ", >>>> ELEMENT MISSING <<<<";
+            sb << " ]";
+            if (sb.size() > maxLen) { sb.resize(maxLen); sb << "..."; } // truncate
             return sb.str();
         }
 
@@ -227,6 +247,33 @@ namespace rpp
             std::string sMin = as_short_string(min);
             std::string sMax = as_short_string(max);
             assert_failed(file, line, "%s => '%s' %s min:'%s' max:'%s'", expr, sActual.c_str(), why, sMin.c_str(), sMax.c_str());
+        }
+
+        // specific support for std::vector type
+        template<class T, class A>
+        void assumption_failed(const char* file, int line,
+            const char* expr, const std::vector<T, A>& actual, const char* why, const std::vector<T, A>& expected)
+        {
+            // find the first difference:
+            size_t diffAt = 0;
+            for (; diffAt < actual.size() && diffAt < expected.size(); ++diffAt)
+                if (actual[diffAt] != expected[diffAt])
+                    break;
+            ssize_t printFrom = rpp::max<ssize_t>(0, (ssize_t)diffAt - 2);
+            std::string sActual = as_short_string(actual, printFrom, diffAt);
+            std::string sExpect = as_short_string(expected, printFrom, diffAt);
+            std::string sActualItem = diffAt < actual.size() ? as_short_string(actual[diffAt]) : "";
+            std::string sExpectedItem = diffAt < expected.size() ? as_short_string(expected[diffAt]) : "";
+            assert_failed(file, line, "%s[%zu] != expected[%zu]\n"
+                                      "    GOT '%s' AT [%zu]:\n"
+                                      "        %s\n"
+                                      "    %s '%s' AT [%zu]:\n"
+                                      "        %s\n",
+                                      expr, actual.size(), expected.size(),
+                                      sActualItem.c_str(), diffAt,
+                                      sActual.c_str(),
+                                      why, sExpectedItem.c_str(), diffAt,
+                                      sExpect.c_str());
         }
 
         int add_test_func(strview name, test_func_type fn, size_t expectedExHash, bool autorun);
@@ -254,17 +301,6 @@ namespace rpp
         }
     };
 
-    
-    template<class T>
-    bool operator==(const std::vector<T>& a, const std::vector<T>& b)
-    {
-        size_t len = a.size();
-        if (len != b.size()) return false;
-        for (size_t i = 0; i < len; ++i)
-            if (a[i] != b[i]) return false;
-        return true;
-    }
-
     struct Compare
     {
         template<class Expr, class Expected> static bool eq(const Expr& expr, const Expected& expected)
@@ -278,6 +314,12 @@ namespace rpp
         static bool eq(float expr, float expected) noexcept { return fabs(expr - expected) < (FLT_EPSILON*2); }
         static bool eq(double expr, double expected) noexcept { return fabs(expr - expected) < (DBL_EPSILON*2); }
         template<class T> static bool eq(const std::atomic<T>& expr, const T& expected) noexcept { return expr.load() == expected; }
+
+        // specifically support some C++ Std types
+        template<class T, class A> static bool eq(const std::vector<T, A>& a, const std::vector<T, A>& b) noexcept
+        {
+            return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin());
+        }
 
         template<class Expr, class Than> static bool gt(const Expr& expr, const Than& than) noexcept
         {
@@ -342,7 +384,7 @@ namespace rpp
 #undef TestCaseExpectedEx
 
 #define Assert(expr) do { \
-    if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "but expected", true); } \
+    if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "BUT EXPECTED", true); } \
 }while(0)
 
 #define AssertFailed(fmt, ...) do { \
@@ -351,7 +393,7 @@ namespace rpp
 
 #define AssertTrue Assert
 #define AssertFalse(expr) do { \
-    if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "but expected", false); } \
+    if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "BUT EXPECTED", false); } \
 }while(0)
 
 // Asserts that expression is true, otherwise displays a custom formatted error message
@@ -363,7 +405,7 @@ namespace rpp
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
@@ -371,7 +413,7 @@ namespace rpp
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); \
+        assumption_failed(__FILE__, __LINE__, #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
