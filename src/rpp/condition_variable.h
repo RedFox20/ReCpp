@@ -46,19 +46,9 @@ namespace rpp
         using time_point = clock::time_point;
 
     private:
-        struct mutex_type;
 
-        struct mutex_type_wrapper
-        {
-            std::shared_ptr<mutex_type> mtx;
-            mutex_type* get() const noexcept { return mtx.get(); }
-            void lock() noexcept { _lock(mtx.get()); }
-            void unlock() noexcept { _unlock(mtx.get()); }
-        };
-
-        std::shared_ptr<mutex_type> mtx;
+        rpp::mutex cs;
         struct { native_handle_type impl; } handle { nullptr };
-        native_handle_type timer = nullptr; // for high-precision waits
 
     public:
         condition_variable() noexcept;
@@ -89,26 +79,16 @@ namespace rpp
          * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
          */
         template<class Mutex>
-        void wait(std::unique_lock<Mutex>& locked_lock) noexcept
+        void wait(std::unique_lock<Mutex>& lock) noexcept
         {
-            if (!locked_lock.owns_lock())
-            {
-                LogError("unique_lock not owned by calling thread, calling lock() to avoid crash");
-                locked_lock.lock();
-            }
-
-            mutex_type_wrapper cs { mtx }; // shared_ptr for immunity to *this destruction
-
             // critical section lock is needed to avoid race condition between notify() and wait()
             // otherwise the notify() may signal just before entering wait() and the signal is lost
             // leading to a deadlocked wait
             cs.lock(); // lock critical section
-            locked_lock.unlock(); // unlock the outer lock, and relock when we exit the scope
-
-            (void)_wait_suspended_unlocked(cs.get(), 0xFFFFFFFF/*INFINITE*/);
-
+            lock.unlock(); // unlock the outer lock, and relock when we exit the scope
+            (void)_wait_suspended_unlocked(0xFFFFFFFF/*INFINITE*/);
             cs.unlock(); // unlock critical section before relocking outer
-            locked_lock.lock(); // relock the outer lock
+            lock.lock(); // relock the outer lock
         }
 
         /**
@@ -130,22 +110,16 @@ namespace rpp
          */
         template<class Mutex>
         [[nodiscard]]
-        std::cv_status wait_for(std::unique_lock<Mutex>& locked_lock, const duration& rel_time) noexcept
+        std::cv_status wait_for(std::unique_lock<Mutex>& lock, const duration& rel_time) noexcept
         {
-            if (!locked_lock.owns_lock())
-            {
-                LogError("unique_lock not owned by calling thread, calling lock() to avoid crash");
-                locked_lock.lock();
-            }
-
-            mutex_type_wrapper cs { mtx }; // shared_ptr for immunity to *this destruction
+            // critical section lock is needed to avoid race condition between notify() and wait()
+            // otherwise the notify() may signal just before entering wait() and the signal is lost
+            // leading to a deadlocked wait
             cs.lock(); // lock critical section
-            locked_lock.unlock(); // unlock the outer lock, and relock when we exit the scope
-
-            std::cv_status status = _wait_for_unlocked(cs.get(), rel_time);
-
+            lock.unlock(); // unlock the outer lock, and relock when we exit the scope
+            std::cv_status status = _wait_for_unlocked(rel_time);
             cs.unlock(); // unlock critical section before relocking outer
-            locked_lock.lock(); // relock the outer lock
+            lock.lock(); // relock the outer lock
             return status;
         }
 
@@ -157,8 +131,7 @@ namespace rpp
          * @param stop_waiting predicate which returns ​false if the waiting should be continued
          */
         template<class Mutex, class Predicate>
-        void wait(std::unique_lock<Mutex>& lock,
-                  const Predicate& stop_waiting) noexcept
+        void wait(std::unique_lock<Mutex>& lock, const Predicate& stop_waiting) noexcept
         {
             while (!stop_waiting())
                 wait(lock);
@@ -183,8 +156,7 @@ namespace rpp
          */
         template<class Mutex>
         [[nodiscard]]
-        std::cv_status wait_until(std::unique_lock<Mutex>& lock, 
-                                  const time_point& abs_time) noexcept
+        std::cv_status wait_until(std::unique_lock<Mutex>& lock, const time_point& abs_time) noexcept
         {
             duration rel_time = (abs_time - clock::now());
             return wait_for(lock, rel_time);
@@ -240,26 +212,18 @@ namespace rpp
 
     private:
 
-        static void _lock(mutex_type* m) noexcept;
-        static void _unlock(mutex_type* m) noexcept;
-
-        /**
-         * @returns TRUE if CondVar is signaled, FALSE otherwise
-         */
-        bool _is_signaled(mutex_type* m) noexcept;
-
         /**
          * suspended wait which has roughly ~15.6ms tick resolution
          * accuracy on the timeout
          * @returns no_timeout if signaled or error, timeout if timed out without a signal
          */
-        std::cv_status _wait_suspended_unlocked(mutex_type* m, unsigned long timeoutMs) noexcept;
+        std::cv_status _wait_suspended_unlocked(unsigned long timeoutMs) noexcept;
 
         /**
          * Waits or SpinWaits depending on the desired duration
          * @returns no_timeout if signaled or error, timeout if timed out without a signal
          */
-        std::cv_status _wait_for_unlocked(mutex_type* m, const duration& rel_time) noexcept;
+        std::cv_status _wait_for_unlocked(const duration& rel_time) noexcept;
     };
 #endif // _MSC_VER
 }
