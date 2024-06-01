@@ -7,7 +7,7 @@
 #  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
 #endif
 #include "config.h"
-#include "condition_variable.h"
+#include "semaphore.h"
 #include "delegate.h"
 #include "strview.h"
 #include "mutex.h"
@@ -117,17 +117,11 @@ namespace rpp
      */
     class RPPAPI pool_task_handle
     {
-    public:
-        using mutex = rpp::mutex;
-        using condition_variable = rpp::condition_variable;
-
         struct state
         {
-            mutable mutex m;
-            condition_variable cv;
+            rpp::semaphore_flag finished;
             std::string trace;
             std::exception_ptr error;
-            std::atomic_bool finished = false;
         };
         std::shared_ptr<state> s;
 
@@ -137,6 +131,7 @@ namespace rpp
         pool_task_handle(std::nullptr_t) noexcept : s{} {}
         pool_task_handle() : s{std::make_shared<state>()} {}
 
+        bool valid() const noexcept { return s.get() != nullptr; }
         explicit operator bool() const noexcept { return s.get() != nullptr; }
         bool operator!=(std::nullptr_t) const noexcept { return s.get() != nullptr; }
         bool operator==(const pool_task_handle& other) const noexcept { return s.get() == other.s.get(); }
@@ -179,12 +174,8 @@ namespace rpp
      */
     class RPPAPI pool_worker
     {
-    public:
-        using mutex = pool_task_handle::mutex;
-        using condition_variable = pool_task_handle::condition_variable;
     private:
-        mutex start_mutex; // mutex to synchronize start/stop of the task
-        condition_variable new_task_cv;
+        rpp::semaphore_flag new_task_flag;
         std::thread th;
         char name[32];
 
@@ -192,9 +183,9 @@ namespace rpp
         rpp::action<int, int> range_task;
         int range_start  = 0;
         int range_end    = 0;
-        float max_idle_timeout = 15.0f;
+        std::chrono::milliseconds max_idle_timeout = std::chrono::milliseconds{15'000};
 
-        pool_task_handle current_task{nullptr};
+        pool_task_handle current_task { nullptr };
         std::atomic_bool killed = false; // this pool_worker is being destroyed/has been destroyed
 
     public:
@@ -256,7 +247,7 @@ namespace rpp
             pool_task_handle task;
         };
 
-        pool_worker::mutex TasksMutex;
+        rpp::mutex TasksMutex;
         std::vector<worker_ptr> Workers;
         float TaskMaxIdleTime = 15; // new task timeout in seconds
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for

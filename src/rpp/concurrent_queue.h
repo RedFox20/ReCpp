@@ -43,7 +43,7 @@ namespace rpp
         mutable mutex Mutex;
         mutable condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
-        std::atomic_bool cleared = false;
+        std::atomic_bool Cleared = false;
 
     public:
         concurrent_queue() = default;
@@ -176,7 +176,7 @@ namespace rpp
         {
             auto lock = spin_lock();
             clear_unlocked(); // destroy all elements
-            cleared = true; // set the cleared flag
+            Cleared = true; // set the cleared flag
             notify_all_unlocked(); // notify all waiters that the queue was emptied
         }
 
@@ -610,7 +610,7 @@ namespace rpp
                     (void)Waiter.wait_until(lock, prevTime + interval); // may throw
                 #endif
                     if (!empty()) break; // got data
-                    if (cleared) return false; // give up immediately
+                    if (Cleared) return false; // give up immediately
 
                     time_point now = clock::now();
                     remaining -= (now - prevTime);
@@ -674,7 +674,7 @@ namespace rpp
                     (void)Waiter.wait_until(lock, end); // may throw
                 #endif
                 if (!empty()) return true; // got an item
-                if (cleared) return false; // give up immediately
+                if (Cleared) return false; // give up immediately
                 now = clock::now();
             } while (now < end); // handle spurious wakeups
             return false;
@@ -694,7 +694,7 @@ namespace rpp
                     (void)Waiter.wait_until(lock, until); // may throw
                 #endif
                 if (!empty()) return true; // got an item
-                if (cleared) return false; // give up immediately
+                if (Cleared) return false; // give up immediately
                 now = clock::now();
             } while (now < until); // handle spurious wakeups
             return false;
@@ -769,7 +769,7 @@ namespace rpp
                 const size_t newCap = oldCap + growBy;
                 grow_to(newCap);
             }
-            cleared = false; // reset the cleared flag
+            Cleared = false; // reset the cleared flag
         }
         void grow_to(size_t newCap) noexcept
         {

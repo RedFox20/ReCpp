@@ -100,26 +100,12 @@ namespace rpp
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto p = s; p && !p->finished)
+        if (auto p = s)
         {
-            std::unique_lock lock{p->m};
-            while (!s->finished)
-            {
-                if (p->cv.wait_for(lock, timeout) == std::cv_status::timeout)
-                {
-                    // even if we time out, check if the task finished
-                    if (!p->finished)
-                        result = wait_result::timeout;
-                    else
-                        LogWarning("pool_task_handle::wait() timeout, but task was finished (notify failed)");
-                    break;
-                }
-            }
-            // NOTE: this is thread safe only thanks to the unique lock above
+            if (s->finished.wait_no_unset(timeout) == rpp::semaphore::timeout)
+                result = wait_result::timeout;
             if (auto e = p->error; outErr != nullptr && !*outErr)
-            {
                 *outErr = e;
-            }
         }
         return result;
     }
@@ -135,19 +121,11 @@ namespace rpp
     wait_result pool_task_handle::wait(std::nothrow_t, std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto p = s; p && !p->finished)
+        if (auto p = s)
         {
-            std::unique_lock lock{p->m};
-            while (!s->finished)
-            {
-                p->cv.wait(lock);
-                // loop back and see if we finished
-            }
-            // NOTE: this is thread safe only thanks to the unique lock above
+            p->finished.wait_no_unset();
             if (auto e = p->error; outErr != nullptr && !*outErr)
-            {
                 *outErr = e;
-            }
         }
         return result;
     }
@@ -161,9 +139,7 @@ namespace rpp
     {
         if (auto p = s)
         {
-            std::lock_guard lock{p->m};
-            p->finished = true;
-            p->cv.notify_all();
+            p->finished.notify_all();
             this->s = nullptr; // clear the state
         }
     }
@@ -181,13 +157,16 @@ namespace rpp
         kill();
     }
 
-    void pool_worker::max_idle_time(float max_idle_seconds) noexcept { max_idle_timeout = max_idle_seconds; }
+    void pool_worker::max_idle_time(float max_idle_seconds) noexcept
+    {
+        max_idle_timeout = std::chrono::milliseconds{int(max_idle_seconds*1000)};
+    }
 
     pool_task_handle pool_worker::run_range(int start, int end, const action<int, int>& newTask) noexcept
     {
-        std::lock_guard lock{start_mutex};
+        std::unique_lock lock { new_task_flag.mutex() };
         // we always need to double-check if a task is already running
-        if (current_task)
+        if (current_task.valid())
             return nullptr;
 
         current_task = pool_task_handle{};
@@ -206,15 +185,15 @@ namespace rpp
             (void)join_or_detach(wait_result::finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
-        new_task_cv.notify_one();
+        new_task_flag.notify_once(lock);
         return current_task;
     }
 
     pool_task_handle pool_worker::run_generic(task_delegate<void()>&& newTask) noexcept
     {
-        std::lock_guard lock{start_mutex};
+        std::unique_lock lock { new_task_flag.mutex() };
         // we always need to double-check if a task is already running
-        if (current_task)
+        if (current_task.valid())
             return nullptr;
 
         current_task = pool_task_handle{};
@@ -233,7 +212,7 @@ namespace rpp
             (void)join_or_detach(wait_result::finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
-        new_task_cv.notify_one();
+        new_task_flag.notify_once(lock);
         return current_task;
     }
 
@@ -242,17 +221,14 @@ namespace rpp
         if (killed) {
             return join_or_detach(wait_result::finished);
         }
-        {
-            std::lock_guard lock{start_mutex};
+
+        new_task_flag.notify_all([&] {
             TaskDebug("%s", name);
             killed = true;
-            new_task_cv.notify_all();
-        }
+        });
 
         // wait for runner to finish current task before joining the thread
-        wait_result result = wait_result::finished;
-        if (auto task = current_task)
-            result = task.wait(std::chrono::milliseconds{timeoutMillis}, std::nothrow);
+        wait_result result = current_task.wait(std::chrono::milliseconds{timeoutMillis}, std::nothrow);
         return join_or_detach(result);
     }
 
@@ -296,7 +272,7 @@ namespace rpp
 
                 // consume the Tasks atomically
                 {
-                    std::unique_lock lock{start_mutex};
+                    std::unique_lock lock { new_task_flag.mutex() };
                     TaskDebug("%s wait for task", name);
                     if (!wait_for_new_job(lock)) {
                         TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
@@ -328,7 +304,7 @@ namespace rpp
 
             // cleanup the current task
             {
-                std::lock_guard lock{start_mutex};
+                std::lock_guard lock { new_task_flag.mutex() };
                 current_task.signal_finished();
             }
         }
@@ -346,21 +322,20 @@ namespace rpp
 
     bool pool_worker::wait_for_new_job(std::unique_lock<mutex>& lock) noexcept
     {
-        for (;;)
+        for (;;) // loop until new job, or killed
         {
             if (killed)
                 return false;
             if (current_task)
                 return true;
-            if (max_idle_timeout > 0.000001f)
+            if (max_idle_timeout.count() > 0)
             {
-                auto wait = std::chrono::duration_cast<duration>(fseconds_t(max_idle_timeout));
-                if (new_task_cv.wait_for(lock, wait) == std::cv_status::timeout)
+                if (new_task_flag.wait(lock, max_idle_timeout) == rpp::semaphore::timeout)
                     return (bool)current_task; // make sure to check for task even if it timeouts
             }
             else
             {
-                new_task_cv.wait(lock);
+                new_task_flag.wait(lock);
             }
         }
     }
