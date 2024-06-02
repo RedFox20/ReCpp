@@ -192,9 +192,8 @@ namespace rpp
         sockaddr     sa;
         sockaddr_in  sa4;
         sockaddr_in6 sa6;
-        sockaddr_storage sas;
-        operator const sockaddr*() const { return &sa; }
-        int size() const {
+        operator const sockaddr*() const noexcept { return &sa; }
+        int size() const noexcept {
             switch (sa.sa_family) {
                 default:       return sizeof(sa);
                 case AF_INET:  return sizeof(sa4);

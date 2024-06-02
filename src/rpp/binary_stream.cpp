@@ -23,7 +23,7 @@ namespace rpp
             free(Ptr);
     }
 
-    void binary_stream::disable_buffering()
+    void binary_stream::disable_buffering() noexcept
     {
         flush();
         if (Cap > SBSize)
@@ -36,26 +36,26 @@ namespace rpp
         return (End - ReadPos) + (Src ? Src->stream_available() : 0);
     }
 
-    void binary_stream::clear()
+    void binary_stream::clear() noexcept
     {
         ReadPos  = 0;
         WritePos = 0;
         End      = 0;
     }
 
-    void binary_stream::rewind(int pos)
+    void binary_stream::rewind(int pos) noexcept
     {
         ReadPos = WritePos = pos < 0 ? 0 : pos <= End ? pos : End;
     }
 
-    bool binary_stream::good() const
+    bool binary_stream::good() const noexcept
     {
         if (Src)
             return Src->stream_good();
         return (End - ReadPos) > 0;
     }
 
-    void binary_stream::reserve(int capacity)
+    void binary_stream::reserve(int capacity) noexcept
     {
         if (capacity == 0)
         {
@@ -86,14 +86,14 @@ namespace rpp
         Cap = capacity;
     }
 
-    void binary_stream::flush() 
+    void binary_stream::flush() noexcept
     {
         if (!Src) return;
         flush_write_buffer();
         Src->stream_flush(); // now ask the source itself to flush the stuff
     }
 
-    void binary_stream::flush_write_buffer()
+    void binary_stream::flush_write_buffer() noexcept
     {
         if (WritePos) // were we writing something?
         {
@@ -102,7 +102,7 @@ namespace rpp
         }
     }
 
-    void binary_stream::ensure_space(int numBytes)
+    void binary_stream::ensure_space(int numBytes) noexcept
     {
         int newlen = size() + numBytes;
         if (newlen > Cap)
@@ -115,16 +115,63 @@ namespace rpp
         }
     }
 
-    binary_stream& binary_stream::write(const void* data, int numBytes)
+    binary_stream& binary_stream::write(const void* data, int numBytes) noexcept
     {
         ensure_space(numBytes);
-        memcpy(&Ptr[WritePos], data, (size_t)numBytes);
-        WritePos += numBytes;
-        End      += numBytes;
+        unsafe_write(data, numBytes);
         return *this;
     }
 
-    void binary_stream::unsafe_write(const void* data, int numBytes)
+    void binary_stream::unsafe_write(rpp::uint16 data) noexcept
+    {
+        // write int as 2 bytes in Little-Endian order, into unaligned address
+        Ptr[WritePos + 0] = rpp::byte(data & 0xFF);
+        Ptr[WritePos + 1] = rpp::byte((data >> 8) & 0xFF);
+        WritePos += 2;
+        End += 2;
+    }
+
+    void binary_stream::unsafe_write(rpp::uint32 data) noexcept
+    {
+        // write int as 4 bytes in Little-Endian order, into unaligned address
+        Ptr[WritePos + 0] = rpp::byte(data & 0xFF);
+        Ptr[WritePos + 1] = rpp::byte((data >> 8) & 0xFF);
+        Ptr[WritePos + 2] = rpp::byte((data >> 16) & 0xFF);
+        Ptr[WritePos + 3] = rpp::byte((data >> 24) & 0xFF);
+        WritePos += 4;
+        End += 4;
+    }
+
+    void binary_stream::unsafe_write(rpp::uint64 data) noexcept
+    {
+        // write int as 8 bytes in Little-Endian order, into unaligned address
+        Ptr[WritePos + 0] = rpp::byte(data & 0xFF);
+        Ptr[WritePos + 1] = rpp::byte((data >> 8) & 0xFF);
+        Ptr[WritePos + 2] = rpp::byte((data >> 16) & 0xFF);
+        Ptr[WritePos + 3] = rpp::byte((data >> 24) & 0xFF);
+        Ptr[WritePos + 4] = rpp::byte((data >> 32) & 0xFF);
+        Ptr[WritePos + 5] = rpp::byte((data >> 40) & 0xFF);
+        Ptr[WritePos + 6] = rpp::byte((data >> 48) & 0xFF);
+        Ptr[WritePos + 7] = rpp::byte((data >> 56) & 0xFF);
+        WritePos += 8;
+        End += 8;
+    }
+
+    void binary_stream::unsafe_write(float data) noexcept
+    {
+        memcpy(&Ptr[WritePos], &data, sizeof(float));
+        WritePos += sizeof(float);
+        End      += sizeof(float);
+    }
+
+    void binary_stream::unsafe_write(double data) noexcept
+    {
+        memcpy(&Ptr[WritePos], &data, sizeof(double));
+        WritePos += sizeof(double);
+        End      += sizeof(double);
+    }
+
+    void binary_stream::unsafe_write(const void* data, int numBytes) noexcept
     {
         memcpy(&Ptr[WritePos], data, (size_t)numBytes);
         WritePos += numBytes;
@@ -133,7 +180,7 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////
 
-    int binary_stream::unsafe_buffer_fill()
+    int binary_stream::unsafe_buffer_fill() noexcept
     {
         int n = Src->stream_read(Ptr, Cap);
         ReadPos = 0;
@@ -142,14 +189,62 @@ namespace rpp
     }
 
 
-    int binary_stream::unsafe_buffer_read(void* dst, int bytesToRead)
+    int binary_stream::unsafe_buffer_read(void* dst, int bytesToRead) noexcept
     {
         memcpy(dst, &Ptr[ReadPos], (size_t)bytesToRead);
         ReadPos += bytesToRead;
         return bytesToRead;
     }
 
-    int binary_stream::fragmented_read(void* dst, int bytesToRead)
+    void binary_stream::unsafe_buffer_decode(rpp::uint16& dst) noexcept
+    {
+        // unaligned read
+        const uint8_t* p = (const uint8_t*)(Ptr + ReadPos);
+        rpp::uint16 ret = 0;
+        ret |= rpp::uint16(p[0]);
+        ret |= rpp::uint16(p[1]) << 8;
+        dst = ret;
+    }
+
+    void binary_stream::unsafe_buffer_decode(rpp::uint32& dst) noexcept
+    {
+        // unaligned read
+        const uint8_t* p = (const uint8_t*)(Ptr + ReadPos);
+        rpp::uint32 ret = 0;
+        ret |= rpp::uint32(p[0]);
+        ret |= rpp::uint32(p[1]) << 8;
+        ret |= rpp::uint32(p[2]) << 16;
+        ret |= rpp::uint32(p[3]) << 24;
+        dst = ret;
+    }
+
+    void binary_stream::unsafe_buffer_decode(rpp::uint64& dst) noexcept
+    {
+        // unaligned read
+        const uint8_t* p = (const uint8_t*)(Ptr + ReadPos);
+        rpp::uint64 ret = 0;
+        ret |= rpp::uint64(p[0]);
+        ret |= rpp::uint64(p[1]) << 8;
+        ret |= rpp::uint64(p[2]) << 16;
+        ret |= rpp::uint64(p[3]) << 24;
+        ret |= rpp::uint64(p[4]) << 32;
+        ret |= rpp::uint64(p[5]) << 40;
+        ret |= rpp::uint64(p[6]) << 48;
+        ret |= rpp::uint64(p[7]) << 56;
+        dst = ret;
+    }
+
+    void binary_stream::unsafe_buffer_decode(float& dst) noexcept
+    {
+        memcpy(&dst, &Ptr[ReadPos], sizeof(float));
+    }
+
+    void binary_stream::unsafe_buffer_decode(double& dst) noexcept
+    {
+        memcpy(&dst, &Ptr[ReadPos], sizeof(double));
+    }
+
+    int binary_stream::fragmented_read(void* dst, int bytesToRead) noexcept
     {
         int total = 0;
 
@@ -191,14 +286,14 @@ namespace rpp
         return total;
     }
 
-    int binary_stream::read(void* dst, int bytesToRead)
+    int binary_stream::read(void* dst, int bytesToRead) noexcept
     {
         if (size() >= bytesToRead)
             return unsafe_buffer_read(dst, bytesToRead); // best case, all from buffer
         return fragmented_read(dst, bytesToRead);
     }
 
-    int binary_stream::peek(void* dst, int bytesToPeek)
+    int binary_stream::peek_fetch_avail() noexcept
     {
         int avail = size();
         if (avail <= 0)
@@ -206,30 +301,29 @@ namespace rpp
             if (!Src) return 0;
             avail = unsafe_buffer_fill(); // fill before peek if possible
         }
-        if (avail < bytesToPeek)
-            return 0;
-        memcpy(dst, &Ptr[ReadPos], bytesToPeek);
+        return avail;
+    }
+
+    int binary_stream::peek(void* dst, int bytesToPeek) noexcept
+    {
+        int avail = peek_fetch_avail();
+        if (avail < bytesToPeek) return 0;
+        ::memcpy(dst, &Ptr[ReadPos], bytesToPeek);
         return bytesToPeek;
     }
 
-    strview binary_stream::peek_strview()
+    strview binary_stream::peek_strview() noexcept
     {
         strview s;
-        int avail = size();
-        if (avail <= 0)
-        {
-            if (!Src) return s;
-            avail = unsafe_buffer_fill();
-        }
-        if (avail < (int)sizeof(strlen_t))
-            return s;
+        int avail = peek_fetch_avail();
+        if (avail < (int)sizeof(strlen_t)) return s;
         s.len = min<int>(peek<strlen_t>(), avail - sizeof(strlen_t));
         s.str = &Ptr[ReadPos + sizeof(strlen_t)];
         undo(sizeof(strlen_t));
         return s;
     }
 
-    void binary_stream::skip(int n)
+    void binary_stream::skip(int n) noexcept
     {
         int nskip = min<int>(n, size()); // max skippable: Size
         ReadPos += nskip;
@@ -237,7 +331,7 @@ namespace rpp
             Src->stream_skip(n - nskip); // skip remaining from storage
     }
 
-    void binary_stream::undo(int n)
+    void binary_stream::undo(int n) noexcept
     {
         int nundo = min<int>(n, ReadPos); // max undoable:  Pos
         ReadPos -= nundo;

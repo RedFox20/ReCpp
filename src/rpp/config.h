@@ -207,6 +207,9 @@ namespace rpp
         using uint   = unsigned int;
         using ulong  = unsigned long;
 
+        using int16 = short;
+        using uint16 = unsigned short;
+
     #if RPP_INT_SIZE == 4
         using int32  = int;
         using uint32 = unsigned int;

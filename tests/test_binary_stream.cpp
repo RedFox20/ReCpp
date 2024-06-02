@@ -17,7 +17,7 @@ TestImpl(test_binary_stream)
         AssertThat(buf.good(), false);
         AssertThat(buf.available(), 0);
 
-        AssertThat(buf.read_int(), 0);
+        AssertThat(buf.read_int32(), 0);
         AssertThat(buf.read_int64(), 0LL);
         AssertThat(buf.peek_string(), "");
         Assert(buf.peek_wstring().empty());
@@ -40,18 +40,18 @@ TestImpl(test_binary_stream)
         AssertThat(buf.read_byte(), 42);
         AssertThat(buf.available(), 0);
 
-        buf.write_short(32000);
+        buf.write_int16(32000);
         AssertThat(buf.available(), 2);
-        AssertThat(buf.peek_short(), 32000);
+        AssertThat(buf.peek_int16(), 32000);
         AssertThat(buf.available(), 2);
-        AssertThat(buf.read_short(), 32000);
+        AssertThat(buf.read_int16(), 32000);
         AssertThat(buf.available(), 0);
 
-        buf.write_int(42000000);
+        buf.write_int32(42000000);
         AssertThat(buf.available(), 4);
-        AssertThat(buf.peek_int(), 42000000);
+        AssertThat(buf.peek_int32(), 42000000);
         AssertThat(buf.available(), 4);
-        AssertThat(buf.read_int(), 42000000);
+        AssertThat(buf.read_int32(), 42000000);
         AssertThat(buf.available(), 0);
 
         buf.write_uint64(42000000000LL);
@@ -113,7 +113,8 @@ TestImpl(test_binary_stream)
             AssertThat(strvec2[i], strvec[i]);
     }
 
-    template<int END, int CHUNK> class mock_source : public rpp::binary_stream, protected rpp::stream_source
+    template<int END, int CHUNK>
+    class mock_source : public rpp::binary_stream, protected rpp::stream_source
     {
         int BytesServed = 0;
     public:
@@ -165,7 +166,7 @@ TestImpl(test_binary_stream)
             rpp::file_writer out { file };
             for (int i = 0; i < count; ++i)
             {
-                out.write_ushort(10);
+                out.write_uint16(10);
                 out.write(20.0f);
                 out.write("test_string"s);
             }
@@ -183,7 +184,7 @@ TestImpl(test_binary_stream)
                 } \
             } while (false)
 
-            FileReaderAssertThat(in.read_ushort(), 10);
+            FileReaderAssertThat(in.read_uint16(), 10);
             FileReaderAssertThat(in.read_float(), 20.0f);
             FileReaderAssertThat(in.read_string(), "test_string"s);
         }

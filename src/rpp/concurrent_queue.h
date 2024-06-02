@@ -820,7 +820,8 @@ namespace rpp
             if constexpr (std::is_trivially_move_assignable_v<T>)
             {
                 size_t count = (oldTail - oldHead);
-                ::memmove(newStart, oldHead, count * sizeof(T));
+                if (count)
+                    ::memmove(newStart, oldHead, count * sizeof(T));
                 return newStart + count;
             }
             else

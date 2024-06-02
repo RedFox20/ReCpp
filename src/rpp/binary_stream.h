@@ -6,7 +6,6 @@
 #include "strview.h"
 #include "minmax.h"
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS
-#  include "mutex.h"
 #  include "sockets.h"
 #endif
 #ifndef RPP_BINARY_READWRITE_NO_FILE_IO
@@ -39,12 +38,12 @@ namespace rpp
          * Writes a block of data to the underlying storage target or network device
          * @return Number of bytes actually written. Must be [numBytes] or <= 0 on failure
          */
-        virtual int stream_write(const void* data, int numBytes) = 0;
+        virtual int stream_write(const void* data, int numBytes) noexcept = 0;
 
         /**
          * Flush all read/write buffers on the stream
          */
-        virtual void stream_flush() = 0;
+        virtual void stream_flush() noexcept = 0;
 
         /**
          * @brief Reads bytes directly from the underlying stream
@@ -159,18 +158,18 @@ namespace rpp
         // binary_stream is pure virtual and shouldn't be copied or moved
         NOCOPY_NOMOVE(binary_stream)
 
-        void disable_buffering();
+        void disable_buffering() noexcept;
 
-        const char* data()  const { return &Ptr[ReadPos]; }
-        char*       data()        { return &Ptr[ReadPos]; }
-        const char* begin() const { return &Ptr[ReadPos]; }
-        const char* end()   const { return &Ptr[End]; }
-        int readpos()      const { return ReadPos; }
-        int writepos()     const { return WritePos; }
+        FINLINE const char* data()  const noexcept { return &Ptr[ReadPos]; }
+        FINLINE char*       data()        noexcept { return &Ptr[ReadPos]; }
+        FINLINE const char* begin() const noexcept { return &Ptr[ReadPos]; }
+        FINLINE const char* end()   const noexcept { return &Ptr[End]; }
+        FINLINE int readpos()      const noexcept { return ReadPos; }
+        FINLINE int writepos()     const noexcept { return WritePos; }
         // @return Number of bytes in the read buffer
-        int size()      const { return End - ReadPos; }
-        int capacity()  const { return Cap; }
-        strview view()   const { return { data(), (int)size() }; }
+        FINLINE int size()      const noexcept { return End - ReadPos; }
+        FINLINE int capacity()  const noexcept { return Cap; }
+        FINLINE strview view()  const noexcept { return { data(), (int)size() }; }
 
         // @return Total buffered bytes and available stream bytes: 
         //         size() + stream_available()
@@ -179,45 +178,45 @@ namespace rpp
         /**
          * Sets the buffer position and size to 0; no data is flushed
          */
-        void clear();
+        void clear() noexcept;
 
         /**
          * Rewinds the Read/Write head to a specific position in the BUFFER.
          * All subsequent read/write operations will begin from the given position.
          * @note New pos is range checked and clamped
          */
-        void rewind(int pos = 0);
+        void rewind(int pos = 0) noexcept;
 
         /**
          * @return TRUE if this stream is open and data is available
          */
-        bool good() const;
-        explicit operator bool() const { return good(); }
+        bool good() const noexcept;
+        FINLINE explicit operator bool() const noexcept { return good(); }
 
         /** 
          * Flushes the buffer and changes the size of write buffer
          * Setting this to 0 will disable buffering. Setting it to <= binary_stream::SBSize has no effect
          */
-        void reserve(int capacity);
+        void reserve(int capacity) noexcept;
 
         /** 
          * @brief Flush write buffer and then flush to the underlying stream.
          */
-        void flush();
+        void flush() noexcept;
 
         /**
          * @brief Flush write buffer only. Underlying stream will take care of its own things.
          */
-        void flush_write_buffer();
+        void flush_write_buffer() noexcept;
 
     private:
-        NOINLINE void ensure_space(int numBytes);
+        NOINLINE void ensure_space(int numBytes) noexcept;
 
     public:
         ////////////////////// ----- Writer Fields ----- //////////////////////////
 
         /** @brief Writes raw data into the buffer */
-        binary_stream& write(const void* data, int numBytes);
+        binary_stream& write(const void* data, int numBytes) noexcept;
 
         template<class T>
         static constexpr bool is_trivial_type = std::is_default_constructible<T>::value
@@ -225,20 +224,30 @@ namespace rpp
 
         /** @brief Writes object of type T into the buffer */
         template<class T, typename = std::enable_if_t<is_trivial_type<T>>> 
-        binary_stream& write(const T& data)
+        binary_stream& write(const T& data) noexcept
         {
             ensure_space((int)sizeof(T));
-            *(T*)&Ptr[WritePos] = data;
-            WritePos += (int)sizeof(T);
-            End      += (int)sizeof(T);
+            unsafe_write(data);
             return *this;
         }
 
     private:
-        void unsafe_write(const void* data, int numBytes);
-        template<class T> void unsafe_write(const T& data)
+        void unsafe_write(const void* data, int numBytes) noexcept;
+
+        void unsafe_write(rpp::uint16 data) noexcept;
+        void unsafe_write(rpp::uint32 data) noexcept;
+        void unsafe_write(rpp::uint64 data) noexcept;
+        FINLINE void unsafe_write(rpp::int16 data) noexcept { unsafe_write((rpp::uint16)data); }
+        FINLINE void unsafe_write(rpp::int32 data) noexcept { unsafe_write((rpp::uint32)data); }
+        FINLINE void unsafe_write(rpp::int64 data) noexcept { unsafe_write((rpp::uint64)data); }
+
+        void unsafe_write(float data) noexcept;
+        void unsafe_write(double data) noexcept;
+
+        template<class T>
+        void unsafe_write(const T& data) noexcept
         {
-            *(T*)&Ptr[WritePos] = data;
+            *reinterpret_cast<T*>(Ptr + WritePos) = data;
             WritePos += (int)sizeof(T);
             End      += (int)sizeof(T);
         }
@@ -246,43 +255,52 @@ namespace rpp
     public:
 
         /** @brief Appends data from other binary_writer to this one */
-        binary_stream& write(const binary_stream& w) { return write(w.data(), w.size()); }
-        binary_stream& write_byte(uint8_t value)  { return write(value); } /** @brief Writes a 8-bit unsigned byte into the buffer */
-        binary_stream& write_short(short value)   { return write(value); } /** @brief Writes a 16-bit signed short into the buffer */
-        binary_stream& write_ushort(ushort value) { return write(value); } /** @brief Writes a 16-bit unsigned short into the buffer */
-        binary_stream& write_int(int value)       { return write(value); } /** @brief Writes a 32-bit signed integer into the buffer */
-        binary_stream& write_uint(uint value)     { return write(value); } /** @brief Writes a 32-bit unsigned integer into the buffer */
-        binary_stream& write_int64(int64 value)   { return write(value); } /** @brief Writes a 64-bit signed integer into the buffer */
-        binary_stream& write_uint64(uint64 value) { return write(value); } /** @brief Writes a 64-bit unsigned integer into the buffer */
-        binary_stream& write_float(float value)   { return write(value); } /** @brief Writes a 32-bit float into the buffer */
-        binary_stream& write_double(double value) { return write(value); } /** @brief Writes a 64-bit double into the buffer */
+        FINLINE binary_stream& write(const binary_stream& w) noexcept { return write(w.data(), w.size()); }
+        /** @brief Writes a 8-bit unsigned byte into the buffer */
+        FINLINE binary_stream& write_byte(rpp::byte value)  noexcept { return write(value); }
+        /** @brief Writes a 16-bit signed int into the buffer */
+        FINLINE binary_stream& write_int16(rpp::int16 value)   noexcept { return write(value); }
+        /** @brief Writes a 16-bit unsigned int into the buffer */
+        FINLINE binary_stream& write_uint16(rpp::uint16 value) noexcept { return write(value); }
+        /** @brief Writes a 32-bit signed integer into the buffer */
+        FINLINE binary_stream& write_int32(rpp::int32 value)       noexcept { return write(value); }
+        /** @brief Writes a 32-bit unsigned integer into the buffer */
+        FINLINE binary_stream& write_uint32(rpp::uint32 value)     noexcept { return write(value); }
+        /** @brief Writes a 64-bit signed integer into the buffer */
+        FINLINE binary_stream& write_int64(rpp::int64 value)   noexcept { return write(value); }
+        /** @brief Writes a 64-bit unsigned integer into the buffer */
+        FINLINE binary_stream& write_uint64(rpp::uint64 value) noexcept { return write(value); }
+        /** @brief Writes a 32-bit float into the buffer */
+        FINLINE binary_stream& write_float(float value)   noexcept { return write(value); }
+        /** @brief Writes a 64-bit double into the buffer */
+        FINLINE binary_stream& write_double(double value) noexcept { return write(value); }
 
 
-        using strlen_t = int32_t;
+        using strlen_t = rpp::uint16;
 
         /** @brief Write a length specified string to the buffer in the form of [strlen_t len][data] */
-        template<class Char> binary_stream& write_nstr(const Char* str, int len) {
+        template<class Char> binary_stream& write_nstr(const Char* str, int len) noexcept {
             return write<strlen_t>(len).write((void*)str, len * (int)sizeof(Char));
         }
-        binary_stream& write(const strview& str)      { return write_nstr(str.str, str.len); }
-        binary_stream& write(const std::string& str)  { return write_nstr(str.c_str(), (int)str.length()); }
-        binary_stream& write(const std::wstring& str) { return write_nstr(str.c_str(), (int)str.length()); }
+        FINLINE binary_stream& write(const strview& str)      noexcept { return write_nstr(str.str, str.len); }
+        FINLINE binary_stream& write(const std::string& str)  noexcept { return write_nstr(str.c_str(), (int)str.length()); }
+        FINLINE binary_stream& write(const std::wstring& str) noexcept { return write_nstr(str.c_str(), (int)str.length()); }
 
         template<class T, class A>
-        binary_stream& write(const std::vector<T, A>& v)
+        binary_stream& write(const std::vector<T, A>& v) noexcept
         {
-            int n = (int)v.size();
+            rpp::int32 n = (int)v.size();
             int cap = min(4 + n * (int)sizeof(T), 1024 * 1024); // fuzzy capacity
             ensure_space(cap);
 
             RPP_CXX17_IF_CONSTEXPR(is_trivial_type<T>)
             {
-                unsafe_write<int>(n);
+                unsafe_write<rpp::int32>(n);
                 unsafe_write(v.data(), n * (int)sizeof(T));
             }
             else
             {
-                write<int>(n);
+                write<rpp::int32>(n);
                 for (const T& item : v)
                     *this << item; // @note ADL fails easily here, use write_vector with custom writer instead
             }
@@ -290,13 +308,13 @@ namespace rpp
         }
 
         template<class T, class A, class Writer>
-        binary_stream& write(const std::vector<T, A>& v, const Writer& writer)
+        binary_stream& write(const std::vector<T, A>& v, const Writer& writer) noexcept
         {
-            int n = (int)v.size();
+            rpp::int32 n = (int)v.size();
             int cap = min(4 + n * (int)sizeof(T), 1024*1024); // fuzzy capacity
             ensure_space(cap);
 
-            write<int>(n);
+            write<rpp::int32>(n);
             for (const T& item : v)
                 writer(*this, item);
             return *this;
@@ -305,82 +323,117 @@ namespace rpp
         ////////////////////// ----- Reader Fields ----- //////////////////////////
 
     private:
-        int unsafe_buffer_fill();
-        int unsafe_buffer_read(void* dst, int bytesToRead);
-        int fragmented_read(void* dst, int bytesToRead);
+        int unsafe_buffer_fill() noexcept;
+        int unsafe_buffer_read(void* dst, int bytesToRead) noexcept;
+        int fragmented_read(void* dst, int bytesToRead) noexcept;
 
-        template<class T> int unsafe_buffer_read(T& dst)
+        template<class T>
+        int unsafe_buffer_read(T& dst) noexcept
         {
-            dst = *(T*)&Ptr[ReadPos];
+            unsafe_buffer_decode(dst);
             ReadPos += (int)sizeof(T);
             return (int)sizeof(T);
         }
 
+        template<class T>
+        void unsafe_buffer_decode(T& dst) noexcept
+        {
+            dst = *reinterpret_cast<T*>(Ptr + ReadPos);
+        }
+
+        void unsafe_buffer_decode(rpp::uint16& dst) noexcept;
+        void unsafe_buffer_decode(rpp::uint32& dst) noexcept;
+        void unsafe_buffer_decode(rpp::uint64& dst) noexcept;
+        FINLINE void unsafe_buffer_decode(rpp::int16& dst) noexcept { unsafe_buffer_decode((rpp::uint16&)dst); }
+        FINLINE void unsafe_buffer_decode(rpp::int32& dst) noexcept { unsafe_buffer_decode((rpp::uint32&)dst); }
+        FINLINE void unsafe_buffer_decode(rpp::int64& dst) noexcept { unsafe_buffer_decode((rpp::uint64&)dst); }
+        void unsafe_buffer_decode(float& dst) noexcept;
+        void unsafe_buffer_decode(double& dst) noexcept;
+
     public:
-        int read(void* dst, int bytesToRead);
-        template<class T> int read(T& dst)
+        int read(void* dst, int bytesToRead) noexcept;
+        template<class T> int read(T& dst) noexcept
         {
             if (size() >= (int)sizeof(T))
-                return unsafe_buffer_read<T>(dst); // best case, all from buffer
+                return unsafe_buffer_read(dst); // best case, all from buffer
             return fragmented_read(&dst, (int)sizeof(T)); // fallback partial read
         }
 
-        int peek(void* dst, int bytesToPeek);
-        
-        template<class T> int peek(T& dst)
+    private:
+        int peek_fetch_avail() noexcept;
+
+    public:
+        int peek(void* dst, int bytesToPeek) noexcept;
+
+        FINLINE int peek(rpp::uint16& dst) noexcept { return peek((rpp::int16&)dst); }
+
+        template<class T>
+        int peek(T& dst) noexcept
         {
-            int avail = size();
-            if (avail <= 0)
-            {
-                if (!Src) return 0;
-                avail = unsafe_buffer_fill(); // fill before peek if possible
-            }
-            if (avail < (int)sizeof(T))
-                return 0;
-            dst = *(T*)&Ptr[ReadPos];
+            int avail = peek_fetch_avail();
+            if (avail < (int)sizeof(T)) return 0;
+            unsafe_buffer_decode(dst);
             return (int)sizeof(T);
         }
-        
+
         /** @brief Skips data in the buffer and in the stream */
-        void skip(int n);
+        void skip(int n) noexcept;
 
         /** @brief Attempts to undo a previous read from the buffer. Not very reliable. */
-        void undo(int n);
+        void undo(int n) noexcept;
 
         /** @brief Reads generic POD type data and returns it */
-        template<class T> T read() { T out{}; read(out); return out; }
+        template<class T> FINLINE T read() noexcept { T out{}; read(out); return out; }
         /** @brief Peeks generic POD type data and returns it without advancing the streampos */
-        template<class T> T peek() { T out{}; peek(out); return out; }
+        template<class T> FINLINE T peek() noexcept { T out{}; peek(out); return out; }
 
-        uint8_t read_byte()   { return read<uint8_t>();} /** @brief Reads a 8-bit unsigned byte   */
-        short   read_short()  { return read<short>();  } /** @brief Reads a 16-bit signed short   */
-        ushort  read_ushort() { return read<ushort>(); } /** @brief Reads a 16-bit unsigned short */
-        int     read_int()    { return read<int>();    } /** @brief Reads a 32-bit signed integer */
-        uint    read_uint()   { return read<uint>();   } /** @brief Reads a 32-bit unsigned integer */
-        int64   read_int64()  { return read<int64>();  } /** @brief Reads a 64-bit signed integer   */
-        uint64  read_uint64() { return read<uint64>(); } /** @brief Reads a 64-bit unsigned integer */
-        float   read_float()  { return read<float>();  } /** @brief Reads a 32-bit float */
-        double  read_double() { return read<double>(); } /** @brief Reads a 64-bit float */
+        /** @brief Reads a 8-bit unsigned byte   */
+        FINLINE rpp::byte read_byte() noexcept { return read<uint8_t>(); }
+        /** @brief Reads a 16-bit signed int   */
+        FINLINE rpp::int16 read_int16() noexcept { return read<rpp::int16>(); }
+        /** @brief Reads a 16-bit unsigned int */
+        FINLINE rpp::uint16 read_uint16() noexcept { return read<rpp::uint16>(); }
+        /** @brief Reads a 32-bit signed integer */
+        FINLINE rpp::int32 read_int32() noexcept { return read<rpp::int32>(); }
+        /** @brief Reads a 32-bit unsigned integer */
+        FINLINE rpp::uint32 read_uint32() noexcept { return read<rpp::uint32>(); }
+        /** @brief Reads a 64-bit signed integer   */
+        FINLINE rpp::int64 read_int64() noexcept { return read<rpp::int64>(); }
+        /** @brief Reads a 64-bit unsigned integer */
+        FINLINE rpp::uint64 read_uint64() noexcept { return read<rpp::uint64>(); }
+        /** @brief Reads a 32-bit float */
+        FINLINE float read_float() noexcept { return read<float>();  }
+        /** @brief Reads a 64-bit float */
+        FINLINE double read_double() noexcept { return read<double>(); }
 
-        uint8_t peek_byte()   { return peek<uint8_t>();}/** @brief Peeks a 8-bit unsigned byte without advancing the streampos   */
-        short   peek_short()  { return peek<short>();  } /** @brief Peeks a 16-bit signed short without advancing the streampos   */
-        ushort  peek_ushort() { return peek<ushort>(); } /** @brief Peeks a 16-bit unsigned short without advancing the streampos */
-        int     peek_int()    { return peek<int>();    } /** @brief Peeks a 32-bit signed integer without advancing the streampos */
-        uint    peek_uint()   { return peek<uint>();   } /** @brief Peeks a 32-bit unsigned integer without advancing the streampos */
-        int64   peek_int64()  { return peek<int64>();  } /** @brief Peeks a 64-bit signed integer without advancing the streampos   */
-        uint64  peek_uint64() { return peek<uint64>(); } /** @brief Peeks a 64-bit unsigned integer without advancing the streampos */
-        float   peek_float()  { return peek<float>();  } /** @brief Peeks a 32-bit float */
-        double  peek_double() { return peek<double>(); } /** @brief Peeks a 64-bit float */
+        /** @brief Peeks a 8-bit unsigned byte without advancing the streampos   */
+        FINLINE rpp::byte peek_byte() noexcept { return peek<rpp::byte>();}
+        /** @brief Peeks a 16-bit signed int without advancing the streampos   */
+        FINLINE rpp::int16 peek_int16() noexcept { return peek<rpp::int16>(); }
+        /** @brief Peeks a 16-bit unsigned int without advancing the streampos */
+        FINLINE rpp::uint16 peek_uint16() noexcept { return peek<rpp::uint16>(); }
+        /** @brief Peeks a 32-bit signed integer without advancing the streampos */
+        FINLINE rpp::int32 peek_int32() noexcept { return peek<rpp::int32>(); }
+        /** @brief Peeks a 32-bit unsigned integer without advancing the streampos */
+        FINLINE rpp::uint32 peek_uint32() noexcept { return peek<rpp::uint32>(); }
+        /** @brief Peeks a 64-bit signed integer without advancing the streampos   */
+        FINLINE rpp::int64 peek_int64() noexcept { return peek<rpp::int64>(); }
+        /** @brief Peeks a 64-bit unsigned integer without advancing the streampos */
+        FINLINE rpp::uint64 peek_uint64() noexcept { return peek<rpp::uint64>(); }
+        /** @brief Peeks a 32-bit float */
+        FINLINE float peek_float() noexcept { return peek<float>();  }
+        /** @brief Peeks a 64-bit float */
+        FINLINE double peek_double() noexcept { return peek<double>(); }
 
         /** @brief Reads a length specified string to the std::string in the form of [strlen_t len][data] */
-        template<class Char> binary_stream& read(std::basic_string<Char>& str) {
+        template<class Char> binary_stream& read(std::basic_string<Char>& str) noexcept {
             strlen_t n = read<strlen_t>();
             str.resize(size_t(n));
             read((void*)str.data(), (int)sizeof(Char) * n);
             return *this;
         }
         /** @brief Reads a length specified string to the dst buffer in the form of [strlen_t len][data] and returns actual length */
-        template<class Char> int read_nstr(Char* dst, int maxLen) {
+        template<class Char> int read_nstr(Char* dst, int maxLen) noexcept {
             strlen_t n = read<strlen_t>();
             strlen_t m = min<strlen_t>(n, maxLen);
             int actual = read((void*)dst, (int)sizeof(Char) * m);
@@ -389,7 +442,7 @@ namespace rpp
             return actual;
         }
         /** @brief Peeks a length specified string to the std::string in the form of [strlen_t len][data] */
-        template<class Char> binary_stream& peek(std::basic_string<Char>& str) {
+        template<class Char> binary_stream& peek(std::basic_string<Char>& str) noexcept {
             // we cannot peek, because read<T>() causes side effects and read buffer is too small
             if (size() < (int)sizeof(strlen_t)) {
                 str.clear();
@@ -403,7 +456,7 @@ namespace rpp
             return *this;
         }
         /** @brief Peeks a length specified string to the dst buffer in the form of [strlen_t len][data] and returns actual length */
-        template<class Char> int peek_nstr(Char* dst, int maxLen) {
+        template<class Char> int peek_nstr(Char* dst, int maxLen) noexcept {
             // we cannot peek, because read<T>() causes side effects and read buffer is too small
             if (size() < (int)sizeof(strlen_t)) {
                 dst[0] = Char('\0');
@@ -416,16 +469,21 @@ namespace rpp
             return n;
         }
 
-        std::string  read_string()  { std::string  s; read(s); return s; } /** @brief Reads a length specified [strlen_t len][data] string */
-        std::wstring read_wstring() { std::wstring s; read(s); return s; } /** @brief Reads a length specified [strlen_t len][data] wstring */
-        std::string  peek_string()  { std::string  s; peek(s); return s; } /** @brief Peeks a length specified [strlen_t len][data] string */
-        std::wstring peek_wstring() { std::wstring s; peek(s); return s; } /** @brief Peeks a length specified [strlen_t len][data] wstring */
-        strview      peek_strview(); /** @brief Peeks a length specified [strlen_t len][data] string view */
+        /** @brief Reads a length specified [strlen_t len][data] string */
+        FINLINE std::string read_string() noexcept { std::string  s; read(s); return s; }
+        /** @brief Reads a length specified [strlen_t len][data] wstring */
+        FINLINE std::wstring read_wstring() noexcept { std::wstring s; read(s); return s; }
+        /** @brief Peeks a length specified [strlen_t len][data] string */
+        FINLINE std::string peek_string() noexcept { std::string  s; peek(s); return s; }
+        /** @brief Peeks a length specified [strlen_t len][data] wstring */
+        FINLINE std::wstring peek_wstring() noexcept { std::wstring s; peek(s); return s; }
+        /** @brief Peeks a length specified [strlen_t len][data] string view */
+        strview peek_strview() noexcept;
     
         template<class T, class A>
-        binary_stream& read(std::vector<T, A>& out)
+        binary_stream& read(std::vector<T, A>& out) noexcept
         {
-            int n = read_int();
+            int n = read_int32();
             out.clear();
             RPP_CXX17_IF_CONSTEXPR(is_trivial_type<T>)
             {
@@ -436,21 +494,16 @@ namespace rpp
             {
                 out.reserve(size_t(n));
                 for (int i = 0; i < n; ++i) {
-                #if _MSC_VER
                     *this >> out.emplace_back();
-                #else
-                    out.emplace_back();
-                    *this >> out.back();
-                #endif
                 }
             }
             return *this;
         }
 
         template<class T, class A, class Reader>
-        binary_stream& read(std::vector<T, A>& out, const Reader& reader)
+        binary_stream& read(std::vector<T, A>& out, const Reader& reader) noexcept
         {
-            int n = read_int();
+            int n = read_int32();
             out.clear();
             out.reserve(size_t(n));
             for (int i = 0; i < n; ++i)
@@ -460,48 +513,48 @@ namespace rpp
     };
 
     // explicit operator<< overloads
-    inline binary_stream& operator<<(binary_stream& w, const strview& v)      { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, const std::string& v)  { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, const std::wstring& v) { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, bool v)   { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, char v)   { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, uint8_t v){ return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, short v)  { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, ushort v) { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, int v)    { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, uint v)   { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, int64 v)  { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, uint64 v) { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, float v)  { return w.write(v); }
-    inline binary_stream& operator<<(binary_stream& w, double v) { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, const strview& v)      noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, const std::string& v)  noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, const std::wstring& v) noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, bool v)   noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, char v)   noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::byte v)   noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::int16 v)  noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::uint16 v) noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::int32 v)  noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::uint32 v) noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::int64 v)  noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, rpp::uint64 v) noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, float v)  noexcept { return w.write(v); }
+    inline binary_stream& operator<<(binary_stream& w, double v) noexcept { return w.write(v); }
     template<class T>
-    binary_stream& operator<<(binary_stream& w, const std::vector<T>& v)
+    inline binary_stream& operator<<(binary_stream& w, const std::vector<T>& v) noexcept
     {
         return w.write(v);
     }
-    inline binary_stream& operator<<(binary_stream& w, binary_stream& m(binary_stream&)) { return m(w); }
-    inline binary_stream& endl(binary_stream& w) { w.flush(); return w; }
+    inline binary_stream& operator<<(binary_stream& w, binary_stream& m(binary_stream&)) noexcept { return m(w); }
+    inline binary_stream& endl(binary_stream& w) noexcept { w.flush(); return w; }
 
-    inline binary_stream& operator>>(binary_stream& r, strview& v)      { r.peek(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, std::string& v)  { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, std::wstring& v) { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, bool& v)   { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, char& v)   { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, uint8_t& v){ r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, short& v)  { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, ushort& v) { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, int& v)    { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, uint& v)   { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, int64& v)  { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, uint64& v) { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, float& v)  { r.read(v); return r; }
-    inline binary_stream& operator>>(binary_stream& r, double& v) { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, strview& v)      noexcept { r.peek(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, std::string& v)  noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, std::wstring& v) noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, bool& v)   noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, char& v)   noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::byte& v)   noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::int16& v)  noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::uint16& v) noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::int32& v)  noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::uint32& v) noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::int64& v)  noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, rpp::uint64& v) noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, float& v)  noexcept { r.read(v); return r; }
+    inline binary_stream& operator>>(binary_stream& r, double& v) noexcept { r.read(v); return r; }
     template<class T, class A>
-    binary_stream& operator>>(binary_stream& r, std::vector<T, A>& out)
+    inline binary_stream& operator>>(binary_stream& r, std::vector<T, A>& out) noexcept
     {
         return r.read(out);
     }
-    inline binary_stream& operator>>(binary_stream& r, binary_stream& m(binary_stream&)) { return m(r); }
+    inline binary_stream& operator>>(binary_stream& r, binary_stream& m(binary_stream&)) noexcept { return m(r); }
 
 
 
@@ -576,73 +629,7 @@ namespace rpp
         void stream_skip(int n) noexcept override;
     };
 
-
-    /**
-     * Almost identical to lock_guard, but allows move semantics
-     */
-    template<class Mutex = rpp::mutex> struct scoped_guard
-    {
-        Mutex* Mut;
-        explicit scoped_guard(Mutex& m) : Mut(&m) { m.lock(); }
-        ~scoped_guard() noexcept { if (Mut) Mut->unlock(); }
-
-        scoped_guard(scoped_guard&& fwd) noexcept : Mut(fwd.Mut) { fwd.Mut = 0; }
-        scoped_guard& operator=(scoped_guard&& fwd) noexcept {
-            std::swap(Mut, fwd.Mut);
-            return *this;
-        }
-        scoped_guard(const scoped_guard&)            = delete;
-        scoped_guard& operator=(const scoped_guard&) = delete;
-    };
-
-
-    /**
-     * A simple socket_writer wrapper that provides a lock_guard facility
-     * for writing to the socket_writer buffer across multiple threads
-     *
-     * @warning Write operations may cause a flush(), so make sure to use nonblocking sockets
-     *          otherwise you will experience long lock times
-     */
-    class RPPAPI shared_socket_writer : public socket_writer
-    {
-    protected:
-        rpp::mutex Mutex;
-    public:
-        using socket_writer::socket_writer;
-
-        // Acquire a scoped lock_guard on this socket writer's mutex
-        // Ex:     auto&& lock = writer.guard();
-        //
-        scoped_guard<rpp::mutex> guard() noexcept {
-            return scoped_guard<rpp::mutex>{ Mutex };
-        }
-    };
-
-
-    /**
-     * A simple socket_reader wrapper that provides a lock_guard facility
-     * for reading from the socket_reader buffer across multiple threads
-     *
-     * @warning Read operations may cause a buffer fill event, so make
-     *          sure the socket has enough data available to continue
-     */
-    class RPPAPI shared_socket_reader : public socket_reader
-    {
-    protected:
-        rpp::mutex Mutex;
-    public:
-        using socket_reader::socket_reader;
-
-        // Acquire a scoped lock_guard on this socket reader's mutex
-        // Ex:     auto&& lock = reader.guard();
-        //
-        scoped_guard<rpp::mutex> guard() noexcept {
-            return scoped_guard<rpp::mutex>{ Mutex };
-        }
-    };
-
-
-#endif
+#endif // ifndef RPP_BINARY_READWRITE_NO_SOCKETS
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -672,10 +659,10 @@ namespace rpp
         ~file_writer() noexcept;
 
         /** @return Tells the current virtual write position of the stream */
-        int tell() const { return File->tell() + writepos(); }
+        int tell() const noexcept { return File->tell() + writepos(); }
 
         /** @return Currently flushed size of the file stream */
-        int stream_size() const { return File->size(); }
+        int stream_size() const noexcept { return File->size(); }
 
         /**
          * Close the file stream. Any seek, write, etc. Operations are not valid after this call.
@@ -683,7 +670,7 @@ namespace rpp
          * @warning This will flush the write buffer!
          * @note This will also clear the read buffer!
          */
-        void close()
+        void close() noexcept
         {
             flush_write_buffer();
             clear();
@@ -695,7 +682,7 @@ namespace rpp
          * @return The new position in the stream
          * @note This will also clear the read buffer!
          */
-        int seek(int filepos, int seekmode = 0)
+        int seek(int filepos, int seekmode = 0) noexcept
         {
             flush_write_buffer();
             clear();
@@ -704,7 +691,7 @@ namespace rpp
 
         void set_file(rpp::file& file) noexcept { File = &file; }
         NOCOPY_NOMOVE(file_writer)
-        
+
         bool stream_good() const noexcept override { return File && File->good(); }
         int stream_write(const void* data, int numBytes) noexcept override;
         void stream_flush() noexcept override;
@@ -736,17 +723,17 @@ namespace rpp
         ~file_reader() noexcept;
 
         /** @return Tells the current virtual read position of the stream */
-        int tell() const { return File->tell() - size(); }
+        int tell() const noexcept { return File->tell() - size(); }
 
         /** @return Currently flushed size of the file stream */
-        int stream_size() const { return File->size(); }
+        int stream_size() const noexcept { return File->size(); }
 
         /**
          * Close the file stream. Any seek, read, etc. Operations are not valid after this call.
          * stream_good() and good() will return false
          * @note This will also clear the read buffer!
          */
-        void close()
+        void close() noexcept
         {
             clear();
             File->close();
@@ -757,7 +744,7 @@ namespace rpp
          * @return The new position in the stream
          * @note This will clear the read buffer!
          */
-        int seek(int filepos, int seekmode = 0)
+        int seek(int filepos, int seekmode = 0) noexcept
         {
             clear();
             return File->seek(filepos, seekmode);
@@ -777,7 +764,7 @@ namespace rpp
         void stream_skip(int n) noexcept override;
     };
 
-#endif
+#endif // ifndef RPP_BINARY_READWRITE_NO_FILE_IO
 
     ////////////////////////////////////////////////////////////////////////////
 } // namespace ReCpp
