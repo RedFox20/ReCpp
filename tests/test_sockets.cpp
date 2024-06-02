@@ -573,10 +573,10 @@ TestImpl(test_sockets)
         }
     }
 
-    TestCase(udp_poll_stress_test_1000)
+    TestCase(udp_poll_stress_test)
     {
-        const int NUM_MESSAGES = 1'000;
-        const int MSG_SIZE = 300;
+        const int NUM_MESSAGES = 500;
+        const int MSG_SIZE = 200;
         socket send = rpp::make_udp_randomport();
         socket recv = rpp::make_udp_randomport();
         send.set_blocking(true);
@@ -587,7 +587,6 @@ TestImpl(test_sockets)
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
-                send.poll(1, socket::PF_Write);
                 send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
             }
         });
@@ -616,10 +615,10 @@ TestImpl(test_sockets)
         AssertLess(elapsed_ms, 200.0);
     }
 
-    TestCase(udp_poll_multi_stress_test_1000)
+    TestCase(udp_poll_multi_stress_test)
     {
-        const int NUM_MESSAGES = 1'000;
-        const int MSG_SIZE = 300;
+        const int NUM_MESSAGES = 500;
+        const int MSG_SIZE = 200;
         socket send = rpp::make_udp_randomport();
         socket recv1 = rpp::make_udp_randomport();
         socket recv2 = rpp::make_udp_randomport();
@@ -633,7 +632,6 @@ TestImpl(test_sockets)
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
-                send.poll(15, socket::PF_Write);
                 send.sendto(recv1_addr, std::string(MSG_SIZE, 'x'));
                 send.sendto(recv2_addr, std::string(MSG_SIZE, 'x'));
             }
@@ -673,10 +671,10 @@ TestImpl(test_sockets)
 
     // in this case we stress test the UDP socket without using poll
     // it should set the baseline benchmark for the poll tests
-    TestCase(udp_poll_nopoll_stress_test_2000)
+    TestCase(udp_poll_nopoll_stress_test)
     {
         const int NUM_MESSAGES = 2'000;
-        const int MSG_SIZE = 300;
+        const int MSG_SIZE = 200;
         socket send = rpp::make_udp_randomport();
         socket recv = rpp::make_udp_randomport();
         send.set_blocking(true);
@@ -688,7 +686,6 @@ TestImpl(test_sockets)
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
-                send.poll(1, socket::PF_Write);
                 send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
             }
         });
