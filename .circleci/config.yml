@@ -15,11 +15,9 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      # giving false positives, annoying, disable for now
-      #- run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
-      - run: CXX20=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama clang verbose build
+      - run: CXX20=1 pipenv run mama clang verbose build with_tests coverage
       - run: pipenv run mama clang verbose test="nogdb -vv"
-      - run: gcovr --sort-percentage -r src build/ReCpp/linux
+      - run: pipenv run mama coverage-report=src
       # do a second run with thread sanitizer
       # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
       # - run: pipenv run mama clang verbose test="nogdb -vv"
@@ -35,11 +33,9 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      # giving false positives, annoying, disable for now
-      #- run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 pipenv run mama clang verbose build
-      - run: CXX17=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama clang verbose build
+      - run: CXX17=1 pipenv run mama clang verbose build with_tests coverage
       - run: pipenv run mama clang verbose test="nogdb -vv"
-      - run: gcovr --sort-percentage -r src build/ReCpp/linux
+      - run: pipenv run mama coverage-report=src
   gcc-ubuntu-cpp20:
     description: Ubuntu GCC C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -52,12 +48,9 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: BUILD_WITH_MEM_SAFETY=ON CXX20=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama gcc verbose build
+      - run: CXX20=1 pipenv run mama gcc verbose build with_tests coverage asan
       - run: pipenv run mama gcc verbose test="nogdb -vv"
-      - run: gcovr --sort-percentage -r src build/ReCpp/linux
-      # do a second run with thread sanitizer
-      # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
-      # - run: pipenv run mama clang verbose test="nogdb -vv"
+      - run: pipenv run mama coverage-report=src
   gcc-ubuntu-cpp17:
     description: Ubuntu GCC C++17 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -70,20 +63,42 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
-      - run: BUILD_WITH_MEM_SAFETY=ON CXX17=1 BUILD_TESTS=1 BUILD_WITH_CODE_COVERAGE=1 pipenv run mama gcc verbose build
+      - run: CXX17=1 pipenv run mama gcc verbose build with_tests coverage asan
       - run: pipenv run mama gcc verbose test="nogdb -vv"
-      - run: gcovr --sort-percentage -r src build/ReCpp/linux
+      - run: pipenv run mama coverage-report=src
+  gcc-ubuntu-tsan-cpp20:
+    description: Ubuntu GCC C++20 x64 Build with ThreadSanitizer
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
+      - run: pipenv install mama
+      - run: sudo apt-get install gcc-11 -y
+      - run: make configure-cmake
+      - run: CXX20=1 pipenv run mama gcc verbose build with_tests tsan
+      - run: pipenv run mama gcc verbose test="nogdb -vv"
+  gcc-ubuntu-ubsan-cpp20:
+    description: Ubuntu GCC C++20 x64 Build with UndefinedBehaviorSanitizer
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
+      - run: pipenv install mama
+      - run: sudo apt-get install gcc-11 -y
+      - run: make configure-cmake
+      - run: CXX20=1 pipenv run mama gcc verbose build with_tests ubsan
+      - run: pipenv run mama gcc verbose test="nogdb -vv"
   msvc-win64-cpp20:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:
       name: win/default
       size: medium # can be medium, large, xlarge, 2xlarge
-    environment:
-      PIPELINE_NUMBER: << pipeline.number >>
-      QT_VERSION: "5.15.2"
-      Qt5_DIR: "C:\\Qt\\5.15.2\\msvc2019_64\\lib\\cmake\\Qt5"
-      QT_BIN: "C:\\Qt\\5.15.2\\msvc2019_64\\bin"
-      JOM_PATH: "C:\\Qt\\Tools\\QtCreator\\bin\\jom"
     steps:
       - checkout
       - run: pip3 install mama
@@ -94,8 +109,7 @@ jobs:
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
               $env:BUILD_WITH_MEM_SAFETY="ON";
               $env:CXX20="1";
-              $env:BUILD_TESTS="1";
-              mama windows verbose build
+              mama windows verbose build with_tests
       - run:
           name: Tests
           command: |
@@ -116,8 +130,7 @@ jobs:
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
               $env:BUILD_WITH_MEM_SAFETY="ON";
               $env:CXX17="1";
-              $env:BUILD_TESTS="1";
-              mama windows verbose build
+              mama windows verbose build with_tests
       - run:
           name: Tests
           command: |
@@ -145,7 +158,7 @@ jobs:
       - run: make configure-cmake
       - run: make configure-pip3
       - run: pip3 install mama
-      - run: CXX17=1 BUILD_TESTS=1 mama android verbose build
+      - run: CXX17=1 mama android verbose build with_tests
   clang-android-cpp20:
     description: Android C++20 Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -156,7 +169,7 @@ jobs:
       - run: make configure-cmake
       - run: make configure-pip3
       - run: pip3 install mama
-      - run: CXX20=1 BUILD_TESTS=1 mama android verbose build
+      - run: CXX20=1 mama android verbose build with_tests
 
 workflows:
   build_all:
@@ -165,6 +178,8 @@ workflows:
       - clang-ubuntu-cpp17
       - gcc-ubuntu-cpp20
       - gcc-ubuntu-cpp17
+      - gcc-ubuntu-tsan-cpp20
+      - gcc-ubuntu-ubsan-cpp20
       - msvc-win64-cpp20
       - msvc-win64-cpp17
       - gcc-mipsel-cpp20

@@ -153,7 +153,8 @@ TestImpl(test_threadpool)
         // Continuous Integration machines are virtualized,
         // so the parallelism are shared between VM's which can lead to invalid test results
         // Attempt to detect this and limit the number of tasks
-        if (thread_pool::global_max_parallelism() > 8)
+        const int default_parallelism = thread_pool::global_max_parallelism();
+        if (default_parallelism > 8)
         {
             print_info("Limiting Max Parallelism to 8\n");
             thread_pool::set_global_max_parallelism(8);
@@ -185,7 +186,7 @@ TestImpl(test_threadpool)
         print_info("Singlethread elapsed: %.4fs  result: %lld\n", serial_elapsed, (long long)sum2);
         AssertThat((long long)sum2, 3299527397221461LL);
 
-        int parallelism = thread_pool::global_max_parallelism();
+        const int parallelism = thread_pool::global_max_parallelism();
         print_info("Test System # Max Parallelism: %d\n", parallelism);
         if (parallelism == 1)
         {
@@ -199,11 +200,15 @@ TestImpl(test_threadpool)
         }
         else
         {
-            AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.001);
+            // no point running this under ASAN/TSAN/UBSAN, it will most likely always fail
+            #if !RPP_SANITIZERS
+                AssertLessOrEqual(parallel_elapsed, serial_elapsed + 0.001);
+            #endif
         }
 
         print_info("Global Thread Pool idle tasks: %d\n", thread_pool::global().idle_tasks());
         print_info("Global Thread Pool active tasks: %d\n", thread_pool::global().active_tasks());
+        thread_pool::set_global_max_parallelism(default_parallelism);
     }
 
     TestCase(parallel_foreach)

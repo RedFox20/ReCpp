@@ -193,8 +193,11 @@ TestImpl(memory_pool)
         AssertGreater(info2.virtual_size, info.virtual_size);
         AssertGreater(info2.physical_mem, info.physical_mem);
 
-        // ensure it's within reasonable range
-        AssertLess(info2.virtual_size - info.virtual_size, size_t(num_bytes*1.1));
-        AssertLess(info2.physical_mem - info.physical_mem, size_t(num_bytes*1.1));
+        // no point in running this check under ASAN/TSAN
+        #if !RPP_SANITIZERS
+            // ensure it's within reasonable range
+            AssertLess(info2.virtual_size - info.virtual_size, size_t(num_bytes*1.1));
+            AssertLess(info2.physical_mem - info.physical_mem, size_t(num_bytes*1.1));
+        #endif
     }
 };

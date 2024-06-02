@@ -80,6 +80,39 @@
 #  endif
 #endif
 
+/// @brief evaluates TRUE if AddressSanitizer is enabled
+#if defined(__SANITIZE_ADDRESS__)
+#  define RPP_ASAN 1
+#elif __clang__
+#  if __has_feature(address_sanitizer)
+#    define RPP_ASAN 1
+#  endif
+#endif
+
+#if defined(__SANITIZE_THREAD__)
+#  define RPP_TSAN 1
+#elif __clang__
+#  if __has_feature(thread_sanitizer)
+#    define RPP_TSAN 1
+#  endif
+#endif
+
+#if __clang__
+#  if __has_feature(undefined_behavior_sanitizer)
+#    define RPP_UBSAN 1
+#  endif
+#endif
+
+
+/// @brief evaluates TRUE if any sanitizers are enabled
+#ifndef RPP_SANITIZERS
+#  if defined(RPP_ASAN) || defined(RPP_TSAN) || defined(RPP_UBSAN)
+#    define RPP_SANITIZERS 1
+#  else
+#    define RPP_SANITIZERS 0
+#  endif
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE
