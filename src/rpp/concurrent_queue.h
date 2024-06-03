@@ -94,12 +94,13 @@ namespace rpp
 
         [[nodiscard]] FINLINE lock_t spin_lock() const noexcept
         {
-            return rpp::semaphore::spin_lock(Mutex);
+            return rpp::spin_lock(Mutex);
         }
 
         /** @returns TRUE if this queue is empty */
         [[nodiscard]] FINLINE bool empty() const noexcept
         {
+            auto lock = spin_lock();
             return Head == Tail;
         }
 
@@ -256,7 +257,7 @@ namespace rpp
          */
         [[nodiscard]] bool try_pop_all(std::vector<T>& outItems) noexcept
         {
-            if (empty())
+            if (Head == Tail)
                 return false;
 
             if (mutex().try_lock())
@@ -325,7 +326,7 @@ namespace rpp
         {
             T item;
             auto lock = spin_lock();
-            if (empty())
+            if (Head == Tail)
                 throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
             pop_unlocked(item);
             return item;
@@ -340,12 +341,12 @@ namespace rpp
          */ 
         [[nodiscard]] bool try_pop(T& outItem) noexcept
         {
-            if (empty())
+            if (Head == Tail)
                 return false;
 
             if (mutex().try_lock())
             {
-                if (empty())
+                if (Head == Tail)
                 {
                     mutex().unlock();
                     return false;
@@ -368,12 +369,12 @@ namespace rpp
          */
         [[nodiscard]] bool peek(T& outItem) const noexcept
         {
-            if (empty())
+            if (Head == Tail)
                 return false;
 
             if (mutex().try_lock())
             {
-                if (empty())
+                if (Head == Tail)
                 {
                     mutex().unlock();
                     return false;
@@ -407,12 +408,12 @@ namespace rpp
          */
         [[nodiscard]] bool pop_atomic_start(T& outItem) noexcept
         {
-            if (empty())
+            if (Head == Tail)
                 return false;
 
             if (mutex().try_lock())
             {
-                if (empty())
+                if (Head == Tail)
                 {
                     mutex().unlock();
                     return false;
@@ -433,7 +434,7 @@ namespace rpp
         void pop_atomic_end() noexcept
         {
             auto lock = spin_lock();
-            if (!empty())
+            if (Head != Tail)
                 pop_unlocked();
         }
 
@@ -650,7 +651,7 @@ namespace rpp
                                const WaitUntil& cancelCondition) noexcept(noexcept(cancelCondition()))
         {
             auto lock = spin_lock();
-            if (empty())
+            if (Head == Tail)
             {
                 duration remaining = timeout;
                 time_point prevTime = clock::now();
@@ -664,7 +665,7 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, prevTime + interval); // may throw
                 #endif
-                    if (!empty()) break; // got data
+                    if (Head != Tail) break; // got data
                     if (Cleared) return false; // give up immediately
 
                     time_point now = clock::now();
@@ -676,9 +677,9 @@ namespace rpp
                     // make sure we don't suspend past the final waiting point
                     if (interval > remaining)
                         interval = remaining;
-                } while (empty());
+                } while (Head == Tail);
 
-                if (empty())
+                if (Head == Tail)
                     return false;
             }
             pop_unlocked(outItem);
@@ -689,14 +690,14 @@ namespace rpp
         // waits until any wakeup signal and returns true if there is an item
         bool wait_notify(lock_t& lock) const noexcept
         {
-            if (!empty()) return true; // wait is not needed
+            if (Head != Tail) return true; // wait is not needed
             (void)Waiter.wait(lock); // noexcept
-            return !empty();
+            return Head != Tail;
         }
         // wait_notify with a timeout, returns true if there is an item
         bool wait_notify_for(lock_t& lock, const duration& timeout) const noexcept
         {
-            if (!empty()) return true; // wait is not needed
+            if (Head != Tail) return true; // wait is not needed
             auto now = clock::now();
             auto end = now + timeout;
             do {
@@ -706,7 +707,7 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, end); // may throw
                 #endif
-                if (!empty()) return true; // got an item
+                if (Head != Tail) return true; // got an item
                 if (Cleared) return false; // give up immediately
                 now = clock::now();
             } while (now < end); // handle spurious wakeups
@@ -714,7 +715,7 @@ namespace rpp
         }
         bool wait_notify_until(lock_t& lock, const time_point& until) const noexcept
         {
-            if (!empty()) return true; // wait is not needed
+            if (Head != Tail) return true; // wait is not needed
             time_point now;
             #if _MSC_VER
                 now = clock::now();
@@ -726,7 +727,7 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, until); // may throw
                 #endif
-                if (!empty()) return true; // got an item
+                if (Head != Tail) return true; // got an item
                 if (Cleared) return false; // give up immediately
                 now = clock::now();
             } while (now < until); // handle spurious wakeups

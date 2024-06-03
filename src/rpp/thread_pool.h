@@ -130,6 +130,7 @@ namespace rpp
 
         // this is only null if no task was ever given
         std::shared_ptr<state> s;
+        rpp::mutex m; // copy/move mutex
 
     public:
         using duration = std::chrono::high_resolution_clock::duration;
@@ -137,9 +138,52 @@ namespace rpp
         pool_task_handle(std::nullptr_t) noexcept : s{} {}
         pool_task_handle(pool_worker* w) noexcept : s{std::make_shared<state>(w)} {}
 
-        explicit operator bool() const noexcept { return s && !s->finished.is_set(); }
-        bool is_started() const noexcept { return s && !s->finished.is_set(); }
-        bool is_finished() const noexcept { return !s || s->finished.is_set(); }
+        ~pool_task_handle() noexcept
+        {
+            auto lock = rpp::spin_lock(m);
+            s.reset();
+        }
+
+        pool_task_handle(const pool_task_handle& other) noexcept : s{}
+        {
+            this->operator=(other);
+        }
+        pool_task_handle(pool_task_handle&& other) noexcept : s{}
+        {
+            this->operator=(std::move(other));
+        }
+
+        pool_task_handle& operator=(const pool_task_handle& other) noexcept
+        {
+            if (this != &other)
+            {
+                auto lock = rpp::spin_lock(m);
+                s = other.s;
+            }
+            return *this;
+        }
+        pool_task_handle& operator=(pool_task_handle&& other) noexcept
+        {
+            if (this != &other)
+            {
+                auto lock = rpp::spin_lock(m);
+                std::swap(s, other.s);
+            }
+            return *this;
+        }
+
+        explicit operator bool() const noexcept
+        {
+            return s && !s->finished.is_set();
+        }
+        bool is_started() const noexcept
+        {
+            return s && !s->finished.is_set();
+        }
+        bool is_finished() const noexcept
+        {
+            return !s || s->finished.is_set();
+        }
 
         // wait for task to finish with timeout
         // if timeout duration is 0, then task completion is checked atomically

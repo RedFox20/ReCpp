@@ -102,7 +102,7 @@ namespace rpp
         wait_result result = wait_result::finished;
         if (auto p = s)
         {
-            if (s->finished.wait_no_unset(timeout) == rpp::semaphore::timeout)
+            if (p->finished.wait_no_unset(timeout) == rpp::semaphore::timeout)
                 result = wait_result::timeout;
             if (auto e = p->error; outErr != nullptr && !*outErr)
                 *outErr = e;
@@ -140,8 +140,8 @@ namespace rpp
     {
         if (auto p = s)
         {
-            auto lock = s->finished.spin_lock();
-            s->finished.notify_all(lock);
+            auto lock = p->finished.spin_lock();
+            p->finished.notify_all(lock);
         }
     }
 
@@ -160,6 +160,7 @@ namespace rpp
 
     void pool_worker::max_idle_time(float max_idle_seconds) noexcept
     {
+        auto lock = new_task_flag.spin_lock();
         max_idle_timeout = std::chrono::milliseconds{int(max_idle_seconds*1000)};
     }
 

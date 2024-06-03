@@ -10,6 +10,8 @@ using namespace std::this_thread;
 
 TestImpl(test_coroutines)
 {
+    rpp::mutex m;
+
     TestInit(test_coroutines)
     {
     }
@@ -20,6 +22,19 @@ TestImpl(test_coroutines)
     }
 
 #if RPP_HAS_COROUTINES
+
+    template<class T>
+    void set_locked(T& out, const T& value)
+    {
+        std::lock_guard lock{m};
+        out = value;
+    }
+    template<class T>
+    T get_locked(const T& value)
+    {
+        std::lock_guard lock{m};
+        return value;
+    }
 
     rpp::cfuture<void> chrono_coro(int millis)
     {
@@ -57,14 +72,14 @@ TestImpl(test_coroutines)
     cfuture<void> void_coro(std::string& result)
     {
         co_await std::chrono::milliseconds{1};
-        result = co_await string_coro();
+        set_locked(result, co_await string_coro());
         co_return;
     }
     TestCase(basic_void_coro)
     {
         std::string result = "default";
         auto f = void_coro(result);
-        AssertThat(result, "default"s);
+        AssertThat(get_locked(result), "default"s);
         f.get();
         AssertThat(result, "string from coro"s);
     }

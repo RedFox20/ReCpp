@@ -69,30 +69,7 @@ namespace rpp
 
 
         /** @brief Attempts to spin-loop and acquire the internal mutex */
-        [[nodiscard]] FINLINE lock_t spin_lock() const noexcept { return spin_lock(m); }
-
-        static NOINLINE lock_t spin_lock(mutex_t& m) noexcept
-        {
-            if (!m.try_lock()) // spin until we can lock the mutex
-            {
-                for (int i = 0; i < 10; ++i)
-                {
-                    std::this_thread::yield(); // yielding here will improve perf massively
-                    if (m.try_lock())
-                        return lock_t{m, std::adopt_lock};
-                }
-                // suspend until we can lock the mutex
-                try {
-                    m.lock(); // may throw if deadlock
-                } catch (...) {
-                    // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
-                    // simply give up and return a deferred lock
-                    return lock_t{m, std::defer_lock};
-                }
-            }
-            return lock_t{m, std::adopt_lock};
-        }
-
+        [[nodiscard]] FINLINE lock_t spin_lock() const noexcept { return rpp::spin_lock(m); }
 
         /**
          * @brief Increments the semaphore count and notifies one waiting thread
