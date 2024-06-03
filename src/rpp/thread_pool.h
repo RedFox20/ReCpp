@@ -127,6 +127,8 @@ namespace rpp
             pool_worker* worker = nullptr;
             state(pool_worker* w) noexcept : worker{w} {}
         };
+
+        // this is only null if no task was ever given
         std::shared_ptr<state> s;
 
     public:
@@ -135,11 +137,9 @@ namespace rpp
         pool_task_handle(std::nullptr_t) noexcept : s{} {}
         pool_task_handle(pool_worker* w) noexcept : s{std::make_shared<state>(w)} {}
 
-        bool valid() const noexcept { return s.get() != nullptr; }
-        explicit operator bool() const noexcept { return s.get() != nullptr; }
-        bool operator!=(std::nullptr_t) const noexcept { return s.get() != nullptr; }
-        bool operator==(const pool_task_handle& other) const noexcept { return s.get() == other.s.get(); }
-        bool operator!=(const pool_task_handle& other) const noexcept { return s.get() != other.s.get(); }
+        explicit operator bool() const noexcept { return s && !s->finished.is_set(); }
+        bool is_started() const noexcept { return s && !s->finished.is_set(); }
+        bool is_finished() const noexcept { return !s || s->finished.is_set(); }
 
         // wait for task to finish with timeout
         // if timeout duration is 0, then task completion is checked atomically
@@ -202,7 +202,7 @@ namespace rpp
         /**
          * @return TRUE if pool_worker is running a task
          */
-        bool running() const noexcept { return (bool)current_task; }
+        bool running() const noexcept { return current_task.is_started(); }
 
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param max_idle_seconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever

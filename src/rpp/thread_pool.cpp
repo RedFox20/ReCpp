@@ -140,8 +140,8 @@ namespace rpp
     {
         if (auto p = s)
         {
-            auto lock = p->finished.spin_lock();
-            p->finished.notify_all(lock);
+            auto lock = s->finished.spin_lock();
+            s->finished.notify_all(lock);
         }
     }
 
@@ -167,7 +167,7 @@ namespace rpp
     {
         auto lock = new_task_flag.spin_lock();
         // we always need to double-check if a task is already running
-        if (current_task.valid())
+        if (current_task.is_started())
             return nullptr;
 
         current_task = pool_task_handle{this};
@@ -194,7 +194,7 @@ namespace rpp
     {
         auto lock = new_task_flag.spin_lock();
         // we always need to double-check if a task is already running
-        if (current_task.valid())
+        if (current_task.is_started())
             return nullptr;
 
         current_task = pool_task_handle{this};
@@ -260,8 +260,9 @@ namespace rpp
 
     void pool_worker::run() noexcept
     {
-        static int pool_task_id;
-        snprintf(name, sizeof(name), "rpp_task_%d", pool_task_id++);
+        static std::atomic_int pool_task_id;
+        int this_task_id = ++pool_task_id;
+        snprintf(name, sizeof(name), "rpp_task_%d", this_task_id);
         set_this_thread_name(name);
         TaskDebug("%s start", name);
         for (;;)
@@ -285,8 +286,8 @@ namespace rpp
                     generic = std::move(generic_task);
                     range_task   = {};
                     generic_task = {};
-                    Assert(current_task != nullptr, "current_task must not be null");
                 }
+
                 if (range)
                 {
                     //TaskDebug("%s(range_task[%d,%d))", name, rangeStart, rangeEnd);
@@ -297,18 +298,17 @@ namespace rpp
                     //TaskDebug("%s(generic_task)", name);
                     generic();
                 }
+
+                // non-exceptional cleanup path:
+                {
+                    auto lock = new_task_flag.spin_lock();
+                    current_task.signal_finished();
+                }
             }
             // prevent failures that would terminate the thread
             catch (const std::exception& e) { unhandled_exception(e.what()); }
             catch (const char* e)           { unhandled_exception(e);        }
             catch (...)                     { unhandled_exception("");       }
-
-            // cleanup the current task
-            {
-                auto lock = new_task_flag.spin_lock();
-                current_task.signal_finished();
-                current_task = nullptr;
-            }
         }
     }
 
@@ -317,10 +317,9 @@ namespace rpp
         //if (trace.empty()) UnhandledEx("%s", what);
         //else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
         (void)what;
-        if (auto task = current_task)
-        {
-            task.s->error = std::current_exception();
-        }
+        auto lock = new_task_flag.spin_lock();
+        current_task.s->error = std::current_exception();
+        current_task.signal_finished();
     }
 
     bool pool_worker::wait_for_new_job(std::unique_lock<mutex>& lock) noexcept
@@ -329,12 +328,12 @@ namespace rpp
         {
             if (killed)
                 return false;
-            if (current_task)
+            if (current_task.is_started())
                 return true;
             if (max_idle_timeout.count() > 0)
             {
                 if (new_task_flag.wait(lock, max_idle_timeout) == rpp::semaphore::timeout)
-                    return current_task.valid(); // make sure to check for task even if it timeouts
+                    return current_task.is_started();
             }
             else
             {
@@ -503,7 +502,7 @@ namespace rpp
         auto* worker = w.get();
         worker->max_idle_time(TaskMaxIdleTime);
         pool_task_handle task = worker->run_range(range_start, range_end, range_task);
-        AssertTerminate(task != nullptr, "brand new pool_task->run_range() failed");
+        AssertTerminate(task.is_started(), "brand new pool_task->run_range() failed");
         return parallel_for_task{ std::move(w), std::move(task) };
     }
 
@@ -635,7 +634,7 @@ namespace rpp
         auto* worker = w.get();
         worker->max_idle_time(TaskMaxIdleTime);
         auto task = worker->run_generic(std::move(generic_task));
-        AssertTerminate(task != nullptr, "brand new pool_task->run_generic() failed");
+        AssertTerminate(task.is_started(), "brand new pool_task->run_generic() failed");
 
         std::lock_guard lock{TasksMutex};
         Workers.emplace_back(std::move(w));
