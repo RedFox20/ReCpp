@@ -803,8 +803,14 @@ namespace rpp
     {
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
+        int flags = 0;
+        #if __linux__
+            // Linux triggers SIGPIPE on write to a closed socket, which terminates the application
+            // Since we're running in a multithreaded environment, we MUST ignore it
+            flags = MSG_NOSIGNAL;
+        #endif
         std::lock_guard lock { Mtx };
-        return handle_txres(::send(Sock, (const char*)buffer, numBytes, 0));
+        return handle_txres(::send(Sock, (const char*)buffer, numBytes, flags));
     }
     int socket::send(const char* str)    noexcept { return send(str, (int)strlen(str)); }
     int socket::send(const wchar_t* str) noexcept { return send(str, int(sizeof(wchar_t) * wcslen(str))); }
