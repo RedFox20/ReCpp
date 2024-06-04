@@ -1125,6 +1125,10 @@ namespace rpp
             case ESOCK(ENETUNREACH):   return 0; // network is unreachable
             case ESOCK(EISCONN):       return 0; // socket is already connected
             case ESOCK(EINTR):         return 0; // the operation was interrupted
+            // Cannot send after transport endpoint shutdown
+            // but do not close the socket, it may have data available to read
+            case ESOCK(ESHUTDOWN): Connected = false; return 0;
+
             case ESOCK(EADDRINUSE): {
                 logerror("socket fh:%d EADDRINUSE %s", Sock, last_os_socket_err(errcode).c_str());
                 if (AutoClose) close(); else Connected = false;
@@ -1141,7 +1145,6 @@ namespace rpp
             case ESOCK(ECONNABORTED):  // connection closed
             case ESOCK(ETIMEDOUT):     // remote end did not respond
             case ESOCK(EHOSTUNREACH):  // no route to host
-            case ESOCK(ESHUTDOWN):     // socket was shut down
                 if (AutoClose) close(); else Connected = false;
                 os_setsockerr(errcode); // store the errcode after close() so that application can inspect it
                 return -1;
@@ -1701,7 +1704,7 @@ namespace rpp
     #endif
         if (r < 0)
         {
-            set_errno();
+            handle_errno();
             return false;
         }
         return on_poll_result(pfd.revents, pollFlags);
@@ -1757,6 +1760,11 @@ namespace rpp
             // the other side has GRACEFULLY closed the connection
             // this is not an error, but the socket is no longer connected
             handle_errno(ESOCK(ESHUTDOWN));
+
+            // BUGFIX: if TCP socket is SHUTDOWN, sending is no longer possible
+            //         and polling makes no sense, however there might be data to read
+            if ((pollFlags & PF_Read) && ((revents & POLLIN) || available() > 0))
+                return true;
             return false;
         }
 
@@ -1768,13 +1776,10 @@ namespace rpp
 
         LastErr = 0; // clear errors
 
-        if (pollFlags & PF_Read)
-        {
-            // BUGFIX: it's possible for poll() to miss some READ events
-            //         so double-check with available() to be sure
-            if ((revents & POLLIN) || available() > 0)
-                return true;
-        }
+        // BUGFIX: it's possible for poll() to miss some READ events
+        //         so double-check with available() to be sure
+        if ((pollFlags & PF_Read) && ((revents & POLLIN) || available() > 0))
+            return true;
 
         if ((revents & POLLOUT) && (pollFlags & PF_Write))
             return true;
