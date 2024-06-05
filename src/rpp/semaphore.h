@@ -18,7 +18,7 @@ namespace rpp
         using mutex_t = rpp::mutex;
         using lock_t = std::unique_lock<mutex_t>;
 
-    private:
+    protected:
         mutable mutex_t m;
         rpp::condition_variable cv;
         std::atomic_int value{0}; // atomic int to ensure cache coherency
@@ -45,14 +45,23 @@ namespace rpp
             reset(initialCount);
         }
 
-        /** @returns Current semaphore count (thread-unsafe) */
-        FINLINE int count() const noexcept { return value; }
+        /** @returns Current semaphore count (thread-safe) */
+        int count() const noexcept
+        {
+            auto lock = spin_lock();
+            return value;
+        }
+        int count(lock_t& lock) const noexcept
+        {
+            (void)lock;
+            return value;
+        }
 
         /**
          * @brief Sets the semaphore count to newCount and notifies one waiting thread
          *        if newCount > 0
          */
-        void reset(int newCount = 0)
+        void reset(int newCount = 0) noexcept
         {
             auto lock = spin_lock();
             if (0 <= newCount && newCount <= max_value)
@@ -76,7 +85,7 @@ namespace rpp
          * 
          * This should be the default preferred way to notify a semaphore
          */
-        FINLINE void notify()
+        FINLINE void notify() noexcept
         {
             auto lock = spin_lock();
             notify(lock);
@@ -93,7 +102,7 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> FINLINE void notify(const Callback& callback)
+        template<class Callback> FINLINE void notify(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify<Callback>(lock, callback);
@@ -111,7 +120,7 @@ namespace rpp
          * This should only be used for special cases where all waiting threads need to be notified,
          * it will inherently cause contention issues.
          */
-        FINLINE void notify_all()
+        FINLINE void notify_all() noexcept
         {
             auto lock = spin_lock();
             notify_all(lock);
@@ -128,7 +137,7 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> FINLINE void notify_all(const Callback& callback)
+        template<class Callback> FINLINE void notify_all(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify_all<Callback>(lock, callback);
@@ -144,7 +153,7 @@ namespace rpp
          * @brief Only notifies one thread if count == 0 (not signaled yet)
          * @returns true if the semaphore was notified
          */
-        FINLINE bool notify_once()
+        FINLINE bool notify_once() noexcept
         {
             auto lock = spin_lock();
             return notify_once(lock);
@@ -166,7 +175,7 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> FINLINE void notify_once(const Callback& callback)
+        template<class Callback> FINLINE void notify_once(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify_once<Callback>(lock, callback);
@@ -182,7 +191,7 @@ namespace rpp
          * @brief Tests whether the semaphore is signaled and returns immediately
          * @return true if the semaphore was signaled, false otherwise
          */
-        bool try_wait()
+        bool try_wait() noexcept
         {
             auto lock = spin_lock();
             if (value > 0)
@@ -198,7 +207,7 @@ namespace rpp
          * @brief Waits and loops forever, until the semaphore is signaled, then decrements the count.
          * @warning This can cause a deadlock if the semaphore is never signaled
          */
-        FINLINE void wait()
+        FINLINE void wait() noexcept
         {
             auto lock = spin_lock();
             wait(lock);
@@ -214,7 +223,7 @@ namespace rpp
          * @brief Waits and loops forever, until the semaphore is signaled, BUT DOES NOT DECREMENT THE COUNT
          * @warning This can cause a deadlock if the semaphore is never signaled
          */
-        FINLINE void wait_no_unset()
+        FINLINE void wait_no_unset() noexcept
         {
             auto lock = spin_lock();
             wait_no_unset(lock);
@@ -233,7 +242,7 @@ namespace rpp
          * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        FINLINE wait_result wait(const std::chrono::nanoseconds& timeout)
+        FINLINE wait_result wait(const std::chrono::nanoseconds& timeout) noexcept
         {
             auto lock = spin_lock();
             return wait(lock, timeout);
@@ -255,7 +264,7 @@ namespace rpp
          * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        FINLINE wait_result wait_no_unset(const std::chrono::nanoseconds& timeout)
+        FINLINE wait_result wait_no_unset(const std::chrono::nanoseconds& timeout) noexcept
         {
             auto lock = spin_lock();
             return wait_no_unset(lock, timeout);
@@ -286,7 +295,7 @@ namespace rpp
          * @endcode
          * @param taskIsRunning Reference to atomic flag to wait on
          */
-        NOINLINE void wait_barrier_while(std::atomic_bool& taskIsRunning)
+        NOINLINE void wait_barrier_while(std::atomic_bool& taskIsRunning) noexcept
         {
             auto lock = spin_lock();
             while (taskIsRunning)
@@ -306,7 +315,7 @@ namespace rpp
          * @endcode
          * @param hasFinished Reference to atomic flag to wait on
          */
-        NOINLINE void wait_barrier_until(std::atomic_bool& hasFinished)
+        NOINLINE void wait_barrier_until(std::atomic_bool& hasFinished) noexcept
         {
             auto lock = spin_lock();
             while (!hasFinished)
@@ -330,8 +339,9 @@ namespace rpp
     public:
         semaphore_flag() noexcept : semaphore{0, 1} {}
 
-        /** @returns TRUE if the semaphore is signaled */
+        /** @returns TRUE if the semaphore is signaled. Does not unset the semaphore count. */
         [[nodiscard]] FINLINE bool is_set() const noexcept { return count() > 0; }
+        [[nodiscard]] FINLINE bool is_set(lock_t& lock) const noexcept { return count(lock) > 0; }
 
         using semaphore::mutex;
         using semaphore::spin_lock;
@@ -343,6 +353,55 @@ namespace rpp
         using semaphore::try_wait;
         using semaphore::wait;
         using semaphore::wait_no_unset;
+    };
+
+    /**
+     * @brief A semaphore that can only be set once and never unset.
+     *        This is useful to signal that a run-once task has completed.
+     * notify() - sets the semaphore flag and notified ONE listener
+     * notify_once() - sets the semaphore flag and notifies ALL listeners
+     * wait() - waits until set, but never unsets,
+     *          returns immediately if already set
+     */
+    class semaphore_once_flag : protected rpp::semaphore
+    {
+    public:
+        semaphore_once_flag() noexcept : semaphore{0, 1} {}
+
+        /** @returns TRUE if the semaphore is signaled. Does not unset the semaphore count. */
+        [[nodiscard]] FINLINE bool is_set() const noexcept { return count() > 0; }
+        [[nodiscard]] FINLINE bool is_set(lock_t& lock) const noexcept { return count(lock) > 0; }
+
+        using semaphore::mutex;
+        using semaphore::spin_lock;
+
+        using semaphore::notify;
+        using semaphore::notify_all;
+
+        bool try_wait() noexcept
+        {
+            auto lock = spin_lock();
+            return value > 0;
+        }
+
+        FINLINE void wait() noexcept
+        {
+            auto lock = spin_lock();
+            wait_no_unset(lock);
+        }
+        FINLINE void wait(lock_t& lock) noexcept
+        {
+            wait_no_unset(lock);
+        }
+        FINLINE wait_result wait(const std::chrono::nanoseconds& timeout) noexcept
+        {
+            auto lock = spin_lock();
+            return wait_no_unset(lock, timeout);
+        }
+        FINLINE wait_result wait(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
+        {
+            return wait_no_unset(lock, timeout);
+        }
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////

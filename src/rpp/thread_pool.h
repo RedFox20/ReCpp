@@ -121,7 +121,7 @@ namespace rpp
     {
         struct state
         {
-            rpp::semaphore_flag finished;
+            rpp::semaphore_once_flag finished;
             std::string trace;
             std::exception_ptr error;
             pool_worker* worker = nullptr;
@@ -172,22 +172,23 @@ namespace rpp
             return *this;
         }
 
+        /// @returns The name of the worker thread that is running this task 
+        const char* worker_name() const noexcept;
+
         /// @brief True if task was started -- and it may have already finished @see is_finished
-        bool is_started() const noexcept { return s != nullptr; }
+        bool was_started() const noexcept { return s != nullptr; }
 
         /// @returns True if task is running and has not finished yet
         bool is_running() const noexcept
         {
-            if (s == nullptr) return false;
-            auto lock = s->finished.spin_lock();
+            if (s == nullptr) return false; // a null task cannot be running
             return !s->finished.is_set();
         }
 
         /// @returns True if task has finished running
         bool is_finished() const noexcept
         {
-            if (s == nullptr) return true;
-            auto lock = s->finished.spin_lock();
+            if (s == nullptr) return false; // a null task can never be finished
             return s->finished.is_set();
         }
 
@@ -207,13 +208,6 @@ namespace rpp
         //                     is initialized with the caught exception (if any)
         wait_result wait() const;
         wait_result wait(std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
-
-        /**
-         * @brief Checks if the task has finished without waiting
-         * @param outErr if the task has finished with an exception, this will be set to the exception
-         * @returns TRUE if the task has finished, FALSE if it's still running
-         */
-        bool wait_check(std::exception_ptr* outErr = nullptr) const noexcept;
     
     private:
         friend class pool_worker;
@@ -228,6 +222,7 @@ namespace rpp
      */
     class RPPAPI pool_worker
     {
+        friend class pool_task_handle;
     private:
         rpp::semaphore_flag new_task_flag;
         std::thread th;
@@ -281,6 +276,10 @@ namespace rpp
         wait_result join_or_detach(wait_result result = wait_result::finished) noexcept;
     };
 
+    /**
+     * @returns Number of physicals cores on the system
+     */
+    RPPAPI int num_physical_cores() noexcept;
 
     /**
      * A generic thread pool that can be used to group and control pool lifetimes
@@ -410,6 +409,7 @@ namespace rpp
          * to trace the callstack which triggered the parallel task, otherwise
          * there would be no hints where the it was launched if the task crashes.
          * @note This will slow down parallel task startup since the call stack is unwound for debugging
+         * @warning This can severely impact performance, so only use for debugging purposes
          */
         void set_task_tracer(pool_trace_provider traceProvider);
     };

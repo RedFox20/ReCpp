@@ -77,7 +77,10 @@ namespace rpp
 #  if POOL_TASK_RPPLOG
 #    define TaskDebug(fmt, ...) LogWarning(fmt, ##__VA_ARGS__)
 #  else
-#    define TaskDebug(fmt, ...) do { fprintf(stderr, fmt "\n", ##__VA_ARGS__); fflush(stderr); } while(0)
+#    define TaskDebug(fmt, ...) do { \
+        fprintf(stdout, "%s $ " fmt "\n", \
+            rpp::TimePoint::now().time_of_day().to_string().c_str(), ##__VA_ARGS__); \
+    } while(0)
 #  endif
 #  define InTaskDebug(...) __VA_ARGS__
 #else
@@ -93,6 +96,14 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////
 
+    const char* pool_task_handle::worker_name() const noexcept
+    {
+        if (auto p = s)
+            if (auto w = p->worker)
+                return w->name;
+        return "none";
+    }
+
     wait_result pool_task_handle::wait(duration timeout) const
     {
         std::exception_ptr err;
@@ -107,7 +118,8 @@ namespace rpp
         wait_result result = wait_result::finished;
         if (auto p = s)
         {
-            if (p->finished.wait_no_unset(timeout) == rpp::semaphore::timeout)
+            auto lock = p->finished.spin_lock();
+            if (p->finished.wait(lock, timeout) == rpp::semaphore::timeout)
                 result = wait_result::timeout;
             if (auto e = p->error; outErr != nullptr && !*outErr)
                 *outErr = e;
@@ -129,16 +141,11 @@ namespace rpp
         if (auto p = s)
         {
             auto lock = p->finished.spin_lock();
-            p->finished.wait_no_unset(lock);
+            p->finished.wait(lock);
             if (auto e = p->error; outErr != nullptr && !*outErr)
                 *outErr = e;
         }
         return result;
-    }
-
-    bool pool_task_handle::wait_check(std::exception_ptr* outErr) const noexcept
-    {
-        return wait(duration{0}, std::nothrow, outErr) == wait_result::finished;
     }
 
     void pool_task_handle::signal_finished() noexcept
@@ -185,13 +192,11 @@ namespace rpp
         }
 
         current_task = pool_task_handle{this};
-        if (auto tracer = TraceProvider)
-            current_task.s->trace = tracer();
-
-        generic_task = {};
         range_task   = newTask;
         range_start  = start;
         range_end    = end;
+        new_task_flag.notify_all(lock);
+        lock.unlock();
 
         if (killed)
         {
@@ -200,7 +205,11 @@ namespace rpp
             (void)join_or_detach(wait_result::finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
-        new_task_flag.notify_all(lock);
+
+        // WARNING: this can be VERY slow
+        if (auto tracer = TraceProvider)
+            current_task.s->trace = tracer();
+
         return current_task;
     }
 
@@ -215,13 +224,9 @@ namespace rpp
         }
 
         current_task = pool_task_handle{this};
-        if (auto tracer = TraceProvider)
-            current_task.s->trace = tracer();
-
         generic_task = std::move(newTask);
-        range_task   = {};
-        range_start  = 0;
-        range_end    = 0;
+        new_task_flag.notify_all(lock);
+        lock.unlock();
 
         if (killed)
         {
@@ -230,7 +235,11 @@ namespace rpp
             (void)join_or_detach(wait_result::finished);
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
-        new_task_flag.notify_all(lock);
+
+        // WARNING: this can be VERY slow
+        if (auto tracer = TraceProvider)
+            current_task.s->trace = tracer();
+
         return current_task;
     }
 
@@ -241,7 +250,7 @@ namespace rpp
         }
 
         new_task_flag.notify_all([&] {
-            TaskDebug("%s kill", name);
+            TaskDebug("%s set killed", name);
             killed = true;
         });
 
@@ -266,15 +275,15 @@ namespace rpp
                 TaskDebug("%s detaching in same thread", name);
                 th.detach();
             }
-            else
+            else // finished
             {
-                TaskDebug("%s join", name);
+                TaskDebug("%s joining", name);
                 InTaskDebug(rpp::Timer t);
                 th.join();
             #if POOL_TASK_DEBUG
                 double elapsed_ms = t.elapsed_millis();
-                TaskDebug("%s join elapsed: %.3fms", name, elapsed_ms);
-                if (elapsed_ms >= 1.0) LogError("%s join took excessively long", name);
+                TaskDebug("%s joining took: %.3fms", name, elapsed_ms);
+                if (elapsed_ms >= 2.0) LogError("%s joining took excessively long", name);
             #endif
             }
         }
@@ -298,10 +307,10 @@ namespace rpp
                 // consume the Tasks atomically
                 {
                     InTaskDebug(rpp::Timer t);
-                    auto lock = new_task_flag.spin_lock();
                     TaskDebug("%s wait_for_new_job", name);
+                    auto lock = new_task_flag.spin_lock();
                     if (!wait_for_new_job(lock)) {
-                        TaskDebug("%s stop (%s)", name, killed ? "killed" : "timeout");
+                        TaskDebug("%s wait_for_new_job stopped (%s)", name, killed ? "killed" : "timeout");
                         killed = true;
                         return;
                     }
@@ -312,16 +321,20 @@ namespace rpp
                     range_task   = {};
                     generic_task = {};
                 }
-
+                InTaskDebug(rpp::Timer task_timer);
                 if (range)
                 {
-                    TaskDebug("%s (range_task[%d,%d))", name, range_start, range_end);
+                    TaskDebug("%s (RANGE[%d,%d))", name, range_start, range_end);
                     range(range_start, range_end);
+                    TaskDebug("%s (RANGE[%d,%d)) elapsed %.3fms",
+                              name, range_start, range_end, task_timer.elapsed_millis());
                 }
                 else if (generic)
                 {
-                    TaskDebug("%s (generic_task)", name);
+                    TaskDebug("%s (GENERIC)", name);
                     generic();
+                    TaskDebug("%s (GENERIC) elapsed %.3fms",
+                              name, task_timer.elapsed_millis());
                 }
                 else
                 {
@@ -385,7 +398,7 @@ namespace rpp
     }
 
 #if _WIN32
-    static int num_physical_cores()
+    int num_physical_cores() noexcept
     {
         static int num_cores = []
         {
@@ -405,11 +418,17 @@ namespace rpp
         return num_cores;
     }
 #else
-    static int num_physical_cores()
+    int num_physical_cores() noexcept
     {
         static int num_cores = []
         {
-            int n = (int)std::thread::hardware_concurrency() / 2;
+            // TODO: figure out which types of CPU-s have SMT/HT
+            #if MIPS || RASPI || OCLEA || __ANDROID__
+                constexpr int hyperthreading_factor = 1;
+            #else
+                constexpr int hyperthreading_factor = 2;
+            #endif
+            int n = (int)std::thread::hardware_concurrency() / hyperthreading_factor;
             return n > 0 ? n : 1;
         }();
         return num_cores;
@@ -521,7 +540,7 @@ namespace rpp
                 if (!worker->running())
                 {
                     if (pool_task_handle task = worker->run_range(range_start, range_end, range_task);
-                        task.is_started())
+                        task.was_started())
                     {
                         worker_ptr t = std::move(worker_ref);
                         Workers.erase(Workers.begin()+i);
@@ -535,7 +554,7 @@ namespace rpp
         // in this case we don't need any locking, because the task is not added to Pool
         auto w = std::make_unique<pool_worker>(TaskMaxIdleTime);
         pool_task_handle task = w->run_range(range_start, range_end, range_task);
-        AssertTerminate(task.is_started(), "brand new pool_task->run_range() failed");
+        AssertTerminate(task.was_started(), "brand new pool_task->run_range() failed");
         return parallel_for_task{ std::move(w), std::move(task) };
     }
 
@@ -575,6 +594,7 @@ namespace rpp
         // OR the number of physical cores is simply 1
         if (minTasks <= 1)
         {
+            TaskDebug("parallel_for parallelism disabled");
             rangeTask(rangeStart, rangeEnd);
             return;
         }
@@ -596,6 +616,7 @@ namespace rpp
             if (spawned < maxTasks)
             {
                 // placement new on stack
+                TaskDebug("parallel_for spawning %d < %d maxTasks", spawned, maxTasks);
                 new (&active[spawned]) parallel_for_task{start_range_task(start, end, rangeTask)};
                 ++spawned;
             }
@@ -608,17 +629,25 @@ namespace rpp
                     if (nextWait >= spawned) nextWait = 0;
 
                     auto& wait = active[nextWait];
+                    TaskDebug("parallel_for check_free %s", wait.task.worker_name());
                     // this 1ms wait is necessary, however it slightly slows down the loop
                     // during high contention, so we don't burn CPU trying to get a task
                     auto result = wait.task.wait(std::chrono::milliseconds{1}, std::nothrow, &err);
                     if (result == wait_result::finished)
                     {
                         // try to run next range on the same worker that just finished
+                        InTaskDebug(rpp::Timer try_run);
+                        TaskDebug("parallel_for check_free try_run %s", wait.task.worker_name());
                         if (auto task = wait.worker->run_range(start, end, rangeTask);
-                            task.is_started())
+                            task.was_started())
                         {
                             wait.task = std::move(task);
+                            TaskDebug("parallel_for wait_for_task try_run success %.3fms", try_run.elapsed_millis());
                             break; // great!
+                        }
+                        else
+                        {
+                            TaskDebug("parallel_for wait_for_task try_run failed");
                         }
                         // boo! race condition, try again
                     }
@@ -630,10 +659,16 @@ namespace rpp
             ThrowErr("BUG: parallel_for spawned:%d > maxTasks:%d", spawned, maxTasks);
 
         // wait on all the spawned tasks to finish
+        TaskDebug("parallel_for waiting on %d tasks", spawned);
+        InTaskDebug(rpp::Timer wait_on_all);
+        // wait in reverse order, since last task is probably the slowest
+        // and suspending this thread until then makes most sense
         for (uint32_t i = 0; i < spawned; ++i)
+        // for (int32_t i = spawned - 1; i >= 0; --i)
         {
             active[i].task.wait(std::nothrow, &err);
         }
+        TaskDebug("parallel_for wait_on_all %.3fms", wait_on_all.elapsed_millis());
 
         // and finally throw them back into the pool
         {
@@ -657,7 +692,7 @@ namespace rpp
                 if (!worker->running())
                 {
                     if (auto task = worker->run_generic(std::move(generic_task));
-                        task.is_started())
+                        task.was_started())
                         return task;
                     // else: race condition (someone else held pointer to the task and restarted it)
                 }
@@ -667,7 +702,7 @@ namespace rpp
         // create and run a new task atomically
         auto w = std::make_unique<pool_worker>(TaskMaxIdleTime);
         auto task = w->run_generic(std::move(generic_task));
-        AssertTerminate(task.is_started(), "brand new pool_task->run_generic() failed");
+        AssertTerminate(task.was_started(), "brand new pool_task->run_generic() failed");
 
         std::lock_guard lock{TasksMutex};
         Workers.emplace_back(std::move(w));

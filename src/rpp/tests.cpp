@@ -573,11 +573,13 @@ namespace rpp
         decltype(t1) t2;
         try
         {
+            test_case_setup();
             #if _MSC_VER
                 (reinterpret_cast<dummy*>(this)->*test.func.dfunc)();
             #else
                 test.func.mfunc(this);
             #endif
+            test_case_cleanup();
             t2 = std::chrono::high_resolution_clock::now();
             if (test.expectedExType) // we expected an exception, but none happened?!
             {
@@ -587,6 +589,7 @@ namespace rpp
         }
         catch (const std::exception& e)
         {
+            test_case_cleanup();
             t2 = std::chrono::high_resolution_clock::now();
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {

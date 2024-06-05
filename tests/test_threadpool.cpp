@@ -32,7 +32,13 @@ TestImpl(test_threadpool)
             print_error("Dangling tasks detected: %d\n", thread_pool::global().active_tasks());
     }
 
-    static int parallelism_count(int numIterations)
+    TestCaseSetup()
+    {
+        // reset to default
+        thread_pool::set_global_max_parallelism(num_physical_cores());
+    }
+
+    static int count_parallel_for_thread_ids(int numIterations)
     {
         rpp::mutex m;
         std::unordered_set<std::thread::id> ids;
@@ -48,10 +54,11 @@ TestImpl(test_threadpool)
         return (int)ids.size();
     }
 
-    TestCase(threadpool_concurrency)
+    TestCase(parallel_for_should_not_exceed_max_parallelism)
     {
-        AssertThat(parallelism_count(1), 1);
-        AssertThat(parallelism_count(128), thread_pool::global_max_parallelism());
+        AssertThat(count_parallel_for_thread_ids(1), 1);
+        AssertThat(count_parallel_for_thread_ids(128),
+                   thread_pool::global_max_parallelism());
     }
 
     TestCase(generic_task)
@@ -83,7 +90,7 @@ TestImpl(test_threadpool)
 
         rpp::Timer t;
 
-        thread_pool pool{4};
+        thread_pool pool{/*max_parallelism*/4};
         pool.parallel_for(0, len, 8, [&](int start, int end) {
             AssertThat(end-start, 8);
             for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
@@ -111,7 +118,7 @@ TestImpl(test_threadpool)
         for (int i = 0; i < len; ++i)
             ptr[i] = i;
         
-        thread_pool pool{4};
+        thread_pool pool{/*max_parallelism*/4};
         rpp::Timer t;
 
         // [0,8); [8,16); [16,17)
@@ -130,17 +137,41 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_performance)
     {
-        auto numbers = std::vector<int>(81'234'567);
-        int* ptr = numbers.data();
-        volatile int len = (int)numbers.size();
+    #if OCLEA || MIPS || __ANDROID__
+        constexpr int COUNT = 81'234'567 / 10;
+        constexpr int64 EXPECTED_SUM = 32995264630240LL;
+    #else
+        constexpr int COUNT = 81'234'567;
+        constexpr int64 EXPECTED_SUM = 3299527397221461LL;
+    #endif
 
+        auto numbers = std::vector<int>(COUNT);
+        int* ptr = numbers.data();
+        int len = (int)numbers.size();
+
+        // Continuous Integration machines are virtualized,
+        // so the parallelism are shared between VM's which can lead to invalid test results
+        // Attempt to detect this and limit the number of tasks
+        const int default_parallelism = rpp::num_physical_cores();
+        thread_pool::set_global_max_parallelism(default_parallelism);
+        if (default_parallelism > 8)
+        {
+            print_info("Limiting Max Parallelism to 8\n");
+            thread_pool::set_global_max_parallelism(8);
+        }
+
+        print_info("PFOR pre-validation loop\n");
         parallel_for(0, len, 0, [&](int start, int end) {
             for (int i = start; i < end; ++i)
                 ptr[i] = i;
         });
+
+        print_info("PFOR validation loop\n");
+        rpp::Timer t0;
         for (int i = 0; i < len; ++i) {
             AssertThat(ptr[i], i);
         }
+        print_info("PFOR validation elapsed: %.3fms\n", t0.elapsed_millis());
         //#pragma loop(hint_parallel(0))
         //for (int i = 0; i < len; ++i)
         //    ptr[i] = rand() % 32768;
@@ -148,21 +179,12 @@ TestImpl(test_threadpool)
         //    ptr[index] = index;
         //});
 
+        print_info("PFOR perf loop\n");
         Timer timer1;
 
-        // Continuous Integration machines are virtualized,
-        // so the parallelism are shared between VM's which can lead to invalid test results
-        // Attempt to detect this and limit the number of tasks
-        const int default_parallelism = thread_pool::global_max_parallelism();
-        if (default_parallelism > 8)
-        {
-            print_info("Limiting Max Parallelism to 8\n");
-            thread_pool::set_global_max_parallelism(8);
-        }
-
-        std::atomic<int64_t> sum { 0 };
+        std::atomic_int64_t sum { 0 };
         parallel_for(0, len, 0, [&](int start, int end) {
-            int64_t isum = 0;
+            int64 isum = 0;
             for (int i = start; i < end; ++i)
                 isum += ptr[i];
             sum += isum; // only touch atomic int once
@@ -174,17 +196,17 @@ TestImpl(test_threadpool)
         //    sum += ptr[index];
         //});
         double parallel_elapsed = timer1.elapsed();
-        print_info("ParallelFor  elapsed: %.4fs  result: %lld\n", parallel_elapsed, (long long)sum);
-        AssertThat((long long)sum, 3299527397221461LL);
+        print_info("ParallelFor  elapsed: %.4fs  result: %lld\n", parallel_elapsed, (int64)sum);
+        AssertThat((int64)sum, EXPECTED_SUM);
 
         Timer timer2;
-        int64_t sum2 = 0;
+        int64 sum2 = 0;
         for (int i = 0; i < len; ++i)
             sum2 += ptr[i];
         double serial_elapsed = timer2.elapsed();
 
-        print_info("Singlethread elapsed: %.4fs  result: %lld\n", serial_elapsed, (long long)sum2);
-        AssertThat((long long)sum2, 3299527397221461LL);
+        print_info("Singlethread elapsed: %.4fs  result: %lld\n", serial_elapsed, (int64)sum2);
+        AssertThat((int64)sum2, EXPECTED_SUM);
 
         const int parallelism = thread_pool::global_max_parallelism();
         print_info("Test System # Max Parallelism: %d\n", parallelism);
@@ -227,7 +249,8 @@ TestImpl(test_threadpool)
     {
         for (int i = 0; i < 2; ++i)
         {
-            test_threadpool_concurrency();
+            test_case_setup(); // reset defaults
+            test_parallel_for_should_not_exceed_max_parallelism();
             test_generic_task();
             test_parallel_for_performance();
         }
@@ -283,7 +306,8 @@ TestImpl(test_threadpool)
         }).wait(std::chrono::milliseconds{1000});
         AssertThat((int)times_launched, 2);
 
-        thread_pool::global().max_task_idle_time(2);
+        // restore default
+        thread_pool::global().max_task_idle_time();
     }
 
     TestCase(parallel_task_nested_nodeadlocks)

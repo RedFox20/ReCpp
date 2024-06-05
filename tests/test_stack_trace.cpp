@@ -14,6 +14,10 @@ TestImpl(test_stack_trace)
     {
         thread_pool::global().set_task_tracer(&stack_tracer);
     }
+    TestCleanup()
+    {
+        thread_pool::global().set_task_tracer(nullptr);
+    }
     TestCase(second_trace_faster_than_first)
     {
         Timer t;

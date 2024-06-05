@@ -151,6 +151,10 @@ namespace rpp
         // optionally clean up the test
         virtual void cleanup_test() {}
 
+        // optionally setup / clean up test case funcs
+        virtual void test_case_setup() {}
+        virtual void test_case_cleanup() {}
+
         bool run_init();
         void run_cleanup();
 
@@ -521,11 +525,17 @@ namespace rpp
     ClassType* self() { return this; }                                \
     void init_test() override
 
+// called once per TestImpl class init
 #define TestInit(testclass)          __TestInit(testclass, true)
 #define TestInitNoAutorun(testclass) __TestInit(testclass, false)
 
+// called once per TestImpl class run to cleanup
 #define TestCleanup() void cleanup_test() override
 
+// called once for each test func
+#define TestCaseSetup() void test_case_setup() override
+// called once after each test func to clean up
+#define TestCaseCleanup() void test_case_cleanup() override
 
 #if _MSC_VER
 #  define __TestLambda(testname) [&](){ this->test_##testname(); }
