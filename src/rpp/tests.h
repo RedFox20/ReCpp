@@ -3,6 +3,7 @@
  * Minimal Unit Testing Framework, Copyright (c) 2016-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
+
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
 #include <cstdint> // uint32_t, etc
@@ -11,6 +12,7 @@
 #include <vector>  // access to std::vector and std::string
 #include <atomic>  // std::atomic<T> type support
 #include <typeinfo>
+
 #include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
 #include <rpp/debugging.h> // for adapting debugging API-s with tests API
 #include <rpp/math.h> // rpp::min, rpp::max

@@ -53,7 +53,10 @@ TestImpl(test_file_io)
 
     TestCase(exists)
     {
+        // can only run this test on host machines
+    #if _MSC_VER || (__linux__ && !__ANDROID__ && !OCLEA && !__EMSCRIPTEN__)
         Assert(file_exists(__FILE__));
+    #endif
         Assert(!file_exists("/complete/rubbish/path.txt"));
 
         std::string dir = working_dir();

@@ -1,6 +1,6 @@
 ﻿#include "tests.h"
+#include "mutex.h"
 #include <memory>
-#include <rpp/mutex.h>
 #include <unordered_set>
 #include <chrono> // high_resolution_clock
 #include <cstdarg>
@@ -257,25 +257,7 @@ namespace rpp
 
     static void console(ConsoleColor color, const char* str, int len)
     {
-    #if _WIN32
-        FILE* cout = color == Red ? stderr : stdout;
-
-        static constexpr const char* colors[] = {
-            "\x1b[0m",  // clears all formatting
-            "\x1b[32m", // green
-            "\x1b[33m", // yellow
-            "\x1b[31m", // red
-        };
-        static rpp::mutex consoleSync;
-        {
-            std::lock_guard lock { consoleSync };
-            fwrite(colors[color], strlen(colors[color]), 1, cout);
-            fwrite(str, size_t(len), 1, cout);
-            fwrite(colors[Default], strlen(colors[Default]), 1, cout);
-        }
-
-        fflush(cout); // flush needed for proper sync with unix-like shells
-    #elif __ANDROID__
+    #if __ANDROID__
         (void)len;
         int priority = 0;
         switch (color) {
@@ -285,40 +267,24 @@ namespace rpp
             case Red:     priority = ANDROID_LOG_ERROR; break;
         }
         __android_log_write(priority, "rpp", str);
-    #elif __linux || TARGET_OS_OSX
-        static bool stdoutIsAtty = isatty(fileno(stdout));
-        static bool stderrIsAtty = isatty(fileno(stderr));
-
-        FILE* cout = (color == Red) ? stderr : stdout;
-        bool isTerminal = (color == Red) ? stderrIsAtty : stdoutIsAtty;
-
-        if (isTerminal)
-        {
-            static constexpr const char* colors[] = {
-                "\x1b[0m",  // clears all formatting
-                "\x1b[32m", // green
-                "\x1b[33m", // yellow
-                "\x1b[31m", // red
-            };
-            static rpp::mutex consoleSync;
-            {
-                std::unique_lock guard{ consoleSync, std::defer_lock };
-                if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
-
-                fwrite(colors[color], strlen(colors[color]), 1, cout);
-                fwrite(str, size_t(len), 1, cout);
-                fwrite(colors[Default], strlen(colors[Default]), 1, cout);
-            }
-        }
-        else // it's a file descriptor
-        {
-            fwrite(str, size_t(len), 1, cout);
-        }
-        fflush(cout); // flush needed for proper sync with different shells
     #else
         FILE* cout = color == Red ? stderr : stdout;
-        fwrite(str, size_t(len), 1, cout);
-        fflush(cout); // flush needed for proper sync with different shells
+        static constexpr rpp::strview colors[] = {
+            "\x1b[0m",  // clears all formatting
+            "\x1b[32m", // green
+            "\x1b[33m", // yellow
+            "\x1b[31m", // red
+        };
+        // perform a double copy to avoid having to mutex lock
+        rpp::strview c1 = colors[color];
+        constexpr rpp::strview c2 = colors[Default];
+        size_t total_len = c1.len + len + c2.len;
+        char* buf = (char*)alloca(total_len);
+        memcpy(buf, c1.str, c1.len);
+        memcpy(buf + c1.len, str, len);
+        memcpy(buf + c1.len + len, c2.str, c2.len);
+        fwrite(buf, total_len, 1, cout);
+        fflush(cout); // flush needed for proper sync with unix-like shells
     #endif
     }
 

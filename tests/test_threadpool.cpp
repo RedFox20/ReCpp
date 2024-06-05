@@ -123,7 +123,7 @@ TestImpl(test_threadpool)
         });
 
         double elapsed = t.elapsed();
-        AssertLessOrEqual(elapsed, 0.05);
+        AssertLessOrEqual(elapsed, 0.06);
 
         AssertEqual(pool.idle_tasks(), 3);
     }

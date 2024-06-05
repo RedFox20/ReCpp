@@ -130,7 +130,7 @@ namespace rpp
 
         // this is only null if no task was ever given
         std::shared_ptr<state> s;
-        rpp::mutex m; // copy/move mutex
+        // rpp::mutex m; // copy/move mutex
 
     public:
         using duration = std::chrono::high_resolution_clock::duration;
@@ -140,7 +140,7 @@ namespace rpp
 
         ~pool_task_handle() noexcept
         {
-            auto lock = rpp::spin_lock(m);
+            // auto lock = rpp::spin_lock(m);
             s.reset();
         }
 
@@ -157,7 +157,7 @@ namespace rpp
         {
             if (this != &other)
             {
-                auto lock = rpp::spin_lock(m);
+                // auto lock = rpp::spin_lock(m);
                 s = other.s;
             }
             return *this;
@@ -166,23 +166,29 @@ namespace rpp
         {
             if (this != &other)
             {
-                auto lock = rpp::spin_lock(m);
+                // auto lock = rpp::spin_lock(m);
                 std::swap(s, other.s);
             }
             return *this;
         }
 
-        explicit operator bool() const noexcept
+        /// @brief True if task was started -- and it may have already finished @see is_finished
+        bool is_started() const noexcept { return s != nullptr; }
+
+        /// @returns True if task is running and has not finished yet
+        bool is_running() const noexcept
         {
-            return s && !s->finished.is_set();
+            if (s == nullptr) return false;
+            auto lock = s->finished.spin_lock();
+            return !s->finished.is_set();
         }
-        bool is_started() const noexcept
-        {
-            return s && !s->finished.is_set();
-        }
+
+        /// @returns True if task has finished running
         bool is_finished() const noexcept
         {
-            return !s || s->finished.is_set();
+            if (s == nullptr) return true;
+            auto lock = s->finished.spin_lock();
+            return s->finished.is_set();
         }
 
         // wait for task to finish with timeout
@@ -240,13 +246,14 @@ namespace rpp
         using duration = pool_task_handle::duration;
 
         pool_worker();
+        pool_worker(float max_idle_seconds);
         ~pool_worker() noexcept;
         NOCOPY_NOMOVE(pool_worker)
 
         /**
          * @return TRUE if pool_worker is running a task
          */
-        bool running() const noexcept { return current_task.is_started(); }
+        bool running() const noexcept { return current_task.is_running(); }
 
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param max_idle_seconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever

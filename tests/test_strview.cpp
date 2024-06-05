@@ -203,10 +203,19 @@ TestImpl(test_strview)
         AssertThat(toString(-2.00120, 6), "-2.0012");
         AssertThat(toString(+0.99590, 6), "0.9959");
         AssertThat(toString(+0.16, 6), "0.16");
+
+    #if OCLEA || __ANDROID__
+        // ARMv8 rounds stuff differently
+        AssertThat(toString(+4.8418443193907041e+30, 6), "9223372036854775807");
+        AssertThat(toString(-4.8418443193907041e+30, 6), "-9223372036854775807");
+        AssertThat(toString(+MAX_DOUBLE, 6), "9223372036854775807");
+        AssertThat(toString(-MAX_DOUBLE, 6), "-9223372036854775807");
+    #else
         AssertThat(toString(+4.8418443193907041e+30, 6), "9223372036854775808");
         AssertThat(toString(-4.8418443193907041e+30, 6), "-9223372036854775808");
         AssertThat(toString(+MAX_DOUBLE, 6), "9223372036854775808");
         AssertThat(toString(-MAX_DOUBLE, 6), "-9223372036854775808");
+    #endif
         AssertThat(toString(+MIN_DOUBLE, 6), "0.0");
         AssertThat(toString(-MIN_DOUBLE, 6), "-0.0");
     }

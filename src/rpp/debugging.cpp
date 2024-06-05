@@ -1,7 +1,7 @@
 #include "debugging.h"
 #include "timer.h" // rpp::TimePoint
 #include "stack_trace.h"
-#include "mutex.h"
+#include "strview.h"
 
 #include <cstdio>
 #include <cstring>
@@ -150,77 +150,55 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
     std::terminate();
 }
 
-// this ensures default output newline is atomic with the rest of the error string
-#define AllocaPrintlineBuf(err, len) \
-    auto* buf = (char*)alloca(size_t(len) + 2); \
-    memcpy(buf, err, size_t(len)); \
-    buf[len] = '\n'; \
-    buf[size_t(len)+1] = '\0';
-
-RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len)
+RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* str, int len)
 {
     #if __ANDROID__
         (void)len;
         auto priority = severity == LogSeverityInfo ? ANDROID_LOG_INFO :
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
                                                       ANDROID_LOG_ERROR;
-        __android_log_write(priority, tag, err);
-    #elif _WIN32
-        static HANDLE winstd = GetStdHandle(STD_OUTPUT_HANDLE);
-        static HANDLE winerr = GetStdHandle(STD_ERROR_HANDLE);
-        static const WORD colormap[] = {
-            FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY, // white - Info
-            FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY, // bright yellow - Warning
-            FOREGROUND_RED | FOREGROUND_INTENSITY, // bright red - Error
-        };
-        HANDLE winout = severity == LogSeverityError ? winstd : winerr;
-        FILE*  fout   = severity == LogSeverityError ? stderr : stdout;
-
-        AllocaPrintlineBuf(err, len);
-        static rpp::mutex consoleSync;
-        {
-            std::lock_guard lock { consoleSync };
-            SetConsoleTextAttribute(winout, colormap[severity]);
-            fwrite(buf, size_t(len + 1), 1, fout); // fwrite to sync with unix-like shells
-            SetConsoleTextAttribute(winout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-        }
-        fflush(fout); // flush needed for proper sync with unix-like shells
-    #elif __linux || TARGET_OS_OSX
-        AllocaPrintlineBuf(err, len);
-        FILE* fout = severity == LogSeverityError ? stderr : stdout;
-        if (isatty(fileno(fout))) // is terminal?
-        {
-            if (severity)
-            {
-                static const char clearColor[] = "\x1b[0m"; // Default: clear all formatting
-                static const char* colors[] = {
-                        "\x1b[0m",  // Default
-                        "\x1b[93m", // Warning: bright yellow
-                        "\x1b[91m", // Error  : bright red
-                };
-                static rpp::mutex consoleSync;
-                std::unique_lock guard{ consoleSync, std::defer_lock };
-                if (consoleSync.native_handle()) guard.lock(); // lock if mutex not destroyed
-
-                fwrite(colors[severity], strlen(colors[severity]), 1, fout);
-                fwrite(buf, size_t(len) + 1, 1, fout);
-                fwrite(clearColor, sizeof(clearColor)-1, 1, fout);
-            }
-            else
-            {
-                fwrite(buf, size_t(len) + 1, 1, fout);
-            }
-        }
-        else
-        {
-            fwrite(buf, size_t(len) + 1, 1, fout);
-        }
-        fflush(fout); // flush needed for proper sync with different shells
+        __android_log_write(priority, tag, str);
     #else
-        AllocaPrintlineBuf(err, len);
-        FILE* fout = severity == LogSeverityError ? stderr : stdout;
-        fwrite(buf, size_t(len) + 1, 1, fout);
-        fflush(fout); // flush needed for proper sync with unix-like shells
+        FILE* cout = severity == LogSeverityError ? stderr : stdout;
+        static constexpr rpp::strview colors[] = {
+            "\x1b[0m",  // Default
+            "\x1b[93m", // Warning: bright yellow
+            "\x1b[91m", // Error  : bright red
+        };
+        int color = severity == LogSeverityInfo ? 0 :
+                    severity == LogSeverityWarn ? 1 :
+                                                  2 ;
+
+        // perform a double copy to avoid having to mutex lock
+        constexpr rpp::strview clear = colors[0];
+
+        size_t total_len = len + 1/*newline*/;
+        if (color != 0)
+            total_len += colors[color].len + clear.len;
+
+        // copy the string with color codes and newline
+        auto* buf = (char*)alloca(total_len);
+        size_t offset = 0;
+
+        if (color != 0) // insert starting color code
+        {
+            rpp::strview c1 = colors[color];
+            memcpy(&buf[offset], c1.str, c1.len);
+            offset += c1.len;
+        }
+
+        memcpy(&buf[offset], str, len); // append log text itself
+        offset += len;
+
+        if (color != 0) // append clear color code
+        {
+            memcpy(&buf[offset], clear.str, clear.len);
+            offset += clear.len;
+        }
+
+        buf[offset++] = '\n'; // newline
+
+        fwrite(buf, total_len, 1, cout);
     #endif
     (void)tag;
 }
