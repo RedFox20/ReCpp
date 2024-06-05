@@ -58,12 +58,12 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            return poolTask && poolTask.wait_check();
+            return poolTask.is_started() && poolTask.wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (poolTask) std::terminate(); // avoid task explosion
+            if (poolTask.is_started()) std::terminate(); // avoid task explosion
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
             {
                 try { result = std::move(action()); }
@@ -93,12 +93,12 @@ namespace rpp
         // is the task ready?
         bool await_ready() const noexcept
         {
-            return poolTask && poolTask.wait_check();
+            return poolTask.is_started() && poolTask.wait_check();
         }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (poolTask) std::terminate(); // avoid task explosion
+            if (poolTask.is_started()) std::terminate(); // avoid task explosion
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable {
                 try { action(); }
                 catch (...) { ex = std::current_exception(); }

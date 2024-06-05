@@ -265,6 +265,9 @@ namespace rpp
             if (value < 0) LogError("count=%d must not be negative", value.load());
             if (value <= 0)
             {
+                // if timeout is 0, then do not enter this infinite loop, just return instantly
+                if (timeout.count() <= 0)
+                    return semaphore::timeout;
                 auto until = std::chrono::high_resolution_clock::now() + timeout;
                 while (value <= 0)
                     if (cv.wait_until(lock, until) == std::cv_status::timeout)
