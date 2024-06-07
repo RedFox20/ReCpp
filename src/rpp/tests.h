@@ -13,9 +13,9 @@
 #include <atomic>  // std::atomic<T> type support
 #include <typeinfo>
 
-#include <rpp/sprint.h> // we love strview and sprint, so it's a common dependency
-#include <rpp/debugging.h> // for adapting debugging API-s with tests API
-#include <rpp/math.h> // rpp::min, rpp::max
+#include "sprint.h" // we love strview and sprint, so it's a common dependency
+#include "debugging.h" // for adapting debugging API-s with tests API
+#include "math.h" // rpp::min, rpp::max
 
 namespace rpp
 {

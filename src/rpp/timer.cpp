@@ -6,6 +6,7 @@
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
     #include <timeapi.h>
+    #include <sysinfoapi.h> // GetSystemTimePreciseAsFileTime
     #pragma comment(lib, "Winmm.lib") // MM time library
 #elif __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
     #include <stdio.h>  // fprintf
