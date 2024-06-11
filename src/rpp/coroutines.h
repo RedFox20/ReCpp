@@ -139,7 +139,7 @@ namespace rpp
                     f = action(); // get the future from the lambda
                     f.wait(); // wait for the nested coroutine to finish (can throw)
                 } catch (...) { ex = std::current_exception(); }
-                action.reset(); // deallocate the lambda before resuming
+                //action.reset(); // deallocate the lambda before resuming
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }

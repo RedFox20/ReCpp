@@ -76,29 +76,30 @@ namespace rpp
 #if POOL_TASK_DEBUG
 #  if POOL_TASK_RPPLOG
 #    define TaskDebug(fmt, ...) LogWarning(fmt, ##__VA_ARGS__)
+#    define UnhandledEx(fmt, ...) LogWarning(fmt, ##__VA_ARGS__)
 #  else
 #    define TaskDebug(fmt, ...) do { \
         fprintf(stdout, "%s $ " fmt "\n", \
             rpp::TimePoint::now().time_of_day().to_string().c_str(), ##__VA_ARGS__); \
     } while(0)
+#    define UnhandledEx(fmt, ...) do { \
+        fprintf(stdout, "pool_task::unhandled_exception $ " fmt "\n", ##__VA_ARGS__); \
+        fflush(stderr); \
+    } while(0)
 #  endif
 #  define InTaskDebug(...) __VA_ARGS__
 #else
-#  define TaskDebug(fmt, ...) // do nothing
+#  define TaskDebug(fmt, ...) do {} while(0) // do nothing
+#  define UnhandledEx(fmt, ...) do {} while(0) // do nothing
 #  define InTaskDebug(...)   // do nothing
 #endif
 
-#if POOL_TASK_RPPLOG
-#  define UnhandledEx(fmt, ...) LogWarning(fmt, ##__VA_ARGS__)
-#else
-#  define UnhandledEx(fmt, ...) do { fprintf(stderr, "pool_task::unhandled_exception $ " fmt "\n", ##__VA_ARGS__); fflush(stderr); } while(0)
-#endif
 
     ///////////////////////////////////////////////////////////////////////////////
 
     const char* pool_task_handle::worker_name() const noexcept
     {
-        if (auto p = s)
+        if (auto p = get())
             if (auto w = p->worker)
                 return w->name;
         return "none";
@@ -116,7 +117,7 @@ namespace rpp
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto p = s)
+        if (auto p = get())
         {
             auto lock = p->finished.spin_lock();
             if (p->finished.wait(lock, timeout) == rpp::semaphore::timeout)
@@ -138,7 +139,7 @@ namespace rpp
     wait_result pool_task_handle::wait(std::nothrow_t, std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto p = s)
+        if (auto p = get())
         {
             auto lock = p->finished.spin_lock();
             p->finished.wait(lock);
@@ -150,7 +151,7 @@ namespace rpp
 
     void pool_task_handle::signal_finished() noexcept
     {
-        if (auto p = s)
+        if (auto p = get())
         {
             auto lock = p->finished.spin_lock();
             p->finished.notify_all(lock);
@@ -208,7 +209,7 @@ namespace rpp
 
         // WARNING: this can be VERY slow
         if (auto tracer = TraceProvider)
-            current_task.s->trace = tracer();
+            current_task->trace = tracer();
 
         return current_task;
     }
@@ -238,7 +239,7 @@ namespace rpp
 
         // WARNING: this can be VERY slow
         if (auto tracer = TraceProvider)
-            current_task.s->trace = tracer();
+            current_task->trace = tracer();
 
         return current_task;
     }
@@ -356,12 +357,20 @@ namespace rpp
 
     void pool_worker::unhandled_exception(const char* what) noexcept
     {
-        //if (trace.empty()) UnhandledEx("%s", what);
-        //else               UnhandledEx("%s\nTask Start Trace:\n%s", what, trace.c_str());
-        (void)what;
         auto lock = new_task_flag.spin_lock();
-        current_task.s->error = std::current_exception();
-        current_task.signal_finished();
+        if (auto* p = current_task.get())
+        {
+        #if POOL_TASK_DEBUG
+            if (p->trace.empty())
+                UnhandledEx("%s", what);
+            else
+                UnhandledEx("%s\nTask Start Trace:\n%s", what, p->trace.c_str());
+        #else
+            (void)what;
+        #endif // POOL_TASK_DEBUG
+            p->error = std::current_exception();
+            current_task.signal_finished();
+        }
     }
 
     bool pool_worker::wait_for_new_job(std::unique_lock<mutex>& lock) noexcept

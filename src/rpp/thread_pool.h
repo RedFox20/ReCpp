@@ -114,82 +114,110 @@ namespace rpp
 
     class pool_worker;
 
+    struct pool_task_state
+    {
+        std::atomic_int ref_count;
+        rpp::semaphore_once_flag finished;
+        std::string trace;
+        std::exception_ptr error;
+        pool_worker* worker = nullptr;
+        explicit pool_task_state(pool_worker* w) noexcept
+            : ref_count{1}, worker{w} {}
+    };
+
     /**
-     * A waitable pool task handle that can thread safely passed around
+     * A waitable pool task handle that can thread safely passed around.
+     * 
+     * This is an atomic shared ptr, specialized to pool_task_state.
+     * It's not easy to generalize this to an atomic<shared_ptr<T>>,
+     * so this wrapper is used to provide a correct implementation.
      */
     class RPPAPI pool_task_handle
     {
-        struct state
-        {
-            rpp::semaphore_once_flag finished;
-            std::string trace;
-            std::exception_ptr error;
-            pool_worker* worker = nullptr;
-            state(pool_worker* w) noexcept : worker{w} {}
-        };
-
-        // this is only null if no task was ever given
-        std::shared_ptr<state> s;
-        // rpp::mutex m; // copy/move mutex
+        std::atomic<pool_task_state*> ptr;
 
     public:
         using duration = std::chrono::high_resolution_clock::duration;
 
-        pool_task_handle(std::nullptr_t) noexcept : s{} {}
-        pool_task_handle(pool_worker* w) noexcept : s{std::make_shared<state>(w)} {}
-
+        pool_task_handle(std::nullptr_t) noexcept : ptr{nullptr} {}
+        explicit pool_task_handle(pool_worker* w) noexcept
+            : ptr{new pool_task_state{w}}
+        {
+        }
         ~pool_task_handle() noexcept
         {
-            // auto lock = rpp::spin_lock(m);
-            s.reset();
+            if (auto* p = get()) {
+                dec_ref(*p);
+            }
         }
-
-        pool_task_handle(const pool_task_handle& other) noexcept : s{}
+        pool_task_handle(const pool_task_handle& other) noexcept
         {
-            this->operator=(other);
+            auto* new_ptr = other.get();
+            if (new_ptr) inc_ref(*new_ptr);
+            ptr.store(new_ptr);
         }
-        pool_task_handle(pool_task_handle&& other) noexcept : s{}
+        pool_task_handle(pool_task_handle&& other) noexcept
         {
-            this->operator=(std::move(other));
+            ptr.store(other.ptr.exchange(nullptr)); // atomic swap
         }
-
         pool_task_handle& operator=(const pool_task_handle& other) noexcept
         {
-            if (this != &other)
-            {
-                // auto lock = rpp::spin_lock(m);
-                s = other.s;
+            if (this != &other) {
+                auto* new_ptr = other.get();
+                auto* old_ptr = get();
+                if (new_ptr) inc_ref(*new_ptr);
+                if (old_ptr) dec_ref(*old_ptr);
+                ptr.store(new_ptr);
             }
             return *this;
         }
         pool_task_handle& operator=(pool_task_handle&& other) noexcept
         {
-            if (this != &other)
-            {
-                // auto lock = rpp::spin_lock(m);
-                std::swap(s, other.s);
+            if (this != &other) {
+                 // atomic exchange (no need to inc/dec refcount)
+                other.ptr.store(ptr.exchange(other.ptr.load()));
             }
             return *this;
         }
+    private:
+        static void inc_ref(pool_task_state& p) noexcept // pre-condition: not null
+        {
+            int old_refs = p.ref_count.fetch_add(1, std::memory_order_seq_cst);
+            if (old_refs <= 0 || old_refs > 100'000) {
+                __assertion_failure("pool_task_state::inc_ref invalid refcount=%d", old_refs);
+                std::terminate();
+            }
+        }
+        static void dec_ref(pool_task_state& p) noexcept
+        {
+            int refs = p.ref_count.fetch_sub(1, std::memory_order_seq_cst) - 1;
+            if (refs != 0) return;
+            delete &p;
+        }
+        pool_task_state* get() const noexcept { return ptr.load(); }
+        pool_task_state* operator->() const noexcept { return ptr.load(); }
+    public:
 
         /// @returns The name of the worker thread that is running this task 
         const char* worker_name() const noexcept;
 
         /// @brief True if task was started -- and it may have already finished @see is_finished
-        bool was_started() const noexcept { return s != nullptr; }
+        bool was_started() const noexcept { return ptr != nullptr; }
 
         /// @returns True if task is running and has not finished yet
         bool is_running() const noexcept
         {
-            if (s == nullptr) return false; // a null task cannot be running
-            return !s->finished.is_set();
+            auto* p = get();
+            if (p == nullptr) return false; // a null task cannot be running
+            return !p->finished.is_set();
         }
 
         /// @returns True if task has finished running
         bool is_finished() const noexcept
         {
-            if (s == nullptr) return false; // a null task can never be finished
-            return s->finished.is_set();
+            auto* p = get();
+            if (p == nullptr) return false; // a null task can never be finished
+            return p->finished.is_set();
         }
 
         // wait for task to finish with timeout

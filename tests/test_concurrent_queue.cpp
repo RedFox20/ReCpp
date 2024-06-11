@@ -228,8 +228,15 @@ TestImpl(test_concurrent_queue)
         scope_guard([&]{ worker.get(); });
 
         // flush
+        rpp::Timer t;
         while (!queue.empty())
+        {
             rpp::sleep_us(100);
+            if (t.elapsed_ms() > 100) {
+                AssertFailed("queue could not empty itself! size=%zu", queue.size());
+                break;
+            }
+        }
         AssertThat(numProcessed, 3);
     }
 
