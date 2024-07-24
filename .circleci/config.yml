@@ -15,9 +15,8 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      - run: CXX20=1 pipenv run mama clang verbose build with_tests coverage
+      - run: CXX20=1 pipenv run mama clang verbose build with_tests
       - run: pipenv run mama clang verbose test="nogdb -vv"
-      - run: pipenv run mama coverage-report=src
       # do a second run with thread sanitizer
       # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
       # - run: pipenv run mama clang verbose test="nogdb -vv"
@@ -33,9 +32,8 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
       - run: make configure-cmake
-      - run: CXX17=1 pipenv run mama clang verbose build with_tests coverage
+      - run: CXX17=1 pipenv run mama clang verbose build with_tests
       - run: pipenv run mama clang verbose test="nogdb -vv"
-      - run: pipenv run mama coverage-report=src
   gcc-ubuntu-cpp20:
     description: Ubuntu GCC C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
