@@ -12,8 +12,8 @@ TestImpl(test_mutex)
         std::string value;
         rpp::mutex mutex;
     public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return value; }
+        auto& get_mutex() { return mutex; }
+        auto& get_ref() { return value; }
     };
 
     TestCase(sync_guard_can_lock_simple_value)
@@ -69,15 +69,64 @@ TestImpl(test_mutex)
         AssertEqual(vec->at(0), 1);
         AssertEqual(vec->at(1), 2);
         AssertEqual(vec->at(2), 3);
+        AssertEqual(*vec, std::vector<int>({1,2,3}));
 
         std::vector<int> iterated_values;
-        for (auto& v : vec.guard())
+        for (auto& v : *vec)
             iterated_values.push_back(v);
         AssertEqual(iterated_values.size(), 3);
         AssertEqual(iterated_values[0], 1);
         AssertEqual(iterated_values[1], 2);
         AssertEqual(iterated_values[2], 3);
 
-        AssertEqual(*vec, std::vector<int>({1,2,3}));
+        // the guard will prevent modification in background thread
+        auto guard = vec.guard();
+        auto t = std::thread([&]
+        {
+            vec->push_back(4);
+            vec->push_back(5);
+            vec->push_back(6);
+        });
+
+        for (int i = 0; i < 10; ++i)
+        {
+            AssertEqual(*guard, std::vector<int>({1,2,3}));
+            sleep(1);
+        }
+
+        guard.unlock();
+        t.join();
+
+        AssertEqual(*vec, std::vector<int>({1,2,3,4,5,6}));
     };
+
+    TestCase(synchronized_var)
+    {
+        rpp::synchronized<std::string> str { "Initial value" };
+        AssertEqual(*str, "Initial value");
+
+        *str = "Testing operator*";
+        AssertEqual(*str, "Testing operator*");
+
+        str->assign("Testing operator->");
+        AssertEqual(*str, "Testing operator->");
+
+        (*str).get() = "Testing get()";
+        AssertEqual((*str).get(), "Testing get()");
+
+        auto guard = str.guard();
+        *guard = "First value";
+        auto t = std::thread([&]
+        {
+            *str = "Second value";
+        });
+        for (int i = 0; i < 10; ++i)
+        {
+            AssertEqual(*guard, "First value");
+            sleep(1);
+        }
+        guard.unlock();
+        t.join();
+        AssertEqual(*str, "Second value");
+    }
 };

@@ -109,23 +109,16 @@ namespace rpp
     }
 
 #if RPP_HAS_CXX20
-    template<typename S>
-    concept SyncableType = requires(S syncable) {
-        syncable.get_mutex(); // example:  rpp::mutex& get_mutex() noexcept { ... }
-        syncable.get_ref();   // example:  std::string& get_ref() noexcept { ... }
+    template<typename T>
+    concept SyncableType = requires(T t) {
+        { t.get_mutex() };
+        { t.get_ref() };
     };
-    template<typename M>
-    concept BasicLockable = requires(M mutex) {
-        mutex.lock();
-        mutex.unlock();
-    };
+    // Doesn't work for some reason :shrug:
     // #define RPP_SYNC_T SyncableType
-    // #define RPP_SYNC_MUTEX_T BasicLockable
     #define RPP_SYNC_T class
-    #define RPP_SYNC_MUTEX_T class
 #else
     #define RPP_SYNC_T class
-    #define RPP_SYNC_MUTEX_T class
 #endif
 
     template<RPP_SYNC_T SyncType>
@@ -224,5 +217,29 @@ namespace rpp
         const guard_type operator->() const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
         const guard_type operator*()  const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
         const guard_type guard()      const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+    };
+
+    /**
+     * @brief Provides a generic synchronized variable which can be used to wrap any type.
+     * @tparam T The type of the synchronized variable, eg std::string or MyStateStruct
+     * @code
+     * rpp::synchronized<std::string> str { "Initial value" };
+     * *str = "Thread safely set new value";
+     * @endcode
+     */
+    template<class T>
+    class synchronized : public synchronizable<synchronized<T>>
+    {
+    protected:
+        T value {};
+        rpp::recursive_mutex mutex {};
+    public:
+
+        synchronized() noexcept = default;
+        synchronized(T&& value) noexcept : value{std::move(value)} {}
+        synchronized(const T& value) noexcept : value{value} {}
+
+        auto& get_mutex() noexcept { return mutex; }
+        T& get_ref() noexcept { return value; }
     };
 }

@@ -158,7 +158,7 @@ namespace rpp
             }
         }
         // necessary overload to prevent ambiguous call picking up write(const T& value)
-        template<class T> FINLINE void write(T* ptr) noexcept
+        template<class T> void write(T* ptr) noexcept
         {
             write((const T*)ptr);
         }
