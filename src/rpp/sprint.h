@@ -77,6 +77,18 @@ namespace rpp
     template<class T> constexpr bool has_to_string_memb  = is_detected_v<to_string_memb_expression, T>;
     template<class T> constexpr bool is_to_stringable = has_to_string<T> || has_to_string_memb<T>;
 
+    template<class T> using get_memb_expression = decltype(std::declval<T>().get());
+    template<class T> constexpr bool has_get_memb = is_detected_v<get_memb_expression, T>;
+
+    template<class T> constexpr bool is_sbuf_special = is_to_stringable<T> || has_get_memb<T>;
+
+    template<class T> using has_begin_expression = decltype(std::declval<T>().begin());
+    template<class T> using has_end_expression   = decltype(std::declval<T>().end());
+    template<class T> using has_size_epxression = decltype(std::declval<T>().size());
+    template<class T> constexpr bool is_container = is_detected_v<has_begin_expression, T>
+                                                 && is_detected_v<has_end_expression, T>
+                                                 && is_detected_v<has_size_epxression, T>;
+
     template<class T> constexpr bool is_byte_array_type = std::is_same<T, void>::value
                                                        || std::is_same<T, uint8_t>::value;
 
@@ -141,7 +153,7 @@ namespace rpp
         void write_ptr_begin() noexcept;
         void write_ptr_end() noexcept;
 
-        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        template<class T, std::enable_if_t<is_to_stringable<T> && !has_get_memb<T>, int> = 0>
         void write(const T* ptr) noexcept
         {
             if (ptr == nullptr) return write(nullptr);
@@ -157,7 +169,7 @@ namespace rpp
             }
         }
 
-        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
+        template<class T, std::enable_if_t<is_to_stringable<T> && !has_get_memb<T>, int> = 0>
         void write(T* ptr) noexcept
         {
             if (ptr == nullptr) return write(nullptr);
@@ -167,8 +179,8 @@ namespace rpp
         template<class T> using sbuf_op = decltype(std::declval<string_buffer&>() << std::declval<T>());
         template<class T> static constexpr bool has_sbuf_op = is_detected_v<sbuf_op, T>;
 
-        template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
-        template<class T> static constexpr bool has_ostrm_op = is_detected_v<ostrm_op, T>;
+        // template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
+        // template<class T> static constexpr bool has_ostrm_op = is_detected_v<ostrm_op, T>;
 
         template<class T, std::enable_if_t<has_to_string<T>, int> = 0>
         FINLINE void write(const T& value) noexcept
@@ -188,12 +200,18 @@ namespace rpp
             *this << value;
         }
 
-        template<class T, std::enable_if_t<!is_to_stringable<T> && !has_sbuf_op<T> && has_ostrm_op<T>, int> = 0>
-        FINLINE void write(const T& value) noexcept
+        // template<class T, std::enable_if_t<!is_to_stringable<T> && !has_sbuf_op<T> && has_ostrm_op<T>, int> = 0>
+        // FINLINE void write(const T& value) noexcept
+        // {
+        //     std::stringstream ss;
+        //     ss << value;
+        //     this->write(ss.str());
+        // }
+
+        template<class T, std::enable_if_t<!is_to_stringable<T> && has_get_memb<T>, int> = 0>
+        FINLINE void write(const T& obj) noexcept
         {
-            std::stringstream ss;
-            ss << value;
-            this->write(ss.str());
+            this->write(obj.get());
         }
 
         template<int N>
@@ -224,55 +242,10 @@ namespace rpp
         template<class T> FINLINE void write(const std::shared_ptr<T>& p) noexcept { this->write(p.get());  }
         template<class T> FINLINE void write(const std::atomic<T>& value) noexcept { this->write(value.load()); }
 
-
-        FINLINE string_buffer& operator<<(const std::string& value) noexcept { this->write(strview{ value }); return *this; }
-        FINLINE string_buffer& operator<<(const char* value) noexcept        { this->write(strview{ value }); return *this; }
-        FINLINE string_buffer& operator<<(const strview& value) noexcept     { this->write(value);            return *this; }
-        FINLINE string_buffer& operator<<(char   value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(bool   value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(rpp::byte bv) noexcept { this->write(bv);    return *this; }
-        FINLINE string_buffer& operator<<(short  value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(ushort value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(int    value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(uint   value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(long   value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(ulong  value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(int64  value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(uint64 value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(float  value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(double value) noexcept { this->write(value); return *this; }
-        FINLINE string_buffer& operator<<(std::nullptr_t) noexcept { this->write(std::nullptr_t{}); return *this; }
-        FINLINE string_buffer& operator<<(const string_buffer& buf) noexcept { this->write(buf); return *this; }
-        FINLINE string_buffer& operator<<(const void* ptr) noexcept    { this->write_ptr(ptr); return *this; }
-        FINLINE string_buffer& operator<<(const uint8_t* ptr) noexcept { this->write_ptr(ptr); return *this; }
-        FINLINE string_buffer& operator<<(void* ptr) noexcept          { this->write_ptr(ptr); return *this; }
-        FINLINE string_buffer& operator<<(uint8_t* ptr) noexcept       { this->write_ptr(ptr); return *this; }
-        template<class T> FINLINE string_buffer& operator<<(const std::weak_ptr<T>& p) noexcept   { this->write(p.lock()); return *this; }
-        template<class T> FINLINE string_buffer& operator<<(const std::shared_ptr<T>& p) noexcept { this->write(p.get());  return *this; }
-        template<class T> FINLINE string_buffer& operator<<(const std::atomic<T>& value) noexcept { this->write(value.load()); return *this; }
-
-        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
-        FINLINE string_buffer& operator<<(const T* obj) noexcept { this->write(obj); return *this; }
-
-        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
-        FINLINE string_buffer& operator<<(T* obj) noexcept       { this->write(obj); return *this; }
-
-        template<class T, std::enable_if_t<is_to_stringable<T>, int> = 0>
-        FINLINE string_buffer& operator<<(const T& obj) noexcept { this->write(obj); return *this; }
-
-        template<class T, std::enable_if_t<!is_to_stringable<T> && has_ostrm_op<T>, int> = 0>
-        FINLINE string_buffer& operator<<(const T& obj) noexcept
+        template<class T>
+        FINLINE string_buffer& operator<<(const T& value) noexcept
         {
-            std::stringstream ss;
-            ss << obj;
-            this->write(ss.str());
-            return *this;
-        }
-
-        template<typename T, template<class, class...> class C, class... Args>
-        FINLINE string_buffer& operator<<(const C<T, Args...>& container) noexcept
-        {
-            this->write(container, /*newlines:*/true);
+            this->write(value);
             return *this;
         }
 
@@ -318,9 +291,11 @@ namespace rpp
          * @see string_buffer::delimiter (default = ' ')
          * Ex: write("test:", 10, 20.1f);  --> "test: 10 20.1"
          */
-        template<class T, class... Args> FINLINE void write(const T& first, const Args&... args) noexcept
+        template<class T, class U, class... Args>
+        FINLINE void write(const T& first, const U& second, const Args&... args) noexcept
         {
             write(first);
+            write_with_separator(second);
             #if RPP_HAS_CXX17
                 (..., write_with_separator(args)); // C++17 Fold Expressions
             #else
@@ -332,9 +307,11 @@ namespace rpp
             write(value);
             writeln();
         }
-        template<class T, class... Args> FINLINE void writeln(const T& first, const Args&... args) noexcept
+        template<class T, class U, class... Args>
+        FINLINE void writeln(const T& first, const U& second, const Args&... args) noexcept
         {
             write(first);
+            write_with_separator(second);
             #if RPP_HAS_CXX17
                 (..., write_with_separator(args)); // C++17 Fold Expressions
             #else
@@ -373,8 +350,8 @@ namespace rpp
         void pretty_cont_item_end(int i, int count, bool newlines) noexcept;
         void pretty_cont_end(int count) noexcept;
 
-        template<typename T, template<class, class...> class C, class... Args>
-        NOINLINE void write(const C<T, Args...>& container, bool newlines = true) noexcept
+        template<typename C, std::enable_if_t<is_container<C>, int> = 0>
+        NOINLINE void write(const C& container, bool newlines = true) noexcept
         {
             int count = (int)container.size();
             pretty_cont_start(count, newlines);
@@ -387,8 +364,8 @@ namespace rpp
             pretty_cont_end(count);
         }
 
-        template<typename T, template<class, class...> class C, class... Args>
-        NOINLINE void prettyprint(const C<T, Args...>& container, bool newlines = true) noexcept
+        template<typename C, std::enable_if_t<is_container<C>, int> = 0>
+        NOINLINE void prettyprint(const C& container, bool newlines = true) noexcept
         {
             this->write(container, newlines);
         }
@@ -538,8 +515,8 @@ namespace rpp
      *  [2] = { "key": "value", "name": "john" }
      *  @endcode
      */
-    template<class T, template<class,class...> class C, class... Args>
-    NOINLINE std::string to_string(const C<T,Args...>& container, bool newLineSeparator = true) noexcept
+    template<typename C, std::enable_if_t<is_container<C>, int> = 0>
+    NOINLINE std::string to_string(const C& container, bool newLineSeparator = true) noexcept
     {
         rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
     }
