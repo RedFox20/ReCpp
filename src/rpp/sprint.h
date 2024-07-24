@@ -3,14 +3,15 @@
  * String Printing and Formatting, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include <string>
 #include "strview.h"
 #include "debugging.h"
+#include "type_traits.h"
+
 #include <cstdio>        // fprintf
 #include <memory>        // std::shared_ptr
 #include <unordered_map> // std::unordered_map for to_string extensions
 #include <atomic>        // std::atomic<T> support
-#include <sstream>
+#include <sstream>       // std::stringstream
 
 #ifndef RPP_SPRINT_H
 #define RPP_SPRINT_H 1
@@ -50,47 +51,7 @@ namespace rpp
 
     RPPAPI inline const std::string& to_string(const std::string& s) noexcept { return s; }
 
-    namespace detail
-    {
-        template< class... >
-        using void_t = void;
-
-        template<typename, template<typename...> class, typename...>
-        struct is_detected : std::false_type {};
-
-        template<template<class...> class Operation, typename... Arguments>
-        struct is_detected<void_t<Operation<Arguments...>>, Operation, Arguments...> : std::true_type {};
-    }
-
-    template<template<class...> class Operation, typename... Arguments>
-    using is_detected = detail::is_detected<detail::void_t<>, Operation, Arguments...>;
-
-    template<template<class...> class Operation, typename... Arguments>
-    constexpr bool is_detected_v = detail::is_detected<detail::void_t<>, Operation, Arguments...>::value;
-
-
-    template<class T> using std_to_string_expression  = decltype(std::to_string(std::declval<T>()));
-    template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
-    template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
-
-    template<class T> constexpr bool has_to_string       = is_detected_v<to_string_expression, T>;
-    template<class T> constexpr bool has_to_string_memb  = is_detected_v<to_string_memb_expression, T>;
-    template<class T> constexpr bool is_to_stringable = has_to_string<T> || has_to_string_memb<T>;
-
-    template<class T> using get_memb_expression = decltype(std::declval<T>().get());
-    template<class T> constexpr bool has_get_memb = is_detected_v<get_memb_expression, T>;
-
-    template<class T> constexpr bool is_sbuf_special = is_to_stringable<T> || has_get_memb<T>;
-
-    template<class T> using has_begin_expression = decltype(std::declval<T>().begin());
-    template<class T> using has_end_expression   = decltype(std::declval<T>().end());
-    template<class T> using has_size_epxression = decltype(std::declval<T>().size());
-    template<class T> constexpr bool is_container = is_detected_v<has_begin_expression, T>
-                                                 && is_detected_v<has_end_expression, T>
-                                                 && is_detected_v<has_size_epxression, T>;
-
-    template<class T> constexpr bool is_byte_array_type = std::is_same<T, void>::value
-                                                       || std::is_same<T, uint8_t>::value;
+    ////////////////////////////////////////////////////////////////////////////////
 
     enum format_opt
     {
@@ -149,71 +110,6 @@ namespace rpp
         char* emplace_buffer(int count) noexcept;
         void writef(PRINTF_FMTSTR const char* format, ...) noexcept PRINTF_CHECKFMT2;
 
-
-        void write_ptr_begin() noexcept;
-        void write_ptr_end() noexcept;
-
-        template<class T, std::enable_if_t<is_to_stringable<T> && !has_get_memb<T>, int> = 0>
-        void write(const T* ptr) noexcept
-        {
-            if (ptr == nullptr) return write(nullptr);
-            RPP_CXX17_IF_CONSTEXPR(std::is_function<T>::value)
-            {
-                this->write_ptr(reinterpret_cast<const void*>(ptr));
-            }
-            else
-            {
-                write_ptr_begin();
-                this->write(*ptr); 
-                write_ptr_end();
-            }
-        }
-
-        template<class T, std::enable_if_t<is_to_stringable<T> && !has_get_memb<T>, int> = 0>
-        void write(T* ptr) noexcept
-        {
-            if (ptr == nullptr) return write(nullptr);
-            write_ptr_begin();this->write(*ptr); write_ptr_end();
-        }
-
-        template<class T> using sbuf_op = decltype(std::declval<string_buffer&>() << std::declval<T>());
-        template<class T> static constexpr bool has_sbuf_op = is_detected_v<sbuf_op, T>;
-
-        // template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
-        // template<class T> static constexpr bool has_ostrm_op = is_detected_v<ostrm_op, T>;
-
-        template<class T, std::enable_if_t<has_to_string<T>, int> = 0>
-        FINLINE void write(const T& value) noexcept
-        {
-            this->write(to_string(value));
-        }
-
-        template<class T, std::enable_if_t<has_to_string_memb<T>, int> = 0>
-        FINLINE void write(const T& value) noexcept
-        {
-            this->write(value.to_string());
-        }
-
-        template<class T, std::enable_if_t<!is_to_stringable<T> && has_sbuf_op<T>, int> = 0>
-        FINLINE void write(const T& value) noexcept
-        {
-            *this << value;
-        }
-
-        // template<class T, std::enable_if_t<!is_to_stringable<T> && !has_sbuf_op<T> && has_ostrm_op<T>, int> = 0>
-        // FINLINE void write(const T& value) noexcept
-        // {
-        //     std::stringstream ss;
-        //     ss << value;
-        //     this->write(ss.str());
-        // }
-
-        template<class T, std::enable_if_t<!is_to_stringable<T> && has_get_memb<T>, int> = 0>
-        FINLINE void write(const T& obj) noexcept
-        {
-            this->write(obj.get());
-        }
-
         template<int N>
         FINLINE void write(const char (&value)[N])   noexcept { this->write(strview{ value }); }
         FINLINE void write(const std::string& value) noexcept { this->write(strview{ value }); }
@@ -242,12 +138,115 @@ namespace rpp
         template<class T> FINLINE void write(const std::shared_ptr<T>& p) noexcept { this->write(p.get());  }
         template<class T> FINLINE void write(const std::atomic<T>& value) noexcept { this->write(value.load()); }
 
+        // --------------------------------------------------------------- //
+
+        void write_ptr_begin() noexcept;
+        void write_ptr_end() noexcept;
+
+        template<class T> void write(const T* ptr) noexcept
+        {
+            if (ptr == nullptr) return write(nullptr);
+            if constexpr(std::is_function<T>::value)
+            {
+                this->write_ptr(reinterpret_cast<const void*>(ptr));
+            }
+            else
+            {
+                write_ptr_begin();
+                this->write(*ptr); 
+                write_ptr_end();
+            }
+        }
+        // necessary overload to prevent ambiguous call picking up write(const T& value)
+        template<class T> FINLINE void write(T* ptr) noexcept
+        {
+            write((const T*)ptr);
+        }
+
+        // For: string_buffer& operator<<(string_buffer& sb, const T& value)
+        template<class T> using sbuf_op = decltype(operator<<(std::declval<string_buffer&>(), std::declval<T>()));
+
+        // For: std::ostream& operator<<(std::ostream& os, const T& value);
+        template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
+
+        /**
+         * @brief Matches all operator<< overloads for string_buffer& and T
+         */
         template<class T>
         FINLINE string_buffer& operator<<(const T& value) noexcept
         {
             this->write(value);
             return *this;
         }
+
+        /**
+         * @brief Generic fallback for unknown types. Tries different ways to convert T to string
+         */
+        template<class T>
+        void write(const T& value) noexcept
+        {
+            if constexpr (is_detected_v<sbuf_op, T>)
+            {
+                // this part is a bit dangerous, there is a possibility for cyclic recursion
+                // of types that have operator<< overloads for string_buffer
+                *this << value;
+            }
+            else if constexpr (has_to_string_memb<T>)
+            {
+                this->write(value.to_string());
+            }
+            else if constexpr (has_to_string<T>)
+            {
+                this->write(to_string(value));
+            }
+            else if constexpr (has_std_to_string<T>)
+            {
+                this->write(std::to_string(value));
+            }
+            else if constexpr (is_detected_v<ostrm_op, T>)
+            {
+                std::ostringstream oss;
+                oss << value;
+                this->write(oss.str());
+            }
+            else if constexpr (is_container<T>)
+            {
+                this->write_cont(value);
+            }
+            // if all common string conversion methods failed,
+            // and value.get() exists, then try to write that instead
+            else if constexpr (has_get_memb<T>)
+            {
+                this->write(value.get());
+            }
+            else if constexpr (std::is_enum_v<T>)
+            {
+                this->write(static_cast<int>(value));
+            }
+            else
+            {
+                this->write_ptr(reinterpret_cast<const void*>(&value));
+            }
+        }
+
+        /**
+         * @brief Prettyprint a container with .size(), .begin(), .end() methods.
+         */
+        template<typename C>
+        NOINLINE void write_cont(const C& container, bool newlines = false) noexcept
+        {
+            int count = (int)container.size();
+            pretty_cont_start(count, newlines);
+            int i = 0;
+            for (const auto& item : container) {
+                pretty_cont_item_start(newlines);
+                prettyprint(item);
+                pretty_cont_item_end(++i, count, newlines);
+            }
+            pretty_cont_end(count);
+        }
+
+        // --------------------------------------------------------------- //
 
         /**
          * Appends a full hex string from the given byte buffer
@@ -302,6 +301,7 @@ namespace rpp
                 write_separator(); write(args...);
             #endif
         }
+
         template<class T> FINLINE void writeln(const T& value) noexcept
         {
             write(value);
@@ -310,13 +310,7 @@ namespace rpp
         template<class T, class U, class... Args>
         FINLINE void writeln(const T& first, const U& second, const Args&... args) noexcept
         {
-            write(first);
-            write_with_separator(second);
-            #if RPP_HAS_CXX17
-                (..., write_with_separator(args)); // C++17 Fold Expressions
-            #else
-                write_separator(); write(args...);
-            #endif
+            write(first, second, args...);
             writeln();
         }
 
@@ -350,36 +344,21 @@ namespace rpp
         void pretty_cont_item_end(int i, int count, bool newlines) noexcept;
         void pretty_cont_end(int count) noexcept;
 
-        template<typename C, std::enable_if_t<is_container<C>, int> = 0>
-        NOINLINE void write(const C& container, bool newlines = true) noexcept
-        {
-            int count = (int)container.size();
-            pretty_cont_start(count, newlines);
-            int i = 0;
-            for (const auto& item : container) {
-                pretty_cont_item_start(newlines);
-                prettyprint(item);
-                pretty_cont_item_end(++i, count, newlines);
-            }
-            pretty_cont_end(count);
-        }
-
-        template<typename C, std::enable_if_t<is_container<C>, int> = 0>
-        NOINLINE void prettyprint(const C& container, bool newlines = true) noexcept
-        {
-            this->write(container, newlines);
-        }
-
         /**
          * Similar to write(...), but performs prettyprint formatting to each argument
          */
-        template<class T, class... Args> FINLINE void prettyprint(const T& first, const Args&... args) noexcept
+        template<class T, class U, class... Args>
+        FINLINE void prettyprint(const T& first, const U& second, const Args&... args) noexcept
         {
-            prettyprint(first); write_separator(); prettyprint(args...);
+            prettyprint(first); write_separator();
+            prettyprint(second); write_separator();
+            prettyprint(args...);
         }
-        template<class T, class... Args> FINLINE void prettyprintln(const T& first, const Args&... args) noexcept
+        template<class T, class U, class... Args>
+        FINLINE void prettyprintln(const T& first, const U& second, const Args&... args) noexcept
         {
-            prettyprint(first, args...); writeln();
+            prettyprint(first, second, args...);
+            writeln();
         }
     };
 
@@ -479,13 +458,14 @@ namespace rpp
         return buf.str();
     }
 
-    inline const char* __format_wrap(const std::string& s) noexcept { return s.c_str();    }
-    inline const char* __format_wrap(const strview& s) noexcept { return s.to_cstr();  }
+    inline const char* __format_wrap(const std::string& s) noexcept { return s.c_str(); }
+    inline const char* __format_wrap(const strview& s) noexcept { return s.to_cstr(); }
     template<class T> const T& __format_wrap(const T& t) noexcept { return t; }
 
     RPPAPI std::string __format(const char* format, ...) noexcept; 
 
-    template<class... Args> std::string format(const char* format, const Args&... args) noexcept
+    template<class... Args>
+    inline std::string format(const char* format, const Args&... args) noexcept
     {
         return __format(format, __format_wrap(args)...);
     }
@@ -509,16 +489,16 @@ namespace rpp
      *  }
      *  @endcode
      *  
-     *  With newLineSeparator = false the output is:
+     *  With newlines = false the output is:
      *  @code
      *  [2] = { "hello", "world" }
      *  [2] = { "key": "value", "name": "john" }
      *  @endcode
      */
     template<typename C, std::enable_if_t<is_container<C>, int> = 0>
-    NOINLINE std::string to_string(const C& container, bool newLineSeparator = true) noexcept
+    NOINLINE std::string to_string(const C& container, bool newlines = true) noexcept
     {
-        rpp::string_buffer sb; sb.prettyprint(container, newLineSeparator); return sb.str();
+        rpp::string_buffer sb; sb.write_cont(container, newlines); return sb.str();
     }
     template<class T> NOINLINE std::string to_string(const std::shared_ptr<T>& p) noexcept
     {
