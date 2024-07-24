@@ -1,6 +1,10 @@
 #pragma once
+#include "config.h"
 #include <mutex> // lock_guard etc
 #include <thread> // this_thread::yield
+#if RPP_HAS_CXX20
+#include <type_traits>
+#endif
 
 namespace rpp
 {
@@ -105,4 +109,111 @@ namespace rpp
         }
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
+
+#if RPP_HAS_CXX20
+    template<typename S>
+    concept SyncableType = requires(S syncable) {
+        syncable.get_mutex(); // example:  rpp::mutex& get_mutex() noexcept { ... }
+        syncable.get_ref();   // example:  std::string& get_ref() noexcept { ... }
+    };
+    template<typename M>
+    concept BasicLockable = requires(M mutex) {
+        mutex.lock();
+        mutex.unlock();
+    };
+    // #define RPP_SYNC_T SyncableType
+    // #define RPP_SYNC_MUTEX_T BasicLockable
+    #define RPP_SYNC_T class
+    #define RPP_SYNC_MUTEX_T class
+#else
+    #define RPP_SYNC_T class
+    #define RPP_SYNC_MUTEX_T class
+#endif
+
+    template<RPP_SYNC_T SyncType>
+    class synchronize_guard
+    {
+    public:
+        using value_type = std::decay_t< decltype(std::declval<SyncType>().get_ref()) >;
+        using mutex_type = std::decay_t< decltype(std::declval<SyncType>().get_mutex()) >;
+    private:
+        std::unique_lock<mutex_type> lock;
+        SyncType* instance;
+    public:
+        explicit synchronize_guard(SyncType* s) noexcept
+            : lock{rpp::spin_lock(s->get_mutex())}
+            , instance{s}
+        { }
+
+        void unlock() { lock.unlock(); }
+
+        value_type* operator->() noexcept { return &instance->get_ref(); }
+        value_type& operator*() noexcept { return instance->get_ref(); }
+        value_type& get() noexcept { return instance->get_ref(); }
+        operator value_type&() noexcept { return instance->get_ref(); }
+
+        const value_type* operator->() const noexcept { return &instance->get_ref(); }
+        const value_type& operator*() const noexcept { return instance->get_ref(); }
+        const value_type& get() const noexcept { return instance->get_ref(); }
+        operator const value_type&() const noexcept { return instance->get_ref(); }
+
+        void operator=(const value_type& value) noexcept
+        {
+            instance->get_ref() = value;
+        }
+        void operator=(value_type&& value) noexcept
+        {
+            instance->get_ref() = std::move(value);
+        }
+
+        // template<typename U = T>
+        // std::enable_if_t<std::is_same_v<U, std::vector<typename U::value_type>>, typename U::const_iterator>
+        // begin() const
+        // {
+        //     return var.current_value_cref().cbegin();
+        // }
+
+        // template<typename U = T>
+        // std::enable_if_t<std::is_same_v<U, std::vector<typename U::value_type>>, typename U::const_iterator>
+        // end() const
+        // {
+        //     return var.current_value_cref().cend();
+        // }
+    };
+
+    /**
+     * @brief Provides a generalized synchronization proxy which any class can inherit from.
+     * @tparam SyncType The type of the class inheriting from synchronizable
+     * @code
+     * class Example : public rpp::synchronizable<Example>
+     * {
+     *     std::string value;
+     *     rpp::mutex mutex;
+     * public:
+     *     rpp::mutex& get_mutex() noexcept { return mutex; }
+     *     std::string& get_ref() noexcept { return value; }
+     * };
+     * @endcode
+     */
+    template<RPP_SYNC_T SyncType>
+    class synchronizable
+    {
+    public:
+        synchronizable() noexcept = default;
+
+        // NOMOVE / NOCOPY
+        synchronizable(synchronizable&&) = delete;
+        synchronizable(const synchronizable&) = delete;
+        synchronizable& operator=(synchronizable&&) = delete;
+        synchronizable& operator=(const synchronizable&) = delete;
+
+        using guard_type = rpp::synchronize_guard<SyncType>;
+
+        guard_type operator->() noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+        guard_type operator*()  noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+        guard_type guard()      noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+        const guard_type operator->() const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+        const guard_type operator*()  const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+        const guard_type guard()      const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+    };
 }
