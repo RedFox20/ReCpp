@@ -110,7 +110,7 @@ TestImpl(test_sprint)
         TempFILE printed;
         println(printed.out, names);
         AssertEqual(printed.text(),
-            "[5] = { \n  \"Bob\", \n  \"Marley\", \n  \"Mick\", \n  \"Jagger\", \n  \"Bruce\"\n }\n");
+            "[5] = { \"Bob\", \"Marley\", \"Mick\", \"Jagger\", \"Bruce\" }\n");
     }
 
     TestCase(println_vector_shared_ptrs)
@@ -121,7 +121,7 @@ TestImpl(test_sprint)
         
         TempFILE printed;
         println(printed.out, ptrs);
-        AssertEqual(printed.text(), "{ \n  *{1.1}, \n  *{2.2}, \n  *{3.4}\n }\n");
+        AssertEqual(printed.text(), "{ *{1.1}, *{2.2}, *{3.4} }\n");
     }
 
     TestCase(println_unordered_map)
@@ -131,7 +131,7 @@ TestImpl(test_sprint)
         TempFILE printed;
         println(printed.out, map);
         AssertEqual(printed.text(),
-            "[5] = { \n  0: \"Bob\", \n  1: \"Marley\", \n  2: \"Mick\", \n  3: \"Jagger\", \n  4: \"Bruce\"\n }\n");
+            "[5] = { 0: \"Bob\", 1: \"Marley\", 2: \"Mick\", 3: \"Jagger\", 4: \"Bruce\" }\n");
     }
 
     TestCase(format)
@@ -202,7 +202,7 @@ TestImpl(test_sprint)
         AssertThat(ashex, referenceHex(input));
     }
     
-    TestCase(to_stringable)
+    TestCase(string_buffer_write_any)
     {
         string_buffer sb;
 
@@ -266,6 +266,10 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "string_buffer_operator");
         sb.clear();
 
+        sb.operator<<(string_buffer_operator{});
+        AssertThat(sb.view(), "string_buffer_operator");
+        sb.clear();
+
         sb << ostream_operator{};
         AssertThat(sb.view(), "ostream_operator");
         sb.clear();
@@ -279,7 +283,7 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "*{external_to_string}");
         sb.clear();
     }
-    
+
     TestCase(sprint_to_stringable)
     {
         AssertThat(rpp::sprint(0.16), "0.16");
@@ -293,6 +297,5 @@ TestImpl(test_sprint)
         AssertThat(rpp::sprint(&ext), "*{external_to_string}");
         AssertThat(rpp::sprint((const external_to_string*)&ext), "*{external_to_string}");
     }
-
 
 };

@@ -1,10 +1,8 @@
 #pragma once
 #include "config.h"
+#include "type_traits.h"
 #include <mutex> // lock_guard etc
 #include <thread> // this_thread::yield
-#if RPP_HAS_CXX20
-#include <type_traits>
-#endif
 
 namespace rpp
 {
@@ -166,19 +164,30 @@ namespace rpp
             instance->get_ref() = std::move(value);
         }
 
-        // template<typename U = T>
-        // std::enable_if_t<std::is_same_v<U, std::vector<typename U::value_type>>, typename U::const_iterator>
-        // begin() const
-        // {
-        //     return var.current_value_cref().cbegin();
-        // }
+        template<class U> FINLINE bool operator==(const U& other) const noexcept
+        {
+            return instance->get_ref() == other;
+        }
+        template<class U> FINLINE bool operator!=(const U& other) const noexcept
+        {
+            return instance->get_ref() != other;
+        }
 
-        // template<typename U = T>
-        // std::enable_if_t<std::is_same_v<U, std::vector<typename U::value_type>>, typename U::const_iterator>
-        // end() const
-        // {
-        //     return var.current_value_cref().cend();
-        // }
+        template<typename U = value_type>
+        std::enable_if_t<is_iterable<U>, decltype(std::declval<U>().begin())>
+        begin() { return get().begin(); }
+
+        template<typename U = value_type>
+        std::enable_if_t<is_iterable<U>, decltype(std::declval<U>().end())>
+        end() { return get().end(); }
+
+        template<typename U = value_type>
+        std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().begin())>
+        begin() const { return get().begin(); }
+
+        template<typename U = value_type>
+        std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().end())>
+        end() const { return get().end(); }
     };
 
     /**
