@@ -140,17 +140,17 @@ namespace rpp
         bool owns_lock() const noexcept { return mtx_lock.owns_lock(); }
         void unlock() { mtx_lock.unlock(); }
 
-        // NOTE: we don't allow all direct access operators, otherwise
-        //       we're unable to insert instance->set() calls for classes that have it
+        // NOTE: Do not allow overwriting accessors, because all writes need to go 
+        //       through synchronize_guard::operator=() which detects SyncType::set() method.
+        //       However existing value can be modified via operator->()
         value_type* operator->() noexcept { return &instance->get_ref(); }
-        // value_type& operator*() noexcept { return instance->get_ref(); }
-        // value_type& get() noexcept { return instance->get_ref(); }
-        // operator value_type&() noexcept { return instance->get_ref(); }
 
+        // For const refs, all read accessors are allowed
+        // WARNING: do not const_cast these, it will cause undefined behavior
         const value_type* operator->() const noexcept { return &instance->get_ref(); }
         const value_type& operator*() const noexcept { return instance->get_ref(); }
         const value_type& get() const noexcept { return instance->get_ref(); }
-        // operator const value_type&() const noexcept { return instance->get_ref(); }
+        operator const value_type&() const noexcept { return instance->get_ref(); }
 
         /**
          * @brief It's important that all write operations go through this operator,
@@ -197,6 +197,13 @@ namespace rpp
         std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().end())>
         end() const {
             return static_cast<const U&>(instance->get_ref()).end(); 
+        }
+
+        template<class U = value_type, class V,
+                 std::enable_if_t<rpp::is_iterable<U>, int> = 0>
+        FINLINE void operator=(std::initializer_list<V> value)
+        {
+            this->operator=(U{value});
         }
     };
 

@@ -48,12 +48,12 @@ TestImpl(test_mutex)
         AssertEqual(*simple, "Second value"); // 5
     }
 
-    template<class T>
+    template<class T, class Mutex = rpp::mutex>
     class SafeVector : public rpp::synchronizable<SafeVector<T>>
     {
-        std::vector<T> value;
-        rpp::mutex mutex;
     public:
+        std::vector<T> value;
+        Mutex mutex;
         auto& get_mutex() noexcept { return mutex; }
         auto& get_ref() noexcept { return value; }
     };
@@ -61,9 +61,7 @@ TestImpl(test_mutex)
     TestCase(sync_guard_can_lock_vector)
     {
         SafeVector<int> vec;
-        vec->push_back(1);
-        vec->push_back(2);
-        vec->push_back(3);
+        *vec = {1,2,3};
 
         AssertEqual(vec->size(), 3);
         AssertEqual(vec->at(0), 1);
@@ -74,7 +72,7 @@ TestImpl(test_mutex)
         std::vector<int> iterated_values;
         for (auto& v : *vec)
             iterated_values.push_back(v);
-        AssertEqual(iterated_values.size(), 3);
+        AssertEqual(iterated_values.size(), 3u);
         AssertEqual(iterated_values[0], 1);
         AssertEqual(iterated_values[1], 2);
         AssertEqual(iterated_values[2], 3);
@@ -99,6 +97,34 @@ TestImpl(test_mutex)
 
         AssertEqual(*vec, std::vector<int>({1,2,3,4,5,6}));
     };
+
+    TestCase(sync_guard_holds_lock_during_iteration)
+    {
+        SafeVector<int, rpp::recursive_mutex> vec;
+        *vec = {1,2,3};
+
+        // try to acquire lock and modify the vector
+        auto task = std::thread([&]
+        {
+            sleep(5);
+            auto guard = vec.guard();
+            guard->push_back(4);
+            guard->push_back(5);
+            guard->push_back(6);
+        });
+
+        // immediately acquire lock and slowly iterate over the vector
+        for (auto& v : *vec)
+        {
+            sleep(10);
+            AssertTrue(v == 1 || v == 2 || v == 3);
+            AssertEqual(vec->size(), 3u);
+        }
+
+        // now lock should be released and vec will be modified
+        task.join();
+        AssertEqual(*vec, std::vector<int>({1,2,3,4,5,6}));
+    }
 
     class WithSetMethod : public rpp::synchronizable<WithSetMethod>
     {
@@ -128,6 +154,66 @@ TestImpl(test_mutex)
         AssertEqual(*var, "Testing operator set()");
         AssertTrue(var.called_set);
         var.called_set = false;
+    }
+
+    TestCase(sync_guard_locks_during_function_call)
+    {
+        WithSetMethod var { "Initial value" };
+
+        auto t = std::thread([&]{
+            sleep(5);
+            *var = "Setting new value";
+        });
+
+        // will hold the lock for a long time
+        auto fun = [&](const std::string& s)
+        {
+            sleep(10);
+            AssertEqual(s, "Initial value");
+        };
+        fun(*var);
+
+        t.join();
+        AssertEqual(*var, "Setting new value");
+    }
+
+    class WithLongFunction : public rpp::synchronizable<WithLongFunction>
+    {
+    public:
+        struct ValueType : public std::string
+        {
+            std::atomic_int associated_value = 0;
+            int set_value_slow(int value, int sleep_for)
+            {
+                associated_value = value;
+                sleep(sleep_for);
+                return associated_value;
+            }
+        };
+        ValueType value;
+        rpp::mutex mutex;
+        auto& get_mutex() { return mutex; }
+        auto& get_ref() { return value; }
+    };
+
+    TestCase(sync_guard_locks_during_long_function_call)
+    {
+        WithLongFunction var;
+        var->assign("Initial value");
+
+        auto task = std::thread([&]
+        {
+            sleep(5);
+            var->associated_value = 2;
+        });
+
+        // sets the value and holds the lock for a long time
+        // the task will then enter the mutex and will be blocked,
+        // unable to overwrite the value
+        AssertEqual(var->set_value_slow(/*value*/1, /*sleep*/20), 1);
+
+        task.join();
+        AssertEqual(var->associated_value, 2);
     }
 
     TestCase(synchronized_var)
