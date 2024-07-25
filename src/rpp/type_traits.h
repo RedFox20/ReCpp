@@ -30,11 +30,13 @@ namespace rpp
     template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
     template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
     template<class T> using get_memb_expression       = decltype(std::declval<T>().get());
+    template<class T, class U> using set_memb_expression = decltype(std::declval<T>().set(std::declval<U>()));
 
     template<class T> constexpr bool has_std_to_string  = is_detected_v<std_to_string_expression, T>;
     template<class T> constexpr bool has_to_string      = is_detected_v<to_string_expression, T>;
     template<class T> constexpr bool has_to_string_memb = is_detected_v<to_string_memb_expression, T>;
     template<class T> constexpr bool has_get_memb       = is_detected_v<get_memb_expression, T>;
+    template<class T, class U> constexpr bool has_set_memb = is_detected_v<set_memb_expression, T, U>;
 
     template<class T> using has_begin_expression  = decltype(std::declval<T>().begin());
     template<class T> using has_end_expression    = decltype(std::declval<T>().end());

@@ -128,33 +128,42 @@ namespace rpp
         using value_type = std::decay_t< decltype(std::declval<SyncType>().get_ref()) >;
         using mutex_type = std::decay_t< decltype(std::declval<SyncType>().get_mutex()) >;
     private:
-        std::unique_lock<mutex_type> lock;
+        std::unique_lock<mutex_type> mtx_lock;
         SyncType* instance;
     public:
         explicit synchronize_guard(SyncType* s) noexcept
-            : lock{rpp::spin_lock(s->get_mutex())}
+            : mtx_lock{rpp::spin_lock(s->get_mutex())}
             , instance{s}
         { }
 
-        void unlock() { lock.unlock(); }
+        std::unique_lock<mutex_type>& lock() const noexcept { return mtx_lock; }
+        bool owns_lock() const noexcept { return mtx_lock.owns_lock(); }
+        void unlock() { mtx_lock.unlock(); }
 
+        // NOTE: we don't allow all direct access operators, otherwise
+        //       we're unable to insert instance->set() calls for classes that have it
         value_type* operator->() noexcept { return &instance->get_ref(); }
-        value_type& operator*() noexcept { return instance->get_ref(); }
-        value_type& get() noexcept { return instance->get_ref(); }
-        operator value_type&() noexcept { return instance->get_ref(); }
+        // value_type& operator*() noexcept { return instance->get_ref(); }
+        // value_type& get() noexcept { return instance->get_ref(); }
+        // operator value_type&() noexcept { return instance->get_ref(); }
 
         const value_type* operator->() const noexcept { return &instance->get_ref(); }
         const value_type& operator*() const noexcept { return instance->get_ref(); }
         const value_type& get() const noexcept { return instance->get_ref(); }
-        operator const value_type&() const noexcept { return instance->get_ref(); }
+        // operator const value_type&() const noexcept { return instance->get_ref(); }
 
-        void operator=(const value_type& value) noexcept
+        /**
+         * @brief It's important that all write operations go through this operator,
+         *        because we match SyncType::set() method if it exists.
+         */
+        template<class ValueType>
+        void operator=(ValueType&& value) noexcept
         {
-            instance->get_ref() = value;
-        }
-        void operator=(value_type&& value) noexcept
-        {
-            instance->get_ref() = std::move(value);
+            // if class has a set() method, use it for assignments instead
+            if constexpr (has_set_memb<SyncType, ValueType>)
+                instance->set(std::forward<ValueType>(value));
+            else
+                instance->get_ref() = std::forward<ValueType>(value);
         }
 
         template<class U> FINLINE bool operator==(const U& other) const noexcept
@@ -168,19 +177,27 @@ namespace rpp
 
         template<typename U = value_type>
         std::enable_if_t<is_iterable<U>, decltype(std::declval<U>().begin())>
-        begin() { return get().begin(); }
+        begin() {
+            return instance->get_ref().begin();
+        }
 
         template<typename U = value_type>
         std::enable_if_t<is_iterable<U>, decltype(std::declval<U>().end())>
-        end() { return get().end(); }
+        end() {
+            return instance->get_ref().end();
+        }
 
         template<typename U = value_type>
         std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().begin())>
-        begin() const { return get().begin(); }
+        begin() const {
+            return static_cast<const U&>(instance->get_ref()).begin();
+        }
 
         template<typename U = value_type>
         std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().end())>
-        end() const { return get().end(); }
+        end() const {
+            return static_cast<const U&>(instance->get_ref()).end(); 
+        }
     };
 
     /**

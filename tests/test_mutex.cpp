@@ -26,7 +26,7 @@ TestImpl(test_mutex)
         simple->assign("Testing operator->");
         AssertEqual(*simple, "Testing operator->");
 
-        (*simple).get() = "Testing get()";
+        *simple = "Testing get()";
         AssertEqual((*simple).get(), "Testing get()");
 
         // 1. lock and set First value
@@ -35,7 +35,7 @@ TestImpl(test_mutex)
         // 4. unlock the value and join the thread
         // 5. ensure it has the Second value
         auto guard = simple.guard(); // 1
-        *guard = "First value";
+        guard = "First value";
         auto t = std::thread([&] { // 2
             *simple = "Second value";
         });
@@ -100,6 +100,36 @@ TestImpl(test_mutex)
         AssertEqual(*vec, std::vector<int>({1,2,3,4,5,6}));
     };
 
+    class WithSetMethod : public rpp::synchronizable<WithSetMethod>
+    {
+    public:
+        std::string value;
+        rpp::mutex mutex;
+        bool called_set = false;
+
+        WithSetMethod(std::string&& value) : value(std::move(value)) {}
+
+        auto& get_mutex() { return mutex; }
+        auto& get_ref() { return value; }
+
+        template<class U> void set(U&& new_value) { 
+            value = std::forward<U>(new_value);
+            called_set = true;
+        }
+    };
+
+    TestCase(sync_guard_uses_set_method_on_synced_type)
+    {
+        WithSetMethod var { "Initial value" };
+        AssertEqual(*var, "Initial value");
+        AssertFalse(var.called_set);
+
+        *var = "Testing operator set()";
+        AssertEqual(*var, "Testing operator set()");
+        AssertTrue(var.called_set);
+        var.called_set = false;
+    }
+
     TestCase(synchronized_var)
     {
         rpp::synchronized<std::string> str { "Initial value" };
@@ -111,11 +141,11 @@ TestImpl(test_mutex)
         str->assign("Testing operator->");
         AssertEqual(*str, "Testing operator->");
 
-        (*str).get() = "Testing get()";
+        *str = "Testing get()";
         AssertEqual((*str).get(), "Testing get()");
 
         auto guard = str.guard();
-        *guard = "First value";
+        guard = "First value";
         auto t = std::thread([&]
         {
             *str = "Second value";
