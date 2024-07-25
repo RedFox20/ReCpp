@@ -231,9 +231,9 @@ namespace rpp
         guard_type operator->() noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
         guard_type operator*()  noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
         guard_type guard()      noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        const guard_type operator->() const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        const guard_type operator*()  const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        const guard_type guard()      const noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
+        const guard_type operator->() const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
+        const guard_type operator*()  const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
+        const guard_type guard()      const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
     };
 
     /**
