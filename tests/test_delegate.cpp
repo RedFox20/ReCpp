@@ -181,6 +181,131 @@ namespace rpp
 
         ////////////////////////////////////////////////////
 
+        /**
+         * Using this convoluted Var<T>, since this is a simplification
+         * of a real-world usecase from SyncVar<T> which triggers events via
+         * delegate callbacks when a variable is synced over remote network.
+         */
+        template<class T> class TemplatedVar
+        {
+        public:
+            T value {};
+            T result {};
+            using ByValue = rpp::delegate<void(T value)>;
+            using ByRef = rpp::delegate<void(const T& value)>;
+            ByRef func;
+            TemplatedVar(T default_value, ByValue&& by_value)
+                : value{default_value}
+            {
+                set_callback(std::move(by_value));
+            }
+            TemplatedVar(T default_value, ByRef&& by_ref)
+                : value{default_value}
+            {
+                set_callback(std::move(by_ref));
+            }
+            template<class ByAny = ByValue>
+            void set_callback(ByAny&& callback) noexcept
+            {
+                if constexpr (std::is_same_v<ByAny, ByRef>)
+                    func = std::forward<ByAny>(callback);
+                else {
+                    if (!callback) func = {};
+                    else func = [callback=std::forward<ByAny>(callback)](const T& value) { callback(value); };
+                }
+            }
+            void set_value(T new_value)
+            {
+                value = new_value;
+                func(value);
+            }
+        };
+
+        ////////////////////////////////////////////////////
+
+        class VirtualInterfaceA
+        {
+        public:
+            TemplatedVar<int> var_virtual_A;
+            TemplatedVar<int> var_override_A;
+            VirtualInterfaceA()
+                : var_virtual_A{0, {this, &VirtualInterfaceA::virtual_method_A}}
+                , var_override_A{0, {this, &VirtualInterfaceA::override_method_A}}
+            {}
+            virtual ~VirtualInterfaceA() = default;
+            virtual void virtual_method_A(int value) noexcept { var_virtual_A.result = value; }
+            virtual void override_method_A(int value) noexcept { var_override_A.result = value; }
+        };
+
+        class VirtualInterfaceB
+        {
+        public:
+            TemplatedVar<int> var_virtual_B;
+            TemplatedVar<int> var_override_B;
+            VirtualInterfaceB()
+                : var_virtual_B{0, {this, &VirtualInterfaceB::virtual_method_B}}
+                , var_override_B{0, {this, &VirtualInterfaceB::override_method_B}}
+            {}
+            virtual ~VirtualInterfaceB() = default;
+            virtual void virtual_method_B(int value) noexcept { var_virtual_B.result = value; }
+            virtual void override_method_B(int value) noexcept { var_override_B.result = value; }
+        };
+
+        // In MSVC if a class uses multiple inheritance,
+        // then we get this error:
+        //       Pointers to members have different representations; cannot cast between them
+        // This is because MSVC uses 16-byte PMF for multiple inheritance.
+        class ContainingClass : public VirtualInterfaceA, public VirtualInterfaceB
+        {
+        public:
+            TemplatedVar<int> var_byval;
+            TemplatedVar<int> var_byref;
+            ContainingClass()
+                : var_byval{0, {this, &ContainingClass::var1_byval_method}}
+                , var_byref{0, {this, &ContainingClass::var2_byref_method}}
+            {}
+            void var1_byval_method(int value) noexcept { var_byval.result = value; }
+            void var2_byref_method(const int& value) noexcept { var_byref.result = value; }
+            void override_method_A(int value) noexcept override { var_override_A.result = value*2; }
+            void override_method_B(int value) noexcept final { var_override_B.result = value*3; }
+        };
+
+        TestCase(multi_inheritance_pmf_resolves_correctly)
+        {
+            ContainingClass obj;
+
+            // calling by value works
+            obj.var_byval.set_value(42);
+            AssertThat(obj.var_byval.result, 42);
+
+            // calling by ref works
+            obj.var_byref.set_value(22);
+            AssertThat(obj.var_byref.result, 22);
+        }
+
+        TestCase(multi_inheritance_virtual_pmf_resolves_as_expected)
+        {
+            ContainingClass obj;
+
+            // calling non-overridden virtual A works
+            obj.var_virtual_A.set_value(11);
+            AssertThat(obj.var_virtual_A.result, 11);
+
+            // calling non-overridden virtual B works
+            obj.var_virtual_B.set_value(33);
+            AssertThat(obj.var_virtual_B.result, 33);
+
+            // calling overridden virtual A will use the override method, not the base class method
+            obj.var_override_A.set_value(5);
+            AssertThat(obj.var_override_A.result, 10);
+
+            // calling final virtual B will use the final method, not the base class method
+            obj.var_override_B.set_value(7);
+            AssertThat(obj.var_override_B.result, 21);
+        }
+
+        ////////////////////////////////////////////////////
+
         TestCase(lambdas)
         {
             DataDelegate lambda1 = [](Data a) {

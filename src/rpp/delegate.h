@@ -285,7 +285,27 @@ namespace rpp
             proxy_copy = nullptr;
         }
 
-        #if !_MSC_VER && __clang__ // disable on VC++ clang, enable on all other clang builds
+        #if _MSC_VER
+            union MultiInheritThunk {
+                struct {
+                    uintptr_t ptr; // function pointer
+                    int adj; // this pointer displacement in bytes
+                    int padding;
+                };
+                struct {
+                    dummy_type dfunc;
+                };
+            };
+            static dummy_type devirtualize_mi(void** mi_pmf, void** out_adjusted_inst = nullptr) noexcept
+            {
+                MultiInheritThunk* mi_thunk = reinterpret_cast<MultiInheritThunk*>(mi_pmf);
+                static_assert(sizeof(dummy_type) == sizeof(MultiInheritThunk::ptr));
+                if (out_adjusted_inst)
+                    *out_adjusted_inst = (void*)((char*)*out_adjusted_inst + mi_thunk->adj);{
+                }
+                return mi_thunk->dfunc;
+            }
+        #elif __clang__ // disable on VC++ clang, enable on all other clang builds
             struct VCallThunk {
                 union {
                     void* method;
@@ -317,7 +337,10 @@ namespace rpp
         {
             obj = &inst;
             #if _MSC_VER // VC++ and MSVC clang
-                dfunc = reinterpret_cast<dummy_type>(method);
+                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                    dfunc = devirtualize_mi((void**)&method, &obj);
+                else
+                    dfunc = reinterpret_cast<dummy_type>(method);
             #elif __clang__
                 dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
             #elif __GNUG__ // G++
@@ -334,7 +357,10 @@ namespace rpp
         {
             obj = &const_cast<IClass&>(inst);
             #if _MSC_VER // VC++ and MSVC clang
-                dfunc = reinterpret_cast<dummy_type>(method);
+                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                    dfunc = devirtualize_mi((void**)&method, &obj);
+                else
+                    dfunc = reinterpret_cast<dummy_type>(method);
             #elif __clang__
                 dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
             #elif __GNUG__ // G++
@@ -361,7 +387,10 @@ namespace rpp
             comparison_helper u;
             #if _MSC_VER // VC++ and MSVC clang
                 (void)inst;
-                u.dfunc = reinterpret_cast<dummy_type>(method);
+                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                    u.dfunc = devirtualize_mi((void**)&method);
+                else
+                    u.dfunc = reinterpret_cast<dummy_type>(method);
             #elif __clang__ // Unix Clang
                 u.dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
             #elif __GNUG__ // G++
@@ -380,7 +409,10 @@ namespace rpp
             comparison_helper u;
             #if _MSC_VER // VC++ and MSVC clang
                 (void)inst;
-                u.dfunc = reinterpret_cast<dummy_type>(method);
+                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                    u.dfunc = devirtualize_mi((void**)&method);
+                else
+                    u.dfunc = reinterpret_cast<dummy_type>(method);
             #elif __clang__ // Unix Clang
                 u.dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
             #elif __GNUG__ // G++
