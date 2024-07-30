@@ -69,7 +69,7 @@ TestImpl(test_timer)
             rpp::sleep_us(2500);
             double elapsed_us = t.elapsed_micros();
             print_info("micros %d 2500us sleep time: %gus\n", i+1, elapsed_us);
-            AssertInRange(elapsed_us, 2500, 15'000); // OS sleep can never be accurate enough, so the range must be very loose
+            AssertInRange(elapsed_us, 2500, 20'000); // OS sleep can never be accurate enough, so the range must be very loose
         }
         for (int i = 0; i < 20; ++i)
         {

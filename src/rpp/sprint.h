@@ -68,9 +68,9 @@ namespace rpp
     {
         static constexpr int SIZE = 512;
         char* ptr = nullptr;
-        int   len = 0;
-        int   cap = SIZE;
-        char  buf[SIZE];
+        int len = 0;
+        int cap = SIZE;
+        char buf[SIZE];
 
         // controls the separator for generic template write calls
         // the default value " " will turn write("brown", "fox"); into "brown fox"
@@ -163,34 +163,24 @@ namespace rpp
 
         // For: std::ostream& operator<<(std::ostream& os, const T& value);
         template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
+        
+        // For: string_buffer& operator<<(string_buffer& sb, const T& value);
+        // template<class T> using sbuf_op = decltype(std::declval<string_buffer&>() << std::declval<T>());
 
-        /**
-         * @brief Matches all operator<< overloads for string_buffer& and T
-         */
-        template<class T> string_buffer& operator<<(const T& value) noexcept
-        {
-            this->write(value);
-            return *this;
-        }
-
-        // Helper to detect truly external operator<< overloads for string_buffer
-        template<typename T, typename = void> struct has_external_sbuf_op : std::false_type {};
-        template<typename T>
-        struct has_external_sbuf_op<T, std::void_t<decltype(std::declval<string_buffer&>() << std::declval<const T&>())> >
-            : std::negation<std::is_same<decltype(std::declval<string_buffer&>() << std::declval<const T&>()), string_buffer&>>
-        {};
+        // For: T::operator<<(rpp::string_buffer&) const;
+        template<class T> using member_sbuf_op = decltype(std::declval<const T&>().operator<<(std::declval<string_buffer&>()));
 
         /**
          * @brief Generic fallback for unknown types. Tries different ways to convert T to string
          */
-        template<class T>
-        void write(const T& value) noexcept
+        template<class T> void write(const T& value) noexcept
         {
             // this part is a bit dangerous, there is a possibility for cyclic recursion
-            // of types that have operator<< overloads for string_buffer, so we only allow external ones
-            if constexpr (has_external_sbuf_op<T>::value)
+            // if we call *this << value, which calls write(value)
+            // so only value.operator<< is allowed
+            if constexpr (is_detected_v<member_sbuf_op, T>)
             {
-                operator<<(*this, value);
+                value.operator<<(*this); // member operator<<
             }
             else if constexpr (has_to_string_memb<T>)
             {
@@ -365,6 +355,18 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @brief Matches all operator<< overloads for string_buffer& and T
+     */
+    template<class T>
+    RPPAPI inline string_buffer& operator<<(string_buffer& sb, const T& value) noexcept
+    {
+        sb.write(value);
+        return sb;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
     RPPAPI inline std::string to_hex_string(const strview& s, format_opt opt = lowercase) noexcept
     {
         rpp::string_buffer sb;
@@ -399,12 +401,18 @@ namespace rpp
 
     template<class T> int println(FILE* file, const T& value) noexcept
     {
-        string_buffer buf; buf.writeln(value);
+        string_buffer buf;
+        // using operator<< here to support global operator<< overloads more easily
+        // since trying to implement them inside write<T>() leads to cyclic recursion
+        buf << value;
+        buf.writeln();
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T> int println(const T& value) noexcept
     {
-        string_buffer buf; buf.writeln(value);
+        string_buffer buf;
+        buf << value;
+        buf.writeln();
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);
     }
 
@@ -414,12 +422,16 @@ namespace rpp
      */
     template<class T, class... Args> int print(FILE* file, const T& first, const Args&... args) noexcept
     {
-        string_buffer buf; buf.write(first, args...);
+        string_buffer buf;
+        buf << first;
+        (..., (buf << ' ', buf << args));
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int print(const T& first, const Args&... args) noexcept
     {
-        string_buffer buf; buf.write(first, args...);
+        string_buffer buf;
+        buf << first;
+        (..., (buf << ' ', buf << args));
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);
     }
 
@@ -429,12 +441,18 @@ namespace rpp
      */
     template<class T, class... Args> int println(FILE* file, const T& first, const Args&... args) noexcept
     {
-        string_buffer buf; buf.writeln(first, args...);
+        string_buffer buf;
+        buf << first;
+        (..., (buf << ' ', buf << args));
+        buf.writeln();
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, file);
     }
     template<class T, class... Args> int println(const T& first, const Args&... args) noexcept
     {
-        string_buffer buf; buf.writeln(first, args...);
+        string_buffer buf;
+        buf << first;
+        (..., (buf << ' ', buf << args));
+        buf.writeln();
         return (int)fwrite(buf.ptr, (size_t)buf.len, 1, stdout);
     }
     
@@ -450,12 +468,19 @@ namespace rpp
      */
     template<class T, class... Args> std::string sprint(const T& first, const Args&... args) noexcept
     {
-        string_buffer buf; buf.write(first, args...);
+        string_buffer buf;
+        // using operator<< here to support global operator<< overloads more easily
+        // since trying to implement them inside write<T>() leads to cyclic recursion
+        buf << first;
+        (..., (buf << ' ', buf << args));
         return buf.str();
     }
     template<class T, class... Args> std::string sprintln(const T& first, const Args&... args) noexcept
     {
-        string_buffer buf; buf.writeln(first, args...);
+        string_buffer buf;
+        buf << first;
+        (..., (buf << ' ', buf << args));
+        buf.writeln();
         return buf.str();
     }
 

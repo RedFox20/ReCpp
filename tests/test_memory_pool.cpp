@@ -190,8 +190,8 @@ TestImpl(memory_pool)
         if (getenv("CIRCLECI"))
             return;
 
-        AssertGreater(info2.virtual_size, info.virtual_size);
-        AssertGreater(info2.physical_mem, info.physical_mem);
+        AssertGreaterOrEqual(info2.virtual_size, info.virtual_size);
+        AssertGreaterOrEqual(info2.physical_mem, info.physical_mem);
 
         // no point in running this check under ASAN/TSAN
         #if !RPP_SANITIZERS

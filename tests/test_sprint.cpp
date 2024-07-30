@@ -21,6 +21,14 @@ string_buffer& operator<<(string_buffer& sb, const string_buffer_operator&)
     return sb << "string_buffer_operator";
 }
 
+struct string_buffer_member_operator
+{
+    string_buffer& operator<<(string_buffer& sb) const
+    {
+        return sb << "string_buffer_member_operator";
+    }
+};
+
 struct ostream_operator { };
 std::ostream& operator<<(std::ostream& os, const ostream_operator&)
 {
@@ -124,7 +132,7 @@ TestImpl(test_sprint)
         AssertEqual(printed.text(), "{ *{1.1}, *{2.2}, *{3.4} }\n");
     }
 
-    TestCase(println_unordered_map)
+    TestCase(println_map)
     {
         std::map<int, std::string> map = { {0,"Bob"}, {1,"Marley"}, {2,"Mick"}, {3,"Jagger"}, {4,"Bruce"} };
 
@@ -223,8 +231,12 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "member_to_string");
         sb.clear();
 
-        sb.write(string_buffer_operator{});
-        AssertThat(sb.view(), "string_buffer_operator");
+        // sb.write(string_buffer_operator{});
+        // AssertThat(sb.view(), "string_buffer_operator");
+        // sb.clear();
+
+        sb.write(string_buffer_member_operator{});
+        AssertThat(sb.view(), "string_buffer_member_operator");
         sb.clear();
 
         sb.write(ostream_operator{});
@@ -266,8 +278,8 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "string_buffer_operator");
         sb.clear();
 
-        sb.operator<<(string_buffer_operator{});
-        AssertThat(sb.view(), "string_buffer_operator");
+        sb << string_buffer_member_operator{};
+        AssertThat(sb.view(), "string_buffer_member_operator");
         sb.clear();
 
         sb << ostream_operator{};
@@ -291,7 +303,9 @@ TestImpl(test_sprint)
         AssertThat(rpp::sprint(external_to_string{}), "external_to_string");
         AssertThat(rpp::sprint(member_to_string{}), "member_to_string");
         AssertThat(rpp::sprint(string_buffer_operator{}), "string_buffer_operator");
-        AssertThat(rpp::sprint(ostream_operator{}), "ostream_operator");
+        AssertThat(rpp::sprint(1,2,string_buffer_operator{}), "1 2 string_buffer_operator");
+        AssertThat(rpp::sprint(string_buffer_member_operator{}), "string_buffer_member_operator");
+        AssertThat(rpp::sprint(ostream_operator{}, 1), "ostream_operator 1");
 
         external_to_string ext;
         AssertThat(rpp::sprint(&ext), "*{external_to_string}");

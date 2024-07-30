@@ -362,7 +362,11 @@ namespace rpp
                 if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
                     return devirtualize_mi(inst, (void**)&method, out_inst);
                 else
-                    return func{ .dfunc = reinterpret_cast<dummy_type>(method) };
+                {
+                    func f; // piecewise init to supports MSVC C++17
+                    f.dfunc = reinterpret_cast<dummy_type>(method);
+                    return f;
+                }
             }
         #elif __clang__ // disable on VC++ clang, enable on all other clang builds
             struct VCallThunk {
