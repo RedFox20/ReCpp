@@ -470,6 +470,7 @@ namespace rpp
         TestCase(basic_lambda)
         {
             DataDelegate lambda1 = [x=1](Data a) {
+                (void)x;
                 return validate("lambda1", a);
             };
             Data result = lambda1.invoke(data);
@@ -617,9 +618,11 @@ namespace rpp
         {
             // add state to lambda, so it is not optimized into a function pointer
             auto compare_lambda = [x=0](Data a) -> Data {
+                (void)x;
                 return validate("compare_lambda", a);
             };
             auto compare_lambda2 = [y=1](Data a) -> Data {
+                (void)y;
                 return validate("compare_lambda2", a);
             };
 
@@ -660,6 +663,7 @@ namespace rpp
         TestCase(copy_operator_lambdas)
         {
             auto lambda = [state=1](Data a) -> Data {
+                (void)state;
                 return validate("copy_lambda", a);
             };
 

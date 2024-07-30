@@ -221,8 +221,8 @@ namespace rpp
         };
 
         /** @brief creates a safe iterator for the queue */
-        FINLINE       iterator_lock iterator()       noexcept { return { this, spin_lock() }; }
-        FINLINE const iterator_lock iterator() const noexcept { return { this, spin_lock() }; }
+        FINLINE       iterator_lock iterator()       noexcept { return { {this}, spin_lock() }; }
+        FINLINE const iterator_lock iterator() const noexcept { return { {this}, spin_lock() }; }
 
         /** @brief Creates a safe iterator for the queue, using a previously acquired lock */
         FINLINE       iterator_proxy iterator(lock_t& lock)       noexcept { if (!lock.owns_lock()) { lock.lock(); } return { this }; }

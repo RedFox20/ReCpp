@@ -375,7 +375,8 @@ namespace rpp
             struct VTable {
                 void* entries[16]; // size is pseudo, mainly for gdb
             };
-            static func devirtualize(const void* inst, void* method, void** out_inst = nullptr) noexcept
+            template<class FClass, class MethodType>
+            static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
             {
                 auto& t = *(struct VCallThunk*)&method;
                 if (size_t(t.method) & 1u) { // is_thunk?
@@ -386,7 +387,7 @@ namespace rpp
                     }
                     return { .pfunc = vtable->entries[voffset] }; // resolve thunk
                 }
-                return func{ .dfunc = reinterpret_cast<dummy_type>(method) }; // not a virtual method thunk
+                return func{ .pfunc = t.method }; // not a virtual method thunk
             }
         #elif __GNUG__ // G++
             template<class IClass, class FClass, class MethodType>

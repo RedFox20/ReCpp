@@ -176,8 +176,8 @@ namespace rpp
         // Helper to detect truly external operator<< overloads for string_buffer
         template<typename T, typename = void> struct has_external_sbuf_op : std::false_type {};
         template<typename T>
-        struct has_external_sbuf_op<T, std::void_t<decltype(operator<<(std::declval<string_buffer&>(), std::declval<const T&>()))> >
-            : std::negation<std::is_same<decltype(operator<<(std::declval<string_buffer&>(), std::declval<const T&>())), string_buffer&>>
+        struct has_external_sbuf_op<T, std::void_t<decltype(std::declval<string_buffer&>() << std::declval<const T&>())> >
+            : std::negation<std::is_same<decltype(std::declval<string_buffer&>() << std::declval<const T&>()), string_buffer&>>
         {};
 
         /**
