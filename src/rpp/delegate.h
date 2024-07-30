@@ -551,8 +551,8 @@ namespace rpp
         template<class Functor> bool equal_functor() const noexcept
         {
             using FunctorType = typename std::decay<Functor>::type;
-        #if _MSC_VER
             func tmp;
+        #if _MSC_VER
             tmp.dfunc = reinterpret_cast<dummy_type>( &functor_dummy<FunctorType>::functor_call );
         #else
             tmp.mfunc = &functor_call<FunctorType>;
