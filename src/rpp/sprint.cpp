@@ -92,7 +92,7 @@ namespace rpp
         if (n < 0 || n >= (int)sizeof(buffer))
             n = sizeof(buffer) - 1;
         reserve(n);
-        memcpy(&ptr[len], buffer, (size_t)n);
+        memcpy(&ptr[len], buffer, size_t(n));
         len += n;
         ptr[len] = '\0';
     }
@@ -103,12 +103,11 @@ namespace rpp
     void string_buffer::write(std::nullptr_t) noexcept { write("null"); }
     void string_buffer::write_ptr_end() noexcept       { write('}');    }
 
-    void string_buffer::write(const strview& s) noexcept
+    void string_buffer::write(strview s) noexcept
     {
-        if (!s.len) return;
+        if (s.len <= 0) return;
         reserve(s.len);
-        char* dst = ptr + len;
-        memcpy(dst, s.str, (size_t)s.len);
+        memcpy(&ptr[len], s.str, size_t(s.len));
         len += s.len;
         ptr[len] = '\0';
     }

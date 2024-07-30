@@ -110,11 +110,10 @@ namespace rpp
         char* emplace_buffer(int count) noexcept;
         void writef(PRINTF_FMTSTR const char* format, ...) noexcept PRINTF_CHECKFMT2;
 
-        template<int N>
-        FINLINE void write(const char (&value)[N])   noexcept { this->write(strview{ value }); }
         FINLINE void write(const std::string& value) noexcept { this->write(strview{ value }); }
-        FINLINE void write(const char* value)        noexcept { this->write(strview{ value }); }
-        void write(const strview& s) noexcept;
+        FINLINE void write(const char* value)        noexcept { this->write(strview{ value, std::char_traits<char>::length(value) }); }
+
+        void write(strview s) noexcept;
         void write(char value) noexcept;
         void write(bool   value) noexcept;
         void write(rpp::byte bv) noexcept;
@@ -146,7 +145,7 @@ namespace rpp
         template<class T> void write(const T* ptr) noexcept
         {
             if (ptr == nullptr) return write(nullptr);
-            if constexpr(std::is_function<T>::value)
+            if constexpr (std::is_function<T>::value)
             {
                 this->write_ptr(reinterpret_cast<const void*>(ptr));
             }
@@ -157,14 +156,6 @@ namespace rpp
                 write_ptr_end();
             }
         }
-        // necessary overload to prevent ambiguous call picking up write(const T& value)
-        template<class T> void write(T* ptr) noexcept
-        {
-            write((const T*)ptr);
-        }
-
-        // For: string_buffer& operator<<(string_buffer& sb, const T& value)
-        template<class T> using sbuf_op = decltype(operator<<(std::declval<string_buffer&>(), std::declval<T>()));
 
         // For: std::ostream& operator<<(std::ostream& os, const T& value);
         template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
@@ -172,12 +163,18 @@ namespace rpp
         /**
          * @brief Matches all operator<< overloads for string_buffer& and T
          */
-        template<class T>
-        FINLINE string_buffer& operator<<(const T& value) noexcept
+        template<class T> string_buffer& operator<<(const T& value) noexcept
         {
             this->write(value);
             return *this;
         }
+
+        // Helper to detect truly external operator<< overloads for string_buffer
+        template<typename T, typename = void> struct has_external_sbuf_op : std::false_type {};
+        template<typename T>
+        struct has_external_sbuf_op<T, std::void_t<decltype(operator<<(std::declval<string_buffer&>(), std::declval<const T&>()))> >
+            : std::negation<std::is_same<decltype(operator<<(std::declval<string_buffer&>(), std::declval<const T&>())), string_buffer&>>
+        {};
 
         /**
          * @brief Generic fallback for unknown types. Tries different ways to convert T to string
@@ -185,11 +182,11 @@ namespace rpp
         template<class T>
         void write(const T& value) noexcept
         {
-            if constexpr (is_detected_v<sbuf_op, T>)
+            // this part is a bit dangerous, there is a possibility for cyclic recursion
+            // of types that have operator<< overloads for string_buffer, so we only allow external ones
+            if constexpr (has_external_sbuf_op<T>::value)
             {
-                // this part is a bit dangerous, there is a possibility for cyclic recursion
-                // of types that have operator<< overloads for string_buffer
-                *this << value;
+                operator<<(*this, value);
             }
             else if constexpr (has_to_string_memb<T>)
             {
