@@ -68,7 +68,7 @@ namespace rpp
 
     inline string_buffer& operator<<(string_buffer& out, const DataDelegate& d)
     {
-        return out << "delegate{" << d.get_fun() << "}";
+        return out << "delegate{" << d.get_obj() << "::" << d.get_fun() << "}";
     }
 
     TestImpl(test_delegate)
@@ -435,11 +435,34 @@ namespace rpp
             AssertThat(str_result, "dynamically allocated long test string");
         }
 
+        TestCase(decay_adapter_function_noop)
+        {
+            static int int_result = 0;
+            static std::string str_result;
+            struct noop
+            {
+                static void int_func(int val) noexcept { int_result = val; }
+                static void str_func(std::string val) noexcept { str_result = val; }
+            };
+
+            int_result = 0;
+            auto noop_int_func = rpp::delegate<void(int val)>{ &noop::int_func };
+            int value = 4242;
+            noop_int_func(value);
+            AssertThat(int_result, 4242);
+
+            str_result = {};
+            auto noop_str_func = rpp::delegate<void(std::string val)>{ &noop::str_func };
+            std::string str = "dynamically allocated long test string";
+            noop_str_func(str);
+            AssertThat(str_result, "dynamically allocated long test string");
+        }
+
         ////////////////////////////////////////////////////
 
         TestCase(basic_lambda)
         {
-            DataDelegate lambda1 = [](Data a) {
+            DataDelegate lambda1 = [x=1](Data a) {
                 return validate("lambda1", a);
             };
             AssertThat(lambda1(data), "lambda1");
@@ -566,10 +589,11 @@ namespace rpp
 
         TestCase(compare_lambdas)
         {
-            auto compare_lambda = [](Data a) -> Data {
+            // add state to lambda, so it is not optimized into a function pointer
+            auto compare_lambda = [x=0](Data a) -> Data {
                 return validate("compare_lambda", a);
             };
-            auto compare_lambda2 = [](Data a) -> Data {
+            auto compare_lambda2 = [y=1](Data a) -> Data {
                 return validate("compare_lambda2", a);
             };
 
@@ -609,7 +633,7 @@ namespace rpp
 
         TestCase(copy_operator_lambdas)
         {
-            auto lambda = [](Data a) -> Data {
+            auto lambda = [state=1](Data a) -> Data {
                 return validate("copy_lambda", a);
             };
 
