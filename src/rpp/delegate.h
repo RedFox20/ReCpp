@@ -56,7 +56,7 @@
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
 #include <utility> // std::forward
-#include <exception> // std::terminate
+#include <stdexcept> // std::terminate
 
 namespace rpp
 {
@@ -130,8 +130,8 @@ namespace rpp
         // for regular and member function calls
         using ret_type  = Ret;
         using func_type = Ret (*)(Args...);
-        using dtor_type = void (*)(void*);
-        using copy_type = void (*)(void*, delegate&);
+        using dtor_type = void (*)(void*) noexcept;
+        using copy_type = void (*)(void*, delegate&) noexcept;
 
         struct dummy {
             // proxy for plain old functions to avoid a branch check in delegate::operator()
@@ -157,28 +157,31 @@ namespace rpp
         #endif
     private:
 
-        // this is the original function pointer
-        union {
+        union func
+        {
             func_type fun;
             memb_type mfunc;
             dummy_type dfunc;
+            void* pfunc;
         };
-        void* obj;
-        dtor_type destructor;
-        copy_type proxy_copy;
+
+        func f; // the function pointer
+        void* obj; // optional instance ptr
+        dtor_type destructor; // optional destructor if we allocated obj
+        copy_type proxy_copy; // optional copy constructor
 
     public:
         //////////////////////////////////////////////////////////////////////////////////////
 
         /** @brief Default constructor */
         delegate() noexcept
-            : fun{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
+            : f{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
         }
 
         /** @brief Default constructor from nullptr */
         explicit delegate(std::nullptr_t) noexcept
-            : fun{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
+            : f{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
         }
 
@@ -195,19 +198,19 @@ namespace rpp
             if (destructor) // looks like we have a functor
             {
                 proxy_copy(obj, to);
-                to.fun        = fun;
+                to.f = f;
                 to.proxy_copy = proxy_copy;
             }
             else
             {
-                to.fun = fun;
+                to.f = f;
                 to.obj = obj;
             }
         }
 
         /** @brief Creates a copy of the delegate */
         delegate(const delegate& d) noexcept
-            : fun{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
+            : f{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
         {
             d.copy(*this);
         }
@@ -223,35 +226,38 @@ namespace rpp
 
         /** @brief Forward reference initialization (move) */
         delegate(delegate&& d) noexcept 
-            : fun{d.fun}, obj{d.obj}, destructor{d.destructor}, proxy_copy{d.proxy_copy}
+            : f{d.f}, obj{d.obj}, destructor{d.destructor}, proxy_copy{d.proxy_copy}
         {
-            d.fun        = nullptr;
-            d.obj        = nullptr;
+            d.f.fun = nullptr;
+            d.obj = nullptr;
             d.destructor = nullptr;
             d.proxy_copy = nullptr;
         }
         /** @brief Forward reference assignment (swap) */
         delegate& operator=(delegate&& d) noexcept
         {
-            auto _func       = fun;
-            auto _obj        = obj;
-            auto _destructor = destructor;
-            auto _proxy_copy = proxy_copy;
-            fun        = d.fun;
-            obj        = d.obj;
+            auto tmp_f = f;
+            auto tmp_obj = obj;
+            auto tmp_destructor = destructor;
+            auto tmp_proxy_copy = proxy_copy;
+            f = d.f;
+            obj = d.obj;
             destructor = d.destructor;
             proxy_copy = d.proxy_copy;
-            d.fun        = _func;
-            d.obj        = _obj;
-            d.destructor = _destructor;
-            d.proxy_copy = _proxy_copy;
+            d.f = tmp_f;
+            d.obj = tmp_obj;
+            d.destructor = tmp_destructor;
+            d.proxy_copy = tmp_proxy_copy;
             return *this;
         }
 
-        //////////////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
+        // -------------------------- Static Functions ------------------------- //
+        ///////////////////////////////////////////////////////////////////////////
 
         /** @brief Regular function constructor */
-        /*implicit*/ delegate(func_type function) noexcept
+
+        /*implicit*/ delegate(Ret (*function)(Args...))
         {
             init_function(function);
         }
@@ -269,21 +275,27 @@ namespace rpp
                 #if (__GNUG__ && __GNUG__ > 5) && !__clang__ // G++
                     #pragma GCC diagnostic push
                     #pragma GCC diagnostic ignored "-Wcast-function-type"
-                    dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
+                    f.dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
                     #pragma GCC diagnostic pop
                 #else
-                    dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
+                    f.dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
                 #endif
                 obj = reinterpret_cast<void*>(function);
             }
             else
             {
-                fun = nullptr;
+                f.fun = nullptr;
                 obj = nullptr;
             }
             destructor = nullptr;
             proxy_copy = nullptr;
         }
+
+    private:
+
+        ///////////////////////////////////////////////////////////////////////////
+        // -------------------------- Member Functions ------------------------- //
+        ///////////////////////////////////////////////////////////////////////////
 
         #if _MSC_VER
             union MultiInheritThunk {
@@ -292,18 +304,32 @@ namespace rpp
                     int adj; // this pointer displacement in bytes
                     int padding;
                 };
-                struct {
-                    dummy_type dfunc;
-                };
+                func f;
             };
-            static dummy_type devirtualize_mi(void** mi_pmf, void** out_adjusted_inst = nullptr) noexcept
+            static func devirtualize_mi(const void* inst, void** mi_pmf, void** out_inst = nullptr) noexcept
             {
                 MultiInheritThunk* mi_thunk = reinterpret_cast<MultiInheritThunk*>(mi_pmf);
                 static_assert(sizeof(dummy_type) == sizeof(MultiInheritThunk::ptr));
-                if (out_adjusted_inst)
-                    *out_adjusted_inst = (void*)((char*)*out_adjusted_inst + mi_thunk->adj);{
+                if (out_inst) {
+                    *out_inst = (void*)((const uint8_t*)inst + mi_thunk->adj);
                 }
-                return mi_thunk->dfunc;
+                return mi_thunk->f;
+            }
+            template<class IClass, class FClass>
+            static func devirtualize(IClass* inst, Ret (FClass::*method)(Args...), void** out_inst = nullptr) noexcept
+            {
+                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                    return devirtualize_mi(inst, (void**)&method, out_inst);
+                else
+                    return func{ .dfunc = reinterpret_cast<dummy_type>(method) };
+            }
+            template<class IClass, class FClass>
+            static func devirtualize(const IClass* inst, Ret (FClass::*method)(Args...) const, void** out_inst = nullptr) noexcept
+            {
+                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                    return devirtualize_mi(inst, (void**)&method, out_inst);
+                else
+                    return func{ .dfunc = reinterpret_cast<dummy_type>(method) };
             }
         #elif __clang__ // disable on VC++ clang, enable on all other clang builds
             struct VCallThunk {
@@ -316,192 +342,181 @@ namespace rpp
             struct VTable {
                 void* entries[16]; // size is pseudo, mainly for gdb
             };
-            static dummy_type devirtualize(const void* instance, dummy_type method) noexcept // resolve Thunks into method pointer
+            static func devirtualize(const void* inst, void* method, void** out_inst = nullptr) noexcept
             {
                 auto& t = *(struct VCallThunk*)&method;
                 if (size_t(t.method) & 1u) { // is_thunk?
-                    auto* vtable = (struct VTable*) *(void**)instance;
+                    auto* vtable = (struct VTable*) *(void**)inst;
                     size_t voffset = (t.vtable_index-1)/8;
-                    union {
-                        dummy_type dfunc;
-                        void* pfunc;
-                    } ch;
-                    ch.pfunc = vtable->entries[voffset]; // resolve thunk
-                    return ch.dfunc;
+                    if (out_inst) {
+                        *out_inst = (void*)((const uint8_t*)inst + t.this_adjustment);
+                    }
+                    return { .pfunc = vtable->entries[voffset] }; // resolve thunk
                 }
-                return method; // not a virtual method thunk
+                return func{ .dfunc = reinterpret_cast<dummy_type>(method) }; // not a virtual method thunk
+            }
+        #elif __GNUG__ // G++
+            template<class IClass, class FClass>
+            static func devirtualize(IClass* inst, Ret (FClass::*method)(Args...), void** out_inst = nullptr) noexcept
+            {
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                (void)out_inst;
+                memb_type mfunc = (memb_type)(inst->*method); // de-virtualize / pmf-conversion
+                return func{ .mfunc = mfunc };
+                #pragma GCC diagnostic pop
+            }
+            template<class IClass, class FClass>
+            static func devirtualize(const IClass* inst, Ret (FClass::*method)(Args...) const, void** out_inst = nullptr) noexcept
+            {
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                (void)out_inst;
+                memb_type mfunc = (memb_type)(inst->*method); // de-virtualize / pmf-conversion
+                return func{ .mfunc = mfunc };
+                #pragma GCC diagnostic pop
             }
         #endif
 
-        template<class IClass, class FClass> void init_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
+        template<class IClass, class FClass> void init_method(IClass* inst, Ret (FClass::*method)(Args...)) noexcept
         {
-            obj = &inst;
-            #if _MSC_VER // VC++ and MSVC clang
-                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
-                    dfunc = devirtualize_mi((void**)&method, &obj);
-                else
-                    dfunc = reinterpret_cast<dummy_type>(method);
-            #elif __clang__
-                dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
-            #elif __GNUG__ // G++
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wpmf-conversions"
-                #pragma GCC diagnostic ignored "-Wpedantic"
-                mfunc = (memb_type)(inst.*method); // de-virtualize / pfm-conversion
-                #pragma GCC diagnostic pop
-            #endif
+            obj = inst;
+            f = devirtualize(inst, method, &obj);
             destructor = nullptr;
             proxy_copy = nullptr;
         }
-        template<class IClass, class FClass> void init_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
+        template<class IClass, class FClass> void init_method(const IClass* inst, Ret (FClass::*method)(Args...) const) noexcept
         {
-            obj = &const_cast<IClass&>(inst);
-            #if _MSC_VER // VC++ and MSVC clang
-                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
-                    dfunc = devirtualize_mi((void**)&method, &obj);
-                else
-                    dfunc = reinterpret_cast<dummy_type>(method);
-            #elif __clang__
-                dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
-            #elif __GNUG__ // G++
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wpmf-conversions"
-                #pragma GCC diagnostic ignored "-Wpedantic"
-                mfunc = (memb_type)(inst.*method); // de-virtualize / pfm-conversion
-                #pragma GCC diagnostic pop
-            #endif
+            obj = const_cast<IClass*>(inst);
+            f = devirtualize(inst, method, &obj);
             destructor = nullptr;
             proxy_copy = nullptr;
         }
-
-        union comparison_helper
+        // adapts delegate invoke(Args) into FClass method(TArgs),
+        // this ensures `const int&` is correctly passed as `int` and vice-versa
+        template<class IClass, class FClass, class...TArgs> void init_method_adapter(IClass* inst, Ret (FClass::*method)(TArgs...)) noexcept
         {
-            func_type func;
-            memb_type mfunc;
-            dummy_type dfunc;
-        };
-        
-        // @note instance is used during de-virtualization
-        template<class IClass, class FClass> bool equal_method(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
-        {
-            comparison_helper u;
-            #if _MSC_VER // VC++ and MSVC clang
-                (void)inst;
-                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
-                    u.dfunc = devirtualize_mi((void**)&method);
-                else
-                    u.dfunc = reinterpret_cast<dummy_type>(method);
-            #elif __clang__ // Unix Clang
-                u.dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
-            #elif __GNUG__ // G++
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wpmf-conversions"
-                #pragma GCC diagnostic ignored "-Wpedantic"
-                u.mfunc = (memb_type)(inst.*method); // de-virtualize / pfm-conversion
-                #pragma GCC diagnostic pop
-            #endif
-            return fun == u.func;
+            *this = [inst, method](Args... args) -> Ret {
+                return (inst->*method)(std::forward<Args>(args)...);
+            };
         }
-        
-        // @note instance is used during de-virtualization
-        template<class IClass, class FClass> bool equal_method(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
+        template<class IClass, class FClass, class...TArgs> void init_method_adapter(const IClass* inst, Ret (FClass::*method)(TArgs...) const) noexcept
         {
-            comparison_helper u;
-            #if _MSC_VER // VC++ and MSVC clang
-                (void)inst;
-                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
-                    u.dfunc = devirtualize_mi((void**)&method);
-                else
-                    u.dfunc = reinterpret_cast<dummy_type>(method);
-            #elif __clang__ // Unix Clang
-                u.dfunc = devirtualize(&inst, reinterpret_cast<dummy_type>(method));
-            #elif __GNUG__ // G++
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wpmf-conversions"
-                #pragma GCC diagnostic ignored "-Wpedantic"
-                u.mfunc = (memb_type)(inst.*method); // de-virtualize / pfm-conversion
-                #pragma GCC diagnostic pop
-            #endif
-            return fun == u.func;
+            *this = [inst, method](Args... args) -> Ret {
+                return (inst->*method)(std::forward<Args>(args)...);
+            };
         }
-
-        template<class FunctorType> static void functor_delete(void* self)
+        template<class IClass, class FClass> bool equal_method(IClass* inst, Ret (FClass::*method)(Args...)) noexcept
         {
-            auto* instance = static_cast<FunctorType*>(self);
-            delete instance;
+            func tmp = devirtualize(inst, method);
+            return f.fun == tmp.fun;
         }
-
-        template<class FunctorType> static void functor_copy(void* self, delegate& dest)
+        template<class IClass, class FClass> bool equal_method(const IClass* inst, Ret (FClass::*method)(Args...) const) noexcept
         {
-            auto* instance = static_cast<FunctorType*>(self);
-            dest.reset(*instance);
-        }
-
-        template<class Functor> void init_functor(Functor&& functor) noexcept
-        {
-            using FunctorType = typename std::decay<Functor>::type;
-
-            #if (__GNUG__ && __GNUG__ > 5) && !__clang__ // G++
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wcast-function-type"
-                dfunc = reinterpret_cast<dummy_type>( &FunctorType::operator() );
-                #pragma GCC diagnostic pop
-            #else
-                dfunc = reinterpret_cast<dummy_type>( &FunctorType::operator() );
-            #endif
-
-            obj = new FunctorType{ std::forward<Functor>(functor) };
-            destructor = &functor_delete<FunctorType>;
-            proxy_copy = &functor_copy<FunctorType>;
-        }
-
-        void init_clear()
-        {
-            fun = nullptr;
-            obj = nullptr;
-            destructor = nullptr;
-            proxy_copy = nullptr;
+            func tmp = devirtualize(inst, method);
+            return f.fun == tmp.fun;
         }
 
     public:
 
         /**
-         * @brief Object member function constructor (from pointer)
+         * @brief Object member function constructor
          * @code
          *   delegate<void(int)> d(&myClass, &MyClass::method);
          * @endcode
          */
-        template<class IClass, class FClass> delegate(IClass* inst, Ret (FClass::*method)(Args...)) noexcept
+        template<class IClass, class FClass, class...TArgs,
+                 std::enable_if_t<std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        delegate(IClass* inst, Ret (FClass::*method)(TArgs...))
         {
-            if (inst) init_method(*inst, method);
-            else      init_clear();
-        }
-        template<class IClass, class FClass> delegate(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
-        {
+            if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
             init_method(inst, method);
         }
 
         /**
-         * @brief Object member function constructor (from pointer)
+         * @brief Object member function constructor
          * @code
          *   delegate<void(int)> d(&myClass, &MyClass::method);
          * @endcode
          */
-        template<class IClass, class FClass> delegate(const IClass* inst, Ret (FClass::*method)(Args...) const) noexcept
+        template<class IClass, class FClass, class...TArgs,
+                 std::enable_if_t<std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        delegate(const IClass* inst, Ret (FClass::*method)(TArgs...) const)
         {
-            if (inst) init_method(*inst, method);
-            else      init_clear();
-        }
-        /**
-         * @brief Object member function constructor (from reference)
-         * @code
-         *   delegate<void(int)> d(myClass, &MyClass::method);
-         * @endcode
-         */
-        template<class IClass, class FClass> delegate(const IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
-        {
+            if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
             init_method(inst, method);
         }
+
+        /**
+         * @brief Object member function constructor with adapter when argument types mismatch the delegate
+         * @code
+         *   delegate<void(int)> d(&myClass, &MyClass::method);
+         * @endcode
+         */
+        template<class IClass, class FClass, class...TArgs,
+                 std::enable_if_t<!std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        delegate(IClass* inst, Ret (FClass::*method)(TArgs...)) : delegate{}
+        {
+            if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
+            init_method_adapter(inst, method);
+        }
+
+        /**
+         * @brief Object member function constructor with adapter when argument types mismatch the delegate
+         * @code
+         *   delegate<void(int)> d(&myClass, &MyClass::method);
+         * @endcode
+         */
+        template<class IClass, class FClass, class...TArgs,
+                 std::enable_if_t<!std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        delegate(const IClass* inst, Ret (FClass::*method)(TArgs...) const) : delegate{}
+        {
+            if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
+            init_method_adapter(inst, method);
+        }
+
+    private:
+
+        ///////////////////////////////////////////////////////////////////////////
+        // ------------------------------ Functors ----------------------------- //
+        ///////////////////////////////////////////////////////////////////////////
+
+        template<class Functor> void init_functor(Functor&& functor) noexcept
+        {
+            using FunctorType = typename std::decay<Functor>::type;
+            f.mfunc = &functor_call<FunctorType>;
+            obj = new FunctorType{ std::forward<Functor>(functor) };
+            destructor = &functor_delete<FunctorType>;
+            proxy_copy = &functor_copy<FunctorType>;
+        }
+
+        template<class FunctorType> static void functor_delete(void* self) noexcept
+        {
+            auto* instance = static_cast<FunctorType*>(self);
+            delete instance;
+        }
+
+        template<class FunctorType> static void functor_copy(void* self, delegate& dest) noexcept
+        {
+            auto* instance = static_cast<FunctorType*>(self);
+            dest.reset(*instance);
+        }
+
+        template<class FunctorType> static Ret functor_call(void* instance, Args... args) // may throw
+        {
+            FunctorType& functor = *reinterpret_cast<FunctorType*>(instance);
+            return functor(std::forward<Args>(args)...);
+        }
+
+        template<class Functor> bool equal_functor() const noexcept
+        {
+            using FunctorType = typename std::decay<Functor>::type;
+            return f.mfunc == &functor_call<FunctorType>;
+        }
+
+    public:
 
         /**
          * Enable delegate initialization overloads only if:
@@ -549,7 +564,17 @@ namespace rpp
 
         //////////////////////////////////////////////////////////////////////////////////////
 
-        
+
+    private:
+        void init_clear()
+        {
+            f.fun = nullptr;
+            obj = nullptr;
+            destructor = nullptr;
+            proxy_copy = nullptr;
+        }
+
+    public:
         /** @brief Resets the delegate to point to a function */
         void reset(func_type function) noexcept
         {
@@ -560,25 +585,13 @@ namespace rpp
         template<class IClass, class FClass> void reset(IClass* inst, Ret (FClass::*method)(Args...)) noexcept
         {
             reset();
-            if (inst) init_method(*inst, method);
-        }
-        /** @brief Resets the delegate to point to a member function */
-        template<class IClass, class FClass> void reset(IClass& inst, Ret (FClass::*method)(Args...)) noexcept
-        {
-            reset();
-            init_method(inst, method);
+            if (inst) init_method(inst, method);
         }
         /** @brief Resets the delegate to point to a member function */
         template<class IClass, class FClass> void reset(IClass* inst, Ret (FClass::*method)(Args...) const) noexcept
         {
             reset();
-            if (inst) init_method(*inst, method);
-        }
-        /** @brief Resets the delegate to point to a member function */
-        template<class IClass, class FClass> void reset(IClass& inst, Ret (FClass::*method)(Args...) const) noexcept
-        {
-            reset();
-            init_method(inst, method);
+            if (inst) init_method(inst, method);
         }
         /** @brief Resets the delegate to point to a functor or lambda */
         template<class Functor, typename = enable_if_callable_t<Functor>>
@@ -610,7 +623,7 @@ namespace rpp
                 destructor = nullptr;
                 proxy_copy = nullptr;
             }
-            fun = nullptr;
+            f.fun = nullptr;
             obj = nullptr;
         }
 
@@ -619,47 +632,39 @@ namespace rpp
 
 
         /** @return true if this delegate is initialized and can be invoked */
-        explicit operator bool() const noexcept { return fun != nullptr; }
+        explicit operator bool() const noexcept { return f.fun != nullptr; }
 
 
         /** @return true if this delegate is initialized and can be invoked */
-        bool good() const noexcept { return fun != nullptr; }
+        bool good() const noexcept { return f.fun != nullptr; }
 
-        func_type get_fun() const noexcept { return fun; }
+        func_type get_fun() const noexcept { return f.fun; }
         void*     get_obj() const noexcept { return obj; }
 
         /** @brief Basic operator= shortcuts for reset() */
-        delegate& operator=(func_type function)
+        delegate& operator=(func_type function) noexcept
         {
             reset(function);
             return *this;
         }
-        template<class Functor> delegate& operator=(Functor&& functor)
+        template<class Functor> delegate& operator=(Functor&& functor) noexcept
         {
             reset(std::forward<Functor>(functor));
             return *this;
         }
 
 
-        /** @brief Basic comparison of delegates */
-        bool operator==(std::nullptr_t) const noexcept { return fun == nullptr; }
-        bool operator!=(std::nullptr_t) const noexcept { return fun != nullptr; }
-        bool operator==(func_type function) const noexcept { return fun == function; }
-        bool operator!=(func_type function) const noexcept { return fun != function; }
-        bool operator==(const delegate& d)  const noexcept { return fun == d.fun && obj == d.obj; }
-        bool operator!=(const delegate& d)  const noexcept { return fun != d.fun || obj != d.obj; }
-        template<class Functor> bool operator==(const Functor& fn) const noexcept
-        {
-            return obj == &fn && mfunc == &Functor::operator();
-        }
-        template<class Functor> bool operator!=(const Functor& fn) const noexcept
-        {
-            return obj != &fn || mfunc != &Functor::operator();
-        }
+        /** @brief Basic comparison of delegates, however delegate()  */
+        bool operator==(std::nullptr_t) const noexcept { return f.fun == nullptr; }
+        bool operator!=(std::nullptr_t) const noexcept { return f.fun != nullptr; }
+        bool operator==(func_type function) const noexcept { return f.fun == function; }
+        bool operator!=(func_type function) const noexcept { return f.fun != function; }
+        bool operator==(const delegate& d)  const noexcept { return f.fun == d.f.fun && obj == d.obj; }
+        bool operator!=(const delegate& d)  const noexcept { return f.fun != d.f.fun || obj != d.obj; }
 
 
         /** @brief Compares if this delegate is the specified global func */
-        bool equals(func_type function) const noexcept { return fun == function; }
+        bool equals(func_type function) const noexcept { return f.fun == function; }
 
         /** @brief More complex comparison of delegates */
         bool equals(const delegate& d) const noexcept { return *this == d; }
@@ -667,33 +672,17 @@ namespace rpp
         /** @brief Class member function comparison is instance sensitive */
         template<class IClass, class FClass> bool equals(IClass* inst, Ret (FClass::*method)(Args...)) const noexcept
         {
-            return obj == inst && (!inst || equal_method(*inst, method));
-        }
-        /** @brief Class member function comparison is instance sensitive */
-        template<class IClass, class FClass> bool equals(IClass& inst, Ret (FClass::*method)(Args...)) const noexcept
-        {
-            return obj == &inst && equal_method(inst, method);
+            return obj == inst && (!inst || equal_method(inst, method));
         }
 
         /** @brief Class member function comparison is instance sensitive */
         template<class IClass, class FClass> bool equals(IClass* inst, Ret (FClass::*method)(Args...) const) const noexcept
         {
-            return obj == inst && (!inst || equal_method(*inst, method));
-        }
-        /** @brief Class member function comparison is instance sensitive */
-        template<class IClass, class FClass> bool equals(IClass& inst, Ret (FClass::*method)(Args...) const) const noexcept
-        {
-            return obj == &inst && equal_method(inst, method);
+            return obj == inst && (!inst || equal_method(inst, method));
         }
 
-        /** @brief Comparing Functors by type. Sadly lambdas can't really be
-         *         compared in a sensical fashion
-         */
-        template<class Functor> bool equals() const noexcept
-        {
-            Functor inst;
-            return equal_method(inst, &Functor::operator());
-        }
+        /** @brief Compares Functor by signature. */
+        template<class Functor> bool equals() const noexcept { return equal_functor<Functor>(); }
 
         //////////////////////////////////////////////////////////////////////////////////////
 
@@ -709,9 +698,9 @@ namespace rpp
     Ret delegate<Ret(Args...)>::operator()(Args... args) const
     {
     #if _MSC_VER
-        return (reinterpret_cast<dummy*>(obj)->*dfunc)(std::forward<Args>(args)...);
+        return (reinterpret_cast<dummy*>(obj)->*f.dfunc)(std::forward<Args>(args)...);
     #else
-        return mfunc(obj, std::forward<Args>(args)...);
+        return f.mfunc(obj, std::forward<Args>(args)...);
     #endif
     }
 
@@ -720,9 +709,9 @@ namespace rpp
     Ret delegate<Ret(Args...)>::invoke(Args... args) const
     {
     #if _MSC_VER
-        return (reinterpret_cast<dummy*>(obj)->*dfunc)(std::forward<Args>(args)...);
+        return (reinterpret_cast<dummy*>(obj)->*f.dfunc)(std::forward<Args>(args)...);
     #else
-        return mfunc(obj, std::forward<Args>(args)...);
+        return f.mfunc(obj, std::forward<Args>(args)...);
     #endif
     }
 
@@ -885,39 +874,23 @@ namespace rpp
         }
 
 
-        template<class Class> void add(void* obj, void (Class::*member_function)(Args...)) noexcept
+        template<class IClass, class FClass> void add(IClass* obj, void (FClass::*method)(Args...))
         {
-            add(deleg{obj, member_function});
+            add(deleg{obj, method});
         }
-        template<class IClass, class FClass> void add(IClass& obj, void (FClass::*member_function)(Args...)) noexcept
+        template<class IClass, class FClass> void add(const IClass* obj, void (FClass::*method)(Args...) const)
         {
-            add(deleg{obj, member_function});
-        }
-        template<class Class> void add(void* obj, void (Class::*member_function)(Args...)const) noexcept
-        {
-            add(deleg{obj, member_function});
-        }
-        template<class IClass, class FClass> void add(IClass& obj, void (FClass::*member_function)(Args...)const) noexcept
-        {
-            add(deleg{obj, member_function});
+            add(deleg{obj, method});
         }
 
 
-        template<class Class> void remove(void* obj, void (Class::*member_function)(Args...)) noexcept
+        template<class IClass, class FClass> void remove(IClass* obj, void (FClass::*method)(Args...))
         {
-            remove(deleg{obj, member_function});
+            remove(deleg{obj, method});
         }
-        template<class IClass, class FClass> void remove(IClass& obj, void (FClass::*member_function)(Args...))
+        template<class IClass, class FClass> void remove(const IClass* obj, void (FClass::*method)(Args...) const)
         {
-            remove(deleg{obj, member_function});
-        }
-        template<class Class> void remove(void* obj, void (Class::*member_function)(Args...)const) noexcept
-        {
-            remove(deleg{obj, member_function});
-        }
-        template<class IClass, class FClass> void remove(IClass& obj, void (FClass::*member_function)(Args...)const)
-        {
-            remove(deleg{obj, member_function});
+            remove(deleg{obj, method});
         }
 
 

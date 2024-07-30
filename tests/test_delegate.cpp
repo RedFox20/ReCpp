@@ -153,10 +153,10 @@ namespace rpp
         TestCase(methods)
         {
             Derived inst;
-            DataDelegate func1{inst, &Derived::method};
+            DataDelegate func1{&inst, &Derived::method};
             AssertThat(func1(data), "method");
 
-            DataDelegate func2{inst, &Derived::const_method};
+            DataDelegate func2{&inst, &Derived::const_method};
             AssertThat(func2(data), "const_method");
         }
 
@@ -166,16 +166,16 @@ namespace rpp
             Derived inst;
 
             // bind base virtual method
-            DataDelegate func1(base, &Base::virtual_method);
+            DataDelegate func1(&base, &Base::virtual_method);
             AssertThat(func1(data), "virtual_method");
 
             // bind virtual method directly
-            DataDelegate func3(inst, &Derived::virtual_method);
+            DataDelegate func3(&inst, &Derived::virtual_method);
             AssertThat(func3(data), "derived_method");
 
             // bind virtual method through type erasure
             Base& erased = inst;
-            DataDelegate func2(erased, &Base::virtual_method);
+            DataDelegate func2(&erased, &Base::virtual_method);
             AssertThat(func2(data), "derived_method");
         }
 
@@ -191,28 +191,10 @@ namespace rpp
         public:
             T value {};
             T result {};
-            using ByValue = rpp::delegate<void(T value)>;
-            using ByRef = rpp::delegate<void(const T& value)>;
-            ByRef func;
-            TemplatedVar(T default_value, ByValue&& by_value)
-                : value{default_value}
+            rpp::delegate<void(const T& value)> func;
+            TemplatedVar(T default_value, rpp::delegate<void(const T& value)>&& fn)
+                : value{default_value}, result{}, func{std::move(fn)}
             {
-                set_callback(std::move(by_value));
-            }
-            TemplatedVar(T default_value, ByRef&& by_ref)
-                : value{default_value}
-            {
-                set_callback(std::move(by_ref));
-            }
-            template<class ByAny = ByValue>
-            void set_callback(ByAny&& callback) noexcept
-            {
-                if constexpr (std::is_same_v<ByAny, ByRef>)
-                    func = std::forward<ByAny>(callback);
-                else {
-                    if (!callback) func = {};
-                    else func = [callback=std::forward<ByAny>(callback)](const T& value) { callback(value); };
-                }
             }
             void set_value(T new_value)
             {
@@ -260,14 +242,25 @@ namespace rpp
         public:
             TemplatedVar<int> var_byval;
             TemplatedVar<int> var_byref;
+            TemplatedVar<int> var_subclass_override_A;
+            TemplatedVar<int> var_subclass_override_B;
+
             ContainingClass()
                 : var_byval{0, {this, &ContainingClass::var1_byval_method}}
                 , var_byref{0, {this, &ContainingClass::var2_byref_method}}
+                , var_subclass_override_A{0, {this, &ContainingClass::override_method_A}}
+                , var_subclass_override_B{0, {this, &ContainingClass::override_method_B}}
             {}
             void var1_byval_method(int value) noexcept { var_byval.result = value; }
             void var2_byref_method(const int& value) noexcept { var_byref.result = value; }
-            void override_method_A(int value) noexcept override { var_override_A.result = value*2; }
-            void override_method_B(int value) noexcept final { var_override_B.result = value*3; }
+            void override_method_A(int value) noexcept override {
+                var_override_A.result = value*2;
+                var_subclass_override_A.result = value*2;
+            }
+            void override_method_B(int value) noexcept final {
+                var_override_B.result = value*3;
+                var_subclass_override_B.result = value*3;
+            }
         };
 
         TestCase(multi_inheritance_pmf_resolves_correctly)
@@ -302,11 +295,149 @@ namespace rpp
             // calling final virtual B will use the final method, not the base class method
             obj.var_override_B.set_value(7);
             AssertThat(obj.var_override_B.result, 21);
+
+            // when initialized from subclass directly, it should always resolve to the override
+            obj.var_subclass_override_A.set_value(3);
+            AssertThat(obj.var_subclass_override_A.result, 6);
+
+            obj.var_subclass_override_B.set_value(4);
+            AssertThat(obj.var_subclass_override_B.result, 12);
         }
 
         ////////////////////////////////////////////////////
 
-        TestCase(lambdas)
+        class ConstRefAdapterClass
+        {
+        public:
+            mutable int result = 0;
+
+            void cref_method(const int& value) noexcept { result = value; }
+            void byval_method(int value) noexcept { result = value; }
+
+            void cref_const_method(const int& value) const noexcept { result = value; }
+            void byval_const_method(int value) const noexcept { result = value; }
+        };
+
+        // ensures cref arguments are correctly adapted to byval arguments via an adapter call
+        TestCase(decay_adapter_method_cref_to_byval)
+        {
+            ConstRefAdapterClass obj1;
+            rpp::delegate<void(int val)> func1 {&obj1, &ConstRefAdapterClass::cref_method};
+            func1(42);
+            AssertThat(obj1.result, 42);
+
+            ConstRefAdapterClass obj2;
+            rpp::delegate<void(int val)> func2 {&obj2, &ConstRefAdapterClass::cref_const_method};
+            func2(89);
+            AssertThat(obj2.result, 89);
+        }
+
+        TestCase(decay_adapter_method_byval_to_cref)
+        {
+            ConstRefAdapterClass obj1;
+            rpp::delegate<void(const int& val)> func1 {&obj1, &ConstRefAdapterClass::byval_method};
+            func1(42);
+            AssertThat(obj1.result, 42);
+
+            ConstRefAdapterClass obj2;
+            rpp::delegate<void(const int& val)> func2 {&obj2, &ConstRefAdapterClass::byval_const_method};
+            func2(89);
+            AssertThat(obj2.result, 89);
+        }
+
+        // no actual decay happens, but everything should still work correctly
+        TestCase(decay_adapter_method_cref_noop)
+        {
+            ConstRefAdapterClass obj1;
+            rpp::delegate<void(const int& val)> func1 {&obj1, &ConstRefAdapterClass::cref_method};
+            rpp::delegate<void(const int& val)> func2 {&obj1, &ConstRefAdapterClass::cref_const_method};
+            func1(42);
+            AssertThat(obj1.result, 42);
+            func2(89);
+            AssertThat(obj1.result, 89);
+
+        }
+
+        TestCase(decay_adapter_method_noop)
+        {
+            ConstRefAdapterClass obj1;
+            rpp::delegate<void(int val)> func1 {&obj1, &ConstRefAdapterClass::byval_method};
+            rpp::delegate<void(int val)> func2 {&obj1, &ConstRefAdapterClass::byval_const_method};
+            func1(42);
+            AssertThat(obj1.result, 42);
+            func2(89);
+            AssertThat(obj1.result, 89);
+        }
+
+        TestCase(decay_adapter_lambda_cref_to_byval)
+        {
+            // cref lambda could incorrectly decay to byval, causing
+            // pointer-to-integer be passed as `int val`.
+            // this must be handled by rpp::delegate by adding a proxy adapter.
+            int result = 0;
+            rpp::delegate<void(int val)> func1 = [&](const int& val) {
+                result = val;
+            };
+            func1(42);
+            AssertThat(result, 42);
+
+            result = 0;
+            rpp::delegate<void(const int& val)> func2 = [&](int val) {
+                result = val;
+            };
+            func2(22);
+            AssertThat(result, 22);
+        }
+
+        TestCase(decay_adapter_function_cref_to_byval)
+        {
+            static int int_result = 0;
+            static std::string str_result;
+            struct cref
+            {
+                static void int_func(const int& val) noexcept { int_result = val; }
+                static void str_func(const std::string& val) noexcept { str_result = val; }
+            };
+
+            int_result = 0;
+            auto byval_int_func = rpp::delegate<void(int val)>{ &cref::int_func };
+            int value = 4141;
+            byval_int_func(value);
+            AssertThat(int_result, 4141);
+
+            str_result = {};
+            auto byval_str_func = rpp::delegate<void(std::string val)>{ &cref::str_func };
+            std::string str = "dynamically allocated long test string";
+            byval_str_func(str);
+            AssertThat(str_result, "dynamically allocated long test string");
+        }
+
+        TestCase(decay_adapter_function_byval_to_cref)
+        {
+            static int int_result = 0;
+            static std::string str_result;
+            struct byval
+            {
+                static void int_func(int val) noexcept { int_result = val; }
+                static void str_func(std::string val) noexcept { str_result = val; }
+            };
+
+            int_result = 0;
+            auto byref_int_func = rpp::delegate<void(const int& val)>{ &byval::int_func };
+            int value = 4242;
+            byref_int_func(value);
+            AssertThat(int_result, 4242);
+
+            str_result = {};
+            auto byref_str_func = rpp::delegate<void(const std::string& val)>{ &byval::str_func };
+            std::string str = "dynamically allocated long test string";
+            byref_str_func(str);
+            AssertThat(str_result, "dynamically allocated long test string");
+        }
+
+        ////////////////////////////////////////////////////
+
+        TestCase(basic_lambda)
         {
             DataDelegate lambda1 = [](Data a) {
                 return validate("lambda1", a);
@@ -319,7 +450,7 @@ namespace rpp
             AssertThat(lambda2(data), "lambda2");
         }
 
-        TestCase(nested_lambdas)
+        TestCase(nested_lambda)
         {
             DataDelegate lambda = [x=data](Data a) {
                 DataDelegate nested = [x=x](Data a) {
@@ -348,7 +479,7 @@ namespace rpp
             AssertThat(func(data), "functor");
         }
 
-        TestCase(move_init)
+        TestCase(lambda_move_init)
         {
             DataDelegate lambda = [x=data](Data a) {
                 return validate("move_init", a);  
@@ -461,16 +592,16 @@ namespace rpp
         TestCase(compare_methods)
         {
             Base inst, inst2;
-            DataDelegate func1 {inst, &Base::method};
-            DataDelegate func2 {inst, &Base::method};
+            DataDelegate func1 {&inst, &Base::method};
+            DataDelegate func2 {&inst, &Base::method};
             AssertThat(func1.good(), true);
             AssertThat(func2.good(), true);
             AssertNotEqual(func1, nullptr);
             AssertNotEqual(func2, nullptr);
             AssertEqual(func1, func2);
 
-            DataDelegate func3 {inst,  &Base::const_method};
-            DataDelegate func4 {inst2, &Base::const_method};
+            DataDelegate func3 {&inst,  &Base::const_method};
+            DataDelegate func4 {&inst2, &Base::const_method};
             AssertEqual(func3, func3);
             AssertNotEqual(func1, func3);
             AssertNotEqual(func3, func4);
@@ -521,8 +652,8 @@ namespace rpp
 
             // add 2 events
             evt += &event_func;
-            evt.add(receiver, &Receiver::event_method);
-            evt.add(receiver, &Receiver::const_method);
+            evt.add(&receiver, &Receiver::event_method);
+            evt.add(&receiver, &Receiver::const_method);
             evt(data);
             AssertThat(evt.size(), 3);
 
@@ -534,12 +665,12 @@ namespace rpp
             // try to remove an incorrect function:
             evt -= &event_func;
             AssertThat(evt.size(), 2); // nothing must change
-            evt.remove(receiver, &Receiver::unused_method);
+            evt.remove(&receiver, &Receiver::unused_method);
             AssertThat(evt.size(), 2); // nothing must change
 
             // remove final events
-            evt.remove(receiver, &Receiver::event_method);
-            evt.remove(receiver, &Receiver::const_method);
+            evt.remove(&receiver, &Receiver::event_method);
+            evt.remove(&receiver, &Receiver::const_method);
             evt(data);
             AssertThat(evt.size(), 0); // must be empty now
             AssertThat(evt.empty(), true);
