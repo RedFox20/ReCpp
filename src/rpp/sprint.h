@@ -142,7 +142,7 @@ namespace rpp
         void write_ptr_begin() noexcept;
         void write_ptr_end() noexcept;
 
-        template<class T> void write(const T* ptr) noexcept
+        template<class T> void write_ptr_type(T* ptr) noexcept
         {
             if (ptr == nullptr) return write(nullptr);
             if constexpr (std::is_function<T>::value)
@@ -157,21 +157,9 @@ namespace rpp
             }
         }
 
+        template<class T> FINLINE void write(const T* ptr) noexcept { write_ptr_type(ptr); }
         // needs to be duplicated due to operator<< not being able to detect the correct overload
-        template<class T> void write(T* ptr) noexcept
-        {
-            if (ptr == nullptr) return write(nullptr);
-            if constexpr (std::is_function<T>::value)
-            {
-                this->write_ptr(reinterpret_cast<const void*>(ptr));
-            }
-            else
-            {
-                write_ptr_begin();
-                this->write(*ptr); 
-                write_ptr_end();
-            }
-        }
+        template<class T> FINLINE void write(T* ptr) noexcept { write_ptr_type(ptr); }
 
         // For: std::ostream& operator<<(std::ostream& os, const T& value);
         template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
