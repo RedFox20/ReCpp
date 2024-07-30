@@ -13,15 +13,21 @@ namespace rpp
         char* data = nullptr;
         static char* alloc(const char* str) {
             size_t n = strlen(str) + 1;
-            return static_cast<char*>(memcpy(new char[n], str, n));
+            return static_cast<char*>(memcpy(malloc(n), str, n));
         }
-        explicit Data(const char* s) : data(alloc(s)) {}
-        Data()                       : data(alloc("data")) {}
-        Data(const Data& d)          : data(alloc(d.data)) {}
-        Data(Data&& d) noexcept      : data(d.data) { d.data = nullptr; }
-        ~Data() { delete[] data; }
+        Data() noexcept : data(alloc("data")) {}
+        Data(Data&& d) noexcept { std::swap(data, d.data); }
+        Data(const Data& d) noexcept : data(alloc(d.data)) {}
+        explicit Data(const char* s) noexcept : data(alloc(s)) {}
+        ~Data() noexcept {
+            if (data) {
+                free(data);
+                data = nullptr;
+            }
+        }
         Data& operator=(Data&& d) noexcept {
-            std::swap(data, d.data);
+            if (this != &d)
+                std::swap(data, d.data);
             return *this;
         }
         Data& operator=(const Data& d) {
@@ -34,7 +40,8 @@ namespace rpp
         bool operator==(const char* s) const { return strcmp(data, s) == 0; }
         bool operator!=(const char* s) const { return strcmp(data, s) != 0; }
     };
-    std::string to_string(const Data& d) { return d.data; }
+
+    std::string to_string(const Data& d) noexcept { return d.data; }
 
     #define VALIDATE_DATA_ARG(name, arg) \
         if (!(arg).data || (arg) != "data") \
@@ -465,7 +472,8 @@ namespace rpp
             DataDelegate lambda1 = [x=1](Data a) {
                 return validate("lambda1", a);
             };
-            AssertThat(lambda1(data), "lambda1");
+            Data result = lambda1.invoke(data);
+            AssertThat(result, "lambda1");
 
             DataDelegate lambda2 { [x=data](Data a) {
                 return validate("lambda2", a, x);
@@ -473,7 +481,25 @@ namespace rpp
             AssertThat(lambda2(data), "lambda2");
         }
 
-        TestCase(nested_lambda)
+        using StringOp = rpp::delegate<std::string(std::string a, std::string b)>;
+
+        TestCase(lambda_returning_data)
+        {
+            StringOp join1 = [](const std::string& a, const std::string& b) {
+                return a + b;
+            };
+            std::string joined1 = join1("long string will be joined", " with another string of similar length");
+            AssertThat(joined1, "long string will be joined with another string of similar length");
+
+            std::string capture = " and an extra capture string which is appended";
+            StringOp join2 = [capture](std::string a, std::string b) {
+                return a + b + capture;
+            };
+            std::string joined2 = join2("long string will be joined", " with another string of similar length");
+            AssertThat(joined2, "long string will be joined with another string of similar length and an extra capture string which is appended");
+        }
+
+        TestCase(lambda_nested)
         {
             DataDelegate lambda = [x=data](Data a) {
                 DataDelegate nested = [x=x](Data a) {

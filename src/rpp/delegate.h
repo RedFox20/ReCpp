@@ -251,6 +251,9 @@ namespace rpp
         template<class FunctionType>
         using enable_if_not_delegate_t = std::enable_if_t<  !std::is_same_v<std::decay_t<FunctionType>, delegate>  >;
 
+        template<class Function>
+        static constexpr bool is_func_type = std::is_same_v<Function, func_type>;
+
         /**
          * @brief Master constructor for most delegate types
          *        Matches: functors, lambdas, global functions
@@ -259,9 +262,8 @@ namespace rpp
         delegate(FunctionType&& function) noexcept
         {
             using Function = typename std::decay_t<FunctionType>;
-            if constexpr (std::is_same_v<Function, func_type> ||
-                          std::is_same_v<Function, func_noexcept_type> ||
-                          std::is_empty_v<Function>/*stateless lambda*/)
+            if constexpr ((is_func_type<Function> || std::is_same_v<Function, func_noexcept_type>) ||
+                          (is_func_type<Function> && std::is_empty_v<Function>/*stateless lambda*/))
             {
                 init_function(function);
             }
@@ -285,9 +287,8 @@ namespace rpp
         {
             reset();
             using Function = typename std::decay_t<FunctionType>;
-            if constexpr (std::is_same_v<Function, func_type> ||
-                          std::is_same_v<Function, func_noexcept_type> ||
-                          std::is_empty_v<Function>/*stateless lambda*/)
+            if constexpr ((is_func_type<Function> || std::is_same_v<Function, func_noexcept_type>) ||
+                          (is_func_type<Function> && std::is_empty_v<Function>/*stateless lambda*/))
             {
                 init_function(function);
             }
@@ -357,6 +358,7 @@ namespace rpp
             template<class IClass, class FClass, class MethodType>
             static func devirtualize(IClass* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
             {
+                // for MSVC we always use dfunc (dummy_type) for all delegates, which uses thiscall
                 if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
                     return devirtualize_mi(inst, (void**)&method, out_inst);
                 else
@@ -503,10 +505,31 @@ namespace rpp
         // ------------------------------ Functors ----------------------------- //
         ///////////////////////////////////////////////////////////////////////////
 
+    #if _MSC_VER // for MSVC we use thiscall for everything
+        template<class FunctorType> struct functor_dummy
+        {
+            Ret functor_call(Args... args) // may throw
+            {
+                FunctorType& functor = *reinterpret_cast<FunctorType*>(this);
+                return functor(std::forward<Args>(args)...);
+            }
+        };
+    #else // for G++ and Clang++ we use mfunc call for everything
+        template<class FunctorType> static Ret functor_call(void* instance, Args... args) // may throw
+        {
+            FunctorType& functor = *reinterpret_cast<FunctorType*>(instance);
+            return functor(std::forward<Args>(args)...);
+        }
+    #endif
+
         template<class Functor> void init_functor(Functor&& functor) noexcept
         {
             using FunctorType = typename std::decay<Functor>::type;
+        #if _MSC_VER
+            f.dfunc = reinterpret_cast<dummy_type>( &functor_dummy<FunctorType>::functor_call );
+        #else
             f.mfunc = &functor_call<FunctorType>;
+        #endif
             RPP_DELEGATE_DEBUG("delegate::init_functor(%p,%p)", &functor, f.mfunc);
             obj = new FunctorType{ std::forward<Functor>(functor) };
             destructor = &functor_delete<FunctorType>;
@@ -525,16 +548,16 @@ namespace rpp
             dest.reset(*instance);
         }
 
-        template<class FunctorType> static Ret functor_call(void* instance, Args... args) // may throw
-        {
-            FunctorType& functor = *reinterpret_cast<FunctorType*>(instance);
-            return functor(std::forward<Args>(args)...);
-        }
-
         template<class Functor> bool equal_functor() const noexcept
         {
             using FunctorType = typename std::decay<Functor>::type;
-            return f.mfunc == &functor_call<FunctorType>;
+        #if _MSC_VER
+            func tmp;
+            tmp.dfunc = reinterpret_cast<dummy_type>( &functor_dummy<FunctorType>::functor_call );
+        #else
+            tmp.mfunc = &functor_call<FunctorType>;
+        #endif
+            return f.fun == tmp.fun;
         }
 
 

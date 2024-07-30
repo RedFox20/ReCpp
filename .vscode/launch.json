@@ -5,12 +5,12 @@
             "type": "cppvsdbg",
             "request": "launch",
             "preLaunchTask": "mamabuild_debug",
-            "program": "${workspaceFolder}/bin/RppTests.exe",
+            "program": "${workspaceFolder}/build/ReCpp/windows/Debug/RppTests.exe",
             "args": [ "-vv", "" ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",
             "environment": [],
-            "console": "externalTerminal"
+            "console": "integratedTerminal"
         },
         {
             "name": "Test Debug GDB",
