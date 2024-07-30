@@ -49,7 +49,7 @@ TestImpl(test_mutex)
     }
 
     template<class T, class Mutex = rpp::mutex>
-    class SafeVector : public rpp::synchronizable<SafeVector<T>>
+    class SafeVector : public rpp::synchronizable<SafeVector<T, Mutex>>
     {
     public:
         std::vector<T> value;
