@@ -169,12 +169,6 @@ namespace rpp
         {
         }
 
-        /** @brief Default constructor from nullptr */
-        explicit delegate(std::nullptr_t) noexcept
-            : f{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
-        {
-        }
-
         /** @brief Handles functor copy cleanup */
         ~delegate() noexcept
         {
@@ -249,21 +243,33 @@ namespace rpp
 
         // not const delegate& or delegate&&
         template<class FunctionType>
-        using enable_if_not_delegate_t = std::enable_if_t<  !std::is_same_v<std::decay_t<FunctionType>, delegate>  >;
+        using enable_if_not_copy_ctor_t = std::enable_if_t< !std::is_same_v<std::decay_t<FunctionType>, delegate> >;
 
         template<class Function>
         static constexpr bool is_func_type = std::is_same_v<Function, func_type>;
+
+        // does it match a function pointer or a stateless lambda that can be initialized via init_function?
+        template<class Function>
+        static constexpr bool is_function_pointer =
+               (std::is_same_v<Function, func_type> || std::is_same_v<Function, func_noexcept_type>)
+            || (std::is_same_v<Function, func_type> && std::is_empty_v<Function>/*stateless lambda*/);
 
         /**
          * @brief Master constructor for most delegate types
          *        Matches: functors, lambdas, global functions
          */
-        template<class FunctionType, typename = enable_if_not_delegate_t<FunctionType>>
+        template<class FunctionType, typename = enable_if_not_copy_ctor_t<FunctionType>>
         delegate(FunctionType&& function) noexcept
         {
             using Function = typename std::decay_t<FunctionType>;
-            if constexpr ((is_func_type<Function> || std::is_same_v<Function, func_noexcept_type>) ||
-                          (is_func_type<Function> && std::is_empty_v<Function>/*stateless lambda*/))
+            if constexpr (std::is_same_v<Function, std::nullptr_t>)
+            {
+                f.fun = nullptr;
+                obj = nullptr;
+                destructor = nullptr;
+                proxy_copy = nullptr;
+            }
+            else if constexpr (is_function_pointer<Function>)
             {
                 init_function(function);
             }
@@ -274,7 +280,7 @@ namespace rpp
         }
 
         /** @brief Basic operator= shortcut for reset() */
-        template<class FunctionType, typename = enable_if_not_delegate_t<FunctionType>>
+        template<class FunctionType, typename = enable_if_not_copy_ctor_t<FunctionType>>
         DELEGATE_FINLINE delegate& operator=(FunctionType&& function) noexcept
         {
             reset(std::forward<FunctionType>(function));
@@ -282,13 +288,16 @@ namespace rpp
         }
 
         /** @brief Generic init which catches: functors, lambdas, global funcs */
-        template<class FunctionType, typename = enable_if_not_delegate_t<FunctionType>>
+        template<class FunctionType, typename = enable_if_not_copy_ctor_t<FunctionType>>
         void reset(FunctionType&& function) noexcept
         {
             reset();
             using Function = typename std::decay_t<FunctionType>;
-            if constexpr ((is_func_type<Function> || std::is_same_v<Function, func_noexcept_type>) ||
-                          (is_func_type<Function> && std::is_empty_v<Function>/*stateless lambda*/))
+            if constexpr (std::is_same_v<Function, std::nullptr_t>)
+            {
+                // do nothing, reset() already called
+            }
+            else if constexpr (is_function_pointer<Function>)
             {
                 init_function(function);
             }

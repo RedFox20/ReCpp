@@ -88,6 +88,21 @@ namespace rpp
 
         ////////////////////////////////////////////////////
 
+        TestCase(init_nullptr)
+        {
+            rpp::delegate<void(std::string val)> func = nullptr;
+            AssertThat(func.good(), false);
+            AssertTrue(!func);
+            AssertThat(func, nullptr);
+            AssertThat(func.get_fun(), nullptr);
+
+            func = nullptr;
+            AssertThat(func.good(), false);
+            AssertTrue(!func);
+            AssertThat(func, nullptr);
+            AssertThat(func.get_fun(), nullptr);
+        }
+
         TestCase(functions)
         {
             Data (*function)(Data a) = [](Data a) {
