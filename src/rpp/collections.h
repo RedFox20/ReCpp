@@ -393,6 +393,17 @@ namespace rpp
         return nullptr;
     }
 
+    template<class T, class Pred> const T* find_if(element_range<const T> v, const Pred& predicate) noexcept
+    {
+        for (const T& elem : v) if (predicate(elem)) return &elem;
+        return nullptr;
+    }
+
+    template<class T, class Pred> const T* find_if(const std::vector<T>& v, const Pred& predicate) noexcept
+    {
+        return find_if(range(v), predicate);
+    }
+
     template<class T, class Pred> T* find_last_if(element_range<T> v, const Pred& predicate) noexcept
     {
         T* first = v.begin();
