@@ -314,10 +314,10 @@ namespace rpp
         // we can convert this to a string using the standard C functions
         time_t seconds = ns / NANOS_PER_SEC;
         int64 nanos = ns % NANOS_PER_SEC;
-        struct tm* tm_utc = gmtime(&seconds);
+        struct tm tm_utc = gmtime_safe(seconds);
 
         // Format the date and time in the buffer
-        char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", tm_utc);
+        char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", &tm_utc);
         if (fraction_digits > 0)
             end += print_fraction(nanos, end, fraction_digits);
         *end = '\0';
