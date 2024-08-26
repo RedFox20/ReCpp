@@ -275,6 +275,17 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    static std::tm gmtime_safe(const time_t& time) noexcept
+    {
+        std::tm time_tm;
+        #if _MSC_VER // MSVC++
+            gmtime_s(&time_tm, &time); // arguments reversed for some reason
+        #else
+            gmtime_r(&time, &time_tm);
+        #endif
+        return time_tm;
+    }
+
     // YYYY-MM-DD HH:MM:SS.mmm
     NOINLINE static int datetime_to_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
@@ -322,17 +333,6 @@ namespace rpp
             end += print_fraction(nanos, end, fraction_digits);
         *end = '\0';
         return int(end - buf);
-    }
-
-    static std::tm gmtime_safe(const time_t& time) noexcept
-    {
-        std::tm time_tm;
-        #if _MSC_VER // MSVC++
-            gmtime_s(&time_tm, &time); // arguments reversed for some reason
-        #else
-            gmtime_r(&time, &time_tm);
-        #endif
-        return time_tm;
     }
 
     TimePoint::TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept
