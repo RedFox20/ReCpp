@@ -409,6 +409,42 @@ namespace rpp
             return this->valid() && this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
         }
 
+        /**
+         * @brief Checks if the future is already finished and collects the result (non-blocking)
+         *        if the future is valid. Otherwise returns false. Can throw [get()].
+         * Equivalent to:
+         * @code
+         * if (f.await_ready())
+         *    *result = f.get();
+         * @endcode
+         */
+        bool collect_ready(T* result = nullptr)
+        {
+            if (!this->await_ready())
+                return false;
+            if (result) *result = this->get();
+            else        (void)this->get();
+            return true;
+        }
+
+        /**
+         * @brief Waits for the future to complete and collects the result (blocking)
+         *        if the future is valid. Otherwise returns false. Can throw [get()].
+         * Equivalent to:
+         * @code
+         * if (f.valid())
+         *   *result = f.get();
+         * @endcode
+         */
+        bool collect_wait(T* result = nullptr)
+        {
+            if (!this->valid())
+                return false;
+            if (result) *result = this->get();
+            else        (void)this->get();
+            return true;
+        }
+
     #if RPP_HAS_COROUTINES // C++20 coro support
 
         // suspension point that launches the background async task
@@ -751,6 +787,40 @@ namespace rpp
         bool await_ready() const noexcept
         {
             return this->valid() && this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+        }
+
+        /**
+         * @brief Checks if the future is already finished and collects the result (non-blocking)
+         *        if the future is valid. Otherwise returns false. Can throw [get()].
+         * Equivalent to:
+         * @code
+         * if (f.await_ready())
+         *    *result = f.get();
+         * @endcode
+         */
+        bool collect_ready()
+        {
+            if (!this->await_ready())
+                return false;
+            this->get();
+            return true;
+        }
+
+        /**
+         * @brief Waits for the future to complete and collects the result (blocking)
+         *        if the future is valid. Otherwise returns false. Can throw [get()].
+         * Equivalent to:
+         * @code
+         * if (f.valid())
+         *     f.get();
+         * @endcode
+         */
+        bool collect_wait()
+        {
+            if (!this->valid())
+                return false;
+            this->get();
+            return true;
         }
 
     #if RPP_HAS_COROUTINES // C++20 coroutine support
