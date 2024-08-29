@@ -746,7 +746,7 @@ namespace rpp
     {
         socket s{};
         s.Addr = addr;
-        s.LastErr = last_err;
+        s.set_errno_unlocked(last_err);
         return s;
     }
     socket::socket(socket&& s) noexcept : socket{}/*create with defaults*/
@@ -1061,15 +1061,22 @@ namespace rpp
         #endif
     }
 
+    // PUBLIC -- for external use if regular error API is not enough
     int socket::last_errno() const noexcept
     {
-        if (!LastErr) set_errno(); // if it wasn't already set (rare)
-        return LastErr;
+        std::lock_guard lock { Mtx };
+        int err = get_errno_unlocked();
+        return err ? err : set_errno_unlocked(os_getsockerr());
     }
-
-    void socket::set_errno() const noexcept
+    void socket::set_errno(int err) const noexcept
     {
-        LastErr = os_getsockerr();
+        std::lock_guard lock { Mtx };
+        LastErr = err;
+    }
+    int socket::get_errno() const noexcept
+    {
+        std::lock_guard lock { Mtx };
+        return LastErr;
     }
 
     // properly handles the crazy responses given by the recv() and send() functions
@@ -1078,7 +1085,7 @@ namespace rpp
     {
         if (ret == 0) // socket closed gracefully
         {
-            set_errno();
+            set_errno(os_getsockerr());
             if (Type == ST_Stream) // only for TCP streams, connection was closed gracefully
             {
                 logdebug("socket closed gracefully");
@@ -1090,7 +1097,7 @@ namespace rpp
         {
             return handle_errno();
         }
-        LastErr = 0;
+        set_errno(0); // clear any errors
         return (int)ret; // return as bytesAvailable
     }
 
@@ -1102,8 +1109,8 @@ namespace rpp
 
     int socket::handle_errno(int err) noexcept
     {
-        int errcode = err ? err : os_getsockerr();
-        LastErr = errcode;
+        std::lock_guard lock { Mtx }; // mtx lock does not affect errno
+        int errcode = set_errno_unlocked(err ? err : os_getsockerr());
         switch (errcode) {
             case 0: return 0; // no error
             default: {
@@ -1153,12 +1160,12 @@ namespace rpp
 
     std::string socket::last_err() const noexcept
     {
-        return last_os_socket_err(LastErr);
+        return last_os_socket_err(get_errno());
     }
 
     socket::error socket::last_err_type() const noexcept
     {
-        return last_os_socket_err_type(LastErr);
+        return last_os_socket_err_type(get_errno());
     }
 
     int socket::get_socket_level_error() const noexcept
@@ -1278,17 +1285,17 @@ namespace rpp
 
     int socket::get_opt(int optlevel, int socketopt) const noexcept
     {
+        std::lock_guard lock { Mtx };
         int value = 0; socklen_t len = sizeof(int);
         bool ok = getsockopt(Sock, optlevel, socketopt, (char*)&value, &len) == 0;
-        LastErr = ok ? 0 : os_getsockerr();
+        set_errno_unlocked(ok ? 0 : os_getsockerr());
         return ok ? value : -1;
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept
     {
         std::lock_guard lock { Mtx };
         bool ok = setsockopt(Sock, optlevel, socketopt, (char*)&value, sizeof(int)) == 0;
-        LastErr = ok ? 0 : os_getsockerr();
-        return LastErr;
+        return set_errno_unlocked(ok ? 0 : os_getsockerr());
     }
 
 #if RPP_SOCKETS_DBG
@@ -1308,7 +1315,8 @@ namespace rpp
 
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept
     {
-        LastErr = 0;
+        std::lock_guard lock { Mtx };
+        set_errno_unlocked(0);
     #if _WIN32 // on win32, ioctlsocket SETS FIONBIO, so we need this little helper
         if (iocmd == FIONBIO)
         {
@@ -1325,15 +1333,15 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &outValue) == 0)
             return 0;
     #endif
-        set_errno();
-        logerronce(LastErr, "(%s) failed: %s", ioctl_string(iocmd), last_err().c_str());
-        return LastErr;
+        int err = set_errno_unlocked(os_getsockerr());
+        logerronce(err, "(%s) failed: %s", ioctl_string(iocmd), last_err().c_str());
+        return err;
     }
 
     int socket::set_ioctl(int iocmd, int value) noexcept
     {
         std::lock_guard lock { Mtx };
-        LastErr = 0;
+        set_errno_unlocked(0);
     #if _WIN32
         u_long val = value;
         if (ioctlsocket(Sock, iocmd, &val) == 0)
@@ -1342,8 +1350,7 @@ namespace rpp
         if (::ioctl(Sock, iocmd, &value) == 0)
             return 0;
     #endif
-        set_errno();
-        return LastErr;
+        return set_errno_unlocked(os_getsockerr());
     }
 
     bool socket::enable_broadcast() noexcept
@@ -1391,6 +1398,7 @@ namespace rpp
     #if _WIN32
         return Blocking; // On Windows, there is no way to GET FIONBIO without setting it
     #else
+        std::lock_guard lock { Mtx };
         int flags = fcntl(Sock, F_GETFL, 0);
         if (flags < 0) return false;
         bool nonBlocking = (flags & O_NONBLOCK) != 0;
@@ -1465,7 +1473,7 @@ namespace rpp
         l.l_onoff = active ? 1 : 0;
         l.l_linger = seconds;
         bool ok = setsockopt(Sock, SOL_SOCKET, SO_LINGER, (char*)&l, sizeof(l)) == 0;
-        LastErr = ok ? 0 : os_getsockerr();
+        set_errno_unlocked(ok ? 0 : os_getsockerr());
         return ok;
     }
 
@@ -1488,8 +1496,9 @@ namespace rpp
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
+            std::lock_guard lock { Mtx };
             bool ok = getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len) == 0;
-            LastErr = ok ? 0 : os_getsockerr();
+            set_errno_unlocked(ok ? 0 : os_getsockerr());
             return to_ipproto(winf.iProtocol);
         #else // this implementation is incomplete:
             switch (get_opt(SOL_SOCKET, SO_TYPE)) {
@@ -1506,8 +1515,9 @@ namespace rpp
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
+            std::lock_guard lock { Mtx };
             bool ok = getsockopt(Sock, SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len) == 0;
-            LastErr = ok ? 0 : os_getsockerr();
+            set_errno_unlocked(ok ? 0 : os_getsockerr());
             return protocol_info {
                 winf.iProtocol,
                 to_addrfamily(winf.iAddressFamily),
@@ -1524,6 +1534,7 @@ namespace rpp
 
     bool socket::connected() noexcept
     {
+        std::lock_guard lock { Mtx };
         if (Sock == -1)
             return false;
 
@@ -1751,7 +1762,7 @@ namespace rpp
     {
         if ((revents & POLLNVAL) != 0) // dead socket
         {
-            LastErr = ESOCK(EBADF);
+            set_errno(ESOCK(EBADF));
             return false;
         }
 
@@ -1774,7 +1785,7 @@ namespace rpp
             return false;
         }
 
-        LastErr = 0; // clear errors
+        set_errno(0); // clear errors
 
         // BUGFIX: it's possible for poll() to miss some READ events
         //         so double-check with available() to be sure
@@ -1807,7 +1818,7 @@ namespace rpp
         socket s;
         if (s.listen(localAddr, ipp, opt))
             return s;
-        return socket::from_err_code(s.LastErr, localAddr);
+        return socket::from_err_code(s.get_errno_unlocked(), localAddr);
     }
 
 
@@ -1825,7 +1836,7 @@ namespace rpp
         }
 
         if (!this->poll(timeoutMillis, PF_Read)) // poll will handle any errors
-            return socket::from_err_code(LastErr);
+            return socket::from_err_code(get_errno());
 
         std::lock_guard lock { Mtx };
         saddr saddr;
@@ -1834,7 +1845,7 @@ namespace rpp
         if (handle == -1)
         {
             handle_errno();
-            return socket::from_err_code(LastErr);
+            return socket::from_err_code(get_errno_unlocked());
         }
 
         socket client = socket::from_os_handle(handle, ipaddress{handle});
@@ -1849,7 +1860,7 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        std::lock_guard lock { Mtx };
+        std::unique_lock lock { Mtx };
         if (!good())
         {
             // need to use SO_Blocking for infinite wait
@@ -1859,21 +1870,24 @@ namespace rpp
 
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
+        int sock = Sock;
+        lock.unlock(); // release lock before a blocking connect() call
 
-        if (::connect(Sock, sa, sa.size()) != 0)
+        if (::connect(sock, sa, sa.size()) != 0)
         {
             // connection unsuccessful, the user has to retry or handle error
             handle_errno();
             return false;
         }
 
+        lock.lock(); // relock again
         configure_connected_client(opt);
         return true;
     }
 
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        std::lock_guard lock { Mtx };
+        std::unique_lock lock { Mtx };
         if (!good())
         {
             // needs to be a non-blocking socket to do connect() + poll()
@@ -1887,9 +1901,12 @@ namespace rpp
 
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
+        int sock = Sock;
 
-        LastErr = 0;
-        if (::connect(Sock, sa, sa.size()) == 0)
+        set_errno_unlocked(0); // clear any errors
+
+        // this will return immediately because socket is in non-blocking mode and we hold the mutex
+        if (::connect(sock, sa, sa.size()) == 0)
         {
             configure_connected_client(opt);
             return true;
@@ -1900,10 +1917,12 @@ namespace rpp
         // EINPROGRESS|EWOULDBLOCK: nonblocking connect is in progress, use poll() to wait for completion
         if (err == ESOCK(EALREADY) || err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
         {
+            lock.unlock(); // unlock before entering very slow poll()
             if (poll(millis, PF_Write))
             {
                 // the socket is writable, but according to connect() manual,
                 // SO_ERROR needs to be checked for the final status
+                lock.lock(); // relock again
                 int so_err = get_socket_level_error();
                 if (so_err == 0)
                 {
@@ -1915,8 +1934,10 @@ namespace rpp
             }
             else
             {
-                // if poll timed out (no LastErr), then use the EINPROGRESS / EALREADY error codes
-                if (!LastErr) LastErr = err;
+                lock.lock(); // relock again
+                // if poll timed out (no last errno), then use the EINPROGRESS / EALREADY error codes
+                if (!get_errno_unlocked())
+                    set_errno_unlocked(err);
                 return false;
             }
         }
@@ -1946,7 +1967,7 @@ namespace rpp
         socket s;
         if (s.connect(remoteAddr, opt))
             return s;
-        return socket::from_err_code(s.LastErr, remoteAddr);
+        return socket::from_err_code(s.get_errno_unlocked(), remoteAddr);
     }
 
     socket socket::connect_to(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
@@ -1954,7 +1975,7 @@ namespace rpp
         socket s;
         if (s.connect(remoteAddr, millis, opt))
             return s;
-        return socket::from_err_code(s.LastErr, remoteAddr);
+        return socket::from_err_code(s.get_errno_unlocked(), remoteAddr);
     }
 
     bool socket::bind_to_interface([[maybe_unused]] uint64_t network_handle) noexcept
@@ -1966,7 +1987,7 @@ namespace rpp
     #if __ANDROID__ && __ANDROID_API__ >= 23
         if (android_setsocknetwork((net_handle_t)network_handle, Sock) != 0)
         {
-            set_errno();
+            set_errno_unlocked(os_getsockerr());
             logerror("Failed to bind socket to network handle: %s", last_err().c_str());
             return false;
         }

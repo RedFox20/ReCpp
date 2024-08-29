@@ -580,6 +580,8 @@ TestImpl(test_sockets)
         const int MSG_SIZE = 200;
         socket send = socket::listen_to_udp(33010, rpp::SO_Blocking);
         socket recv = socket::listen_to_udp(33011, rpp::SO_NonBlock);
+        send.set_snd_buf_size(512*1024);
+        recv.set_rcv_buf_size(1024*1024);
         send.set_blocking(true);
         recv.set_blocking(false);
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
@@ -679,6 +681,8 @@ TestImpl(test_sockets)
         // create a dedicated port to avoid accidental interference
         socket send = socket::listen_to_udp(33010, rpp::SO_Blocking);
         socket recv = socket::listen_to_udp(33011, rpp::SO_Blocking);
+        send.set_snd_buf_size(512*1024);
+        recv.set_rcv_buf_size(1024*1024);
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         rpp::Timer t;
@@ -698,7 +702,11 @@ TestImpl(test_sockets)
                 rpp::ipaddress from;
                 int r = recv.recvfrom(from, buffer, sizeof(buffer)); // BLOCKING
                 if (r <= 0) continue;
-                AssertEqual(r, MSG_SIZE);
+                if (r != MSG_SIZE)
+                {
+                    buffer[r > 0 ? r : 0] = '\0';
+                    AssertFailed("expected %d bytes, got %d: '%s'\n", MSG_SIZE, r, buffer);
+                }
                 ++num_received;
             }
             return num_received;

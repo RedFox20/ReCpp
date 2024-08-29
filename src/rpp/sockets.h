@@ -495,7 +495,7 @@ namespace rpp
 
     protected:
 
-        rpp::recursive_mutex Mtx; // recursive mutex for thread safe read/write operations
+        mutable rpp::recursive_mutex Mtx; // recursive mutex for thread safe read/write operations
         int Sock;            // Socket handle
         ipaddress Addr;      // remote addr
         mutable int LastErr; // last error code
@@ -561,11 +561,16 @@ namespace rpp
          *           for sockets created via accept() and connect() */
         bool is_autoclosing() const noexcept { return AutoClose; }
 
-        explicit operator bool() const noexcept { return Sock != INVALID; }
+        explicit operator bool() const noexcept { return good(); }
         /** @return TRUE if Sock handle is currently VALID */
-        bool good() const noexcept { return Sock != INVALID; }
+        bool good() const noexcept
+        {
+            // FIX: potential race condition during AutoClose error handling
+            std::lock_guard lock { Mtx };
+            return Sock != INVALID;
+        }
         /** @return TRUE if Sock handle is currently INVALID */
-        bool bad()  const noexcept { return Sock == INVALID; }
+        bool bad()  const noexcept { return !good(); }
 
         /** @return OS socket handle. We are generous. */
         int os_handle() const noexcept { return Sock; }
@@ -614,7 +619,10 @@ namespace rpp
         int last_errno() const noexcept;
 
     private:
-        void set_errno() const noexcept;
+        void set_errno(int err) const noexcept;
+        int get_errno() const noexcept;
+        FINLINE int set_errno_unlocked(int err) const noexcept { LastErr = err; return err; }
+        FINLINE int get_errno_unlocked() const noexcept { return LastErr; }
         int handle_errno(int err=0) noexcept;
         int handle_txres(long ret) noexcept;
     public:
