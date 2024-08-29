@@ -561,20 +561,25 @@ namespace rpp
          *           for sockets created via accept() and connect() */
         bool is_autoclosing() const noexcept { return AutoClose; }
 
-        explicit operator bool() const noexcept { return good(); }
+        explicit operator bool() const noexcept { return os_handle() != INVALID; }
         /** @return TRUE if Sock handle is currently VALID */
-        bool good() const noexcept
-        {
-            // FIX: potential race condition during AutoClose error handling
-            std::lock_guard lock { Mtx };
-            return Sock != INVALID;
-        }
+        bool good() const noexcept { return os_handle() != INVALID; }
         /** @return TRUE if Sock handle is currently INVALID */
-        bool bad()  const noexcept { return !good(); }
+        bool bad()  const noexcept { return os_handle() == INVALID; }
 
         /** @return OS socket handle. We are generous. */
-        int os_handle() const noexcept { return Sock; }
-        int oshandle() const noexcept { return Sock; }
+        int os_handle() const noexcept
+        {
+            // FIX: potential race condition during AutoClose error handling
+            std::unique_lock lock = rpp::spin_lock(Mtx);
+            return Sock;
+        }
+        int oshandle() const noexcept { return os_handle(); }
+    private:
+        // non-locked versions of os_handle()
+        FINLINE int os_handle_unsafe() const noexcept { return Sock; }
+        FINLINE void set_os_handle_unsafe(int sock) noexcept { Sock = sock; }
+    public:
 
         /** @returns Current ipaddress */
         const ipaddress& address() const noexcept { return Addr; }
