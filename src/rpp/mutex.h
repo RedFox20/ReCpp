@@ -136,8 +136,9 @@ namespace rpp
             , instance{s}
         { }
 
-        std::unique_lock<mutex_type>& lock() const noexcept { return mtx_lock; }
+        std::unique_lock<mutex_type>& get_lock() noexcept { return mtx_lock; }
         bool owns_lock() const noexcept { return mtx_lock.owns_lock(); }
+        void lock() { mtx_lock.lock(); }
         void unlock() { mtx_lock.unlock(); }
 
         // NOTE: Do not allow overwriting accessors, because all writes need to go 
