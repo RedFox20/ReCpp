@@ -927,7 +927,10 @@ namespace rpp
         }
     }
 
-    /** @brief Blocks and gathers the results from all of the futures */
+    /**
+     * @brief Blocks and gathers the results from all of the futures
+     * @throws an exception if any of the futures threw an exception
+     */
     template<typename T>
     inline std::vector<T> get_all(std::vector<cfuture<T>>& vf)
     {
@@ -938,6 +941,18 @@ namespace rpp
             all.emplace_back(f.get());
         }
         return all;
+    }
+
+    /**
+     * @brief Blocks and gets() the void result from all of the futures.
+     * @throws an exception if any of the futures threw an exception
+     */
+    inline void get_all(std::vector<cfuture<void>>& vf)
+    {
+        for (cfuture<void>& f : vf)
+        {
+            f.get();
+        }
     }
 
     /**
