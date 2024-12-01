@@ -5,6 +5,7 @@
 #include <cstring> // strlen
 
 #include "mutex.h"
+#include "minmax.h"
 
 #if _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -17,6 +18,8 @@
 #  include <TlHelp32.h>
 #  include <Psapi.h>
 #  include <vector>
+#  undef min
+#  undef max
 #else
 #  include <cstdlib>  // malloc/free
 #  include <cxxabi.h> // __cxa_demangle
@@ -46,40 +49,45 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Trivial convenience wrappers
 
-    std::string stack_trace(int maxDepth) noexcept
+    std::string format_trace(const std::vector<uint64_t>& callstack) noexcept
+    {
+        return rpp::format_trace(std::string{}, callstack);
+    }
+
+    std::string stack_trace(size_t maxDepth) noexcept
     {
         return stack_trace(nullptr, 0, maxDepth, 2);
     }
-    std::string stack_trace(const char* message, int maxDepth) noexcept
+    std::string stack_trace(const char* message, size_t maxDepth) noexcept
     {
         return stack_trace(message, strlen(message), maxDepth, 2);
     }
-    std::string stack_trace(const std::string& message, int maxDepth) noexcept
+    std::string stack_trace(const std::string& message, size_t maxDepth) noexcept
     {
         return stack_trace(message.data(), message.size(), maxDepth, 2);
     }
 
-    void print_trace(int maxDepth) noexcept
+    void print_trace(size_t maxDepth) noexcept
     {
         std::string s = stack_trace(nullptr, 0, maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
-    void print_trace(const char* message, int maxDepth) noexcept
+    void print_trace(const char* message, size_t maxDepth) noexcept
     {
         std::string s = stack_trace(message, strlen(message), maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
-    void print_trace(const std::string& message, int maxDepth) noexcept
+    void print_trace(const std::string& message, size_t maxDepth) noexcept
     {
         std::string s = stack_trace(message.data(), message.size(), maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
 
-    std::runtime_error error_with_trace(const char* message, int maxDepth) noexcept
+    std::runtime_error error_with_trace(const char* message, size_t maxDepth) noexcept
     {
         return std::runtime_error{ stack_trace(message, strlen(message), maxDepth, 2) };
     }
-    std::runtime_error error_with_trace(const std::string& message, int maxDepth) noexcept
+    std::runtime_error error_with_trace(const std::string& message, size_t maxDepth) noexcept
     {
         return std::runtime_error{ stack_trace(message.data(), message.size(), maxDepth, 2) };
     }
@@ -117,53 +125,36 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Common utils
 
-    struct CallstackEntry
-    {
-        uint64_t addr = 0;  // if 0, we have no valid entry
-        int      line = 0;
-        const char* name = nullptr;
-        const char* file = nullptr;   // if nullptr, we have no valid file info, try using module name instead
-        const char* module = nullptr;
-
-        const char* short_path() const // @return short file or module path
-        {
-            const char* longFilePath = file ? file : module;
-            if (longFilePath == nullptr) return "(null)";
-            const char* eptr = longFilePath + strlen(longFilePath);
-            for (int n = 1; longFilePath < eptr; --eptr)
-                if (*eptr == '/' || *eptr == '\\')
-                    if (--n <= 0) return ++eptr;
-            return eptr;
-        }
-    };
-
-    class FuncnameCleaner
+    struct FuncnameCleaner
     {
         char buf[64];
         const char* ptr;
         int len;
-        template<size_t N, size_t M> bool replace(const char(&what)[N], const char(&with)[M]) {
+        template<size_t N, size_t M> bool replace(const char(&what)[N], const char(&with)[M]) noexcept
+        {
             if (memcmp(ptr, what, N - 1) != 0) return false;
             memcpy(&buf[len], with, M - 1);
             len += M - 1;
             return true;
         }
-        bool try_replace_lambda() {
+        bool try_replace_lambda() noexcept
+        {
             if (!replace("<lambda", "lambda")) return false;
             ptr += sizeof("<lambda");
             for (int i = 0; i < 64 && *ptr && *ptr != '>'; ++i)
                 ++ptr;
             return true;
         }
-        template<size_t N> bool skip(const char(&what)[N]) {
+        template<size_t N> bool skip(const char(&what)[N]) noexcept
+        {
             if (memcmp(ptr, what, N - 1) != 0) return false;
             ptr += N - 2; // - 2 because next() will bump the pointer
             return true;
         }
-    public:
-        const char* clean_name(const char* longFuncName) {
-            if (longFuncName == nullptr) return "(null)";
-            ptr = longFuncName - 1;
+        const char* clean_name(const std::string& longFuncName) noexcept
+        {
+            if (longFuncName.empty()) return "(null)";
+            ptr = longFuncName.data() - 1;
             len = 0;
             constexpr int MAX = sizeof(buf) - 4; // reserve space for 4 chars "...\0"
             for (;;)
@@ -198,13 +189,15 @@ namespace rpp
         static constexpr int MAX = 8192 - 1;
         char buf[MAX + 1] = "";
     public:
-        std::string to_string() const { return { buf, buf + len }; }
-        void writeln(const char* message, size_t n) {
+        std::string to_string() const noexcept { return { buf, buf + len }; }
+        void writeln(const char* message, size_t n) noexcept
+        {
             memcpy(&buf[len], message, n);
             len += (int)n;
             buf[len++] = '\n';
         }
-        void writef(const char* fmt, ...) {
+        void writef(const char* fmt, ...) noexcept
+        {
             va_list ap; va_start(ap, fmt);
             int n = vsnprintf(&buf[len], size_t(MAX - len), fmt, ap);
             va_end(ap);
@@ -216,26 +209,57 @@ namespace rpp
                 buf[len] = '\0';
             }
         }
-        void writeln(const CallstackEntry& cse) {
+        void writeln(const CallstackEntry& c) noexcept
+        {
             if (len >= MAX)
                 return;
             FuncnameCleaner fc{};
-            if (cse.line) writef("  at %20s:%-4d  in  %s\n", cse.short_path(), cse.line, fc.clean_name(cse.name));
-            else          writef("  at %20s:%-4s  in  %s\n", cse.short_path(), "??", fc.clean_name(cse.name));
+            if (c.line) writef("  at %20s:%-4d  in  %s\n", c.short_path(), c.line, fc.clean_name(c.name));
+            else        writef("  at %20s:%-4s  in  %s\n", c.short_path(), "??", fc.clean_name(c.name));
         }
     };
 
+    const char* CallstackEntry::short_path() const noexcept
+    {
+        const std::string& longFilePath = !file.empty() ? file : module;
+        if (longFilePath.empty()) return "(null)";
+        const char* ptr = longFilePath.data();
+        const char* eptr = ptr + longFilePath.size();
+        for (int n = 1; ptr < eptr; --eptr)
+            if (*eptr == '/' || *eptr == '\\')
+                if (--n <= 0) return ++eptr;
+        return eptr;
+    }
+
+    std::string CallstackEntry::clean_name() const noexcept
+    {
+        FuncnameCleaner fc{};
+        fc.clean_name(name);
+        return std::string{fc.buf, fc.buf + fc.len};
+    }
+
+    std::string CallstackEntry::to_string() const noexcept
+    {
+        CallstackFormatter fmt;
+        FuncnameCleaner fc{};
+        if (line) fmt.writef("%20s:%-4d  in  %s\n", short_path(), line, fc.clean_name(name));
+        else      fmt.writef("%20s:%-4s  in  %s\n", short_path(), "??", fc.clean_name(name));
+        return fmt.to_string();
+    }
 
 #if !_WIN32
     ///////////////////////////////////////////////////////////////////////////////////////////
     // CLANG Implementation
 
+    /**
+     * @brief Demangler for GCC/Clang, uses __cxa_demangle which can reallocate the buffer
+     */
     struct Demangler
     {
         size_t len = 128;
         char* buf = (char*)malloc(128);
-        ~Demangler() { free(buf); }
-        const char* Demangle(const char* symbol)
+        ~Demangler() noexcept { free(buf); }
+        const char* Demangle(const char* symbol) noexcept
         {
             char* demangled = __cxxabiv1::__cxa_demangle(symbol, buf, &len, nullptr);
             if (demangled) buf = demangled; // __cxa_demangle may realloc our buf
@@ -253,15 +277,15 @@ namespace rpp
         Dwarf_Addr hi;
         Dwarf_Die* die;
 
-        bool in_range(Dwarf_Addr x)          const { return lo <= x && x <= hi; }
-        bool overlaps_with(const FlatDie& f) const { return in_range(f.lo) || in_range(f.hi); }
-        bool nearly_adjacent(const FlatDie& f) const
+        bool in_range(Dwarf_Addr x)          const noexcept { return lo <= x && x <= hi; }
+        bool overlaps_with(const FlatDie& f) const noexcept { return in_range(f.lo) || in_range(f.hi); }
+        bool nearly_adjacent(const FlatDie& f) const noexcept
         {
             if      (f.lo > hi) { return (f.lo - hi) <= 256; }
             else if (f.hi < lo) { return (lo - f.hi) <= 256; }
             return false;
         }
-        bool try_merge(const FlatDie& f)
+        bool try_merge(const FlatDie& f) noexcept
         {
             // same address ranges but different Compilation Units. Should be safe to merge:
             if (lo == f.lo && hi == f.hi)
@@ -270,12 +294,12 @@ namespace rpp
             // @todo Add more safe merge options
             return false;
         }
-        void merge(const FlatDie& f)
+        void merge(const FlatDie& f) noexcept
         {
             lo = std::min(lo, f.lo);
             hi = std::max(hi, f.hi);
         }
-        void print() const
+        void print() const noexcept
         {
             const char* file = nullptr;
             int line = 0;
@@ -298,7 +322,7 @@ namespace rpp
         std::vector<FlatDie> flatmap;
         std::vector<Dwarf_Die*> rootDies;
 
-        void init(Dwfl_Module* mod)
+        void init(Dwfl_Module* mod) noexcept
         {
             flatmap.reserve(1024*16);
             rootDies.reserve(1024);
@@ -319,7 +343,7 @@ namespace rpp
     //        print_flatmap();
         }
 
-        // void print_flatmap()
+        // void print_flatmap() noexcept
         // {
         //     for (const FlatDie& f : flatmap)
         //         f.print();
@@ -327,14 +351,14 @@ namespace rpp
         //     printf("total root CU DIE: %zu\n", rootDies.size());
         // }
 
-        void push_die(const FlatDie& f)
+        void push_die(const FlatDie& f) noexcept
         {
             if (!flatmap.empty() && flatmap.back().try_merge(f))
                 return;
             flatmap.push_back(f);
         }
 
-        void insert_die_ranges(Dwarf_Die* rootDie, Dwarf_Die* node)
+        void insert_die_ranges(Dwarf_Die* rootDie, Dwarf_Die* node) noexcept
         {
             Dwarf_Addr base, low, high;
             ptrdiff_t offset = 0;
@@ -344,7 +368,7 @@ namespace rpp
             }
         }
 
-        void init_traverse(Dwarf_Die* rootDie, Dwarf_Die* parent)
+        void init_traverse(Dwarf_Die* rootDie, Dwarf_Die* parent) noexcept
         {
             Dwarf_Die node{};
             if (dwarf_child(parent, &node))
@@ -358,7 +382,7 @@ namespace rpp
             } while (dwarf_siblingof(&node, &node) == 0);
         }
 
-        Dwarf_Die* find(Dwarf_Addr addr)
+        Dwarf_Die* find(Dwarf_Addr addr) noexcept
         {
             Dwarf_Addr pc = addr - bias;
             int imax = max;
@@ -386,7 +410,7 @@ namespace rpp
         }
     };
 
-    static Dwarf_Die* custom_module_addrdie(Dwfl_Module* mod, Dwarf_Addr addr, Dwarf_Addr* outBias)
+    static Dwarf_Die* custom_module_addrdie(Dwfl_Module* mod, Dwarf_Addr addr, Dwarf_Addr* outBias) noexcept
     {
         static std::unordered_map<Dwfl_Module*, ModuleMap> moduleDies;
         ModuleMap* map;
@@ -407,7 +431,7 @@ namespace rpp
         return nullptr;
     }
 
-    static Dwfl* init_dwfl()
+    static Dwfl* init_dwfl() noexcept
     {
         static Dwfl_Callbacks dwfl_callbacks {
                 .find_elf       = &dwfl_linux_proc_find_elf,
@@ -424,7 +448,7 @@ namespace rpp
         return dwfl;
     }
 
-    static CallstackEntry resolve_trace(Demangler& d, void* addr)
+    static CallstackEntry resolve_trace(Demangler& d, void* addr) noexcept
     {
         static Dwfl* dwfl = init_dwfl();
         CallstackEntry cse; cse.addr = (uint64_t)addr;
@@ -467,39 +491,83 @@ namespace rpp
 
 #endif // HAS_LIBDW
 
-    std::string stack_trace(const char* message, size_t messageLen, int maxDepth, int entriesToSkip) noexcept
+    struct BacktraceState
     {
+        void** current;
+        void** end;
+    };
+
+    RPPAPI CallstackEntry get_address_info(uint64_t addr) noexcept
+    {
+        // TODO: need to optimize this to not allocate memory on every call
         Demangler d;
+        return resolve_trace(d, (void*)addr);
+    }
+
+    static _Unwind_Reason_Code backtrace_cb(_Unwind_Context* context, void* arg) noexcept
+    {
+        auto* s = (BacktraceState*)arg;
+        int ip_before_instruction;
+        if (uintptr_t ip = _Unwind_GetIPInfo(context, &ip_before_instruction))
+        {
+            if (!ip_before_instruction)
+                ip -= 1;
+            if (s->current == s->end)
+                return _URC_END_OF_STACK;
+            *s->current++ = (void*)ip;
+        }
+        return _URC_NO_REASON;
+    }
+
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        maxDepth = rpp::min(maxDepth, 256llu);
+
         void* callstack[maxDepth];
+        BacktraceState state { callstack, callstack + maxDepth };
+        // _Unwind is called directly to reduce the number of frames in the stack trace
+        _Unwind_Backtrace(backtrace_cb, &state);
+        size_t count = size_t(state.current - callstack);
 
-        struct BacktraceState
+        std::vector<uint64_t> addresses;
+        if (entriesToSkip >= count)
+            return addresses;
+        addresses.reserve(count - entriesToSkip);
+        for (size_t i = entriesToSkip; i < count; ++i)
         {
-            void** current;
-            void** end;
-        } state { callstack, callstack + maxDepth };
+            addresses.push_back((uint64_t)callstack[i]);
+        }
+        return addresses;
+    }
 
-        _Unwind_Backtrace([](_Unwind_Context* context, void* arg)
+    RPPAPI std::string format_trace(const std::string& message, const std::vector<uint64_t>& callstack) noexcept
+    {
+        CallstackFormatter fmt;
+        if (!message.empty()) fmt.writeln(message.c_str(), message.size());
+
+        Demangler d;
+        for (uint64_t addr : callstack)
         {
-            auto* s = (BacktraceState*)arg;
+            fmt.writeln(resolve_trace(d, (void*)addr));
+        }
+        return fmt.to_string();
+    }
 
-            int ip_before_instruction;
-            if (uintptr_t ip = _Unwind_GetIPInfo(context, &ip_before_instruction))
-            {
-                if (!ip_before_instruction)
-                    ip -= 1;
-                if (s->current == s->end)
-                    return _URC_END_OF_STACK;
-                *s->current++ = (void*)ip;
-            }
-            return _URC_NO_REASON;
-        }, &state);
+    RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        maxDepth = rpp::min(maxDepth, 256llu);
 
-        auto count = int(state.current - callstack);
+        void* callstack[maxDepth];
+        BacktraceState state { callstack, callstack + maxDepth };
+        // _Unwind is called directly to reduce the number of frames in the stack trace
+        _Unwind_Backtrace(backtrace_cb, &state);
+        size_t count = size_t(state.current - callstack);
 
         CallstackFormatter fmt;
         if (messageLen) fmt.writeln(message, messageLen);
 
-        for (int i = entriesToSkip; i < count; ++i)
+        Demangler d;
+        for (size_t i = entriesToSkip; i < count; ++i)
         {
             fmt.writeln(resolve_trace(d, callstack[i]));
         }
@@ -511,9 +579,9 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Windows implementation
 
-    static rpp::mutex DbgHelpMutex; // DbgHelp.dll is single-threaded
+    static rpp::recursive_mutex DbgHelpMutex; // DbgHelp.dll is single-threaded
 
-    static void OnDebugError(const char* what, int lastError, uint64_t offset)
+    static void OnDebugError(const char* what, int lastError, uint64_t offset) noexcept
     {
         if (lastError)
         {
@@ -528,19 +596,19 @@ namespace rpp
         }
     }
 
-    static const wchar_t* CombinePath(wchar_t (&combined)[1024], const wchar_t* folder, const wchar_t* file)
+    static const wchar_t* CombinePath(wchar_t (&combined)[1024], const wchar_t* folder, const wchar_t* file) noexcept
     {
         wcscpy_s(combined, folder);
         wcscat_s(combined, file);
         return combined;
     }
-    static bool FileExists(const wchar_t* file) { return GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES; }
-    static bool FileExists(const wchar_t* folder, const wchar_t* file)
+    static bool FileExists(const wchar_t* file) noexcept { return GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES; }
+    static bool FileExists(const wchar_t* folder, const wchar_t* file) noexcept
     {
         wchar_t path[1024];
         return FileExists(CombinePath(path, folder, file));
     }
-    static HMODULE LoadDbgHelp()
+    static HMODULE LoadDbgHelp() noexcept
     {
         // Dynamically load the Entry-Points for dbghelp.dll:
         // But before we do this, we first check if the ".local" file exists (Dll Hell redirection)
@@ -575,7 +643,7 @@ namespace rpp
         return LoadLibraryW(L"dbghelp.dll"); // if not already loaded, try to load a default-one
     }
 
-    template<class Func> bool LoadProc(Func& func, const char* proc)
+    template<class Func> bool LoadProc(Func& func, const char* proc) noexcept
     {
         static HMODULE DbgHelp = LoadDbgHelp();
         return DbgHelp ? (func = (Func)GetProcAddress(DbgHelp, proc)) != nullptr : false;
@@ -598,7 +666,7 @@ namespace rpp
     static decltype(SymAddrIncludeInlineTrace)*   pSymAddrIncludeInlineTrace;
     static decltype(SymGetLineFromName64)*        pSymGetLineFromName64;
 
-    static bool SymInit(void* hProcess)
+    static bool SymInit(void* hProcess) noexcept
     {
         if (pSymInitialize)
             return true;
@@ -640,21 +708,21 @@ namespace rpp
         return true;
     }
 
-    static DWORD LoadModule(void* hProcess, const char* img, const char* mod, uint64_t baseAddr, int size)
+    static DWORD LoadModule(void* hProcess, const char* img, const char* mod, uint64_t baseAddr, int size) noexcept
     {
         if (pSymLoadModule64(hProcess, nullptr, img, mod, baseAddr, size))
             return ERROR_SUCCESS;
         return GetLastError();
     }
 
-    static DWORD LoadModule(void* hProcess, const WCHAR* img, const WCHAR* mod, uint64_t baseAddr, int size)
+    static DWORD LoadModule(void* hProcess, const WCHAR* img, const WCHAR* mod, uint64_t baseAddr, int size) noexcept
     {
         if (pSymLoadModuleExW(hProcess, nullptr, img, mod, baseAddr, size, nullptr, 0))
             return ERROR_SUCCESS;
         return GetLastError();
     }
 
-    static bool GetModuleListTH32(void* hProcess, uint32_t pid)
+    static bool GetModuleListTH32(void* hProcess, uint32_t pid) noexcept
     {
         HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
         if (hSnap == HANDLE(-1))
@@ -677,7 +745,7 @@ namespace rpp
         return count > 0;
     }
 
-    static bool GetModuleListPSAPI(void* hProcess)
+    static bool GetModuleListPSAPI(void* hProcess) noexcept
     {
         DWORD cbNeeded;
         if (!EnumProcessModules(hProcess, nullptr, 0, &cbNeeded))
@@ -707,14 +775,14 @@ namespace rpp
         return totalModules > 0;
     }
 
-    static bool LoadModules(void* hProcess, uint32_t processId)
+    static bool LoadModules(void* hProcess, uint32_t processId) noexcept
     {
         if (GetModuleListTH32(hProcess, processId)) // first try toolhelp32
             return true;
         return GetModuleListPSAPI(hProcess); // then try psapi
     }
 
-    static const char* GetModuleNameFromAddr(void* hProcess, uint64_t baseAddr, char (&nameBuffer)[32])
+    static const char* GetModuleNameFromAddr(void* hProcess, uint64_t baseAddr, char (&nameBuffer)[32]) noexcept
     {
         IMAGEHLP_MODULE64 m = { sizeof(IMAGEHLP_MODULE64) };
         if (!pSymGetModuleInfo64(hProcess, baseAddr, &m)) return nullptr;
@@ -722,7 +790,7 @@ namespace rpp
         return nameBuffer;
     }
 
-    static DWORD InitStackFrame(STACKFRAME64& s, const CONTEXT& c)
+    static DWORD InitStackFrame(STACKFRAME64& s, const CONTEXT& c) noexcept
     {
         #ifdef _M_IX86
             s.AddrPC.Offset    = c.Eip;
@@ -756,113 +824,214 @@ namespace rpp
         #endif
     }
 
-    std::string stack_trace(const char* message, size_t messageLen, int maxDepth, int entriesToSkip) noexcept
+    static CallstackEntry get_address_info(HANDLE process, uint64_t addr) noexcept
     {
-        HANDLE hThread = GetCurrentThread();
+        char pSymBuf[sizeof(IMAGEHLP_SYMBOL64) + 512] = { 0 };
+        IMAGEHLP_SYMBOL64* pSym = (IMAGEHLP_SYMBOL64*)pSymBuf;
+        pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+        pSym->MaxNameLength = 512;
+
+        CallstackEntry cse { addr };
+
+        DWORD64 offsetFromSymbol = 0;
+        if (pSymGetSymFromAddr64(process, addr, &offsetFromSymbol, pSym))
+        {
+            if (pSym->Name) cse.name = pSym->Name;
+        }
+        else
+        {
+            DWORD err = GetLastError();
+            if (err != ERROR_INVALID_ADDRESS)
+                OnDebugError("SymGetSymFromAddr64", err, addr);
+        }
+
+        DWORD offsetFromLine = 0;
+        IMAGEHLP_LINE64 lineInfo = { 0 };
+        lineInfo.SizeOfStruct = sizeof(lineInfo);
+        if (pSymGetLineFromAddr64(process, addr, &offsetFromLine, &lineInfo))
+        {
+            if (lineInfo.LineNumber > 1000000) // @note Not sure yet why this happens with C++ StdLib lambdas
+                lineInfo.LineNumber = 0;
+
+            cse.line = lineInfo.LineNumber;
+            if (lineInfo.FileName) cse.file = lineInfo.FileName;
+        }
+
+        char moduleNameBuf[32];
+        if (const char* module = GetModuleNameFromAddr(process, addr, moduleNameBuf))
+            cse.module = module;
+        return cse;
+    }
+
+    RPPAPI CallstackEntry get_address_info(uint64_t addr) noexcept
+    {
         HANDLE process = GetCurrentProcess();
-        DWORD processId = GetCurrentProcessId();
+        // DbgHelp.dll is single-threaded, so we need to synchronize here
+        std::lock_guard lock { DbgHelpMutex };
+        return get_address_info(process, addr);
+    }
+
+    RPPAPI std::string format_trace(const std::string& message, const std::vector<uint64_t>& callstack) noexcept
+    {
+        HANDLE process = GetCurrentProcess();
+        CallstackFormatter fmt;
+        if (!message.empty()) fmt.writeln(message.c_str(), message.size());
+
+        // DbgHelp.dll is single-threaded, so we need to synchronize here
+        std::lock_guard lock { DbgHelpMutex };
+
+        for (uint64_t addr : callstack)
+        {
+            fmt.writeln(get_address_info(process, addr));
+        }
+        return fmt.to_string();
+    }
+
+    struct ThreadContext
+    {
+        HANDLE process = nullptr;
+        HANDLE hThread = nullptr;
+        CONTEXT c { 0 };
+        STACKFRAME64 s = { 0 };
+        DWORD imageType;
+    };
+
+    static const char* GetThreadContext(ThreadContext& tc) noexcept
+    {
+        tc.hThread = GetCurrentThread();
+        tc.process = GetCurrentProcess();
 
         static bool modulesLoaded;
         if (!modulesLoaded)
         {
-            if (!SymInit(process))
-                return "<stack_trace:SymInitFailed>";
-            modulesLoaded = LoadModules(process, processId);
+            std::lock_guard lock { DbgHelpMutex };
+            if (!modulesLoaded)
+            {
+                if (!SymInit(tc.process))
+                    return "<stack_trace:SymInitFailed>";
+                modulesLoaded = LoadModules(tc.process, GetCurrentProcessId());
+            }
         }
 
-        CONTEXT c = { 0 }; // capture the current context
-        c.ContextFlags = CONTEXT_FULL;
+        tc.c.ContextFlags = CONTEXT_FULL; // capture the current context
 
-        if (GetThreadId(hThread) == GetCurrentThreadId())
+        if (GetThreadId(tc.hThread) == GetCurrentThreadId())
         {
-            RtlCaptureContext(&c);
+            RtlCaptureContext(&tc.c);
         }
         else
         {
-            SuspendThread(hThread);
-            if (GetThreadContext(hThread, &c) == false)
+            SuspendThread(tc.hThread);
+            if (GetThreadContext(tc.hThread, &tc.c) == false)
             {
-                ResumeThread(hThread);
+                ResumeThread(tc.hThread);
                 return "<stack_trace:GetThreadContextFailed>";
             }
         }
 
-        STACKFRAME64 s = { 0 };
-        DWORD imageType = InitStackFrame(s, c);
+        tc.imageType = InitStackFrame(tc.s, tc.c);
+        return nullptr;
+    }
 
-        char pSymBuf[sizeof(IMAGEHLP_SYMBOL64) + 512] = { 0 };
-        IMAGEHLP_SYMBOL64* pSym = (IMAGEHLP_SYMBOL64 *)pSymBuf;
-        pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
-        pSym->MaxNameLength = 512;
+    static void ReleaseThreadContext(ThreadContext& tc) noexcept
+    {
+        if (tc.hThread)
+            ResumeThread(tc.hThread);
+    }
 
-        char moduleNameBuf[32];
-        int curRecursionCount = 0;
-        constexpr int maxRecursionCount = 128;
+    static size_t walk_callstack(ThreadContext& tc, DWORD64* outCallstack, size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        constexpr size_t maxRecursionCount = 128;
+        size_t curRecursionCount = 0;
+        size_t count = 0;
 
-        CallstackFormatter fmt;
-        if (messageLen) fmt.writeln(message, messageLen);
+		entriesToSkip += 1; // skip the current frame
 
-        // DbgHelp.dll is single-threaded, so we need to synchronize here
-        std::lock_guard guard { DbgHelpMutex };
-
-        for (int frameNum = 0; frameNum < maxDepth; ++frameNum)
+        for (size_t frameNum = 0; count < maxDepth; ++frameNum)
         {
             // get next stack frame (StackWalk64(), SymFunctionTableAccess64(), SymGetModuleBase64())
-            if (!pStackWalk64(imageType, process, hThread, &s, &c, nullptr, pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr))
+            if (!pStackWalk64(tc.imageType, tc.process, tc.hThread, &tc.s, &tc.c, nullptr, pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr))
             {
-                OnDebugError("StackWalk64", 0, s.AddrPC.Offset);
+                OnDebugError("StackWalk64", 0, tc.s.AddrPC.Offset);
                 break;
             }
             if (frameNum < entriesToSkip)
                 continue;
 
-            CallstackEntry cse { s.AddrPC.Offset };
-
-            if (s.AddrPC.Offset == s.AddrReturn.Offset)
+            if (tc.s.AddrPC.Offset == tc.s.AddrReturn.Offset)
             {
                 if (curRecursionCount > maxRecursionCount)
                 {
-                    OnDebugError("StackWalk64-Endless-Callstack", 0, s.AddrPC.Offset);
+                    OnDebugError("StackWalk64-Endless-Callstack", 0, tc.s.AddrPC.Offset);
                     break;
                 }
                 ++curRecursionCount;
             }
-            else curRecursionCount = 0;
-
-            DWORD64 offsetFromSymbol = 0;
-            if (pSymGetSymFromAddr64(process, s.AddrPC.Offset, &offsetFromSymbol, pSym))
-            {
-                cse.name = pSym->Name;
-            }
             else
             {
-                DWORD err = GetLastError();
-                if (err != ERROR_INVALID_ADDRESS)
-                    OnDebugError("SymGetSymFromAddr64", err, s.AddrPC.Offset);
+                curRecursionCount = 0;
             }
 
-            DWORD offsetFromLine = 0;
-            IMAGEHLP_LINE64 lineInfo = { 0 };
-            lineInfo.SizeOfStruct = sizeof(lineInfo);
-            if (pSymGetLineFromAddr64(process, s.AddrPC.Offset, &offsetFromLine, &lineInfo))
-            {
-                if (lineInfo.LineNumber > 1000000) // @note Not sure yet why this happens with C++ StdLib lambdas
-                    lineInfo.LineNumber = 0;
+            outCallstack[count++] = tc.s.AddrPC.Offset;
 
-                cse.line = lineInfo.LineNumber;
-                cse.file = lineInfo.FileName;
-            }
-
-            cse.module = GetModuleNameFromAddr(process, s.AddrPC.Offset, moduleNameBuf);
-            fmt.writeln(cse);
-
-            if (s.AddrReturn.Offset == 0) // no return? then we're done!
+            if (tc.s.AddrReturn.Offset == 0) // no return? then we're done!
             {
                 SetLastError(ERROR_SUCCESS);
                 break;
             }
         }
-        ResumeThread(hThread);
+        return count;
+    }
+
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        ThreadContext tc;
+        if (GetThreadContext(tc))
+            return {};
+
+        maxDepth = rpp::min(maxDepth, 256llu);
+        uint64_t* callstack = (uint64_t*)_malloca(maxDepth * sizeof(uint64_t));
+        size_t count;
+        {
+            // DbgHelp.dll is single-threaded, so we need to synchronize here
+            std::lock_guard lock { DbgHelpMutex };
+            count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
+        }
+
+        // copy the callstack to a vector
+        std::vector<uint64_t> addresses { callstack, callstack + count };
+        _freea(callstack);
+
+        ReleaseThreadContext(tc);
+        return addresses;
+    }
+
+    RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        ThreadContext tc;
+        if (const char* error = GetThreadContext(tc))
+            return error;
+
+        CallstackFormatter fmt;
+        if (messageLen) fmt.writeln(message, messageLen);
+
+        maxDepth = rpp::min(maxDepth, 256llu);
+        uint64_t* callstack = (uint64_t*)_malloca(maxDepth * sizeof(uint64_t));
+        {
+            // DbgHelp.dll is single-threaded, so we need to synchronize here
+            std::lock_guard lock { DbgHelpMutex };
+
+            // walk the stack
+            size_t count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
+
+            // format the callstack
+            for (size_t i = 0; i < count; ++i)
+            {
+                fmt.writeln(get_address_info(tc.process, callstack[i]));
+            }
+        }
+		_freea(callstack);
+        ReleaseThreadContext(tc);
         return fmt.to_string();
     }
 
