@@ -214,10 +214,39 @@ namespace rpp { namespace jni
 
     std::string toString(JNIEnv* env, jstring s) noexcept
     {
-        if (!s) return {};
-        jsize len = env->GetStringUTFLength(s);
-        std::string result((size_t)len, ' ');
-        env->GetStringUTFRegion(s, 0, len, (char*) result.data());
+        if (!s) return {};  // Return empty string if null
+
+        // Get the length of the string (in UTF-16 code units)
+        jsize len = env->GetStringLength(s);
+        if (len == 0) return {};  // Return empty string if string is empty
+
+        // Allocate buffer for UTF-16 string (2 bytes per character in UTF-16)
+        std::vector<jchar> utf16(len);
+
+        // Get the raw UTF-16 data from the Java string
+        env->GetStringRegion(s, 0, len, utf16.data());
+
+        // Convert the UTF-16 data to UTF-8
+        std::string result;
+        for (jsize i = 0; i < len; ++i) {
+            jchar c = utf16[i];
+            if (c <= 0x7F) {
+                // Single byte for characters in the ASCII range
+                result.push_back(static_cast<char>(c));
+            }
+            else if (c <= 0x7FF) {
+                // Two-byte character in UTF-8
+                result.push_back(static_cast<char>(0xC0 | (c >> 6)));
+                result.push_back(static_cast<char>(0x80 | (c & 0x3F)));
+            }
+            else {
+                // Three-byte character in UTF-8 (covers most Unicode characters)
+                result.push_back(static_cast<char>(0xE0 | (c >> 12)));
+                result.push_back(static_cast<char>(0x80 | ((c >> 6) & 0x3F)));
+                result.push_back(static_cast<char>(0x80 | (c & 0x3F)));
+            }
+        }
+
         return result;
     }
 
