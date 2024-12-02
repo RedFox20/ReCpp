@@ -5,6 +5,7 @@
  */
 #include <stdexcept>
 #include <string>
+#include <vector>
 #include "config.h"
 
 namespace rpp

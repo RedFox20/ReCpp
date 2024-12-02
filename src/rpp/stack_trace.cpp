@@ -296,8 +296,8 @@ namespace rpp
         }
         void merge(const FlatDie& f) noexcept
         {
-            lo = std::min(lo, f.lo);
-            hi = std::max(hi, f.hi);
+            lo = rpp::min(lo, f.lo);
+            hi = rpp::max(hi, f.hi);
         }
         void print() const noexcept
         {
@@ -521,7 +521,7 @@ namespace rpp
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min(maxDepth, 256llu);
+        maxDepth = rpp::min<size_t>(maxDepth, 256u);
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -555,7 +555,7 @@ namespace rpp
 
     RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min(maxDepth, 256llu);
+        maxDepth = rpp::min<size_t>(maxDepth, 256u);
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -989,7 +989,7 @@ namespace rpp
         if (GetThreadContext(tc))
             return {};
 
-        maxDepth = rpp::min(maxDepth, 256llu);
+        maxDepth = rpp::min<size_t>(maxDepth, 256u);
         uint64_t* callstack = (uint64_t*)_malloca(maxDepth * sizeof(uint64_t));
         size_t count;
         {
@@ -1015,7 +1015,7 @@ namespace rpp
         CallstackFormatter fmt;
         if (messageLen) fmt.writeln(message, messageLen);
 
-        maxDepth = rpp::min(maxDepth, 256llu);
+        maxDepth = rpp::min<size_t>(maxDepth, 256u);
         uint64_t* callstack = (uint64_t*)_malloca(maxDepth * sizeof(uint64_t));
         {
             // DbgHelp.dll is single-threaded, so we need to synchronize here
