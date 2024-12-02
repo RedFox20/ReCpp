@@ -831,7 +831,8 @@ namespace rpp
         pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
         pSym->MaxNameLength = 512;
 
-        CallstackEntry cse { .addr = addr };
+        CallstackEntry cse;
+        cse.addr = addr;
 
         DWORD64 offsetFromSymbol = 0;
         if (pSymGetSymFromAddr64(process, addr, &offsetFromSymbol, pSym))
