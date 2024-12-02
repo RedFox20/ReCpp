@@ -451,12 +451,17 @@ namespace rpp
     static CallstackEntry resolve_trace(Demangler& d, void* addr) noexcept
     {
         static Dwfl* dwfl = init_dwfl();
-        CallstackEntry cse; cse.addr = (uint64_t)addr;
+        CallstackEntry cse(addr);
         if (Dwfl_Module* mod = dwfl_addrmodule(dwfl, cse.addr))
         {
-            cse.module = dwfl_module_info(mod, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-            cse.name   = dwfl_module_addrname(mod, cse.addr);
-            cse.name   = d.Demangle(cse.name);
+            // .so or binary name
+            auto* module_name = dwfl_module_info(mod, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            if (module_name) cse.module = module_name;
+
+            // get mangled function name and demangle it
+            auto* function_name = dwfl_module_addrname(mod, cse.addr);
+            function_name = d.Demangle(function_name);
+            if (function_name) cse.name = function_name;
 
             Dwarf_Addr bias = 0;
             Dwarf_Die* die = dwfl_module_addrdie(mod, cse.addr, &bias);
@@ -466,7 +471,8 @@ namespace rpp
             {
                 if (Dwarf_Line* src = dwarf_getsrc_die(die, cse.addr - bias))
                 {
-                    cse.file = dwarf_linesrc(src, nullptr, nullptr);
+                    auto* file = dwarf_linesrc(src, nullptr, nullptr);
+                    if (file) cse.file = file;
                     dwarf_lineno(src, &cse.line);
                 }
             }
@@ -480,13 +486,17 @@ namespace rpp
     {
         Dl_info info { nullptr, nullptr, nullptr, nullptr };
         dladdr(addr, &info);
-        return {
-            .addr = (uint64_t)addr,
-            .line = 0,
-            .name = d.Demangle(info.dli_sname),
-            .file = nullptr,
-            .module = info.dli_fname
-        };
+
+        CallstackEntry cse((uint64_t)addr);
+        if (info.dli_sname)
+        {
+            cse.name = d.Demangle(info.dli_sname);
+        }
+        if (info.dli_fname)
+        {
+            cse.module = info.dli_fname;
+        }
+        return cse;
     }
 
 #endif // HAS_LIBDW
@@ -831,7 +841,7 @@ namespace rpp
         pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
         pSym->MaxNameLength = 512;
 
-        CallstackEntry cse { addr };
+        CallstackEntry cse(addr);
 
         DWORD64 offsetFromSymbol = 0;
         if (pSymGetSymFromAddr64(process, addr, &offsetFromSymbol, pSym))
