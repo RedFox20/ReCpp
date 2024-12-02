@@ -20,8 +20,6 @@ namespace rpp
         std::string file; // if empty, we have no valid file info, try using module name instead
         std::string module;
 
-        explicit CallstackEntry(uint64_t addr) noexcept : addr{addr} {}
-
         /** @return short file or module path from long `file` path */
         const char* short_path() const noexcept;
 

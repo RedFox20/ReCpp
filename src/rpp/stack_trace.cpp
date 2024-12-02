@@ -3,6 +3,7 @@
 #include <csignal> // SIGSEGV
 #include <cstdio>  // fprintf
 #include <cstring> // strlen
+#include <vector>
 
 #include "mutex.h"
 #include "minmax.h"
@@ -521,7 +522,7 @@ namespace rpp
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min(maxDepth, 256llu);
+        maxDepth = rpp::min(maxDepth, 256lu);
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -555,7 +556,7 @@ namespace rpp
 
     RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min(maxDepth, 256llu);
+        maxDepth = rpp::min(maxDepth, 256lu);
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -831,7 +832,7 @@ namespace rpp
         pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
         pSym->MaxNameLength = 512;
 
-        CallstackEntry cse { addr };
+        CallstackEntry cse { .addr = addr };
 
         DWORD64 offsetFromSymbol = 0;
         if (pSymGetSymFromAddr64(process, addr, &offsetFromSymbol, pSym))
