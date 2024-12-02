@@ -3,7 +3,6 @@
 #include <csignal> // SIGSEGV
 #include <cstdio>  // fprintf
 #include <cstring> // strlen
-#include <vector>
 
 #include "mutex.h"
 #include "minmax.h"
@@ -522,7 +521,7 @@ namespace rpp
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min(maxDepth, 256lu);
+        maxDepth = rpp::min(maxDepth, static_cast<size_t>(256));
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -556,7 +555,7 @@ namespace rpp
 
     RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min(maxDepth, 256lu);
+        maxDepth = rpp::min(maxDepth, static_cast<size_t>(256));
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
