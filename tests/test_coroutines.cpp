@@ -170,8 +170,11 @@ TestImpl(test_coroutines)
             co_await std::chrono::milliseconds{10};
         };
         print_warning("dtor sequence #1 elapsed: %.2fms\n", t1.elapsed_millis());
-        AssertThat(destructor_ids.size(), 1u);
-        AssertThat(destructor_ids[0], 1);
+        {
+            std::lock_guard lock { m };
+            AssertThat(destructor_ids.size(), 1u);
+            AssertThat(destructor_ids[0], 1);
+        }
 
         rpp::Timer t2;
         std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string>
@@ -182,8 +185,11 @@ TestImpl(test_coroutines)
         };
         print_warning("dtor sequence #2 elapsed: %.2fms\n", t2.elapsed_millis());
         AssertThat(fstr, "test"s);
-        AssertThat(destructor_ids.size(), 2u);
-        AssertThat(destructor_ids[1], 2);
+        {
+            std::lock_guard lock { m };
+            AssertThat(destructor_ids.size(), 2u);
+            AssertThat(destructor_ids[1], 2);
+        }
 
         rpp::Timer t3;
         co_await [&m, &destructor_ids]() -> cfuture<void>
@@ -192,8 +198,11 @@ TestImpl(test_coroutines)
             co_return;
         };
         print_warning("dtor sequence #3 elapsed: %.2fms\n", t3.elapsed_millis());
-        AssertThat(destructor_ids.size(), 3u);
-        AssertThat(destructor_ids[2], 3);
+        {
+            std::lock_guard lock { m };
+            AssertThat(destructor_ids.size(), 3u);
+            AssertThat(destructor_ids[2], 3);
+        }
 
         co_return destructor_ids;
     }
