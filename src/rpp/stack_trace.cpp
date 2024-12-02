@@ -457,7 +457,7 @@ namespace rpp
         {
             cse.module = dwfl_module_info(mod, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
             cse.name   = dwfl_module_addrname(mod, cse.addr);
-            cse.name   = d.Demangle(cse.name);
+            cse.name   = d.Demangle(cse.name.c_str());
 
             Dwarf_Addr bias = 0;
             Dwarf_Die* die = dwfl_module_addrdie(mod, cse.addr, &bias);
