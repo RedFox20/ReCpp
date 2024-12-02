@@ -154,16 +154,17 @@ namespace rpp
         const char* clean_name(const std::string& longFuncName) noexcept
         {
             if (longFuncName.empty()) return "(null)";
-            ptr = longFuncName.data() - 1;
+            ptr = longFuncName.data();
+            const char* end = ptr + longFuncName.size();
             len = 0;
             constexpr int MAX = sizeof(buf) - 4; // reserve space for 4 chars "...\0"
-            for (;;)
+            while (ptr < end)
             {
                 if (len >= MAX) {
                     buf[len++] = '.'; buf[len++] = '.'; buf[len++] = '.'; // "..."
                     break;
                 }
-                char ch = *++ptr;
+                char ch = *ptr++;
                 if (ch == '<') {
                     if (try_replace_lambda()) continue;
                 }
@@ -451,7 +452,7 @@ namespace rpp
     static CallstackEntry resolve_trace(Demangler& d, void* addr) noexcept
     {
         static Dwfl* dwfl = init_dwfl();
-        CallstackEntry cse(addr);
+        CallstackEntry cse { (uint64_t)addr };
         if (Dwfl_Module* mod = dwfl_addrmodule(dwfl, cse.addr))
         {
             // .so or binary name
@@ -487,7 +488,7 @@ namespace rpp
         Dl_info info { nullptr, nullptr, nullptr, nullptr };
         dladdr(addr, &info);
 
-        CallstackEntry cse((uint64_t)addr);
+        CallstackEntry cse { (uint64_t)addr };
         if (info.dli_sname)
         {
             cse.name = d.Demangle(info.dli_sname);
@@ -841,7 +842,7 @@ namespace rpp
         pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
         pSym->MaxNameLength = 512;
 
-        CallstackEntry cse(addr);
+        CallstackEntry cse { addr };
 
         DWORD64 offsetFromSymbol = 0;
         if (pSymGetSymFromAddr64(process, addr, &offsetFromSymbol, pSym))

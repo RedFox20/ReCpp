@@ -22,6 +22,7 @@ namespace rpp
         std::string module;
 
         explicit CallstackEntry(uint64_t addr) noexcept : addr{addr} {}
+        CallstackEntry() noexcept = default; // required for std::vector<CallstackEntry>
 
         /** @return short file or module path from long `file` path */
         const char* short_path() const noexcept;
