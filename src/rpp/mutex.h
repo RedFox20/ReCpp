@@ -260,7 +260,7 @@ namespace rpp
         rpp::recursive_mutex mutex {};
     public:
 
-        synchronized() noexcept = default;
+        synchronized() noexcept(noexcept(T{})) = default;
         synchronized(T&& value) noexcept : value{std::move(value)} {}
         synchronized(const T& value) noexcept : value{value} {}
 
