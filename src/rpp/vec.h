@@ -275,7 +275,7 @@ namespace rpp
     {
         int x, y;
 
-        static constexpr Vector2d Zero() { return { 0, 0 }; } // 0 0
+        static constexpr Point Zero() { return { 0, 0 }; } // 0 0
 
         explicit operator bool()  const { return  x || y;  }
         bool operator!() const { return !x && !y; }
@@ -473,14 +473,14 @@ namespace rpp
 
         Recti& operator+=(const Recti& b) { join(b); return *this; }
 
-        // joins two rects, resulting in a RectF that fits them both
+        // joins two rects, resulting in a Recti that fits them both
         Recti joined(const Recti& b) const;
 
-        // modifies this RectF by joining RectF b with this RectF
+        // modifies this Recti by joining Recti b with this Recti
         void join(const Recti& b);
 
-        // clips this RectF with a potentially smaller frame
-        // this RectF will then fit inside the frame RectF
+        // clips this Recti with a potentially smaller frame
+        // this Recti will then fit inside the frame Recti
         void clip(const Recti& frame);
 
         Recti operator+(const Recti& b) const { return joined(b); }
