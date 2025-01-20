@@ -326,22 +326,25 @@ namespace rpp
 
 
     /** @brief Utility for dealing with 2D Rects */
-    struct RPPAPI Rect
+    struct RPPAPI RectF
     {
         union {
             struct { float x, y, w, h; };
             struct { Vector2 pos; Vector2 size; };
         };
 
-        static constexpr Rect Zero() { return { 0, 0, 0, 0 }; } // 0 0 0 0
+        static constexpr RectF Zero() { return { 0, 0, 0, 0 }; } // 0 0 0 0
 
-        constexpr Rect(float x, float y, float w, float h) : x{x}, y{y}, w{w}, h{h} {}
-        constexpr Rect(Vector2 pos, Vector2 size) : pos{pos}, size{size} {}
+        constexpr RectF() : x{ 0 }, y{ 0 }, w{ 0 }, h{ 0 } {}
+        constexpr RectF(float x, float y, float w, float h) : x{x}, y{y}, w{w}, h{h} {}
+        constexpr RectF(Vector2 pos, Vector2 size) : pos{pos}, size{size} {}
+        constexpr RectF(Vector2 pos, float w, float h) : pos{ pos }, size{ w, h } {}
+        constexpr RectF(float x, float y, Vector2 size) : pos{ x, y }, size{ size } {}
 
-        /** Print the Rect */
+        /** Print the RectF */
         void print() const;
 
-        /** @return Temporary static string from this Rect in the form of "{pos %g;%g size %g;%g}" */
+        /** @return Temporary static string from this RectF in the form of "{pos %g;%g size %g;%g}" */
         const char* toString() const;
 
         char* toString(char* buffer) const;
@@ -356,60 +359,144 @@ namespace rpp
         const Vector2& topleft()  const { return pos; }
         Vector2        botright() const { return { x+w, y+h }; }
 
-        /** @return TRUE if this Rect is equal to Rect::Zero */
+        /** @return TRUE if this RectF is equal to RectF::Zero */
         bool isZero() const { return !x && !y && !w && !h; }
-        /** @return TRUE if this Rect is NOT equal to Rect::Zero */
+        /** @return TRUE if this RectF is NOT equal to RectF::Zero */
         bool notZero() const { return w || h || x || y; }
 
-        /** @return True if point is inside this Rect */
+        /** @return True if point is inside this RectF */
         bool hitTest(const Vector2& position) const;
         bool hitTest(float xPos, float yPos) const;
-        /** @return TRUE if r is completely inside this Rect */
-        bool hitTest(const Rect& r) const;
+        /** @return TRUE if r is completely inside this RectF */
+        bool hitTest(const RectF& r) const;
 
-        /** @return TRUE if this Rect and r intersect */
-        bool intersectsWith(const Rect& r) const;
+        /** @return TRUE if this RectF and r intersect */
+        bool intersectsWith(const RectF& r) const;
 
-        /** @brief Extrude the bounds of this rect by a positive or negative amount */
+        /** @brief Extrude the bounds of this RectF by a positive or negative amount */
         void extrude(float extrude);
         void extrude(const Vector2& extrude);
 
-        Rect extruded(float extrude) const {
-            Rect r = *this;
+        RectF extruded(float extrude) const {
+            RectF r = *this;
             r.extrude(extrude);
             return *this;
         }
 
-        Rect& operator+=(const Rect& b) { join(b); return *this; }
+        RectF& operator+=(const RectF& b) { join(b); return *this; }
 
-        // joins two rects, resulting in a rect that fits them both
-        Rect joined(const Rect& b) const;
+        // joins two rects, resulting in a RectF that fits them both
+        RectF joined(const RectF& b) const;
 
-        // modifies this rect by joining rect b with this rect
-        void join(const Rect& b);
+        // modifies this RectF by joining RectF b with this RectF
+        void join(const RectF& b);
 
-        // clips this Rect with a potentially smaller frame
-        // this Rect will then fit inside the frame Rect
-        void clip(const Rect& frame);
+        // clips this RectF with a potentially smaller frame
+        // this RectF will then fit inside the frame RectF
+        void clip(const RectF& frame);
 
-        Rect operator+(const Rect& b) const { return joined(b); }
+        RectF operator+(const RectF& b) const { return joined(b); }
 
-        bool operator==(const Rect& r) const { return x == r.x && y == r.y && w == r.w && h == r.h; }
-        bool operator!=(const Rect& r) const { return x != r.x || y != r.y || w != r.w || h != r.h; }
+        bool operator==(const RectF& r) const { return x == r.x && y == r.y && w == r.w && h == r.h; }
+        bool operator!=(const RectF& r) const { return x != r.x || y != r.y || w != r.w || h != r.h; }
     };
 
-    constexpr Rect rect(Vector2 pos, Vector2 size) { return { pos.x, pos.y, size.x, size.y }; }
-    constexpr Rect rect(float x, float y, Vector2 size)      { return { x, y, size.x, size.y }; }
-    constexpr Rect rect(Vector2 pos, float w, float h)       { return { pos.x, pos.y, w, h }; }
+    inline RectF operator+(const RectF& a, float f) { return{ a.x+f, a.y+f, a.w, a.h }; }
+    inline RectF operator-(const RectF& a, float f) { return{ a.x-f, a.y-f, a.w, a.h }; }
+    inline RectF operator*(const RectF& a, float f) { return{ a.x, a.y, a.w*f, a.h*f }; }
+    inline RectF operator/(const RectF& a, float f) { return{ a.x, a.y, a.w/f, a.h/f }; }
+    inline RectF operator+(float f, const RectF& a) { return{ f+a.x, f+a.y, a.w, a.h }; }
+    inline RectF operator-(float f, const RectF& a) { return{ f-a.x, f-a.y, a.w, a.h }; }
+    inline RectF operator*(float f, const RectF& a) { return{ a.x, a.y, f*a.w, f*a.h }; }
+    inline RectF operator/(float f, const RectF& a) { return{ a.x, a.y, f/a.w, f/a.h }; }
 
-    inline Rect operator+(const Rect& a, float f) { return{ a.x+f, a.y+f, a.w, a.h }; }
-    inline Rect operator-(const Rect& a, float f) { return{ a.x-f, a.y-f, a.w, a.h }; }
-    inline Rect operator*(const Rect& a, float f) { return{ a.x, a.y, a.w*f, a.h*f }; }
-    inline Rect operator/(const Rect& a, float f) { return{ a.x, a.y, a.w/f, a.h/f }; }
-    inline Rect operator+(float f, const Rect& a) { return{ f+a.x, f+a.y, a.w, a.h }; }
-    inline Rect operator-(float f, const Rect& a) { return{ f-a.x, f-a.y, a.w, a.h }; }
-    inline Rect operator*(float f, const Rect& a) { return{ a.x, a.y, f*a.w, f*a.h }; }
-    inline Rect operator/(float f, const Rect& a) { return{ a.x, a.y, f/a.w, f/a.h }; }
+    using Rect = typename RectF;
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+    struct RPPAPI Recti
+    {
+        union {
+            struct { int x, y, w, h; };
+            struct { Point pos; Point size; };
+        };
+
+        static constexpr Recti Zero() { return { 0, 0, 0, 0 }; } // 0 0 0 0
+
+        constexpr Recti() : x{ 0 }, y{ 0 }, w{ 0 }, h{ 0 } {}
+        constexpr Recti(int x, int y, int w, int h) : x{x}, y{y}, w{w}, h{h} {}
+        constexpr Recti(Point pos, Point size) : x{ pos.x }, y{ pos.y }, w{ size.x }, h{ size.y } {}
+        constexpr Recti(Point pos, int w, int h) : x{ pos.x }, y{ pos.y }, w{ w }, h{ h } {}
+        constexpr Recti(int x, int y, Point size) : x{ x }, y{ y }, w{ size.x }, h{ size.y } {}
+
+        /** Print the Recti */
+        void print() const;
+
+        /** @return Temporary static string from this Recti in the form of "{pos %d;%d size %d;%d}" */
+        const char* toString() const;
+
+        char* toString(char* buffer) const;
+        char* toString(char* buffer, int bufSize) const;
+        template<int N> char* toString(char(&b)[N]) { return toString(b, N); }
+
+        int area()   const { return w * h; }
+        int left()   const { return x;     }
+        int top()    const { return y;     }
+        int right()  const { return x + w; }
+        int bottom() const { return y + h; }
+        const Point& topleft()  const { return { x, y }; }
+        Point        botright() const { return { x+w, y+h }; }
+
+        /** @return TRUE if this Recti is equal to Recti::Zero */
+        bool isZero() const { return !x && !y && !w && !h; }
+        /** @return TRUE if this Recti is NOT equal to Recti::Zero */
+        bool notZero() const { return w || h || x || y; }
+
+        /** @return True if point is inside this Recti */
+        bool hitTest(const Point& position) const;
+        bool hitTest(int xPos, int yPos) const;
+        /** @return TRUE if r is completely inside this Recti */
+        bool hitTest(const Recti& r) const;
+
+        /** @return TRUE if this Recti and r intersect */
+        bool intersectsWith(const Recti& r) const;
+
+        /** @brief Extrude the bounds of this rect by a positive or negative amount */
+        void extrude(int extrude);
+        void extrude(const Point& extrude);
+
+        Recti extruded(int extrude) const {
+            Recti r = *this;
+            r.extrude(extrude);
+            return *this;
+        }
+
+        Recti& operator+=(const Recti& b) { join(b); return *this; }
+
+        // joins two rects, resulting in a RectF that fits them both
+        Recti joined(const Recti& b) const;
+
+        // modifies this RectF by joining RectF b with this RectF
+        void join(const Recti& b);
+
+        // clips this RectF with a potentially smaller frame
+        // this RectF will then fit inside the frame RectF
+        void clip(const Recti& frame);
+
+        Recti operator+(const Recti& b) const { return joined(b); }
+
+        bool operator==(const Recti& r) const { return x == r.x && y == r.y && w == r.w && h == r.h; }
+        bool operator!=(const Recti& r) const { return x != r.x || y != r.y || w != r.w || h != r.h; }
+    };
+
+    inline Recti operator+(const Recti& a, int i) { return{ a.x+i, a.y+i, a.w, a.h }; }
+    inline Recti operator-(const Recti& a, int i) { return{ a.x-i, a.y-i, a.w, a.h }; }
+    inline Recti operator*(const Recti& a, int i) { return{ a.x, a.y, a.w*i, a.h*i }; }
+    inline Recti operator/(const Recti& a, int i) { return{ a.x, a.y, a.w/i, a.h/i }; }
+    inline Recti operator+(int i, const Recti& a) { return{ i+a.x, i+a.y, a.w, a.h }; }
+    inline Recti operator-(int i, const Recti& a) { return{ i-a.x, i-a.y, a.w, a.h }; }
+    inline Recti operator*(int i, const Recti& a) { return{ a.x, a.y, i*a.w, i*a.h }; }
+    inline Recti operator/(int i, const Recti& a) { return{ a.x, a.y, i/a.w, i/a.h }; }
 
     ///////////////////////////////////////////////////////////////////////////////
 

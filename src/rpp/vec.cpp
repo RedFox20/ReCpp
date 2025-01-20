@@ -240,58 +240,58 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    void Rect::print() const
+    void RectF::print() const
     {
         char buffer[64];
         puts(toString(buffer));
     }
 
-    const char* Rect::toString() const
+    const char* RectF::toString() const
     {
         static char buffer[64];
         return toString(buffer, sizeof(buffer));
     }
 
-    char* Rect::toString(char* buffer) const
+    char* RectF::toString(char* buffer) const
     {
         return toString(buffer, 64);
     }
 
-    char* Rect::toString(char* buffer, int bufSize) const
+    char* RectF::toString(char* buffer, int bufSize) const
     {
         snprintf(buffer, bufSize, "{position %.3g;%.3g size %.3g;%.3g}", x, y, w, h);
         return buffer;
     }
 
-    bool Rect::hitTest(const Vector2& position) const
+    bool RectF::hitTest(const Vector2& position) const
     {
-        return x <= position.x && y <= position.y && 
-               position.x <= x + w && 
-               position.y <= y + h;
+        return x <= position.x && y <= position.y
+            && position.x <= x + w
+            && position.y <= y + h;
     }
 
-    bool Rect::hitTest(const float xPos, const float yPos) const
+    bool RectF::hitTest(const float xPos, const float yPos) const
     {
-        return x <= xPos && y <= yPos && 
-               xPos <= x + w && 
-               yPos <= y + h;
+        return x <= xPos && y <= yPos
+            && xPos <= x + w 
+            && yPos <= y + h;
     }
 
-    bool Rect::hitTest(const Rect& r) const
+    bool RectF::hitTest(const RectF& r) const
     {
-        return x <= r.x && y <= r.y &&
-               r.x + r.w <= x + w &&
-               r.y + r.h <= y + h;
+        return x <= r.x && y <= r.y
+            && r.x + r.w <= x + w
+            && r.y + r.h <= y + h;
     }
 
-    bool Rect::intersectsWith(const Rect& r) const
+    bool RectF::intersectsWith(const RectF& r) const
     {
         // this is just a collision test
         return x < r.right()  && right()  > r.x
             && y < r.bottom() && bottom() > r.y;
     }
 
-    void Rect::extrude(float extrude)
+    void RectF::extrude(float extrude)
     {
         x -= extrude;
         y -= extrude;
@@ -299,7 +299,7 @@ namespace rpp
         if ((h += extrude*2) < 0.0f) h = 0.0f;
     }
 
-    void Rect::extrude(const Vector2& extrude)
+    void RectF::extrude(const Vector2& extrude)
     {
         x -= extrude.x;
         y -= extrude.y;
@@ -307,7 +307,7 @@ namespace rpp
         if ((h += extrude.y*2) < 0.0f) h = 0.0f;
     }
 
-    Rect Rect::joined(const Rect& b) const
+    RectF RectF::joined(const RectF& b) const
     {
         float newX = min(x, b.x);
         float newY = min(y, b.y);
@@ -316,7 +316,7 @@ namespace rpp
         return{ newX, newY, newW, newH };
     }
 
-    void Rect::join(const Rect & b)
+    void RectF::join(const RectF & b)
     {
         float ax = x, ay = y;
         x = min(ax, b.x);
@@ -325,12 +325,111 @@ namespace rpp
         h = max(ay + h, b.y + b.h) - y;
     }
 
-    void Rect::clip(const Rect& frame)
+    void RectF::clip(const RectF& frame)
     {
         float r = right();
         float b = bottom();
         float fr = frame.right();
         float fb = frame.bottom();
+        if (x < frame.x) x = frame.x; else if (x > fr) x = fr;
+        if (y < frame.y) y = frame.y; else if (y > fb) y = fb;
+        if (r > fr) w = fr - x;
+        if (b > fb) h = fb - y;
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    void Recti::print() const
+    {
+        char buffer[64];
+        puts(toString(buffer));
+    }
+
+    const char* Recti::toString() const
+    {
+        static char buffer[64];
+        return toString(buffer, sizeof(buffer));
+    }
+
+    char* Recti::toString(char* buffer) const
+    {
+        return toString(buffer, 64);
+    }
+
+    char* Recti::toString(char* buffer, int bufSize) const
+    {
+        snprintf(buffer, bufSize, "{pos %d;%d size %d;%d}", x, y, w, h);
+        return buffer;
+    }
+
+    bool Recti::hitTest(const Point& position) const
+    {
+        return x <= position.x && y <= position.y
+            && position.x <= x + w
+            && position.y <= y + h;
+    }
+
+    bool Recti::hitTest(const int xPos, const int yPos) const
+    {
+        return x <= xPos && y <= yPos
+            && xPos <= x + w
+            && yPos <= y + h;
+    }
+
+    bool Recti::hitTest(const Recti& r) const
+    {
+        return x <= r.x && y <= r.y
+            && r.x + r.w <= x + w
+            && r.y + r.h <= y + h;
+    }
+
+    bool Recti::intersectsWith(const Recti& r) const
+    {
+        // this is just a collision test
+        return x < r.right() && right()  > r.x
+            && y < r.bottom() && bottom() > r.y;
+    }
+
+    void Recti::extrude(int extrude)
+    {
+        x -= extrude;
+        y -= extrude;
+        if ((w += extrude * 2) < 0) w = 0;
+        if ((h += extrude * 2) < 0) h = 0;
+    }
+
+    void Recti::extrude(const Point& extrude)
+    {
+        x -= extrude.x;
+        y -= extrude.y;
+        if ((w += extrude.x * 2) < 0) w = 0;
+        if ((h += extrude.y * 2) < 0) h = 0;
+    }
+
+    Recti Recti::joined(const Recti& b) const
+    {
+        int newX = min(x, b.x);
+        int newY = min(y, b.y);
+        int newW = max(x + w, b.x + b.w) - newX;
+        int newH = max(y + h, b.y + b.h) - newY;
+        return{ newX, newY, newW, newH };
+    }
+
+    void Recti::join(const Recti& b)
+    {
+        int ax = x, ay = y;
+        x = min(ax, b.x);
+        w = max(ax + w, b.x + b.w) - x;
+        y = min(ay, b.y);
+        h = max(ay + h, b.y + b.h) - y;
+    }
+
+    void Recti::clip(const Recti& frame)
+    {
+        int r = right();
+        int b = bottom();
+        int fr = frame.right();
+        int fb = frame.bottom();
         if (x < frame.x) x = frame.x; else if (x > fr) x = fr;
         if (y < frame.y) y = frame.y; else if (y > fb) y = fb;
         if (r > fr) w = fr - x;
