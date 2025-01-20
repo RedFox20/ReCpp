@@ -78,20 +78,21 @@ jobs:
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama gcc verbose build with_tests tsan
       - run: pipenv run mama gcc verbose test="nogdb -vv"
-  gcc-ubuntu-ubsan-cpp20:
-    description: Ubuntu GCC C++20 x64 Build with UndefinedBehaviorSanitizer
-    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
-    docker:
-      - image: cimg/python:3.10
-    steps:
-      - checkout
-      - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
-      - run: pipenv install mama
-      - run: sudo apt-get install gcc-11 -y
-      - run: make configure-cmake
-      - run: CXX20=1 pipenv run mama gcc verbose build with_tests ubsan
-      - run: pipenv run mama gcc verbose test="nogdb -vv" || true
+  # this fails to build on CI machines
+  # gcc-ubuntu-ubsan-cpp20:
+  #   description: Ubuntu GCC C++20 x64 Build with UndefinedBehaviorSanitizer
+  #   resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+  #   docker:
+  #     - image: cimg/python:3.10
+  #   steps:
+  #     - checkout
+  #     - run: sudo apt-get update
+  #     - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
+  #     - run: pipenv install mama
+  #     - run: sudo apt-get install gcc-11 -y
+  #     - run: make configure-cmake
+  #     - run: CXX20=1 pipenv run mama gcc verbose build with_tests ubsan
+  #     - run: pipenv run mama gcc verbose test="nogdb -vv" || true
   msvc-win64-cpp20:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:
@@ -177,7 +178,7 @@ workflows:
       - gcc-ubuntu-cpp20
       - gcc-ubuntu-cpp17
       - gcc-ubuntu-tsan-cpp20
-      - gcc-ubuntu-ubsan-cpp20
+      # - gcc-ubuntu-ubsan-cpp20
       - msvc-win64-cpp20
       - msvc-win64-cpp17
       - gcc-mipsel-cpp20
