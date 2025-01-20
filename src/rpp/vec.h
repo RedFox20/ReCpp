@@ -410,7 +410,7 @@ namespace rpp
     inline RectF operator*(float f, const RectF& a) { return{ a.x, a.y, f*a.w, f*a.h }; }
     inline RectF operator/(float f, const RectF& a) { return{ a.x, a.y, f/a.w, f/a.h }; }
 
-    using Rect = typename RectF;
+    using Rect = RectF;
 
     ///////////////////////////////////////////////////////////////////////////////
 
@@ -444,7 +444,7 @@ namespace rpp
         int top()    const { return y;     }
         int right()  const { return x + w; }
         int bottom() const { return y + h; }
-        const Point& topleft()  const { return { x, y }; }
+        const Point& topleft()  const { return pos; }
         Point        botright() const { return { x+w, y+h }; }
 
         /** @return TRUE if this Recti is equal to Recti::Zero */
@@ -1061,7 +1061,7 @@ namespace rpp
     constexpr Vector4 vec4(Vector3 xyz, float w)             { return { xyz.x, xyz.y, xyz.z, w }; }
     constexpr Vector4 vec4(float x, Vector3 yzw)             { return { x, yzw.x, yzw.y, yzw.z }; }
 
-    constexpr Rect rect(Vector4 xywh) { return { xywh.x, xywh.y, xywh.x, xywh.y }; }
+    constexpr RectF rect(Vector4 xywh) { return { xywh.x, xywh.y, xywh.x, xywh.y }; }
 
     inline Vector4 operator+(const Vector4& a, float f) { return { a.x+f, a.y+f, a.z+f, a.w+f }; }
     inline Vector4 operator-(const Vector4& a, float f) { return { a.x-f, a.y-f, a.z-f, a.w-f }; }
