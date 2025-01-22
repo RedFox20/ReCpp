@@ -359,6 +359,10 @@ namespace rpp
         const Vector2& topleft()  const { return pos; }
         Vector2        botright() const { return { x+w, y+h }; }
 
+        Vector2 center() const { return { x + w/2, y + h/2 }; }
+        float center_x() const { return x + w/2; }
+        float center_y() const { return y + h/2; }
+
         /** @return TRUE if this RectF is equal to RectF::Zero */
         bool isZero() const { return !x && !y && !w && !h; }
         /** @return TRUE if this RectF is NOT equal to RectF::Zero */
@@ -447,10 +451,17 @@ namespace rpp
         const Point& topleft()  const { return pos; }
         Point        botright() const { return { x+w, y+h }; }
 
+        Point center() const { return { x + w/2, y + h/2 }; }
+        int center_x() const { return x + w/2; }
+        int center_y() const { return y + h/2; }
+
         /** @return TRUE if this Recti is equal to Recti::Zero */
         bool isZero() const { return !x && !y && !w && !h; }
         /** @return TRUE if this Recti is NOT equal to Recti::Zero */
         bool notZero() const { return w || h || x || y; }
+
+        /** @return TRUE if this Recti has a valid W and H */
+        explicit operator bool() const { return  w > 0 && h > 0; }
 
         /** @return True if point is inside this Recti */
         bool hitTest(const Point& position) const;
