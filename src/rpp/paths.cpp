@@ -52,7 +52,7 @@ namespace rpp /* ReCpp */
             return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
         #elif _MSC_VER
             struct _stat64 s;
-            return _wstat64(filename, &s) == 0 && S_ISDIR(s.st_mode);
+            return _wstat64(filename, &s) == 0 && !S_ISDIR(s.st_mode);
         #else
             return file_exists(rpp::to_string(filename).c_str());
         #endif
