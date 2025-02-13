@@ -335,6 +335,15 @@ namespace rpp
         return int(end - buf);
     }
 
+    // TODO: this won't handle system time changes correctly
+    static FINLINE time_t get_timezone_offset() noexcept
+    {
+        time_t local_now = time(nullptr);
+        std::tm utc_tm = gmtime_safe(local_now);
+        time_t utc_now = mktime(&utc_tm);
+        return local_now - utc_now;
+    }
+
     TimePoint::TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept
     {
         #if _WIN32
@@ -357,15 +366,7 @@ namespace rpp
             }
         #endif
 
-        // TODO: this won't handle system time changes correctly
-        static time_t timezone_offset = []() -> time_t
-        {
-            time_t local_now = time(nullptr);
-            std::tm utc_tm = gmtime_safe(local_now);
-            time_t utc_now = mktime(&utc_tm);
-            time_t diff = local_now - utc_now;
-            return diff;
-        }();
+        static time_t timezone_offset = get_timezone_offset();
 
         std::tm tm {};
         tm.tm_year = year - 1900; // [0, 60] since 1900
@@ -403,6 +404,19 @@ namespace rpp
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
             return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) };
+        #endif
+    }
+
+    TimePoint TimePoint::local() noexcept
+    {
+        static time_t timezone_offset = get_timezone_offset();
+        #if _WIN32
+            // convert 100ns ticks to nanoseconds, this would overflow in 292 years
+            return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset * NANOS_PER_SEC };
+        #else
+            struct timespec t;
+            clock_gettime(CLOCK_REALTIME, &t);
+            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + timezone_offset * NANOS_PER_SEC };
         #endif
     }
 

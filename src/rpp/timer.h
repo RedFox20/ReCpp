@@ -191,6 +191,9 @@ namespace rpp
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
 
+        /** @returns Current OS time with timezone offset */
+        static TimePoint local() noexcept;
+
         /** @returns only the HH:MM:SS.NANOS part of the Duration */
         constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }
 
