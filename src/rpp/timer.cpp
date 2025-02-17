@@ -336,7 +336,7 @@ namespace rpp
     }
 
     // TODO: this won't handle system time changes correctly
-    static FINLINE time_t get_timezone_offset() noexcept
+    static time_t get_timezone_offset() noexcept
     {
         time_t local_now = time(nullptr);
         std::tm utc_tm = gmtime_safe(local_now);
