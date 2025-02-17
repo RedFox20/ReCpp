@@ -33,12 +33,10 @@ typedef enum {
 } LogSeverity;
 
 typedef void (*LogMessageCallback) (LogSeverity severity, const char* message, int len);
-typedef void (*LogEventCallback) (const char* eventName, const char* message, int len);
 typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 /** Sets the callback handler for any error messages */
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler);
-RPPCAPI LogMessageCallback GetLogHandler();
 
 // legacy ALIAS for SetLogHandler
 RPPCAPI
@@ -46,9 +44,6 @@ RPPCAPI
 [[deprecated("Use SetLogHandler() instead")]]
 #endif
 void SetLogErrorHandler(LogMessageCallback loghandler);
-
-/** Sets the callback handler for event messages  */
-RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler);
 
 /** Sets the callback handler for C++ messages. You can even intercept these in C. */
 RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler);
@@ -87,7 +82,6 @@ RPPCAPI void LogSetTimeOffset(rpp::int64 offset_nanos);
  * @param len Length of string err
  */
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* err, int len);
-RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len);
 
 // Provides a generic assertion fail, which calls std::terminate
 RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
@@ -99,7 +93,6 @@ RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len);
 RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-RPPCAPI void  LogEvent   (const char* eventName,     PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 RPPCAPI void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
 RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
@@ -117,15 +110,55 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 #import <Foundation/NSString.h>
 #endif
 
+// Qt compatibility
+#ifdef QT_VERSION
+#include <QString>
+#endif
+
 namespace rpp
 {
     template<class T>
-    inline const T&    __wrap_arg(const T& arg)            { return arg; }
-    inline const char* __wrap_arg(const std::string& arg)  { return arg.c_str();   }
+    inline const T& __wrap_arg(const T& arg) noexcept { return arg; }
+    inline const char* __wrap_arg(const std::string& arg) noexcept { return arg.c_str();   }
 
     #if __APPLE__ && __OBJC__
-    inline const char* __wrap_arg(NSString* arg) { return arg.UTF8String; }
+        inline const char* __wrap_arg(NSString* arg) noexcept { return arg.UTF8String; }
     #endif
+
+    // Qt compatibility
+    #ifdef QT_VERSION
+        struct QtPrintable : public QByteArray
+        {
+            /*implicit*/QtPrintable(const QString& s) : QByteArray{s.toUtf8()} {}
+            /*implicit*/QtPrintable(const QStringView& s) : QByteArray{s.toUtf8()} {}
+        };
+        inline const char* __wrap_arg(const QtPrintable& s) noexcept { return s.constData(); }
+    #endif
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    /// New C++ Logging API
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief Handles a log message with the given severity level.
+     * @param context User provided context pointer
+     * @param severity Log severity level
+     * @param message Log message
+     * @param len Length of the message
+     */
+    using LogMsgHandler = void (*)(void* context, LogSeverity severity, const char* message, int len);
+
+    /**
+     * @brief Adds an additional log handler that is able to receive log messages
+     *        when standard LogInfo(), LogWarning(), LogError() are called
+     */
+    void add_log_handler(void* context, LogMsgHandler handler);
+
+    /**
+     * @brief Removes a matching log handler to prevent further logging calls
+     *        on the `context` object.
+     */
+    void remove_log_handler(void* context, LogMsgHandler handler);
 }
 
 #define _rpp_get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0

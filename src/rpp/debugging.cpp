@@ -3,6 +3,7 @@
 #include "stack_trace.h"
 #include "strview.h"
 
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib> // alloca
@@ -28,35 +29,77 @@
 # include <signal.h>
 #endif
 
-
 #ifdef QUIETLOG
     static LogSeverity Filter = LogSeverityWarn;
 #else
     static LogSeverity Filter = LogSeverityInfo;
 #endif
-static LogMessageCallback LogHandler;
-static LogEventCallback EventHandler;
+
+static constexpr int MAX_LOG_HANDLERS = 16;
+struct LogHandler
+{
+    void* context;
+    rpp::LogMsgHandler handler;
+};
+static int NumLogHandlers;
+static std::array<LogHandler, MAX_LOG_HANDLERS> LogHandlers;
 static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
 static bool EnableTimestamps = false;
 static int TimePrecision = 3;
 static rpp::int64 TimeOffset;
 
+// new logging API
+namespace rpp
+{
+    static int index_of(const LogHandler& handler)
+    {
+        for (int i = 0; i < NumLogHandlers; ++i)
+        {
+            const LogHandler& h = LogHandlers[i];
+            if (h.context == handler.context && h.handler == handler.handler)
+                return i;
+        }
+        return -1;
+    }
+
+    void add_log_handler(void* context, LogMsgHandler handler)
+    {
+        if (NumLogHandlers < MAX_LOG_HANDLERS)
+        {
+            if (index_of({ context, handler }) == -1)
+            {
+                LogHandlers[NumLogHandlers++] = { context, handler };
+            }
+        }
+    }
+
+    void remove_log_handler(void* context, LogMsgHandler handler)
+    {
+        int index = index_of({ context, handler });
+        if (index != -1)
+        {
+            int newSize = --NumLogHandlers;
+            for (int i = index; i < newSize; ++i) // unshift, preserving order
+                LogHandlers[i] = LogHandlers[i + 1];
+        }
+    }
+}
+
+// old-style API adapter
+static void LogHandlerProxy(void* context, LogSeverity severity, const char* message, int len)
+{
+    LogMessageCallback old_callback = reinterpret_cast<LogMessageCallback>(context);
+    old_callback(severity, message, len);
+}
+
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler)
 {
-    LogHandler = loghandler;
+    rpp::add_log_handler(loghandler, &LogHandlerProxy);
 }
 RPPCAPI void SetLogErrorHandler(LogMessageCallback loghandler)
 {
-    LogHandler = loghandler;
-}
-RPPCAPI LogMessageCallback GetLogHandler()
-{
-    return LogHandler;
-}
-RPPCAPI void SetLogEventHandler(LogEventCallback eventHandler)
-{
-    EventHandler = eventHandler;
+    rpp::add_log_handler(loghandler, &LogHandlerProxy);
 }
 RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler)
 {
@@ -203,16 +246,6 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
     (void)tag;
 }
 
-RPPCAPI void LogEventToDefaultOutput(const char* tag, const char* eventName, const char* message, int len)
-{
-    #if __ANDROID__
-        __android_log_print(ANDROID_LOG_INFO, tag, "EVT %s: %.*s", eventName, len, message);
-    #else
-        printf("EVT %s: %.*s\n", eventName, len, message);
-    #endif
-    (void)tag;
-}
-
 RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
 {
     if (severity < Filter)
@@ -221,17 +254,23 @@ RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
     char errBuf[4096];
     int len = SafeFormat(errBuf, sizeof(errBuf), format, ap);
 
-    if (LogHandler)
+    // truncate long filepaths on linux
+    char* ptr = errBuf;
+    #ifdef __linux__
+        ShortFilePathMessage(ptr, len);
+    #endif
+
+    if (int num_handlers = NumLogHandlers)
     {
-        char* ptr = errBuf;
-        #ifdef __linux__
-          ShortFilePathMessage(ptr, len);
-        #endif
-        LogHandler(severity, ptr, len);
+        for (int i = 0; i < num_handlers; ++i)
+        {
+            auto& h = LogHandlers[i];
+            h.handler(h.context, severity, ptr, len);
+        }
     }
     else
     {
-        LogWriteToDefaultOutput("ReCpp", severity, errBuf, len);
+        LogWriteToDefaultOutput("ReCpp", severity, ptr, len);
     }
 }
 
@@ -240,10 +279,18 @@ RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len)
 {
     if (severity < Filter)
         return;
-    if (LogHandler)
-        LogHandler(severity, message, len);
+    if (int num_handlers = NumLogHandlers)
+    {
+        for (int i = 0; i < num_handlers; ++i)
+        {
+            auto& h = LogHandlers[i];
+            h.handler(h.context, severity, message, len);
+        }
+    }
     else
+    {
         LogWriteToDefaultOutput("ReCpp", severity, message, len);
+    }
 }
 
 #define WrappedLogFormatv(severity, format) \
@@ -258,28 +305,6 @@ RPPCAPI void _LogWarning(PRINTF_FMTSTR const char* format, ...) {
 }
 RPPCAPI void _LogError(PRINTF_FMTSTR const char* format, ...) {
     WrappedLogFormatv(LogSeverityError, format);
-}
-
-RPPCAPI void LogEvent(const char* eventName, PRINTF_FMTSTR const char* format, ...)
-{
-#if __clang__
-#if __has_feature(address_sanitizer)
-    return; // ASAN reports a false positive with vsnprintf
-#endif
-#endif
-    va_list ap; va_start(ap, format);
-    char messageBuf[4096];
-    int len = SafeFormat(messageBuf, sizeof(messageBuf), format, ap);
-    va_end(ap);
-
-    if (EventHandler)
-    {
-        EventHandler(eventName, messageBuf, len);
-    }
-    else
-    {
-        LogEventToDefaultOutput("ReCpp", eventName, messageBuf, len);
-    }
 }
 
 void _LogExcept(const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...)
