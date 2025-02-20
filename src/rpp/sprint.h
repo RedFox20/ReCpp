@@ -127,6 +127,9 @@ namespace rpp
         void write(uint64 value) noexcept;
         void write(float  value) noexcept;
         void write(double value) noexcept;
+        // input as UTF-16 string, converted directly to UTF-8
+        void write_utf16_as_utf8(const ushort* utf16, int len) noexcept;
+
         void write(std::nullptr_t) noexcept;
         void write(const string_buffer& sb) noexcept;
         FINLINE void write(const void* ptr) noexcept    { this->write_ptr(ptr); }

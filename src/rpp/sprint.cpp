@@ -132,9 +132,48 @@ namespace rpp
     void string_buffer::write(float value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(double value) noexcept { reserve(48); len += _tostring(&ptr[len], value); }
 
+    void string_buffer::write_utf16_as_utf8(const ushort* utf16, int length) noexcept
+    {
+        for (int i = 0; i < length; ++i)
+        {
+            char32_t codepoint = utf16[i];
+            if (codepoint >= 0xD800 && codepoint <= 0xDBFF && (i+1) < length)
+            {
+                // Handle surrogate pairs
+                char32_t high = codepoint - 0xD800;
+                char32_t low = utf16[++i] - 0xDC00; // consume i+1 pair
+                codepoint = (high << 10) + low + 0x10000;
+            }
+
+            // Convert to UTF-8
+            if (codepoint <= 0x7F)
+            {
+                write(static_cast<char>(codepoint));
+            }
+            else if (codepoint <= 0x7FF)
+            {
+                write(static_cast<char>(0xC0 | (codepoint >> 6)));
+                write(static_cast<char>(0x80 | (codepoint & 0x3F)));
+            }
+            else if (codepoint <= 0xFFFF)
+            {
+                write(static_cast<char>(0xE0 | (codepoint >> 12)));
+                write(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+                write(static_cast<char>(0x80 | (codepoint & 0x3F)));
+            }
+            else
+            {
+                write(static_cast<char>(0xF0 | (codepoint >> 18)));
+                write(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+                write(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+                write(static_cast<char>(0x80 | (codepoint & 0x3F)));
+            }
+        }
+    }
+
     static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };
     static const char HEXUP[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-    
+
     void string_buffer::write_hex(const void* data, int numBytes, format_opt opt) noexcept
     {
         const char* hex = opt == uppercase ? HEXUP : HEX;
