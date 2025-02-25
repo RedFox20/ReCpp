@@ -172,6 +172,11 @@ namespace rpp /* ReCpp */
         bool is_open() const noexcept { return good(); }
 
         /**
+         * @returns The underlying OS file handle, Linux fd or Windows HANDLE
+         */
+        int os_handle() const noexcept;
+
+        /**
          * @return TRUE if the file handle is INVALID
          */
         bool bad() const noexcept;

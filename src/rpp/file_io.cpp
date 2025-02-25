@@ -207,6 +207,14 @@ namespace rpp /* ReCpp */
             Handle = nullptr;
         }
     }
+    int file::os_handle() const noexcept
+    {
+    #if USE_WINAPI_IO
+        return (int)Handle;
+    #else
+        return fileno((FILE*)Handle);
+    #endif
+    }
     bool file::good() const noexcept
     {
         return Handle != nullptr;
