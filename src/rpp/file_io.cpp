@@ -210,7 +210,7 @@ namespace rpp /* ReCpp */
     int file::os_handle() const noexcept
     {
     #if USE_WINAPI_IO
-        return (int)Handle;
+        return (int)(intptr_t)Handle;
     #else
         return fileno((FILE*)Handle);
     #endif
