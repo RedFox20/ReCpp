@@ -4,15 +4,14 @@
  * Distributed under MIT Software License
  * 
  */
-#include <shared_mutex> // shared_lock
 #include "mutex.h" // unique_lock
-#include <cassert>
+#include "debugging.h"
+#include <shared_mutex> // shared_lock
 
 namespace rpp
 {
     using readonly_lock  = std::shared_lock<std::shared_mutex>;
     using exclusive_lock = std::unique_lock<std::shared_mutex>;
-
 
     /**
      * This helper attempts to ease the problem of async programming where the owning
@@ -85,60 +84,71 @@ namespace rpp
     class close_sync
     {
         std::shared_mutex mut;
-        bool explicitLock{ false };
+        bool locked_for_close = false;
         
-        static constexpr unsigned short StillAlive = (unsigned short)0xB5C4;
-        unsigned short aliveToken = StillAlive; // for validating if this object is still alive
+        static constexpr unsigned short STILL_ALIVE = (unsigned short)0xB5C4;
+        unsigned short alive_token = STILL_ALIVE; // for validating if this object is still alive
 
     public:
-
-        // this helper is NOCOPY/NOMOVE because such operations
-        // will break any sane async code
+        close_sync() noexcept = default;
+        ~close_sync() noexcept
+        {
+            if (locked_for_close) { // already explicitly locked for close
+                alive_token = 0;
+                mut.unlock();
+            }
+            else { // no explicit locking used, so simply block until async Tasks finish
+                exclusive_lock exclusive_lock { mut };
+                alive_token = 0;
+            }
+        }
+        
+        // NOCOPY/NOMOVE because such operations will break async code
         close_sync(close_sync&&) = delete;
         close_sync(const close_sync&) = delete;
         close_sync& operator=(close_sync&&) = delete;
         close_sync& operator=(const close_sync&) = delete;
 
-        close_sync() = default;
-        ~close_sync()
-        {
-            if (explicitLock) { // already explicitly locked for close
-                aliveToken = 0;
-                mut.unlock();
-            }
-            else { // no explicit locking used, so simply block until async Tasks finish
-                exclusive_lock exclusiveLock{ mut };
-                aliveToken = 0;
-            }
-        }
-        
-        bool is_alive() const { return aliveToken == StillAlive; }
-        
+        /** @returns TRUE if CloseSync is still alive and destructor hasn't deleted it */
+        bool is_alive() const noexcept { return alive_token == STILL_ALIVE; }
+
+        /** @returns TRUE if lock_for_close() has been called */
+        bool is_closing() const noexcept { return locked_for_close; }
+
+        /** @returns TRUE if lock_for_close() has been called or already destroyed */
+        bool is_dead_or_closing() const noexcept { return locked_for_close || !is_alive(); }
+
         /**
          * Acquires exclusive lock during destruction of the owning class.
          * It holds the lock until all fields declared after this are destroyed,
          * since fields are destructed in reverse order.
+         * 
          * @note This should only be called in the destructor of the owning class.
          * @see acquire_exclusive_lock()
          */
-        void lock_for_close()
+        void lock_for_close() noexcept
         {
-            assert(!explicitLock && "close_sync::lock_for_close called twice! This will deadlock.");
-            explicitLock = true;
+            if (locked_for_close)
+            {
+                LogError("close_sync::lock_for_close called twice! This is a bug.");
+                return; // already locked
+            }
+            locked_for_close = true;
             mut.lock();
         }
-        [[deprecated("try_lock has been replaced by try_readonly_lock")]]
-        readonly_lock try_lock() noexcept
-        {
-            return { mut, std::try_to_lock };
-        }
-        readonly_lock try_readonly_lock() noexcept
+
+        /**
+         * @brief Attempts to acquire a Read-Only (shared) lock
+         * The lock needs to be checked.
+         */
+        [[nodiscard]] readonly_lock try_readonly_lock() noexcept
         {
             if (!is_alive())
                 return {};
-            return { mut, std::try_to_lock };
+            return readonly_lock{ mut, std::try_to_lock };
         }
-        exclusive_lock acquire_exclusive_lock() noexcept
+
+        [[nodiscard]] exclusive_lock acquire_exclusive_lock() noexcept
         {
             return exclusive_lock{ mut };
         }
