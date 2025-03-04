@@ -485,6 +485,8 @@ namespace rpp
 
         /** Index of character, or -1 if not found */
         int indexof(char ch) const noexcept;
+        int indexof(char ch, int start) const noexcept;
+        int indexof(char ch, int start, int end) const noexcept;
 
         // Reverse iterating indexof
         int rindexof(char ch) const noexcept;

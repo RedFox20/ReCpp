@@ -287,6 +287,27 @@ namespace rpp
         return -1;
     }
 
+    int strview::indexof(char ch, int start) const noexcept
+    {
+        if (start < 0) start = 0;
+        if (start >= len) return -1;
+
+        for (int i = start; i < len; ++i)
+            if (str[i] == ch) return i;
+        return -1;
+    }
+
+    int strview::indexof(char ch, int start, int end) const noexcept
+    {
+        if (start < 0) start = 0;
+        if (end > len) end = len;
+        if (start >= end) return -1;
+
+        for (int i = start; i < end; ++i)
+            if (str[i] == ch) return i;
+        return -1;
+    }
+
     int strview::rindexof(char ch) const noexcept
     {
         for (int i = len-1; i >= 0; --i)
