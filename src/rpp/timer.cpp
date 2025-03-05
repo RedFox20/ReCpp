@@ -335,13 +335,17 @@ namespace rpp
         return int(end - buf);
     }
 
-    // TODO: this won't handle system time changes correctly
-    static time_t get_timezone_offset() noexcept
+    // TODO: this won't handle system time changes correctly, so we need an invalidation condition
+    static time_t get_timezone_offset_seconds() noexcept
     {
-        time_t local_now = time(nullptr);
-        std::tm utc_tm = gmtime_safe(local_now);
-        time_t utc_now = mktime(&utc_tm);
-        return local_now - utc_now;
+        static time_t timezone_offset = []() -> time_t
+        {
+            time_t local_now = time(nullptr);
+            std::tm utc_tm = gmtime_safe(local_now);
+            time_t utc_now = mktime(&utc_tm);
+            return local_now - utc_now;
+        }();
+        return timezone_offset;
     }
 
     TimePoint::TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept
@@ -366,8 +370,6 @@ namespace rpp
             }
         #endif
 
-        static time_t timezone_offset = get_timezone_offset();
-
         std::tm tm {};
         tm.tm_year = year - 1900; // [0, 60] since 1900
         tm.tm_mon  = month - 1;   // [0, 11] since Jan
@@ -377,7 +379,7 @@ namespace rpp
         tm.tm_sec  = second;      // [0, 60] after the min allows for 1 positive leap second
         tm.tm_isdst = 0;          // [-1...] -1 for unknown, 0 for not DST, any positive value if DST.
 
-        time_t seconds = mktime(&tm) + timezone_offset;
+        time_t seconds = mktime(&tm) + get_timezone_offset_seconds();
         duration = Duration{int64(seconds * NANOS_PER_SEC + nanos)};
     }
 
@@ -409,14 +411,13 @@ namespace rpp
 
     TimePoint TimePoint::local() noexcept
     {
-        static time_t timezone_offset = get_timezone_offset();
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
-            return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset * NANOS_PER_SEC };
+            return TimePoint{ ticks_to_ns(ticks_since_epoch()) + get_timezone_offset_seconds() * NANOS_PER_SEC };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
-            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + timezone_offset * NANOS_PER_SEC };
+            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + get_timezone_offset_seconds() * NANOS_PER_SEC };
         #endif
     }
 

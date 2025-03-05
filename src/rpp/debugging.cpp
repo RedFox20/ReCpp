@@ -95,11 +95,11 @@ static void LogHandlerProxy(void* context, LogSeverity severity, const char* mes
 
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler)
 {
-    rpp::add_log_handler((void*)loghandler, &LogHandlerProxy);
+    rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
 }
 RPPCAPI void SetLogErrorHandler(LogMessageCallback loghandler)
 {
-    rpp::add_log_handler((void*)loghandler, &LogHandlerProxy);
+    rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
 }
 RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler)
 {
