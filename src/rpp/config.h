@@ -113,6 +113,15 @@
 #  endif
 #endif
 
+/// @brief QT support detection
+#if !defined(RPP_HAS_QT) && defined(__cplusplus)
+#  if defined(QT_VERSION) || defined(QT_CORE_LIB)
+#    define RPP_HAS_QT 1
+#  else
+#    define RPP_HAS_QT 0
+#  endif
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE

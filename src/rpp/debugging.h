@@ -111,8 +111,8 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 #endif
 
 // Qt compatibility
-#ifdef QT_VERSION
-#include <QString>
+#if RPP_HAS_QT
+#  include <QString>
 #endif
 
 namespace rpp
@@ -126,7 +126,7 @@ namespace rpp
     #endif
 
     // Qt compatibility
-    #ifdef QT_VERSION
+    #if RPP_HAS_QT
         struct QtPrintable : public QByteArray
         {
             /*implicit*/QtPrintable(const QString& s) : QByteArray{s.toUtf8()} {}

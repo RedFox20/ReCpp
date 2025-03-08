@@ -132,12 +132,16 @@ namespace rpp
     void string_buffer::write(float value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(double value) noexcept { reserve(48); len += _tostring(&ptr[len], value); }
 
-    void string_buffer::write_utf16_as_utf8(const ushort* utf16, int length) noexcept
+    void string_buffer::write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept
     {
-        for (int i = 0; i < length; ++i)
+        // if UTF-16 contains only ASCII, then UTF-8 will be the same length
+        // so best case scenario we can reserve the same length, however we will dynamically append
+        reserve(utflength);
+
+        for (int i = 0; i < utflength; ++i)
         {
             char32_t codepoint = utf16[i];
-            if (codepoint >= 0xD800 && codepoint <= 0xDBFF && (i+1) < length)
+            if (codepoint >= 0xD800 && codepoint <= 0xDBFF && (i+1) < utflength)
             {
                 // Handle surrogate pairs
                 char32_t high = codepoint - 0xD800;
@@ -146,29 +150,37 @@ namespace rpp
             }
 
             // Convert to UTF-8
-            if (codepoint <= 0x7F)
+            int char_size;
+            if      (codepoint <= 0x7F)   char_size = 1;
+            else if (codepoint <= 0x7FF)  char_size = 2;
+            else if (codepoint <= 0xFFFF) char_size = 3;
+            else                          char_size = 4;
+            reserve(char_size);
+
+            if (char_size == 1)
             {
-                write(static_cast<char>(codepoint));
+                ptr[len++] = (static_cast<char>(codepoint));
             }
-            else if (codepoint <= 0x7FF)
+            else if (char_size == 2)
             {
-                write(static_cast<char>(0xC0 | (codepoint >> 6)));
-                write(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                ptr[len++] = (static_cast<char>(0xC0 | (codepoint >> 6)));
+                ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
             }
-            else if (codepoint <= 0xFFFF)
+            else if (char_size == 3)
             {
-                write(static_cast<char>(0xE0 | (codepoint >> 12)));
-                write(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-                write(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                ptr[len++] = (static_cast<char>(0xE0 | (codepoint >> 12)));
+                ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+                ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
             }
             else
             {
-                write(static_cast<char>(0xF0 | (codepoint >> 18)));
-                write(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
-                write(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-                write(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                ptr[len++] = (static_cast<char>(0xF0 | (codepoint >> 18)));
+                ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+                ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+                ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
             }
         }
+        ptr[len] = '\0';
     }
 
     static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };

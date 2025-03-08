@@ -17,6 +17,11 @@
 #define RPP_SPRINT_H 1
 #endif
 
+// Qt compatibility for rpp::string_buffer
+#if RPP_HAS_QT
+#  include <QString>
+#endif
+
 namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////
@@ -77,8 +82,9 @@ namespace rpp
         // setting it to "..." will turn write("brown", "fox"); into "brown...fox"
         rpp::strview separator = " "_sv;
 
-        FINLINE string_buffer() noexcept { ptr = buf; buf[0] = '\0'; } // NOLINT
-        FINLINE explicit string_buffer(strview text) noexcept : string_buffer{} {
+        string_buffer() noexcept { ptr = buf; buf[0] = '\0'; } // NOLINT
+        explicit string_buffer(strview text) noexcept : string_buffer{}
+        {
             write(text);
         }
         ~string_buffer() noexcept;
@@ -127,8 +133,21 @@ namespace rpp
         void write(uint64 value) noexcept;
         void write(float  value) noexcept;
         void write(double value) noexcept;
+
         // input as UTF-16 string, converted directly to UTF-8
-        void write_utf16_as_utf8(const ushort* utf16, int len) noexcept;
+        void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;
+
+    // Qt support for QString and QStringView with automatic fast conversion to UTF-8
+    #if RPP_HAS_QT
+        FINLINE void write(const QString& str) noexcept
+        {
+            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.constData()), str.length());
+        }
+        FINLINE void write(const QStringView& str) noexcept
+        {
+            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.data()), str.length());
+        }
+    #endif
 
         void write(std::nullptr_t) noexcept;
         void write(const string_buffer& sb) noexcept;
