@@ -1233,7 +1233,6 @@ namespace rpp
 // forward declare std::hash
 namespace std { template<class T> struct hash; }
 #endif
-
 namespace std
 {
     template<>
@@ -1241,22 +1240,13 @@ namespace std
     {
         size_t operator()(const rpp::strview& s) const noexcept
         {
-            #if INTPTR_MAX == INT64_MAX // 64-bit
-                static_assert(sizeof(size_t) == 8, "Expected 64-bit build");
-                constexpr size_t FNV_offset_basis = 14695981039346656037ULL;
-                constexpr size_t FNV_prime = 1099511628211ULL;
-            #elif INTPTR_MAX == INT32_MAX // 32-bit
-                static_assert(sizeof(size_t) == 4, "Expected 32-bit build");
-                constexpr size_t FNV_offset_basis = 2166136261U;
-                constexpr size_t FNV_prime = 16777619U;
-            #endif
-            const char* p = s.str;
-            size_t value = FNV_offset_basis;
-            for (auto e = p + s.len; p < e; ++p) {
-                value ^= (size_t)*p;
-                value *= FNV_prime;
-            }
-            return value;
+        #if _MSC_VER
+            return std::_Hash_array_representation<char>(s.str, static_cast<size_t>(s.len));
+        #elif __clang__ && _LIBCPP_STD_VER
+            return std::__do_string_hash(s.str, s.str+s.len);
+        #else
+            return std::hash<std::string_view>{}(std::string_view{s.str, s.str+s.len});
+        #endif
         }
     };
 }
