@@ -3,8 +3,6 @@
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
-#include <cerrno> // errno
-#include <locale>  // wstring_convert
 #include <sys/stat.h> // stat,fstat
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -353,26 +351,6 @@ namespace rpp /* ReCpp */
         return file{filename, READONLY}.read_all();
     }
 
-    std::unordered_map<std::string, std::string> file::read_map(const strview& filename) noexcept
-    {
-        load_buffer buf = read_all(filename);
-        strview key, value;
-        keyval_parser parser = { buf };
-        std::unordered_map<std::string, std::string> map;
-        while (parser.read_next(key, value))
-            map[key] = value.to_string();
-        return map;
-    }
-
-    std::unordered_map<strview, strview> file::parse_map(const load_buffer& buf) noexcept
-    {
-        strview key, value;
-        keyval_parser parser = { buf };
-        std::unordered_map<strview, strview> map;
-        while (parser.read_next(key, value))
-            map[key] = value;
-        return map;
-    }
     // ReSharper disable once CppMemberFunctionMayBeConst
     int file::write(const void* buffer, int bytesToWrite) noexcept
     {

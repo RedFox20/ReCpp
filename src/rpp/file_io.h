@@ -18,6 +18,7 @@
 #  include <unordered_map>
 #endif
 
+// included for backwards compatibility
 #include "paths.h"
 
 namespace rpp /* ReCpp */
@@ -92,18 +93,6 @@ namespace rpp /* ReCpp */
      *         f.writeln("line1", 10, 20.1f);   // writes 'line1 10 20.1\n'
      *         f.writef("a more %.2f complicated %.*s\n", 3.14159, 4, "line");
      *     }
-     * @endcode
-     * 
-     * Example: parsing or writing a key-value map
-     * @code
-     *     keyvals.txt : "key1=value1\nkey2=value2\n"
-     *     
-     *     unordered_map<string,string> keyvals = file::read_map("keyvals.txt");
-     *     
-     *     file::write_map("keyvals.txt", {
-     *         { "key1", "value1" },
-     *         { "key2", "value2" },
-     *     });
      * @endcode
      */
     struct RPPAPI file
@@ -242,25 +231,6 @@ namespace rpp /* ReCpp */
         {
             return read_all(filename.c_str());
         }
-
-        /**
-         * Reads a simple key-value map from file in the form of:
-         * @code
-         *     key1=value1\n
-         *     key2 = value2 \n
-         * @endcode
-         * @return Hash map of key string and value string
-         */
-        static std::unordered_map<std::string, std::string> read_map(const strview& filename) noexcept;
-
-        /**
-         * Parses a simple key-value map from a load_buffer file.
-         * Intended usage:
-         *     load_buffer buf = file::read_all("values.txt");
-         *     auto map = file::parse_map(buf);
-         * @return Map of string views, referencing into buf
-         */
-        static std::unordered_map<strview, strview> parse_map(const load_buffer& buf) noexcept;
 
         /**
          * Writes a block of bytes to the file. Regular Windows IO
@@ -497,37 +467,6 @@ namespace rpp /* ReCpp */
     using buffer_line_parser    = buffer_parser<line_parser>;
     using buffer_bracket_parser = buffer_parser<bracket_parser>;
     using buffer_keyval_parser  = buffer_parser<keyval_parser>;
-    
-    /**
-     * Key-Value map parser that stores a file load buffer, with easy construction and usability
-     * Example:
-     * @code
-     *   if (auto map = key_value_map::from_file("keyvalues.txt");
-     *   {
-     *       println(map["key"]);
-     *   }
-     * @endcode
-     */
-    struct key_value_map
-    {
-        load_buffer dataOwner;
-        std::unordered_map<strview, strview> map;
-        
-        key_value_map(load_buffer&& buf) noexcept : dataOwner(std::move(buf)), map(file::parse_map(dataOwner)) {}
-        
-        explicit operator bool() const noexcept { return (bool)dataOwner && !map.empty(); }
-        int size()   const { return (int)map.size(); }
-        bool empty() const { return map.empty(); }
-        
-        strview operator[](strview key) const noexcept {
-            auto it = map.find(key);
-            return it == map.end() ? strview{} : it->second;
-        }
-        
-        static key_value_map from_file(strview filename) noexcept {
-            return { file::read_all(filename) };
-        }
-    };
 
     ////////////////////////////////////////////////////////////////////////////////
 
