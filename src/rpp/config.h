@@ -7,17 +7,29 @@
 
 // MSVC++ with VC standard libs
 #ifndef RPP_MSVC_WIN
-#  define RPP_MSVC_WIN (_WIN32 && _MSC_VER)
+#  if (_WIN32 && _MSC_VER)
+#    define RPP_MSVC_WIN 1
+#  else
+#    define RPP_MSVC_WIN 0
+#  endif
 #endif
 
 // GCC with unknown standard lib
 #ifndef RPP_GCC
-#  define RPP_GCC (__GNUC__ && !__clang__)
+#  if (__GNUC__ && !__clang__)
+#    define RPP_GCC 1
+#  else
+#    define RPP_GCC 0
+#  endif
 #endif
 
 // Clang using GCC/LLVM standard libs
 #ifndef RPP_CLANG_LLVM
-#  define RPP_CLANG_LLVM (__GNUC__ && __clang__)
+#  if (__GNUC__ && __clang__)
+#    define RPP_CLANG_LLVM 1
+#  else
+#    define RPP_CLANG_LLVM 0
+#  endif
 #endif
 
 #ifndef RPPAPI

@@ -1222,6 +1222,16 @@ namespace rpp
     {
         FINLINE static const char* w(const strview& arg) noexcept { return arg.to_cstr(); }
     };
+
+    template<>
+    struct __wrap<std::string_view>
+    {
+        // convert std::string_view to rpp::strview and then call the specialized to_cstr()
+        FINLINE static const char* w(const std::string_view& arg) noexcept
+        {
+            return strview{arg.data(), arg.size()}.to_cstr();
+        }
+    };
 } // namespace rpp
 
 
