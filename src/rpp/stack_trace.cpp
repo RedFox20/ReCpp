@@ -690,6 +690,12 @@ namespace rpp
 #if USE_STACKWALK2
     // NOTE: There is an issue on Windows Server builds, where StackWalk2 is not declared
     //       Fix is to use this typedef, and then dynamically load symbol from DbgHelp.dll
+    typedef BOOL (WINAPI *PGET_TARGET_ATTRIBUTE_VALUE64_t)(
+        HANDLE hProcess,
+        DWORD Attribute,
+        DWORD64 AttributeData,
+        DWORD64* AttributeValue
+    );
     typedef BOOL (WINAPI *StackWalk2_t)(
         DWORD MachineType,
         HANDLE hProcess,
@@ -700,7 +706,7 @@ namespace rpp
         PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine,
         PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine,
         PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress,
-        PGET_TARGET_ATTRIBUTE_VALUE64 GetTargetAttributeValue,
+        PGET_TARGET_ATTRIBUTE_VALUE64_t GetTargetAttributeValue,
         DWORD Flags
     );
     static StackWalk2_t pStackWalk2;
