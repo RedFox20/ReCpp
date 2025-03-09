@@ -132,7 +132,7 @@ namespace rpp
     #if __APPLE__ && __OBJC__
         template<>
         struct __wrap<NSString>
-        { FINLINE static constexpr const char* w(NSString* arg) noexcept { return arg.UTF8String; } };
+        { FINLINE static const char* w(NSString* arg) noexcept { return arg.UTF8String; } };
     #endif
 
     #if RPP_HAS_QT
@@ -144,7 +144,7 @@ namespace rpp
         };
         template<>
         struct __wrap<QString>
-        { FINLINE static constexpr const char* w(const QtPrintable& s) noexcept { return s.constData(); } };
+        { FINLINE static const char* w(const QtPrintable& s) noexcept { return s.constData(); } };
     #endif
 
     // Helper to remove references and cv-qualifiers
