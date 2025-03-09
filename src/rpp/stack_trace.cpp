@@ -688,24 +688,22 @@ namespace rpp
 
 #define USE_STACKWALK2 1
 #if USE_STACKWALK2
-    #ifdef SYM_STKWALK_DEFAULT
-        static decltype(StackWalk2)* pStackWalk2;
-    #else
-        typedef BOOL (WINAPI *StackWalk2_t)(
-            DWORD MachineType,
-            HANDLE hProcess,
-            HANDLE hThread,
-            LPSTACKFRAME_EX StackFrameEx,
-            PVOID ContextRecord,
-            PREAD_PROCESS_MEMORY_ROUTINE64 ReadMemoryRoutine,
-            PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine,
-            PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine,
-            PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress,
-            PGET_TARGET_ATTRIBUTE_VALUE64 GetTargetAttributeValue,
-            DWORD Flags
-        );
-        static StackWalk2_t pStackWalk2;
-    #endif
+    // NOTE: There is an issue on Windows Server builds, where StackWalk2 is not declared
+    //       Fix is to use this typedef, and then dynamically load symbol from DbgHelp.dll
+    typedef BOOL (WINAPI *StackWalk2_t)(
+        DWORD MachineType,
+        HANDLE hProcess,
+        HANDLE hThread,
+        LPSTACKFRAME_EX StackFrameEx,
+        PVOID ContextRecord,
+        PREAD_PROCESS_MEMORY_ROUTINE64 ReadMemoryRoutine,
+        PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine,
+        PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine,
+        PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress,
+        PGET_TARGET_ATTRIBUTE_VALUE64 GetTargetAttributeValue,
+        DWORD Flags
+    );
+    static StackWalk2_t pStackWalk2;
 #endif
 
     template<class Func> bool LoadProc(Func& func, const char* proc) noexcept
