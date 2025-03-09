@@ -89,7 +89,11 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 #endif
 
 #if __cplusplus
+
+// std::string logging compatibility
 #include <string>
+
+// MacOS Obj-C compatbility
 #if __APPLE__ && __OBJC__
 #import <Foundation/NSString.h>
 #endif
@@ -282,7 +286,9 @@ RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __d
 #endif
 
 #ifdef __cplusplus
-#include <stdexcept>
+#if !__ANDROID__
+#  include <stdexcept>
+#endif
 
 // logs an std::exception; this is piped into the special exception handler @see SetLogExceptHandler()
 // triggers an assertion in debug builds
