@@ -686,6 +686,28 @@ namespace rpp
         return DbgHelpModule;
     }
 
+#define USE_STACKWALK2 1
+#if USE_STACKWALK2
+    #ifdef SYM_STKWALK_DEFAULT
+        static decltype(StackWalk2)* pStackWalk2;
+    #else
+        typedef BOOL (WINAPI *StackWalk2_t)(
+            DWORD MachineType,
+            HANDLE hProcess,
+            HANDLE hThread,
+            LPSTACKFRAME_EX StackFrameEx,
+            PVOID ContextRecord,
+            PREAD_PROCESS_MEMORY_ROUTINE64 ReadMemoryRoutine,
+            PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine,
+            PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine,
+            PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress,
+            PGET_TARGET_ATTRIBUTE_VALUE64 GetTargetAttributeValue,
+            DWORD Flags
+        );
+        static StackWalk2_t pStackWalk2;
+    #endif
+#endif
+
     template<class Func> bool LoadProc(Func& func, const char* proc) noexcept
     {
         HMODULE dbghelp = GetDbgHelpModule();
@@ -703,9 +725,6 @@ namespace rpp
     static decltype(SymLoadModuleExW)*            pSymLoadModuleExW;
     static decltype(SymSetOptions)*               pSymSetOptions;
     static decltype(StackWalk64)*                 pStackWalk64;
-#if WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
-    static decltype(StackWalk2)*                  pStackWalk2;
-#endif
     static decltype(UnDecorateSymbolName)*        pUnDecorateSymbolName;
     static decltype(SymGetSearchPath)*            pSymGetSearchPath;
     static decltype(SymGetLineFromInlineContext)* pSymGetLineFromInlineContext;
@@ -724,7 +743,7 @@ namespace rpp
         }
         LoadProc(pSymCleanup,                  "SymCleanup");
         LoadProc(pStackWalk64,                 "StackWalk64");
-    #if WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
+    #if USE_STACKWALK2
         LoadProc(pStackWalk2,                  "StackWalk2");
     #endif
         LoadProc(pSymGetOptions,               "SymGetOptions");
@@ -1032,7 +1051,7 @@ namespace rpp
         for (size_t frameNum = 0; count < maxDepth; ++frameNum)
         {
             // get next stack frame (StackWalk64(), SymFunctionTableAccess64(), SymGetModuleBase64())
-        #if WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
+        #if USE_STACKWALK2
             if (pStackWalk2)
             {
                 if (!pStackWalk2(tc.imageType, tc.process, tc.hThread, &tc.s, &tc.c, nullptr,
@@ -1044,7 +1063,7 @@ namespace rpp
                 }
             }
             else
-        #endif // WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
+        #endif // USE_STACKWALK2
             if (!pStackWalk64(tc.imageType, tc.process, tc.hThread,
                               (STACKFRAME64*)&tc.s, &tc.c, nullptr,
                               pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr))
