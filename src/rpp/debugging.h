@@ -8,16 +8,7 @@
 #include <stdarg.h>
 #include <stdio.h> // fprintf
 
-#ifdef _MSC_VER
-#  include <crtdbg.h>
-#  define PRINTF_CHECKFMT
-#  define PRINTF_CHECKFMT2
-#  define PRINTF_FMTSTR _In_z_ _Printf_format_string_
-#else
-#  define PRINTF_CHECKFMT __attribute__((__format__ (__printf__, 1, 2)))
-#  define PRINTF_CHECKFMT2 __attribute__((__format__ (__printf__, 2, 3)))
-#  define PRINTF_FMTSTR
-#endif
+// TODO: currently we ignore this bug, but this needs to be fixed in unwrap macros
 #if __GNUG__
 #  pragma GCC diagnostic ignored "-Wformat-extra-args"
 #  ifdef NDEBUG
@@ -83,11 +74,11 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
 /** Logs an error to the backing error mechanism */
 RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap);
 RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len);
-RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
-RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+RPPCAPI void _LogInfo    (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT1;
+RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT1;
+RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT1;
 RPPCAPI void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
-RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT;
+RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT1;
 RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func name
 

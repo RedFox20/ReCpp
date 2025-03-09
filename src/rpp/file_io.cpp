@@ -371,7 +371,7 @@ namespace rpp /* ReCpp */
         return (int)fwrite(buffer, 1, bytesToWrite, (FILE*)Handle);
     #endif
     }
-    int file::writef(const char* format, ...) noexcept
+    int file::writef(PRINTF_FMTSTR const char* format, ...) noexcept
     {
         if (!Handle)
             return 0;
@@ -388,10 +388,12 @@ namespace rpp /* ReCpp */
             if (heap) free(b2);
             return n;
         }
-        return write(buf, n);
+        int written = write(buf, n);
     #else
-        return vfprintf((FILE*)Handle, format, ap);
+        int written = vfprintf((FILE*)Handle, format, ap);
     #endif
+        va_end(ap);
+        return written;
     }
 
     int file::writeln(const strview& str) noexcept

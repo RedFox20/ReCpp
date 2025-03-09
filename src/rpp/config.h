@@ -190,6 +190,40 @@
 #  endif
 #endif
 
+// MSVC printf format string validator
+#ifndef PRINTF_FMTSTR
+#  if _MSC_VER
+#    define PRINTF_FMTSTR _In_z_ _Printf_format_string_
+#  else
+#    define PRINTF_FMTSTR
+#  endif
+#endif
+
+// printf format string validator
+// validates the 1st argument as a printf vararg format string, 2nd arg as input
+// for member functions, the first argument is the 'this' pointer
+#ifndef PRINTF_CHECKFMT1 // 1st arg is format, 2nd arg is input
+#  if !_MSC_VER
+#    define PRINTF_CHECKFMT1 __attribute__((__format__ (__printf__, 1, 2)))
+#    define PRINTF_CHECKFMT2 __attribute__((__format__ (__printf__, 2, 3)))
+#    define PRINTF_CHECKFMT3 __attribute__((__format__ (__printf__, 3, 4)))
+#    define PRINTF_CHECKFMT4 __attribute__((__format__ (__printf__, 4, 5)))
+#    define PRINTF_CHECKFMT5 __attribute__((__format__ (__printf__, 5, 6)))
+#    define PRINTF_CHECKFMT6 __attribute__((__format__ (__printf__, 6, 7)))
+#    define PRINTF_CHECKFMT7 __attribute__((__format__ (__printf__, 7, 8)))
+#    define PRINTF_CHECKFMT8 __attribute__((__format__ (__printf__, 8, 9)))
+#  else
+#    define PRINTF_CHECKFMT1
+#    define PRINTF_CHECKFMT2
+#    define PRINTF_CHECKFMT3
+#    define PRINTF_CHECKFMT4
+#    define PRINTF_CHECKFMT5
+#    define PRINTF_CHECKFMT6
+#    define PRINTF_CHECKFMT7
+#    define PRINTF_CHECKFMT8
+#  endif
+#endif
+
 // Define the noreturn attribute
 // Prefixed before function return type:
 // RPP_NORETURN void func() { ... }

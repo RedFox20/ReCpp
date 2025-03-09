@@ -9,17 +9,12 @@
 #if _MSC_VER
 #  pragma warning(disable: 4251)
 #endif
-#include <ctime> // time_t
+#include "config.h"
 #include "strview.h"
+#include "sprint.h"
+#include "paths.h" // included for backwards compatibility
+#include <ctime> // time_t
 #include <vector>
-#if __has_include("sprint.h")
-#  include "sprint.h"
-#else
-#  include <unordered_map>
-#endif
-
-// included for backwards compatibility
-#include "paths.h"
 
 namespace rpp /* ReCpp */
 {
@@ -275,7 +270,7 @@ namespace rpp /* ReCpp */
          * For format string reference, check printf() documentation.
          * @return Number of bytes written to the file
          */
-        int writef(const char* format, ...) noexcept; // NOLINT
+        int writef(PRINTF_FMTSTR const char* format, ...) noexcept PRINTF_CHECKFMT2; // NOLINT
 
         /**
          * Writes a string to file and also appends a newline
@@ -352,34 +347,6 @@ namespace rpp /* ReCpp */
         static int write_new(const strview& filename, const std::vector<T,U>& plainOldData) noexcept
         {
             return write_new(filename, plainOldData.data(), int(plainOldData.size()*sizeof(T)));
-        }
-
-        /**
-         * Writes a simple key-value map to file in the form of:
-         * @code
-         *     key1=value1\n
-         *     key2=value2\n
-         * @endcode
-         * @note Please avoid using \n in the keys or values
-         * @note Key and Value types require .size() and .c_str()
-         * @return Number of bytes written
-         */
-        template<class K, class V, class H, class C, class A>
-        static int write_map(const strview& filename, const std::unordered_map<K, V, H, C, A>& map) noexcept
-        {
-            size_t required = 0;
-            for (auto& kv : map)
-                required += kv.first.size() + kv.second.size() + 2ul;
-
-            std::string buffer; buffer.reserve(required);
-            for (auto& kv : map)
-            {
-                buffer.append(kv.first.c_str(), kv.first.size());
-                buffer += '=';
-                buffer.append(kv.second.c_str(), kv.second.size());
-                buffer += '\n';
-            }
-            return write_new(filename, buffer);
         }
 
         /**

@@ -83,7 +83,7 @@ namespace rpp
         return result;
     }
 
-    void string_buffer::writef(const char* format, ...) noexcept
+    void string_buffer::writef(PRINTF_FMTSTR const char* format, ...) noexcept
     {
         va_list ap;
         va_start(ap, format);
@@ -267,12 +267,13 @@ namespace rpp
     int println(FILE* file)              noexcept { return print(file, '\n'); }
     int println()                        noexcept { return print(stdout, '\n'); }
 
-    std::string __format(const char* format, ...) noexcept
+    std::string __format(PRINTF_FMTSTR const char* format, ...) noexcept
     {
         va_list ap;
         va_start(ap, format);
         char buf[8192];
         int n = vsnprintf(buf, sizeof(buf), format, ap);
+        va_end(ap);
         if (n < 0 || n >= (int)sizeof(buf)) {
             n = sizeof(buf)-1;
             buf[n] = '\0';

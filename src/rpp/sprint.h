@@ -510,8 +510,13 @@ namespace rpp
     inline const char* __format_wrap(const strview& s) noexcept { return s.to_cstr(); }
     template<class T> const T& __format_wrap(const T& t) noexcept { return t; }
 
-    RPPAPI std::string __format(const char* format, ...) noexcept; 
+    RPPAPI std::string __format(PRINTF_FMTSTR const char* format, ...) noexcept PRINTF_CHECKFMT1; 
 
+    /**
+     * @brief printf-formats into a string, similar to sprintf
+     * @param format printf-style format string
+     * @param args Arguments to format -- will be unwrapped if they are std::string or rpp::strview
+     */
     template<class... Args>
     inline std::string format(const char* format, const Args&... args) noexcept
     {
