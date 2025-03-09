@@ -703,7 +703,9 @@ namespace rpp
     static decltype(SymLoadModuleExW)*            pSymLoadModuleExW;
     static decltype(SymSetOptions)*               pSymSetOptions;
     static decltype(StackWalk64)*                 pStackWalk64;
+#if WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
     static decltype(StackWalk2)*                  pStackWalk2;
+#endif
     static decltype(UnDecorateSymbolName)*        pUnDecorateSymbolName;
     static decltype(SymGetSearchPath)*            pSymGetSearchPath;
     static decltype(SymGetLineFromInlineContext)* pSymGetLineFromInlineContext;
@@ -722,7 +724,9 @@ namespace rpp
         }
         LoadProc(pSymCleanup,                  "SymCleanup");
         LoadProc(pStackWalk64,                 "StackWalk64");
+    #if WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
         LoadProc(pStackWalk2,                  "StackWalk2");
+    #endif
         LoadProc(pSymGetOptions,               "SymGetOptions");
         LoadProc(pSymSetOptions,               "SymSetOptions");
         LoadProc(pSymFunctionTableAccess64,    "SymFunctionTableAccess64");
@@ -1028,6 +1032,7 @@ namespace rpp
         for (size_t frameNum = 0; count < maxDepth; ++frameNum)
         {
             // get next stack frame (StackWalk64(), SymFunctionTableAccess64(), SymGetModuleBase64())
+        #if WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
             if (pStackWalk2)
             {
                 if (!pStackWalk2(tc.imageType, tc.process, tc.hThread, &tc.s, &tc.c, nullptr,
@@ -1038,7 +1043,9 @@ namespace rpp
                     break;
                 }
             }
-            else if (!pStackWalk64(tc.imageType, tc.process, tc.hThread,
+            else
+        #endif // WINAPI_FAMILY_PARTITION(NONGAMESPARTITIONS)
+            if (!pStackWalk64(tc.imageType, tc.process, tc.hThread,
                               (STACKFRAME64*)&tc.s, &tc.c, nullptr,
                               pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr))
             {

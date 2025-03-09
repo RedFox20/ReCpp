@@ -1255,7 +1255,7 @@ namespace std
         #elif __clang__ && _LIBCPP_STD_VER
             return std::__do_string_hash(s.str, s.str+s.len);
         #else
-            return std::hash<std::string_view>{}(std::string_view{s.str, s.str+s.len});
+            return std::hash<std::string_view>{}(std::string_view{s.str, static_cast<size_t>(s.len)});
         #endif
         }
     };
