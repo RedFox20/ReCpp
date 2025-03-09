@@ -231,5 +231,15 @@ namespace rpp
         using uint64 = unsigned long long;
 
     #endif // RPP_BASIC_INTEGER_TYPEDEFS
+
+    /**
+     * @brief Common base type for wrapping arguments in <rpp/debugging.h>
+     *        Helps us to efficiently convert custom argument types to strings.
+     */
+    template<class T>
+    struct __wrap
+    {
+        FINLINE static constexpr const T& w(const T& arg) noexcept { return arg; }
+    };
 }
 #endif

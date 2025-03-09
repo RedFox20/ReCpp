@@ -3,10 +3,10 @@
  * Cross platform debugging interface, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
+#include "config.h"
 #include <assert.h> // platform specific assert stuff
 #include <stdarg.h>
 #include <stdio.h> // fprintf
-#include "config.h"
 
 #ifdef _MSC_VER
 #  include <crtdbg.h>
@@ -117,23 +117,39 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 
 namespace rpp
 {
-    template<class T>
-    inline const T& __wrap_arg(const T& arg) noexcept { return arg; }
-    inline const char* __wrap_arg(const std::string& arg) noexcept { return arg.c_str();   }
+    template<>
+    struct __wrap<const char*>
+    { FINLINE static constexpr const char* w(const char* arg) noexcept { return arg; } };
+
+    template<>
+    struct __wrap<std::string>
+    { FINLINE static constexpr const char* w(const std::string& arg) noexcept { return arg.c_str(); } };
+
+    template<>
+    struct __wrap<const std::string&>
+    { FINLINE static constexpr const char* w(const std::string& arg) noexcept { return arg.c_str(); } };
 
     #if __APPLE__ && __OBJC__
-        inline const char* __wrap_arg(NSString* arg) noexcept { return arg.UTF8String; }
+        template<>
+        struct __wrap<NSString>
+        { FINLINE static constexpr const char* w(NSString* arg) noexcept { return arg.UTF8String; } };
     #endif
 
-    // Qt compatibility
     #if RPP_HAS_QT
+        // Qt compatibility adapter -- it has to allocate a temporary array
         struct QtPrintable : public QByteArray
         {
             /*implicit*/QtPrintable(const QString& s) : QByteArray{s.toUtf8()} {}
             /*implicit*/QtPrintable(const QStringView& s) : QByteArray{s.toUtf8()} {}
         };
-        inline const char* __wrap_arg(const QtPrintable& s) noexcept { return s.constData(); }
+        template<>
+        struct __wrap<QString>
+        { FINLINE static constexpr const char* w(const QtPrintable& s) noexcept { return s.constData(); } };
     #endif
+
+    // Helper to remove references and cv-qualifiers
+    template<typename T>
+    using __clean_type = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
 
     ///////////////////////////////////////////////////////////////////////////////////
     /// New C++ Logging API
@@ -173,18 +189,18 @@ namespace rpp
 #define _va_comma(...) _va_comma2(_spaces_on_empty_token __VA_ARGS__ (/*empty*/))
 
 #define _wa0(...)
-#define _wa1(z, x)       , rpp::__wrap_arg(x)
-#define _wa2(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa1(z, __VA_ARGS__))
-#define _wa3(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa2(z, __VA_ARGS__))
-#define _wa4(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa3(z, __VA_ARGS__))
-#define _wa5(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa4(z, __VA_ARGS__))
-#define _wa6(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa5(z, __VA_ARGS__))
-#define _wa7(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa6(z, __VA_ARGS__))
-#define _wa8(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa7(z, __VA_ARGS__))
-#define _wa9(z, x, ...)  , rpp::__wrap_arg(x) _rpp_wrap(_wa8(z, __VA_ARGS__))
-#define _wa10(z, x, ...) , rpp::__wrap_arg(x) _rpp_wrap(_wa9(z, __VA_ARGS__))
-#define _wa11(z, x, ...) , rpp::__wrap_arg(x) _rpp_wrap(_wa10(z, __VA_ARGS__))
-#define _wa12(z, x, ...) , rpp::__wrap_arg(x) _rpp_wrap(_wa11(z, __VA_ARGS__))
+#define _wa1(z, x)       , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x)
+#define _wa2(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa1(z, __VA_ARGS__))
+#define _wa3(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa2(z, __VA_ARGS__))
+#define _wa4(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa3(z, __VA_ARGS__))
+#define _wa5(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa4(z, __VA_ARGS__))
+#define _wa6(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa5(z, __VA_ARGS__))
+#define _wa7(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa6(z, __VA_ARGS__))
+#define _wa8(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa7(z, __VA_ARGS__))
+#define _wa9(z, x, ...)  , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa8(z, __VA_ARGS__))
+#define _wa10(z, x, ...) , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa9(z, __VA_ARGS__))
+#define _wa11(z, x, ...) , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa10(z, __VA_ARGS__))
+#define _wa12(z, x, ...) , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x) _rpp_wrap(_wa11(z, __VA_ARGS__))
 
 #define _rpp_wrap_args_2(...) _rpp_wrap( _rpp_get_nth_wrap_arg(__VA_ARGS__,  _wa12,_wa11,_wa10,_wa9, \
                                                        _wa8,_wa7,_wa6,_wa5,  _wa4,_wa3,_wa2,_wa1,  _wa0)(__VA_ARGS__) )

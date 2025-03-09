@@ -1217,8 +1217,11 @@ namespace rpp
     };
 
     // support for "debugging.h"
-    inline const char* __wrap_arg(const strview& arg) noexcept { return arg.to_cstr(); }
-
+    template<>
+    struct __wrap<strview>
+    {
+        FINLINE static const char* w(const strview& arg) noexcept { return arg.to_cstr(); }
+    };
 } // namespace rpp
 
 
