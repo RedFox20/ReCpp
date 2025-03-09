@@ -52,7 +52,7 @@ static rpp::int64 TimeOffset;
 // new logging API
 namespace rpp
 {
-    static int index_of(const LogHandler& handler)
+    static int index_of(const LogHandler& handler) noexcept
     {
         for (int i = 0; i < NumLogHandlers; ++i)
         {
@@ -63,7 +63,15 @@ namespace rpp
         return -1;
     }
 
-    void add_log_handler(void* context, LogMsgHandler handler)
+    static int index_of(LogMsgHandler handler_func) noexcept
+    {
+        for (int i = 0; i < NumLogHandlers; ++i)
+            if (LogHandlers[i].handler == handler_func)
+                return i;
+        return -1;
+    }
+
+    void add_log_handler(void* context, LogMsgHandler handler) noexcept
     {
         if (NumLogHandlers < MAX_LOG_HANDLERS)
         {
@@ -74,9 +82,20 @@ namespace rpp
         }
     }
 
-    void remove_log_handler(void* context, LogMsgHandler handler)
+    void remove_log_handler(void* context, LogMsgHandler handler) noexcept
     {
         int index = index_of({ context, handler });
+        if (index != -1)
+        {
+            int newSize = --NumLogHandlers;
+            for (int i = index; i < newSize; ++i) // unshift, preserving order
+                LogHandlers[i] = LogHandlers[i + 1];
+        }
+    }
+
+    void remove_log_handler_func(LogMsgHandler handler_func) noexcept
+    {
+        int index = index_of(handler_func);
         if (index != -1)
         {
             int newSize = --NumLogHandlers;
@@ -93,36 +112,37 @@ static void LogHandlerProxy(void* context, LogSeverity severity, const char* mes
     old_callback(severity, message, len);
 }
 
-RPPCAPI void SetLogHandler(LogMessageCallback loghandler)
+RPPCAPI void SetLogHandler(LogMessageCallback loghandler) noexcept
 {
-    rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
+    // always remove the current proxy, since we can only have one at a time
+    rpp::remove_log_handler_func(&LogHandlerProxy);
+    if (loghandler)
+    {
+        rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
+    }
 }
-RPPCAPI void SetLogErrorHandler(LogMessageCallback loghandler)
-{
-    rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
-}
-RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler)
+RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler) noexcept
 {
     ExceptHandler = exceptHandler;
 }
-RPPCAPI void LogDisableFunctionNames()
+RPPCAPI void LogDisableFunctionNames() noexcept
 {
     DisableFunctionNames = true;
 }
-RPPCAPI void SetLogSeverityFilter(LogSeverity filter)
+RPPCAPI void SetLogSeverityFilter(LogSeverity filter) noexcept
 {
     Filter = filter;
 }
-RPPCAPI LogSeverity GetLogSeverityFilter()
+RPPCAPI LogSeverity GetLogSeverityFilter() noexcept
 {
     return Filter;
 }
-RPPCAPI void LogEnableTimestamps(bool enable, int precision)
+RPPCAPI void LogEnableTimestamps(bool enable, int precision) noexcept
 {
     EnableTimestamps = enable;
     TimePrecision = precision;
 }
-RPPCAPI void LogSetTimeOffset(rpp::int64 offset)
+RPPCAPI void LogSetTimeOffset(rpp::int64 offset) noexcept
 {
     TimeOffset = offset;
 }

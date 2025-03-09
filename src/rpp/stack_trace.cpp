@@ -46,6 +46,9 @@
 
 namespace rpp
 {
+    // absolute limit for callstack depth
+    static constexpr size_t CALLSTACK_MAX_DEPTH = 256u;
+
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Trivial convenience wrappers
 
@@ -532,7 +535,7 @@ namespace rpp
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min<size_t>(maxDepth, 256u);
+        maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -566,7 +569,7 @@ namespace rpp
 
     RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        maxDepth = rpp::min<size_t>(maxDepth, 256u);
+        maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
         void* callstack[maxDepth];
         BacktraceState state { callstack, callstack + maxDepth };
@@ -619,17 +622,31 @@ namespace rpp
         wchar_t path[1024];
         return FileExists(CombinePath(path, folder, file));
     }
-    static HMODULE LoadDbgHelp() noexcept
+
+    static HMODULE DbgHelpModule = nullptr;
+
+    static bool TryLoadDbgHelp(const wchar_t* path)
     {
+        if (HMODULE module = LoadLibraryW(path))
+        {
+            DbgHelpModule = module;
+            return true;
+        }
+        return false;
+    }
+
+    static HMODULE GetDbgHelpModule() noexcept
+    {
+        if (DbgHelpModule) return DbgHelpModule;
+
         // Dynamically load the Entry-Points for dbghelp.dll:
         // But before we do this, we first check if the ".local" file exists (Dll Hell redirection)
         wchar_t exePath[1024]; // @note Try to avoid dynamic allocations in case the crash is because of OOM
         if (GetModuleFileNameW(nullptr, exePath, 1024) > 0 && !FileExists(exePath, L".local"))
         {
+            // ".local" file does not exist, so we can try to load the dbghelp.dll from the "Debugging Tools for Windows"
             wchar_t programFiles[1024];
             GetEnvironmentVariableW(L"ProgramFiles", programFiles, 1024);
-
-            // ".local" file does not exist, so we can try to load the dbghelp.dll from the "Debugging Tools for Windows"
             const wchar_t* platformTags[] = {
                 #if _M_IX86
                     L" (x86)",
@@ -643,21 +660,36 @@ namespace rpp
                     L" 64-Bit",
                 #endif
             };
+
             for (const wchar_t* tag : platformTags)
             {
                 wchar_t path[1024];
                 swprintf_s(path, L"%s\\Debugging Tools for Windows%s\\dbghelp.dll", programFiles, tag);
-                if (FileExists(path))
-                    return LoadLibraryW(path);
+                if (FileExists(path) && TryLoadDbgHelp(path))
+                    return DbgHelpModule;
+            }
+            
+            // try Windows Kits
+            wchar_t programFilesX86[1024];
+            GetEnvironmentVariableW(L"ProgramFiles(x86)", programFilesX86, 1024);
+            for (const wchar_t* ver : { L"10", L"11", })
+            {
+                wchar_t path[1024];
+                swprintf_s(path, L"%s\\Windows Kits\\%s\\Debuggers\\x64\\dbghelp.dll", programFilesX86, ver);
+                if (FileExists(path) && TryLoadDbgHelp(path))
+                    return DbgHelpModule;
             }
         }
-        return LoadLibraryW(L"dbghelp.dll"); // if not already loaded, try to load a default-one
+
+         // if not already loaded, try to load a default-one
+        TryLoadDbgHelp(L"dbghelp.dll");
+        return DbgHelpModule;
     }
 
     template<class Func> bool LoadProc(Func& func, const char* proc) noexcept
     {
-        static HMODULE DbgHelp = LoadDbgHelp();
-        return DbgHelp ? (func = (Func)GetProcAddress(DbgHelp, proc)) != nullptr : false;
+        HMODULE dbghelp = GetDbgHelpModule();
+        return dbghelp ? (func = (Func)GetProcAddress(dbghelp, proc)) != nullptr : false;
     }
     static decltype(SymCleanup)*                  pSymCleanup;
     static decltype(SymFunctionTableAccess64)*    pSymFunctionTableAccess64;
@@ -671,6 +703,7 @@ namespace rpp
     static decltype(SymLoadModuleExW)*            pSymLoadModuleExW;
     static decltype(SymSetOptions)*               pSymSetOptions;
     static decltype(StackWalk64)*                 pStackWalk64;
+    static decltype(StackWalk2)*                  pStackWalk2;
     static decltype(UnDecorateSymbolName)*        pUnDecorateSymbolName;
     static decltype(SymGetSearchPath)*            pSymGetSearchPath;
     static decltype(SymGetLineFromInlineContext)* pSymGetLineFromInlineContext;
@@ -689,6 +722,7 @@ namespace rpp
         }
         LoadProc(pSymCleanup,                  "SymCleanup");
         LoadProc(pStackWalk64,                 "StackWalk64");
+        LoadProc(pStackWalk2,                  "StackWalk2");
         LoadProc(pSymGetOptions,               "SymGetOptions");
         LoadProc(pSymSetOptions,               "SymSetOptions");
         LoadProc(pSymFunctionTableAccess64,    "SymFunctionTableAccess64");
@@ -704,7 +738,8 @@ namespace rpp
         LoadProc(pSymAddrIncludeInlineTrace,   "SymAddrIncludeInlineTrace");
         LoadProc(pSymGetLineFromName64,        "SymGetLineFromName64");
 
-        if (!pSymInitialize(hProcess, nullptr, false))
+        // invade process loads all modules automatically
+        if (!pSymInitialize(hProcess, nullptr, /*invadeProcess*/TRUE))
         {
             OnDebugError("SymInitialize", GetLastError(), 0);
             SetLastError(ERROR_DLL_INIT_FAILED);
@@ -713,8 +748,9 @@ namespace rpp
 
         DWORD symOptions = pSymGetOptions();
         symOptions |= SYMOPT_LOAD_LINES;
-        symOptions |= SYMOPT_DEFERRED_LOADS;
+        //symOptions |= SYMOPT_DEFERRED_LOADS;
         symOptions |= SYMOPT_FAIL_CRITICAL_ERRORS;
+        symOptions |= SYMOPT_UNDNAME;
         pSymSetOptions(symOptions);
         return true;
     }
@@ -745,11 +781,14 @@ namespace rpp
         while (keepGoing)
         {
 #       if UNICODE
-            LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64)me.modBaseAddr, me.modBaseSize);
+            DWORD err = LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64)me.modBaseAddr, me.modBaseSize);
         #else
-            LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64)me.modBaseAddr, me.modBaseSize);
+            DWORD err = LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64)me.modBaseAddr, me.modBaseSize);
         #endif
-            ++count;
+            if (err != ERROR_SUCCESS)
+                OnDebugError("LoadModule", err, 0);
+            else
+                ++count;
             keepGoing = !!Module32Next(hSnap, &me);
         }
         CloseHandle(hSnap);
@@ -769,6 +808,7 @@ namespace rpp
         char imageFile[4096];
         char moduleName[4096];
 
+        int count = 0;
         for (size_t i = 0; i < totalModules; ++i)
         {
             GetModuleInformation(hProcess, modules[i], &mi, sizeof(mi)); // base address, size
@@ -782,8 +822,10 @@ namespace rpp
             DWORD result = LoadModule(hProcess, imageFile, moduleName, (DWORD64)mi.lpBaseOfDll, mi.SizeOfImage);
             if (result != ERROR_SUCCESS)
                 OnDebugError("LoadModule", result, 0);
+            else
+                ++count;
         }
-        return totalModules > 0;
+        return count > 0;
     }
 
     static bool LoadModules(void* hProcess, uint32_t processId) noexcept
@@ -801,7 +843,7 @@ namespace rpp
         return nameBuffer;
     }
 
-    static DWORD InitStackFrame(STACKFRAME64& s, const CONTEXT& c) noexcept
+    static DWORD InitStackFrame(STACKFRAME_EX& s, const CONTEXT& c) noexcept
     {
         #ifdef _M_IX86
             s.AddrPC.Offset    = c.Eip;
@@ -814,7 +856,7 @@ namespace rpp
         #elif _M_X64
             s.AddrPC.Offset    = c.Rip;
             s.AddrPC.Mode      = AddrModeFlat;
-            s.AddrFrame.Offset = c.Rsp;
+            s.AddrFrame.Offset = c.Rbp;
             s.AddrFrame.Mode   = AddrModeFlat;
             s.AddrStack.Offset = c.Rsp;
             s.AddrStack.Mode   = AddrModeFlat;
@@ -903,53 +945,78 @@ namespace rpp
         HANDLE process = nullptr;
         HANDLE hThread = nullptr;
         CONTEXT c { 0 };
-        STACKFRAME64 s = { 0 };
-        DWORD imageType;
-    };
+        STACKFRAME_EX s { 0 };
+        DWORD imageType = 0;
+        // initialization errors
+        const char* error = nullptr;
+        bool openedProcess = false; // TODO: implement
+        bool openedThread = false;
+        bool suspendedThread = false;
 
-    static const char* GetThreadContext(ThreadContext& tc) noexcept
-    {
-        tc.hThread = GetCurrentThread();
-        tc.process = GetCurrentProcess();
+        explicit operator bool() const noexcept { return error == nullptr; }
 
-        static bool modulesLoaded;
-        if (!modulesLoaded)
+        ThreadContext() noexcept
         {
-            std::lock_guard lock { DbgHelpMutex };
+            // this opens pseudo-handles to the current process and thread
+            hThread = GetCurrentThread();
+            process = GetCurrentProcess();
+
+            static bool modulesLoaded;
             if (!modulesLoaded)
             {
-                if (!SymInit(tc.process))
-                    return "<stack_trace:SymInitFailed>";
-                modulesLoaded = LoadModules(tc.process, GetCurrentProcessId());
+                std::lock_guard lock { DbgHelpMutex };
+                if (!modulesLoaded)
+                {
+                    if (!SymInit(process))
+                    {
+                        error = "<stack_trace:SymInitFailed>";
+                        return;
+                    }
+                    modulesLoaded = LoadModules(process, GetCurrentProcessId());
+                }
             }
-        }
+            
+            c.ContextFlags = CONTEXT_FULL; // capture the current context
 
-        tc.c.ContextFlags = CONTEXT_FULL; // capture the current context
-
-        if (GetThreadId(tc.hThread) == GetCurrentThreadId())
-        {
-            RtlCaptureContext(&tc.c);
-        }
-        else
-        {
-            SuspendThread(tc.hThread);
-            if (GetThreadContext(tc.hThread, &tc.c) == false)
+            if (GetThreadId(hThread) == GetCurrentThreadId())
             {
-                ResumeThread(tc.hThread);
-                return "<stack_trace:GetThreadContextFailed>";
+                #if NTDDI_VERSION >= NTDDI_WIN10_VB
+                    RtlCaptureContext2(&c); // Windows 10 and higher
+                #else
+                    RtlCaptureContext(&c); // Windows 2k and higher
+                #endif
             }
+            else
+            {
+                if (SuspendThread(hThread) == -1)
+                {
+                    error = "<stack_trace:SuspendThreadFailed>";
+                    return;
+                }
+                
+                suspendedThread = true; // destructor will resume the thread
+                if (GetThreadContext(hThread, &c) == false)
+                {
+                    error = "<stack_trace:GetThreadContextFailed>";
+                    return;
+                }
+            }
+            
+            imageType = InitStackFrame(s, c);
         }
 
-        tc.imageType = InitStackFrame(tc.s, tc.c);
-        return nullptr;
-    }
+        ~ThreadContext() noexcept
+        {
+            if (suspendedThread && hThread)
+                ResumeThread(hThread);
+            if (openedProcess && process)
+                CloseHandle(process);
+            if (openedThread && hThread)
+                CloseHandle(hThread);
+        }
+    };
 
-    static void ReleaseThreadContext(ThreadContext& tc) noexcept
-    {
-        if (tc.hThread)
-            ResumeThread(tc.hThread);
-    }
-
+    // WARNING: do not call any alloca()/_malloca() before calling this function
     static size_t walk_callstack(ThreadContext& tc, DWORD64* outCallstack, size_t maxDepth, size_t entriesToSkip) noexcept
     {
         constexpr size_t maxRecursionCount = 128;
@@ -961,11 +1028,24 @@ namespace rpp
         for (size_t frameNum = 0; count < maxDepth; ++frameNum)
         {
             // get next stack frame (StackWalk64(), SymFunctionTableAccess64(), SymGetModuleBase64())
-            if (!pStackWalk64(tc.imageType, tc.process, tc.hThread, &tc.s, &tc.c, nullptr, pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr))
+            if (pStackWalk2)
             {
-                OnDebugError("StackWalk64", 0, tc.s.AddrPC.Offset);
+                if (!pStackWalk2(tc.imageType, tc.process, tc.hThread, &tc.s, &tc.c, nullptr,
+                                 pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr, nullptr,
+                                 SYM_STKWALK_DEFAULT))
+                {
+                    OnDebugError("StackWalk2", GetLastError(), tc.s.AddrPC.Offset);
+                    break;
+                }
+            }
+            else if (!pStackWalk64(tc.imageType, tc.process, tc.hThread,
+                              (STACKFRAME64*)&tc.s, &tc.c, nullptr,
+                              pSymFunctionTableAccess64, pSymGetModuleBase64, nullptr))
+            {
+                OnDebugError("StackWalk64", GetLastError(), tc.s.AddrPC.Offset);
                 break;
             }
+
             if (frameNum < entriesToSkip)
                 continue;
 
@@ -996,44 +1076,43 @@ namespace rpp
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        ThreadContext tc;
-        if (GetThreadContext(tc))
-            return {};
+        ThreadContext tc {};
+        if (!tc) return {};
 
-        maxDepth = rpp::min<size_t>(maxDepth, 256u);
-        uint64_t* callstack = (uint64_t*)_malloca(maxDepth * sizeof(uint64_t));
+        maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
+
+        // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
+        uint64_t callstack[CALLSTACK_MAX_DEPTH];
         size_t count;
         {
             // DbgHelp.dll is single-threaded, so we need to synchronize here
             std::lock_guard lock { DbgHelpMutex };
             count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
         }
-
         // copy the callstack to a vector
         std::vector<uint64_t> addresses { callstack, callstack + count };
-        _freea(callstack);
-
-        ReleaseThreadContext(tc);
         return addresses;
     }
 
     RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        ThreadContext tc;
-        if (const char* error = GetThreadContext(tc))
-            return error;
+        ThreadContext tc {};
+        if (!tc) return tc.error;
 
         CallstackFormatter fmt;
         if (messageLen) fmt.writeln(message, messageLen);
 
-        maxDepth = rpp::min<size_t>(maxDepth, 256u);
-        uint64_t* callstack = (uint64_t*)_malloca(maxDepth * sizeof(uint64_t));
+        maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
+        
+        // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
+        uint64_t callstack[CALLSTACK_MAX_DEPTH];
         {
             // DbgHelp.dll is single-threaded, so we need to synchronize here
             std::lock_guard lock { DbgHelpMutex };
 
             // walk the stack
             size_t count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
+            //count = RtlCaptureStackBackTrace(entriesToSkip, maxDepth, (void**)callstack, nullptr);
 
             // format the callstack
             for (size_t i = 0; i < count; ++i)
@@ -1041,8 +1120,6 @@ namespace rpp
                 fmt.writeln(get_address_info(tc.process, callstack[i]));
             }
         }
-		_freea(callstack);
-        ReleaseThreadContext(tc);
         return fmt.to_string();
     }
 

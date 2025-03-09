@@ -36,27 +36,20 @@ typedef void (*LogMessageCallback) (LogSeverity severity, const char* message, i
 typedef void (*LogExceptCallback)(const char* message, const char* exception);
 
 /** Sets the callback handler for any error messages */
-RPPCAPI void SetLogHandler(LogMessageCallback loghandler);
-
-// legacy ALIAS for SetLogHandler
-RPPCAPI
-#if __cplusplus && !__clang__
-[[deprecated("Use SetLogHandler() instead")]]
-#endif
-void SetLogErrorHandler(LogMessageCallback loghandler);
+RPPCAPI void SetLogHandler(LogMessageCallback loghandler) noexcept;
 
 /** Sets the callback handler for C++ messages. You can even intercept these in C. */
-RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler);
+RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler) noexcept;
 
 /** This will remove function and lambda name information from the logs */
-RPPCAPI void LogDisableFunctionNames();
+RPPCAPI void LogDisableFunctionNames() noexcept;
 
 /** Sets the default log severity filter: if (severity >= filter) log(..)
  *  This defaults to LogSeverityInfo, which is the most verbose
  *  If Debugging.c is compiled with QUIETLOG, then it defaults to LogSeverityWarn
  **/
-RPPCAPI void SetLogSeverityFilter(LogSeverity filter);
-RPPCAPI LogSeverity GetLogSeverityFilter();
+RPPCAPI void SetLogSeverityFilter(LogSeverity filter) noexcept;
+RPPCAPI LogSeverity GetLogSeverityFilter() noexcept;
 
 /**
  * Prefixes all log entries with a time-of-day timestamp in the format of:
@@ -64,13 +57,13 @@ RPPCAPI LogSeverity GetLogSeverityFilter();
  * @param enable True to enable timestamps, false to disable
  * @param precision[3] The number of decimal places to show: 3 for milliseconds, 6 for micros.
  */
-RPPCAPI void LogEnableTimestamps(bool enable, int precision = 3);
+RPPCAPI void LogEnableTimestamps(bool enable, int precision = 3) noexcept;
 
 /**
  * Adds a time offset to the log timestamps. This is useful for syncing logs.
  * The offset is in nanoseconds.
  */
-RPPCAPI void LogSetTimeOffset(rpp::int64 offset_nanos);
+RPPCAPI void LogSetTimeOffset(rpp::int64 offset_nanos) noexcept;
 
 /**
  * Writes a message to default output. On most platforms this is stdout/stderr
@@ -171,13 +164,13 @@ namespace rpp
      * @brief Adds an additional log handler that is able to receive log messages
      *        when standard LogInfo(), LogWarning(), LogError() are called
      */
-    void add_log_handler(void* context, LogMsgHandler handler);
+    void add_log_handler(void* context, LogMsgHandler handler) noexcept;
 
     /**
      * @brief Removes a matching log handler to prevent further logging calls
      *        on the `context` object.
      */
-    void remove_log_handler(void* context, LogMsgHandler handler);
+    void remove_log_handler(void* context, LogMsgHandler handler) noexcept;
 }
 
 #define _rpp_get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
