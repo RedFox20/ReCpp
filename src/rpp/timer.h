@@ -139,6 +139,11 @@ namespace rpp
          */
         constexpr int64 minutes() const noexcept { return nsec / NANOS_PER_MINUTE; }
 
+        /**
+         * @returns This time duration as an absolute duration
+         */
+        constexpr Duration abs() const noexcept { return Duration{ nsec < 0 ? -nsec : nsec }; }
+
         constexpr Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
         constexpr Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
         constexpr Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
