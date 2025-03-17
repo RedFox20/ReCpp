@@ -203,18 +203,18 @@ namespace rpp
         constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }
 
         /** @returns Duration from this point until end */
-        constexpr Duration elapsed(const TimePoint& end) const noexcept { return (end.duration - duration); }
+        constexpr Duration elapsed(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}; }
 
         /** @returns fractional seconds elapsed from this time point until end */
-        constexpr double elapsed_sec(const TimePoint& end) const noexcept { return (end.duration - duration).sec(); }
+        constexpr double elapsed_sec(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.sec(); }
         /** @returns integer seconds elapsed from this time point until end */
-        constexpr int64 elapsed_s(const TimePoint& end) const noexcept { return (end.duration - duration).seconds(); }
+        constexpr int64 elapsed_s(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.seconds(); }
         /** @returns integer milliseconds elapsed from this time point until end */
-        constexpr int64 elapsed_ms(const TimePoint& end) const noexcept { return (end.duration - duration).millis(); }
+        constexpr int64 elapsed_ms(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.millis(); }
         /** @returns integer microseconds elapsed from this time point until end */
-        constexpr int64 elapsed_us(const TimePoint& end) const noexcept { return (end.duration - duration).micros(); }
+        constexpr int64 elapsed_us(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.micros(); }
         /** @returns integer nanoseconds elapsed from this time point until end */
-        constexpr int64 elapsed_ns(const TimePoint& end) const noexcept { return (end.duration - duration).nanos(); }
+        constexpr int64 elapsed_ns(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.nanos(); }
 
         /** @returns true if this timepoint has been initialized */
         constexpr bool is_valid() const noexcept { return duration.is_valid(); }
@@ -230,7 +230,7 @@ namespace rpp
         constexpr TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration.nsec - d.nsec}; }
         constexpr TimePoint& operator+=(const Duration& d) noexcept { duration.nsec += d.nsec; return *this; }
         constexpr TimePoint& operator-=(const Duration& d) noexcept { duration.nsec -= d.nsec; return *this;}
-        constexpr Duration operator-(const TimePoint& t) const noexcept { return duration - t.duration; }
+        constexpr Duration operator-(const TimePoint& t) const noexcept { return Duration{duration.nsec - t.duration.nsec}; }
 
         /** @brief Converts this Duration into a string */
         int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
