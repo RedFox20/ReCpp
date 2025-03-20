@@ -158,6 +158,12 @@ namespace rpp
          */
         constexpr Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
 
+        /**
+         * @brief Multiplies this duration by a fraction - must be double precision due to internal int64 representation
+         * @warning This can overflow if the double is too large!!!
+         */
+        constexpr Duration operator*(double d) const noexcept { return Duration{ int64(double(nsec) * d) }; }
+
         /** 
          * @brief Converts this Duration into a string with fractional seconds
          * @example "12:44:00" -- 0 fractional digits
