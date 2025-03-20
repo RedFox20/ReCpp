@@ -399,6 +399,25 @@ TestImpl(test_timer)
         AssertEqual((d1 - d2).to_string(6), "-01:01:01.000001");
     }
 
+    TestCase(duration_to_stopwatch_string)
+    {
+        auto d1 = rpp::Duration(19, 57, 11, 523'425'526);
+        auto d2 = -rpp::Duration(0, 10000, 1, 523'001'000);
+        AssertEqual(rpp::Duration{}.to_stopwatch_string(3), "[0s 000ms]");
+        AssertEqual(d1.to_stopwatch_string(3), "[1197m 11s 523ms]");
+        AssertEqual(d1.to_stopwatch_string(6), "[1197m 11s 523ms 425us]");
+        AssertEqual(d1.to_stopwatch_string(9), "[1197m 11s 523ms 425us 526ns]");
+        AssertEqual(d2.to_stopwatch_string(3), "[-10000m 1s 523ms]");
+        AssertEqual(d2.to_stopwatch_string(6), "[-10000m 1s 523ms 001us]");
+        AssertEqual(d2.to_stopwatch_string(9), "[-10000m 1s 523ms 001us 000ns]");
+        auto minDuration = rpp::Duration::min();
+        AssertEqual(minDuration.to_stopwatch_string(9), "[-153722867m 16s 854ms 775us 807ns]");
+        AssertLessOrEqual(minDuration.to_stopwatch_string(9).length(), 35u);
+        auto maxDuration = rpp::Duration::max();
+        AssertEqual(maxDuration.to_stopwatch_string(9), "[153722867m 16s 854ms 775us 807ns]");
+        AssertLessOrEqual(maxDuration.to_stopwatch_string(9).length(), 35u);
+    }
+
     TestCase(timepoint_to_string)
     {
         auto t1 = rpp::TimePoint(2021, 1, 1, 12, 34, 56, 789'010'000LL);

@@ -196,6 +196,14 @@ namespace rpp
         return fraction_digits + 1;
     }
 
+    inline static int print_3digits(int value, char* out) noexcept
+    {
+        *out++ = (value / 100) + '0';
+        *out++ = ((value / 10) % 10) + '0';
+        *out++ = (value % 10) + '0';
+        return 3;
+    }
+
     inline static int print_2digits(int value, char* out) noexcept
     {
         *out++ = (value / 10) + '0';
@@ -233,7 +241,14 @@ namespace rpp
         if (bufsize < 25)
             return 0; // won't fit
         char* end = buf;
-        if (ns < 0) { ns = -ns; *end++ = '-'; }
+
+        if (ns < 0) {
+            // handle edge case, INT64_MIN is not representable as positive
+            // -9223372036854775808 --> 9223372036854775807
+            ns = (ns == INT64_MIN) ? INT64_MAX : -ns;
+            *end++ = '-';
+        }
+
         if (ns >= NANOS_PER_YEAR) {
             int years = int(ns / NANOS_PER_YEAR);
             ns -= years * NANOS_PER_YEAR;
@@ -270,6 +285,84 @@ namespace rpp
     {
         char buf[64];
         int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
+        return {buf, buf+len};
+    }
+
+    NOINLINE static int duration_to_stopwatch_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
+    {
+        // int64 has max 153,722,867 minutes which requires 9 chars
+        // "[(-)[9]m [2]s [3]ms [3]us [3]ns]"
+        // 1 + (1) + 11 + 4 + 6 + 6 + 5 + 1 = 36 chars
+        if (bufsize < 36)
+            return 0; // won't fit
+
+        char* end = buf;
+        *end++ = '[';
+
+        if (ns < 0) {
+            // handle edge case, INT64_MIN is not representable as positive
+            // -9223372036854775808 --> 9223372036854775807
+            ns = (ns == INT64_MIN) ? INT64_MAX : -ns;
+            *end++ = '-';
+        }
+
+        if (ns >= NANOS_PER_MINUTE)
+        {
+            int64 minutes = int64(ns / NANOS_PER_MINUTE);
+            ns -= minutes * NANOS_PER_MINUTE;
+            end += print_digits(minutes, end, 'm');
+            *end++ = ' ';
+        }
+
+        // always display seconds, so if we get `ns=0` we still print "0s"
+        // max 9'223'372'036 seconds which requires 
+        int seconds = int(ns / NANOS_PER_SEC);
+        end += print_digits(seconds, end, 's');
+
+        // TODO: currently fraction printing is simplified to 3 digit versions only
+        if (fraction_digits > 0)
+        {
+            *end++ = ' ';
+            int frac_ns = ns - seconds * NANOS_PER_SEC;
+            int frac_ms = frac_ns / NANOS_PER_MILLI;
+
+            if (fraction_digits >= 1)
+            {
+                end += print_3digits(frac_ms, end);
+                *end++ = 'm';
+                *end++ = 's';
+            }
+            if (fraction_digits >= 4)
+            {
+                *end++ = ' ';
+                int frac_us = frac_ns / NANOS_PER_MICRO - (frac_ms * 1000);
+                end += print_3digits(frac_us, end);
+                *end++ = 'u';
+                *end++ = 's';
+            }
+            if (fraction_digits >= 7)
+            {
+                *end++ = ' ';
+                end += print_3digits(frac_ns % 1000, end);
+                *end++ = 'n';
+                *end++ = 's';
+            }
+        }
+
+        *end++ = ']';
+        *end = '\0';
+        return int(end - buf);
+    }
+
+    int Duration::to_stopwatch_string(char* buf, int bufsize, int fraction_digits) const noexcept
+    {
+        return duration_to_stopwatch_string(nanos(), buf, bufsize, fraction_digits);
+    }
+
+    std::string Duration::to_stopwatch_string(int fraction_digits) const noexcept
+    {
+        char buf[64];
+        int len = duration_to_stopwatch_string(nanos(), buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
 

@@ -158,9 +158,35 @@ namespace rpp
          */
         constexpr Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
 
-        /** @brief Converts this Duration into a string */
+        /** 
+         * @brief Converts this Duration into a string with fractional seconds
+         * @example "12:44:00" -- 0 fractional digits
+         * @example "12:44:00.938" -- 3 fractional digits (milliseconds)
+         * @example "12:44:00.937521" -- 6 fractional digits (microseconds)
+         * @example "12:44:00.937521423" -- 9 fractional digits (nanoseconds)
+         * @param buf            - Output buffer [must be at least 25 bytes]
+         * @param bufsize        - Size of the output buffer
+         * @param fraction_digits - Number of fractional digits to include (default is 3 which is milliseconds) (6 is microseconds)
+         * @returns Number of characters written into the buffer
+         */
         int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
+
         std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
+
+        /**
+         * @brief Converts this Duration into a Stopwatch string which is easier for humans to read.
+         *        The fraction_digits parameter decides where microseconds or nanoseconds are also displayed.
+         * @example "[100m 12s 44ms]" -- 3 fractional digits
+         * @example "[100m 12s 44ms 938us]" -- 6 fractional digits
+         * @example "[100m 12s 44ms 937us 521ns]" -- 9 fractional digits
+         * @param buf            - Output buffer [must be at least 36 bytes]
+         * @param bufsize        - Size of the output buffer
+         * @param fraction_digits - Number of fractional digits to include (default is 3 which is milliseconds)
+         * @returns Number of characters written into the buffer
+         */
+        int to_stopwatch_string(char* buf, int bufsize, int fraction_digits = 3) const noexcept;
+
+        std::string to_stopwatch_string(int fraction_digits = 3) const noexcept;
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
