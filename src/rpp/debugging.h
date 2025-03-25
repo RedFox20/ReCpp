@@ -80,11 +80,28 @@ RPPCAPI void _LogWarning (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT
 RPPCAPI void _LogError   (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT1;
 RPPCAPI void _LogExcept  (const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT2;
 RPPCAPI const char* _FmtString  (PRINTF_FMTSTR const char* format, ...) PRINTF_CHECKFMT1;
-RPPCAPI const char* _LogFilename(const char* longFilePath); // gets a shortened filepath substring
 RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func name
 
+namespace rpp
+{
+    /**
+     * @brief Returns the filename part of a long file path.
+     * @param path The full file path
+     * @return The filename part of the path
+     */
+    constexpr inline const char* shorten_filename(const char* path) noexcept
+    {
+        if (path == nullptr) return "(null)";
+        const char* filename = path;
+        for (const char* p = path; *p; ++p)
+            if (*p == '/' || *p == '\\')
+                filename = p + 1;
+        return filename;
+    }
+}
+
 #ifndef QUIETLOG
-#define __log_format(format, file, line, func) "%s:%d %s $ " format, _LogFilename(file), line, _LogFuncname(func)
+#define __log_format(format, file, line, func) "%s:%d %s $ " format, rpp::shorten_filename(file), line, _LogFuncname(func)
 #else
 #define __log_format(format, file, line, func) "$ " format
 #endif
@@ -210,11 +227,11 @@ namespace rpp
 #if defined __APPLE__ || defined __clang__ // iOS or just clang
 #  if __ANDROID__
 #    define __assertion_failure(fmt,...) \
-    __assert2(_LogFilename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), _rpp_assert_format(fmt, ##__VA_ARGS__))
+    __assert2(rpp::shorten_filename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  elif __APPLE__
 RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __dead2 __disable_tail_calls;
 #    define __assertion_failure(fmt,...) \
-    __assert_rtn(_LogFuncname(__FUNCTION__), _LogFilename(__FILE__), __LINE__, _rpp_assert_format(fmt, ##__VA_ARGS__))
+    __assert_rtn(_LogFuncname(__FUNCTION__), rpp::shorten_filename(__FILE__), __LINE__, _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  else
 #    define  __assertion_failure(fmt,...) do { \
         RppAssertFail(_rpp_assert_format(fmt, ##__VA_ARGS__), __FILE__, __LINE__, __FUNCTION__); } while (0)
@@ -225,7 +242,7 @@ RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __d
         __debugbreak(); RppAssertFail(_rpp_assert_format(fmt, ##__VA_ARGS__), __FILE__, __LINE__, __FUNCTION__); } while (0)
 #  else // MSVC++ debug assert is quite unique since it supports Format strings. Wish all toolchains did that:
 #    define __assertion_failure(fmt,...) do { \
-    _CrtDbgReport(_CRT_ASSERT, _LogFilename(__FILE__), __LINE__, "libReCpp", fmt _rpp_wrap_args(__VA_ARGS__) ); } while (0)
+    _CrtDbgReport(_CRT_ASSERT, rpp::shorten_filename(__FILE__), __LINE__, "libReCpp", fmt _rpp_wrap_args(__VA_ARGS__) ); } while (0)
 #  endif
 #elif defined __GNUC__ // other clang, mingw or linux gcc
 #  define  __assertion_failure(fmt,...) do { \

@@ -361,17 +361,6 @@ RPPCAPI const char* _FmtString(PRINTF_FMTSTR const char* format, ...)
     return errBuf;
 }
 
-RPPCAPI const char* _LogFilename(const char* longFilePath)
-{
-    if (longFilePath == nullptr) return "(null)";
-    const char* eptr = longFilePath + strlen(longFilePath);
-    for (int n = 1; longFilePath < eptr; --eptr)
-        if (*eptr == '/' || *eptr == '\\')
-            if (--n <= 0) return ++eptr;
-    return eptr;
-}
-
-
 static const int funcname_max = 48;
 
 struct funcname_builder
