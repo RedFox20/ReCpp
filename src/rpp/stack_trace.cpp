@@ -503,11 +503,11 @@ namespace rpp
     {
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
-        void* callstack[maxDepth];
-        BacktraceState state { callstack, callstack + maxDepth };
+        void* cs_temp[maxDepth];
+        BacktraceState state { cs_temp, cs_temp + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
         _Unwind_Backtrace(backtrace_cb, &state);
-        size_t count = size_t(state.current - callstack);
+        size_t count = size_t(state.current - cs_temp);
 
         std::vector<uint64_t> addresses;
         if (entriesToSkip >= count)
@@ -515,9 +515,28 @@ namespace rpp
         addresses.reserve(count - entriesToSkip);
         for (size_t i = entriesToSkip; i < count; ++i)
         {
-            addresses.push_back((uint64_t)callstack[i]);
+            addresses.push_back((uint64_t)cs_temp[i]);
         }
         return addresses;
+    }
+
+    RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
+
+        void* cs_temp[maxDepth];
+        BacktraceState state { cs_temp, cs_temp + maxDepth };
+        // _Unwind is called directly to reduce the number of frames in the stack trace
+        _Unwind_Backtrace(backtrace_cb, &state);
+        size_t count = size_t(state.current - cs_temp);
+
+        if (entriesToSkip >= count)
+            return 0;
+        for (size_t i = 0; i < count; ++i)
+        {
+            callstack[i] = (uint64_t)cs_temp[entriesToSkip + i];
+        }
+        return int(count - entriesToSkip);
     }
 
     RPPAPI std::string format_trace(rpp::strview message, const uint64_t* callstack, size_t depth) noexcept
