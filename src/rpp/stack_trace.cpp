@@ -46,60 +46,26 @@
 
 namespace rpp
 {
-    // absolute limit for callstack depth
-    static constexpr size_t CALLSTACK_MAX_DEPTH = 256u;
-
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Trivial convenience wrappers
 
-    std::string format_trace(const std::vector<uint64_t>& callstack) noexcept
-    {
-        return rpp::format_trace(std::string{}, callstack);
-    }
-
-    std::string stack_trace(size_t maxDepth) noexcept
-    {
-        return stack_trace(nullptr, 0, maxDepth, 2);
-    }
-    std::string stack_trace(const char* message, size_t maxDepth) noexcept
-    {
-        return stack_trace(message, strlen(message), maxDepth, 2);
-    }
-    std::string stack_trace(const std::string& message, size_t maxDepth) noexcept
-    {
-        return stack_trace(message.data(), message.size(), maxDepth, 2);
-    }
-
     void print_trace(size_t maxDepth) noexcept
     {
-        std::string s = stack_trace(nullptr, 0, maxDepth, 2);
+        std::string s = stack_trace(rpp::strview{}, maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
-    void print_trace(const char* message, size_t maxDepth) noexcept
+    void print_trace(rpp::strview message, size_t maxDepth) noexcept
     {
-        std::string s = stack_trace(message, strlen(message), maxDepth, 2);
-        fwrite(s.c_str(), s.size(), 1, stderr);
-    }
-    void print_trace(const std::string& message, size_t maxDepth) noexcept
-    {
-        std::string s = stack_trace(message.data(), message.size(), maxDepth, 2);
+        std::string s = stack_trace(message, maxDepth, 2);
         fwrite(s.c_str(), s.size(), 1, stderr);
     }
 
-    std::runtime_error error_with_trace(const char* message, size_t maxDepth) noexcept
+    std::runtime_error error_with_trace(rpp::strview message, size_t maxDepth) noexcept
     {
-        return std::runtime_error{ stack_trace(message, strlen(message), maxDepth, 2) };
-    }
-    std::runtime_error error_with_trace(const std::string& message, size_t maxDepth) noexcept
-    {
-        return std::runtime_error{ stack_trace(message.data(), message.size(), maxDepth, 2) };
+        return std::runtime_error{ stack_trace(message, maxDepth, 2) };
     }
 
-    traced_exception::traced_exception(const char* message) noexcept
-        : runtime_error(error_with_trace(message))
-    {
-    }
-    traced_exception::traced_exception(const std::string& message) noexcept
+    traced_exception::traced_exception(rpp::strview message) noexcept
         : runtime_error(error_with_trace(message))
     {
     }
@@ -554,20 +520,22 @@ namespace rpp
         return addresses;
     }
 
-    RPPAPI std::string format_trace(const std::string& message, const std::vector<uint64_t>& callstack) noexcept
+    RPPAPI std::string format_trace(rpp::strview message, const uint64_t* callstack, size_t depth) noexcept
     {
         CallstackFormatter fmt;
-        if (!message.empty()) fmt.writeln(message.c_str(), message.size());
+        if (message) fmt.writeln(message.c_str(), message.size());
+
+        depth = rpp::min<size_t>(depth, CALLSTACK_MAX_DEPTH);
 
         Demangler d;
-        for (uint64_t addr : callstack)
+        for (size_t i = 0; i < depth; ++i)
         {
-            fmt.writeln(resolve_trace(d, (void*)addr));
+            fmt.writeln(resolve_trace(d, (void*)callstack[i]));
         }
         return fmt.to_string();
     }
 
-    RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
+    RPPAPI std::string stack_trace(rpp::strview message, size_t maxDepth, size_t entriesToSkip) noexcept
     {
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
@@ -578,7 +546,7 @@ namespace rpp
         size_t count = size_t(state.current - callstack);
 
         CallstackFormatter fmt;
-        if (messageLen) fmt.writeln(message, messageLen);
+        if (message) fmt.writeln(message.c_str(), message.size());
 
         Demangler d;
         for (size_t i = entriesToSkip; i < count; ++i)
@@ -951,18 +919,18 @@ namespace rpp
         return get_address_info(process, addr);
     }
 
-    RPPAPI std::string format_trace(const std::string& message, const std::vector<uint64_t>& callstack) noexcept
+    RPPAPI std::string format_trace(rpp::strview message, const uint64_t* callstack, size_t depth) noexcept
     {
         HANDLE process = GetCurrentProcess();
         CallstackFormatter fmt;
-        if (!message.empty()) fmt.writeln(message.c_str(), message.size());
+        if (message) fmt.writeln(message.c_str(), message.size());
 
         // DbgHelp.dll is single-threaded, so we need to synchronize here
         std::lock_guard lock { DbgHelpMutex };
 
-        for (uint64_t addr : callstack)
+        for (size_t i = 0; i < depth; ++i)
         {
-            fmt.writeln(get_address_info(process, addr));
+            fmt.writeln(get_address_info(process, callstack[i]));
         }
         return fmt.to_string();
     }
@@ -1124,13 +1092,28 @@ namespace rpp
         return addresses;
     }
 
-    RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept
+    RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        ThreadContext tc {};
+        if (!tc) return 0;
+
+        maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
+        size_t count;
+        {
+            // DbgHelp.dll is single-threaded, so we need to synchronize here
+            std::lock_guard lock { DbgHelpMutex };
+            count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
+        }
+        return count;
+    }
+
+    RPPAPI std::string stack_trace(rpp::strview message, size_t maxDepth, size_t entriesToSkip) noexcept
     {
         ThreadContext tc {};
         if (!tc) return tc.error;
 
         CallstackFormatter fmt;
-        if (messageLen) fmt.writeln(message, messageLen);
+        if (message) fmt.writeln(message.c_str(), message.size());
 
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
         

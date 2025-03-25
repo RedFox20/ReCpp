@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include "config.h"
+#include "strview.h"
 
 namespace rpp
 {
@@ -43,26 +44,59 @@ namespace rpp
      */
     RPPAPI CallstackEntry get_address_info(uint64_t addr) noexcept;
 
+    // absolute limit for callstack depth
+    static inline constexpr size_t CALLSTACK_MAX_DEPTH = 256u;
+
     /**
      * @brief Walks the stack and returns a list of callstack addresses.
      * You can then use get_address_info() to get more information about each address,
      * or use format_trace() to get a formatted stack trace.
+     * @param maxDepth Maximum number of stack frames to trace
+     * @param entriesToSkip Number of initial entries to skip in order to hide stack tracing internals
+     * @return List of callstack addresses
      */
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth = 32, size_t entriesToSkip = 0) noexcept;
+
+    /**
+     * @brief Walks the stack and returns a list of callstack addresses.
+     * You can then use get_address_info() to get more information about each address,
+     * or use format_trace() to get a formatted stack trace.
+     * @param callstack [out] Pre-allocated buffer for callstack addresses
+     * @param maxDepth Maximum number of stack frames to trace
+     * @param entriesToSkip Number of initial entries to skip in order to hide stack tracing internals
+     * @return Number of callstack entries written to the buffer
+     */
+    RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip = 0) noexcept;
+
+    /**
+     * Prepends an error message before formatting the stack trace
+     * @param message Message to prepend to stack trace
+     * @param callstack [in] Pre-walked callstack
+     * @param depth Number of entries in the callstack
+     * @return Formatted stack trace with available debug information. Line information is not always available.
+     */
+    RPPAPI std::string format_trace(rpp::strview message, const uint64_t* callstack, size_t depth) noexcept;
 
     /**
      * @brief Generic implementation of stack trace, taking a pre-walked callstack
      * @param callstack [in] Pre-walked callstack
      * @return Formatted stack trace with available debug information. Line information is not always available.
      */
-    RPPAPI std::string format_trace(const std::vector<uint64_t>& callstack) noexcept;
+    inline std::string format_trace(const std::vector<uint64_t>& callstack) noexcept
+    {
+        return rpp::format_trace(rpp::strview{}, callstack.data(), callstack.size());
+    }
 
     /**
      * Prepends an error message before formatting the stack trace
      * @param message Message to prepend to stack trace
      * @param callstack [in] Pre-walked callstack
+     * @return Formatted stack trace with available debug information. Line information is not always available.
      */
-    RPPAPI std::string format_trace(const std::string& message, const std::vector<uint64_t>& callstack) noexcept;
+    inline std::string format_trace(rpp::strview message, const std::vector<uint64_t>& callstack) noexcept
+    {
+        return rpp::format_trace(message, callstack.data(), callstack.size());
+    }
 
     /**
      * Base implementation of stack trace. Only needed if you're implementing custom abstractions
@@ -75,18 +109,16 @@ namespace rpp
      * On linux you must compile with -rdynamic, otherwise internal symbols won't be visible
      * @endnote
      */
-    RPPAPI std::string stack_trace(const char* message, size_t messageLen, size_t maxDepth, size_t entriesToSkip) noexcept;
-
+    RPPAPI std::string stack_trace(rpp::strview message, size_t maxDepth = 32,
+                                   size_t entriesToSkip = 2) noexcept;
 
     /**
      * Prepares stack trace
      */
-    RPPAPI std::string stack_trace(size_t maxDepth = 32) noexcept;
-    /**
-     * Prepares stack trace WITH error message
-     */
-    RPPAPI std::string stack_trace(const char* message, size_t maxDepth = 32) noexcept;
-    RPPAPI std::string stack_trace(const std::string& message, size_t maxDepth = 32) noexcept;
+    inline std::string stack_trace(size_t maxDepth = 32) noexcept
+    {
+        return rpp::stack_trace(rpp::strview{}, maxDepth, 2);
+    }
 
 
     /**
@@ -96,15 +128,13 @@ namespace rpp
     /**
      * Prints stack trace to STDERR WITH error message
      */
-    RPPAPI void print_trace(const char* message, size_t maxDepth = 32) noexcept;
-    RPPAPI void print_trace(const std::string& message, size_t maxDepth = 32) noexcept;
+    RPPAPI void print_trace(rpp::strview message, size_t maxDepth = 32) noexcept;
 
 
     /**
      * @return Prepared runtime_error with error message and stack trace
      */
-    RPPAPI std::runtime_error error_with_trace(const char* message, size_t maxDepth = 32) noexcept;
-    RPPAPI std::runtime_error error_with_trace(const std::string& message, size_t maxDepth = 32) noexcept;
+    RPPAPI std::runtime_error error_with_trace(rpp::strview message, size_t maxDepth = 32) noexcept;
 
 
     /**
@@ -113,8 +143,7 @@ namespace rpp
      */
     struct RPPAPI traced_exception : std::runtime_error
     {
-        explicit traced_exception(const char* message) noexcept;
-        explicit traced_exception(const std::string& message) noexcept;
+        explicit traced_exception(rpp::strview message) noexcept;
     };
 
 
