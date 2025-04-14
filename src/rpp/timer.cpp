@@ -310,7 +310,7 @@ namespace rpp
         {
             int64 minutes = int64(ns / NANOS_PER_MINUTE);
             ns -= minutes * NANOS_PER_MINUTE;
-            end += print_digits(minutes, end, 'm');
+            end += print_digits(static_cast<int>(minutes), end, 'm');
             *end++ = ' ';
         }
 
@@ -323,7 +323,7 @@ namespace rpp
         if (fraction_digits > 0)
         {
             *end++ = ' ';
-            int frac_ns = ns - seconds * NANOS_PER_SEC;
+            int frac_ns = static_cast<int>(ns - seconds * NANOS_PER_SEC);
             int frac_ms = frac_ns / NANOS_PER_MILLI;
 
             if (fraction_digits >= 1)
