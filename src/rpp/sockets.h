@@ -921,6 +921,7 @@ namespace rpp
          * @return 0 on success, error code otherwise (or check last_err())
          */
         int set_opt(int optlevel, int socketopt, int value) noexcept;
+        int set_opt(int optlevel, int socketopt, void* value, int value_size) noexcept;
 
         /**
          * Get values from IO handle with the specified IO command
@@ -942,6 +943,14 @@ namespace rpp
          * Enables broadcast on UDP sockets, returns true on success
          */
         bool enable_broadcast() noexcept;
+
+        /**
+         * Enables multicast on UDP sockets, returns true on success
+         * @param multicast_group Multicast group address
+         * @param ttl Time to live for multicast packets
+         * @note This only applies for IPv4 sockets
+         */
+        bool enable_multicast(rpp::ipaddress4 multicast_group, int ttl = 16) noexcept;
 
         /**
          * Configure socket settings: non-blocking I/O,

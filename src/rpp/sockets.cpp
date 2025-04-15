@@ -1306,6 +1306,12 @@ namespace rpp
         bool ok = setsockopt(os_handle_unsafe(), optlevel, socketopt, (char*)&value, sizeof(int)) == 0;
         return set_errno_unlocked(ok ? 0 : os_getsockerr());
     }
+    int socket::set_opt(int optlevel, int socketopt, void* value, int value_size) noexcept
+    {
+        std::unique_lock lock = rpp::spin_lock(Mtx);
+        bool ok = setsockopt(os_handle_unsafe(), optlevel, socketopt, (char*)value, value_size) == 0;
+        return set_errno_unlocked(ok ? 0 : os_getsockerr());
+    }
 
 #if RPP_SOCKETS_DBG
     static const char* ioctl_string(int iocmd)
@@ -1368,6 +1374,30 @@ namespace rpp
         if (!success)
             LogError("setsockopt SO_BROADCAST TRUE failed: %s\n", last_err());
         return success;
+    }
+
+    bool socket::enable_multicast(rpp::ipaddress4 multicast_group, int ttl) noexcept
+    {
+        if (Type != ST_Datagram)
+            return false; // multicast only works on datagram sockets
+
+        struct ip_mreq group = {};
+        group.imr_multiaddr = to_saddr(multicast_group).sa4.sin_addr;
+        group.imr_interface.s_addr = htonl(INADDR_ANY); // bind to all interfaces
+
+        bool success = set_opt(IPPROTO_IP, IP_ADD_MEMBERSHIP, &group, sizeof(group)) == 0;
+        if (!success)
+        {
+            LogError("setsockopt IP_ADD_MEMBERSHIP failed: %s\n", last_err());
+            return false;
+        }
+        success = set_opt(IPPROTO_IP, IP_MULTICAST_TTL, ttl) == 0;
+        if (!success)
+        {
+            LogError("setsockopt IP_MULTICAST_TTL failed: %s\n", last_err());
+            return false;
+        }
+        return true;
     }
 
     void socket::set_noblock_nodelay() noexcept
