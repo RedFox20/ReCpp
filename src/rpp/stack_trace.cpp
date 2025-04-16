@@ -1123,7 +1123,7 @@ namespace rpp
             std::lock_guard lock { DbgHelpMutex };
             count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
         }
-        return count;
+        return (int)count;
     }
 
     RPPAPI std::string stack_trace(rpp::strview message, size_t maxDepth, size_t entriesToSkip) noexcept
