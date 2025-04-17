@@ -30,6 +30,15 @@ namespace rpp
     void set_this_thread_name(rpp::strview name) noexcept
     {
         #if _MSC_VER
+            // set the global thread name for regular consumers
+            wchar_t wname[64];
+            int wname_len = name.size() < 63 ? name.size() : 63;
+            for (int i = 0; i < wname_len; ++i)
+                wname[i] = wchar_t(name[i]);
+            wname[wname_len] = L'\0';
+            SetThreadDescription(GetCurrentThread(), wname);
+
+            // and then set it specifically for MSVC Debugger
             char threadName[33];
             THREADNAME_INFO info { 0x1000, name.to_cstr(threadName, sizeof(threadName)), DWORD(-1), 0 };
             #pragma warning(push)
