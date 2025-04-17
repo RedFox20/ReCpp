@@ -7,6 +7,7 @@
 #  pragma warning(disable: 4251) // class 'std::*' needs to have dll-interface to be used by clients of struct 'rpp::*'
 #endif
 #include "config.h"
+#include "threads.h"
 #include "semaphore.h"
 #include "delegate.h"
 #include "strview.h"
@@ -91,18 +92,6 @@ namespace rpp
      */
     using pool_trace_provider = std::string (*)();
 
-
-    //////////////////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * @brief Sets the debug name for this thread
-     */
-    RPPAPI void set_this_thread_name(rpp::strview name) noexcept;
-
-    /**
-     * @returns Current thread ID as a 64-bit integer
-     */
-    RPPAPI uint64 get_thread_id() noexcept;
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -303,11 +292,6 @@ namespace rpp
         bool wait_for_new_job(std::unique_lock<mutex>& lock) noexcept;
         wait_result join_or_detach(wait_result result = wait_result::finished) noexcept;
     };
-
-    /**
-     * @returns Number of physicals cores on the system
-     */
-    RPPAPI int num_physical_cores() noexcept;
 
     /**
      * A generic thread pool that can be used to group and control pool lifetimes
