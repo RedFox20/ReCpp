@@ -1280,15 +1280,15 @@ namespace rpp
 
     Matrix4& Matrix4::setOrtho(float left, float right, float bottom, float top)
     {
-        const float far  = 1000.0f;
-        const float near = -1000.0f;
+        const float farDist = 1000.0f;
+        const float nearDist = -1000.0f;
         const float rl = right - left;
         const float tb = top - bottom;
-        const float dt = far - near;
+        const float dt = farDist - nearDist;
         m00 = 2.0f/rl; m01 = 0.0f;    m02 = 0.0f;     m03 = 0.0f;
         m10 = 0.0f;    m11 = 2.0f/tb; m12 = 0.0f;     m13 = 0.0f;
         m20 = 0.0f;    m21 = 0.0f;    m22 = -2.0f/dt; m23 = 0.0f;
-        m30 = -(right+left)/rl; m31 = -(top+bottom)/tb; m32 = -(far+near)/dt; m33 = 1.0f;
+        m30 = -(right+left)/rl; m31 = -(top+bottom)/tb; m32 = -(farDist+nearDist)/dt; m33 = 1.0f;
         return *this;
     }
 
