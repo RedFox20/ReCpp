@@ -28,6 +28,7 @@ namespace rpp
 {
     //////////////////////////////////////////////////////////////////////////////////////////
 
+#if _MSC_VER
     static int to_wchar_str(wchar_t* out, int maxlen, rpp::strview str) noexcept
     {
         int outlen = str.size() < maxlen ? str.size() : maxlen-1;
@@ -36,6 +37,7 @@ namespace rpp
         out[outlen] = L'\0';
         return outlen;
     }
+#endif
 
     void set_this_thread_name(rpp::strview name) noexcept
     {
