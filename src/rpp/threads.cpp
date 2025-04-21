@@ -28,15 +28,22 @@ namespace rpp
 {
     //////////////////////////////////////////////////////////////////////////////////////////
 
+    static int to_wchar_str(wchar_t* out, int maxlen, rpp::strview str) noexcept
+    {
+        int outlen = str.size() < maxlen ? str.size() : maxlen-1;
+        for (int i = 0; i < outlen; ++i)
+            out[i] = wchar_t(str[i]);
+        out[outlen] = L'\0';
+        return outlen;
+    }
+
     void set_this_thread_name(rpp::strview name) noexcept
     {
         #if _MSC_VER
             // set the global thread name for regular consumers
             wchar_t wname[64];
-            int wname_len = name.size() < 63 ? name.size() : 63;
-            for (int i = 0; i < wname_len; ++i)
-                wname[i] = wchar_t(name[i]);
-            wname[wname_len] = L'\0';
+            to_wchar_str(wname, sizeof(wname), name);
+
             if (FAILED(SetThreadDescription(GetCurrentThread(), wname))) {
                 LogError("failed to set thread name: %s", name);
             }
@@ -74,11 +81,15 @@ namespace rpp
     {
         std::string thread_name;
         #if _WIN32
-            PWSTR name = nullptr;
-            if (SUCCEEDED(GetThreadDescription(HANDLE(thread_id), &name)))
+            if (HANDLE thread_handle = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)thread_id))
             {
-                thread_name = rpp::to_string(name); // wchar_t* to std::string
-                LocalFree(name);
+                PWSTR name = nullptr;
+                if (SUCCEEDED(GetThreadDescription(thread_handle, &name)))
+                {
+                    thread_name = rpp::to_string(name); // wchar_t* to std::string
+                    LocalFree(name);
+                }
+                CloseHandle(thread_handle);
             }
         #else
             char name[64];
