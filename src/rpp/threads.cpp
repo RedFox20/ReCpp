@@ -1,4 +1,5 @@
 #include "threads.h"
+#include "debugging.h"
 #include <thread> // hardware_concurrency
 #include <vector>
 #if __APPLE__ || __linux__
@@ -36,7 +37,9 @@ namespace rpp
             for (int i = 0; i < wname_len; ++i)
                 wname[i] = wchar_t(name[i]);
             wname[wname_len] = L'\0';
-            SetThreadDescription(GetCurrentThread(), wname);
+            if (FAILED(SetThreadDescription(GetCurrentThread(), wname))) {
+                LogError("failed to set thread name: %s", name);
+            }
 
             // and then set it specifically for MSVC Debugger
             char threadName[33];
