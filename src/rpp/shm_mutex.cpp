@@ -1,3 +1,4 @@
+#if __linux__
 #include "shm_mutex.h"
 #include "debugging.h"
 #include <condition_variable>
@@ -75,3 +76,5 @@ namespace rpp {
     }
 
 } // namespace rpp
+
+#endif // __linux__

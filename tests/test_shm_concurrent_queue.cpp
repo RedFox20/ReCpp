@@ -1,3 +1,5 @@
+#ifdef __linux__
+
 #include <rpp/concurrent_queue.h>
 #include <rpp/shm_mutex.h>
 #include <rpp/future.h>
@@ -618,3 +620,5 @@ TestImpl(test_concurrent_queue_pthread)
         print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
     }
 };
+
+#endif // __linux__

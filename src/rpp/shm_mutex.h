@@ -1,4 +1,5 @@
 #pragma once
+#if __linux__
 #include <pthread.h>
 #include <chrono>
 #include <mutex>
@@ -130,3 +131,5 @@ namespace rpp {
     };
 
 } // namespace rpp
+
+#endif // __linux__
