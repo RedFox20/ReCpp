@@ -5,7 +5,21 @@
 #include <condition_variable>
 
 namespace rpp {
-    inline timespec to_timespec(const std::chrono::system_clock::time_point& tp);
+
+    template<class Clock, class Duration>
+    inline timespec to_timespec(const std::chrono::time_point<Clock, Duration>& tp)
+    {
+        using namespace std::chrono;
+    
+        // Get duration since the system_clock epoch, in nanoseconds
+        auto d = tp.time_since_epoch();
+        auto ns = duration_cast<nanoseconds>(d).count();
+    
+        timespec ts;
+        ts.tv_sec  = ns / 1'000'000'000;
+        ts.tv_nsec = ns % 1'000'000'000;
+        return ts;
+    }
 
     class shm_mutex
     {
@@ -114,19 +128,5 @@ namespace rpp {
 
         native_handle_type native_handle() noexcept { return &handle; }
     };
-
-    inline timespec to_timespec(const std::chrono::system_clock::time_point& tp)
-    {
-        using namespace std::chrono;
-    
-        // Get duration since the system_clock epoch, in nanoseconds
-        auto d = tp.time_since_epoch();
-        auto ns = duration_cast<nanoseconds>(d).count();
-    
-        timespec ts;
-        ts.tv_sec  = ns / 1'000'000'000;
-        ts.tv_nsec = ns % 1'000'000'000;
-        return ts;
-    }
 
 } // namespace rpp
