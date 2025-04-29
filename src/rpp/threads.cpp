@@ -4,6 +4,7 @@
 #include <vector>
 #if __APPLE__ || __linux__
 # include <pthread.h>
+# include <unistd.h> // getpid()
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,6 +83,8 @@ namespace rpp
     std::string get_thread_name(uint64 thread_id) noexcept
     {
         std::string thread_name;
+        if (thread_id == 0)
+        {
         #if _WIN32
             if (HANDLE thread_handle = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)thread_id))
             {
@@ -98,7 +101,8 @@ namespace rpp
             if (pthread_getname_np(pthread_t(thread_id), name, sizeof(name)) == 0)
                 thread_name = name;
         #endif
-            return thread_name;
+        }
+        return thread_name;
     }
 
     uint64 get_thread_id() noexcept
@@ -110,6 +114,14 @@ namespace rpp
         #endif
     }
 
+    uint32_t get_process_id() noexcept
+    {
+    #if _WIN32
+        return (uint32_t)GetCurrentProcessId();
+    #else
+        return (uint32_t)getpid();
+    #endif
+    }
 
 #if _WIN32
     int num_physical_cores() noexcept

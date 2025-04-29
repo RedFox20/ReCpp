@@ -27,6 +27,11 @@ namespace rpp
     RPPAPI uint64 get_thread_id() noexcept;
 
     /**
+     * @returns Current process ID as a 32-bit integer
+     */
+    RPPAPI uint32_t get_process_id() noexcept;
+
+    /**
      * @returns Number of physicals cores on the system
      */
     RPPAPI int num_physical_cores() noexcept;
