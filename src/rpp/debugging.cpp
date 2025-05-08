@@ -46,6 +46,7 @@ static std::array<LogHandler, MAX_LOG_HANDLERS> LogHandlers;
 static LogExceptCallback ExceptHandler;
 static bool DisableFunctionNames = false;
 static bool EnableTimestamps = false;
+static bool TimeOfDay = false;
 static int TimePrecision = 3;
 static rpp::int64 TimeOffset;
 
@@ -137,10 +138,11 @@ RPPCAPI LogSeverity GetLogSeverityFilter() noexcept
 {
     return Filter;
 }
-RPPCAPI void LogEnableTimestamps(bool enable, int precision) noexcept
+RPPCAPI void LogEnableTimestamps(bool enable, int precision, bool time_of_day) noexcept
 {
     EnableTimestamps = enable;
     TimePrecision = precision;
+    TimeOfDay = time_of_day;
 }
 RPPCAPI void LogSetTimeOffset(rpp::int64 offset) noexcept
 {
@@ -155,7 +157,10 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     if (EnableTimestamps) {
         rpp::TimePoint now = rpp::TimePoint::now();
         now.duration.nsec += TimeOffset;
-        len = now.to_string(pbuf, remaining-1, TimePrecision);
+        if (TimeOfDay)
+            len = now.time_of_day().to_string(pbuf, remaining-1, TimePrecision);
+        else
+            len = now.to_string(pbuf, remaining-1, TimePrecision);
         pbuf[len++] = ' '; // add separator
         pbuf += len;
         remaining -= len;

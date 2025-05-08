@@ -48,8 +48,9 @@ RPPCAPI LogSeverity GetLogSeverityFilter() noexcept;
  * hh:mm:ss.MMMms, e.g. 21:24:13.172ms
  * @param enable True to enable timestamps, false to disable
  * @param precision[3] The number of decimal places to show: 3 for milliseconds, 6 for micros.
+ * @param time_of_day[false] If true, show the time of day, otherwise shows datetime.
  */
-RPPCAPI void LogEnableTimestamps(bool enable, int precision = 3) noexcept;
+RPPCAPI void LogEnableTimestamps(bool enable, int precision = 3, bool time_of_day = false) noexcept;
 
 /**
  * Adds a time offset to the log timestamps. This is useful for syncing logs.
