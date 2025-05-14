@@ -29,7 +29,7 @@ namespace rpp
     /**
      * @returns Current process ID as a 32-bit integer
      */
-    RPPAPI uint32_t get_process_id() noexcept;
+    RPPAPI uint32 get_process_id() noexcept;
 
     /**
      * @returns Number of physicals cores on the system

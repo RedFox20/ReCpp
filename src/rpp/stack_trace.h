@@ -3,11 +3,12 @@
  * Stack tracing and traced exceptions, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
+#include "config.h"
+#include "strview.h"
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include "config.h"
-#include "strview.h"
+#include <cstdint>
 
 namespace rpp
 {

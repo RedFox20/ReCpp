@@ -114,12 +114,12 @@ namespace rpp
         #endif
     }
 
-    uint32_t get_process_id() noexcept
+    uint32 get_process_id() noexcept
     {
     #if _WIN32
-        return (uint32_t)GetCurrentProcessId();
+        return (uint32)GetCurrentProcessId();
     #else
-        return (uint32_t)getpid();
+        return (uint32)getpid();
     #endif
     }
 
