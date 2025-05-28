@@ -462,6 +462,18 @@ namespace rpp
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
+
+    template<class T> int index_of(const std::vector<T>& v, const T& item) noexcept
+    {
+        const T* first = v.data();
+        const T* end = first + v.size();
+        for (const T* it = first; it != end; ++it) {
+            if (*it == item) return int(it - first);
+        }
+        return -1; // not found
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////
     
     /** @return TRUE if any predicate(element) yields true */
     template<class T, class Pred> bool any_of(const std::vector<T>& v, const Pred& predicate)
