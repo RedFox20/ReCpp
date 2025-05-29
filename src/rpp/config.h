@@ -261,6 +261,22 @@
 #define RPP_UINT32_MAX    0xFFFFFFFFU
 #define RPP_UINT32_MIN    0x00000000U
 
+#ifndef RPP_BIG_ENDIAN
+#  if _MSC_VER
+#    if defined(_M_X64) || defined(_M_IX86)
+#      define RPP_LITTLE_ENDIAN 1
+#    else
+#      error "Unsupported Windows machine type"
+#    endif
+#  else
+#    if __BYTE_ORDER == __BIG_ENDIAN
+#      define RPP_BIG_ENDIAN 1
+#    else
+#      define RPP_LITTLE_ENDIAN 1
+#    endif
+#  endif
+#endif
+
 #ifdef __cplusplus
 namespace rpp
 {
