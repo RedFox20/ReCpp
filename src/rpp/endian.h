@@ -74,4 +74,38 @@ namespace rpp
     }
 
     /////////////////////////////////////////////////////////////////////
+    //// LITTLE ENDIAN
+
+    /** @brief Write a 16-bit unsigned integer in little-endian format */
+    inline void writeLEU16(void* out, uint16_t value) noexcept
+    {
+        *reinterpret_cast<uint16_t*>(out) = RPP_TO_LITTLE16(value);
+    }
+    /** @brief Write a 32-bit unsigned integer in little-endian format */
+    inline void writeLEU32(void* out, uint32_t value) noexcept
+    {
+        *reinterpret_cast<uint32_t*>(out) = RPP_TO_LITTLE32(value);
+    }
+    /** @brief Write a 64-bit unsigned integer in little-endian format */
+    inline void writeLEU64(void* out, uint64_t value) noexcept
+    {
+        *reinterpret_cast<uint64_t*>(out) = RPP_TO_LITTLE64(value);
+    }
+    /** @brief Read a 16-bit unsigned integer in little-endian format to machine format */
+    inline uint16_t readLEU16(const void* in) noexcept
+    {
+        return RPP_TO_LITTLE16(*reinterpret_cast<const uint16_t*>(in));
+    }
+    /** @brief Read a 32-bit unsigned integer in little-endian format to machine format */
+    inline uint32_t readLEU32(const void* in) noexcept
+    {
+        return RPP_TO_LITTLE32(*reinterpret_cast<const uint32_t*>(in));
+    }
+    /** @brief Read a 64-bit unsigned integer in little-endian format to machine format */
+    inline uint64_t readLEU64(const void* in) noexcept
+    {
+        return RPP_TO_LITTLE64(*reinterpret_cast<const uint64_t*>(in));
+    }
+
+    /////////////////////////////////////////////////////////////////////
 }
