@@ -301,20 +301,28 @@ namespace rpp /* ReCpp */
          * Truncate front part of the file
          * @param newLength The new length of the file, with any data in the front discarded
          */
-        void truncate_front(int64 newLength);
+        void truncate_front(int64 newLength) noexcept;
 
         /**
          * Truncate end of file
          * @param newLength The new length of the file, with any data in the end truncated
          */
-        void truncate_end(int64 newLength);
+        void truncate_end(int64 newLength) noexcept;
 
         /**
          * Calls OS truncate. This can be used to resize files. Behaviour depends on platform.
          * @param newLength The new length of the file
          */
-        void truncate(int64 newLength);
+        void truncate(int64 newLength) noexcept;
 
+        /**
+         * Preallocates a file and seeks to the given position
+         * @param preallocSize Size to preallocate in bytes
+         * @param seekPos Position to seek to after preallocation
+         * @param seekMode Seek mode to use, default is SEEK_SET
+         * @returns TRUE if preallocation was successful, FALSE if it failed
+         */
+        bool preallocate(int64 preallocSize, int64 seekPos = 0, int seekMode = SEEK_SET) noexcept;
 
         /**
          * Forcefully flushes any OS file buffers to send all data to the storage device

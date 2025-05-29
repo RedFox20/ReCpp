@@ -15,6 +15,7 @@
     #undef min
 #else
     #include <unistd.h>
+    #include <fcntl.h> // fallocate
     #define _fstat64 fstat
     #define stat64   stat
     #define fseeki64 fseeko
@@ -406,7 +407,7 @@ namespace rpp /* ReCpp */
         return write("\n", 1);
     }
 
-    void file::truncate_front(int64 newLength)
+    void file::truncate_front(int64 newLength) noexcept
     {
         int64 len = sizel();
         if (len <= newLength)
@@ -423,7 +424,7 @@ namespace rpp /* ReCpp */
         write(buf.data(), bytesRead);
     }
 
-    void file::truncate_end(int64 newLength)
+    void file::truncate_end(int64 newLength) noexcept
     {
         int64 len = sizel();
         if (len <= newLength)
@@ -431,7 +432,7 @@ namespace rpp /* ReCpp */
         truncate(newLength);
     }
 
-    void file::truncate(int64 newLength)
+    void file::truncate(int64 newLength) noexcept
     {
         if (!Handle) return;
     #if USE_WINAPI_IO
@@ -442,6 +443,23 @@ namespace rpp /* ReCpp */
     #else
         int result = ftruncate(fileno((FILE*)Handle), (off_t)newLength);
         (void)result;
+    #endif
+    }
+
+    bool file::preallocate(int64 preallocSize, int64 seekPos, int seekMode) noexcept
+    {
+        if (!Handle || preallocSize <= 0) return false;
+    #if USE_WINAPI_IO
+        // TODO: implement preallocation for Windows
+        return false;
+    #else
+        int fd = fileno((FILE*)Handle);
+        if (fd < 0)
+            return false; // invalid file descriptor
+        if (fallocate(fd, 0, 0, preallocSize) != 0)
+            return false; // preallocation failed
+        seekl(seekPos, seekMode);
+        return true; // preallocation succeeded
     #endif
     }
 
