@@ -269,10 +269,12 @@
 #      error "Unsupported Windows machine type"
 #    endif
 #  else
-#    if __BYTE_ORDER == __BIG_ENDIAN
+#    if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#      define RPP_LITTLE_ENDIAN 1
+#    elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #      define RPP_BIG_ENDIAN 1
 #    else
-#      define RPP_LITTLE_ENDIAN 1
+#      error "Unsupported endianness"
 #    endif
 #  endif
 #endif

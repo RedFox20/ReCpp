@@ -43,32 +43,32 @@ namespace rpp
     //// BIG ENDIAN
 
     /** @brief Write a 16-bit unsigned integer in big-endian format */
-    inline void writeBEU16(uint8_t* out, uint16_t value) noexcept
+    inline void writeBEU16(void* out, uint16_t value) noexcept
     {
         *reinterpret_cast<uint16_t*>(out) = RPP_TO_BIG16(value);
     }
     /** @brief Write a 32-bit unsigned integer in big-endian format */
-    inline void writeBEU32(uint8_t* out, uint32_t value) noexcept
+    inline void writeBEU32(void* out, uint32_t value) noexcept
     {
         *reinterpret_cast<uint32_t*>(out) = RPP_TO_BIG32(value);
     }
     /** @brief Write a 64-bit unsigned integer in big-endian format */
-    inline void writeBEU64(uint8_t* out, uint64_t value) noexcept
+    inline void writeBEU64(void* out, uint64_t value) noexcept
     {
         *reinterpret_cast<uint64_t*>(out) = RPP_TO_BIG64(value);
     }
-    /** @brief Read a 16-bit unsigned integer in big-endian format */
-    inline uint16_t readBEU16(const uint8_t* in) noexcept
+    /** @brief Read a 16-bit unsigned integer in big-endian format to machine format*/
+    inline uint16_t readBEU16(const void* in) noexcept
     {
         return RPP_TO_BIG16(*reinterpret_cast<const uint16_t*>(in));
     }
-    /** @brief Read a 32-bit unsigned integer in big-endian format */
-    inline uint32_t readBEU32(const uint8_t* in) noexcept
+    /** @brief Read a 32-bit unsigned integer in big-endian format to machine format */
+    inline uint32_t readBEU32(const void* in) noexcept
     {
         return RPP_TO_BIG32(*reinterpret_cast<const uint32_t*>(in));
     }
-    /** @brief Read a 64-bit unsigned integer in big-endian format */
-    inline uint64_t readBEU64(const uint8_t* in) noexcept
+    /** @brief Read a 64-bit unsigned integer in big-endian format to machine format */
+    inline uint64_t readBEU64(const void* in) noexcept
     {
         return RPP_TO_BIG64(*reinterpret_cast<const uint64_t*>(in));
     }
