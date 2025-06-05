@@ -236,6 +236,9 @@ namespace rpp
         static constexpr TimePoint max() noexcept { return TimePoint{ int64(RPP_INT64_MAX) }; }
         static constexpr TimePoint min() noexcept { return TimePoint{ int64(RPP_INT64_MIN) }; }
 
+        /** @returns TimePoint from a UNIX EPOCH microseconds timestamp */
+        static constexpr TimePoint from_epoch_us(uint64 unix_epoch_us) noexcept { return TimePoint{ int64(unix_epoch_us) * NANOS_PER_MICRO }; }
+
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
 
