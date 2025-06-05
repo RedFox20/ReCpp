@@ -1082,10 +1082,26 @@ namespace rpp
         bool create(address_family af = AF_IPv4,
                     ip_protocol ipp = IPP_TCP,
                     socket_option opt = SO_None) noexcept;
-        
-        // Binds this socket to some address:port -- as a TCP listener OR a general UDP socket
-        // If you bind an UDP socket to a remote address, you can use send() to send datagrams without specifying remote address
-        bool bind(const ipaddress& address) noexcept;
+
+        /**
+         * @warning This MUST be called before any bind() calls!
+         * @brief Enables the SO_REUSEADDR socket option
+         * This allows the socket to bind to an address that is already in use.
+         * This is useful for TCP servers that need to restart without waiting for the TIME_WAIT state to expire.
+         * @param enable TRUE to enable SO_REUSEADDR, FALSE to disable it.
+         * @return TRUE if the option was successfully set, FALSE otherwise (check socket::last_err())
+         */
+        bool enable_reuse_address(bool enable) noexcept;
+
+        /**
+         * @brief Binds this socket to some address:port -- as a TCP listener OR a general UDP socket
+         * If you bind an UDP socket to a remote address, you can use send() to send datagrams without specifying remote address.
+         * @param address The address to bind to, can be ipaddress{AF_IPv4, localPort} for example.
+         * @param opt Socket option, only used for setting SO_ReuseAddr option.
+         *            The SO_ReuseAddr option MUST be configured before binding the socket.
+         * @return TRUE if the socket was successfully bound to the address, FALSE otherwise.
+         */
+        bool bind(const ipaddress& address, socket_option opt = SO_None) noexcept;
 
         /**
          * @brief For TCP sockets, starts listening for new clients, returns true on success

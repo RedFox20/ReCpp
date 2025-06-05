@@ -1669,22 +1669,39 @@ namespace rpp
 
         if (opt & SO_ReuseAddr)
         {
-            if (set_opt(IPPROTO_IP, SO_REUSEADDR, 1)) {
-                return handle_errno() == 0;
-            }
-        #if !_WIN32
-            if (set_opt(IPPROTO_IP, SO_REUSEPORT, 1)) {
-                return handle_errno() == 0;
-            }
-        #endif
+            if (!enable_reuse_address(true))
+                return false;
         }
         return true;
     }
 
-    bool socket::bind(const ipaddress& addr) noexcept
+    bool socket::enable_reuse_address(bool enable) noexcept
+    {
+        if (!good())
+            return false;
+        int reuse = enable ? 1 : 0;
+        if (set_opt(SOL_SOCKET, SO_REUSEADDR, reuse)) {
+            return handle_errno(get_errno_unlocked()) == 0;
+        }
+    #if !_WIN32
+        if (set_opt(SOL_SOCKET, SO_REUSEPORT, reuse)) {
+            return handle_errno(get_errno_unlocked()) == 0;
+        }
+    #endif
+        return true; // SO_REUSEADDR is set
+    }
+
+    bool socket::bind(const ipaddress& addr, socket_option opt) noexcept
     {
         auto sa = to_saddr(addr);
         std::unique_lock lock = rpp::spin_lock(Mtx);
+
+        if (opt & SO_ReuseAddr)
+        {
+            if (!enable_reuse_address(true))
+                return false; // failed to enable SO_REUSEADDR, dont bind
+        }
+
         if (::bind(os_handle_unsafe(), sa, sa.size()) == 0)
         {
             Addr = addr;
@@ -1848,11 +1865,17 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
-
     bool socket::listen(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
         std::unique_lock lock = rpp::spin_lock(Mtx);
-        if (!create(localAddr.Address.Family, ipp, opt) || !bind(localAddr))
+
+        // SO_ReuseAddr is handled by bind(), remove it from the options
+        socket_option creationOpts = socket_option(opt & (~SO_ReuseAddr));
+        if (!create(localAddr.Address.Family, ipp, creationOpts))
+            return false;
+
+        // bind with binding options (SO_ReuseAddr)
+        if (!bind(localAddr, opt))
             return false;
 
         if (ipp != IPP_UDP && !listen()) // start listening for new clients
