@@ -144,6 +144,17 @@ namespace rpp
          */
         constexpr Duration abs() const noexcept { return Duration{ nsec < 0 ? -nsec : nsec }; }
 
+        /**
+         * @returns This duration clamped between [min, max] range.
+         */
+        constexpr Duration clamped(const Duration& min, const Duration& max) const noexcept
+        {
+            int64 nsec_clamped = nsec;
+            if      (nsec_clamped < min.nsec) nsec_clamped = min.nsec;
+            else if (nsec_clamped > max.nsec) nsec_clamped = max.nsec;
+            return Duration{ nsec_clamped };
+        }
+
         constexpr Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
         constexpr Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
         constexpr Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
