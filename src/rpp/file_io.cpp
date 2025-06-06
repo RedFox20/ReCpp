@@ -451,6 +451,8 @@ namespace rpp /* ReCpp */
         if (!Handle || preallocSize <= 0) return false;
     #if USE_WINAPI_IO
         // TODO: implement preallocation for Windows
+        (void)seekPos;
+        (void)seekMode;
         return false;
     #else
         int fd = fileno((FILE*)Handle);
