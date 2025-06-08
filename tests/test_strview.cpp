@@ -3,8 +3,8 @@ using namespace rpp;
 #include <limits>
 #include <unordered_map>
 
-constexpr auto MAX_DOUBLE = std::numeric_limits<double>::max();
-constexpr auto MIN_DOUBLE = std::numeric_limits<double>::min();
+constexpr double MAX_DOUBLE = std::numeric_limits<double>::max();
+constexpr double MIN_DOUBLE = std::numeric_limits<double>::min();
 
 TestImpl(test_strview)
 {
@@ -36,6 +36,29 @@ TestImpl(test_strview)
         std::string stdstr3 = str2;
         AssertThat(stdstr3, str2);
         AssertThat(str2, stdstr3);
+    }
+
+    std::string returns_new_string_value()
+    {
+        return "hello world";
+    }
+
+    void accepts_strview(rpp::strview arg)
+    {
+        LogInfo("strview parameter: %s", arg.to_cstr());
+    }
+
+    // a few cases where initializing a strview is most likely a mistake
+    TestCase(forbid_temporary_initialization)
+    {
+        // this is a mistake, strview will point to a temporary
+        rpp::strview str1 = returns_new_string_value();
+        LogInfo("str1: %s", str1.to_cstr());
+
+        rpp::strview str2 { returns_new_string_value() };
+        LogInfo("str2: %s", str2.to_cstr());
+
+        accepts_strview(returns_new_string_value());
     }
 
     TestCase(thread_local_buffer)

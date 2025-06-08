@@ -83,10 +83,6 @@ namespace rpp
     RPPAPI NOINLINE bool strequalsi(const char* s1, const char* s2, int len) noexcept;
 
 
-
-
-
-
     /**
      * C-locale specific, simplified atof that also outputs the end of parsed string
      * @param str Input string, e.g. "-0.25" / ".25", etc.. '+' is not accepted as part of the number
@@ -249,10 +245,20 @@ namespace rpp
         strview(char) = delete;
         strview(bool) = delete;
 
+        // requires std::string&& ctor to be explicit, to avoid accidental init from std::string&&
+        FINLINE explicit strview(std::string&& s) noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
+
         // disallow accidental assignment from an std::string&& which is an error, 
         // because the strview will be invalidated immediately
         // however strview(std::string&&) is allowed because it allows passing temporaries as arguments to functions
         strview& operator=(std::string&&) = delete;
+        strview& operator=(std::string) = delete;
+
+        FINLINE strview& operator=(const std::string& s) noexcept {
+            this->str = s.c_str();
+            this->len = static_cast<int>(s.length());
+            return *this;
+        }
 
         FINLINE RPP_CONSTEXPR_STRLEN strview& operator=(const char* s) noexcept {
             this->str = s ? s : "";
