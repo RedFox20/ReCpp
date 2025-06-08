@@ -1,6 +1,7 @@
 #pragma once
 #include "config.h"
 #include "type_traits.h"
+#include "timer.h" // rpp:Timer
 #include <mutex> // lock_guard etc
 #include <thread> // this_thread::yield
 
@@ -84,6 +85,8 @@ namespace rpp
     /**
      * @brief Performs a few spins before locking and suspending the thread.
      * This will massive improve locking performance in high-contention scenarios.
+     * 
+     * @returns Owned Lock if successful, Deferred Lock if lock was not acquired (suspended lock threw exception)
      */
     template<class Mutex>
     inline std::unique_lock<Mutex> spin_lock(Mutex& m) noexcept
@@ -104,6 +107,32 @@ namespace rpp
                 // simply give up and return a deferred lock
                 return std::unique_lock<Mutex>{m, std::defer_lock};
             }
+        }
+        return std::unique_lock<Mutex>{m, std::adopt_lock};
+    }
+
+    /**
+     * @brief Tries to spin-lock the mutex until the given timeout is reached.
+     * This works for regular non-timed mutexes that don't support try_lock_for().
+     * 
+     * @returns Owned Lock if successful, Deferred Lock if lock was not acquired (timeout)
+     */
+    template<class Mutex>
+    inline std::unique_lock<Mutex> spin_lock_for(Mutex& m, rpp::Duration timeout) noexcept
+    {
+        if (!m.try_lock()) // spin until we can lock the mutex
+        {
+            if (timeout <= rpp::Duration::zero())
+                return std::unique_lock<Mutex>{m, std::defer_lock}; // no timeout, just return deferred lock
+
+            rpp::TimePoint start = rpp::TimePoint::now();
+            do {
+                rpp::sleep_us(100); // yielding here will improve perf massively
+                if (m.try_lock()) return std::unique_lock<Mutex>{m, std::adopt_lock};
+            }
+            while ((rpp::TimePoint::now() - start) < timeout);
+
+            return std::unique_lock<Mutex>{m, std::defer_lock}; // no timeout, just return deferred lock
         }
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
