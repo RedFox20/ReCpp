@@ -216,44 +216,48 @@ namespace rpp
         return item;
     }
 
-    template<class T> void push_unique(std::vector<T>& v, const T& item)
+    /** @returns TRUE if item was pushed, FALSE if item already exists and was not pushed */
+    template<class T> bool push_unique(std::vector<T>& v, const T& item)
     {
-        for (const T& elem : v) if (elem == item) return;
+        for (const T& elem : v) if (elem == item) return false; // was not pushed
         v.push_back(item);
+        return true; // item was pushed
     }
     
     // erases a SINGLE item
-    template<class T, class U> void erase_item(std::vector<T>& v, const U& item)
+    template<class T, class U> bool erase_item(std::vector<T>& v, const U& item)
     {
         T* data = v.data();
         for (size_t i = 0, n = v.size(); i < n; ++i) {
             if (data[i] == item) {
                 v.erase(v.begin() + i);
-                return;
+                return true; // item found and erased
             }
         }
+        return false; // no item found that matches the predicate
     }
 
-    template<class T, class Pred> void erase_first_if(std::vector<T>& v, const Pred& pred)
+    template<class T, class Pred> bool erase_first_if(std::vector<T>& v, const Pred& pred)
     {
         T* data = v.data();
         for (size_t i = 0, n = v.size(); i < n; ++i) {
             if (pred(data[i])) {
                 v.erase(v.begin() + i);
-                return;
+                return true; // item found and erased
             }
         }
+        return false; // no item found that matches the predicate
     }
 
     // short-hand for the erase-remove-if idiom
     // erases ALL items that match the predicate
-    template<class T, class Pred> void erase_if(std::vector<T>& v, const Pred& pred)
+    template<class T, class Pred> bool erase_if(std::vector<T>& v, const Pred& pred)
     {
         T* first = v.data();
         T* end   = first + v.size();
         for (;; ++first) {
             if (first == end)
-                return; // nothing to erase
+                return false; // nothing to erase
             if (pred(*first))
                 break;
         }
@@ -268,6 +272,7 @@ namespace rpp
 
         size_t pop = (end - next);
         v.resize(v.size() - pop);
+        return true; // items were erased
     }
 
     // erases item at index i by moving the last item to [i]
@@ -296,7 +301,7 @@ namespace rpp
     }
     
     // erases a SINGLE item using ERASE-BACK-SWAP idiom
-    template<class T, class Pred> void erase_back_swap_first_if(std::vector<T>& v, const Pred& condition)
+    template<class T, class Pred> bool erase_back_swap_first_if(std::vector<T>& v, const Pred& condition)
     {
         T* data = v.data();
         for (size_t i = 0, n = v.size(); i < n; ++i)
@@ -306,15 +311,17 @@ namespace rpp
                 if (i != n-1)
                     data[i] = std::move(data[n-1]); // move last item to data[i]
                 v.pop_back();
-                return;
+                return true;
             }
         }
+        return false;
     }
 
     // erases ALL matching items using ERASE-BACK-SWAP idiom
-    template<class T, class Pred> void erase_back_swap_all_if(std::vector<T>& v, const Pred& condition)
+    template<class T, class Pred> bool erase_back_swap_all_if(std::vector<T>& v, const Pred& condition)
     {
         T* data = v.data();
+        bool erased = false;
         for (size_t i = 0, n = v.size(); i < n; )
         {
             if (condition(data[i]))
@@ -322,10 +329,12 @@ namespace rpp
                 if (i != n-1)
                     data[i] = std::move(data[n-1]); // move last item to data[i]
                 v.pop_back();
+                erased = true;
                 --n;
             }
             else ++i;
         }
+        return erased; // at least one item was erased
     }
 
     template<class T> bool contains(const std::vector<T>& v, const T& item)
