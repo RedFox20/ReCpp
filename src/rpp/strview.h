@@ -198,10 +198,6 @@ namespace rpp
     inline int to_string(char* buffer, ulong value)     noexcept { return _tostring(buffer, (uint64)value); }
     #endif
 
-    /**
-     * @brief Converts a Wide String to a UTF-8 String
-     */
-    std::string to_string(const wchar_t* str) noexcept;
 
     #ifndef RPP_CONSTEXPR_STRLEN
     #  if _MSC_VER && _MSVC_LANG >= 201703L
@@ -1056,6 +1052,23 @@ namespace rpp
         FINLINE operator const strview&() const noexcept { return *(rpp::strview*)this; }
         FINLINE strview* operator->()     const noexcept { return  (rpp::strview*)this; }
     };
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    /**
+     * @brief Converts a Wide String to a UTF-8 String
+     */
+    std::string to_string(const wchar_t* str, int wlen = -1) noexcept;
+    inline std::string to_string(const std::wstring& str)   noexcept { return to_string(str.c_str(), static_cast<int>(str.size())); }
+
+    /**
+     * @brief Converts a UTF-8 String to a Wide String
+     */
+    std::wstring to_wstring(const char* str, int utflen = -1) noexcept;
+    inline std::wstring to_wstring(const std::string& str) noexcept { return to_wstring(str.c_str(), static_cast<int>(str.size())); }
+    inline std::wstring to_wstring(strview str)            noexcept { return to_wstring(str.str, str.len); }
 
 
     ////////////////////////////////////////////////////////////////////////////////

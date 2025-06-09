@@ -5,7 +5,6 @@
 
 #include <cerrno> // errno
 #include <array> // std::array
-#include <locale>  // wstring_convert
 #include <sys/stat.h> // stat,fstat
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN

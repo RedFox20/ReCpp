@@ -853,21 +853,41 @@ namespace rpp
 
     ///////////// to_string(wchar)
 
-    std::string to_string(const wchar_t* str) noexcept
+    std::string to_string(const wchar_t* wstr, int wlen) noexcept
     {
+        if (wlen <= 0) wlen = int(wcslen(wstr));
     #if _WIN32
-        int len = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
+        int utflen = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, nullptr, 0, nullptr, nullptr);
         std::string ret;
-        if (len > 0)
+        if (utflen > 0)
         {
             // len includes space for null term, which std::string already reserves
-            ret.resize(len - 1);
-            WideCharToMultiByte(CP_UTF8, 0, str, -1, (char*)ret.data(), len, nullptr, nullptr);
+            ret.resize(utflen - 1);
+            WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, (char*)ret.data(), utflen, nullptr, nullptr);
         }
         return ret;
     #else
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-        return cvt.to_bytes(str);
+        return cvt.to_bytes(wstr, wstr + wlen);
+    #endif
+    }
+
+    std::wstring to_wstring(const char* str, int utflen) noexcept
+    {
+        if (utflen <= 0) utflen = int(strlen(str));
+    #if _WIN32
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, str, utflen, nullptr, 0);
+        std::wstring ret;
+        if (wlen > 0)
+        {
+            // len includes space for null term, which std::wstring already reserves
+            ret.resize(wlen - 1);
+            MultiByteToWideChar(CP_UTF8, 0, str, utflen, (wchar_t*)ret.data(), wlen);
+        }
+        return ret;
+    #else
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
+        return cvt.from_bytes(str, str + utflen);
     #endif
     }
 
