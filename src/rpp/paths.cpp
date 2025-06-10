@@ -36,7 +36,14 @@ namespace rpp /* ReCpp */
     bool file_exists(const char* filename) noexcept
     {
         #if USE_WINAPI_IO
-            DWORD attr = GetFileAttributesA(filename);
+            DWORD attr;
+            // WIN32 will internally convert to wchar_t, but using ANSI codepage
+            // so we convert to wchar_t using UTF8 instead
+            wchar_t filename_u16[1024];
+            if (to_wstring(filename_u16, sizeof(filename_u16), filename) > 0)
+                attr = GetFileAttributesW(filename_u16);
+            else // string contained invalid UTF8 sequences, fall back to ANSI codepage
+                attr = GetFileAttributesA(filename);
             return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
         #else
             struct stat s;
@@ -55,6 +62,13 @@ namespace rpp /* ReCpp */
         #else
             return file_exists(rpp::to_string(filename).c_str());
         #endif
+    }
+
+    bool file_exists(wstrview filename) noexcept
+    {
+        if (filename.is_null_terminated())
+            return file_exists(filename);
+        return file_exists(filename.to_string().c_str()); // null terminate on the fly
     }
 
     bool is_symlink(const char* filename) noexcept
@@ -396,6 +410,10 @@ namespace rpp /* ReCpp */
         return false; // no way to delete, since some subtree files are protected
     }
 
+    bool delete_folder(wstrview foldername, delete_mode mode) noexcept
+    {
+
+    }
 
     std::string full_path(const char* path) noexcept
     {
@@ -469,7 +487,7 @@ namespace rpp /* ReCpp */
     }
 
 
-    std::string file_replace_ext(strview path, strview ext)
+    std::string file_replace_ext(strview path, strview ext) noexcept
     {
         if (strview oldext = file_ext(path))
         {
@@ -577,7 +595,8 @@ namespace rpp /* ReCpp */
         return res;
     }
 
-    template<size_t N> std::string slash_combine(const std::array<strview, N>& args)
+    template<class TString = std::string, class TStrView = rpp::strview, size_t N>
+    static TString slash_combine(const std::array<TStrView, N>& args)
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
@@ -588,14 +607,14 @@ namespace rpp /* ReCpp */
             }
         }
         
-        std::string result; result.reserve(res);
-        result.append(args[0].c_str(), args[0].size());
+        TString result; result.reserve(res);
+        result.append(args[0].data(), args[0].size());
 
         for (size_t i = 1; i < N; ++i) {
             if (auto n = static_cast<size_t>(args[i].size())) {
                 if (!result.empty())
                     result.append(1, '/');
-                result.append(args[i].c_str(), n);
+                result.append(args[i].data(), n);
             }
         }
         return result;
@@ -623,6 +642,49 @@ namespace rpp /* ReCpp */
         path3.trim("/\\");
         path4.trim("/\\");
         return slash_combine(std::array<strview, 4>{{path1, path2, path3, path4}});
+    }
+
+    static wstrview& trim_slashes_back(wstrview& str) noexcept
+    {
+        if (size_t pos = str.find_last_not_of(L"/\\"); pos != wstrview::npos)
+            str.remove_suffix(pos + 1);
+        return str;
+    }
+    static wstrview& trim_slashes_front(wstrview& str) noexcept
+    {
+        if (size_t pos = str.find_first_not_of(L"/\\"); pos != wstrview::npos)
+            str.remove_prefix(pos);
+        return str;
+    }
+    static wstrview& trim_slashes(wstrview& str) noexcept
+    {
+        trim_slashes_front(str);
+        trim_slashes_back(str);
+        return str;
+    }
+
+    std::wstring path_combine(wstrview path1, wstrview path2) noexcept
+    {
+        trim_slashes_back(path1);
+        trim_slashes(path2);
+        return slash_combine<std::wstring>(std::array<wstrview, 2>{{ path1, path2 }});
+    }
+
+    std::wstring path_combine(wstrview path1, wstrview path2, wstrview path3) noexcept
+    {
+        trim_slashes_back(path1);
+        trim_slashes(path2);
+        trim_slashes(path3);
+        return slash_combine<std::wstring>(std::array<wstrview, 3>{{ path1, path2, path3 }});
+    }
+
+    std::wstring path_combine(wstrview path1, wstrview path2, wstrview path3, wstrview path4) noexcept
+    {
+        trim_slashes_back(path1);
+        trim_slashes(path2);
+        trim_slashes(path3);
+        trim_slashes(path4);
+        return slash_combine<std::wstring>(std::array<wstrview, 3>{{ path1, path2, path3, path4 }});
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -838,14 +900,16 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    static void append_slash(char* path, int& len) noexcept
+    template<class TChar>
+    static void append_slash(TChar* path, int& len) noexcept
     {
-        if (path[len-1] != '/')
-            path[len++] = '/';
+        if (path[len-1] != TChar('/'))
+            path[len++] = TChar('/');
     }
 
     #if _WIN32
-    static void win32_fixup_path(char* path, int& len) noexcept
+    template<class TChar>
+    static void win32_fixup_path(TChar* path, int& len) noexcept
     {
         normalize(path);
         append_slash(path, len);
@@ -957,6 +1021,22 @@ namespace rpp /* ReCpp */
                 return { p, p + len };
             }
             return {};
+        #endif
+    }
+
+    std::wstring home_dirw() noexcept
+    {
+        #if _MSC_VER
+            size_t len = 0;
+            wchar_t path[512];
+            _wgetenv_s(&len, path, sizeof(path), L"USERPROFILE");
+            if (len == 0)
+                return {};
+            int slen = static_cast<int>(len) - 1;
+            win32_fixup_path(path, slen);
+            return { path, path + len };
+        #else
+            return to_wstring(home_dir());
         #endif
     }
     

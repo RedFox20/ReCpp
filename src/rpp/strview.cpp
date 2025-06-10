@@ -13,6 +13,8 @@
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
+    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
+    #include <codecvt> // codecvt_utf8
 #else
     #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
     #include <codecvt> // codecvt_utf8
@@ -874,35 +876,68 @@ namespace rpp
         if (wlen < 0) wlen = int(wcslen(wstr));
         if (wlen == 0) return std::string{}; // empty string
     #if _WIN32
-        int utflen = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, nullptr, 0, nullptr, nullptr);
+        int utf8len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, nullptr, 0, nullptr, nullptr);
         std::string ret;
-        if (utflen > 0) {
-            ret.resize(utflen);
-            WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, (char*)ret.data(), utflen, nullptr, nullptr);
+        if (utf8len > 0) {
+            ret.resize(utf8len);
+            WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, (char*)ret.data(), utf8len, nullptr, nullptr);
         }
         return ret;
     #else
+        // TODO: codecvt is deprected, but the other API-s don't even work
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
         return cvt.to_bytes(wstr, wstr + wlen);
     #endif
     }
 
-    std::wstring to_wstring(const char* str, int utflen) noexcept
+    std::wstring to_wstring(const char* utf8, int utf8len) noexcept
     {
-        if (utflen < 0) utflen = int(strlen(str));
-        if (utflen == 0) return std::wstring{};
+        if (utf8len < 0) utf8len = int(strlen(utf8));
+        if (utf8len == 0) return std::wstring{};
 
     #if _WIN32
-        int wlen = MultiByteToWideChar(CP_UTF8, 0, str, utflen, nullptr, 0);
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, nullptr, 0);
         std::wstring ret;
         if (wlen > 0) {
             ret.resize(wlen);
-            MultiByteToWideChar(CP_UTF8, 0, str, utflen, (wchar_t*)ret.data(), wlen);
+            MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)ret.data(), wlen);
         }
         return ret;
     #else
+        // TODO: codecvt is deprected, but the other API-s don't even work
         std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-        return cvt.from_bytes(str, str + utflen);
+        return cvt.from_bytes(utf8, utf8 + utf8len);
+    #endif
+    }
+    
+    int to_wstring(wchar_t* out, int out_max, const char* utf8, int utf8len) noexcept
+    {
+    #if false && _WIN32
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, out, out_max - 1);
+        if (wlen <= 0/*failed*/) {
+            int lasterr = GetLastError();
+            if (lasterr == ERROR_INSUFFICIENT_BUFFER) {
+                wlen = out_max - 1;
+            } else {
+                return 0; // failed -- invalid unicode characters or invalid inputs
+            }
+        }
+        out[wlen] = L'\0'; // always null terminate
+        return wlen; // success
+    #else
+        // TODO: codecvt is deprected, but the other API-s don't even work
+        std::codecvt_utf8<wchar_t> cvt;
+        std::mbstate_t state = std::mbstate_t();
+        wchar_t* to_next;
+        const char* from_next;
+        const char* from_end = (utf8len == -1) ? utf8 + strlen(utf8) : utf8 + utf8len;
+        auto res = cvt.in(state, utf8, from_end, from_next, out, out + out_max - 1, to_next);
+        if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
+            *to_next = L'\0';
+            return (int)(to_next - out);
+        }
+        *out = L'\0'; // always null terminate
+        return 0;
     #endif
     }
 

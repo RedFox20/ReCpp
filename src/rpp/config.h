@@ -134,6 +134,17 @@
 #  endif
 #endif
 
+/// @brief Unicode (wstring) support conditionally enabled for relevant platforms
+#ifndef RPP_ENABLE_UNICODE
+#  if defined(_MSC_VER) || defined(__ANDROID__)
+#    define RPP_ENABLE_UNICODE 
+#    define RPP_IN_UNICODE(...) __VA_ARGS__
+#  else
+#    define RPP_ENABLE_UNICODE 0
+#    define RPP_IN_UNICODE(...) // no-op
+#  endif
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE

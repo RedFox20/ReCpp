@@ -1,7 +1,10 @@
-﻿#include <fstream> // use fstream as a baseline
+﻿#if _MSC_VER
+#pragma execution_character_set("utf-8")
+#endif
 #include <rpp/file_io.h>
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
+#include <fstream> // use fstream as a baseline file utility to test against
 using namespace rpp;
 
 TestImpl(test_file_io)
@@ -9,6 +12,8 @@ TestImpl(test_file_io)
     std::string TestDir;
     std::string TestFile;
     int TestSize = 0;
+    std::wstring TestWFile;
+    std::wstring TestWDir;
 
     TestInit(test_file_io)
     {
@@ -21,6 +26,12 @@ TestImpl(test_file_io)
             Assert(delete_folder(TestDir, delete_mode::recursive));
         if (file_exists(TestFile))
             Assert(delete_file(TestFile));
+
+        // only for wstring tests
+        if (!TestWDir.empty())
+            Assert(delete_folder(TestWDir, delete_mode::recursive));
+        if (!TestWFile.empty())
+            Assert(delete_file(TestWFile));
     }
 
     TestCase(basic_file)
@@ -294,4 +305,16 @@ TestImpl(test_file_io)
         AssertThat(last(home_dir()), '/');
     }
 
+    // mostly for Win32 to validate that unicode paths work
+    // even if regular const char* / std::string paths are used
+    TestCase(can_handle_unicode_paths)
+    {
+        TestDir = path_combine(temp_dir(), "_rpp_test_tmp_unicode_😀𝄞ℵ€");
+        TestFile = path_combine(temp_dir(), "_rpp_test_unicode_😀𝄞ℵ€.txt");
+    }
+
+    TestCase(can_handle_wstring_paths)
+    {
+        TestWFile = path_combine(rpp::to_wstring(temp_dir()), L"_rpp_test_wstring_😀𝄞ℵ€.txt");
+    }
 };

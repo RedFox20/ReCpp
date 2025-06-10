@@ -209,6 +209,24 @@ namespace rpp
     #  endif
     #endif
 
+    /**
+     * @brief Currently there is no plan to add rpp::strview variant for wchar_t, since most text
+     *        processing can be done in UTF8 in modern days.
+     *        However, wstrview uses std::wstring_view as an adapter to support wchar_t string operations in API-s.
+     */
+    struct wstrview : public std::wstring_view
+    {
+        using std::wstring_view::wstring_view;
+
+        FINLINE constexpr wstrview(const std::wstring& s) noexcept : std::wstring_view{s.data(), s.size()} {}
+        FINLINE RPP_CONSTEXPR_STRLEN wstrview(const wchar_t* s) noexcept : std::wstring_view{s, std::char_traits<wchar_t>::length(s)} {}
+    
+        inline std::wstring to_string() const noexcept { return std::wstring{data(), size()}; }
+        inline bool is_null_terminated() const noexcept {
+            const wchar_t* ws = data();
+            return ws && ws[size()] == L'\0';
+        }
+    };
 
     /**
      * String token for efficient parsing.
@@ -239,12 +257,19 @@ namespace rpp
                                                      , len{static_cast<int>(std::char_traits<char>::length(reinterpret_cast<const char*>(str)))} {}
     #endif
 
+        // // avoid ambiguous conversion calls to overloaded functions
+        // strview(const wchar_t*) = delete;
+        // strview(wstrview) = delete;
+        // strview(const std::wstring&) = delete;
+
         template<class StringT>
-        using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
+        using enable_if_string_like_t = std::enable_if_t<
+            std::is_member_function_pointer<decltype(&StringT::c_str)>::value &&
+            sizeof(*std::declval<const StringT&>().c_str()) == 1
+        >;
 
         template<class StringT, typename = enable_if_string_like_t<StringT>>
         FINLINE constexpr strview(const StringT& str) noexcept : str{str.c_str()}, len{static_cast<int>(str.length())} {}
-        FINLINE constexpr const char& operator[](int index) const noexcept { return str[index]; }
 
         // disallow accidental init from char or bool
         strview(char) = delete;
@@ -324,6 +349,9 @@ namespace rpp
         FINLINE const char* end()   const noexcept { return str + len; }
         FINLINE char front() const noexcept { return *str; }
         FINLINE char back()  const noexcept { return str[len - 1]; }
+
+        FINLINE constexpr const char& operator[](int index) const noexcept { return str[index]; }
+
         /** @return TRUE if the strview is only whitespace: " \t\r\n"  */
         NOINLINE bool is_whitespace() const noexcept;
         /** @return TRUE if the strview ends with a null terminator */
@@ -1072,15 +1100,20 @@ namespace rpp
     /**
      * @brief Converts a Wide String to a UTF-8 String
      */
-    std::string to_string(const wchar_t* str, int wlen = -1) noexcept;
-    FINLINE std::string to_string(const std::wstring& str)   noexcept { return to_string(str.c_str(), static_cast<int>(str.size())); }
+    std::string to_string(const wchar_t* wstr, int wlen = -1) noexcept;
+    FINLINE std::string to_string(const std::wstring& utf8) noexcept { return to_string(utf8.c_str(), static_cast<int>(utf8.size())); }
+    FINLINE std::string to_string(wstrview utf8) noexcept { return to_string(utf8.data(), static_cast<int>(utf8.size())); }
 
     /**
      * @brief Converts a UTF-8 String to a Wide String
      */
-    std::wstring to_wstring(const char* str, int utflen = -1) noexcept;
-    FINLINE std::wstring to_wstring(strview str)              noexcept { return to_wstring(str.str, str.len); }
+    std::wstring to_wstring(const char* utf8, int utf8len = -1) noexcept;
+    FINLINE std::wstring to_wstring(strview utf8) noexcept { return to_wstring(utf8.str, utf8.len); }
 
+    /**
+     * @brief Buffer style conversion for less allocations
+     */
+    int to_wstring(wchar_t* out, int out_max, const char* utf8, int utf8len = -1) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
