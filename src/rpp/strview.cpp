@@ -853,16 +853,31 @@ namespace rpp
 
     ///////////// to_string(wchar)
 
+    bool is_likely_utf8(const char* str, int len) noexcept
+    {
+        const unsigned char* s = reinterpret_cast<const unsigned char*>(str);
+        for (int i = 0; i < len; ++i)
+        {
+            unsigned char byte = s[i];
+            // UTF-8 multi-byte sequences start with:
+            // 110xxxxx (0xC0-0xDF) for 2-byte sequences
+            // 1110xxxx (0xE0-0xEF) for 3-byte sequences  
+            // 11110xxx (0xF0-0xF7) for 4-byte sequences
+            if ((byte & 0xC0) == 0xC0 && (byte & 0xFE) != 0xFE)
+                return true; // found a likely UTF-8 start byte
+        }
+        return false; // did not detect a start byte
+    }
+
     std::string to_string(const wchar_t* wstr, int wlen) noexcept
     {
-        if (wlen <= 0) wlen = int(wcslen(wstr));
+        if (wlen < 0) wlen = int(wcslen(wstr));
+        if (wlen == 0) return std::string{}; // empty string
     #if _WIN32
         int utflen = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, nullptr, 0, nullptr, nullptr);
         std::string ret;
-        if (utflen > 0)
-        {
-            // len includes space for null term, which std::string already reserves
-            ret.resize(utflen - 1);
+        if (utflen > 0) {
+            ret.resize(utflen);
             WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, (char*)ret.data(), utflen, nullptr, nullptr);
         }
         return ret;
@@ -874,14 +889,14 @@ namespace rpp
 
     std::wstring to_wstring(const char* str, int utflen) noexcept
     {
-        if (utflen <= 0) utflen = int(strlen(str));
+        if (utflen < 0) utflen = int(strlen(str));
+        if (utflen == 0) return std::wstring{};
+
     #if _WIN32
         int wlen = MultiByteToWideChar(CP_UTF8, 0, str, utflen, nullptr, 0);
         std::wstring ret;
-        if (wlen > 0)
-        {
-            // len includes space for null term, which std::wstring already reserves
-            ret.resize(wlen - 1);
+        if (wlen > 0) {
+            ret.resize(wlen);
             MultiByteToWideChar(CP_UTF8, 0, str, utflen, (wchar_t*)ret.data(), wlen);
         }
         return ret;

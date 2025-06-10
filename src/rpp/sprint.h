@@ -117,7 +117,8 @@ namespace rpp
         void writef(PRINTF_FMTSTR const char* format, ...) noexcept PRINTF_CHECKFMT2;
 
         FINLINE void write(const std::string& value) noexcept { this->write(strview{ value }); }
-        FINLINE void write(const char* value)        noexcept { this->write(strview{ value, std::char_traits<char>::length(value) }); }
+        FINLINE void write(std::string_view value) noexcept { this->write(strview{ value.data(), static_cast<int>(value.size()) }); }
+        void write(const char* value) noexcept { this->write(strview{ value, std::char_traits<char>::length(value) }); }
 
         void write(strview s) noexcept;
         void write(char value) noexcept;
@@ -148,6 +149,20 @@ namespace rpp
             write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.data()), str.length());
         }
     #endif
+
+        // support Wide Strings by converting them to UTF-8
+        FINLINE void write(const std::wstring& value) noexcept
+        {
+            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size()));
+        }
+        FINLINE void write(std::wstring_view value) noexcept
+        {
+            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size()));
+        }
+        void write(const wchar_t* value) noexcept
+        {
+            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value), static_cast<int>(std::char_traits<wchar_t>::length(value)));
+        }
 
         void write(std::nullptr_t) noexcept;
         void write(const string_buffer& sb) noexcept;

@@ -320,6 +320,7 @@ namespace rpp
         static bool eq(float expr, float expected) noexcept { return fabs(expr - expected) < (FLT_EPSILON*2); }
         static bool eq(double expr, double expected) noexcept { return fabs(expr - expected) < (DBL_EPSILON*2); }
         template<class T> static bool eq(const std::atomic<T>& expr, const T& expected) noexcept { return expr.load() == expected; }
+        static bool eq(std::wstring_view expr, std::wstring_view expected) noexcept { return expr == expected; }
 
         // specifically support some C++ Std types
         template<class T, class A> static bool eq(const std::vector<T, A>& a, const std::vector<T, A>& b) noexcept
@@ -336,6 +337,7 @@ namespace rpp
         static bool gt(long unsigned int expr, long int than) noexcept { return expr > (long unsigned int)than; }
         static bool gt(long unsigned long expr, long long than) noexcept { return expr > (long unsigned long)than; }
         template<class T> static bool gt(const std::atomic<T>& expr, const T& expected) noexcept { return expr.load() > expected; }
+        static bool gt(std::wstring_view expr, std::wstring_view than) noexcept { return expr > than; }
 
         template<class Expr, class Than> static bool lt(const Expr& expr, const Than& than) noexcept
         {
@@ -346,6 +348,7 @@ namespace rpp
         static bool lt(long unsigned int expr, long int than) noexcept { return expr < (long unsigned int)than; }
         static bool lt(long unsigned long expr, long long than) noexcept { return expr < (long unsigned long)than; }
         template<class T> static bool lt(const std::atomic<T>& expr, const T& expected) noexcept { return expr.load() < expected; }
+        static bool lt(std::wstring_view expr, std::wstring_view than) noexcept { return expr < than; }
 
         template<class Expr, class Than> static bool lte(const Expr& expr, const Than& than) noexcept
         {

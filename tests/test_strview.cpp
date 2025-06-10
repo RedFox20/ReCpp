@@ -1,3 +1,6 @@
+﻿#if _MSC_VER
+#pragma execution_character_set("utf-8")
+#endif
 #include <rpp/tests.h>
 using namespace rpp;
 #include <limits>
@@ -287,5 +290,46 @@ TestImpl(test_strview)
         AssertGreater("bbbb", strview{"aaaaaaaa"});
         AssertGreater(strview{"bbbb"}, strview{"aaaaaaaa"});
         AssertGreater(std::string{"bbbb"}, strview{"aaaaaaaa"});
+    }
+
+    TestCase(can_detect_utf8_strings)
+    {
+        AssertEqual(strview{u8"𝕳𝖊𝖑𝖑𝖔"}.length(), 20);
+        AssertFalse(rpp::is_likely_utf8("hello"));
+        AssertTrue(rpp::is_likely_utf8(u8"hello: Привет"));
+        AssertTrue(rpp::is_likely_utf8(u8"hello: 你好"));
+        AssertTrue(rpp::is_likely_utf8(u8"hello: 𝕳𝖊𝖑𝖑𝖔"));
+        AssertTrue(rpp::is_likely_utf8(u8"2-byte sequence (€)"));
+        AssertTrue(rpp::is_likely_utf8(u8"3-byte sequence (ℵ)"));
+        AssertTrue(rpp::is_likely_utf8(u8"4-byte sequence (𝄞)"));
+        AssertTrue(rpp::is_likely_utf8(u8"valid utf8: 😀 𝄞 ℵ €"));
+    }
+
+    TestCase(can_convert_utf8_to_wstring)
+    {
+        std::wstring empty = rpp::to_wstring("");
+        AssertEqual(empty, L"");
+        AssertEqual(empty.length(), 0);
+
+        // this is a special case, 
+        std::wstring wstr = rpp::to_wstring(u8"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(wstr, L"𝕳𝖊𝖑𝖑𝖔");
+        AssertMsg(wstr.length() == 10u, "UTF8 converted into wstring UTF16");
+
+        wstr = rpp::to_wstring(u8"hello: Привет");
+        AssertEqual(wstr, L"hello: Привет");
+        AssertEqual(wstr.length(), 13);
+
+        wstr = rpp::to_wstring(u8"hello: 你好");
+        AssertEqual(wstr, L"hello: 你好");
+        AssertEqual(wstr.length(), 9);
+
+        wstr = rpp::to_wstring(u8"hello: 𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(wstr, L"hello: 𝕳𝖊𝖑𝖑𝖔");
+        AssertMsg(wstr.length() == 17u, "ASCII and UTF8 mix converted into wstring UCS2 and UTF16 mix");
+
+        wstr = rpp::to_wstring(u8"äääääää");
+        AssertEqual(wstr, L"äääääää");
+        AssertEqual(wstr.length(), 7);
     }
 };

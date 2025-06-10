@@ -234,6 +234,11 @@ namespace rpp
         FINLINE constexpr strview(const void* str, const void* end) noexcept : strview{static_cast<const char*>(str), static_cast<const char*>(end)} {}
         FINLINE strview(const std::string& s)                  noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
 
+    #ifdef __cpp_char8_t // fundamental type char8_t since C++20
+        FINLINE strview(const char8_t* str) noexcept : str{reinterpret_cast<const char*>(str)}
+                                                     , len{static_cast<int>(std::char_traits<char>::length(reinterpret_cast<const char*>(str)))} {}
+    #endif
+
         template<class StringT>
         using enable_if_string_like_t = std::enable_if_t<std::is_member_function_pointer<decltype(&StringT::c_str)>::value>;
 
@@ -1058,17 +1063,23 @@ namespace rpp
 
 
     /**
+     * @returns TRUE if the string appears to contain an UTF-8 start byte sequence.
+     * It will not validate if the string is a valid UTF-8 sequence.
+     */
+    bool is_likely_utf8(const char* str, int len) noexcept;
+    FINLINE bool is_likely_utf8(strview str) noexcept { return is_likely_utf8(str.str, str.len); }
+
+    /**
      * @brief Converts a Wide String to a UTF-8 String
      */
     std::string to_string(const wchar_t* str, int wlen = -1) noexcept;
-    inline std::string to_string(const std::wstring& str)   noexcept { return to_string(str.c_str(), static_cast<int>(str.size())); }
+    FINLINE std::string to_string(const std::wstring& str)   noexcept { return to_string(str.c_str(), static_cast<int>(str.size())); }
 
     /**
      * @brief Converts a UTF-8 String to a Wide String
      */
     std::wstring to_wstring(const char* str, int utflen = -1) noexcept;
-    inline std::wstring to_wstring(const std::string& str) noexcept { return to_wstring(str.c_str(), static_cast<int>(str.size())); }
-    inline std::wstring to_wstring(strview str)            noexcept { return to_wstring(str.str, str.len); }
+    FINLINE std::wstring to_wstring(strview str)              noexcept { return to_wstring(str.str, str.len); }
 
 
     ////////////////////////////////////////////////////////////////////////////////

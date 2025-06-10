@@ -283,6 +283,16 @@ namespace rpp
         memcpy(buf, c1.str, c1.len);
         memcpy(buf + c1.len, str, len);
         memcpy(buf + c1.len + len, c2.str, c2.len);
+
+    #if _MSC_VER
+        // windows: configure code page as UTF-8, so any UTF-8 characters are printed correctly
+        static bool have_configured_mode;
+        if (!have_configured_mode)
+        {
+            have_configured_mode = true;
+            SetConsoleOutputCP(CP_UTF8);
+        }
+    #endif
         fwrite(buf, total_len, 1, cout);
         fflush(cout); // flush needed for proper sync with unix-like shells
     #endif

@@ -213,8 +213,7 @@ namespace rpp
     raw_address::raw_address(address_family af) noexcept
         : Family{af}, FlowInfo{0}, ScopeId{0}
     {
-        if (af == AF_IPv4) Addr4 = INADDR_ANY;
-        else memset(Addr6, 0, sizeof(Addr6));
+        memset(Addr6, 0, sizeof(Addr6));
     }
 
     raw_address::raw_address(address_family af, uint32_t ipv4) noexcept : raw_address{af}
@@ -580,7 +579,7 @@ namespace rpp
         ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
         ULONG bufLen = 0;
         GetAdaptersAddresses(family, flags, nullptr, nullptr, &bufLen);
-        IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)alloca(bufLen);
+        IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)_malloca(bufLen);
 
         if (!GetAdaptersAddresses(family, flags, nullptr, ipa_addrs, &bufLen))
         {
@@ -638,6 +637,7 @@ namespace rpp
                 }
             }
         }
+        _freea(ipa_addrs); // free the allocated memory
     #else
         ifaddrs* if_addrs;
         if (!getifaddrs(&if_addrs))
@@ -1579,7 +1579,7 @@ namespace rpp
         std::unique_lock lock1 = rpp::spin_lock(Mtx);
         int sock = os_handle_unsafe();
         if (lock1.owns_lock())
-            lock1.unlock();
+            lock1.unlock(); // suppress warning
         if (sock == INVALID)
             return false;
 
@@ -1790,7 +1790,14 @@ namespace rpp
     {
         ready.clear();
         const int n = (int)in.size();
-        struct pollfd* pfd = (struct pollfd*)alloca(sizeof(struct pollfd) * n);
+        constexpr int MAX_LOCAL_FDS = 32;
+
+        struct pollfd local_pfd[MAX_LOCAL_FDS];
+        struct pollfd* pfd = local_pfd;
+        if (n > MAX_LOCAL_FDS)
+            pfd = (struct pollfd*)malloc(sizeof(struct pollfd) * n);
+
+        memset(pfd, 0, sizeof(struct pollfd) * n);
 
         const short events = short(
             ((pollFlags & PF_Read) ? POLLIN : 0) |
@@ -1809,17 +1816,23 @@ namespace rpp
     #else
         int r = ::poll(pfd, n, timeoutMillis);
     #endif
-        if (r < 0)
-            return false;
 
-        // BUGFIX: we don't trust the poll() return value, we double-check all of the sockets
-        for (int i = 0; i < n; ++i)
+        bool any_ready = false;
+        if (r >= 0)
         {
-            if (in[i]->on_poll_result(pfd[i].revents, pollFlags))
-                ready.push_back(i);
+            // BUGFIX: we don't trust the poll() return value, we double-check all of the sockets
+            for (int i = 0; i < n; ++i)
+            {
+                if (in[i]->on_poll_result(pfd[i].revents, pollFlags))
+                    ready.push_back(i);
+            }
+
+            any_ready = !ready.empty();
         }
 
-        return !ready.empty();
+        if (pfd != local_pfd)
+            free(pfd); // free the dynamically allocated pollfd array
+        return any_ready;
     }
 
     bool socket::on_poll_result(int revents, PollFlag pollFlags) noexcept

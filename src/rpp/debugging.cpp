@@ -227,6 +227,17 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                                                       ANDROID_LOG_ERROR;
         __android_log_write(priority, tag, str);
     #else
+
+        #if _MSC_VER
+            // windows: configure code page as UTF-8, so any UTF-8 characters are printed correctly
+            static bool have_configured_mode;
+            if (!have_configured_mode)
+            {
+                have_configured_mode = true;
+                SetConsoleOutputCP(CP_UTF8);
+            }
+        #endif
+
         FILE* cout = severity == LogSeverityError ? stderr : stdout;
         static constexpr rpp::strview colors[] = {
             "\x1b[0m",  // Default
