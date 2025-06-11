@@ -12,8 +12,8 @@ TestImpl(test_file_io)
     std::string TestDir;
     std::string TestFile;
     int TestSize = 0;
-    std::wstring TestWFile;
-    std::wstring TestWDir;
+    rpp::ustring TestWFile;
+    rpp::ustring TestWDir;
 
     TestInit(test_file_io)
     {

@@ -26,46 +26,34 @@ namespace rpp /* ReCpp */
     /**
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
-    RPPAPI bool file_exists(const char* filename) noexcept;
-    RPPAPI bool file_exists(const wchar_t* filename) noexcept;
-    inline bool file_exists(const std::string& filename) noexcept { return file_exists(filename.c_str()); }
-    inline bool file_exists(strview filename) noexcept { return file_exists(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI bool file_exists(wstrview filename) noexcept);
+    RPPAPI bool file_exists(strview filename) noexcept;
+    RPPAPI bool file_exists(ustrview filename) noexcept;
 
     /**
      * @return TRUE if the file is a symlink
      */
-    RPPAPI bool is_symlink(const char* filename) noexcept;
-    RPPAPI bool is_symlink(const wchar_t* filename) noexcept;
-    inline bool is_symlink(const std::string& filename) noexcept { return is_symlink(filename.c_str()); }
-    inline bool is_symlink(strview filename) noexcept { return is_symlink(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI bool is_symlink(wstrview filename) noexcept);
+    RPPAPI bool is_symlink(strview filename) noexcept;
+    RPPAPI bool is_symlink(ustrview filename) noexcept;
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
-    RPPAPI bool folder_exists(const char* folder) noexcept;
-    inline bool folder_exists(const std::string& folder) noexcept { return folder_exists(folder.c_str()); }
-    inline bool folder_exists(strview folder) noexcept { return folder_exists(folder.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI bool folder_exists(wstrview filename) noexcept);
+    RPPAPI bool folder_exists(strview folder) noexcept;
+    RPPAPI bool folder_exists(ustrview filename) noexcept;
 
     /**
      * @return TRUE if either a file or a folder exists at the given path
      */
-    RPPAPI bool file_or_folder_exists(const char* fileOrFolder) noexcept;
-    inline bool file_or_folder_exists(const std::string& folder) noexcept { return file_or_folder_exists(folder.c_str()); }
-    inline bool file_or_folder_exists(strview folder) noexcept { return file_or_folder_exists(folder.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI bool file_or_folder_exists(wstrview filename) noexcept);
+    RPPAPI bool file_or_folder_exists(strview fileOrFolder) noexcept;
+    RPPAPI bool file_or_folder_exists(ustrview fileOrFolder) noexcept;
 
     /**
      * @brief Creates a symbolic link to a file or folder
      * @param target Destination where the link will point to
      * @param link   Name of the link to create
      */
-    RPPAPI bool create_symlink(const char* target, const char* link) noexcept;
-    inline bool create_symlink(const std::string& target, const std::string& link) noexcept { return create_symlink(target.c_str(), link.c_str()); }
-    inline bool create_symlink(strview target, strview link) noexcept { return create_symlink(target.to_cstr(), link.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI bool create_symlink(wstrview target, wstrview link) noexcept);
+    RPPAPI bool create_symlink(strview target, strview link) noexcept;
+    RPPAPI bool create_symlink(ustrview target, ustrview link) noexcept;
 
     /**
      * @brief Gets basic information of a file
@@ -76,11 +64,11 @@ namespace rpp /* ReCpp */
      * @param modified (optional) If not null, writes the last file modification date
      * @return TRUE if the file exists and required data was retrieved from the OS
      */
-    bool file_info(const char* filename, int64*  filesize, time_t* created,
-                                         time_t* accessed, time_t* modified) noexcept;
+    RPPAPI bool file_info(strview filename, int64*  filesize, time_t* created,
+                                            time_t* accessed, time_t* modified) noexcept;
 
-    RPP_IN_UNICODE(bool file_info(wstrview filename, int64*  filesize, time_t* created,
-                                      time_t* accessed, time_t* modified) noexcept);
+    RPPAPI bool file_info(ustrview filename, int64*  filesize, time_t* created,
+                                             time_t* accessed, time_t* modified) noexcept;
 
     /**
      * @brief Gets basic information of a file
@@ -91,88 +79,74 @@ namespace rpp /* ReCpp */
      * @param modified (optional) If not null, writes the last file modification date
      * @return TRUE if the file exists and required data was retrieved from the OS
      */
-    bool file_info(intptr_t fd, int64*  filesize, time_t* created,
-                                time_t* accessed, time_t* modified) noexcept;
+    RPPAPI bool file_info(intptr_t fd, int64*  filesize, time_t* created,
+                                       time_t* accessed, time_t* modified) noexcept;
 
     /**
      * @return Short size of a file
      */
-    RPPAPI int file_size(const char* filename) noexcept;
-    inline int file_size(const std::string& filename) noexcept { return file_size(filename.c_str()); }
-    inline int file_size(strview filename) noexcept { return file_size(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI int file_size(wstrview filename) noexcept);
+    RPPAPI int file_size(strview filename) noexcept;
+    RPPAPI int file_size(ustrview filename) noexcept;
 
     /**
      * @return Long size of a file
      */
-    RPPAPI int64 file_sizel(const char* filename) noexcept;
-    inline int64 file_sizel(const std::string& filename) noexcept { return file_sizel(filename.c_str()); }
-    inline int64 file_sizel(strview filename) noexcept { return file_sizel(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI int64 file_sizel(wstrview filename) noexcept);
+    RPPAPI int64 file_sizel(strview filename) noexcept;
+    RPPAPI int64 file_sizel(ustrview filename) noexcept;
 
     /**
      * @return File creation date
      */
-    RPPAPI time_t file_created(const char* filename) noexcept;
-    inline time_t file_created(const std::string& filename) noexcept { return file_created(filename.c_str()); }
-    inline time_t file_created(strview filename) noexcept { return file_created(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI time_t file_created(wstrview filename) noexcept);
+    RPPAPI time_t file_created(strview filename) noexcept;
+    RPPAPI time_t file_created(ustrview filename) noexcept;
 
     /**
      * @return Last file access date
      */
-    RPPAPI time_t file_accessed(const char* filename) noexcept;
-    inline time_t file_accessed(const std::string& filename) noexcept { return file_accessed(filename.c_str()); }
-    inline time_t file_accessed(strview filename) noexcept { return file_accessed(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI time_t file_accessed(wstrview filename) noexcept);
+    RPPAPI time_t file_accessed(strview filename) noexcept;
+    RPPAPI time_t file_accessed(ustrview filename) noexcept;
 
     /**
      * @return Last file modification date
      */
-    RPPAPI time_t file_modified(const char* filename) noexcept;
-    inline time_t file_modified(const std::string& filename) noexcept { return file_modified(filename.c_str()); }
-    inline time_t file_modified(strview filename) noexcept { return file_modified(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI time_t file_modified(wstrview filename) noexcept);
+    RPPAPI time_t file_modified(strview filename) noexcept;
+    RPPAPI time_t file_modified(ustrview filename) noexcept;
 
     /**
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
-    RPPAPI bool delete_file(const char* filename) noexcept;
-    inline bool delete_file(const std::string& filename) noexcept { return delete_file(filename.c_str());   }
-    inline bool delete_file(strview filename) noexcept { return delete_file(filename.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI bool delete_file(wstrview filename) noexcept);
+    RPPAPI bool delete_file(strview filename) noexcept;
+    RPPAPI bool delete_file(ustrview filename) noexcept;
 
     /**
      * @brief Copies sourceFile to destinationFile, overwriting the previous file!
      * @note File access rights are also copied
      * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
      */
-    RPPAPI bool copy_file(const char* sourceFile, const char* destinationFile) noexcept;
     RPPAPI bool copy_file(strview sourceFile, strview destinationFile) noexcept;
-    RPP_IN_UNICODE(RPPAPI bool copy_file(wstrview sourceFile, wstrview destinationFile) noexcept);
+    RPPAPI bool copy_file(ustrview sourceFile, ustrview destinationFile) noexcept;
 
     /**
      * @brief Copies file access rights from sourceFile to destinationFile
      * @return TRUE if file access rights were copied successfully
      */
-    RPPAPI bool copy_file_mode(const char* sourceFile, const char* destinationFile) noexcept;
     RPPAPI bool copy_file_mode(strview sourceFile, strview destinationFile) noexcept;
-    RPP_IN_UNICODE(RPPAPI bool copy_file_mode(wstrview sourceFile, wstrview destinationFile) noexcept);
+    RPPAPI bool copy_file_mode(ustrview sourceFile, ustrview destinationFile) noexcept;
 
     /**
      * @brief Copies sourceFile to destinationFile IF destinationFile doesn't exist
      * @return TRUE if destinationFile exists or copy_file return true
      */
     RPPAPI bool copy_file_if_needed(strview sourceFile, strview destinationFile) noexcept;
-    RPP_IN_UNICODE(RPPAPI bool copy_file_if_needed(wstrview sourceFile, wstrview destinationFile) noexcept);
+    RPPAPI bool copy_file_if_needed(ustrview sourceFile, ustrview destinationFile) noexcept;
 
     /**
      * @brief Copies sourceFile into destinationFolder, overwriting the previous file!
      * @return TRUE if sourceFile was opened && destinationFolder was created && copied successfully
      */
     RPPAPI bool copy_file_into_folder(strview sourceFile, strview destinationFolder) noexcept;
-    RPP_IN_UNICODE(RPPAPI bool copy_file_into_folder(wstrview sourceFile, wstrview destinationFolder) noexcept);
+    RPPAPI bool copy_file_into_folder(ustrview sourceFile, ustrview destinationFolder) noexcept;
 
     /**
      * Creates a folder, recursively creating folders that do not exist
@@ -180,9 +154,8 @@ namespace rpp /* ReCpp */
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */
     RPPAPI bool create_folder(strview foldername) noexcept;
-    RPPAPI bool create_folder(const wchar_t* foldername) noexcept;
-    RPPAPI bool create_folder(const std::wstring& foldername) noexcept;
-    RPP_IN_UNICODE(RPPAPI bool create_folder(wstrview foldername) noexcept);
+    RPPAPI bool create_folder(ustrview foldername) noexcept;
+
 
     enum class delete_mode
     {
@@ -197,22 +170,21 @@ namespace rpp /* ReCpp */
      * @return TRUE if the folder was deleted
      */
     RPPAPI bool delete_folder(strview foldername, delete_mode mode = delete_mode::non_recursive) noexcept;
-    RPP_IN_UNICODE(RPPAPI bool delete_folder(wstrview foldername, delete_mode mode = delete_mode::non_recursive) noexcept);
+    RPPAPI bool delete_folder(ustrview foldername, delete_mode mode = delete_mode::non_recursive) noexcept;
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
      * @result "path" ==> "C:\Projects\Test\path" 
      */
-    RPPAPI std::string full_path(const char* path) noexcept;
-    inline std::string full_path(const std::string& path) noexcept { return full_path(path.c_str());   }
-    inline std::string full_path(const strview path) noexcept { return full_path(path.to_cstr()); }
-    RPP_IN_UNICODE(RPPAPI std::wstring full_path(wstrview path) noexcept);
+    RPPAPI string full_path(strview path) noexcept;
+    RPPAPI ustring full_path(ustrview path) noexcept;
 
     /**
      * @brief Merges all ../ inside of a path
      * @result  ../lib/../bin/file.txt ==> ../bin/file.txt
      */
-    RPPAPI std::string merge_dirups(strview path) noexcept;
+    RPPAPI string merge_dirups(strview path) noexcept;
+    RPPAPI string merge_dirups(ustrview path) noexcept;
 
     /**
      * @brief Extract the filename (no extension) from a file path
@@ -225,7 +197,7 @@ namespace rpp /* ReCpp */
      * @result /.git/filewnoext   ==> filewnoext
      */
     RPPAPI strview file_name(strview path) noexcept;
-    RPP_IN_UNICODE(RPPAPI wstrview file_name(wstrview path) noexcept);
+    RPPAPI ustrview file_name(ustrview path) noexcept;
 
     /**
      * @brief Extract the file part (with ext) from a file path
@@ -235,7 +207,7 @@ namespace rpp /* ReCpp */
      * @result file.ext           ==> file.ext
      */
     RPPAPI strview file_nameext(strview path) noexcept;
-    RPP_IN_UNICODE(RPPAPI wstrview file_nameext(wstrview path) noexcept);
+    RPPAPI ustrview file_nameext(ustrview path) noexcept;
 
     /**
      * @brief Extract the extension from a file path
@@ -247,7 +219,7 @@ namespace rpp /* ReCpp */
      * @result /.git/filewnoext   ==> 
      */
     RPPAPI strview file_ext(strview path) noexcept;
-    RPP_IN_UNICODE(RPPAPI wstrview file_ext(wstrview path) noexcept);
+    RPPAPI ustrview file_ext(ustrview path) noexcept;
 
     /**
      * @brief Replaces the current file path extension
@@ -257,8 +229,8 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.old      ==> file.new
      */
-    RPPAPI std::string file_replace_ext(strview path, strview ext) noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring file_replace_ext(wstrview path, wstrview ext) noexcept);
+    RPPAPI string file_replace_ext(strview path, strview ext) noexcept;
+    RPPAPI ustring file_replace_ext(ustrview path, ustrview ext) noexcept;
     
     /**
      * @brief Changes only the file name by appending a string, leaving directory and extension untouched
@@ -267,8 +239,8 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.txt      ==> fileadd.txt
      */
-    RPPAPI std::string file_name_append(strview path, strview add) noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring file_name_append(wstrview path, wstrview add) noexcept);
+    RPPAPI string file_name_append(strview path, strview add) noexcept;
+    RPPAPI ustring file_name_append(ustrview path, ustrview add) noexcept;
     
     /**
      * @brief Replaces only the file name of the path, leaving directory and extension untouched
@@ -277,8 +249,8 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.txt      ==> replaced.txt
      */
-    RPPAPI std::string file_name_replace(strview path, strview newFileName) noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring file_name_replace(wstrview path, wstrview newFileName) noexcept);
+    RPPAPI string file_name_replace(strview path, strview newFileName) noexcept;
+    RPPAPI ustring file_name_replace(ustrview path, ustrview newFileName) noexcept;
     
     /**
      * @brief Replaces the file name and extension, leaving directory untouched
@@ -287,8 +259,8 @@ namespace rpp /* ReCpp */
      * @result /dir/         ==> /dir/
      * @result file.txt      ==> replaced.bin
      */
-    RPPAPI std::string file_nameext_replace(strview path, strview newFileNameAndExt) noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring file_nameext_replace(wstrview path, wstrview newFileNameAndExt) noexcept);
+    RPPAPI string file_nameext_replace(strview path, strview newFileNameAndExt) noexcept;
+    RPPAPI ustring file_nameext_replace(ustrview path, ustrview newFileNameAndExt) noexcept;
 
     /**
      * @brief Extract the foldername from a path name
@@ -299,7 +271,7 @@ namespace rpp /* ReCpp */
      * @result file.ext           ==> 
      */
     RPPAPI strview folder_name(strview path) noexcept;
-    RPP_IN_UNICODE(RPPAPI wstrview folder_name(wstrview path) noexcept);
+    RPPAPI ustrview folder_name(ustrview path) noexcept;
 
     /**
      * @brief Extracts the full folder path from a file path.
@@ -311,9 +283,7 @@ namespace rpp /* ReCpp */
      * @result file.ext           ==> 
      */
     RPPAPI strview folder_path(strview path) noexcept;
-    RPPAPI std::wstring folder_path(const wchar_t* path) noexcept;
-    RPPAPI std::wstring folder_path(const std::wstring& path) noexcept;
-    RPP_IN_UNICODE(RPPAPI wstrview folder_path(wstrview path) noexcept);
+    RPPAPI ustrview folder_path(ustrview path) noexcept;
 
     /**
      * @brief Normalizes the path string to use a specific type of slash
@@ -322,17 +292,17 @@ namespace rpp /* ReCpp */
      *
      * @result \root/dir\\file.ext ==> /root/dir/file.ext
      */
-    RPPAPI std::string& normalize(std::string& path, char sep = '/') noexcept;
-    RPPAPI char* normalize(char* path, char sep = '/') noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring& normalize(std::wstring& path, wchar_t sep = L'/') noexcept);
-    RPP_IN_UNICODE(RPPAPI wchar_t* normalize(wchar_t* path, char sep = '/') noexcept);
+    RPPAPI string& normalize(string& path, char sep = '/') noexcept;
+    RPPAPI char*   normalize(char* path, char sep = '/') noexcept;
+    RPPAPI ustring&  normalize(ustring& path, char16_t sep = u'/') noexcept;
+    RPPAPI char16_t* normalize(char16_t* path, char16_t sep = u'/') noexcept;
 
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note A copy of the string is made
      */
-    RPPAPI std::string normalized(strview path, char sep = '/') noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring normalized(wstrview path, wchar_t sep = L'/') noexcept);
+    RPPAPI string normalized(strview path, char sep = '/') noexcept;
+    RPPAPI ustring normalized(ustrview path, char16_t sep = u'/') noexcept;
     
     /**
      * @brief Efficiently combines path strings, removing any repeated / or \
@@ -341,17 +311,18 @@ namespace rpp /* ReCpp */
      * @result path_combine("tmp/", "/file.txt") ==> "tmp/file.txt"
      * @result path_combine("tmp/", "/folder//") ==> "tmp/folder"
      */
-    RPPAPI std::string path_combine(strview path1, strview path2) noexcept;
-    RPPAPI std::string path_combine(strview path1, strview path2, strview path3) noexcept;
-    RPPAPI std::string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept;
+    RPPAPI string path_combine(strview path1, strview path2) noexcept;
+    RPPAPI string path_combine(strview path1, strview path2, strview path3) noexcept;
+    RPPAPI string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept;
 
+#if RPP_ENABLE_UNICODE
     /**
      * @brief Efficiently combines two WideChar path strings, removing any repeated / or \
      */
-    RPP_IN_UNICODE(RPPAPI std::wstring path_combine(wstrview path1, wstrview path2) noexcept);
-    RPP_IN_UNICODE(RPPAPI std::wstring path_combine(wstrview path1, wstrview path2, wstrview path3) noexcept);
-    RPP_IN_UNICODE(RPPAPI std::wstring path_combine(wstrview path1, wstrview path2, wstrview path3, wstrview path4) noexcept);
-
+    RPPAPI ustring path_combine(ustrview path1, ustrview path2) noexcept;
+    RPPAPI ustring path_combine(ustrview path1, ustrview path2, ustrview path3) noexcept;
+    RPPAPI ustring path_combine(ustrview path1, ustrview path2, ustrview path3, ustrview path4) noexcept;
+#endif
     ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -380,14 +351,14 @@ namespace rpp /* ReCpp */
         };
 
         dummy s; // iterator state
-        const std::string dir;       // original path used to construct this dir_iterator
-        const std::string reldir;    // relative directory
-        mutable std::string fulldir; // full path to directory we're iterating
+        const string dir;       // original path used to construct this dir_iterator
+        const string reldir;    // relative directory
+        mutable string fulldir; // full path to directory we're iterating
 
     public:
         explicit dir_iterator(const strview& dir) noexcept : dir_iterator{ dir.to_string() } {}
-        explicit dir_iterator(const std::string& dir) noexcept : dir_iterator{ std::string{dir} } {}
-        explicit dir_iterator(std::string&& dir) noexcept;
+        explicit dir_iterator(const string& dir) noexcept : dir_iterator{ string{dir} } {}
+        explicit dir_iterator(string&& dir) noexcept;
         ~dir_iterator() noexcept;
 
         dir_iterator(dir_iterator&& it) = delete;
@@ -401,8 +372,8 @@ namespace rpp /* ReCpp */
             const strview name;
 
             entry(const dir_iterator* it) noexcept : it{it}, name{it->name()}  {}
-            std::string path() const noexcept { return path_combine(it->path(), name); }
-            std::string full_path() const noexcept { return path_combine(it->full_path(), name); }
+            string path() const noexcept { return path_combine(it->path(), name); }
+            string full_path() const noexcept { return path_combine(it->full_path(), name); }
 
             /** @returns TRUE if this is a directory */
             bool is_dir() const noexcept { return it->is_dir(); }
@@ -422,14 +393,14 @@ namespace rpp /* ReCpp */
             // dirs that aren't "." or ".." are valid
             bool is_valid_dir() const noexcept { return is_dir() && !is_special_dir(); }
 
-            bool add_path_to(std::vector<std::string>& out) const noexcept {
+            bool add_path_to(std::vector<string>& out) const noexcept {
                 if (is_valid()) {
                     out.emplace_back(path());
                     return true;
                 }
                 return false;
             }
-            bool add_full_path_to(std::vector<std::string>& out) const noexcept {
+            bool add_full_path_to(std::vector<string>& out) const noexcept {
                 if (is_valid()) {
                     out.emplace_back(full_path());
                     return true;
@@ -461,10 +432,10 @@ namespace rpp /* ReCpp */
         iter end() const noexcept { return { nullptr }; }
 
         // original path used to construct this dir_iterator
-        const std::string& path() const noexcept { return dir; }
+        const string& path() const noexcept { return dir; }
 
         // full path to directory we're iterating
-        const std::string& full_path() const noexcept {
+        const string& full_path() const noexcept {
             return fulldir.empty() ? (fulldir = rpp::full_path(dir)) : fulldir;
         }
     };
@@ -512,20 +483,22 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_dirs(std::vector<std::string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
+    RPPAPI int list_dirs(std::vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
+    RPPAPI int list_dirs(std::vector<ustring>& out, ustrview dir, bool recursive = false, bool fullpath = false) noexcept;
 
-    inline std::vector<std::string> list_dirs(strview dir, bool recursive = false, bool fullpath = false) noexcept {
-        std::vector<std::string> out;
+    template<StringViewType T>
+    inline auto list_dirs(T dir, bool recursive = false, bool fullpath = false) noexcept -> std::vector<typename T::string_t> {
+        std::vector<typename T::string_t> out;
         list_dirs(out, dir, recursive, fullpath);
         return out;
     }
-    inline int list_dirs_fullpath(std::vector<std::string>& out, strview dir, bool recursive = false) noexcept {
-        return list_dirs(out, dir, recursive, true);
-    }
-    inline std::vector<std::string> list_dirs_fullpath(strview dir, bool recursive = false) noexcept {
+
+    template<StringViewType T>
+    inline auto list_dirs_fullpath(T dir, bool recursive = false) noexcept -> std::vector<typename T::string_t> {
         return list_dirs(dir, recursive, true);
     }
-    inline std::vector<std::string> list_dirs_fullpath_recursive(strview dir) noexcept {
+    template<StringViewType T>
+    inline auto list_dirs_fullpath_recursive(T dir) noexcept -> std::vector<typename T::string_t> {
         return list_dirs(dir, true, true);
     }
 
@@ -554,17 +527,19 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_dirs_relpath(std::vector<std::string>& out, strview dir, bool recursive = false) noexcept;
+    RPPAPI int list_dirs_relpath(std::vector<string>& out, strview dir, bool recursive = false) noexcept;
+    RPPAPI int list_dirs_relpath(std::vector<ustring>& out, ustrview dir, bool recursive = false) noexcept;
 
-    inline std::vector<std::string> list_dirs_relpath(strview dir, bool recursive = false) noexcept {
-        std::vector<std::string> out;
+    template<StringViewType T>
+    inline auto list_dirs_relpath(T dir, bool recursive = false) noexcept -> std::vector<typename T::string_t> {
+        std::vector<string> out;
         list_dirs_relpath(out, dir, recursive);
         return out;
     }
-    inline std::vector<std::string> list_dirs_relpath_recursive(strview dir) noexcept {
-        std::vector<std::string> out;
-        list_dirs_relpath(out, dir, true);
-        return out;
+
+    template<StringViewType T>
+    inline auto list_dirs_relpath_recursive(T dir) noexcept -> std::vector<typename T::string_t> {
+        return list_dirs_relpath<T>(dir, true);
     }
 
 
@@ -613,30 +588,26 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_files(std::vector<std::string>& out, strview dir, strview suffix = {}, bool recursive = false, bool fullpath = false) noexcept;
-    inline std::vector<std::string> list_files(strview dir, strview suffix = {}, bool recursive = false, bool fullpath = false) noexcept {
-        std::vector<std::string> out;
+    RPPAPI int list_files(std::vector<string>& out, strview dir, strview suffix = {}, bool recursive = false, bool fullpath = false) noexcept;
+    RPPAPI int list_files(std::vector<ustring>& out, ustrview dir, ustrview suffix = {}, bool recursive = false, bool fullpath = false) noexcept;
+
+    template<StringViewType T>
+    inline auto list_files(T dir, T suffix = {}, bool recursive = false, bool fullpath = false) noexcept -> std::vector<typename T::string_t> {
+        std::vector<typename T::string_t> out;
         list_files(out, dir, suffix, recursive, fullpath);
         return out;
     }
 
-    inline int list_files_fullpath(std::vector<std::string>& out, strview dir, strview suffix = {}, bool recursive = false) noexcept {
-        return list_files(out, dir, suffix, recursive, true);
-    }
-    inline int list_files_recursive(std::vector<std::string>& out, strview dir, strview suffix = {}) noexcept {
-        return list_files(out, dir, suffix, true, false);
-    }
-    inline int list_files_fullpath_recursive(std::vector<std::string>& out, strview dir, strview suffix = {}) noexcept {
-        return list_files(out, dir, suffix, true, true);
-    }
-
-    inline std::vector<std::string> list_files_fullpath(strview dir, strview suffix = {}) noexcept {
+    template<StringViewType T>
+    inline auto list_files_fullpath(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
         return list_files(dir, suffix, false, true);
     }
-    inline std::vector<std::string> list_files_recursive(strview dir, strview suffix = {}) noexcept {
+    template<StringViewType T>
+    inline auto list_files_recursive(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
         return list_files(dir, suffix, true, false);
     }
-    inline std::vector<std::string> list_files_fullpath_recursive(strview dir, strview suffix = {}) noexcept {
+    template<StringViewType T>
+    inline auto list_files_fullpath_recursive(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
         return list_files(dir, suffix, true, true);
     }
 
@@ -671,17 +642,19 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_files_relpath(std::vector<std::string>& out, strview dir, strview suffix = {}, bool recursive = false) noexcept;
+    RPPAPI int list_files_relpath(std::vector<string>& out, strview dir, strview suffix = {}, bool recursive = false) noexcept;
+    RPPAPI int list_files_relpath(std::vector<ustring>& out, ustrview dir, ustrview suffix = {}, bool recursive = false) noexcept;
 
-    inline std::vector<std::string> list_files_relpath(strview dir, strview suffix = {}, bool recursive = false) noexcept {
-        std::vector<std::string> out;
+    template<StringViewType T>
+    inline auto list_files_relpath(T dir, T suffix = {}, bool recursive = false) noexcept -> std::vector<typename T::string_t> {
+        std::vector<typename T::string_t> out;
         list_files_relpath(out, dir, suffix, recursive);
         return out;
     }
-    inline std::vector<std::string> list_files_relpath_recursive(strview dir, strview suffix = {}) noexcept {
-        std::vector<std::string> out;
-        list_files_relpath(out, dir, suffix, true);
-        return out;
+
+    template<StringViewType T>
+    inline auto list_files_relpath_recursive(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
+        return list_files_relpath(dir, suffix, true);
     }
 
 
@@ -694,8 +667,11 @@ namespace rpp /* ReCpp */
      * @param fullpath  [false] If true, full paths will be resolved
      * @return vector of resulting relative file paths
      */
-    RPPAPI std::vector<std::string> list_files(strview dir, const std::vector<strview>& suffixes, bool recursive = false, bool fullpath = false) noexcept;
-    inline std::vector<std::string> list_files_recursive(strview dir, const std::vector<strview>& suffixes, bool fullpath = false) noexcept {
+    RPPAPI std::vector<string> list_files(strview dir, const std::vector<strview>& suffixes, bool recursive = false, bool fullpath = false) noexcept;
+    RPPAPI std::vector<ustring> list_files(ustrview dir, const std::vector<ustrview>& suffixes, bool recursive = false, bool fullpath = false) noexcept;
+
+    template<StringViewType T>
+    inline auto list_files_recursive(T dir, const std::vector<T>& suffixes, bool fullpath = false) noexcept -> std::vector<typename T::string_t> {
         return list_files(dir, suffixes, true, fullpath);
     }
 
@@ -718,9 +694,10 @@ namespace rpp /* ReCpp */
      *     // files: { ".git/config", ..., ".gitignore", ... }
      * @endcode
      */
-    RPPAPI int list_alldir(std::vector<std::string>& outDirs, std::vector<std::string>& outFiles, strview dir,
+    RPPAPI int list_alldir(std::vector<string>& outDirs, std::vector<string>& outFiles, strview dir,
                            bool recursive = false, bool fullpath = false) noexcept;
-
+    RPPAPI int list_alldir(std::vector<ustring>& outDirs, std::vector<ustring>& outFiles, ustrview dir,
+                           bool recursive = false, bool fullpath = false) noexcept;
 
     /**
      * Lists all files and folders inside a dir as relative paths to input dir
@@ -739,8 +716,12 @@ namespace rpp /* ReCpp */
      *     // files: { "ReCpp/.git/config", ..., "ReCpp/.gitignore", ... }
      * @endcode
      */
-    RPPAPI int list_alldir_relpath(std::vector<std::string>& outDirs, std::vector<std::string>& outFiles, strview dir, bool recursive = false) noexcept;
-    inline int list_alldir_relpath_recursive(std::vector<std::string>& outDirs, std::vector<std::string>& outFiles, strview dir) noexcept {
+    RPPAPI int list_alldir_relpath(std::vector<string>& outDirs, std::vector<string>& outFiles, strview dir, bool recursive = false) noexcept;
+    RPPAPI int list_alldir_relpath(std::vector<ustring>& outDirs, std::vector<ustring>& outFiles, ustrview dir, bool recursive = false) noexcept;
+
+
+    template<StringViewType T>
+    inline int list_alldir_relpath_recursive(std::vector<typename T::string_t>& outDirs, std::vector<typename T::string_t>& outFiles, T dir) noexcept {
         return list_alldir_relpath(outDirs, outFiles, dir, true);
     }
 
@@ -752,7 +733,7 @@ namespace rpp /* ReCpp */
      * @example Linux:   "/home/jorma/Projects/ReCpp/"
      * @example Windows: "C:/Projects/ReCpp/"
      */
-    RPPAPI std::string working_dir() noexcept;
+    RPPAPI string working_dir() noexcept;
 
 
     /**
@@ -779,7 +760,7 @@ namespace rpp /* ReCpp */
      * string modulePath = rpp::module_dir(GetModuleHandle("fbxsdk"));
      * @endcode
      */
-    RPPAPI std::string module_dir(void* moduleObject = nullptr) noexcept;
+    RPPAPI string module_dir(void* moduleObject = nullptr) noexcept;
 
 
     /**
@@ -787,7 +768,7 @@ namespace rpp /* ReCpp */
      * resulting in a full path to enclosing binary.
      * Path is always normalized to forward slashes /
      */
-    RPPAPI std::string module_path(void* moduleObject = nullptr) noexcept;
+    RPPAPI string module_path(void* moduleObject = nullptr) noexcept;
 
 
     /**
@@ -795,7 +776,7 @@ namespace rpp /* ReCpp */
      * @return TRUE if chdir() is successful
      */
     RPPAPI bool change_dir(const char* new_wd) noexcept;
-    inline bool change_dir(const std::string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
+    inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
     inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
 
     /**
@@ -805,8 +786,8 @@ namespace rpp /* ReCpp */
      * A trailing slash is always appended to the path
      * Path is always normalized to forward slashes /
      */
-    RPPAPI std::string temp_dir() noexcept;
-    RPP_IN_UNICODE(inline std::wstring temp_dirw() noexcept { return to_wstring(temp_dir()); })
+    RPPAPI string temp_dir() noexcept;
+    inline ustring temp_dirw() noexcept { return to_ustring(temp_dir()); }
     
     /**
      * @return The system home directory for this user
@@ -814,8 +795,8 @@ namespace rpp /* ReCpp */
      * A trailing slash is always appended to the path.
      * Path is always normalized to forward slashes /
      */
-    RPPAPI std::string home_dir() noexcept;
-    RPP_IN_UNICODE(RPPAPI std::wstring home_dirw() noexcept);
+    RPPAPI string home_dir() noexcept;
+    RPPAPI ustring home_dirw() noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 

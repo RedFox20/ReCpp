@@ -305,31 +305,36 @@ TestImpl(test_strview)
         AssertTrue(rpp::is_likely_utf8(u8"valid utf8: 😀 𝄞 ℵ €"));
     }
 
-    TestCase(can_convert_utf8_to_wstring)
+    TestCase(can_convert_utf8_to_utf16)
     {
-        std::wstring empty = rpp::to_wstring("");
-        AssertEqual(empty, L"");
+        rpp::ustring empty = rpp::to_ustring("");
+        AssertEqual(empty, u"");
         AssertEqual(empty.length(), 0);
 
         // this is a special case, 
-        std::wstring wstr = rpp::to_wstring(u8"𝕳𝖊𝖑𝖑𝖔");
-        AssertEqual(wstr, L"𝕳𝖊𝖑𝖑𝖔");
-        AssertMsg(wstr.length() == 10u, "UTF8 converted into wstring UTF16");
+        rpp::ustring ustr = rpp::to_ustring(u8"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(ustr, u"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(ustr.size(), 10u);
 
-        wstr = rpp::to_wstring(u8"hello: Привет");
-        AssertEqual(wstr, L"hello: Привет");
-        AssertEqual(wstr.length(), 13);
+        ustr = rpp::to_ustring(u8"hello: Привет");
+        AssertEqual(ustr, u"hello: Привет");
+        AssertEqual(ustr.length(), 13);
 
-        wstr = rpp::to_wstring(u8"hello: 你好");
-        AssertEqual(wstr, L"hello: 你好");
-        AssertEqual(wstr.length(), 9);
+        ustr = rpp::to_ustring(u8"hello: 你好");
+        AssertEqual(ustr, u"hello: 你好");
+        AssertEqual(ustr.length(), 9);
 
-        wstr = rpp::to_wstring(u8"hello: 𝕳𝖊𝖑𝖑𝖔");
-        AssertEqual(wstr, L"hello: 𝕳𝖊𝖑𝖑𝖔");
-        AssertMsg(wstr.length() == 17u, "ASCII and UTF8 mix converted into wstring UCS2 and UTF16 mix");
+        ustr = rpp::to_ustring(u8"hello: 𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(ustr, u"hello: 𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(ustr.length(), 17u);
 
-        wstr = rpp::to_wstring(u8"äääääää");
-        AssertEqual(wstr, L"äääääää");
-        AssertEqual(wstr.length(), 7);
+        ustr = rpp::to_ustring(u8"äääääää");
+        AssertEqual(ustr, u"äääääää");
+        AssertEqual(ustr.length(), 7);
+
+        char16_t ubuf[512];
+        int ulen = rpp::to_ustring(ubuf, 512, u8"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(ulen, 10);
+        AssertEqual(rpp::ustring{ ubuf, ulen }, u"𝕳𝖊𝖑𝖑𝖔");
     }
 };
