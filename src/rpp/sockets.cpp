@@ -1212,7 +1212,7 @@ namespace rpp
         int errcode = err ? err : os_getsockerr();
         switch (errcode) {
             case 0: return SE_NONE;
-            default: return (socket::error)errcode;
+            default: return SE_UNKNOWN; // unknown error, not in the list below
             case ESOCK(ENETRESET):     return SE_NETRESET;
             case ESOCK(EMSGSIZE):      return SE_MSGSIZE;
             case ESOCK(EINPROGRESS):   return SE_INPROGRESS;
