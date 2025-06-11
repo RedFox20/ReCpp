@@ -157,10 +157,8 @@
 #ifndef FINLINE
 #  if _MSC_VER
 #    define FINLINE __forceinline
-#  elif __APPLE__
-#    define FINLINE inline __attribute__((always_inline))
 #  else
-#    define FINLINE __attribute__((always_inline))
+#    define FINLINE inline __attribute__((always_inline))
 #  endif
 #endif
 
