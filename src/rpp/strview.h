@@ -976,6 +976,10 @@ namespace rpp
         FINLINE ustrview(const string_t& s)                  noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
         FINLINE ustrview(const string_view_t& s)             noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
 
+    #if _MSC_VER
+        FINLINE ustrview(const wchar_t* wstr) noexcept : str{reinterpret_cast<const char16_t*>(wstr)}, len{static_cast<int>(std::char_traits<wchar_t>::length(wstr))} {}
+    #endif
+
         string_t to_string() const noexcept { return string_t{str, str+len}; }
 
         // this is implicit by design; but it may cause some unexpected conversions to std::u16string

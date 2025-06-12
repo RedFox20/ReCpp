@@ -6,16 +6,35 @@
 #include <cerrno> // errno
 #include <array> // std::array
 #include <sys/stat.h> // stat,fstat
+#include <sys/types.h> // S_ISDIR
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
-    #define USE_WINAPI_IO 1 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
+    #define USE_WINAPI_IO 0 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64
     #undef min
+    #ifndef S_ISDIR
+    #  define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
+    #endif
+    #ifndef S_ISREG
+    #  define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
+    #endif
+    #ifndef S_ISLNK
+    #  define S_ISLNK(mode)  (((mode) & S_IFMT) == S_IFLNK)
+    #endif
+    #ifndef S_ISCHR
+    #  define S_ISCHR(mode)  (((mode) & S_IFMT) == S_IFCHR)
+    #endif
+    #ifndef S_ISBLK
+    #  define S_ISBLK(mode)  (((mode) & S_IFMT) == S_IFBLK)
+    #endif
+    #ifndef S_ISFIFO
+    #  define S_ISFIFO(mode) (((mode) & S_IFMT) == S_IFIFO)
+    #endif
 #else
     #include <unistd.h>
     #include <dirent.h> // opendir()
@@ -66,105 +85,172 @@ namespace rpp /* ReCpp */
         }
         const char* to_cstr(ustrview path) noexcept
         {
-            // convert to UTF8, but use the same buffer as for strview
-            if (path.len < MAX_U8)
-            {
-
-            }
-            return nullptr; // cannot be converted due to invalid UTF16 sequence
+            // UTF16 --> UTF8
+            if (to_string(path_u8, MAX_U8, path.str, path.len) > 0)
+                return path_u8;
+            // contains invalid UTF16 sequence, there is no point to continue
+            return nullptr;
         }
     };
 
+#if _MSC_VER
+    #if USE_WINAPI_IO
+    template<StringViewType T>
+    static DWORD win32_file_attributes(T filename) noexcept
+    {
+        conv_helper conv;
+        // try UTF-16 first, then fall back to ANSI codepage
+        // windows internally converts to UCS-2 anyway, so this won't hurt performance
+        if (const wchar_t* filename_w = conv.to_wcs(filename))
+            return GetFileAttributesW(filename_w);
+        if (const char* filename_a = conv.to_cstr(filename))
+            return GetFileAttributesA(filename_a);
+        return DWORD(-1); // error
+    }
+    #endif
+    using os_stat64 = struct _stat64;
+    template<StringViewType T>
+    static bool get_stat64(T filename, os_stat64* out) noexcept
+    {
+        conv_helper conv;
+        // try UTF-16 first, then fall back to ANSI codepage
+        if (const wchar_t* filename_w = conv.to_wcs(filename))
+            return _wstat64(filename_w, out) == 0;
+        if (const char* filename_a = conv.to_cstr(filename))
+            return _stat64(filename_a, out) == 0;
+        return false;
+    }
+#else // Linux
+    using os_stat64 = struct stat64;
+    template<StringViewType T>
+    static bool get_stat64(T filename, os_stat64* out) noexcept
+    {
+        conv_helper conv;
+        if (const char* filename_a = conv.to_cstr(filename))
+            return stat64(filename_a, out) == 0;
+        return false;
+    }
+#endif
+
+    enum file_flags
+    {
+        FF_INVALID = 0, // does not exist
+        FF_FILE    = (1<<1),   // exists and is a file
+        FF_FOLDER  = (1 << 2), // exists and is a folder
+        FF_SYMLINK = (1 << 3), // exists and is a symlink
+        FF_FILE_OR_FOLDER = FF_FILE | FF_FOLDER, // exists and is either a file or a folder
+    };
+
+#if USE_WINAPI_IO
+    template<StringViewType T>
+    static file_flags read_file_flags(T filename) noexcept
+    {
+        file_flags flags = FF_INVALID;
+        DWORD attr = win32_file_attributes(filename);
+        if (attr != DWORD(-1))
+        {
+            if (attr & FILE_ATTRIBUTE_DIRECTORY) flags |= FF_FOLDER;
+            else                                 flags |= FF_FILE;
+            if (attr & FILE_ATTRIBUTE_REPARSE_POINT) flags |= FF_SYMLINK;
+        }
+        return flags;
+    }
+#else
+    template<StringViewType T>
+    static file_flags read_file_flags(T filename) noexcept
+    {
+        file_flags flags = FF_INVALID;
+        os_stat64 s;
+        if (get_stat64(filename, &s) == 0/*OK*/)
+        {
+            if (S_ISDIR(s.st_mode)) flags |= FF_FOLDER;
+            else                    flags |= FF_FILE;
+            if (S_ISLNK(s.st_mode)) flags |= FF_SYMLINK;
+        }
+        return flags;
+    }
+#endif
+
     bool file_exists(strview filename) noexcept
     {
-        conv_helper conv;
-    #if USE_WINAPI_IO
-        DWORD attr;
-        // WIN32 will internally convert to wchar_t, but using ANSI codepage
-        // so we convert to wchar_t using UTF8 instead
-        if (const wchar_t* filename_w = conv.to_wcs(filename)) {
-            attr = GetFileAttributesW(filename_w);
-        } else { // string contained invalid UTF8 sequences, fall back to ANSI codepage
-            attr = GetFileAttributesA(conv.to_cstr(filename));
-        }
-        return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
-    #else
-        struct stat s;
-        return ::stat(conv.to_cstr(filename), &s) == 0 && !S_ISDIR(s.st_mode);
-    #endif
+        file_flags f = read_file_flags(filename);
+        return (f & FF_FILE) != 0;
     }
-
     bool file_exists(ustrview filename) noexcept
     {
-        conv_helper conv;
-    #if USE_WINAPI_IO
-        DWORD attr = GetFileAttributesW(conv.to_wcs(filename));
-        return attr != DWORD(-1) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
-    #elif _MSC_VER
-        struct _stat64 s;
-        int res = _wstat64(conv.to_wcs(filename), &s);
-        return res == 0 && !S_ISDIR(s.st_mode);
-    #else
-        struct stat s;
-        return ::stat(conv.to_cstr(filename), &s) == 0 && !S_ISDIR(s.st_mode);
-    #endif
+        file_flags f = read_file_flags(filename);
+        return (f & FF_FILE) != 0;
     }
 
     bool is_symlink(strview filename) noexcept
     {
-        #if USE_WINAPI_IO
-            DWORD attr = GetFileAttributesA(filename);
-            return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_REPARSE_POINT);
-        #else
-            struct stat s;
-            return ::stat(filename, &s) == 0 && S_ISLNK(s.st_mode);
-        #endif
+        file_flags f = read_file_flags(filename);
+        return (f & FF_SYMLINK) != 0;
     }
-
-    bool is_symlink(const wchar_t* filename) noexcept
+    bool is_symlink(ustrview filename) noexcept
     {
-        #if USE_WINAPI_IO
-            DWORD attr = GetFileAttributesW(filename);
-            return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_REPARSE_POINT);
-        #elif _MSC_VER
-            struct _stat64 s;
-            return _wstat64(filename, &s) == 0 && S_ISLNK(s.st_mode);
-        #else
-            return is_symlink(rpp::to_string(filename).c_str());
-        #endif
+        file_flags f = read_file_flags(filename);
+        return (f & FF_SYMLINK) != 0;
     }
 
-    bool folder_exists(const char* folder) noexcept
+    bool folder_exists(strview folder) noexcept
     {
-        #if USE_WINAPI_IO
-            DWORD attr = GetFileAttributesA(folder);
-            return attr != DWORD(-1) && (attr & FILE_ATTRIBUTE_DIRECTORY);
-        #else
-            struct stat s;
-            return ::stat(folder, &s) == 0 && S_ISDIR(s.st_mode);
-        #endif
+        file_flags f = read_file_flags(folder);
+        return (f & FF_FOLDER) != 0;
     }
-
-    bool file_or_folder_exists(const char* fileOrFolder) noexcept
+    bool folder_exists(ustrview folder) noexcept
     {
-        #if USE_WINAPI_IO
-            DWORD attr = GetFileAttributesA(fileOrFolder);
-            return attr != DWORD(-1);
-        #else
-            struct stat s;
-            return ::stat(fileOrFolder, &s) == 0;
-        #endif
+        file_flags f = read_file_flags(folder);
+        return (f & FF_FOLDER) != 0;
     }
 
-    bool create_symlink(const char* target, const char* link) noexcept
+    bool file_or_folder_exists(strview fileOrFolder) noexcept
+    {
+        file_flags f = read_file_flags(fileOrFolder);
+        return (f & FF_FILE_OR_FOLDER) != 0;
+    }
+
+    bool file_or_folder_exists(ustrview fileOrFolder) noexcept
+    {
+        file_flags f = read_file_flags(fileOrFolder);
+        return (f & FF_FILE_OR_FOLDER) != 0;
+    }
+
+#if _MSC_VER
+    template<StringViewType T>
+    static bool win32_symlink(T target, T link) noexcept
+    {
+        DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+        if (read_file_flags(target) & FF_FOLDER) flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
+        conv_helper c_target, c_link;
+        const wchar_t* target_w = c_target.to_wcs(target);
+        const wchar_t* link_w = c_link.to_wcs(link);
+        if (target_w && link_w)
+            return CreateSymbolicLinkW(link_w, target_w, flags) == TRUE;
+        const char* target_a = c_target.to_cstr(target);
+        const char* link_a = c_link.to_cstr(link);
+        if (target_a && link_a)
+            return CreateSymbolicLinkA(link_a, target_a, flags) == TRUE;
+        return false; // conversion failed
+    }
+#endif
+
+    bool create_symlink(strview target, strview link) noexcept
     {
     #if _WIN32
-        DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-        if (folder_exists(target))
-            flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
-        return CreateSymbolicLinkA(link, target, flags) == TRUE;
+        return win32_symlink(target, link);
     #else
-        return symlink(target, link) == 0;
+        conv_helper c_target, c_link;
+        return symlink(c_target.to_cstr(target), c_link.to_cstr(link)) == 0;
+    #endif
+    }
+    bool create_symlink(ustrview target, ustrview link) noexcept
+    {
+    #if _WIN32
+        return win32_symlink(target, link);
+    #else
+        conv_helper c_target, c_link;
+        return symlink(c_target.to_cstr(target), c_link.to_cstr(link)) == 0;
     #endif
     }
 
@@ -176,33 +262,63 @@ namespace rpp /* ReCpp */
         time.HighPart = ft.dwHighDateTime;
         return time.QuadPart / 10000000ULL - 11644473600ULL;
     }
+    // gets filesize, creation time, access time and modification time
+    template<StringViewType T>
+    static bool win32_stat64(T filename, os_stat64* out) noexcept
+    {
+        WIN32_FILE_ATTRIBUTE_DATA data;
+        conv_helper conv;
+        if (const wchar_t* filename_w = conv.to_wcs(filename)) {
+            if (!GetFileAttributesExW(filename_w, GetFileExInfoStandard, &data))
+                return false;
+        } else if (const char* filename_a = conv.to_cstr(filename)) {
+            if (!GetFileAttributesExA(filename_a, GetFileExInfoStandard, &data))
+                return false;
+        } else {
+            return false; // conversion failed
+        }
+        LARGE_INTEGER li; li.LowPart = data.nFileSizeLow; li.HighPart = data.nFileSizeHigh;
+        out->st_size = (int64)li.QuadPart;
+        out->st_ctime = to_time_t(data.ftCreationTime);
+        out->st_atime = to_time_t(data.ftLastAccessTime);
+        out->st_mtime = to_time_t(data.ftLastWriteTime);
+        return true;
+    }
 #endif
 
-    bool file_info(const char* filename, int64*  filesize, time_t* created, 
-                                         time_t* accessed, time_t* modified) noexcept
+    bool file_info(strview filename, int64*  filesize, time_t* created,
+                                     time_t* accessed, time_t* modified) noexcept
     {
+        os_stat64 s;
     #if USE_WINAPI_IO
-        WIN32_FILE_ATTRIBUTE_DATA data;
-        if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data)) {
-            if (filesize) {
-                LARGE_INTEGER li; li.LowPart = data.nFileSizeLow; li.HighPart = data.nFileSizeHigh;
-                *filesize = li.QuadPart;
-            }
-            if (created)  *created  = to_time_t(data.ftCreationTime);
-            if (accessed) *accessed = to_time_t(data.ftLastAccessTime);
-            if (modified) *modified = to_time_t(data.ftLastWriteTime);
-            return true;
-        }
+        if (win32_stat64(filename, &s)) {
     #else
-        struct stat64 s;
-        if (stat64(filename, &s) == 0/*OK*/) {
+        if (get_stat64(filename, &s)) {
+    #endif
             if (filesize) *filesize = (int64)s.st_size;
             if (created)  *created  = s.st_ctime;
             if (accessed) *accessed = s.st_atime;
             if (modified) *modified = s.st_mtime;
             return true;
         }
+        return false;
+    }
+
+    bool file_info(ustrview filename, int64*  filesize, time_t* created,
+                                      time_t* accessed, time_t* modified) noexcept
+    {
+        os_stat64 s;
+    #if USE_WINAPI_IO
+        if (win32_stat64(filename, &s)) {
+    #else
+        if (get_stat64(filename, &s)) {
     #endif
+            if (filesize) *filesize = (int64)s.st_size;
+            if (created)  *created  = s.st_ctime;
+            if (accessed) *accessed = s.st_atime;
+            if (modified) *modified = s.st_mtime;
+            return true;
+        }
         return false;
     }
 
@@ -226,7 +342,7 @@ namespace rpp /* ReCpp */
         }
         return false;
     #else
-        struct stat s;
+        os_stat64 s;
         if (_fstat64((int)fd, &s)) {
             if (filesize) *filesize = (int64)s.st_size;
             if (created)  *created  = s.st_ctime;
@@ -238,34 +354,74 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    int file_size(const char* filename) noexcept
+    int file_size(strview filename) noexcept
     {
         int64 s; 
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
     }
-    int64 file_sizel(const char* filename) noexcept
+    int file_size(ustrview filename) noexcept
+    {
+        int64 s;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
+    }
+    int64 file_sizel(strview filename) noexcept
     {
         int64 s; 
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
-    time_t file_created(const char* filename) noexcept
+    int64 file_sizel(ustrview filename) noexcept
+    {
+        int64 s;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
+    }
+    time_t file_created(strview filename) noexcept
     {
         time_t t; 
         return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
     }
-    time_t file_accessed(const char* filename) noexcept
+    time_t file_created(ustrview filename) noexcept
+    {
+        time_t t;
+        return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
+    }
+    time_t file_accessed(strview filename) noexcept
     {
         time_t t; 
         return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
     }
-    time_t file_modified(const char* filename) noexcept
+    time_t file_accessed(ustrview filename) noexcept
+    {
+        time_t t;
+        return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
+    }
+    time_t file_modified(strview filename) noexcept
     {
         time_t t; 
         return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
     }
-    bool delete_file(const char* filename) noexcept
+    time_t file_modified(ustrview filename) noexcept
     {
-        return ::remove(filename) == 0;
+        time_t t;
+        return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
+    }
+
+    bool delete_file(strview filename) noexcept
+    {
+        conv_helper conv;
+    #if _MSC_VER
+        return ::_wremove(conv.to_wcs(filename)) == 0;
+    #else
+        return ::remove(conv.to_cstr(filename)) == 0;
+    #endif
+    }
+    bool delete_file(ustrview filename) noexcept
+    {
+        conv_helper conv;
+    #if _MSC_VER
+        return ::_wremove(conv.to_wcs(filename)) == 0;
+    #else
+        return ::remove(conv.to_cstr(filename)) == 0;
+    #endif
     }
 
     bool copy_file(const char* sourceFile, const char* destinationFile) noexcept
