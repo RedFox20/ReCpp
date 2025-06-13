@@ -9,6 +9,7 @@
 #include <cstring> // memcpy
 #include <locale> // toupper
 #include <cfloat> // DBL_MAX
+#include <cwctype> // std::towupper
 //#include <charconv> // to_chars, C++17, not implemented yet
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -48,6 +49,11 @@ namespace rpp
             if (strcontains(control, ncontrol, *s)) return s; // done
         return nullptr; // not found
     }
+    const char16_t* strcontains(const char16_t* str, int nstr, const char16_t* control, int ncontrol) noexcept {
+        for (auto s = str; nstr; --nstr, ++s)
+            if (strcontains(control, ncontrol, *s)) return s; // done
+        return nullptr; // not found
+    }
     bool strequals(const char* s1, const char* s2, int len) noexcept {
         for (int i = 0; i < len; ++i) 
             if (s1[i] != s2[i]) return false; // not equal.
@@ -61,6 +67,11 @@ namespace rpp
     bool strequals(const char16_t* s1, const char16_t* s2, int len) noexcept {
         for (int i = 0; i < len; ++i)
             if (s1[i] != s2[i]) return false; // not equal.
+        return true;
+    }
+    bool strequalsi(const char16_t* s1, const char16_t* s2, int len) noexcept {
+        for (int i = 0; i < len; ++i)
+            if (std::towupper(s1[i]) != std::towupper(s2[i])) return false; // not equal.
         return true;
     }
 
@@ -812,6 +823,21 @@ namespace rpp
         return { str + idx, remaining };
     }
 
+    bool ustrview::next(ustrview& out, char16_t delim) noexcept
+    {
+        return _next_trim(out, [delim](const char16_t* s, int n) {
+            return static_cast<const char16_t*>(memchr(s, delim, size_t(n * sizeof(char16_t)) ));
+        });
+    }
+
+    bool ustrview::next(ustrview& out, const char16_t* delims, int ndelims) noexcept
+    {
+        return _next_trim(out, [delims, ndelims](const char16_t* s, int n) {
+            return strcontains(s, n, delims, ndelims);
+        });
+    }
+
+
     ////////////////////// loose utility functions
 
     /**
@@ -1056,6 +1082,7 @@ namespace rpp
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
         if (utf16len == 0) return string{}; // empty string
+
     #if false && _WIN32
         int utf8len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)utf16, utf16len,
                                           nullptr, 0, nullptr, nullptr);
@@ -1080,23 +1107,25 @@ namespace rpp
     int to_string(char* out, int out_max, const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
-        if (utf16len != 0)
-        {
-        #if false && _WIN32
-        #else
-            // TODO: codecvt is deprected, but the other API-s don't even work
-            std::codecvt_utf8<char16_t> cvt;
-            std::mbstate_t state = std::mbstate_t();
-            char* to_next;
-            const char16_t* from_next;
-            const char16_t* from_end = utf16 + utf16len;
-            auto res = cvt.out(state, utf16, from_end, from_next, out, out + out_max - 1, to_next);
-            if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
-                *to_next = u'\0';
-                return (int)(to_next - out);
-            }
-        #endif
+        if (utf16len == 0) {
+            *out = '\0'; // always null terminate
+            return 0;
         }
+
+    #if false && _WIN32
+    #else
+        // TODO: codecvt is deprected, but the other API-s don't even work
+        std::codecvt_utf8<char16_t> cvt;
+        std::mbstate_t state = std::mbstate_t();
+        char* to_next;
+        const char16_t* from_next;
+        const char16_t* from_end = utf16 + utf16len;
+        auto res = cvt.out(state, utf16, from_end, from_next, out, out + out_max - 1, to_next);
+        if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
+            *to_next = u'\0'; // always null terminate
+            return (int)(to_next - out);
+        }
+    #endif
 
         *out = u'\0'; // always null terminate
         return -1;
@@ -1120,8 +1149,7 @@ namespace rpp
         std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
         try {
             return cvt.from_bytes(utf8, utf8 + utf8len);
-        }
-        catch (...) {
+        } catch (...) {
             return ustring{}; // conversion failed, return empty string
         }
     #endif
@@ -1129,6 +1157,12 @@ namespace rpp
     
     int to_ustring(char16_t* out, int out_max, const char* utf8, int utf8len) noexcept
     {
+        if (utf8len < 0) utf8len = int(strlen(utf8));
+        if (utf8len != 0) {
+            *out = u'\0'; // always null terminate
+            return 0;
+        }
+
     #if false && _WIN32
         int utf16len = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)out, out_max - 1);
         if (utf16len <= 0/*failed*/) {
@@ -1136,6 +1170,7 @@ namespace rpp
             if (lasterr == ERROR_INSUFFICIENT_BUFFER) {
                 utf16len = out_max - 1;
             } else {
+                *out = u'\0'; // always null terminate
                 return -1; // failed -- invalid unicode characters or invalid inputs
             }
         }
@@ -1147,10 +1182,10 @@ namespace rpp
         std::mbstate_t state = std::mbstate_t();
         char16_t* to_next;
         const char* from_next;
-        const char* from_end = (utf8len == -1) ? utf8 + strlen(utf8) : utf8 + utf8len;
+        const char* from_end = utf8 + utf8len;
         auto res = cvt.in(state, utf8, from_end, from_next, out, out + out_max - 1, to_next);
         if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
-            *to_next = u'\0';
+            *to_next = u'\0'; // always null terminate
             return (int)(to_next - out);
         }
         *out = u'\0'; // always null terminate

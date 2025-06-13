@@ -335,6 +335,6 @@ TestImpl(test_strview)
         char16_t ubuf[512];
         int ulen = rpp::to_ustring(ubuf, 512, u8"𝕳𝖊𝖑𝖑𝖔");
         AssertEqual(ulen, 10);
-        AssertEqual(rpp::ustring{ ubuf, ulen }, u"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(ubuf, u"𝕳𝖊𝖑𝖑𝖔");
     }
 };

@@ -3,27 +3,9 @@
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
-#include <sys/stat.h> // stat,fstat
-#if _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
-    #include <Windows.h>
-    #define USE_WINAPI_IO 1 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
-    #define stat64 _stat64
-    #define fseeki64 _fseeki64
-    #define ftelli64 _ftelli64
-    #undef min
-#else
-    #include <unistd.h>
-    #include <fcntl.h> // fallocate
-    #define _fstat64 fstat
-    #define stat64   stat
-    #define fseeki64 fseeko
-    #define ftelli64 ftello
-#endif
-#if _WIN32 && !USE_WINAPI_IO
-    #include <io.h>     // _chsize
-#endif
+
+#include "paths.inl"
+
 #if __APPLE__
     #include <TargetConditionals.h> // TARGET_OS_IPHONE
 #endif
@@ -63,39 +45,37 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-#if USE_WINAPI_IO
-    static void* OpenF(const char* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
-    { return CreateFileA(f, a, s, sa, c, o, nullptr); }
-    static void* OpenF(const wchar_t* f, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
-    { return CreateFileW(f, a, s, sa, c, o, nullptr); }
-#else
-    static void* OpenF(const char* f, file::mode mode) {
-        if (mode == file::READWRITE) {
-            if (FILE* file = fopen(f, "rb+")) // open existing file for read/write
-                return file;
-            mode = file::CREATENEW;
-        }
-        const char* modes[] = { "rb", "", "wb+", "ab" };
-        return fopen(f, modes[static_cast<int>(mode)]);
+#if _MSC_VER
+    template<StringViewType T>
+    static void* OpenF(T fname, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
+    {
+        wchar_fallback_conv conv { fname };
+        if (conv.wstr) return CreateFileW(conv.wstr, a, s, sa, c, o, nullptr);
+        if (conv.cstr) return CreateFileA(conv.cstr, a, s, sa, c, o, nullptr);
+        return nullptr;
     }
-    static void* OpenF(const wchar_t* f, file::mode mode) {
-    #if _WIN32
-        if (mode == file::READWRITE) {
-            if (FILE* file = _wfopen(f, L"rb+")) // open existing file for read/write
-                return file;
-            mode = file::CREATENEW;
+#else
+    template<StringViewType T>
+    static void* OpenF(T fname, file::mode mode)
+    {
+        if (multibyte_conv conv { fname })
+        {
+            if (mode == file::READWRITE) {
+                if (FILE* file = fopen(conv.cstr, "rb+")) // open existing file for read/write
+                    return file;
+                mode = file::CREATENEW;
+            }
+            const char* modes[] = { "rb", "", "wb+", "ab" };
+            return fopen(conv.cstr, modes[static_cast<int>(mode)]);
         }
-        const wchar_t* modes[] = { L"rb", L"", L"wb+", L"ab" };
-        return _wfopen(f, modes[mode]); 
-    #else
-        return OpenF(rpp::to_string(f).c_str(), mode);
-    #endif
+        return nullptr;
     }
 #endif
 
-    template<class TChar> static void* OpenFile(const TChar* filename, file::mode mode) noexcept
+    template<StringViewType T>
+    static void* OpenFile(T filename, file::mode mode) noexcept
     {
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         int access, sharing;        // FILE_SHARE_READ, FILE_SHARE_WRITE
         int createmode, openFlags;	// OPEN_EXISTING, OPEN_ALWAYS, CREATE_ALWAYS
         switch (mode)
@@ -127,14 +107,15 @@ namespace rpp /* ReCpp */
                 break;
         }
         SECURITY_ATTRIBUTES secu = { sizeof(secu), nullptr, TRUE };
-        void* handle = OpenF(filename, access, sharing, &secu, createmode, openFlags);
+        void* handle = OpenF<T>(filename, access, sharing, &secu, createmode, openFlags);
         return handle != INVALID_HANDLE_VALUE ? handle : nullptr;
     #else
-        return OpenF(filename, mode);
+        return OpenF<T>(filename, mode);
     #endif
     }
 
-    template<class TChar> static void* OpenOrCreate(const TChar* filename, file::mode mode) noexcept
+    template<StringViewType T>
+    static void* OpenOrCreate(T filename, file::mode mode) noexcept
     {
         void* handle = OpenFile(filename, mode);
         if (!handle && (mode == file::CREATENEW || mode == file::APPEND))
@@ -146,19 +127,11 @@ namespace rpp /* ReCpp */
         }
         return handle;
     }
-    static void* OpenOrCreate(const strview& filename, file::mode mode) noexcept
-    {
-        char buf[512];
-        return OpenOrCreate(filename.to_cstr(buf), mode);
-    }
 
-    file::file(const char* filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
+    file::file(strview filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
-    file::file(const strview& filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
-    {
-    }
-    file::file(const wchar_t* filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
+    file::file(ustrview filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
     file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
@@ -177,28 +150,23 @@ namespace rpp /* ReCpp */
         f.Handle = nullptr;
         return *this;
     }
-    bool file::open(const char* filename, mode mode) noexcept
-    {
-        close();
-        Mode = mode;
-        return (Handle = OpenOrCreate(filename, mode)) != nullptr;
-    }
     bool file::open(strview filename, mode mode) noexcept
     {
-        char buf[512];
-        return open(filename.to_cstr(buf), mode);
+        close();
+        Mode = mode;
+        return (Handle = OpenOrCreate<strview>(filename, mode)) != nullptr;
     }
-    bool file::open(const wchar_t* filename, mode mode) noexcept
+    bool file::open(ustrview filename, mode mode) noexcept
     {
         close();
         Mode = mode;
-        return (Handle = OpenOrCreate(filename, mode)) != nullptr;
+        return (Handle = OpenOrCreate<ustrview>(filename, mode)) != nullptr;
     }
     void file::close() noexcept
     {
         if (Handle)
         {
-        #if USE_WINAPI_IO
+        #if _MSC_VER
             CloseHandle(reinterpret_cast<HANDLE>(Handle));
         #else
             fclose((FILE*)Handle);
@@ -208,7 +176,7 @@ namespace rpp /* ReCpp */
     }
     int file::os_handle() const noexcept
     {
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         return (int)(intptr_t)Handle;
     #else
         return fileno((FILE*)Handle);
@@ -225,7 +193,7 @@ namespace rpp /* ReCpp */
     int file::size() const noexcept
     {
         if (!Handle) return 0;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         return GetFileSize(reinterpret_cast<HANDLE>(Handle), nullptr);
     #elif __ANDROID__ || TARGET_OS_IPHONE
         struct stat s;
@@ -244,7 +212,7 @@ namespace rpp /* ReCpp */
     int64 file::sizel() const noexcept
     {
         if (!Handle) return 0;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         LARGE_INTEGER size;
         if (!GetFileSizeEx(reinterpret_cast<HANDLE>(Handle), &size)) {
             //fprintf(stderr, "GetFileSizeEx error: [%d]\n", GetLastError());
@@ -269,7 +237,7 @@ namespace rpp /* ReCpp */
     int file::read(void* buffer, int bytesToRead) noexcept
     {
         if (!Handle) return 0;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         DWORD bytesRead;
         (void)ReadFile(reinterpret_cast<HANDLE>(Handle), buffer, bytesToRead, &bytesRead, nullptr);
         return bytesRead;
@@ -308,7 +276,7 @@ namespace rpp /* ReCpp */
         }
         return out;
     }
-    bool file::save_as(const strview& filename) noexcept
+    bool file::save_as(strview filename) noexcept
     {
         file dst { filename, CREATENEW };
         if (!dst) return false;
@@ -338,19 +306,6 @@ namespace rpp /* ReCpp */
         seekl(startPos);
         return totalBytesRead == totalBytesWritten;
     }
-    load_buffer file::read_all(const char* filename) noexcept
-    {
-        return file{filename, READONLY}.read_all();
-    }
-    load_buffer file::read_all(const strview& filename) noexcept
-    {
-        char buf[512];
-        return read_all(filename.to_cstr(buf));
-    }
-    load_buffer file::read_all(const wchar_t* filename) noexcept
-    {
-        return file{filename, READONLY}.read_all();
-    }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
     int file::write(const void* buffer, int bytesToWrite) noexcept
@@ -360,7 +315,7 @@ namespace rpp /* ReCpp */
         if (!Handle)
             return 0;
         
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         DWORD bytesWritten;
         WriteFile(reinterpret_cast<HANDLE>(Handle), buffer, bytesToWrite, &bytesWritten, nullptr);
         return bytesWritten;
@@ -377,7 +332,7 @@ namespace rpp /* ReCpp */
         if (!Handle)
             return 0;
         va_list ap; va_start(ap, format);
-    #if USE_WINAPI_IO // @note This is heavily optimized
+    #if _MSC_VER // @note This is heavily optimized
         char buf[4096];
         int n = vsnprintf(buf, sizeof(buf), format, ap);
         if (n >= static_cast<int>(sizeof(buf)))
@@ -385,21 +340,16 @@ namespace rpp /* ReCpp */
             const int n2 = n + 1;
             const bool heap = (n2 > 64 * 1024);
             auto b2 = static_cast<char*>(heap ? malloc(n2) : _alloca(n2)); // NOLINT
-            n = write(b2, vsnprintf(b2, n2, format, ap));
+            n = this->write(b2, vsnprintf(b2, n2, format, ap));
             if (heap) free(b2);
             return n;
         }
-        int written = write(buf, n);
+        int written = this->write(buf, n);
     #else
         int written = vfprintf((FILE*)Handle, format, ap);
     #endif
         va_end(ap);
         return written;
-    }
-
-    int file::writeln(const strview& str) noexcept
-    {
-        return write(str.str, str.len) + write("\n", 1);
     }
 
     int file::writeln() noexcept
@@ -435,7 +385,7 @@ namespace rpp /* ReCpp */
     void file::truncate(int64 newLength) noexcept
     {
         if (!Handle) return;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         seekl(newLength, SEEK_SET);
         SetEndOfFile(reinterpret_cast<HANDLE>(Handle));
     #elif _MSC_VER
@@ -449,7 +399,7 @@ namespace rpp /* ReCpp */
     bool file::preallocate(int64 preallocSize, int64 seekPos, int seekMode) noexcept
     {
         if (!Handle || preallocSize <= 0) return false;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         // TODO: implement preallocation for Windows
         (void)seekPos;
         (void)seekMode;
@@ -469,21 +419,21 @@ namespace rpp /* ReCpp */
     void file::flush() noexcept
     {
         if (!Handle) return;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         FlushFileBuffers(reinterpret_cast<HANDLE>(Handle));
     #else
         fflush((FILE*)Handle);
     #endif
     }
-    int file::write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept
+    int file::write_new(strview filename, const void* buffer, int bytesToWrite) noexcept
     {
-        file f{ filename, mode::CREATENEW };
+        file f { filename, mode::CREATENEW };
         return f.write(buffer, bytesToWrite);
     }
-    int file::write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept
+    int file::write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept
     {
-        char buf[512];
-        return write_new(filename.to_cstr(buf), buffer, bytesToWrite);
+        file f { filename, mode::CREATENEW };
+        return f.write(buffer, bytesToWrite);
     }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
@@ -491,7 +441,7 @@ namespace rpp /* ReCpp */
     {
         if (!Handle)
             return 0;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         return SetFilePointer(reinterpret_cast<HANDLE>(Handle), filepos, nullptr, seekmode);
     #else
         fseek((FILE*)Handle, filepos, seekmode);
@@ -504,7 +454,7 @@ namespace rpp /* ReCpp */
     {
         if (!Handle)
             return 0LL;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         LARGE_INTEGER newpos, nseek;
         nseek.QuadPart = filepos;
         SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), nseek, &newpos, seekmode);
@@ -518,7 +468,7 @@ namespace rpp /* ReCpp */
     {
         if (!Handle)
             return 0;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         return SetFilePointer(reinterpret_cast<HANDLE>(Handle), 0, nullptr, FILE_CURRENT);
     #else
         return (int)ftell((FILE*)Handle);
@@ -529,7 +479,7 @@ namespace rpp /* ReCpp */
     {
         if (!Handle)
             return 0LL;
-    #if USE_WINAPI_IO
+    #if _MSC_VER
         LARGE_INTEGER current;
         SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), { {0, 0} }, &current, FILE_CURRENT);
         return current.QuadPart;
@@ -541,7 +491,7 @@ namespace rpp /* ReCpp */
     bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
         intptr_t fd = intptr_t(Handle);
-        #if !USE_WINAPI_IO
+        #if !_MSC_VER
             fd = fileno((FILE*)Handle);
         #endif
         return rpp::file_info(fd, nullptr, outCreated, outAccessed, outModified);
@@ -553,7 +503,7 @@ namespace rpp /* ReCpp */
     int file::size_and_time_modified(time_t* outModified) const noexcept
     {
         if (!Handle) return 0;
-        #if USE_WINAPI_IO
+        #if _MSC_VER
             *outModified = time_modified();
             return size();
         #else

@@ -325,6 +325,46 @@ namespace rpp /* ReCpp */
 #endif
     ////////////////////////////////////////////////////////////////////////////////
 
+    using string_list = std::vector<string>;
+    using ustring_list = std::vector<ustring>;
+
+    // common base class which doesn't rely on specific string type
+    class RPPAPI dir_iter_base
+    {
+    public:
+        struct impl;
+        struct state {
+            #if _WIN32
+                void* hFind;
+                char ffd[592]; // WIN32_FIND_DATAW
+            #else
+                void* d;
+                void* e;
+                string dirname;
+            #endif
+            impl* operator->() noexcept;
+            const impl* operator->() const noexcept;
+        };
+        state s; // iterator state
+
+		dir_iter_base(strview dir) noexcept;
+        dir_iter_base(ustrview dir) noexcept;
+        ~dir_iter_base() noexcept;
+
+        explicit operator bool() const noexcept;
+        bool next() noexcept; // find next directory entry
+        bool is_dir() const noexcept; // if current entry is a dir
+        bool is_file() const noexcept; // if current entry is a file
+        bool is_symlink() const noexcept; // if current entry is a symbolic link
+        bool is_device() const noexcept; // if current entry is a block device, character device, named pipe or socket
+
+        // gets specific type of string, performing necessary string conversions
+        template<StringViewType T>
+        struct name_util
+        {
+            static typename T::string_t get(const dir_iter_base* it) noexcept;
+        };
+    };
 
     /**
      * Basic and minimal directory iterator.
@@ -335,45 +375,55 @@ namespace rpp /* ReCpp */
      *         if (e.is_dir) e.add_path_to(out);
      * @endcode
      */
-    class RPPAPI dir_iterator
+    template<StringViewType T>
+    class RPPAPI directory_iter : public dir_iter_base
     {
-        struct impl;
-        struct dummy {
-            #if _WIN32
-                void* hFind;
-                char ffd[320];
-            #else
-                void* d;
-                void* e;
-            #endif
-            impl* operator->() noexcept;
-            const impl* operator->() const noexcept;
-        };
+    public:
+        using view_t = T;
+		using char_t = typename T::char_t;
+        using string_t = typename T::string_t;
 
-        dummy s; // iterator state
-        const string dir;       // original path used to construct this dir_iterator
-        const string reldir;    // relative directory
-        mutable string fulldir; // full path to directory we're iterating
+    private:
+        const string_t dir;       // original path used to construct this dir_iterator
+        mutable string_t fulldir; // full path to directory we're iterating
 
     public:
-        explicit dir_iterator(const strview& dir) noexcept : dir_iterator{ dir.to_string() } {}
-        explicit dir_iterator(const string& dir) noexcept : dir_iterator{ string{dir} } {}
-        explicit dir_iterator(string&& dir) noexcept;
-        ~dir_iterator() noexcept;
+        explicit directory_iter(view_t dir) noexcept
+            : dir_iter_base{dir}
+            , dir{dir.to_string()}
+        {
+        }
+        explicit directory_iter(const string_t& dir) noexcept
+            : dir_iter_base{dir}
+            , dir{dir}
+        {
+        }
+        explicit directory_iter(string_t&& dir) noexcept
+            : dir_iter_base{view_t{dir}}
+            , dir{std::move(dir)}
+        {
+        }
+        ~directory_iter() noexcept = default;
 
-        dir_iterator(dir_iterator&& it) = delete;
-        dir_iterator(const dir_iterator&) = delete;
-        dir_iterator& operator=(dir_iterator&& it) = delete;
-        dir_iterator& operator=(const dir_iterator&) = delete;
+        directory_iter(directory_iter&& it) = delete;
+        directory_iter(const directory_iter&) = delete;
+        directory_iter& operator=(directory_iter&& it) = delete;
+        directory_iter& operator=(const directory_iter&) = delete;
 
         struct entry
         {
-            const dir_iterator* it;
-            const strview name;
+            const directory_iter* it;
+            const string_t name; // name of the entry, file, dir, etc.
 
-            entry(const dir_iterator* it) noexcept : it{it}, name{it->name()}  {}
-            string path() const noexcept { return path_combine(it->path(), name); }
-            string full_path() const noexcept { return path_combine(it->full_path(), name); }
+            entry(const directory_iter* it) noexcept
+                : it{it}, name{it->name()}
+            {}
+
+            /** @returns "{input_dir}/{entry.name}" */
+            string_t path() const noexcept { return rpp::path_combine(it->path(), name); }
+
+            /** @returns absolute path to "{input_dir}/{entry.name}" */
+            string_t full_path() const noexcept { return rpp::path_combine(it->full_path(), name); }
 
             /** @returns TRUE if this is a directory */
             bool is_dir() const noexcept { return it->is_dir(); }
@@ -385,7 +435,11 @@ namespace rpp /* ReCpp */
             bool is_device() const noexcept { return it->is_device(); }
 
             /** @returns TRUE if these are the special '.' or '..' dirs */
-            bool is_special_dir() const noexcept { return name == "." || name == ".."; }
+            bool is_special_dir() const noexcept {
+                size_t len = name.length();
+                return (len == 1 && name.data()[0] == char_t('.'))
+                    || (len == 2 && name.data()[1] == char_t('.') && name.data()[2] == char_t('.'));
+            }
 
             // all files and directories that aren't "." or ".." are valid
             bool is_valid() const noexcept { return (is_file() || is_dir()) && !is_special_dir(); }
@@ -393,14 +447,14 @@ namespace rpp /* ReCpp */
             // dirs that aren't "." or ".." are valid
             bool is_valid_dir() const noexcept { return is_dir() && !is_special_dir(); }
 
-            bool add_path_to(std::vector<string>& out) const noexcept {
+            bool add_path_to(std::vector<string_t>& out) const noexcept {
                 if (is_valid()) {
                     out.emplace_back(path());
                     return true;
                 }
                 return false;
             }
-            bool add_full_path_to(std::vector<string>& out) const noexcept {
+            bool add_full_path_to(std::vector<string_t>& out) const noexcept {
                 if (is_valid()) {
                     out.emplace_back(full_path());
                     return true;
@@ -410,7 +464,7 @@ namespace rpp /* ReCpp */
         };
 
         struct iter { // bare minimum for basic looping
-            dir_iterator* it;
+            directory_iter* it;
             bool operator==(const iter& other) const noexcept { return it == other.it; }
             bool operator!=(const iter& other) const noexcept { return it != other.it; }
             entry operator*() const noexcept { return { it }; }
@@ -420,47 +474,73 @@ namespace rpp /* ReCpp */
             }
         };
 
-        explicit operator bool() const noexcept;
-        bool next() noexcept; // find next directory entry
-        bool is_dir() const noexcept; // if current entry is a dir
-        bool is_file() const noexcept; // if current entry is a file
-        bool is_symlink() const noexcept; // if current entry is a symbolic link
-        bool is_device() const noexcept; // if current entry is a block device, character device, named pipe or socket
-        strview name() const noexcept; // current entry name
         entry current() const noexcept { return { this }; }
         iter begin() noexcept { return { this }; }
         iter end() const noexcept { return { nullptr }; }
 
-        // original path used to construct this dir_iterator
-        const string& path() const noexcept { return dir; }
+        /** @returns Current entry name, can be file, dir, etc */
+        string_t name() const noexcept
+        {
+            return dir_iter_base::name_util<view_t>::get(this);
+        }
 
-        // full path to directory we're iterating
-        const string& full_path() const noexcept {
+        /** @returns original path used to construct this dir_iterator */
+        const string_t& path() const noexcept { return dir; }
+
+        /** @returns full path to directory we're iterating */
+        const string_t& full_path() const noexcept
+        {
             return fulldir.empty() ? (fulldir = rpp::full_path(dir)) : fulldir;
         }
-    };
+	}; // directory_iter<T>
 
-    using dir_entry = dir_iterator::entry;
+    template<StringViewType T>
+    using directory_entry = typename directory_iter<T>::entry;
+
+	// ascii version of the directory iterator
+    using dir_iterator = directory_iter<strview>;
+    using dir_entry    = directory_entry<strview>;
+
+	// unicode version of the directory iterator
+    using udir_iterator = directory_iter<ustrview>;
+    using udir_entry    = directory_entry<ustrview>;
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    enum list_dir_flags
+    {
+        dir_current = 0, // default: only current directory
+        dir_relpath = 0, // default: relative paths
+        dir_relpath_current = 0,
+
+        dir_recursive = (1 << 1), // recursively lists through directories
+        dir_relpath_recursive = dir_relpath | dir_recursive, // recursive and relpaths
+
+        dir_fullpath  = (1 << 2), // emits fullpath instead of relative paths
+        dir_fullpath_recursive = dir_recursive | dir_fullpath, // both recursive and fullpath
+
+        dir_relpath_combine = (1 << 3), // lists relpath, but outputs: path_combine(input_dir, relpath)
+    };
+
+    inline list_dir_flags operator|(list_dir_flags a, list_dir_flags b) noexcept { return list_dir_flags(a | b); }
 
     /**
      * Lists all folders inside this directory
-     * @note By default: not recursive
      * @param out Destination vector for result folder names (not full folder paths!)
      * @param dir Relative or full path of this directory
-     * @param recursive (default: false) If true, will perform a recursive search
-     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
+     * @param flags enum list_dir_flags:
+     *        dir_recursive       - will perform a recursive search
+     *        dir_fullpath        - returned paths will be fullpaths instead of relative
+     *        dir_relpath_combine - combines input_dir with relpaths
      * @return Number of folders found
      * 
      * @code
-     * @example [recursive=false] [fullpath=false] vector<string> {
+     * @example [dir_recursive=false] [dir_fullpath=false] vector<string> {
      *     "bin",
      *     "src",
      *     "lib",
      * };
-     * @example [recursive=true] [fullpath=false] vector<string> {
+     * @example [dir_recursive=true] [dir_fullpath=false] vector<string> {
      *     "bin",
      *     "bin/data",
      *     "bin/data/models",
@@ -468,12 +548,12 @@ namespace rpp /* ReCpp */
      *     "src/mesh",
      *     "lib",
      * };
-     * @example [recursive=false] [fullpath=true] vector<string> {
+     * @example [dir_recursive=false] [dir_fullpath=true] vector<string> {
      *     "/projects/ReCpp/bin",
      *     "/projects/ReCpp/src",
      *     "/projects/ReCpp/lib",
      * };
-     * @example [recursive=true] [fullpath=true] vector<string> {
+     * @example [dir_recursive=true] [dir_fullpath=true] vector<string> {
      *     "/projects/ReCpp/bin",
      *     "/projects/ReCpp/bin/data",
      *     "/projects/ReCpp/bin/data/models",
@@ -483,74 +563,21 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_dirs(std::vector<string>& out, strview dir, bool recursive = false, bool fullpath = false) noexcept;
-    RPPAPI int list_dirs(std::vector<ustring>& out, ustrview dir, bool recursive = false, bool fullpath = false) noexcept;
-
-    template<StringViewType T>
-    inline auto list_dirs(T dir, bool recursive = false, bool fullpath = false) noexcept -> std::vector<typename T::string_t> {
-        std::vector<typename T::string_t> out;
-        list_dirs(out, dir, recursive, fullpath);
-        return out;
-    }
-
-    template<StringViewType T>
-    inline auto list_dirs_fullpath(T dir, bool recursive = false) noexcept -> std::vector<typename T::string_t> {
-        return list_dirs(dir, recursive, true);
-    }
-    template<StringViewType T>
-    inline auto list_dirs_fullpath_recursive(T dir) noexcept -> std::vector<typename T::string_t> {
-        return list_dirs(dir, true, true);
-    }
-
-
-    /**
-     * Lists all folders inside this directory as relative paths including input dir
-     * @note By default: not recursive
-     * @param out Destination vector for result folder names (not full folder paths!)
-     * @param dir Relative or full path of this directory
-     * @param recursive (default: false) If true, will perform a recursive search
-     * @return Number of folders found
-     * 
-     * @code
-     * @example [dir="test/ReCpp/"] [recursive=false] vector<string> {
-     *     "test/ReCpp/bin",
-     *     "test/ReCpp/src",
-     *     "test/ReCpp/lib",
-     * };
-     * @example [dir="test/ReCpp/"] [recursive=true] vector<string> {
-     *     "test/ReCpp/bin",
-     *     "test/ReCpp/bin/data",
-     *     "test/ReCpp/bin/data/models",
-     *     "test/ReCpp/src",
-     *     "test/ReCpp/src/mesh",
-     *     "test/ReCpp/lib",
-     * };
-     * @endcode
-     */
-    RPPAPI int list_dirs_relpath(std::vector<string>& out, strview dir, bool recursive = false) noexcept;
-    RPPAPI int list_dirs_relpath(std::vector<ustring>& out, ustrview dir, bool recursive = false) noexcept;
-
-    template<StringViewType T>
-    inline auto list_dirs_relpath(T dir, bool recursive = false) noexcept -> std::vector<typename T::string_t> {
-        std::vector<string> out;
-        list_dirs_relpath(out, dir, recursive);
-        return out;
-    }
-
-    template<StringViewType T>
-    inline auto list_dirs_relpath_recursive(T dir) noexcept -> std::vector<typename T::string_t> {
-        return list_dirs_relpath<T>(dir, true);
-    }
+    RPPAPI int list_dirs( string_list& out,  strview dir, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_dirs(ustring_list& out, ustrview dir, list_dir_flags flags = {}) noexcept;
+    inline string_list  list_dirs( strview dir, list_dir_flags flags = {}) noexcept {  string_list out; list_dirs(out, dir, flags); return out; }
+    inline ustring_list list_dirs(ustrview dir, list_dir_flags flags = {}) noexcept { ustring_list out; list_dirs(out, dir, flags); return out; }
 
 
     /**
      * Lists all files inside this directory that have the specified extension (default: all files)
-     * @note By default: not recursive
      * @param out Destination vector for result file names.
      * @param dir Relative or full path of this directory
      * @param suffix Filter files by suffix, ex: ".txt" or "_mask.jpg", default ("") lists all files
-     * @param recursive (default: false) If true, will perform a recursive search
-     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
+     * @param flags enum list_dir_flags:
+     *        dir_recursive       - will perform a recursive search
+     *        dir_fullpath        - returned paths will be fullpaths instead of relative
+     *        dir_relpath_combine - combines input_dir with relpaths
      * @return Number of files found that match the extension
      * Example:
      * @code
@@ -558,17 +585,17 @@ namespace rpp /* ReCpp */
      *     vector<string> recursiveRelativePaths = list_files_recursive(folder);
      * @endcode
      * @code
-     * @example [recursive=false] [fullpath=false] vector<string> {
+     * @example [dir_recursive=false] [dir_fullpath=false] vector<string> {
      *     "main.cpp",
      *     "file_io.h",
      *     "file_io.cpp",
      * };
-     * @example [recursive=false] [fullpath=true] vector<string> {
+     * @example [dir_recursive=false] [dir_fullpath=true] vector<string> {
      *     "/projects/ReCpp/main.cpp",
      *     "/projects/ReCpp/file_io.h",
      *     "/projects/ReCpp/file_io.cpp",
      * };
-     * @example [recursive=true] [fullpath=false] vector<string> {
+     * @example [dir_recursive=true] [dir_fullpath=false] vector<string> {
      *     "main.cpp",
      *     "file_io.h",
      *     "file_io.cpp",
@@ -577,7 +604,7 @@ namespace rpp /* ReCpp */
      *     "mesh/mesh_obj.cpp",
      *     "mesh/mesh_fbx.cpp",
      * };
-     * @example [recursive=true] [fullpath=true] vector<string> {
+     * @example [dir_recursive=true] [dir_fullpath=true] vector<string> {
      *     "/projects/ReCpp/main.cpp",
      *     "/projects/ReCpp/file_io.h",
      *     "/projects/ReCpp/file_io.cpp",
@@ -588,102 +615,37 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_files(std::vector<string>& out, strview dir, strview suffix = {}, bool recursive = false, bool fullpath = false) noexcept;
-    RPPAPI int list_files(std::vector<ustring>& out, ustrview dir, ustrview suffix = {}, bool recursive = false, bool fullpath = false) noexcept;
-
-    template<StringViewType T>
-    inline auto list_files(T dir, T suffix = {}, bool recursive = false, bool fullpath = false) noexcept -> std::vector<typename T::string_t> {
-        std::vector<typename T::string_t> out;
-        list_files(out, dir, suffix, recursive, fullpath);
-        return out;
-    }
-
-    template<StringViewType T>
-    inline auto list_files_fullpath(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
-        return list_files(dir, suffix, false, true);
-    }
-    template<StringViewType T>
-    inline auto list_files_recursive(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
-        return list_files(dir, suffix, true, false);
-    }
-    template<StringViewType T>
-    inline auto list_files_fullpath_recursive(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
-        return list_files(dir, suffix, true, true);
-    }
+    RPPAPI int list_files( string_list& out,  strview dir,  strview suffix, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_files(ustring_list& out, ustrview dir, ustrview suffix, list_dir_flags flags = {}) noexcept;
+    inline string_list  list_files( strview dir,  strview suffix, list_dir_flags flags = {}) noexcept {  string_list out; list_files(out, dir, suffix, flags); return out; }
+    inline ustring_list list_files(ustrview dir, ustrview suffix, list_dir_flags flags = {}) noexcept { ustring_list out; list_files(out, dir, suffix, flags); return out; }
 
 
     /**
-     * Lists all files inside this directory that have the specified extension (default: all files)
-     * as relative paths including input dir
-     * @note By default: not recursive
-     * @param out Destination vector for result folder names (not full folder paths!)
-     * @param dir Relative or full path of this directory
-     * @param suffix Filter files by suffix, ex: ".txt" or "_mask.jpg", default ("") lists all files
-     * @param recursive (default: false) If true, will perform a recursive search
-     * @return Number of files found that match the extension
-     * @code
-     *     vector<string> relativePaths          = list_files_relpath(folder);
-     *     vector<string> recursiveRelativePaths = list_files_relpath_recursive(folder);
-     * @endcode
-     * @code
-     * @example [dir="test/ReCpp/"] [recursive=false] vector<string> {
-     *     "test/ReCpp/main.cpp",
-     *     "test/ReCpp/file_io.h",
-     *     "test/ReCpp/file_io.cpp",
-     * };
-     * @example [dir="test/ReCpp/"] [recursive=true] vector<string> {
-     *     "test/ReCpp/main.cpp",
-     *     "test/ReCpp/file_io.h",
-     *     "test/ReCpp/file_io.cpp",
-     *     "test/ReCpp/mesh/mesh.h",
-     *     "test/ReCpp/mesh/mesh.cpp",
-     *     "test/ReCpp/mesh/mesh_obj.cpp",
-     *     "test/ReCpp/mesh/mesh_fbx.cpp",
-     * };
-     * @endcode
-     */
-    RPPAPI int list_files_relpath(std::vector<string>& out, strview dir, strview suffix = {}, bool recursive = false) noexcept;
-    RPPAPI int list_files_relpath(std::vector<ustring>& out, ustrview dir, ustrview suffix = {}, bool recursive = false) noexcept;
-
-    template<StringViewType T>
-    inline auto list_files_relpath(T dir, T suffix = {}, bool recursive = false) noexcept -> std::vector<typename T::string_t> {
-        std::vector<typename T::string_t> out;
-        list_files_relpath(out, dir, suffix, recursive);
-        return out;
-    }
-
-    template<StringViewType T>
-    inline auto list_files_relpath_recursive(T dir, T suffix = {}) noexcept -> std::vector<typename T::string_t> {
-        return list_files_relpath(dir, suffix, true);
-    }
-
-
-    /**
-     * Recursively lists all files under this directory and its subdirectories 
-     * that match the list of suffixex
+     * Recursively lists all files under this directory and its subdirectories that match the list of suffixes.
      * @param dir Relative or full path of root directory
      * @param suffixes Filter files by suffixes, ex: {"txt","_old.cfg","_mask.jpg"}
-     * @param recursive [false] If true, the listing is done recursively
-     * @param fullpath  [false] If true, full paths will be resolved
+     * @param flags enum list_dir_flags:
+     *        dir_recursive       - will perform a recursive search
+     *        dir_fullpath        - returned paths will be fullpaths instead of relative
+     *        dir_relpath_combine - combines input_dir with relpaths
      * @return vector of resulting relative file paths
      */
-    RPPAPI std::vector<string> list_files(strview dir, const std::vector<strview>& suffixes, bool recursive = false, bool fullpath = false) noexcept;
-    RPPAPI std::vector<ustring> list_files(ustrview dir, const std::vector<ustrview>& suffixes, bool recursive = false, bool fullpath = false) noexcept;
-
-    template<StringViewType T>
-    inline auto list_files_recursive(T dir, const std::vector<T>& suffixes, bool fullpath = false) noexcept -> std::vector<typename T::string_t> {
-        return list_files(dir, suffixes, true, fullpath);
-    }
+    RPPAPI int list_files(string_list&  out,  strview dir, const std::vector<strview>&  suffixes, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_files(ustring_list& out, ustrview dir, const std::vector<ustrview>& suffixes, list_dir_flags flags = {}) noexcept;
+    inline string_list  list_files( strview dir, const std::vector<strview>&  suffixes, list_dir_flags flags = {}) noexcept { string_list out;  list_files(out, dir, suffixes, flags); return out; }
+    inline ustring_list list_files(ustrview dir, const std::vector<ustrview>& suffixes, list_dir_flags flags = {}) noexcept { ustring_list out; list_files(out, dir, suffixes, flags); return out; }
 
 
     /**
-     * Lists all files and folders inside a dir
-     * @note By default: not recursive
+     * Lists all files and folders inside a dir.
      * @param outDirs All found directories relative to input dir
      * @param outFiles All found files
      * @param dir Directory to search in
-     * @param recursive (default: false) If true, will perform a recursive search
-     * @param fullpath (default: false) If true, returned paths will be fullpaths instead of relative
+     * @param flags enum list_dir_flags:
+     *        dir_recursive       - will perform a recursive search
+     *        dir_fullpath        - returned paths will be fullpaths instead of relative
+     *        dir_relpath_combine - combines input_dir with relpaths
      * @return Number of files and folders found that match the extension
      * Example:
      * @code
@@ -694,36 +656,8 @@ namespace rpp /* ReCpp */
      *     // files: { ".git/config", ..., ".gitignore", ... }
      * @endcode
      */
-    RPPAPI int list_alldir(std::vector<string>& outDirs, std::vector<string>& outFiles, strview dir,
-                           bool recursive = false, bool fullpath = false) noexcept;
-    RPPAPI int list_alldir(std::vector<ustring>& outDirs, std::vector<ustring>& outFiles, ustrview dir,
-                           bool recursive = false, bool fullpath = false) noexcept;
-
-    /**
-     * Lists all files and folders inside a dir as relative paths to input dir
-     * @note By default: not recursive
-     * @param outDirs All found directories relative to input dir
-     * @param outFiles All found files
-     * @param dir Directory to search in
-     * @param recursive (default: false) If true, will perform a recursive search
-     * @return Number of files and folders found that match the extension
-     * Example:
-     * @code
-     *     string dir = "ReCpp";
-     *     vector<string> dirs, files;
-     *     list_alldir_relpath_recursive(dirs, files, dir);
-     *     // dirs:  { "ReCpp/.git", "ReCpp/.git/logs", ... }
-     *     // files: { "ReCpp/.git/config", ..., "ReCpp/.gitignore", ... }
-     * @endcode
-     */
-    RPPAPI int list_alldir_relpath(std::vector<string>& outDirs, std::vector<string>& outFiles, strview dir, bool recursive = false) noexcept;
-    RPPAPI int list_alldir_relpath(std::vector<ustring>& outDirs, std::vector<ustring>& outFiles, ustrview dir, bool recursive = false) noexcept;
-
-
-    template<StringViewType T>
-    inline int list_alldir_relpath_recursive(std::vector<typename T::string_t>& outDirs, std::vector<typename T::string_t>& outFiles, T dir) noexcept {
-        return list_alldir_relpath(outDirs, outFiles, dir, true);
-    }
+    RPPAPI int list_alldir( string_list& outDirs,  string_list& outFiles,  strview dir, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_alldir(ustring_list& outDirs, ustring_list& outFiles, ustrview dir, list_dir_flags flags = {}) noexcept;
 
 
     /**

@@ -115,11 +115,8 @@ namespace rpp /* ReCpp */
          * @param filename File name to open or create
          * @param mode File open mode
          */
-        file(const char* filename, mode mode = READONLY) noexcept;
-        file(const std::string&  filename, mode mode = READONLY) noexcept : file{ filename.c_str(), mode } { }
-        file(const strview& filename, mode mode = READONLY) noexcept;
-        file(const wchar_t* filename, mode mode = READONLY) noexcept;
-        file(const std::wstring& filename, mode mode = READONLY) noexcept : file{ filename.c_str(), mode } { }
+        file(strview filename, mode mode = READONLY) noexcept;
+        file(ustrview filename, mode mode = READONLY) noexcept;
         file(file&& f) noexcept;
         ~file();
 
@@ -135,17 +132,8 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
-        bool open(const char* filename, mode mode = READONLY) noexcept;
-        bool open(const std::string& filename, mode mode = READONLY) noexcept
-        {
-            return open(filename.c_str(), mode);
-        }
         bool open(strview filename, mode mode = READONLY) noexcept;
-        bool open(const wchar_t* filename, mode mode = READONLY) noexcept;
-        bool open(const std::wstring& filename, mode mode = READONLY) noexcept
-        {
-            return open(filename.c_str(), mode);
-        }
+        bool open(ustrview filename, mode mode = READONLY) noexcept;
         void close() noexcept;
 
         /**
@@ -209,22 +197,19 @@ namespace rpp /* ReCpp */
          * Save all contents to a new file.
          * @return TRUE if entire file was copied successfully
          */
-        bool save_as(const strview& filename) noexcept;
+        bool save_as(strview filename) noexcept;
 
         /**
          * Reads the entire contents of the file into a load_buffer
          * The file is opened as READONLY, unbuffered_file is used internally
          */
-        static load_buffer read_all(const char* filename) noexcept;
-        static load_buffer read_all(const std::string& filename) noexcept
+        static load_buffer read_all(strview filename)  noexcept
         {
-            return read_all(filename.c_str());
+            return file{ filename, READONLY }.read_all();
         }
-        static load_buffer read_all(const strview& filename) noexcept;
-        static load_buffer read_all(const wchar_t* filename) noexcept;
-        static load_buffer read_all(const std::wstring& filename) noexcept
+        static load_buffer read_all(ustrview filename) noexcept
         {
-            return read_all(filename.c_str());
+            return file{ filename, READONLY }.read_all();
         }
 
         /**
@@ -241,23 +226,18 @@ namespace rpp /* ReCpp */
          * Writes a C array with size information to the file.
          * Relies on OS file buffering
          */
-        template<class T, int N> int write(const T(&items)[N]) noexcept {
+        template<class T, int N> int write(const T (&items)[N]) noexcept {
             return write(items, int(sizeof(T)) * N);
         }
-        template<int N> int write(const char(&str)[N]) noexcept {
-            return write(str, N - 1);
-        }
-        template<int N> int write(const wchar_t (&str)[N]) noexcept {
-            return write(str, int(sizeof(wchar_t)) * (N - 1));
-        }
-        int write(const std::string& str) noexcept {
-            return write(str.c_str(), (int)str.size());
-        }
-        int write(const strview& str) noexcept {
+        int write(strview str) noexcept {
             return write(str.str, str.len);
         }
-        int write(const std::wstring& str) noexcept {
-            return write(str.c_str(), int(sizeof(wchar_t) * str.size()));
+        int write(ustrview str) noexcept {
+            return write(str.str, int(sizeof(ustrview::char_t) * str.len));
+        }
+        template<typename Char>
+        int write(const std::basic_string<Char>& str) noexcept {
+            return write(str.data(), int(sizeof(Char) * str.size()));
         }
 #if RPP_SPRINT_H
         int write(const string_buffer& sb) noexcept {
@@ -273,9 +253,18 @@ namespace rpp /* ReCpp */
         int writef(PRINTF_FMTSTR const char* format, ...) noexcept PRINTF_CHECKFMT2; // NOLINT
 
         /**
-         * Writes a string to file and also appends a newline
+         * Writes a string to file and also writes a newline
          */
-        int writeln(const strview& str) noexcept;
+        int writeln(strview str) noexcept
+        {
+            return write(str.str, str.len)
+                 + write("\n", 1);
+        }
+        int writeln(ustrview str) noexcept
+        {
+            return write(str.str, int(sizeof(ustrview::char_t) * str.len))
+                 + write(u"\n", sizeof(ustrview::char_t));
+        }
 
         /**
          * Just append a newline
@@ -289,7 +278,8 @@ namespace rpp /* ReCpp */
          * Example:
          * @code writeln("test:", 10, 20.1f);  --> "test: 10 20.1\n" @endcode
          */
-        template<class T, class... Args> int writeln(const T& first, const Args&... args) noexcept
+        template<class T, class... Args>
+        int writeln(const T& first, const Args&... args) noexcept
         {
             string_buffer buf;
             buf.writeln(first, args...);
@@ -341,20 +331,26 @@ namespace rpp /* ReCpp */
          * @param bytesToWrite Number of bytes to write to the file
          * @return Number of bytes actually written to the file
          */
-        static int write_new(const char* filename, const void* buffer, int bytesToWrite) noexcept;
-        static int write_new(const strview& filename, const void* buffer, int bytesToWrite) noexcept;
-        static int write_new(const std::string& filename, const void* buffer, int bytesToWrite) noexcept
-        {
-            return write_new(filename.c_str(), buffer, bytesToWrite);
-        }
-        static int write_new(const strview& filename, const strview& data) noexcept
+        static int write_new(strview filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(strview filename, strview data) noexcept
         {
             return write_new(filename, data.str, data.len);
         }
         template<class T, class U>
-        static int write_new(const strview& filename, const std::vector<T,U>& plainOldData) noexcept
+        static int write_new(strview filename, const std::vector<T,U>& plainOldData) noexcept
         {
             return write_new(filename, plainOldData.data(), int(plainOldData.size()*sizeof(T)));
+        }
+
+        static int write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(ustrview filename, ustrview data) noexcept
+        {
+            return write_new(filename, data.str, data.len);
+        }
+        template<class T, class U>
+        static int write_new(ustrview filename, const std::vector<T, U>& plainOldData) noexcept
+        {
+            return write_new(filename, plainOldData.data(), int(plainOldData.size() * sizeof(T)));
         }
 
         /**

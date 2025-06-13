@@ -322,6 +322,9 @@ namespace rpp
         template<class T> static bool eq(const std::atomic<T>& expr, const T& expected) noexcept { return eq(expr.load(), expected); }
         template<class T> static bool eq(const std::basic_string<T>& expr, const std::basic_string<T>& expected) noexcept { return expr == expected; }
         template<class T> static bool eq(std::basic_string_view<T> expr, std::basic_string_view<T> expected) noexcept { return expr == expected; }
+        template<class T> static bool eq(rpp::strview expr, rpp::strview expected) noexcept { return expr == expected; }
+        template<class T> static bool eq(rpp::ustrview expr, rpp::ustrview expected) noexcept { return expr == expected; }
+        static bool eq(const char16_t* expr, const char16_t* expected) noexcept { return rpp::ustrview{expr} == rpp::ustrview{expected}; }
 
         // specifically support some C++ Std types
         template<class T, class A> static bool eq(const std::vector<T, A>& a, const std::vector<T, A>& b) noexcept
@@ -340,6 +343,9 @@ namespace rpp
         template<class T> static bool gt(const std::atomic<T>& expr, const T& expected) noexcept { return gt(expr.load(), expected); }
         template<class T> static bool gt(const std::basic_string<T>& expr, const std::basic_string<T>& than) noexcept { return expr > than; }
         template<class T> static bool gt(std::basic_string_view<T> expr, std::basic_string_view<T> than) noexcept { return expr > than; }
+		template<class T> static bool gt(rpp::strview expr, rpp::strview than) noexcept { return expr > than; }
+		template<class T> static bool gt(rpp::ustrview expr, rpp::ustrview than) noexcept { return expr > than; }
+        static bool gt(const char16_t* expr, const char16_t* expected) noexcept { return rpp::ustrview{expr} > rpp::ustrview{expected}; }
 
         template<class Expr, class Than> static bool lt(const Expr& expr, const Than& than) noexcept
         {
@@ -352,6 +358,9 @@ namespace rpp
         template<class T> static bool lt(const std::atomic<T>& expr, const T& expected) noexcept { return lt(expr.load(), expected); }
         template<class T> static bool lt(const std::basic_string<T>& expr, const std::basic_string<T>& than) noexcept { return expr < than; }
         template<class T> static bool lt(std::basic_string_view<T> expr, std::basic_string_view<T> than) noexcept { return expr < than; }
+		template<class T> static bool lt(rpp::strview expr, rpp::strview than) noexcept { return expr < than; }
+		template<class T> static bool lt(rpp::ustrview expr, rpp::ustrview than) noexcept { return expr < than; }
+        static bool lt(const char16_t* expr, const char16_t* expected) noexcept { return rpp::ustrview{expr} < rpp::ustrview{expected}; }
 
         template<class Expr, class Than> static bool lte(const Expr& expr, const Than& than) noexcept
         {

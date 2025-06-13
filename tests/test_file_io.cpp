@@ -12,8 +12,8 @@ TestImpl(test_file_io)
     std::string TestDir;
     std::string TestFile;
     int TestSize = 0;
-    rpp::ustring TestWFile;
-    rpp::ustring TestWDir;
+    rpp::ustring TestUnicodeFile;
+    rpp::ustring TestUnicodeDir;
 
     TestInit(test_file_io)
     {
@@ -28,10 +28,10 @@ TestImpl(test_file_io)
             Assert(delete_file(TestFile));
 
         // only for wstring tests
-        if (!TestWDir.empty())
-            Assert(delete_folder(TestWDir, delete_mode::recursive));
-        if (!TestWFile.empty())
-            Assert(delete_file(TestWFile));
+        if (!TestUnicodeDir.empty())
+            Assert(delete_folder(TestUnicodeDir, delete_mode::recursive));
+        if (!TestUnicodeFile.empty())
+            Assert(delete_file(TestUnicodeFile));
     }
 
     TestCase(basic_file)
@@ -241,44 +241,44 @@ TestImpl(test_file_io)
         Assert(contains(relpaths, "test2.txt"));
         Assert(contains(relpaths, "test3.txt"));
 
-        // TEST: list_files_relpath (relative to folder/path)
-        std::vector<std::string> relpaths_r = list_files_relpath("folder/path", ".txt");
+        // TEST: list_files dir_relpath_combine (relative to folder/path)
+        std::vector<std::string> relpaths_r = list_files("folder/path", ".txt", rpp::dir_relpath_combine);
         AssertThat(relpaths_r.size(), 2u);
         Assert(contains(relpaths_r, "folder/path/test2.txt"));
         Assert(contains(relpaths_r, "folder/path/test3.txt"));
 
-        // TEST: list_files_recursive
-        std::vector<std::string> relpaths2 = list_files_recursive("", ".txt");
+        // TEST: list_files dir_recursive
+        std::vector<std::string> relpaths2 = list_files("", ".txt", rpp::dir_recursive);
         AssertThat(relpaths2.size(), 3u);
         Assert(contains(relpaths2, "folder/test1.txt"));
         Assert(contains(relpaths2, "folder/path/test2.txt"));
         Assert(contains(relpaths2, "folder/path/test3.txt"));
 
-        // TEST: list_files_fullpath
+        // TEST: list_files dir_fullpath
         std::string fullpath = full_path(TestDir);
-        std::vector<std::string> fullpaths = list_files_fullpath("folder/path", ".txt");
+        std::vector<std::string> fullpaths = list_files("folder/path", ".txt", rpp::dir_fullpath);
         AssertThat(fullpaths.size(), 2u);
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test2.txt")));
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test3.txt")));
 
-        fullpaths = list_files_fullpath("folder", ".txt");
+        fullpaths = list_files("folder", ".txt", rpp::dir_fullpath);
         AssertThat(fullpaths.size(), 1u);
         Assert(contains(fullpaths, path_combine(fullpath,"folder/test1.txt")));
 
-        // TEST: list_files_fullpath_recursive
-        std::vector<std::string> fullpaths2 = list_files_fullpath_recursive("", ".txt");
+        // TEST: list_files dir_fullpath_recursive
+        std::vector<std::string> fullpaths2 = list_files("", ".txt", rpp::dir_fullpath_recursive);
         AssertThat(fullpaths2.size(), 3u);
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/test1.txt")));
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/path/test2.txt")));
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/path/test3.txt")));
 
         // TEST: list_dirs_relpath (relative to folder)
-        std::vector<std::string> dirs_r = list_dirs_relpath_recursive("folder");
+        std::vector<std::string> dirs_r = list_dirs("folder", rpp::dir_relpath_recursive);
         Assert(contains(dirs_r, "folder/path"));
 
-        // TEST: list_alldir
+        // TEST: list_alldir dir_recursive
         std::vector<std::string> dirs, files;
-        list_alldir(dirs, files, "", true);
+        list_alldir(dirs, files, "", rpp::dir_recursive);
         Assert(contains(dirs, "folder"));
         Assert(contains(dirs, "folder/path"));
         Assert(contains(files, "folder/test1.txt"));
@@ -313,8 +313,4 @@ TestImpl(test_file_io)
         TestFile = path_combine(temp_dir(), "_rpp_test_unicode_😀𝄞ℵ€.txt");
     }
 
-    TestCase(can_handle_wstring_paths)
-    {
-        TestWFile = path_combine(rpp::to_wstring(temp_dir()), L"_rpp_test_wstring_😀𝄞ℵ€.txt");
-    }
 };
