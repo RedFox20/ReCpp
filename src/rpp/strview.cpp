@@ -602,6 +602,39 @@ namespace rpp
         return str;
     }
 
+    ustring concat(const ustrview& a, const ustrview& b)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len);
+        str.reserve(sa + sb);
+        str.append(a.str, sa).append(b.str, sb);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        str.reserve(sa + sb + sc);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        str.reserve(sa + sb + sc + sd);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        str.reserve(sa + sb + sc + sd + se);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
+        return str;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////
 
     char* to_lower(char* str, int len) noexcept
@@ -704,6 +737,79 @@ namespace rpp
         for (; n && strcontains(chars, nchars, *--e); --n) {}
         len = n;
         return *this;
+    }
+
+    int ustrview::compare(const char16_t* s, int n) const noexcept
+    {
+        int len1 = len;
+        int len2 = n;
+        if (int res = memcmp(str, s, sizeof(char16_t) * size_t(len1 < len2 ? len1 : len2)))
+            return res;
+        if (len1 < len2) return -1;
+        if (len1 > len2) return +1;
+        return 0;
+    }
+    
+    int ustrview::compare(const char16_t* s) const noexcept
+    {
+        const char16_t* s1 = str;
+        const char16_t* s2 = s;
+        for (int len1 = len; len1 > 0; --len1, ++s1, ++s2)
+        {
+            char16_t c1 = *s1, c2 = *s2;
+            if (c1 < c2) return -1;
+            if (c1 > c2) return +1;
+        }
+        return 0;
+    }
+
+    const char16_t* ustrview::rfind(char16_t c) const noexcept
+    {
+        if (len <= 0) return nullptr;
+        const char16_t* p = str;
+        const char16_t* e = p + len - 1;
+        for (; e >= p; --e) if (*e == c) return e;
+        return nullptr;
+    }
+
+    const char16_t* ustrview::findany(const char16_t* chars, int n) const noexcept
+    {
+        const char16_t* p = str;
+        const char16_t* e = p + len;
+        for (; p < e; ++p) if (strcontains(chars, n, *p)) return p;
+        return nullptr;
+    }
+
+    const char16_t* ustrview::rfindany(const char16_t* chars, int n) const noexcept
+    {
+        if (len <= 0) return nullptr;
+        const char16_t* p = str;
+        const char16_t* e = p + len - 1;
+        for (; e >= p; --e) if (strcontains(chars, n, *e)) return e;
+        return nullptr;
+    }
+
+    ustrview ustrview::substr(int index, int length) const noexcept
+    {
+        int idx = index;
+        if (idx > len)    idx = len;
+        else if (idx < 0) idx = 0;
+
+        int remaining = len - idx;
+        if (remaining > length)
+            remaining = length;
+
+        return { str + idx, remaining };
+    }
+
+    ustrview ustrview::substr(int index) const noexcept
+    {
+        int idx = index;
+        if (idx > len)    idx = len;
+        else if (idx < 0) idx = 0;
+
+        int remaining = len - idx;
+        return { str + idx, remaining };
     }
 
     ////////////////////// loose utility functions
@@ -993,7 +1099,7 @@ namespace rpp
         }
 
         *out = u'\0'; // always null terminate
-        return 0;
+        return -1;
     }
 
     ustring to_ustring(const char* utf8, int utf8len) noexcept
@@ -1030,7 +1136,7 @@ namespace rpp
             if (lasterr == ERROR_INSUFFICIENT_BUFFER) {
                 utf16len = out_max - 1;
             } else {
-                return 0; // failed -- invalid unicode characters or invalid inputs
+                return -1; // failed -- invalid unicode characters or invalid inputs
             }
         }
         out[utf16len] = u'\0'; // always null terminate
@@ -1048,7 +1154,7 @@ namespace rpp
             return (int)(to_next - out);
         }
         *out = u'\0'; // always null terminate
-        return 0;
+        return -1;
     #endif
     }
 

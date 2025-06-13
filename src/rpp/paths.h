@@ -184,7 +184,7 @@ namespace rpp /* ReCpp */
      * @result  ../lib/../bin/file.txt ==> ../bin/file.txt
      */
     RPPAPI string merge_dirups(strview path) noexcept;
-    RPPAPI string merge_dirups(ustrview path) noexcept;
+    RPPAPI ustring merge_dirups(ustrview path) noexcept;
 
     /**
      * @brief Extract the filename (no extension) from a file path

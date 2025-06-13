@@ -12,7 +12,7 @@
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
-    #define USE_WINAPI_IO 0 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
+    #define USE_WINAPI_IO 1 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
     #define stat64 _stat64
     #define fseeki64 _fseeki64
     #define ftelli64 _ftelli64
@@ -58,45 +58,84 @@ namespace rpp /* ReCpp */
         static constexpr int MAX_U16 = 1024;
         static constexpr int MAX_U8 = MAX_U16 * 2;
         union {
-            char16_t path_u16[MAX_U16];
-            char path_u8[MAX_U8];
+            char16_t path1_u16[MAX_U16];
+            char     path1_u8[MAX_U8];
         #if _MSC_VER
-            wchar_t path_w[MAX_U16];
+            wchar_t  path1_w[MAX_U16];
+        #endif
+        };
+        union {
+            char16_t path2_u16[MAX_U16];
+            char     path2_u8[MAX_U8];
+        #if _MSC_VER
+            wchar_t  path2_w[MAX_U16];
         #endif
         };
 
     #if _MSC_VER
-        FINLINE const wchar_t* to_wcs(strview path) noexcept
+        FINLINE const wchar_t* to_wcs(strview path) noexcept // UTF8 --> UTF16, and then treat as UCS2
         {
-            // UTF8 --> UTF16, and then treat as UCS2
-            if (to_ustring(path_u16, MAX_U16, path.str, path.len) > 0)
-                return (const wchar_t*)path_u16;
-            // else: cannot be converted due to invalid UTF8 sequence
-            return nullptr;
+            if (to_ustring(path1_u16, MAX_U16, path.str, path.len) > 0)
+                return (const wchar_t*)path1_u16;
+            return nullptr; // else: cannot be converted due to invalid UTF8 sequence
         }
         FINLINE const wchar_t* to_wcs(ustrview path) noexcept
         {
-            return (const wchar_t*)path.to_cstr(path_u16, MAX_U16);
+            return (const wchar_t*)path.to_cstr(path1_u16, MAX_U16);
+        }
+        std::pair<const wchar_t*, const wchar_t*> to_wcs(strview path1, strview path2) noexcept
+        {
+            if (to_ustring(path1_u16, MAX_U16, path1.str, path1.len) > 0 &&
+                to_ustring(path2_u16, MAX_U16, path2.str, path2.len) > 0)
+            {
+                return { (const wchar_t*)path1_u16, (const wchar_t*)path2_u16 };
+            }
+			return { nullptr, nullptr };
+        }
+        std::pair<const wchar_t*, const wchar_t*> to_wcs(ustrview path1, ustrview path2) noexcept
+        {
+            if (const char16_t* path1_u = path1.to_cstr(path1_u16, MAX_U16))
+            {
+                if (const char16_t* path2_u = path2.to_cstr(path2_u16, MAX_U16))
+                    return { (const wchar_t*)path1_u, (const wchar_t*)path2_u };
+            }
+			return { nullptr, nullptr };
         }
     #endif
         FINLINE const char* to_cstr(strview path) noexcept
         {
-            return path.to_cstr(path_u8, MAX_U8);
+            return path.to_cstr(path1_u8, MAX_U8);
         }
-        const char* to_cstr(ustrview path) noexcept
+        const char* to_cstr(ustrview path) noexcept // UTF16 --> UTF8
         {
-            // UTF16 --> UTF8
-            if (to_string(path_u8, MAX_U8, path.str, path.len) > 0)
-                return path_u8;
-            // contains invalid UTF16 sequence, there is no point to continue
-            return nullptr;
+            if (to_string(path1_u8, MAX_U8, path.str, path.len) > 0)
+                return path1_u8;
+            return nullptr; // contains invalid UTF16 sequence, there is no point to continue
+        }
+        std::pair<const char*, const char*> to_cstr(strview path1, strview path2) noexcept
+        {
+            if (const char* path1_a = path1.to_cstr(path1_u8, MAX_U8))
+            {
+                if (const char* path2_a = path2.to_cstr(path2_u8, MAX_U8))
+                    return { path1_a, path2_a };
+            }
+			return { nullptr, nullptr };
+		}
+        std::pair<const char*, const char*> to_cstr(ustrview path1, ustrview path2) noexcept
+        {
+            if (to_string(path1_u8, MAX_U8, path1.str, path1.len) > 0 &&
+                to_string(path2_u8, MAX_U8, path2.str, path2.len) > 0)
+            {
+                return { path1_u8, path2_u8 };
+            }
+			return { nullptr, nullptr };
         }
     };
 
 #if _MSC_VER
     #if USE_WINAPI_IO
     template<StringViewType T>
-    static DWORD win32_file_attributes(T filename) noexcept
+    static DWORD win32_file_attr(T filename) noexcept
     {
         conv_helper conv;
         // try UTF-16 first, then fall back to ANSI codepage
@@ -106,6 +145,16 @@ namespace rpp /* ReCpp */
         if (const char* filename_a = conv.to_cstr(filename))
             return GetFileAttributesA(filename_a);
         return DWORD(-1); // error
+    }
+    template<StringViewType T>
+    static bool win32_set_file_attr(T filename, DWORD attr) noexcept
+    {
+		conv_helper conv;
+        if (const wchar_t* filename_w = conv.to_wcs(filename))
+            return SetFileAttributesW(filename_w, attr) == TRUE;
+		if (const char* filename_a = conv.to_cstr(filename))
+            return SetFileAttributesA(filename_a, attr) == TRUE;
+		return false; // conversion failed
     }
     #endif
     using os_stat64 = struct _stat64;
@@ -130,6 +179,14 @@ namespace rpp /* ReCpp */
             return stat64(filename_a, out) == 0;
         return false;
     }
+    template<StringViewType T>
+    static bool set_st_mode(T filename, mode_t mode) noexcept
+    {
+        conv_helper conv;
+        if (const char* filename_a = conv.to_cstr(filename))
+            return chmod(filename_a, mode) == 0;
+        return false; // conversion failed
+	}
 #endif
 
     enum file_flags
@@ -146,7 +203,7 @@ namespace rpp /* ReCpp */
     static file_flags read_file_flags(T filename) noexcept
     {
         file_flags flags = FF_INVALID;
-        DWORD attr = win32_file_attributes(filename);
+        DWORD attr = win32_file_attr(filename);
         if (attr != DWORD(-1))
         {
             if (attr & FILE_ATTRIBUTE_DIRECTORY) flags |= FF_FOLDER;
@@ -209,7 +266,6 @@ namespace rpp /* ReCpp */
         file_flags f = read_file_flags(fileOrFolder);
         return (f & FF_FILE_OR_FOLDER) != 0;
     }
-
     bool file_or_folder_exists(ustrview fileOrFolder) noexcept
     {
         file_flags f = read_file_flags(fileOrFolder);
@@ -291,10 +347,11 @@ namespace rpp /* ReCpp */
     {
         os_stat64 s;
     #if USE_WINAPI_IO
-        if (win32_stat64(filename, &s)) {
+        if (win32_stat64(filename, &s))
     #else
-        if (get_stat64(filename, &s)) {
+        if (get_stat64(filename, &s))
     #endif
+        {
             if (filesize) *filesize = (int64)s.st_size;
             if (created)  *created  = s.st_ctime;
             if (accessed) *accessed = s.st_atime;
@@ -309,10 +366,11 @@ namespace rpp /* ReCpp */
     {
         os_stat64 s;
     #if USE_WINAPI_IO
-        if (win32_stat64(filename, &s)) {
+        if (win32_stat64(filename, &s))
     #else
-        if (get_stat64(filename, &s)) {
+        if (get_stat64(filename, &s))
     #endif
+        {
             if (filesize) *filesize = (int64)s.st_size;
             if (created)  *created  = s.st_ctime;
             if (accessed) *accessed = s.st_atime;
@@ -424,179 +482,243 @@ namespace rpp /* ReCpp */
     #endif
     }
 
-    bool copy_file(const char* sourceFile, const char* destinationFile) noexcept
+#if !USE_WINAPI_IO
+    static bool copy_file_buffered(strview sourceFile, strview destinationFile) noexcept
     {
-        #if USE_WINAPI_IO
-            // CopyFileA always copies the file access rights
-            return CopyFileA(sourceFile, destinationFile, /*failIfExists:*/false) == TRUE;
-        #else
-            file src{sourceFile, file::READONLY};
-            if (!src) return false;
+        file src { sourceFile, file::READONLY };
+        if (!src) return false;
 
-            file dst{destinationFile, file::CREATENEW};
-            if (!dst) return false;
+        file dst { destinationFile, file::CREATENEW };
+        if (!dst) return false;
 
-            // copy the file access rights
-            if (!copy_file_mode(sourceFile, destinationFile))
-                return false;
+        // copy the file access rights
+        if (!copy_file_mode(sourceFile, destinationFile))
+            return false;
 
-            // special case: empty file
-            int64 size = src.sizel();
-            if (size == 0) return true;
+        // special case: empty file
+        int64 size = src.sizel();
+        if (size == 0) return true;
 
-            constexpr int64 blockSize = 64*1024;
-            char buf[blockSize];
-            int64 totalBytesRead = 0;
-            int64 totalBytesWritten = 0;
-            for (;;)
-            {
-                int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
-                if (bytesToRead <= 0)
-                    break;
-                int bytesRead = src.read(buf, (int)bytesToRead);
-                if (bytesRead <= 0)
-                    break;
-                totalBytesRead += bytesRead;
-                totalBytesWritten += dst.write(buf, bytesRead);
-            }
-            return totalBytesRead == totalBytesWritten;
-        #endif
+        constexpr int64 blockSize = 64 * 1024;
+        char buf[blockSize];
+        int64 totalBytesRead = 0;
+        int64 totalBytesWritten = 0;
+        for (;;)
+        {
+            int64 bytesToRead = std::min(size - totalBytesRead, blockSize);
+            if (bytesToRead <= 0)
+                break;
+            int bytesRead = src.read(buf, (int)bytesToRead);
+            if (bytesRead <= 0)
+                break;
+            totalBytesRead += bytesRead;
+            totalBytesWritten += dst.write(buf, bytesRead);
+        }
+        return totalBytesRead == totalBytesWritten;
+    }
+#endif
+
+    bool copy_file(strview sourceFile, strview destinationFile) noexcept
+    {
+    #if USE_WINAPI_IO
+        conv_helper conv;
+        // CopyFileA/W always copies the file access rights
+		if (auto [src, dest] = conv.to_wcs(sourceFile, destinationFile); src && dest)
+			return CopyFileW(src, dest, /*failIfExists:*/false) == TRUE;
+		if (auto [src, dest] = conv.to_cstr(sourceFile, destinationFile); src && dest)
+            return CopyFileA(src, dest, /*failIfExists:*/false) == TRUE;
+        return false;
+    #else
+		return copy_file_buffered(sourceFile, destinationFile);
+    #endif
     }
 
-    bool copy_file(const strview sourceFile, const strview destinationFile) noexcept
+    bool copy_file_mode(strview sourceFile, strview destinationFile) noexcept
     {
-        char buf1[1024];
-        char buf2[1024];
-        return copy_file(sourceFile.to_cstr(buf1), destinationFile.to_cstr(buf2));
+    #if _WIN32
+        DWORD attr = win32_file_attr(sourceFile);
+        return attr != DWORD(-1) && win32_set_file_attr(destinationFile, attr);
+    #else
+        os_stat64 s;
+		return get_stat64(sourceFile, &s) && set_st_mode(destinationFile, s.st_mode);
+    #endif
+    }
+    bool copy_file_mode(ustrview sourceFile, ustrview destinationFile) noexcept
+    {
+    #if _WIN32
+        DWORD attr = win32_file_attr(sourceFile);
+		return attr != DWORD(-1) && win32_set_file_attr(destinationFile, attr);
+    #else
+        os_stat64 s;
+        return get_stat64(sourceFile, &s) && set_st_mode(destinationFile, s.st_mode);
+    #endif
     }
 
-    bool copy_file_mode(const char* sourceFile, const char* destinationFile) noexcept
+    bool copy_file_if_needed(strview sourceFile, strview destinationFile) noexcept
     {
-        #if _WIN32
-            DWORD attr = GetFileAttributesA(sourceFile);
-            return attr != DWORD(-1) && SetFileAttributesA(destinationFile, attr) != FALSE;
-        #else
-            struct stat s;
-            return stat(sourceFile, &s) != 0 ? false : chmod(destinationFile, s.st_mode) == 0;
-        #endif
+        if (file_exists(destinationFile))
+            return true;
+        return copy_file(sourceFile, destinationFile);
     }
-
-    bool copy_file_mode(const strview sourceFile, const strview destinationFile) noexcept
-    {
-        char buf1[1024];
-        char buf2[1024];
-        return copy_file_mode(sourceFile.to_cstr(buf1), destinationFile.to_cstr(buf2));
-    }
-
-    bool copy_file_if_needed(const strview sourceFile, const strview destinationFile) noexcept
+    bool copy_file_if_needed(ustrview sourceFile, ustrview destinationFile) noexcept
     {
         if (file_exists(destinationFile))
             return true;
         return copy_file(sourceFile, destinationFile);
     }
 
-    bool copy_file_into_folder(const strview sourceFile, const strview destinationFolder) noexcept
+    bool copy_file_into_folder(strview sourceFile, strview destinationFolder) noexcept
     {
-        char buf1[1024];
         string destFile = path_combine(destinationFolder, file_nameext(sourceFile));
-        return copy_file(sourceFile.to_cstr(buf1), destFile.c_str());
+        return copy_file(sourceFile, destFile);
+    }
+    bool copy_file_into_folder(ustrview sourceFile, ustrview destinationFolder) noexcept
+    {
+        ustring destFile = path_combine(destinationFolder, file_nameext(sourceFile));
+        return copy_file(sourceFile, destFile);
     }
     
     // on failure, check errno for details, if folder (or file) exists, we consider it a success
     // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
     static bool sys_mkdir(strview foldername) noexcept
     {
-        char buf[1024];
+        conv_helper conv;
     #if _WIN32
-        return _mkdir(foldername.to_cstr(buf)) == 0 || errno == EEXIST;
+        return _wmkdir(conv.to_wcs(foldername)) == 0 || errno == EEXIST;
     #else
-        return mkdir(foldername.to_cstr(buf), 0755) == 0 || errno == EEXIST;
+        return mkdir(conv.to_cstr(foldername), 0755) == 0 || errno == EEXIST;
     #endif
     }
     static bool sys_mkdir(ustrview foldername) noexcept
     {
+        conv_helper conv;
     #if _WIN32
-        char16_t buf[1024];
-        return _wmkdir((const wchar_t*)foldername.to_cstr(buf)) == 0 || errno == EEXIST;
+        return _wmkdir(conv.to_wcs(foldername)) == 0 || errno == EEXIST;
     #else
-        char buf[1024];
-        int n = to_string(buf, )
-        return sys_mkdir(to_string(foldername));
+        return mkdir(conv.to_cstr(foldername), 0755) == 0 || errno == EEXIST;
     #endif
     }
 
-    bool create_folder(strview foldername) noexcept
+
+    template<StringViewType T>
+    struct strview_constants
     {
+        using tchar = typename T::char_t;
+
+        // slashes: "/\\"
+        static constexpr tchar slashes_a[3] = { (tchar)'/', (tchar)'\\', (tchar)'\0' };
+        static constexpr T slashes_sv { slashes_a, 2 };
+
+        // dotslash: "./"
+        static constexpr tchar dotslash_a[3] = { (tchar)'.', (tchar)'/', (tchar)'\0' };
+        static constexpr T dotslash_sv { dotslash_a, 2 };
+
+        // dotslashes: "./\\"
+        static constexpr tchar dotslashes_a[4] = { (tchar)'.', (tchar)'/', (tchar)'\\', (tchar)'\0' };
+        static constexpr T dotslashes_sv { dotslashes_a, 3 };
+
+        // dotdot: "."
+        static constexpr tchar dot_a[3] = { (tchar)'.', (tchar)'\0' };
+        static constexpr T dot_sv { dot_a, 1 };
+
+        // dotdot: ".."
+        static constexpr tchar dotdot_a[3] = { (tchar)'.', (tchar)'.', (tchar)'\0' };
+        static constexpr T dotdot_sv { dotdot_a, 2 };
+
+        // dotdotslash: "../"
+        static constexpr tchar dotdotslash_a[4] = { (tchar)'.', (tchar)'.', (tchar)'/', (tchar)'\0' };
+        static constexpr T dotdotslash_sv { dotdotslash_a, 3 };
+    };
+
+
+    template<StringViewType T>
+    static bool create_folder(T foldername) noexcept
+    {
+        using tchar = typename T::char_t;
         if (!foldername.len) // fail on empty strings purely for catching bugs
             return false;
-        if (foldername == "./") // current folder already exists
+
+        // foldername == "./", current folder already exist
+        if (foldername == strview_constants<T>::dotslash_sv)
             return true;
+
         if (sys_mkdir(foldername)) // best case, no recursive mkdir required
             return true;
 
         // ugh, need to work our way upward to find a root dir that exists:
         // @note heavily optimized to minimize folder_exists() and mkdir() syscalls
-        const char* fs = foldername.begin();
-        const char* fe = foldername.end();
-        const char* p = fe;
-        while ((p = strview{fs,p}.rfindany("/\\")) != nullptr)
+        const tchar* fs = foldername.begin();
+        const tchar* fe = foldername.end();
+        const tchar* p = fe;
+        while ((p = T{ fs,p }.rfindany(strview_constants<T>::slashes_a, 2)) != nullptr)
         {
-            if (folder_exists(strview{fs,p}))
+            if (folder_exists(T{ fs,p }))
                 break;
         }
 
         // now create all the parent dir between:
         p = p ? p + 1 : fs; // handle /dir/ vs dir/ case
 
-        while (const char* e = strview{p,fe}.findany("/\\"))
+        while (const tchar* e = T{ p,fe }.findany(strview_constants<T>::slashes_a, 2))
         {
-            if (!sys_mkdir(strview{fs,e}))
+            if (!sys_mkdir(T{ fs,e }))
                 return false; // ugh, something went really wrong here...
             p = e + 1;
         }
         return sys_mkdir(foldername); // and now create the final dir
     }
-    bool create_folder(const wchar_t* foldername) noexcept
+    bool create_folder(strview foldername) noexcept
     {
-        if (!foldername || !*foldername || wcscmp(foldername, L"./") == 0)
-            return false;
-        return sys_mkdir(foldername);
+        return create_folder<strview>(foldername);
     }
-    bool create_folder(const ustring& foldername) noexcept
+    bool create_folder(ustrview foldername) noexcept
     {
-        if (foldername.empty() || foldername == L"./")
-            return false;
-        return sys_mkdir(foldername.c_str());
+        return create_folder<ustrview>(foldername);
     }
+
 
     static bool sys_rmdir(strview foldername) noexcept
     {
-        char buf[512];
+        conv_helper conv;
     #if _WIN32
-        return _rmdir(foldername.to_cstr(buf)) == 0;
+        return _wrmdir(conv.to_wcs(foldername)) == 0;
     #else
-        return rmdir(foldername.to_cstr(buf)) == 0;
+        return rmdir(conv.to_cstr(foldername)) == 0;
+    #endif
+    }
+    static bool sys_rmdir(ustrview foldername) noexcept
+    {
+        conv_helper conv;
+    #if _WIN32
+        return _wrmdir(conv.to_wcs(foldername)) == 0;
+    #else
+        return rmdir(conv.to_cstr(foldername)) == 0;
     #endif
     }
 
-    bool delete_folder(strview foldername, delete_mode mode) noexcept
+    template<StringViewType T>
+    static bool delete_folder(T foldername, delete_mode mode) noexcept
     {
         // these would delete the root dir...
-        if (foldername.empty() || foldername == "/"_sv)
+        if (foldername.empty())
+            return false;
+        //  || foldername == "/"_sv
+        if (foldername.len == 1 && foldername[0] == '/')
             return false;
         if (mode == delete_mode::non_recursive)
             return sys_rmdir(foldername); // easy path, just gently try to delete...
 
-        std::vector<string> folders;
-        std::vector<string> files;
+        using tstring = typename T::string_t;
+        std::vector<tstring> folders;
+        std::vector<tstring> files;
         bool deletedChildren = true;
 
         if (list_alldir(folders, files, foldername))
         {
-            for (const string& folder : folders)
+            for (const tstring& folder : folders)
                 deletedChildren |= delete_folder(path_combine(foldername, folder), delete_mode::recursive);
 
-            for (const string& file : files)
+            for (const tstring& file : files)
                 deletedChildren |= delete_file(path_combine(foldername, file));
         }
 
@@ -605,69 +727,75 @@ namespace rpp /* ReCpp */
 
         return false; // no way to delete, since some subtree files are protected
     }
-
-#if RPP_ENABLE_UNICODE
-    static bool sys_rmdir(ustrview foldername) noexcept
+    bool delete_folder(strview foldername, delete_mode mode) noexcept
     {
-    #if _WIN32
-        wchar_t buf[512];
-        return _wrmdir(foldername.to_cstr(buf)) == 0;
-    #else
-        // convert to UTF8 and call the other function
-        return sys_rmdir(foldername.to_string());
-    #endif
+        return delete_folder<strview>(foldername, mode);
     }
     bool delete_folder(ustrview foldername, delete_mode mode) noexcept
     {
-        if (foldername.empty() || foldername == L"/"_sv)
-            return false;
-        if (mode == delete_mode::non_recursive)
-            return sys_rmdir(foldername);
+        return delete_folder<ustrview>(foldername, mode);
+    }
 
-        std::vector<std::wstring> folders;
-        std::vector<std::wstring> files;
-        bool deletedChildren = true;
-
-        if (list_alldir(folders, files, foldername.to_string()))
+    string full_path(strview path) noexcept
+    {
+        conv_helper conv;
+    #if _WIN32
+        if (const wchar_t* path_w = conv.to_wcs(path))
         {
-            for (const std::wstring& folder : folders)
-                deletedChildren |= delete_folder(path_combine(foldername, folder), delete_mode::recursive);
-            for (const std::wstring& file : files)
-                deletedChildren |= delete_file(path_combine(foldername, file));
+            DWORD len = GetFullPathNameW(path_w, sizeof(conv.path2_w), conv.path2_w, nullptr);
+            return to_string(conv.path2_u16, len);
         }
-        if (deletedChildren)
-            return sys_rmdir(foldername);
-        return false; // no way to delete, since some subtree files are protected
+        if (const char* path_a = conv.to_cstr(path))
+        {
+            DWORD len = GetFullPathNameA(path_a, sizeof(conv.path2_u8), conv.path2_u8, nullptr);
+            if (len == 0) return string{};
+            return string{ conv.path2_u8, conv.path2_u8 + len };
+        }
+        return string{};
+    #else
+        // TODO: potential buffer overflow
+        char* res = realpath(conv.to_cstr(path), conv.path2_u8);
+        return res ? string{ res } : string{};
+    #endif
+    }
+    ustring full_path(ustrview path) noexcept
+    {
+        conv_helper conv;
+#if _WIN32
+        if (const wchar_t* path_w = conv.to_wcs(path))
+        {
+            DWORD len = GetFullPathNameW(path_w, sizeof(conv.path2_w), conv.path2_w, nullptr);
+            if (len == 0) return ustring{};
+            return ustring{ conv.path2_u16, conv.path2_u16 + len };
+        }
+        if (const char* path_a = conv.to_cstr(path))
+        {
+            DWORD len = GetFullPathNameA(path_a, sizeof(conv.path2_u8), conv.path2_u8, nullptr);
+            return to_ustring(conv.path2_u8, len);
+        }
+        return ustring{};
+#else
+        // TODO: potential buffer overflow
+        char* res = realpath(conv.to_cstr(path), conv.path2_u8);
+        return res ? string{ res } : string{};
+#endif
     }
 
-#endif // RPP_ENABLE_UNICODE
-
-    string full_path(const char* path) noexcept
+    template<StringViewType T>
+    static auto merge_dirups(T path) noexcept -> T::string_t
     {
-        char buf[4096];
-        #if _WIN32
-            size_t len = GetFullPathNameA(path, sizeof(buf), buf, nullptr);
-            if (len) normalize(buf);
-            return len ? string{ buf,len } : string{};
-        #else
-            char* res = realpath(path, buf);
-            return res ? string{ res } : string{};
-        #endif
-    }
-
-
-    string merge_dirups(strview path) noexcept
-    {
-        strview pathstr = path;
-        const bool isDirPath = path.back() == '/' || path.back() == '\\';
-        std::vector<strview> folders;
-        while (strview folder = pathstr.next("/\\")) {
+        using tchar = typename T::char_t;
+        T pathstr = path;
+        const bool isDirPath = path.back() == (tchar)'/' || path.back() == (tchar)'\\';
+        std::vector<T> folders;
+        while (T folder = pathstr.next(strview_constants<T>::slashes_a)) {
             folders.push_back(folder);
         }
 
         for (size_t i = 0; i < folders.size(); ++i)
         {
-            if (i > 0 && folders[i] == ".." && folders[i-1] != "..") 
+            if (i > 0 && folders[i] == strview_constants<T>::dotdot_sv
+                      && folders[i - 1] != strview_constants<T>::dotdot_sv)
             {
                 auto it = folders.begin() + i;
                 folders.erase(it - 1, it + 1);
@@ -675,155 +803,238 @@ namespace rpp /* ReCpp */
             }
         }
 
-        string result;
-        for (const strview& folder : folders) {
+        T::string_t result;
+        for (const T& folder : folders) {
             result += folder;
-            result += '/';
+            result += (tchar)'/';
         }
         if (!isDirPath) { // it's a filename? so pop the last /
             result.pop_back();
         }
         return result;
     }
+    string merge_dirups(strview path) noexcept
+    {
+        return merge_dirups<strview>(path);
+    }
+    ustring merge_dirups(ustrview path) noexcept
+    {
+        return merge_dirups<ustrview>(path);
+    }
 
 
+    static constexpr int EXT_LEN_MAX = 8; // max length of file extension, including dot
+    
+    template<StringViewType T>
+    static auto file_name(T path) noexcept -> T
+    {
+        T nameext = file_nameext(path);
+        if (auto* ptr = nameext.substr(nameext.len - EXT_LEN_MAX).rfind('.'))
+            return T{ nameext.str, ptr };
+        return nameext; // no extension found, return the whole name
+    }
     strview file_name(strview path) noexcept
     {
-        strview nameext = file_nameext(path);
-
-        if (auto* ptr = nameext.substr(nameext.len - 8).rfind('.'))
-            return strview{ nameext.str, ptr };
-        return nameext;
+        return file_name<strview>(path);
+    }
+    ustrview file_name(ustrview path) noexcept
+    {
+        return file_name<ustrview>(path);
     }
 
 
-    strview file_nameext(const strview path) noexcept
+    template<StringViewType T>
+    static auto file_nameext(T path) noexcept -> T
     {
-        if (auto* str = path.rfindany("/\\"))
-            return strview{ str + 1, path.end() };
+        if (auto* str = path.rfindany(strview_constants<T>::slashes_a))
+            return T{ str + 1, path.end() };
         return path; // assume it's just a file name
     }
-
-
-    strview file_ext(strview path) noexcept
+    strview file_nameext(strview path) noexcept
     {
-        if (auto* ptr = path.substr(path.len - 8).rfindany("./\\")) {
-            if (*ptr == '.') return { ptr + 1, path.end() };
-        }
-        return strview{};
+        return file_nameext<strview>(path);
+    }
+    ustrview file_nameext(ustrview path) noexcept
+    {
+        return file_nameext<ustrview>(path);
     }
 
 
-    string file_replace_ext(strview path, strview ext) noexcept
+    template<StringViewType T>
+    static auto file_ext(T path) noexcept -> T
     {
-        if (strview oldext = file_ext(path))
-        {
-            auto len = int(oldext.str - path.str);
-            return strview{ path.str, len } + ext;
+        if (auto* ptr = path.substr(path.len - EXT_LEN_MAX).rfindany(strview_constants<T>::dotslashes_a)) {
+            if (*ptr == (T::char_t)'.') return T{ ptr + 1, path.end() };
         }
-        if (path && path.back() != '/' && path.back() != '\\')
+        return T{}; // no extension found
+    }
+    strview file_ext(strview path) noexcept
+    {
+        return file_ext<strview>(path);
+    }
+    ustrview file_ext(ustrview path) noexcept
+    {
+        return file_ext<ustrview>(path);
+    }
+
+
+    template<StringViewType T>
+    static auto file_replace_ext(T path, T ext) noexcept -> T::string_t
+    {
+        if (T oldext = file_ext(path))
         {
-            return path + "." + ext;
+            int len = int(oldext.str - path.str);
+            return concat(T{ path.str, len }, ext);
+        }
+        if (path && path.back() != (T::char_t)'/' && path.back() != (T::char_t)'\\')
+        {
+            return concat(path, strview_constants<T>::dot_sv, ext);
         }
         return path;
     }
+    string file_replace_ext(strview path, strview ext) noexcept
+    {
+        return file_replace_ext<strview>(path, ext);
+    }
+    ustring file_replace_ext(ustrview path, ustrview ext) noexcept
+    {
+        return file_replace_ext<ustrview>(path, ext);
+    }
     
+
+    template<StringViewType T>
+    static auto file_name_append(T path, T add) noexcept -> T::string_t
+    {
+        T::string_t result = concat(folder_path(path), file_name(path), add);
+        if (T ext = file_ext(path)) {
+            result += (T::char_t)'.';
+            result += ext;
+        }
+        return result;
+    }
     string file_name_append(strview path, strview add) noexcept
     {
-        string result = folder_path(path);
-        result += file_name(path);
-        result += add;
-        if (strview ext = file_ext(path)) {
-            result += '.';
+        return file_name_append<strview>(path, add);
+    }
+    ustring file_name_append(ustrview path, ustrview add) noexcept
+    {
+        return file_name_append<ustrview>(path, add);
+    }
+    
+
+    template<StringViewType T>
+    static auto file_name_replace(T path, T newFileName) noexcept -> T::string_t
+    {
+        T::string_t result = concat(folder_path(path), newFileName);
+        if (T ext = file_ext(path)) {
+            result += (T::char_t)'.';
             result += ext;
         }
         return result;
     }
-    
     string file_name_replace(strview path, strview newFileName) noexcept
     {
-        string result = folder_path(path) + newFileName;
-        if (strview ext = file_ext(path)) {
-            result += '.';
-            result += ext;
-        }
-        return result;
+        return file_name_replace<strview>(path, newFileName);
+    }
+    ustring file_name_replace(ustrview path, ustrview newFileName) noexcept
+    {
+        return file_name_replace<ustrview>(path, newFileName);
     }
     
+
     string file_nameext_replace(strview path, strview newFileNameAndExt) noexcept
     {
-        return folder_path(path) + newFileNameAndExt;
+        return concat(folder_path(path), newFileNameAndExt);
+    }
+    ustring file_nameext_replace(ustrview path, ustrview newFileNameAndExt) noexcept
+    {
+        return concat(folder_path(path), newFileNameAndExt);
     }
 
-    strview folder_name(strview path) noexcept
+
+    template<StringViewType T>
+    static T folder_name(T path) noexcept
     {
-        strview folder = folder_path(path);
+        T folder = folder_path(path);
         if (folder)
         {
-            if (const char* str = folder.chomp_last().rfindany("/\\"))
-                return strview{ str + 1, folder.end() };
+            if (const auto* str = folder.chomp_last().rfindany(strview_constants<T>::slashes_a))
+                return T{ str + 1, folder.end() };
         }
         return folder;
     }
+    strview folder_name(strview path) noexcept
+    {
+        return folder_name<strview>(path);
+    }
+    ustrview folder_name(ustrview path) noexcept
+    {
+        return folder_name<ustrview>(path);
+    }
 
 
+    template<StringViewType T>
+    static T folder_path(T path) noexcept
+    {
+        if (const auto* end = path.rfindany(strview_constants<T>::slashes_a))
+            return T{ path.str, end + 1 };
+        return T{}; // no folder path found, return empty
+    }
     strview folder_path(strview path) noexcept
     {
-        if (const char* end = path.rfindany("/\\"))
-            return strview{ path.str, end + 1 };
-        return strview{};
+        return folder_path<strview>(path);
     }
-    ustring folder_path(const wchar_t* path) noexcept
+    ustrview folder_path(ustrview path) noexcept
     {
-        auto* end = path + wcslen(path);
-        for (; path < end; --end)
-            if (*end == '/' || *end == '\\')
-                break;
-        return path == end ? ustring{} : ustring{path, end + 1};
-    }
-    ustring folder_path(const ustring& path) noexcept
-    {
-        auto* ptr = path.c_str();
-        auto* end  = ptr + path.size();
-        for (; ptr < end; --end)
-            if (*end == '/' || *end == '\\')
-                break;
-        return ptr == end ? ustring{} : ustring{ptr, end + 1};
+        return folder_path<ustrview>(path);
     }
 
 
-    string& normalize(string& path, char sep) noexcept
+    template<typename Char>
+    static void normalize_nullterm(Char* path, Char sep) noexcept
     {
-        if (sep == '/') {
-            for (char& ch : path) if (ch == '\\') ch = '/';
+        if (sep == (Char)'/') {
+            for (Char* s = path; *s; ++s) if (ch == (Char)'\\') ch = (Char)'/';
         }
-        else if (sep == '\\') {
-            for (char& ch : path) if (ch == '/')  ch = '\\';
+        else if (sep == (Char)'\\') {
+            for (Char* s = path; *s; ++s) if (ch == (Char)'/')  ch = (Char)'\\';
         }
         // else: ignore any other separators
-        return path;
+    }
+    string& normalize(string& path, char sep) noexcept
+    {
+        normalize_nullterm(path.data(), sep);
     }
     char* normalize(char* path, char sep) noexcept
     {
-        if (sep == '/') {
-            for (char* s = path; *s; ++s) if (*s == '\\') *s = '/';
-        }
-        else if (sep == '\\') {
-            for (char* s = path; *s; ++s) if (*s == '/')  *s = '\\';
-        }
-        // else: ignore any other separators
-        return path;
+        normalize_nullterm(path, sep);
     }
+    ustring& normalize(ustring& path, char16_t sep) noexcept
+    {
+        normalize_nullterm(path.data(), sep);
+    }
+    char16_t* normalize(char16_t* path, char16_t sep) noexcept
+    {
+        normalize_nullterm(path, sep);
+    }
+
 
     string normalized(strview path, char sep) noexcept
     {
         string res = path.to_string();
-        normalize(res, sep);
+        normalize_nullterm(res.data(), sep);
+        return res;
+    }
+    ustring normalized(ustrview path, char16_t sep) noexcept
+    {
+        ustring res = path.to_string();
+        normalize_nullterm(res.data(), sep);
         return res;
     }
 
-    template<class TStrView = rpp::strview, size_t N>
-    static TStrView::string_t slash_combine(const std::array<TStrView, N>& args)
+
+    template<StringViewType T, size_t N>
+    static T::string_t slash_combine(const std::array<T, N>& args)
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
@@ -834,13 +1045,13 @@ namespace rpp /* ReCpp */
             }
         }
         
-        TStrView::string_t result; result.reserve(res);
+        T::string_t result; result.reserve(res);
         result.append(args[0].data(), args[0].size());
 
         for (size_t i = 1; i < N; ++i) {
             if (auto n = static_cast<size_t>(args[i].size())) {
                 if (!result.empty())
-                    result.append(1, '/');
+                    result.append(1, (T::char_t)'/');
                 result.append(args[i].data(), n);
             }
         }
@@ -849,49 +1060,45 @@ namespace rpp /* ReCpp */
 
     string path_combine(strview path1, strview path2) noexcept
     {
-        path1.trim_end("/\\");
-        path2.trim("/\\");
+        path1.trim_end(strview_constants<strview>::slashes_a);
+        path2.trim(strview_constants<strview>::slashes_a);
         return slash_combine(std::array<strview, 2>{{path1, path2}});
     }
-
     string path_combine(strview path1, strview path2, strview path3) noexcept
     {
-        path1.trim_end("/\\");
-        path2.trim("/\\");
-        path3.trim("/\\");
+        path1.trim_end(strview_constants<strview>::slashes_a);
+        path2.trim(strview_constants<strview>::slashes_a);
+        path3.trim(strview_constants<strview>::slashes_a);
         return slash_combine(std::array<strview, 3>{{path1, path2, path3}});
     }
-
     string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept
     {
-        path1.trim_end("/\\");
-        path2.trim("/\\");
-        path3.trim("/\\");
-        path4.trim("/\\");
+        path1.trim_end(strview_constants<strview>::slashes_a);
+        path2.trim(strview_constants<strview>::slashes_a);
+        path3.trim(strview_constants<strview>::slashes_a);
+        path4.trim(strview_constants<strview>::slashes_a);
         return slash_combine(std::array<strview, 4>{{path1, path2, path3, path4}});
     }
 
     ustring path_combine(ustrview path1, ustrview path2) noexcept
     {
-        path1.trim_end(u"/\\");
-        path2.trim(u"/\\");
+        path1.trim_end(strview_constants<ustrview>::slashes_a);
+        path2.trim(strview_constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 2>{{ path1, path2 }});
     }
-
     ustring path_combine(ustrview path1, ustrview path2, ustrview path3) noexcept
     {
-        path1.trim_end(u"/\\");
-        path2.trim(u"/\\");
-        path3.trim(u"/\\");
+        path1.trim_end(strview_constants<ustrview>::slashes_a);
+        path2.trim(strview_constants<ustrview>::slashes_a);
+        path3.trim(strview_constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 3>{{ path1, path2, path3 }});
     }
-
     ustring path_combine(ustrview path1, ustrview path2, ustrview path3, ustrview path4) noexcept
     {
-        path1.trim_end(u"/\\");
-        path2.trim(u"/\\");
-        path3.trim(u"/\\");
-        path4.trim(u"/\\");
+        path1.trim_end(strview_constants<ustrview>::slashes_a);
+        path2.trim(strview_constants<ustrview>::slashes_a);
+        path3.trim(strview_constants<ustrview>::slashes_a);
+        path4.trim(strview_constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 4>{{ path1, path2, path3, path4 }});
     }
 

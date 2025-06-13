@@ -1056,6 +1056,7 @@ namespace rpp
             return *this;
         }
 
+
         /**
          * Copies this str[len] string into a C-string array
          * However, if THIS string is null terminated, this operation is a NOP and behaves like c_str()
@@ -1078,6 +1079,59 @@ namespace rpp
         FINLINE bool operator!=(char16_t* s) const noexcept { return !strequals(s, str, len); }
         FINLINE bool operator==(char16_t ch) const noexcept { return len == 1 && *str == ch; }
         FINLINE bool operator!=(char16_t ch) const noexcept { return len != 1 || *str != ch; }
+
+
+        /** @brief Compares this strview to string data */
+        NOINLINE int compare(const char16_t* s, int n) const noexcept;
+        NOINLINE int compare(const char16_t* s) const noexcept;
+        FINLINE int compare(const ustrview& b) const noexcept { return compare(b.str, b.len); }
+        FINLINE int compare(const string_t& b) const noexcept { return compare(b.c_str(),(int)b.size()); }
+        
+        FINLINE bool operator< (const ustrview& s) const noexcept { return compare(s.str, s.len) < 0; }
+        FINLINE bool operator> (const ustrview& s) const noexcept { return compare(s.str, s.len) > 0; }
+        FINLINE bool operator<=(const ustrview& s) const noexcept { return compare(s.str, s.len) <= 0; }
+        FINLINE bool operator>=(const ustrview& s) const noexcept { return compare(s.str, s.len) >= 0; }
+        FINLINE bool operator< (const string_t& s) const noexcept { return compare(s.c_str(),(int)s.size()) < 0; }
+        FINLINE bool operator> (const string_t& s) const noexcept { return compare(s.c_str(),(int)s.size()) > 0; }
+        FINLINE bool operator<=(const string_t& s) const noexcept { return compare(s.c_str(),(int)s.size()) <= 0; }
+        FINLINE bool operator>=(const string_t& s) const noexcept { return compare(s.c_str(),(int)s.size()) >= 0; }
+        template<int SIZE> FINLINE bool operator< (const char16_t(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) < 0;}
+        template<int SIZE> FINLINE bool operator> (const char16_t(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) > 0;}
+        template<int SIZE> FINLINE bool operator<=(const char16_t(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) <= 0;}
+        template<int SIZE> FINLINE bool operator>=(const char16_t(&s)[SIZE]) const noexcept {return compare(s,SIZE-1) >= 0;}
+
+        /** @return Pointer to char if found using reverse search, NULL otherwise */
+        NOINLINE const char16_t* rfind(char16_t c) const noexcept;
+
+        /**
+         * Forward searches for any of the specified chars
+         * @return Pointer to char if found, NULL otherwise.
+         */
+        const char16_t* findany(const char16_t* chars, int n) const noexcept;
+        template<int N> FINLINE const char16_t* findany(const char16_t (&chars)[N]) const noexcept {
+            return findany(chars, N - 1);
+        }
+
+        /**
+         * Reverse searches for any of the specified chars
+         * @return Pointer to char if found, NULL otherwise.
+         */
+        const char16_t* rfindany(const char16_t* chars, int n) const noexcept;
+        template<int N> FINLINE const char16_t* rfindany(const char16_t (&chars)[N]) const noexcept {
+            return rfindany(chars, N - 1);
+        }
+
+        /**
+         * Tries to create a substring from specified index with given length.
+         * The substring will be clamped to a valid range [0 .. len-1]
+         */
+        NOINLINE ustrview substr(int index, int length) const noexcept;
+
+        /**
+         * Tries to create a substring from specified index until the end of string.
+         * Substring will be empty if invalid index is given
+         */
+        NOINLINE ustrview substr(int index) const noexcept;
     };
 #endif // RPP_ENABLE_UNICODE
 
@@ -1199,6 +1253,11 @@ namespace rpp
     RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d);
     RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
 
+    RPPAPI ustring concat(const ustrview& a, const ustrview& b);
+    RPPAPI ustring concat(const ustrview& a, const ustrview& b, const ustrview& c);
+    RPPAPI ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d);
+    RPPAPI ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e);
+
     //////////////// string compare operators /////////////////
 
     inline bool operator< (const string& a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) < 0; }
@@ -1214,6 +1273,22 @@ namespace rpp
     inline bool operator>=(const char* a,const strview& b) noexcept { return strview{a}.compare(b.str, b.len) >= 0; }
     inline bool operator==(const char* a,const strview& b) noexcept { return strview{a}.equals(b.str, b.len); }
     inline bool operator!=(const char* a,const strview& b) noexcept { return !strview{a}.equals(b.str, b.len); }
+
+    // unicode string compare operators
+
+    inline bool operator< (const ustring& a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) < 0; }
+    inline bool operator> (const ustring& a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) > 0; }
+    inline bool operator<=(const ustring& a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) <= 0; }
+    inline bool operator>=(const ustring& a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) >= 0; }
+    inline bool operator==(const ustring& a,const ustrview& b) noexcept { return ustrview{a}.equals(b.str, b.len); }
+    inline bool operator!=(const ustring& a,const ustrview& b) noexcept { return !ustrview{a}.equals(b.str, b.len); }
+    
+    inline bool operator< (const char16_t* a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) < 0; }
+    inline bool operator> (const char16_t* a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) > 0; }
+    inline bool operator<=(const char16_t* a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) <= 0; }
+    inline bool operator>=(const char16_t* a,const ustrview& b) noexcept { return ustrview{a}.compare(b.str, b.len) >= 0; }
+    inline bool operator==(const char16_t* a,const ustrview& b) noexcept { return ustrview{a}.equals(b.str, b.len); }
+    inline bool operator!=(const char16_t* a,const ustrview& b) noexcept { return !ustrview{a}.equals(b.str, b.len); }
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -1249,6 +1324,7 @@ namespace rpp
     FINLINE string to_string(ustrview utf16) noexcept { return to_string(utf16.str, utf16.len); }
     /**
      * @brief Buffer style conversion for less allocations
+     * @returns -1 on failure, [0..out_max-1] on success
      */
     int to_string(char* out, int out_max, const char16_t* utf16, int utf16len = -1) noexcept;
 
@@ -1259,6 +1335,7 @@ namespace rpp
     FINLINE ustring to_ustring(strview utf8) noexcept { return to_ustring(utf8.str, utf8.len); }
     /**
      * @brief Buffer style conversion for less allocations
+     * @returns -1 on failure, [0..out_max-1] on success
      */
     int to_ustring(char16_t* out, int out_max, const char* utf8, int utf8len = -1) noexcept;
     FINLINE int to_ustring(char16_t* out, int out_max, const char8_t* utf8, int utf8len = -1) noexcept {
