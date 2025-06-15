@@ -425,6 +425,9 @@ namespace rpp /* ReCpp */
             /** @returns absolute path to "{input_dir}/{entry.name}" */
             string_t full_path() const noexcept { return rpp::path_combine(it->full_path(), name); }
 
+            /** @returns TRUE if current iterator state points to a valid FILE or DIR */
+            bool is_valid() const noexcept { return (is_file() || is_dir()); }
+
             /** @returns TRUE if this is a directory */
             bool is_dir() const noexcept { return it->is_dir(); }
             /** @returns TRUE if this is a regular file */
@@ -433,19 +436,6 @@ namespace rpp /* ReCpp */
             bool is_symlink() const noexcept { return it->is_symlink(); }
             /** @returns TRUE if this is a block device, character device, named pipe or socket */
             bool is_device() const noexcept { return it->is_device(); }
-
-            /** @returns TRUE if these are the special '.' or '..' dirs */
-            bool is_special_dir() const noexcept {
-                size_t len = name.length();
-                return (len == 1 && name.data()[0] == char_t('.'))
-                    || (len == 2 && name.data()[1] == char_t('.') && name.data()[2] == char_t('.'));
-            }
-
-            // all files and directories that aren't "." or ".." are valid
-            bool is_valid() const noexcept { return (is_file() || is_dir()) && !is_special_dir(); }
-
-            // dirs that aren't "." or ".." are valid
-            bool is_valid_dir() const noexcept { return is_dir() && !is_special_dir(); }
 
             bool add_path_to(std::vector<string_t>& out) const noexcept {
                 if (is_valid()) {
@@ -475,7 +465,7 @@ namespace rpp /* ReCpp */
         };
 
         entry current() const noexcept { return { this }; }
-        iter begin() noexcept { return { this }; }
+        iter begin() noexcept { return { this->operator bool() ? this : nullptr }; }
         iter end() const noexcept { return { nullptr }; }
 
         /** @returns Current entry name, can be file, dir, etc */

@@ -940,6 +940,14 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    template<typename Char>
+    static bool should_skip_dir_entry(const Char* filename) noexcept
+    {
+        // skip "." and ".."
+        return (filename[0] == Char('.') && filename[1] == Char('\0'))
+            || (filename[0] == Char('.') && filename[1] == Char('.') && filename[2] == Char('\0'));
+    }
+
     struct dir_iter_base::impl
     {
     #if _WIN32
@@ -968,7 +976,9 @@ namespace rpp /* ReCpp */
                 wchar_t path[2048];
                 _snwprintf(path, _countof(path), L"%ls/*", dir_w);
                 hFind = find_first_file(&ffd, path);
-				return;
+            }
+            if (hFind && should_skip_dir_entry(ffd.cFileName)) {
+                next();
             }
         #else
             if (dir.empty()) { // handle dir=="" special case
@@ -979,6 +989,9 @@ namespace rpp /* ReCpp */
                 if (d != nullptr) dirname = conv.cstr;
             }
             e = d != nullptr ? readdir(d) : nullptr;
+            if (e && should_skip_dir_entry(e->d_name)) {
+                next();
+            }
         #endif
         }
         void close() noexcept
@@ -989,22 +1002,40 @@ namespace rpp /* ReCpp */
             if (d) { closedir(d); d = nullptr; e = nullptr; }
         #endif
         }
-    #if !_MSC_VER
-        string get_full_path(const dir_iter_base* it) const
+        bool next() noexcept
         {
-            return rpp::path_combine(dirname, it->e->d_name);
+        #if _WIN32
+            if (hFind) {
+                while (FindNextFileW(hFind, &ffd) == TRUE) {
+                    if (should_skip_dir_entry(ffd.cFileName))
+                        continue;
+                    return true;
+                }
+            }
+            ffd.cFileName[0] = L'\0';
+            ffd.dwFileAttributes = 0;
+        #else
+            if (d) {
+                while ((e = readdir(d)) != nullptr) {
+                    if (should_skip_dir_entry(e->name))
+                        continue;
+                    return true;
+                }
+            }
+            e = nullptr;
+        #endif
+            return false;
         }
-    #endif
     };
 
-    dir_iter_base::impl* dir_iter_base::state::operator->() noexcept
+    FINLINE dir_iter_base::impl* dir_iter_base::state::operator->() noexcept
     {
-#if _WIN32
+    #if _WIN32
         static_assert(sizeof(ffd) == sizeof(impl::ffd), "dir_iterator::dummy size mismatch");
-#endif
+    #endif
         return reinterpret_cast<impl*>(this);
     }
-    const dir_iter_base::impl* dir_iter_base::state::operator->() const noexcept
+    FINLINE const dir_iter_base::impl* dir_iter_base::state::operator->() const noexcept
     {
         return reinterpret_cast<const impl*>(this);
     }
@@ -1046,41 +1077,55 @@ namespace rpp /* ReCpp */
         }
         return {};
     }
+    bool dir_iter_base::next() noexcept { return s->next(); }
 
 #if _WIN32
-    dir_iter_base::operator bool()   const noexcept { return s->hFind != nullptr; }
-    bool dir_iter_base::next()             noexcept { return s->hFind && FindNextFileW(s->hFind, &s->ffd) != 0; }
-    bool dir_iter_base::is_dir()     const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
-    bool dir_iter_base::is_file()    const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0; }
-    bool dir_iter_base::is_symlink() const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0; }
-    bool dir_iter_base::is_device()  const noexcept { return s->hFind && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) != 0; }
+    dir_iter_base::operator bool()   const noexcept { return s->hFind && *s->ffd.cFileName; }
+    bool dir_iter_base::is_dir()     const noexcept { return s->hFind && *s->ffd.cFileName && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+    bool dir_iter_base::is_file()    const noexcept { return s->hFind && *s->ffd.cFileName && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0; }
+    bool dir_iter_base::is_symlink() const noexcept { return s->hFind && *s->ffd.cFileName && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0; }
+    bool dir_iter_base::is_device()  const noexcept { return s->hFind && *s->ffd.cFileName && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) != 0; }
 #else
     dir_iter_base::operator bool() const noexcept { return s->d && s->e; }
-    bool dir_iter_base::next()           noexcept { return s->d && (s->e = readdir(s->d)) != nullptr; }
-    bool dir_iter_base::is_dir() const noexcept {
-        if (s->e && s->e->d_type) return s->e->d_type == DT_DIR;
-        struct stat st;
-        return ::stat(s->get_full_path(this).c_str(), &st) == 0 && S_ISDIR(st.st_mode);
-    }
-    bool dir_iter_base::is_file() const noexcept {
-        if (s->e && s->e->d_type) return s->e->d_type == DT_REG;
-        struct stat st;
-        return ::stat(s->get_full_path(this).c_str(), &st) == 0 && S_ISREG(st.st_mode);
-    }
-    bool dir_iter_base::is_symlink() const noexcept {
-        if (s->e && s->e->d_type) return s->e->d_type == DT_LNK;
-        struct stat st;
-        return ::stat(s->get_full_path(this).c_str(), &st) == 0 && S_ISLNK(st.st_mode);
-    }
-    bool dir_iter_base::is_device() const noexcept {
-        if (s->e && s->e->d_type) {
-            int dt = s->e->d_type;
-            return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
+    bool dir_iter_base::is_dir() const noexcept
+    {
+        if (dirent* e = s->e) {
+            if (e->d_type) return e->d_type == DT_DIR;
+            struct stat st;
+            return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISDIR(st.st_mode);
         }
-        struct stat st;
-        if (::stat(s->get_full_path(this).c_str(), &st) == 0) {
-            auto m = st.st_mode;
-            return S_ISBLK(m) || S_ISCHR(m) || S_ISFIFO(m) || S_ISSOCK(m);
+        return false;
+    }
+    bool dir_iter_base::is_file() const noexcept
+    {
+        if (dirent* e = s->e) {
+            if e->d_type) return e->d_type == DT_REG;
+            struct stat st;
+            return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISREG(st.st_mode);
+        }
+        return false;
+    }
+    bool dir_iter_base::is_symlink() const noexcept
+    {
+        if (dirent* e = s->e) {
+            if (e->d_type) return e->d_type == DT_LNK;
+            struct stat st;
+            return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISLNK(st.st_mode);
+        }
+        return false;
+    }
+    bool dir_iter_base::is_device() const noexcept
+    {
+        if (dirent* e = s->e) {
+            if (e->d_type) {
+                int dt = e->d_type;
+                return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
+            }
+            struct stat st;
+            if (::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0) {
+                auto m = st.st_mode;
+                return S_ISBLK(m) || S_ISCHR(m) || S_ISFIFO(m) || S_ISSOCK(m);
+            }
         }
         return false;
     }
@@ -1088,22 +1133,29 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    template<StringViewType T>
-    using DirTraverseFunc = rpp::delegate<void(typename T::string_t&& path, bool isDir)>;
-
     // @param queryRoot The original path passed to the query.
     //                  For abs listing, this must be an absolute path value!
     //                  For rel listing, this is only used for opening the directory
     // @param relPath Relative path from search root, ex: "src", "src/session/util", etc.
-    template<StringViewType T>
-    static NOINLINE void traverse_dir2(T queryRoot, T relPath, bool dirs, bool files,
-                                       list_dir_flags flags, const DirTraverseFunc<T>& func) noexcept
+    template<StringViewType T, typename DirTraverseFunc>
+    static NOINLINE void traverse_dir(T queryRoot, T relPath, bool dirs, bool files,
+                                      list_dir_flags flags, const DirTraverseFunc& func) noexcept
     {
-        typename T::string_t currentDir = path_combine(queryRoot, relPath);
+        typename T::string_t currentDir;
+        if (flags & dir_fullpath)
+        {
+            typename T::string_t fullpath = full_path(queryRoot.empty() ? constants<T>::dot_sv : queryRoot);
+            if (fullpath.empty()) // dir does not exist
+                return;
+            currentDir = path_combine(fullpath, relPath);
+        }
+        else
+        {
+            currentDir = path_combine(queryRoot, relPath);
+        }
+
         for (directory_entry<T> e : directory_iter<T>{ currentDir })
         {
-            if (e.is_special_dir())
-                continue; // skip . and ..
             if (e.is_dir())
             {
                 if (dirs)
@@ -1113,7 +1165,7 @@ namespace rpp /* ReCpp */
                 }
                 if (flags & dir_recursive)
                 {
-                    traverse_dir2<T>(queryRoot, path_combine(relPath, e.name), dirs, files, flags, func);
+                    traverse_dir<T>(queryRoot, /*relPath*/path_combine(relPath, e.name), dirs, files, flags, func);
                 }
             }
             else // file, symlink or device
@@ -1127,28 +1179,12 @@ namespace rpp /* ReCpp */
         }
     }
 
-    template<StringViewType T>
-    static NOINLINE void traverse_dir(T dir, bool dirs, bool files,
-                                      list_dir_flags flags, const DirTraverseFunc<T>& func) noexcept
-    {
-        if (flags & dir_fullpath)
-        {
-            typename T::string_t fullpath = full_path(dir.empty() ? constants<T>::dot_sv : dir);
-            if (!fullpath.empty()) // folder does not exist
-                traverse_dir2<T>(fullpath, T{}, dirs, files, flags, func);
-        }
-        else
-        {
-            traverse_dir2<T>(dir, T{}, dirs, files, flags, func);
-        }
-    }
-
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
     static int list_dirs(std::vector<typename T::string_t>& out, T dir, list_dir_flags flags) noexcept
     {
-        traverse_dir<T>(dir, true, false, flags, [&](typename T::string_t&& path, bool) {
+        traverse_dir<T>(dir, T{}, true, false, flags, [&](typename T::string_t&& path, bool) {
             if (flags & dir_relpath_combine) {
                 out.emplace_back(path_combine(dir, path));
             } else {
@@ -1170,7 +1206,7 @@ namespace rpp /* ReCpp */
     template<StringViewType T>
     static int list_files(std::vector<typename T::string_t>& out, T dir, T suffix, list_dir_flags flags) noexcept
     {
-        traverse_dir(dir, false, true, flags, [&](typename T::string_t&& path, bool) {
+        traverse_dir<T>(dir, T{}, false, true, flags, [&](typename T::string_t&& path, bool) {
             if (suffix.empty() || T{path}.ends_withi(suffix)) {
                 if (flags & dir_relpath_combine) {
                     out.emplace_back(path_combine(dir, path));
@@ -1195,7 +1231,7 @@ namespace rpp /* ReCpp */
     static int list_files(std::vector<typename T::string_t>& out, T dir,
                           const std::vector<T>& suffixes, list_dir_flags flags) noexcept
     {
-        traverse_dir(dir, false, true, flags, [&](typename T::string_t&& path, bool) {
+        traverse_dir<T>(dir, T{}, false, true, flags, [&](typename T::string_t&& path, bool) {
             for (const T& suffix : suffixes) {
                 if (T{path}.ends_withi(suffix)) {
                     out.emplace_back(std::move(path));
@@ -1220,7 +1256,7 @@ namespace rpp /* ReCpp */
                            std::vector<typename T::string_t>& outFiles,
                            T dir, list_dir_flags flags) noexcept
     {
-        traverse_dir<T>(dir, true, true, flags, [&](typename T::string_t&& path, bool isDir) {
+        traverse_dir<T>(dir, T{}, true, true, flags, [&](typename T::string_t&& path, bool isDir) {
             auto& out = isDir ? outDirs : outFiles;
             out.emplace_back(std::move(path));
         });

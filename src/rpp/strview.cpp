@@ -1158,7 +1158,7 @@ namespace rpp
     int to_ustring(char16_t* out, int out_max, const char* utf8, int utf8len) noexcept
     {
         if (utf8len < 0) utf8len = int(strlen(utf8));
-        if (utf8len != 0) {
+        if (utf8len == 0) {
             *out = u'\0'; // always null terminate
             return 0;
         }
