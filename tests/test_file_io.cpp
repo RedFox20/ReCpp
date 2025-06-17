@@ -225,6 +225,12 @@ TestImpl(test_file_io)
         return false;
     }
 
+    void print_paths(const char* what, const std::vector<std::string>& paths)
+    {
+        for (size_t i = 0; i < paths.size(); ++i)
+            print_info("%s[%zu] = '%s'\n", what, i, paths[i].c_str());
+    }
+
     TestCase(file_and_folder_listing)
     {
         std::string originalDir = rpp::working_dir();
@@ -237,18 +243,21 @@ TestImpl(test_file_io)
 
         // TEST: list_files (names only)
         std::vector<std::string> relpaths = list_files("folder/path", ".txt");
+        print_paths("relpaths", relpaths);
         AssertThat(relpaths.size(), 2u);
         Assert(contains(relpaths, "test2.txt"));
         Assert(contains(relpaths, "test3.txt"));
 
         // TEST: list_files dir_relpath_combine (relative to folder/path)
         std::vector<std::string> relpaths_r = list_files("folder/path", ".txt", rpp::dir_relpath_combine);
+        print_paths("relpaths_r", relpaths_r);
         AssertThat(relpaths_r.size(), 2u);
         Assert(contains(relpaths_r, "folder/path/test2.txt"));
         Assert(contains(relpaths_r, "folder/path/test3.txt"));
 
         // TEST: list_files dir_recursive
         std::vector<std::string> relpaths2 = list_files("", ".txt", rpp::dir_recursive);
+        print_paths("relpaths2", relpaths2);
         AssertThat(relpaths2.size(), 3u);
         Assert(contains(relpaths2, "folder/test1.txt"));
         Assert(contains(relpaths2, "folder/path/test2.txt"));
@@ -257,28 +266,34 @@ TestImpl(test_file_io)
         // TEST: list_files dir_fullpath
         std::string fullpath = full_path(TestDir);
         std::vector<std::string> fullpaths = list_files("folder/path", ".txt", rpp::dir_fullpath);
+        print_paths("fullpaths", fullpaths);
         AssertThat(fullpaths.size(), 2u);
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test2.txt")));
         Assert(contains(fullpaths, path_combine(fullpath,"folder/path/test3.txt")));
 
-        fullpaths = list_files("folder", ".txt", rpp::dir_fullpath);
-        AssertThat(fullpaths.size(), 1u);
-        Assert(contains(fullpaths, path_combine(fullpath,"folder/test1.txt")));
+        std::vector<std::string> fullpaths2 = list_files("folder", ".txt", rpp::dir_fullpath);
+        print_paths("fullpaths2", fullpaths2);
+        AssertThat(fullpaths2.size(), 1u);
+        Assert(contains(fullpaths2, path_combine(fullpath,"folder/test1.txt")));
 
         // TEST: list_files dir_fullpath_recursive
-        std::vector<std::string> fullpaths2 = list_files("", ".txt", rpp::dir_fullpath_recursive);
-        AssertThat(fullpaths2.size(), 3u);
-        Assert(contains(fullpaths2, path_combine(fullpath,"folder/test1.txt")));
-        Assert(contains(fullpaths2, path_combine(fullpath,"folder/path/test2.txt")));
-        Assert(contains(fullpaths2, path_combine(fullpath,"folder/path/test3.txt")));
+        std::vector<std::string> fullpaths3 = list_files("", ".txt", rpp::dir_fullpath_recursive);
+        print_paths("fullpaths3", fullpaths3);
+        AssertThat(fullpaths3.size(), 3u);
+        Assert(contains(fullpaths3, path_combine(fullpath,"folder/test1.txt")));
+        Assert(contains(fullpaths3, path_combine(fullpath,"folder/path/test2.txt")));
+        Assert(contains(fullpaths3, path_combine(fullpath,"folder/path/test3.txt")));
 
         // TEST: list_dirs_relpath (relative to folder)
-        std::vector<std::string> dirs_r = list_dirs("folder", rpp::dir_relpath_recursive);
+        std::vector<std::string> dirs_r = list_dirs("folder", rpp::dir_relpath_combine_recursive);
+        print_paths("dirs_r", dirs_r);
         Assert(contains(dirs_r, "folder/path"));
 
         // TEST: list_alldir dir_recursive
         std::vector<std::string> dirs, files;
         list_alldir(dirs, files, "", rpp::dir_recursive);
+        print_paths("dirs", dirs);
+        print_paths("files", files);
         Assert(contains(dirs, "folder"));
         Assert(contains(dirs, "folder/path"));
         Assert(contains(files, "folder/test1.txt"));

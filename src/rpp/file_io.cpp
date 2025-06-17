@@ -49,9 +49,8 @@ namespace rpp /* ReCpp */
     template<StringViewType T>
     static void* OpenF(T fname, int a, int s, SECURITY_ATTRIBUTES* sa, int c, int o)
     {
-        wchar_fallback_conv conv { fname };
-        if (conv.wstr) return CreateFileW(conv.wstr, a, s, sa, c, o, nullptr);
-        if (conv.cstr) return CreateFileA(conv.cstr, a, s, sa, c, o, nullptr);
+        if (wchar_conv conv { fname })
+            return CreateFileW(conv.wstr, a, s, sa, c, o, nullptr);
         return nullptr;
     }
 #else

@@ -82,47 +82,33 @@ namespace rpp
     };
 
 #if _MSC_VER
-    // fallback conversion which prefers wchar_t conversion, but has a char fallback
-    struct wchar_fallback_conv
+    struct wchar_conv
     {
         conv_buffer buf;
         const wchar_t* wstr = nullptr;
-        const char* cstr = nullptr;
-        explicit operator bool() const noexcept { return wstr || cstr; }
+        explicit operator bool() const noexcept { return !!wstr; }
 
         template<StringViewType T>
-        wchar_fallback_conv(T path) noexcept
-            : wstr{buf.to_wstr(path)}
+        wchar_conv(T path) noexcept : wstr{buf.to_wstr(path)}
         {
-            if (!wstr) cstr = buf.to_cstr(path);
         }
     };
-    // fallback conversion for two paths, both have to succeed either wchar_t or char conversion
-    struct wchar_dual_fallback_conv
+    struct wchar_dual_conv
     {
         conv_buffer buf1;
         conv_buffer buf2;
         const wchar_t* wstr1 = nullptr;
         const wchar_t* wstr2 = nullptr;
-        const char* cstr1 = nullptr;
-        const char* cstr2 = nullptr;
-        explicit operator bool() const noexcept { return wstr1 || cstr1; }
+        explicit operator bool() const noexcept { return !!wstr1; }
 
         template<StringViewType T>
-        wchar_dual_fallback_conv(T path1, T path2) noexcept
+        wchar_dual_conv(T path1, T path2) noexcept
         {
             const wchar_t* w1 = buf1.to_wstr(path1);
             const wchar_t* w2 = buf2.to_wstr(path2);
             if (w1 && w2) {
                 wstr1 = w1;
                 wstr2 = w2;
-            } else {
-                const char* a1 = buf1.to_cstr(path1);
-                const char* a2 = buf2.to_cstr(path2);
-                if (a1 && a2) {
-                    cstr1 = a1;
-                    cstr2 = a2;
-                }
             }
         }
     };
@@ -166,19 +152,16 @@ namespace rpp
     template<StringViewType T>
     static DWORD win32_file_attr(T filename) noexcept
     {
-        wchar_fallback_conv conv{ filename };
-        // try UTF-16 first, then fall back to ANSI codepage
-        // windows internally converts to UCS-2 anyway, so this won't hurt performance
-        if (conv.wstr) return GetFileAttributesW(conv.wstr);
-        if (conv.cstr) return GetFileAttributesA(conv.cstr);
+        // convert to UTF-16, windows internally converts to UCS-2 anyway, so this won't hurt performance
+        if (wchar_conv conv{ filename })
+            return GetFileAttributesW(conv.wstr);
         return DWORD(-1); // error
     }
     template<StringViewType T>
     static bool win32_set_file_attr(T filename, DWORD attr) noexcept
     {
-        wchar_fallback_conv conv{ filename };
-        if (conv.wstr) return SetFileAttributesW(conv.wstr, attr) == TRUE;
-        if (conv.cstr) return SetFileAttributesA(conv.cstr, attr) == TRUE;
+        if (wchar_conv conv{ filename })
+            return SetFileAttributesW(conv.wstr, attr) == TRUE;
         return false; // conversion failed
     }
 
@@ -187,9 +170,8 @@ namespace rpp
     template<StringViewType T>
     static bool sys_stat64(T filename, os_stat64* out) noexcept
     {
-        wchar_fallback_conv conv{ filename };
-        if (conv.wstr) return _wstat64(conv.wstr, out) == 0;
-        if (conv.cstr) return _stat64(conv.cstr, out) == 0;
+        if (wchar_conv conv{ filename })
+            return _wstat64(conv.wstr, out) == 0;
         return false;
     }
 #else // Linux

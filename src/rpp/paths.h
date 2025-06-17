@@ -510,6 +510,7 @@ namespace rpp /* ReCpp */
         dir_fullpath_recursive = dir_recursive | dir_fullpath, // both recursive and fullpath
 
         dir_relpath_combine = (1 << 3), // lists relpath, but outputs: path_combine(input_dir, relpath)
+        dir_relpath_combine_recursive = dir_relpath_combine | dir_recursive,
     };
 
     inline list_dir_flags operator|(list_dir_flags a, list_dir_flags b) noexcept { return list_dir_flags(a | b); }

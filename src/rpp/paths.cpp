@@ -52,9 +52,8 @@ namespace rpp /* ReCpp */
         DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
         if (read_file_flags(target) & FF_FOLDER) flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
 
-        wchar_dual_fallback_conv dconv { /*str1*/link, /*str2*/target };
-        if (dconv.wstr1) return CreateSymbolicLinkW(dconv.wstr1, dconv.wstr2, flags) == TRUE;
-        if (dconv.cstr1) return CreateSymbolicLinkA(dconv.cstr1, dconv.cstr2, flags) == TRUE;
+        if (wchar_dual_conv dconv { /*str1*/link, /*str2*/target })
+            return CreateSymbolicLinkW(dconv.wstr1, dconv.wstr2, flags) == TRUE;
         return false; // conversion failed
     }
 #else
@@ -96,12 +95,9 @@ namespace rpp /* ReCpp */
     static bool sys_minstat(T filename, sys_min_fstats* out) noexcept
     {
         WIN32_FILE_ATTRIBUTE_DATA data;
-        wchar_fallback_conv conv { filename };
+        wchar_conv conv { filename };
         if (conv.wstr) {
             if (!GetFileAttributesExW(conv.wstr, GetFileExInfoStandard, &data))
-                return false;
-        } else if (conv.cstr) {
-            if (!GetFileAttributesExA(conv.cstr, GetFileExInfoStandard, &data))
                 return false;
         } else {
             return false; // conversions failed
@@ -249,10 +245,8 @@ namespace rpp /* ReCpp */
     static bool sys_delete(T filename) noexcept
     {
     #if _MSC_VER
-		if (wchar_fallback_conv conv { filename }) {
-            if (conv.wstr) return ::_wremove(conv.wstr) == 0;
-            if (conv.cstr) return ::remove(conv.cstr) == 0;
-        }
+		if (wchar_conv conv { filename })
+            return ::_wremove(conv.wstr) == 0;
         return false;
     #else
         if (multibyte_conv conv { filename })
@@ -275,10 +269,10 @@ namespace rpp /* ReCpp */
     static bool sys_copy_file(T sourceFile, T destinationFile) noexcept
     {
     #if _MSC_VER
-        wchar_dual_fallback_conv conv { /*str1*/sourceFile, /*str2*/destinationFile };
-        // CopyFileA/W always copies the file access rights
-        if (conv.wstr1) return CopyFileW(conv.wstr1, conv.wstr2, /*failIfExists:*/false) == TRUE;
-        if (conv.cstr1) return CopyFileA(conv.cstr1, conv.cstr2, /*failIfExists:*/false) == TRUE;
+        if (wchar_dual_conv conv{ /*str1*/sourceFile, /*str2*/destinationFile }) {
+            // CopyFileA/W always copies the file access rights
+            return CopyFileW(conv.wstr1, conv.wstr2, /*failIfExists:*/false) == TRUE;
+        }
         return false; // conversion failed
     #else
         file src { sourceFile, file::READONLY };
@@ -424,14 +418,15 @@ namespace rpp /* ReCpp */
     static bool sys_mkdir(T foldername) noexcept
     {
     #if _WIN32
-        // TODO: maybe use Win32 API instead?
-        wchar_fallback_conv conv { foldername };
-        if (conv.wstr) return _wmkdir(conv.wstr) == 0 || errno == EEXIST;
-		if (conv.cstr) return mkdir(conv.cstr) == 0 || errno == EEXIST;
+        if (wchar_conv conv{ foldername })
+        {
+            BOOL result = CreateDirectoryW(conv.wstr, nullptr); // -> ERROR_PATH_NOT_FOUND or ERROR_ALREADY_EXISTS
+            return result == TRUE || GetLastError() == ERROR_ALREADY_EXISTS;
+        }
 		return false; // conversion failed
     #else
-        multibyte_conv conv { foldername };
-        if (conv.cstr) return mkdir(conv.cstr, 0755) == 0 || errno == EEXIST;
+        if (multibyte_conv conv { foldername })
+            return mkdir(conv.cstr, 0755) == 0 || errno == EEXIST;
         return false;
     #endif
     }
@@ -487,10 +482,8 @@ namespace rpp /* ReCpp */
     static bool sys_rmdir(T foldername) noexcept
     {
     #if _WIN32
-		// TODO: maybe use Win32 API instead?
-        wchar_fallback_conv conv { foldername };
-        if (conv.wstr) return _wrmdir(conv.wstr) == 0;
-		if (conv.cstr) return rmdir(conv.cstr) == 0;
+        if (wchar_conv conv { foldername })
+            return _wrmdir(conv.wstr) == 0;
         return false;
     #else
 		if (multibyte_conv conv { foldername })
@@ -545,19 +538,13 @@ namespace rpp /* ReCpp */
     string full_path(strview path) noexcept
     {
     #if _WIN32
-        wchar_fallback_conv conv { path };
-        conv_buffer out;
-        if (conv.wstr) {
-            DWORD len = GetFullPathNameW(conv.wstr, out.MAX_U, out.path_w, nullptr);
-			if (len == 0) return string{};
-			if (len > out.MAX_U) len = out.MAX_U;
-            return to_string(out.path_u, len);
-        }
-        if (conv.cstr) {
-            DWORD len = GetFullPathNameA(conv.cstr, out.MAX_A, out.path_a, nullptr);
-            if (len == 0) return string{};
-            if (len > out.MAX_A) len = out.MAX_A;
-            return string{ out.path_a, out.path_a + len };
+        if (wchar_conv conv { path }) {
+            conv_buffer out;
+            if (DWORD len = GetFullPathNameW(conv.wstr, out.MAX_U, out.path_w, nullptr)) {
+                if (len >= out.MAX_U) { len = out.MAX_U; out.path_w[len - 1] = L'\0'; }
+                normalize((char16_t*)out.path_w, u'/'); // normalize windows paths to forward slashes
+                return to_string(out.path_u, len);
+            }
         }
         return string{};
     #else
@@ -572,19 +559,13 @@ namespace rpp /* ReCpp */
     ustring full_path(ustrview path) noexcept
     {
     #if _WIN32
-        wchar_fallback_conv conv{ path };
-        conv_buffer out;
-        if (conv.wstr) {
-            DWORD len = GetFullPathNameW(conv.wstr, out.MAX_U, out.path_w, nullptr);
-            if (len == 0) return ustring{};
-            if (len > out.MAX_U) len = out.MAX_U;
-            return ustring{ out.path_u, out.path_u + len };
-        }
-        if (conv.cstr) {
-            DWORD len = GetFullPathNameA(conv.cstr, out.MAX_A, out.path_a, nullptr);
-            if (len == 0) return ustring{};
-            if (len > out.MAX_A) len = out.MAX_A;
-            return to_ustring(out.path_a, len);
+        if (wchar_conv conv{ path }) {
+            conv_buffer out;
+            if (DWORD len = GetFullPathNameW(conv.wstr, out.MAX_U, out.path_w, nullptr)) {
+                if (len >= out.MAX_U) { len = out.MAX_U; out.path_w[len-1] = L'\0'; }
+                normalize(out.path_u, u'/'); // normalize windows paths to forward slashes
+                return ustring{ out.path_u, out.path_u + len };
+            }
         }
         return ustring{};
     #else
@@ -968,14 +949,14 @@ namespace rpp /* ReCpp */
 			};
             if (dir.empty()) { // handle dir=="" special case
 				hFind = find_first_file(&ffd, L"./*");
-                return;
-            }
-            // only support wstr to simplify API, because internally windows uses WCHAR anyway
-            conv_buffer buf;
-            if (const wchar_t* dir_w = buf.to_wstr(dir)) {
-                wchar_t path[2048];
-                _snwprintf(path, _countof(path), L"%ls/*", dir_w);
-                hFind = find_first_file(&ffd, path);
+            } else {
+                // only support wstr to simplify API, because internally windows uses WCHAR anyway
+                conv_buffer buf;
+                if (const wchar_t* dir_w = buf.to_wstr(dir)) {
+                    wchar_t path[2048];
+                    _snwprintf(path, _countof(path), L"%ls/*", dir_w);
+                    hFind = find_first_file(&ffd, path);
+                }
             }
             if (hFind && should_skip_dir_entry(ffd.cFileName)) {
                 next();
