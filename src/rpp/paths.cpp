@@ -79,10 +79,10 @@ namespace rpp /* ReCpp */
     // minimal version of stat64 struct, with low level dev and inode info removed
     struct sys_min_fstats
     {
-        int64  st_size;
-        time_t st_atime;
-        time_t st_mtime;
-        time_t st_ctime;
+        int64  size;
+        time_t atime;
+        time_t mtime;
+        time_t ctime;
     };
 #if _MSC_VER
     static time_t to_time_t(const FILETIME& ft) noexcept
@@ -103,10 +103,10 @@ namespace rpp /* ReCpp */
             return false; // conversions failed
 		}
         ULARGE_INTEGER li; li.LowPart = data.nFileSizeLow; li.HighPart = data.nFileSizeHigh;
-        out->st_size = (int64)li.QuadPart;
-        out->st_ctime = to_time_t(data.ftCreationTime);
-        out->st_atime = to_time_t(data.ftLastAccessTime);
-        out->st_mtime = to_time_t(data.ftLastWriteTime);
+        out->size = (int64)li.QuadPart;
+        out->ctime = to_time_t(data.ftCreationTime);
+        out->atime = to_time_t(data.ftLastAccessTime);
+        out->mtime = to_time_t(data.ftLastWriteTime);
         return true;
     }
 #else
@@ -115,11 +115,11 @@ namespace rpp /* ReCpp */
     {
         if (multibyte_conv conv { filename }) {
             os_stat64 s;
-            if (stat64(conv.cstr, s) == 0) {
-                out->st_size  = (int64)s.st_size;
-                out->st_ctime = s.st_ctime;
-                out->st_atime = s.st_atime;
-                out->st_mtime = s.st_mtime;
+            if (stat64(conv.cstr, &s) == 0) {
+                out->size  = (int64)s.st_size;
+                out->ctime = s.st_ctime;
+                out->atime = s.st_atime;
+                out->mtime = s.st_mtime;
 				return true;
             }
         }
@@ -132,10 +132,10 @@ namespace rpp /* ReCpp */
     {
         sys_min_fstats s;
         if (sys_minstat<strview>(filename, &s)) {
-            if (filesize) *filesize = s.st_size;
-            if (created)  *created  = s.st_ctime;
-            if (accessed) *accessed = s.st_atime;
-            if (modified) *modified = s.st_mtime;
+            if (filesize) *filesize = s.size;
+            if (created)  *created  = s.ctime;
+            if (accessed) *accessed = s.atime;
+            if (modified) *modified = s.mtime;
             return true;
         }
         return false;
@@ -146,10 +146,10 @@ namespace rpp /* ReCpp */
     {
         sys_min_fstats s;
         if (sys_minstat<ustrview>(filename, &s)) {
-            if (filesize) *filesize = s.st_size;
-            if (created)  *created  = s.st_ctime;
-            if (accessed) *accessed = s.st_atime;
-            if (modified) *modified = s.st_mtime;
+            if (filesize) *filesize = s.size;
+            if (created)  *created  = s.ctime;
+            if (accessed) *accessed = s.atime;
+            if (modified) *modified = s.mtime;
             return true;
         }
         return false;
@@ -369,7 +369,7 @@ namespace rpp /* ReCpp */
     template<typename Char>
     struct chars
     {
-        using tchar = typename Char;
+        using tchar = Char;
         static constexpr tchar FORESLASH = tchar('/');
         static constexpr tchar BACKSLASH = tchar('\\');
         static constexpr tchar DOT = tchar('.');
@@ -572,9 +572,9 @@ namespace rpp /* ReCpp */
         if (multibyte_conv conv { path }) {
             conv_buffer out;
             if (char* res = realpath(conv.cstr, out.path_a))
-				return string{ res };
+				return to_ustring(res);
         }
-		return string{};
+		return {};
     #endif
     }
 
@@ -998,7 +998,7 @@ namespace rpp /* ReCpp */
         #else
             if (d) {
                 while ((e = readdir(d)) != nullptr) {
-                    if (should_skip_dir_entry(e->name))
+                    if (should_skip_dir_entry(e->d_name))
                         continue;
                     return true;
                 }
@@ -1039,19 +1039,19 @@ namespace rpp /* ReCpp */
         if (!it || !*it)
             return {};
     #if _MSC_VER
-        auto* name_w = it->s->ffd.cFileName;
+        const wchar_t* name_w = it->s->ffd.cFileName;
     #else
-        auto* name_a = it->e->d_name;
+        const char* name_a = it->s->e->d_name;
     #endif
         if constexpr (std::is_same_v<T, rpp::strview>) {
             #if _MSC_VER
                 return rpp::to_string((const char16_t*)name_w);
             #else
-                return { name_a };
+                return string{ name_a };
             #endif
         } else if constexpr (std::is_same_v<T, rpp::ustrview>) {
             #if _MSC_VER
-                return { (const char16_t*)name_w };
+                return ustring{ (const char16_t*)name_w };
             #else
                 return rpp::to_ustring(name_a);
             #endif
@@ -1080,7 +1080,7 @@ namespace rpp /* ReCpp */
     bool dir_iter_base::is_file() const noexcept
     {
         if (dirent* e = s->e) {
-            if e->d_type) return e->d_type == DT_REG;
+            if (e->d_type) return e->d_type == DT_REG;
             struct stat st;
             return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISREG(st.st_mode);
         }
@@ -1379,7 +1379,7 @@ namespace rpp /* ReCpp */
         #endif
     }
 
-    ustring home_dirw() noexcept
+    ustring home_diru() noexcept
     {
         #if _MSC_VER
             size_t len = 0;

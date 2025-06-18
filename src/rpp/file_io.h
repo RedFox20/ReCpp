@@ -201,7 +201,7 @@ namespace rpp /* ReCpp */
 
         /**
          * Reads the entire contents of the file into a load_buffer
-         * The file is opened as READONLY, unbuffered_file is used internally
+         * The file is opened as READONLY, unbuffered IO is preferred internally
          */
         static load_buffer read_all(strview filename)  noexcept
         {
@@ -210,6 +210,19 @@ namespace rpp /* ReCpp */
         static load_buffer read_all(ustrview filename) noexcept
         {
             return file{ filename, READONLY }.read_all();
+        }
+
+        /**
+         * Reads the entire contents of the file into a std::string
+         * The file is opened as READONLY, unbuffered IO is preferred internally
+         */
+        static std::string read_all_text(strview filename) noexcept
+        {
+            return file{ filename, READONLY }.read_text();
+        }
+        static std::string read_all_text(ustrview filename) noexcept
+        {
+            return file{ filename, READONLY }.read_text();
         }
 
         /**
@@ -332,20 +345,30 @@ namespace rpp /* ReCpp */
          * @return Number of bytes actually written to the file
          */
         static int write_new(strview filename, const void* buffer, int bytesToWrite) noexcept;
+        static int write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept;
+
         static int write_new(strview filename, strview data) noexcept
         {
             return write_new(filename, data.str, data.len);
         }
+        static int write_new(strview filename, ustrview data) noexcept
+        {
+            return write_new(filename, data.str, data.len * sizeof(char16_t));
+        }
+
+        static int write_new(ustrview filename, strview data) noexcept
+        {
+            return write_new(filename, data.str, data.len);
+        }
+        static int write_new(ustrview filename, ustrview data) noexcept
+        {
+            return write_new(filename, data.str, data.len * sizeof(char16_t));
+        }
+
         template<class T, class U>
         static int write_new(strview filename, const std::vector<T,U>& plainOldData) noexcept
         {
             return write_new(filename, plainOldData.data(), int(plainOldData.size()*sizeof(T)));
-        }
-
-        static int write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept;
-        static int write_new(ustrview filename, ustrview data) noexcept
-        {
-            return write_new(filename, data.str, data.len);
         }
         template<class T, class U>
         static int write_new(ustrview filename, const std::vector<T, U>& plainOldData) noexcept

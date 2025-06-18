@@ -53,25 +53,23 @@ namespace rpp
         FINLINE const wchar_t* to_wstr(ustrview path) noexcept
         {
             int len = path.len;
-            if (len == 0) return L""; // empty string, return empty wchar_t string
-            if (path.str[len] == u'\0') return (const wchar_t*)path.str; // already a null-terminated string, return it as is
+            if (len == 0) return L""; // empty string
+            if (path.str[len] == u'\0') return (const wchar_t*)path.str; // already a null-terminated
             size_t n = size_t((len < MAX_U) ? len : MAX_U - 1);
             memcpy(path_w, path.str, sizeof(char16_t) * n);
             path_w[n] = L'\0';
             return (const wchar_t*)path_w;
         }
     #endif
-        FINLINE const char* to_cstr(strview path) noexcept
+        FINLINE const char* to_cstr(strview path) noexcept // UTF8 strview to UTF8 nullterm string
         {
             int len = path.len;
-            if (len == 0) return ""; // empty string, return empty wchar_t string
-            if (path.str[len] == '\0') return path.str; // already a null-terminated string, return it as is
+            if (len == 0) return ""; // empty string
+            if (path.str[len] == '\0') return path.str; // already a null-terminated
             size_t n = size_t((len < MAX_A) ? len : MAX_A - 1);
             memcpy(path_a, path.str, sizeof(char) * n);
             path_a[n] = '\0';
             return path_a;
-
-            return path.to_cstr(path_a, MAX_A);
         }
         FINLINE const char* to_cstr(ustrview path) noexcept // UTF16 --> UTF8
         {
@@ -121,8 +119,7 @@ namespace rpp
         explicit operator bool() const noexcept { return cstr; }
 
         template<StringViewType T>
-        wchar_fallback_conv(T path) noexcept
-            : cstr{buf.to_cstr(path)}
+        multibyte_conv(T path) noexcept : cstr{buf.to_cstr(path)}
         {
         }
     };
@@ -223,7 +220,7 @@ namespace rpp
     {
         int flags = FF_INVALID;
         os_stat64 s;
-        if (sys_stat64<T>(filename, &s) == 0/*OK*/)
+        if (sys_stat64<T>(filename, &s))
         {
             if (S_ISDIR(s.st_mode)) flags |= FF_FOLDER;
             else                    flags |= FF_FILE;

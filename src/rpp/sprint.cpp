@@ -132,6 +132,7 @@ namespace rpp
     void string_buffer::write(float value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(double value) noexcept { reserve(48); len += _tostring(&ptr[len], value); }
 
+#if RPP_ENABLE_UNICODE
     void string_buffer::write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept
     {
         // if UTF-16 contains only ASCII, then UTF-8 will be the same length
@@ -182,6 +183,7 @@ namespace rpp
         }
         ptr[len] = '\0';
     }
+#endif // RPP_ENABLE_UNICODE
 
     static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };
     static const char HEXUP[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };

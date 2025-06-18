@@ -28,9 +28,9 @@ TestImpl(test_file_io)
             Assert(delete_file(TestFile));
 
         // only for wstring tests
-        if (!TestUnicodeDir.empty())
+        if (!TestUnicodeDir.empty() && folder_exists(TestUnicodeDir))
             Assert(delete_folder(TestUnicodeDir, delete_mode::recursive));
-        if (!TestUnicodeFile.empty())
+        if (!TestUnicodeFile.empty() && file_exists(TestUnicodeFile))
             Assert(delete_file(TestUnicodeFile));
     }
 
@@ -105,8 +105,8 @@ TestImpl(test_file_io)
 
     TestCase(create_delete_folder)
     {
-        Assert(create_folder("") == false); // this is most likely a programming error, so give false
-        Assert(create_folder("./") == true); // because "./" always exists, it should return true
+        AssertFalse(create_folder("")); // this is most likely a programming error, so give false
+        AssertTrue(create_folder("./")); // because "./" always exists, it should return true
 
         // these tests are extremely volatile, don't run without a step-in debugger
         //Assert(create_folder("dangerous"));
@@ -130,6 +130,27 @@ TestImpl(test_file_io)
         Assert(folder_exists(TestDir+"/folder/path/"));
         Assert(delete_folder(TestDir, delete_mode::recursive));
         Assert(!folder_exists(TestDir));
+    }
+
+    TestCase(create_delete_folder_utf16)
+    {
+        AssertFalse(create_folder(u""_sv)); // this is most likely a programming error, so give false
+        AssertTrue(create_folder(u"./"_sv)); // because "./" always exists, it should return true
+
+        Assert(create_folder(TestUnicodeDir + u"/folder/path"_sv));
+        Assert(folder_exists(TestUnicodeDir + u"/folder/path"_sv));
+        Assert(delete_folder(TestUnicodeDir + u"/", delete_mode::recursive));
+        Assert(!folder_exists(TestUnicodeDir));
+
+        Assert(create_folder(TestUnicodeDir + u"/folder/path"_sv));
+        Assert(folder_exists(TestUnicodeDir + u"/folder/path"_sv));
+        Assert(delete_folder(TestUnicodeDir, delete_mode::recursive));
+        Assert(!folder_exists(TestUnicodeDir));
+
+        Assert(create_folder(TestUnicodeDir + u"/folder/path/"_sv));
+        Assert(folder_exists(TestUnicodeDir + u"/folder/path/"_sv));
+        Assert(delete_folder(TestUnicodeDir, delete_mode::recursive));
+        Assert(!folder_exists(TestUnicodeDir));
     }
 
     TestCase(path_utils)
@@ -181,7 +202,54 @@ TestImpl(test_file_io)
 
         AssertThat(normalized("/root\\dir\\file.ext", '\\'), "\\root\\dir\\file.ext");
         AssertThat(normalized("\\root/dir/file.ext",  '\\'), "\\root\\dir\\file.ext");
+    }
 
+    TestCase(path_utils_utf16)
+    {
+        AssertThat(merge_dirups(u"../lib/../bin/file.txt"_sv), u"../bin/file.txt"_sv);
+
+        AssertThat(file_name(u"/root/dir/file.ext"_sv   ), u"file"_sv);
+        AssertThat(file_name(u"/root/dir/file"_sv       ), u"file"_sv);
+        AssertThat(file_name(u"/root/dir/"_sv           ), u""_sv);
+        AssertThat(file_name(u"file.ext"_sv             ), u"file"_sv);
+        AssertThat(file_name(u""_sv                     ), u""_sv);
+
+        AssertThat(file_nameext(u"/root/dir/file.ext"_sv), u"file.ext"_sv);
+        AssertThat(file_nameext(u"/root/dir/file"_sv    ), u"file"_sv);
+        AssertThat(file_nameext(u"/root/dir/"_sv        ), u""_sv);
+        AssertThat(file_nameext(u"file.ext"_sv          ), u"file.ext"_sv);
+        AssertThat(file_nameext(u""_sv                  ), u""_sv);
+
+        AssertThat(file_ext(u"/root/dir/file.ext"_sv), u"ext"_sv);
+        AssertThat(file_ext(u"/root/dir/file"_sv    ), u""_sv);
+        AssertThat(file_ext(u"/root/dir/"_sv        ), u""_sv);
+        AssertThat(file_ext(u"file.ext"_sv          ), u"ext"_sv);
+        AssertThat(file_ext(u"/.git/f.reallylong"_sv), u""_sv);
+        AssertThat(file_ext(u"/.git/filewnoext"_sv  ), u""_sv);
+        AssertThat(file_ext(u""_sv                  ), u""_sv);
+
+        AssertThat(file_replace_ext(u"/dir/file.old"_sv, u"new"_sv), u"/dir/file.new"_sv);
+        AssertThat(file_replace_ext(u"/dir/file"_sv,     u"new"_sv), u"/dir/file.new"_sv);
+        AssertThat(file_replace_ext(u"/dir/"_sv,         u"new"_sv), u"/dir/"_sv);
+        AssertThat(file_replace_ext(u"file.old"_sv,      u"new"_sv), u"file.new"_sv);
+        AssertThat(file_replace_ext(u""_sv,              u"new"_sv), u""_sv);
+
+        AssertThat(folder_name(u"/root/dir/file.ext"_sv ), u"dir"_sv);
+        AssertThat(folder_name(u"/root/dir/file"_sv     ), u"dir"_sv);
+        AssertThat(folder_name(u"/root/dir/"_sv         ), u"dir"_sv);
+        AssertThat(folder_name(u"dir/"_sv               ), u"dir"_sv);
+        AssertThat(folder_name(u"file.ext"_sv           ), u""_sv);
+        AssertThat(folder_name(u""_sv                   ), u""_sv);
+
+        AssertThat(folder_path(u"/root/dir/file.ext"_sv ), u"/root/dir/"_sv);
+        AssertThat(folder_path(u"/root/dir/file"_sv     ), u"/root/dir/"_sv);
+        AssertThat(folder_path(u"/root/dir/"_sv         ), u"/root/dir/"_sv);
+        AssertThat(folder_path(u"dir/"_sv               ), u"dir/"_sv);
+        AssertThat(folder_path(u"file.ext"_sv           ), u""_sv);
+        AssertThat(folder_path(u""_sv                   ), u""_sv);
+
+        AssertThat(normalized(u"/root\\dir\\file.ext"_sv, '/'), u"/root/dir/file.ext"_sv);
+        AssertThat(normalized(u"\\root/dir/file.ext"_sv,  '/'), u"/root/dir/file.ext"_sv);
     }
 
     TestCase(path_combine2)
@@ -196,6 +264,20 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     "/tmp"     ), "tmp");
         AssertThat(path_combine("",     "/tmp/"    ), "tmp");
         AssertThat(path_combine("",     ""         ), "");
+    }
+
+    TestCase(path_combine2_utf16)
+    {
+        AssertThat(path_combine(u"tmp"_sv,  u"file.txt"_sv ), u"tmp/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"file.txt"_sv ), u"tmp/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"/file.txt"_sv), u"tmp/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"/folder//"_sv), u"tmp/folder");
+        AssertThat(path_combine(u"tmp/"_sv, u""_sv         ), u"tmp");
+        AssertThat(path_combine(u"tmp"_sv,  u""_sv         ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u"tmp"_sv      ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u"/tmp"_sv     ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u"/tmp/"_sv    ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u""_sv         ), u"");
     }
     
     TestCase(path_combine3)
@@ -216,6 +298,26 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     "/",     "/tmp"    ), "tmp");
         AssertThat(path_combine("",     "/",     "/tmp/"   ), "tmp");
         AssertThat(path_combine("",     "",     ""         ), "");
+    }
+    
+    TestCase(path_combine3_utf16)
+    {
+        AssertThat(path_combine(u"tmp"_sv,  u"path"_sv, u"file.txt"_sv ), u"tmp/path/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"path"_sv, u"file.txt"_sv ), u"tmp/path/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"path/"_sv, u"file.txt"_sv ),u"tmp/path/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"path"_sv, u"/file.txt"_sv), u"tmp/path/file.txt");
+        AssertThat(path_combine(u"tmp/"_sv, u"path"_sv, u"/folder//"_sv), u"tmp/path/folder");
+        AssertThat(path_combine(u"tmp/"_sv, u"/path/"_sv, u"/folder//"_sv), u"tmp/path/folder");
+        AssertThat(path_combine(u"tmp/"_sv, u"path"_sv, u""_sv         ), u"tmp/path");
+        AssertThat(path_combine(u"tmp/"_sv, u"path/"_sv, u""_sv        ), u"tmp/path");
+        AssertThat(path_combine(u"tmp"_sv,  u""_sv     , u""_sv         ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u""_sv     , u"tmp"_sv      ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u""_sv     , u"/tmp"_sv     ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u""_sv     , u"/tmp/"_sv    ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u"/"_sv    , u"tmp"_sv      ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u"/"_sv    , u"/tmp"_sv     ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u"/"_sv    , u"/tmp/"_sv    ), u"tmp");
+        AssertThat(path_combine(u""_sv,     u""_sv     , u""_sv         ), u"");
     }
 
     static bool contains(const std::vector<std::string>& v, const std::string& s)
@@ -320,12 +422,42 @@ TestImpl(test_file_io)
         AssertThat(last(home_dir()), '/');
     }
 
-    // mostly for Win32 to validate that unicode paths work
-    // even if regular const char* / std::string paths are used
-    TestCase(can_handle_unicode_paths)
+    void prepare_unicode_file_paths()
     {
-        TestDir = path_combine(temp_dir(), "_rpp_test_tmp_unicode_😀𝄞ℵ€");
+        TestDir  = path_combine(temp_dir(), "_rpp_test_tmp_unicode_😀𝄞ℵ€");
         TestFile = path_combine(temp_dir(), "_rpp_test_unicode_😀𝄞ℵ€.txt");
+        TestUnicodeDir  = path_combine(temp_diru(), u"_rpp_test_tmp_unicode_😀𝄞ℵ€");
+        TestUnicodeFile = path_combine(temp_diru(), u"_rpp_test_unicode_😀𝄞ℵ€.txt");
+    }
+
+    // validate that UTF16 file paths work correctly
+    TestCase(can_handle_utf8_file_paths)
+    {
+        prepare_unicode_file_paths();
+
+        AssertTrue(file::write_new(TestFile, "abcdefgh"));
+        AssertTrue(file_exists(TestFile));
+        AssertThat(file::read_all_text(TestFile), "abcdefgh");
+        AssertTrue(delete_file(TestFile));
+
+        AssertTrue(create_folder(TestDir));
+        AssertTrue(folder_exists(TestDir));
+        AssertTrue(delete_folder(TestDir, delete_mode::recursive));
+    }
+
+    TestCase(can_handle_utf16_file_paths)
+    {
+        prepare_unicode_file_paths();
+
+        AssertTrue(file::write_new(TestUnicodeFile, "abcdefgh"));
+        AssertTrue(file_exists(TestUnicodeFile));
+        AssertThat(file::read_all_text(TestUnicodeFile), "abcdefgh");
+        AssertTrue(delete_file(TestUnicodeFile));
+
+        // test that we can create a directory with unicode characters
+        AssertTrue(create_folder(TestUnicodeDir));
+        AssertTrue(folder_exists(TestUnicodeDir));
+        AssertTrue(delete_folder(TestUnicodeDir, delete_mode::recursive));
     }
 
 };

@@ -311,7 +311,6 @@ TestImpl(test_strview)
         AssertEqual(empty, u"");
         AssertEqual(empty.length(), 0);
 
-        // this is a special case, 
         rpp::ustring ustr = rpp::to_ustring(u8"𝕳𝖊𝖑𝖑𝖔");
         AssertEqual(ustr, u"𝕳𝖊𝖑𝖑𝖔");
         AssertEqual(ustr.size(), 10u);
@@ -336,5 +335,37 @@ TestImpl(test_strview)
         int ulen = rpp::to_ustring(ubuf, 512, u8"𝕳𝖊𝖑𝖑𝖔");
         AssertEqual(ulen, 10);
         AssertEqual(ubuf, u"𝕳𝖊𝖑𝖑𝖔");
+    }
+
+    TestCase(can_convert_utf16_to_utf8)
+    {
+        std::string empty = to_string(u"");
+        AssertEqual(empty, "");
+        AssertEqual(empty.length(), 0);
+
+        rpp::string str = rpp::to_string(u"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(str, u8"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(str.size(), 20u);
+
+        str = rpp::to_string(u"hello: Привет");
+        AssertEqual(str, u8"hello: Привет");
+        AssertEqual(str.length(), 19);
+
+        str = rpp::to_string(u"hello: 你好");
+        AssertEqual(str, u8"hello: 你好");
+        AssertEqual(str.length(), 13);
+
+        str = rpp::to_string(u"hello: 𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(str, u8"hello: 𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(str.length(), 27u);
+
+        str = rpp::to_string(u"äääääää");
+        AssertEqual(str, u8"äääääää");
+        AssertEqual(str.length(), 14);
+
+        char8_t buf[512];
+        int len = rpp::to_string(buf, 512, u"𝕳𝖊𝖑𝖑𝖔");
+        AssertEqual(len, 20);
+        AssertEqual(buf, u8"𝕳𝖊𝖑𝖑𝖔");
     }
 };

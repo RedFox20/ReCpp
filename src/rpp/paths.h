@@ -712,7 +712,7 @@ namespace rpp /* ReCpp */
      * Path is always normalized to forward slashes /
      */
     RPPAPI string temp_dir() noexcept;
-    inline ustring temp_dirw() noexcept { return to_ustring(temp_dir()); }
+    inline ustring temp_diru() noexcept { return to_ustring(temp_dir()); }
     
     /**
      * @return The system home directory for this user
@@ -721,7 +721,7 @@ namespace rpp /* ReCpp */
      * Path is always normalized to forward slashes /
      */
     RPPAPI string home_dir() noexcept;
-    RPPAPI ustring home_dirw() noexcept;
+    RPPAPI ustring home_diru() noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 

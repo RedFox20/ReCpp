@@ -136,7 +136,10 @@
 
 /// @brief Unicode (wstring) support conditionally enabled for relevant platforms
 #ifndef RPP_ENABLE_UNICODE
-#  if defined(_MSC_VER) || defined(__ANDROID__)
+// explicitly disable for embedded platforms that shouldn't use UTF16 strings
+#  if defined(OCLEA) || defined(XILINX) || defined(MIPS) || defined(RASPI)
+#    define RPP_ENABLE_UNICODE 0
+#  elif defined(_MSC_VER) || defined(__ANDROID__) || defined(__linux__)
 #    define RPP_ENABLE_UNICODE 1
 #  else
 #    define RPP_ENABLE_UNICODE 0

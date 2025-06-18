@@ -32,10 +32,6 @@ namespace rpp
         for (int i = 0; i < len; ++i) if (::toupper(str[i]) == ::toupper(ch)) return true; // found it.
         return false;
     }
-    bool strcontains(const char16_t* str, int len, char16_t ch) noexcept {
-        for (int i = 0; i < len; ++i) if (str[i] == ch) return true; // found it.
-        return false;
-    }
     const char* strfindi(const char* str, int len, char ch) noexcept {
         for (int i = 0; i < len; ++i) if (::toupper(str[i]) == ::toupper(ch)) return &str[i]; // found it.
         return nullptr;
@@ -45,11 +41,6 @@ namespace rpp
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      */
     const char* strcontains(const char* str, int nstr, const char* control, int ncontrol) noexcept {
-        for (auto s = str; nstr; --nstr, ++s)
-            if (strcontains(control, ncontrol, *s)) return s; // done
-        return nullptr; // not found
-    }
-    const char16_t* strcontains(const char16_t* str, int nstr, const char16_t* control, int ncontrol) noexcept {
         for (auto s = str; nstr; --nstr, ++s)
             if (strcontains(control, ncontrol, *s)) return s; // done
         return nullptr; // not found
@@ -64,6 +55,17 @@ namespace rpp
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;
     }
+
+#if RPP_ENABLE_UNICODE
+    bool strcontains(const char16_t* str, int len, char16_t ch) noexcept {
+        for (int i = 0; i < len; ++i) if (str[i] == ch) return true; // found it.
+        return false;
+    }
+    const char16_t* strcontains(const char16_t* str, int nstr, const char16_t* control, int ncontrol) noexcept {
+        for (auto s = str; nstr; --nstr, ++s)
+            if (strcontains(control, ncontrol, *s)) return s; // done
+        return nullptr; // not found
+    }
     bool strequals(const char16_t* s1, const char16_t* s2, int len) noexcept {
         for (int i = 0; i < len; ++i)
             if (s1[i] != s2[i]) return false; // not equal.
@@ -74,6 +76,7 @@ namespace rpp
             if (std::towupper(s1[i]) != std::towupper(s2[i])) return false; // not equal.
         return true;
     }
+#endif // RPP_ENABLE_UNICODE
 
 
     ///////////// string view
@@ -1078,6 +1081,7 @@ namespace rpp
         return false; // did not detect a start byte
     }
 
+#if RPP_ENABLE_UNICODE
     string to_string(const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
@@ -1115,7 +1119,7 @@ namespace rpp
     #if false && _WIN32
     #else
         // TODO: codecvt is deprected, but the other API-s don't even work
-        std::codecvt_utf8<char16_t> cvt;
+        std::codecvt_utf8_utf16<char16_t> cvt;
         std::mbstate_t state = std::mbstate_t();
         char* to_next;
         const char16_t* from_next;
@@ -1177,8 +1181,8 @@ namespace rpp
         out[utf16len] = u'\0'; // always null terminate
         return utf16len; // success
     #else
-        // TODO: codecvt is deprected, but the other API-s don't even work
-        std::codecvt_utf8<char16_t> cvt;
+        // TODO: codecvt is deprected, but the other API-s have even more issues
+        std::codecvt_utf8_utf16<char16_t> cvt;
         std::mbstate_t state = std::mbstate_t();
         char16_t* to_next;
         const char* from_next;
@@ -1192,6 +1196,7 @@ namespace rpp
         return -1;
     #endif
     }
+#endif // RPP_ENABLE_UNICODE
 
     ///////////// line_parser
 
