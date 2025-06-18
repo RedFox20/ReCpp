@@ -21,6 +21,11 @@ TestImpl(test_file_io)
 
     TestInit(test_file_io)
     {
+    }
+    TestCaseSetup() // setup before every test
+    {
+        TestFileSize = 0;
+        TestFileContents = "";
         TestDir  = path_combine(temp_dir(), "_rpp_test_tmp");
         TestFile = path_combine(temp_dir(), "_rpp_test.txt");
     }
