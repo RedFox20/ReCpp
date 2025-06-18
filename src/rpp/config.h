@@ -328,13 +328,15 @@ namespace rpp
 #endif
 
 #ifndef RPP_LIFETIMEBOUND
-#if defined(_MSC_VER) // MSVC
-    // TODO: add a check for MSVC 17+ version
-    //#define RPP_LIFETIMEBOUND [[msvc::lifetimebound]]
-    #define RPP_LIFETIMEBOUND
-#elif defined(__clang__) // Clang
-    #define RPP_LIFETIMEBOUND [[clang::lifetimebound]]
-#else
-    #define RPP_LIFETIMEBOUND
-#endif
+#  if defined(_MSC_VER) // MSVC
+#    if _MSC_VER >= 1937 // support was added in MSVC 17.7 (19.37)
+#      define RPP_LIFETIMEBOUND [[msvc::lifetimebound]]
+#    else
+#      define RPP_LIFETIMEBOUND
+#    endif
+#  elif defined(__clang__) // Clang
+#   define RPP_LIFETIMEBOUND [[clang::lifetimebound]]
+#  else
+#   define RPP_LIFETIMEBOUND
+#  endif
 #endif // RPP_LIFETIMEBOUND
