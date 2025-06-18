@@ -1107,6 +1107,13 @@ namespace rpp /* ReCpp */
         }
         return {};
     }
+
+    // export explicit template instantiations for strview and ustrview
+    template struct dir_iter_base::name_util<rpp::strview>;
+#if RPP_ENABLE_UNICODE
+    template struct dir_iter_base::name_util<rpp::ustrview>;
+#endif
+
     bool dir_iter_base::next() noexcept { return s->next(); }
 
 #if _WIN32
