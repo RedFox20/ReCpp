@@ -118,7 +118,7 @@ namespace rpp
 
         FINLINE void write(const std::string& value) noexcept { this->write(strview{ value }); }
         FINLINE void write(std::string_view value) noexcept { this->write(strview{ value.data(), static_cast<int>(value.size()) }); }
-        void write(const char* value) noexcept { this->write(strview{ value, std::char_traits<char>::length(value) }); }
+        FINLINE void write(const char* value) noexcept { this->write(strview{ value, RPP_UTF8LEN(value) }); }
 
         void write(strview s) noexcept;
         void write(char value) noexcept;
@@ -135,34 +135,27 @@ namespace rpp
         void write(float  value) noexcept;
         void write(double value) noexcept;
 
+#if RPP_ENABLE_UNICODE
         // input as UTF-16 string, converted directly to UTF-8
         void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;
 
     // Qt support for QString and QStringView with automatic fast conversion to UTF-8
     #if RPP_HAS_QT
-        FINLINE void write(const QString& str) noexcept
-        {
-            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.constData()), str.length());
-        }
-        FINLINE void write(const QStringView& str) noexcept
-        {
-            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.data()), str.length());
-        }
+        FINLINE void write(const QString& str)     noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.constData()), str.length()); }
+        FINLINE void write(const QStringView& str) noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.data()), str.length()); }
     #endif
-
         // support Wide Strings by converting them to UTF-8
-        FINLINE void write(const std::wstring& value) noexcept
-        {
-            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size()));
-        }
-        FINLINE void write(std::wstring_view value) noexcept
-        {
-            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size()));
-        }
-        void write(const wchar_t* value) noexcept
-        {
-            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value), static_cast<int>(std::char_traits<wchar_t>::length(value)));
-        }
+        FINLINE void write(const std::wstring& value) noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size())); }
+        FINLINE void write(std::wstring_view value)   noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size())); }
+        FINLINE void write(const wchar_t* value)      noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value), RPP_UTF16LEN(value)); }
+        // support UTF16 strings directly
+        FINLINE void write(const ustring& value)  noexcept { write_utf16_as_utf8(value.data(), static_cast<int>(value.size())); }
+        FINLINE void write(ustrview value)        noexcept { write_utf16_as_utf8(value.data(), static_cast<int>(value.size())); }
+    #ifdef __cpp_char8_t // fundamental type char8_t since C++20
+        FINLINE void write(const char16_t* value) noexcept { write_utf16_as_utf8(value, RPP_UTF16LEN(value)); }
+        FINLINE void write(const char8_t* value)  noexcept { append(reinterpret_cast<const char*>(value), RPP_UTF8LEN(value)); }
+    #endif
+#endif // RPP_ENABLE_UNICODE
 
         void write(std::nullptr_t) noexcept;
         void write(const string_buffer& sb) noexcept;

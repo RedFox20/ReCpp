@@ -41,12 +41,16 @@ namespace rpp
     template<class T> using has_begin_expression  = decltype(std::declval<T>().begin());
     template<class T> using has_end_expression    = decltype(std::declval<T>().end());
     template<class T> using has_size_expression   = decltype(std::declval<T>().size());
+    template<class T> using has_c_str_expression  = decltype(std::declval<T>().c_str());
 
     template<class T> constexpr bool is_iterable = is_detected_v<has_begin_expression, T>
                                                 && is_detected_v<has_end_expression, T>;
 
+    template<class T> constexpr bool is_stringlike = is_detected_v<has_c_str_expression, T>;
+
     template<class T> constexpr bool is_container = is_iterable<T>
-                                                 && is_detected_v<has_size_expression, T>;
+                                                 && is_detected_v<has_size_expression, T>
+                                                 && !is_stringlike<T>;
 
     // ------------------------------------------------------------------------------------ //
 }

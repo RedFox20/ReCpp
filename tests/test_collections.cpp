@@ -96,13 +96,6 @@ TestImpl(test_collections)
         AssertThat(k, 15); // 5 + 4 + 3 + 2 + 1
     }
 
-    TestCase(emplace_back)
-    {
-        std::vector<std::string> v;
-        AssertThat(emplace_back(v), v.back());
-        AssertThat(emplace_back(v, "emplaced"s), v.back());
-    }
-
     TestCase(pop_back)
     {
         std::vector<std::string> v { "first"s, "second"s };

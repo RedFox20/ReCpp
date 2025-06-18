@@ -9,10 +9,13 @@
 #include <cstring> // memcpy
 #include <locale> // toupper
 #include <cfloat> // DBL_MAX
+#include <cwctype> // std::towupper
 //#include <charconv> // to_chars, C++17, not implemented yet
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
+    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
+    #include <codecvt> // codecvt_utf8
 #else
     #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
     #include <codecvt> // codecvt_utf8
@@ -52,6 +55,28 @@ namespace rpp
             if (::toupper(s1[i]) != ::toupper(s2[i])) return false; // not equal.
         return true;
     }
+
+#if RPP_ENABLE_UNICODE
+    bool strcontains(const char16_t* str, int len, char16_t ch) noexcept {
+        for (int i = 0; i < len; ++i) if (str[i] == ch) return true; // found it.
+        return false;
+    }
+    const char16_t* strcontains(const char16_t* str, int nstr, const char16_t* control, int ncontrol) noexcept {
+        for (auto s = str; nstr; --nstr, ++s)
+            if (strcontains(control, ncontrol, *s)) return s; // done
+        return nullptr; // not found
+    }
+    bool strequals(const char16_t* s1, const char16_t* s2, int len) noexcept {
+        for (int i = 0; i < len; ++i)
+            if (s1[i] != s2[i]) return false; // not equal.
+        return true;
+    }
+    bool strequalsi(const char16_t* s1, const char16_t* s2, int len) noexcept {
+        for (int i = 0; i < len; ++i)
+            if (std::towupper(s1[i]) != std::towupper(s2[i])) return false; // not equal.
+        return true;
+    }
+#endif // RPP_ENABLE_UNICODE
 
 
     ///////////// string view
@@ -537,18 +562,18 @@ namespace rpp
         *p = 0;
         return dst;
     }
-    std::string strview::as_lower() const noexcept
+    string strview::as_lower() const noexcept
     {
-        std::string ret;
+        string ret;
         ret.reserve(size_t(len));
         auto s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::tolower(*s++)));
         return ret;
     }
-    std::string strview::as_upper() const noexcept
+    string strview::as_upper() const noexcept
     {
-        std::string ret;
+        string ret;
         ret.reserve(size_t(len));
         auto s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
@@ -558,38 +583,73 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////
 
-    std::string concat(const strview& a, const strview& b)
+    string concat(const strview& a, const strview& b)
     {
-        std::string str;
+        string str;
         auto sa = size_t(a.len), sb = size_t(b.len);
         str.reserve(sa + sb);
         str.append(a.str, sa).append(b.str, sb);
         return str;
     }
-    std::string concat(const strview& a, const strview& b, const strview& c)
+    string concat(const strview& a, const strview& b, const strview& c)
     {
-        std::string str;
+        string str;
         auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
         str.reserve(sa + sb + sc);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
         return str;
     }
-    std::string concat(const strview& a, const strview& b, const strview& c, const strview& d)
+    string concat(const strview& a, const strview& b, const strview& c, const strview& d)
     {
-        std::string str;
+        string str;
         auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
         str.reserve(sa + sb + sc + sd);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
         return str;
     }
-    std::string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
+    string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
     {
-        std::string str;
+        string str;
         auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
         str.reserve(sa + sb + sc + sd + se);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
         return str;
     }
+
+#if RPP_ENABLE_UNICODE
+    ustring concat(const ustrview& a, const ustrview& b)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len);
+        str.reserve(sa + sb);
+        str.append(a.str, sa).append(b.str, sb);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        str.reserve(sa + sb + sc);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        str.reserve(sa + sb + sc + sd);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        str.reserve(sa + sb + sc + sd + se);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
+        return str;
+    }
+#endif // RPP_ENABLE_UNICODE
 
     ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -601,11 +661,11 @@ namespace rpp
     {
         transform_chars(str, len, ::toupper); return str;
     }
-    std::string& to_lower(std::string& str) noexcept
+    string& to_lower(string& str) noexcept
     {
         transform_chars(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::tolower); return str;
     }
-    std::string& to_upper(std::string& str) noexcept
+    string& to_upper(string& str) noexcept
     {
         transform_chars(const_cast<char*>(str.data()), static_cast<int>(str.size()), ::toupper); return str;
     }
@@ -616,7 +676,7 @@ namespace rpp
         for (; s < e; ++s) if (*s == chOld) *s = chNew;
         return str;
     }
-    std::string& replace(std::string& str, char chOld, char chNew) noexcept {
+    string& replace(string& str, char chOld, char chNew) noexcept {
         replace(const_cast<char*>(str.data()), static_cast<int>(str.size()), chOld, chNew); return str;
     }
 
@@ -628,6 +688,161 @@ namespace rpp
             if (*s == chOld) *s = chNew;
         return *this;
     }
+
+    ////////////////////// ustrview
+
+#if RPP_ENABLE_UNICODE
+    const char16_t* ustrview::to_cstr(char16_t* buf, int max) const noexcept
+    {
+        if (str[len] == u'\0')
+            return str;
+        auto n = size_t((len < max) ? len : max - 1);
+        memcpy(buf, str, sizeof(char16_t) * n);
+        buf[n] = u'\0';
+        return buf;
+    }
+
+    ustrview& ustrview::trim_start() noexcept
+    {
+        auto s = str;
+        auto n = len;
+        for (; n && *const_cast<char16_t*>(s) <= ' '; ++s, --n) {} // loop while is whitespace
+        str = s; len = n; // result writeout
+        return *this;
+    }
+
+    ustrview& ustrview::trim_start(const char16_t ch) noexcept
+    {
+        auto s = str;
+        auto n = len;
+        for (; n && *s == ch; ++s, --n) {}
+        str = s; len = n; // result writeout
+        return *this;
+    }
+
+    ustrview& ustrview::trim_start(const char16_t* chars, int nchars) noexcept
+    {
+        auto s = str;
+        auto n = len;
+        for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
+        str = s; len = n;
+        return *this;
+    }
+
+    ustrview& ustrview::trim_end() noexcept
+    {
+        auto n = len;
+        auto e = str + n;
+        for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
+        len = n;
+        return *this;
+    }
+
+    ustrview& ustrview::trim_end(char16_t ch) noexcept
+    {
+        auto n = len;
+        auto e = str + n;
+        for (; n && *--e == ch; --n) {}
+        len = n;
+        return *this;
+    }
+
+    ustrview& ustrview::trim_end(const char16_t* chars, int nchars) noexcept
+    {
+        auto n = len;
+        auto e = str + n;
+        for (; n && strcontains(chars, nchars, *--e); --n) {}
+        len = n;
+        return *this;
+    }
+
+    int ustrview::compare(const char16_t* s, int n) const noexcept
+    {
+        int len1 = len;
+        int len2 = n;
+        if (int res = memcmp(str, s, sizeof(char16_t) * size_t(len1 < len2 ? len1 : len2)))
+            return res;
+        if (len1 < len2) return -1;
+        if (len1 > len2) return +1;
+        return 0;
+    }
+    
+    int ustrview::compare(const char16_t* s) const noexcept
+    {
+        const char16_t* s1 = str;
+        const char16_t* s2 = s;
+        for (int len1 = len; len1 > 0; --len1, ++s1, ++s2)
+        {
+            char16_t c1 = *s1, c2 = *s2;
+            if (c1 < c2) return -1;
+            if (c1 > c2) return +1;
+        }
+        return 0;
+    }
+
+    const char16_t* ustrview::rfind(char16_t c) const noexcept
+    {
+        if (len <= 0) return nullptr;
+        const char16_t* p = str;
+        const char16_t* e = p + len - 1;
+        for (; e >= p; --e) if (*e == c) return e;
+        return nullptr;
+    }
+
+    const char16_t* ustrview::findany(const char16_t* chars, int n) const noexcept
+    {
+        const char16_t* p = str;
+        const char16_t* e = p + len;
+        for (; p < e; ++p) if (strcontains(chars, n, *p)) return p;
+        return nullptr;
+    }
+
+    const char16_t* ustrview::rfindany(const char16_t* chars, int n) const noexcept
+    {
+        if (len <= 0) return nullptr;
+        const char16_t* p = str;
+        const char16_t* e = p + len - 1;
+        for (; e >= p; --e) if (strcontains(chars, n, *e)) return e;
+        return nullptr;
+    }
+
+    ustrview ustrview::substr(int index, int length) const noexcept
+    {
+        int idx = index;
+        if (idx > len)    idx = len;
+        else if (idx < 0) idx = 0;
+
+        int remaining = len - idx;
+        if (remaining > length)
+            remaining = length;
+
+        return { str + idx, remaining };
+    }
+
+    ustrview ustrview::substr(int index) const noexcept
+    {
+        int idx = index;
+        if (idx > len)    idx = len;
+        else if (idx < 0) idx = 0;
+
+        int remaining = len - idx;
+        return { str + idx, remaining };
+    }
+
+    bool ustrview::next(ustrview& out, char16_t delim) noexcept
+    {
+        return _next_trim(out, [delim](const char16_t* s, int n) {
+            return static_cast<const char16_t*>(memchr(s, delim, size_t(n * sizeof(char16_t)) ));
+        });
+    }
+
+    bool ustrview::next(ustrview& out, const char16_t* delims, int ndelims) noexcept
+    {
+        return _next_trim(out, [delims, ndelims](const char16_t* s, int n) {
+            return strcontains(s, n, delims, ndelims);
+        });
+    }
+#endif // RPP_ENABLE_UNICODE
 
     ////////////////////// loose utility functions
 
@@ -869,42 +1084,122 @@ namespace rpp
         return false; // did not detect a start byte
     }
 
-    std::string to_string(const wchar_t* wstr, int wlen) noexcept
+#if RPP_ENABLE_UNICODE
+    string to_string(const char16_t* utf16, int utf16len) noexcept
     {
-        if (wlen < 0) wlen = int(wcslen(wstr));
-        if (wlen == 0) return std::string{}; // empty string
-    #if _WIN32
-        int utflen = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, nullptr, 0, nullptr, nullptr);
-        std::string ret;
-        if (utflen > 0) {
-            ret.resize(utflen);
-            WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, (char*)ret.data(), utflen, nullptr, nullptr);
+        if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
+        if (utf16len == 0) return string{}; // empty string
+
+    #if false && _WIN32
+        int utf8len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)utf16, utf16len,
+                                          nullptr, 0, nullptr, nullptr);
+        string ret;
+        if (utf8len > 0) {
+            ret.resize(utf8len);
+            WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)utf16, utf16len,
+                                (char*)ret.data(), utf8len, nullptr, nullptr);
         }
         return ret;
     #else
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-        return cvt.to_bytes(wstr, wstr + wlen);
+        // TODO: codecvt is deprected, but the other API-s don't even work
+        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
+        try {
+            return cvt.to_bytes(utf16, utf16 + utf16len);
+        } catch (...) {
+            return string{}; // conversion failed, return empty string
+        }
     #endif
     }
 
-    std::wstring to_wstring(const char* str, int utflen) noexcept
+    int to_string(char* out, int out_max, const char16_t* utf16, int utf16len) noexcept
     {
-        if (utflen < 0) utflen = int(strlen(str));
-        if (utflen == 0) return std::wstring{};
+        if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
+        if (utf16len == 0) {
+            *out = '\0'; // always null terminate
+            return 0;
+        }
 
-    #if _WIN32
-        int wlen = MultiByteToWideChar(CP_UTF8, 0, str, utflen, nullptr, 0);
-        std::wstring ret;
+    #if false && _WIN32
+    #else
+        // TODO: codecvt is deprected, but the other API-s don't even work
+        std::codecvt_utf8_utf16<char16_t> cvt;
+        std::mbstate_t state = std::mbstate_t();
+        char* to_next;
+        const char16_t* from_next;
+        const char16_t* from_end = utf16 + utf16len;
+        auto res = cvt.out(state, utf16, from_end, from_next, out, out + out_max - 1, to_next);
+        if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
+            *to_next = u'\0'; // always null terminate
+            return (int)(to_next - out);
+        }
+    #endif
+
+        *out = u'\0'; // always null terminate
+        return -1;
+    }
+
+    ustring to_ustring(const char* utf8, int utf8len) noexcept
+    {
+        if (utf8len < 0) utf8len = int(strlen(utf8));
+        if (utf8len == 0) return ustring{};
+
+    #if false && _WIN32
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, nullptr, 0);
+        ustring ret;
         if (wlen > 0) {
             ret.resize(wlen);
-            MultiByteToWideChar(CP_UTF8, 0, str, utflen, (wchar_t*)ret.data(), wlen);
+            MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)ret.data(), wlen);
         }
         return ret;
     #else
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-        return cvt.from_bytes(str, str + utflen);
+        // TODO: codecvt is deprected, but the other API-s don't even work
+        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
+        try {
+            return cvt.from_bytes(utf8, utf8 + utf8len);
+        } catch (...) {
+            return ustring{}; // conversion failed, return empty string
+        }
     #endif
     }
+    
+    int to_ustring(char16_t* out, int out_max, const char* utf8, int utf8len) noexcept
+    {
+        if (utf8len < 0) utf8len = int(strlen(utf8));
+        if (utf8len == 0) {
+            *out = u'\0'; // always null terminate
+            return 0;
+        }
+
+    #if false && _WIN32
+        int utf16len = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)out, out_max - 1);
+        if (utf16len <= 0/*failed*/) {
+            int lasterr = GetLastError();
+            if (lasterr == ERROR_INSUFFICIENT_BUFFER) {
+                utf16len = out_max - 1;
+            } else {
+                *out = u'\0'; // always null terminate
+                return -1; // failed -- invalid unicode characters or invalid inputs
+            }
+        }
+        out[utf16len] = u'\0'; // always null terminate
+        return utf16len; // success
+    #else
+        // TODO: codecvt is deprected, but the other API-s have even more issues
+        std::codecvt_utf8_utf16<char16_t> cvt;
+        std::mbstate_t state = std::mbstate_t();
+        char16_t* to_next;
+        const char* from_next;
+        const char* from_end = utf8 + utf8len;
+        auto res = cvt.in(state, utf8, from_end, from_next, out, out + out_max - 1, to_next);
+        if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
+            *to_next = u'\0'; // always null terminate
+            return (int)(to_next - out);
+        }
+        *out = u'\0'; // always null terminate
+        return -1;
+    #endif
+    }
+#endif // RPP_ENABLE_UNICODE
 
     ///////////// line_parser
 

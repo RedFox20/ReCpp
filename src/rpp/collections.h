@@ -179,27 +179,6 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    // Pre C++17
-    template<class T> T& emplace_back(std::vector<T>& v)
-    {
-    #if _MSC_VER >= 1910 && RPP_HAS_CXX17
-        return v.emplace_back();
-    #else
-        v.emplace_back();
-        return v.back();
-    #endif
-    }
-
-    template<class T, class... Args> T& emplace_back(std::vector<T>& v, Args&&... args)
-    {
-    #if _MSC_VER >= 1910 && RPP_HAS_CXX17
-        return v.emplace_back(std::forward<Args>(args)...);
-    #else
-        v.emplace_back(std::forward<Args>(args)...);
-        return v.back();
-    #endif
-    }
-
     template<class T> T pop_back(std::vector<T>& v)
     {
         if (v.empty()) throw std::runtime_error{"rpp::pop_back() failed: vector is empty"};

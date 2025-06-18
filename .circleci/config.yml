@@ -20,20 +20,6 @@ jobs:
       # do a second run with thread sanitizer
       # - run: BUILD_WITH_THREAD_SAFETY=ON CXX20=1 pipenv run mama clang verbose build
       # - run: pipenv run mama clang verbose test="nogdb -vv"
-  clang-ubuntu-cpp17:
-    description: Ubuntu Clang C++17 x64 Build
-    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
-    docker:
-      - image: cimg/python:3.10
-    steps:
-      - checkout
-      - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
-      - run: pipenv install mama
-      - run: sudo apt-get install clang-12 libc++-12-dev libc++abi-12-dev -y
-      - run: make configure-cmake
-      - run: CXX17=1 pipenv run mama clang verbose build with_tests
-      - run: pipenv run mama clang verbose test="nogdb -vv"
   gcc-ubuntu-cpp20:
     description: Ubuntu GCC C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -47,21 +33,6 @@ jobs:
       - run: sudo apt-get install gcc-11 -y
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama gcc verbose build with_tests coverage asan
-      - run: pipenv run mama gcc verbose test="nogdb -vv"
-      - run: pipenv run mama coverage-report=src
-  gcc-ubuntu-cpp17:
-    description: Ubuntu GCC C++17 x64 Build
-    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
-    docker:
-      - image: cimg/python:3.10
-    steps:
-      - checkout
-      - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
-      - run: pipenv install mama
-      - run: sudo apt-get install gcc-11 -y
-      - run: make configure-cmake
-      - run: CXX17=1 pipenv run mama gcc verbose build with_tests coverage asan
       - run: pipenv run mama gcc verbose test="nogdb -vv"
       - run: pipenv run mama coverage-report=src
   gcc-ubuntu-tsan-cpp20:
@@ -114,27 +85,6 @@ jobs:
           command: |
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
               mama windows verbose test="-vv"
-  msvc-win64-cpp17:
-    description: Windows MSVC C++17 VS2022 x64 Build
-    executor:
-      name: win/default
-      size: medium # can be medium, large, xlarge, 2xlarge
-    steps:
-      - checkout
-      - run: pip3 install mama
-      - run: choco install cmake -y
-      - run:
-          name: Build
-          command: |
-              $env:Path+=";$Env:ProgramFiles\CMake\bin";
-              $env:BUILD_WITH_MEM_SAFETY="ON";
-              $env:CXX17="1";
-              mama windows verbose build with_tests
-      - run:
-          name: Tests
-          command: |
-              $env:Path+=";$Env:ProgramFiles\CMake\bin";
-              mama windows verbose test="-vv"
   gcc-mipsel-cpp20:
     description: MIPSEL C++20 GCC Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -147,17 +97,6 @@ jobs:
       - run: pipenv install mama
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama mips verbose build
-  clang-android-cpp17:
-    description: Android C++17 Build (NO TESTS)
-    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
-    docker:
-      - image: cimg/android:2023.08.1-ndk
-    steps:
-      - checkout
-      - run: make configure-cmake
-      - run: make configure-pip3
-      - run: pip3 install mama
-      - run: CXX17=1 mama android verbose build with_tests
   clang-android-cpp20:
     description: Android C++20 Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -174,13 +113,9 @@ workflows:
   build_all:
     jobs:
       - clang-ubuntu-cpp20
-      - clang-ubuntu-cpp17
       - gcc-ubuntu-cpp20
-      - gcc-ubuntu-cpp17
       - gcc-ubuntu-tsan-cpp20
       # - gcc-ubuntu-ubsan-cpp20
       - msvc-win64-cpp20
-      - msvc-win64-cpp17
       - gcc-mipsel-cpp20
-      - clang-android-cpp17
       - clang-android-cpp20

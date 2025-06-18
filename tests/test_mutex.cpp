@@ -27,7 +27,8 @@ TestImpl(test_mutex)
         AssertEqual(*simple, "Testing operator->");
 
         *simple = "Testing get()";
-        AssertEqual((*simple).get(), "Testing get()");
+        std::string value = (*simple).get();
+        AssertEqual(value, "Testing get()");
 
         // 1. lock and set First value
         // 2. spawn a thread which sets Second value
@@ -228,7 +229,8 @@ TestImpl(test_mutex)
         AssertEqual(*str, "Testing operator->");
 
         *str = "Testing get()";
-        AssertEqual((*str).get(), "Testing get()");
+        std::string value = (*str).get();
+        AssertEqual(value, "Testing get()");
 
         auto guard = str.guard();
         guard = "First value";
