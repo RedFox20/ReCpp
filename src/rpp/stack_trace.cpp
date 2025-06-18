@@ -503,7 +503,8 @@ namespace rpp
     {
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
-        void* cs_temp[maxDepth];
+        // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
+        void* cs_temp[CALLSTACK_MAX_DEPTH];
         BacktraceState state { cs_temp, cs_temp + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
         _Unwind_Backtrace(backtrace_cb, &state);
@@ -524,7 +525,8 @@ namespace rpp
     {
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
-        void* cs_temp[maxDepth];
+        // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
+        void* cs_temp[CALLSTACK_MAX_DEPTH];
         BacktraceState state { cs_temp, cs_temp + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
         _Unwind_Backtrace(backtrace_cb, &state);
@@ -558,7 +560,8 @@ namespace rpp
     {
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
-        void* callstack[maxDepth];
+        // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
+        void* callstack[CALLSTACK_MAX_DEPTH];
         BacktraceState state { callstack, callstack + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
         _Unwind_Backtrace(backtrace_cb, &state);

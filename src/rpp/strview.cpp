@@ -17,8 +17,15 @@
     #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
     #include <codecvt> // codecvt_utf8
 #else
-    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
+    // TODO: codecvt is deprected, but the other API-s don't even work
+    #if defined(__clang__) || defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    #endif
     #include <codecvt> // codecvt_utf8
+    #if defined(__clang__) || defined(__GNUC__)
+    #pragma GCC diagnostic pop
+    #endif
 #endif
 
 namespace rpp
@@ -1085,6 +1092,12 @@ namespace rpp
     }
 
 #if RPP_ENABLE_UNICODE
+    // TODO: codecvt is deprected, but the other API-s don't even work
+    #if defined(__clang__) || defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    #endif
+
     string to_string(const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
@@ -1199,6 +1212,10 @@ namespace rpp
         return -1;
     #endif
     }
+
+    #if defined(__clang__) || defined(__GNUC__)
+    #pragma GCC diagnostic pop
+    #endif
 #endif // RPP_ENABLE_UNICODE
 
     ///////////// line_parser

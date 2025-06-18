@@ -11,7 +11,7 @@
             "intelliSenseMode": "windows-msvc-x64"
         },
         {
-            "name": "Linux",
+            "name": "Linux GCC",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
@@ -19,6 +19,17 @@
             "cStandard": "c17",
             "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-gcc-x64",
+            "compileCommands": "${workspaceFolder}/build/ReCpp/linux/compile_commands.json"
+        },
+        {
+            "name": "Linux Clang",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "linux-clang-x64",
             "compileCommands": "${workspaceFolder}/build/ReCpp/linux/compile_commands.json"
         },
         {
