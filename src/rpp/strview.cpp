@@ -583,6 +583,76 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////
 
+    string concat(const strview& a, const strview& b)
+    {
+        string str;
+        auto sa = size_t(a.len), sb = size_t(b.len);
+        str.reserve(sa + sb);
+        str.append(a.str, sa).append(b.str, sb);
+        return str;
+    }
+    string concat(const strview& a, const strview& b, const strview& c)
+    {
+        string str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        str.reserve(sa + sb + sc);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
+        return str;
+    }
+    string concat(const strview& a, const strview& b, const strview& c, const strview& d)
+    {
+        string str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        str.reserve(sa + sb + sc + sd);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
+        return str;
+    }
+    string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
+    {
+        string str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        str.reserve(sa + sb + sc + sd + se);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
+        return str;
+    }
+
+#if RPP_ENABLE_UNICODE
+    ustring concat(const ustrview& a, const ustrview& b)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len);
+        str.reserve(sa + sb);
+        str.append(a.str, sa).append(b.str, sb);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        str.reserve(sa + sb + sc);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        str.reserve(sa + sb + sc + sd);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
+        return str;
+    }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e)
+    {
+        ustring str;
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        str.reserve(sa + sb + sc + sd + se);
+        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
+        return str;
+    }
+#endif // RPP_ENABLE_UNICODE
+
+    ///////////////////////////////////////////////////////////////////////////////////////
+
     char* to_lower(char* str, int len) noexcept
     {
         transform_chars(str, len, ::tolower); return str;
