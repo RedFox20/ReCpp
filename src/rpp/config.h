@@ -249,6 +249,23 @@
 #  endif
 #endif
 
+// Provides hints to the compiler about lifetimes of input arguments.
+// Required for proper strview validation, to prevent dangling pointers.
+#ifndef RPP_LIFETIMEBOUND
+#  if defined(_MSC_VER) // MSVC
+#    if _MSC_VER >= 1937 // support was added in MSVC 17.7 (19.37)
+#      define RPP_LIFETIMEBOUND [[msvc::lifetimebound]]
+#    else
+#      define RPP_LIFETIMEBOUND
+#    endif
+#  elif defined(__clang__)
+#   define RPP_LIFETIMEBOUND [[clang::lifetimebound]]
+#  else
+#   define RPP_LIFETIMEBOUND
+#  endif
+#endif // RPP_LIFETIMEBOUND
+
+
 // Define the basic size of integer types
 #if _MSC_VER
 #  define RPP_SHORT_SIZE     2
@@ -326,17 +343,3 @@ namespace rpp
     };
 }
 #endif
-
-#ifndef RPP_LIFETIMEBOUND
-#  if defined(_MSC_VER) // MSVC
-#    if _MSC_VER >= 1937 // support was added in MSVC 17.7 (19.37)
-#      define RPP_LIFETIMEBOUND [[msvc::lifetimebound]]
-#    else
-#      define RPP_LIFETIMEBOUND
-#    endif
-#  elif defined(__clang__) // Clang
-#   define RPP_LIFETIMEBOUND [[clang::lifetimebound]]
-#  else
-#   define RPP_LIFETIMEBOUND
-#  endif
-#endif // RPP_LIFETIMEBOUND
