@@ -428,7 +428,7 @@ namespace rpp /* ReCpp */
         template<StringViewType T>
         struct name_util
         {
-            static typename T::string_t get(const dir_iter_base* it) noexcept;
+            static auto get(const dir_iter_base* it) noexcept -> typename T::string_t;
         };
     };
 

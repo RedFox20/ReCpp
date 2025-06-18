@@ -9,7 +9,7 @@
 #include "config.h"
 #include <cstring>    // C string utilities
 #include <string>     // compatibility with std::string
-#include <type_traits> // std::same_as
+#include <concepts> // std::same_as
 
 #ifndef RPP_STRVIEW_H
 #define RPP_STRVIEW_H 1

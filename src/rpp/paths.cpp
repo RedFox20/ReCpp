@@ -1083,27 +1083,25 @@ namespace rpp /* ReCpp */
         s->close();
     }
     template<StringViewType T>
-    typename T::string_t dir_iter_base::name_util<T>::get(const dir_iter_base* it) noexcept
+    auto dir_iter_base::name_util<T>::get(const dir_iter_base* it) noexcept -> typename T::string_t
     {
         if (!it || !*it)
             return {};
-    #if _MSC_VER
-        const wchar_t* name_w = it->s->ffd.cFileName;
-    #else
-        const char* name_a = it->s->e->d_name;
-    #endif
-        if constexpr (std::is_same_v<T, rpp::strview>) {
+        if constexpr (std::is_same_v<T, rpp::strview>)
+        {
             #if _MSC_VER
-                return rpp::to_string((const char16_t*)name_w);
+                return rpp::to_string((const char16_t*)it->s->ffd.cFileName);
             #else
-                return string{ name_a };
+                return string{ it->s->e->d_name };
             #endif
     #if RPP_ENABLE_UNICODE
-        } else if constexpr (std::is_same_v<T, rpp::ustrview>) {
+        }
+        else if constexpr (std::is_same_v<T, rpp::ustrview>)
+        {
             #if _MSC_VER
-                return ustring{ (const char16_t*)name_w };
+                return ustring{ (const char16_t*)it->s->ffd.cFileName };
             #else
-                return rpp::to_ustring(name_a);
+                return rpp::to_ustring(it->s->e->d_name);
             #endif
     #endif // RPP_ENABLE_UNICODE
         }
