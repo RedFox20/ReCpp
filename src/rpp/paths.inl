@@ -43,6 +43,7 @@ namespace rpp
             wchar_t  path_w[MAX_U];
         #endif
         };
+        conv_buffer() = default;
     #if _MSC_VER
         FINLINE const wchar_t* to_wstr(strview path) noexcept // UTF8 --> UTF16, and then treat as UCS2
         {
@@ -86,7 +87,7 @@ namespace rpp
 #if _MSC_VER
     struct wchar_conv
     {
-        conv_buffer buf;
+        conv_buffer buf {};
         const wchar_t* wstr = nullptr;
         explicit operator bool() const noexcept { return !!wstr; }
 
@@ -97,8 +98,8 @@ namespace rpp
     };
     struct wchar_dual_conv
     {
-        conv_buffer buf1;
-        conv_buffer buf2;
+        conv_buffer buf1 {};
+        conv_buffer buf2 {};
         const wchar_t* wstr1 = nullptr;
         const wchar_t* wstr2 = nullptr;
         explicit operator bool() const noexcept { return !!wstr1; }
@@ -118,7 +119,7 @@ namespace rpp
     // conv helper which converts UTF16 to multibyte UTF8
     struct multibyte_conv
     {
-        conv_buffer buf;
+        conv_buffer buf {};
         const char* cstr = nullptr;
         explicit operator bool() const noexcept { return cstr; }
 
@@ -130,8 +131,8 @@ namespace rpp
     // conv helper where both conversions must succeed, otherwise result is empty
     struct multibyte_dual_conv
     {
-        conv_buffer buf1;
-        conv_buffer buf2;
+        conv_buffer buf1 {};
+        conv_buffer buf2 {};
         const char* cstr1 = nullptr;
         const char* cstr2 = nullptr;
         explicit operator bool() const noexcept { return cstr1; }
