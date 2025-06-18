@@ -659,6 +659,7 @@ namespace rpp /* ReCpp */
      * @example Windows: "C:/Projects/ReCpp/"
      */
     RPPAPI string working_dir() noexcept;
+    inline ustring working_diru() noexcept { return to_ustring(working_dir()); }
 
 
     /**
@@ -700,9 +701,8 @@ namespace rpp /* ReCpp */
      * Calls chdir() to set the working directory of the application to a new value
      * @return TRUE if chdir() is successful
      */
-    RPPAPI bool change_dir(const char* new_wd) noexcept;
-    inline bool change_dir(const string& new_wd) noexcept { return change_dir(new_wd.c_str()); }
-    inline bool change_dir(const strview new_wd) noexcept { return change_dir(new_wd.to_cstr()); }
+    RPPAPI bool change_dir(strview new_wd) noexcept;
+    RPPAPI bool change_dir(ustrview new_wd) noexcept;
 
     /**
      * @return The system temporary directory for storing misc files

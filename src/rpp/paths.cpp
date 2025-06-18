@@ -1326,13 +1326,28 @@ namespace rpp /* ReCpp */
         #endif
     }
 
-    bool change_dir(const char* new_wd) noexcept
+    template<StringViewType T>
+    static bool change_dir(T new_wd) noexcept
     {
         #if _WIN32
-            return _chdir(new_wd) == 0;
+            if (wchar_conv conv { new_wd }) {
+                return _wchdir(conv.wstr) == 0;
+            }
+            return false; // conversion failed
         #else
-            return chdir(new_wd) == 0;
+            if (multibyte_conv conv { new_wd }) {
+                return chdir(conv.cstr) == 0;
+            }
+            return false;
         #endif
+    }
+    bool change_dir(strview new_wd) noexcept
+    {
+        return change_dir<strview>(new_wd);
+    }
+    bool change_dir(ustrview new_wd) noexcept
+    {
+        return change_dir<ustrview>(new_wd);
     }
 
     string temp_dir() noexcept

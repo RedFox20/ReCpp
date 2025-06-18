@@ -367,5 +367,9 @@ TestImpl(test_strview)
         int len = rpp::to_string(buf, 512, u"𝕳𝖊𝖑𝖑𝖔");
         AssertEqual(len, 20);
         AssertEqual(buf, u8"𝕳𝖊𝖑𝖑𝖔");
+
+        std::string path = rpp::to_string(u"/tmp/äöüß/hello.txt");
+        AssertEqual(path, u8"/tmp/äöüß/hello.txt");
+        AssertEqual(path.length(), 23);
     }
 };

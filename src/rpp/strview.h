@@ -265,15 +265,6 @@ namespace rpp
         strview(const char16_t* str) = delete; // char16_t is not supported by strview
     #endif
 
-        // template<class StringT>
-        // using enable_if_string_like_t = std::enable_if_t<
-        //     std::is_member_function_pointer<decltype(&StringT::c_str)>::value &&
-        //     sizeof(*std::declval<const StringT&>().c_str()) == 1
-        // >;
-
-        // template<class StringT, typename = enable_if_string_like_t<StringT>>
-        // FINLINE constexpr strview(const StringT& str) noexcept : str{str.c_str()}, len{static_cast<int>(str.length())} {}
-
         // disallow accidental init from char or bool
         strview(char) = delete;
         strview(bool) = delete;

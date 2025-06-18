@@ -11,16 +11,18 @@ TestImpl(test_file_io)
 {
     std::string TestDir;
     std::string TestFile;
-    int TestSize = 0;
     rpp::ustring TestUnicodeFile;
     rpp::ustring TestUnicodeDir;
+
+    int TestFileSize = 0;
+    std::string TestFileContents;
 
     TestInit(test_file_io)
     {
         TestDir  = path_combine(temp_dir(), "_rpp_test_tmp");
         TestFile = path_combine(temp_dir(), "_rpp_test.txt");
     }
-    TestCleanup()
+    TestCaseCleanup() // cleanup after every test
     {
         if (folder_exists(TestDir))
             Assert(delete_folder(TestDir, delete_mode::recursive));
@@ -34,27 +36,68 @@ TestImpl(test_file_io)
             Assert(delete_file(TestUnicodeFile));
     }
 
+    void prepare_unicode_file_paths()
+    {
+        TestDir  = path_combine(temp_dir(), "_rpp_test_tmp_unicode_😀𝄞ℵ€");
+        TestFile = path_combine(temp_dir(), "_rpp_test_unicode_😀𝄞ℵ€.txt");
+        TestUnicodeDir  = path_combine(temp_diru(), u"_rpp_test_tmp_unicode_😀𝄞ℵ€");
+        TestUnicodeFile = path_combine(temp_diru(), u"_rpp_test_unicode_😀𝄞ℵ€.txt");
+    }
+
+    void create_test_file(rpp::strview filename)
+    {
+        std::string filePath = filename.to_string();
+        std::ofstream fstr { filePath };
+        AssertMsg(fstr.good(), "std::ofstream create failed: '%s'", filePath.c_str());
+
+        TestFileContents = "abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10"
+                           "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                           "0123456789!@#$%^&*()_+-=[]{};':\",.<>/?`~";
+        fstr << TestFileContents;
+        TestFileSize = (int)fstr.tellp();
+        fstr.close();
+    }
+    void create_test_file(ustrview filename)
+    {
+        ustring filePath = filename.to_string();
+        rpp::file out { filePath, rpp::file::CREATENEW };
+        AssertMsg(out.good(), "rpp::file unicode create failed: '%s'", filePath.c_str());
+
+        TestFileContents = "abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10"
+                           "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                           "0123456789!@#$%^&*()_+-=[]{};':\",.<>/?`~";
+        out.write(TestFileContents);
+        TestFileSize = (int)out.size();
+        out.close();
+    }
+
     TestCase(basic_file)
     {
-        std::ofstream fstr { TestFile };
-        AssertMsg(fstr.good(), "std::ofstream create failed: '%s'", TestFile.c_str());
-
-        std::string aaaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        fstr << aaaa;
-        TestSize = (int)fstr.tellp();
-        fstr.close();
-
-
+        create_test_file(TestFile);
         file f = { TestFile };
         AssertThat(f.good(), true);
         AssertThat(f.bad(), false);
         AssertThat(f.size() > 0, true);
-        AssertThat(f.size(), TestSize);
-        AssertThat(f.read_text(), aaaa);
+        AssertThat(f.size(), TestFileSize);
+        AssertThat(f.read_text(), TestFileContents);
+    }
+
+    TestCase(basic_file_utf16)
+    {
+        prepare_unicode_file_paths();
+        create_test_file(TestUnicodeFile);
+
+        file f = { TestUnicodeFile };
+        AssertThat(f.good(), true);
+        AssertThat(f.bad(), false);
+        AssertThat(f.size() > 0, true);
+        AssertThat(f.size(), TestFileSize);
+        AssertThat(f.read_text(), TestFileContents);
     }
 
     TestCase(if_initializer)
     {
+        create_test_file(TestFile);
         if (file f = { TestFile, file::READONLY })
         {
             Assert(f.good() && !f.bad());
@@ -62,7 +105,7 @@ TestImpl(test_file_io)
         else Assert(f.good() && !f.bad());
     }
 
-    TestCase(exists)
+    TestCase(current_source_file_and_folder_exists)
     {
         // can only run this test on host machines
     #if _MSC_VER || (__linux__ && !__ANDROID__ && !OCLEA && !__EMSCRIPTEN__)
@@ -76,10 +119,36 @@ TestImpl(test_file_io)
         Assert(!folder_exists("/complete/rubbish/path"));
     }
 
+    TestCase(current_source_file_and_folder_exists_utf16)
+    {
+        // can only run this test on host machines
+    #if _MSC_VER || (__linux__ && !__ANDROID__ && !OCLEA && !__EMSCRIPTEN__)
+        Assert(file_exists(rpp::to_ustring(__FILE__)));
+    #endif
+        Assert(!file_exists(u"/complete/rubbish/path.txt"_sv));
+
+        ustring dir = rpp::working_diru();
+        Assert(folder_exists(dir));
+        Assert(folder_exists(dir + u"/"));
+        Assert(!folder_exists(u"/complete/rubbish/path"_sv));
+    }
+
     TestCase(size)
     {
-        AssertThat(file_size(TestFile), TestSize);
-        AssertThat(file_sizel(TestFile), (int64)TestSize);
+        create_test_file(TestFile);
+        AssertThat(file_size(TestFile), TestFileSize);
+        AssertThat(file_sizel(TestFile), (int64)TestFileSize);
+    }
+
+    TestCase(size_utf16)
+    {
+        prepare_unicode_file_paths();
+        create_test_file(TestFile);
+        create_test_file(TestUnicodeFile);
+        AssertThat(file_size(TestFile), TestFileSize);
+        AssertThat(file_sizel(TestFile), (int64)TestFileSize);
+        AssertThat(file_size(TestUnicodeFile), TestFileSize);
+        AssertThat(file_sizel(TestUnicodeFile), (int64)TestFileSize);
     }
 
     TestCase(write_size_sanity)
@@ -134,6 +203,8 @@ TestImpl(test_file_io)
 
     TestCase(create_delete_folder_utf16)
     {
+        prepare_unicode_file_paths();
+    
         AssertFalse(create_folder(u""_sv)); // this is most likely a programming error, so give false
         AssertTrue(create_folder(u"./"_sv)); // because "./" always exists, it should return true
 
@@ -320,17 +391,26 @@ TestImpl(test_file_io)
         AssertThat(path_combine(u""_sv,     u""_sv     , u""_sv         ), u"");
     }
 
-    static bool contains(const std::vector<std::string>& v, const std::string& s)
+    template<typename StringT, typename String2T>
+    static bool contains(const std::vector<StringT>& v, const String2T& s)
     {
-        for (const std::string& item : v)
+        for (const StringT& item : v)
             if (item == s) return true;
         return false;
     }
 
-    void print_paths(const char* what, const std::vector<std::string>& paths)
+    void print_paths(const char* what, const std::vector<string>& paths)
     {
-        for (size_t i = 0; i < paths.size(); ++i)
+        for (size_t i = 0; i < paths.size(); ++i) {
             print_info("%s[%zu] = '%s'\n", what, i, paths[i].c_str());
+        }
+    }
+
+    void print_paths(const char* what, const std::vector<ustring>& paths)
+    {
+        for (size_t i = 0; i < paths.size(); ++i) {
+            print_info("%s[%zu] = '%s'\n", what, i, rpp::to_string(paths[i]).c_str());
+        }
     }
 
     TestCase(file_and_folder_listing)
@@ -407,6 +487,81 @@ TestImpl(test_file_io)
         Assert(delete_folder(TestDir+"/", delete_mode::recursive));
     }
 
+    TestCase(file_and_folder_listing_utf16)
+    {
+        prepare_unicode_file_paths();
+        ustring originalDir = rpp::working_diru();
+        AssertTrue(create_folder(TestUnicodeDir+u"/folder/path"_sv));
+        AssertTrue(rpp::change_dir(TestUnicodeDir));
+        file::write_new(u"folder/test1.txt"_sv,      "text1");
+        file::write_new(u"folder/path/test2.txt"_sv, "text2");
+        file::write_new(u"folder/path/test3.txt"_sv, "text3");
+        file::write_new(u"folder/path/dummy.obj"_sv, "dummy");
+
+        // TEST: list_files (names only)
+        std::vector<ustring> relpaths = list_files(u"folder/path"_sv, u".txt"_sv);
+        print_paths("relpaths", relpaths);
+        AssertThat(relpaths.size(), 2u);
+        Assert(contains(relpaths, u"test2.txt"_sv));
+        Assert(contains(relpaths, u"test3.txt"_sv));
+
+        // TEST: list_files dir_relpath_combine (relative to folder/path)
+        std::vector<ustring> relpaths_r = list_files(u"folder/path"_sv, u".txt"_sv, rpp::dir_relpath_combine);
+        print_paths("relpaths_r", relpaths_r);
+        AssertThat(relpaths_r.size(), 2u);
+        Assert(contains(relpaths_r, u"folder/path/test2.txt"_sv));
+        Assert(contains(relpaths_r, u"folder/path/test3.txt"_sv));
+
+        // TEST: list_files dir_recursive
+        std::vector<ustring> relpaths2 = list_files(u""_sv, u".txt"_sv, rpp::dir_recursive);
+        print_paths("relpaths2", relpaths2);
+        AssertThat(relpaths2.size(), 3u);
+        Assert(contains(relpaths2, u"folder/test1.txt"_sv));
+        Assert(contains(relpaths2, u"folder/path/test2.txt"_sv));
+        Assert(contains(relpaths2, u"folder/path/test3.txt"_sv));
+
+        // TEST: list_files dir_fullpath
+        ustring fullpath = full_path(TestUnicodeDir);
+        std::vector<ustring> fullpaths = list_files(u"folder/path"_sv, u".txt"_sv, rpp::dir_fullpath);
+        print_paths("fullpaths", fullpaths);
+        AssertThat(fullpaths.size(), 2u);
+        Assert(contains(fullpaths, path_combine(fullpath, u"folder/path/test2.txt"_sv)));
+        Assert(contains(fullpaths, path_combine(fullpath, u"folder/path/test3.txt"_sv)));
+
+        std::vector<ustring> fullpaths2 = list_files(u"folder"_sv, u".txt"_sv, rpp::dir_fullpath);
+        print_paths("fullpaths2", fullpaths2);
+        AssertThat(fullpaths2.size(), 1u);
+        Assert(contains(fullpaths2, path_combine(fullpath, u"folder/test1.txt"_sv)));
+
+        // TEST: list_files dir_fullpath_recursive
+        std::vector<ustring> fullpaths3 = list_files(u""_sv, u".txt", rpp::dir_fullpath_recursive);
+        print_paths("fullpaths3", fullpaths3);
+        AssertThat(fullpaths3.size(), 3u);
+        Assert(contains(fullpaths3, path_combine(fullpath, u"folder/test1.txt")));
+        Assert(contains(fullpaths3, path_combine(fullpath, u"folder/path/test2.txt")));
+        Assert(contains(fullpaths3, path_combine(fullpath, u"folder/path/test3.txt")));
+
+        // TEST: list_dirs_relpath (relative to folder)
+        std::vector<ustring> dirs_r = list_dirs(u"folder"_sv, rpp::dir_relpath_combine_recursive);
+        print_paths("dirs_r", dirs_r);
+        Assert(contains(dirs_r, u"folder/path"));
+
+        // TEST: list_alldir dir_recursive
+        std::vector<ustring> dirs, files;
+        list_alldir(dirs, files, u""_sv, rpp::dir_recursive);
+        print_paths("dirs", dirs);
+        print_paths("files", files);
+        Assert(contains(dirs, u"folder"));
+        Assert(contains(dirs, u"folder/path"));
+        Assert(contains(files, u"folder/test1.txt"));
+        Assert(contains(files, u"folder/path/test2.txt"));
+        Assert(contains(files, u"folder/path/test3.txt"));
+        Assert(contains(files, u"folder/path/dummy.obj"));
+
+        Assert(rpp::change_dir(originalDir));
+        Assert(delete_folder(TestDir+"/", delete_mode::recursive));
+    }
+
     TestCase(system_dirs)
     {
         print_info("working_dir: \"%s\"\n", working_dir().c_str());
@@ -420,14 +575,6 @@ TestImpl(test_file_io)
         AssertThat(last(module_dir()), '/');
         AssertThat(last(temp_dir()), '/');
         AssertThat(last(home_dir()), '/');
-    }
-
-    void prepare_unicode_file_paths()
-    {
-        TestDir  = path_combine(temp_dir(), "_rpp_test_tmp_unicode_😀𝄞ℵ€");
-        TestFile = path_combine(temp_dir(), "_rpp_test_unicode_😀𝄞ℵ€.txt");
-        TestUnicodeDir  = path_combine(temp_diru(), u"_rpp_test_tmp_unicode_😀𝄞ℵ€");
-        TestUnicodeFile = path_combine(temp_diru(), u"_rpp_test_unicode_😀𝄞ℵ€.txt");
     }
 
     // validate that UTF16 file paths work correctly
