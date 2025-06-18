@@ -253,12 +253,12 @@ namespace rpp
         FINLINE constexpr strview()                            noexcept : str{""},  len{0} {}
         FINLINE RPP_CONSTEXPR_STRLEN strview(char* str)        noexcept : str{str}, len{RPP_UTF8LEN(str)} {}
         FINLINE RPP_CONSTEXPR_STRLEN strview(const char* str)  noexcept : str{str}, len{RPP_UTF8LEN(str)} {}
-        FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len}                           {}
-        FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)}         {}
-        FINLINE constexpr strview(const char* str, const char* end) noexcept : str{str}, len{static_cast<int>(end - str)}   {}
+        FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len} {}
+        FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)} {}
+        FINLINE constexpr strview(const char* str, const char* end) noexcept : str{str}, len{static_cast<int>(end - str)} {}
         FINLINE constexpr strview(const void* str, const void* end) noexcept : strview{static_cast<const char*>(str), static_cast<const char*>(end)} {}
-        FINLINE strview(const string_t& s)                  noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
-        FINLINE strview(const string_view_t& s)             noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
+        FINLINE strview(const string_t& s RPP_LIFETIMEBOUND) noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
+        FINLINE strview(const string_view_t& s)              noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
 
     #ifdef __cpp_char8_t // fundamental type char8_t since C++20
         FINLINE strview(const char8_t* str) noexcept : str{reinterpret_cast<const char*>(str)}, len{RPP_UTF8LEN(str)} {}
@@ -983,8 +983,8 @@ namespace rpp
         FINLINE constexpr ustrview(const char16_t* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)} {}
         FINLINE constexpr ustrview(const char16_t* str, const char16_t* end) noexcept : str{str}, len{static_cast<int>(end - str)} {}
         FINLINE constexpr ustrview(const void* str, const void* end) noexcept : ustrview{static_cast<const char16_t*>(str), static_cast<const char_t*>(end)} {}
-        FINLINE ustrview(const string_t& s)                  noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
-        FINLINE ustrview(const string_view_t& s)             noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
+        FINLINE ustrview(const string_t& s RPP_LIFETIMEBOUND) noexcept : str{s.c_str()}, len{static_cast<int>(s.length())} {}
+        FINLINE ustrview(const string_view_t& s)              noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
 
     #if _MSC_VER
         FINLINE ustrview(const wchar_t* wstr) noexcept : str{reinterpret_cast<const char16_t*>(wstr)}, len{RPP_UTF16LEN(wstr)} {}
