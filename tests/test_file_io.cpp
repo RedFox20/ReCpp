@@ -11,8 +11,10 @@ TestImpl(test_file_io)
 {
     std::string TestDir;
     std::string TestFile;
+#if RPP_ENABLE_UNICODE
     rpp::ustring TestUnicodeFile;
     rpp::ustring TestUnicodeDir;
+#endif
 
     int TestFileSize = 0;
     std::string TestFileContents;
@@ -28,20 +30,23 @@ TestImpl(test_file_io)
             Assert(delete_folder(TestDir, delete_mode::recursive));
         if (file_exists(TestFile))
             Assert(delete_file(TestFile));
-
+    #if RPP_ENABLE_UNICODE
         // only for wstring tests
         if (!TestUnicodeDir.empty() && folder_exists(TestUnicodeDir))
             Assert(delete_folder(TestUnicodeDir, delete_mode::recursive));
         if (!TestUnicodeFile.empty() && file_exists(TestUnicodeFile))
             Assert(delete_file(TestUnicodeFile));
+    #endif
     }
 
     void prepare_unicode_file_paths()
     {
         TestDir  = path_combine(temp_dir(), "_rpp_test_tmp_unicode_😀𝄞ℵ€");
         TestFile = path_combine(temp_dir(), "_rpp_test_unicode_😀𝄞ℵ€.txt");
+#if RPP_ENABLE_UNICODE
         TestUnicodeDir  = path_combine(temp_diru(), u"_rpp_test_tmp_unicode_😀𝄞ℵ€");
         TestUnicodeFile = path_combine(temp_diru(), u"_rpp_test_unicode_😀𝄞ℵ€.txt");
+#endif // RPP_ENABLE_UNICODE
     }
 
     void create_test_file(rpp::strview filename)
@@ -57,6 +62,7 @@ TestImpl(test_file_io)
         TestFileSize = (int)fstr.tellp();
         fstr.close();
     }
+#if RPP_ENABLE_UNICODE
     void create_test_file(ustrview filename)
     {
         ustring filePath = filename.to_string();
@@ -70,6 +76,7 @@ TestImpl(test_file_io)
         TestFileSize = (int)out.size();
         out.close();
     }
+#endif
 
     TestCase(basic_file)
     {
@@ -82,6 +89,7 @@ TestImpl(test_file_io)
         AssertThat(f.read_text(), TestFileContents);
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(basic_file_utf16)
     {
         prepare_unicode_file_paths();
@@ -94,6 +102,7 @@ TestImpl(test_file_io)
         AssertThat(f.size(), TestFileSize);
         AssertThat(f.read_text(), TestFileContents);
     }
+#endif // RPP_ENABLE_UNICODE
 
     TestCase(if_initializer)
     {
@@ -119,6 +128,7 @@ TestImpl(test_file_io)
         Assert(!folder_exists("/complete/rubbish/path"));
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(current_source_file_and_folder_exists_utf16)
     {
         // can only run this test on host machines
@@ -132,6 +142,7 @@ TestImpl(test_file_io)
         Assert(folder_exists(dir + u"/"));
         Assert(!folder_exists(u"/complete/rubbish/path"_sv));
     }
+#endif
 
     TestCase(size)
     {
@@ -140,6 +151,7 @@ TestImpl(test_file_io)
         AssertThat(file_sizel(TestFile), (int64)TestFileSize);
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(size_utf16)
     {
         prepare_unicode_file_paths();
@@ -150,6 +162,7 @@ TestImpl(test_file_io)
         AssertThat(file_size(TestUnicodeFile), TestFileSize);
         AssertThat(file_sizel(TestUnicodeFile), (int64)TestFileSize);
     }
+#endif
 
     TestCase(write_size_sanity)
     {
@@ -201,6 +214,7 @@ TestImpl(test_file_io)
         Assert(!folder_exists(TestDir));
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(create_delete_folder_utf16)
     {
         prepare_unicode_file_paths();
@@ -223,6 +237,7 @@ TestImpl(test_file_io)
         Assert(delete_folder(TestUnicodeDir, delete_mode::recursive));
         Assert(!folder_exists(TestUnicodeDir));
     }
+#endif
 
     TestCase(path_utils)
     {
@@ -275,6 +290,7 @@ TestImpl(test_file_io)
         AssertThat(normalized("\\root/dir/file.ext",  '\\'), "\\root\\dir\\file.ext");
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(path_utils_utf16)
     {
         AssertThat(merge_dirups(u"../lib/../bin/file.txt"_sv), u"../bin/file.txt"_sv);
@@ -322,6 +338,7 @@ TestImpl(test_file_io)
         AssertThat(normalized(u"/root\\dir\\file.ext"_sv, '/'), u"/root/dir/file.ext"_sv);
         AssertThat(normalized(u"\\root/dir/file.ext"_sv,  '/'), u"/root/dir/file.ext"_sv);
     }
+#endif
 
     TestCase(path_combine2)
     {
@@ -337,6 +354,7 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     ""         ), "");
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(path_combine2_utf16)
     {
         AssertThat(path_combine(u"tmp"_sv,  u"file.txt"_sv ), u"tmp/file.txt");
@@ -350,6 +368,7 @@ TestImpl(test_file_io)
         AssertThat(path_combine(u""_sv,     u"/tmp/"_sv    ), u"tmp");
         AssertThat(path_combine(u""_sv,     u""_sv         ), u"");
     }
+#endif
     
     TestCase(path_combine3)
     {
@@ -371,6 +390,7 @@ TestImpl(test_file_io)
         AssertThat(path_combine("",     "",     ""         ), "");
     }
     
+#if RPP_ENABLE_UNICODE
     TestCase(path_combine3_utf16)
     {
         AssertThat(path_combine(u"tmp"_sv,  u"path"_sv, u"file.txt"_sv ), u"tmp/path/file.txt");
@@ -390,6 +410,7 @@ TestImpl(test_file_io)
         AssertThat(path_combine(u""_sv,     u"/"_sv    , u"/tmp/"_sv    ), u"tmp");
         AssertThat(path_combine(u""_sv,     u""_sv     , u""_sv         ), u"");
     }
+#endif
 
     template<typename StringT, typename String2T>
     static bool contains(const std::vector<StringT>& v, const String2T& s)
@@ -405,13 +426,14 @@ TestImpl(test_file_io)
             print_info("%s[%zu] = '%s'\n", what, i, paths[i].c_str());
         }
     }
-
+#if RPP_ENABLE_UNICODE
     void print_paths(const char* what, const std::vector<ustring>& paths)
     {
         for (size_t i = 0; i < paths.size(); ++i) {
             print_info("%s[%zu] = '%s'\n", what, i, rpp::to_string(paths[i]).c_str());
         }
     }
+#endif // RPP_ENABLE_UNICODE
 
     TestCase(file_and_folder_listing)
     {
@@ -487,6 +509,7 @@ TestImpl(test_file_io)
         Assert(delete_folder(TestDir+"/", delete_mode::recursive));
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(file_and_folder_listing_utf16)
     {
         prepare_unicode_file_paths();
@@ -561,6 +584,7 @@ TestImpl(test_file_io)
         Assert(rpp::change_dir(originalDir));
         Assert(delete_folder(TestDir+"/", delete_mode::recursive));
     }
+#endif 
 
     TestCase(system_dirs)
     {
@@ -592,6 +616,7 @@ TestImpl(test_file_io)
         AssertTrue(delete_folder(TestDir, delete_mode::recursive));
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(can_handle_utf16_file_paths)
     {
         prepare_unicode_file_paths();
@@ -606,5 +631,6 @@ TestImpl(test_file_io)
         AssertTrue(folder_exists(TestUnicodeDir));
         AssertTrue(delete_folder(TestUnicodeDir, delete_mode::recursive));
     }
+#endif 
 
 };

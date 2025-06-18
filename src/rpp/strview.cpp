@@ -616,6 +616,7 @@ namespace rpp
         return str;
     }
 
+#if RPP_ENABLE_UNICODE
     ustring concat(const ustrview& a, const ustrview& b)
     {
         ustring str;
@@ -648,6 +649,7 @@ namespace rpp
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
         return str;
     }
+#endif // RPP_ENABLE_UNICODE
 
     ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -689,6 +691,7 @@ namespace rpp
 
     ////////////////////// ustrview
 
+#if RPP_ENABLE_UNICODE
     const char16_t* ustrview::to_cstr(char16_t* buf, int max) const noexcept
     {
         if (str[len] == u'\0')
@@ -839,7 +842,7 @@ namespace rpp
             return strcontains(s, n, delims, ndelims);
         });
     }
-
+#endif // RPP_ENABLE_UNICODE
 
     ////////////////////// loose utility functions
 

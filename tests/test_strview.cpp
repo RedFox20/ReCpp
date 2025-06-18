@@ -305,6 +305,7 @@ TestImpl(test_strview)
         AssertTrue(rpp::is_likely_utf8(u8"valid utf8: 😀 𝄞 ℵ €"));
     }
 
+#if RPP_ENABLE_UNICODE
     TestCase(can_convert_utf8_to_utf16)
     {
         rpp::ustring empty = rpp::to_ustring("");
@@ -372,4 +373,6 @@ TestImpl(test_strview)
         AssertEqual(path, u8"/tmp/äöüß/hello.txt");
         AssertEqual(path.length(), 23);
     }
+#endif // RPP_ENABLE_UNICODE
+
 };

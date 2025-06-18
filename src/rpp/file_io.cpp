@@ -130,9 +130,11 @@ namespace rpp /* ReCpp */
     file::file(strview filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
+#if RPP_ENABLE_UNICODE
     file::file(ustrview filename, mode mode) noexcept : Handle{OpenOrCreate(filename, mode)}, Mode{mode}
     {
     }
+#endif // RPP_ENABLE_UNICODE
     file::file(file&& f) noexcept : Handle(f.Handle), Mode(f.Mode)
     {
         f.Handle = nullptr;
@@ -155,12 +157,14 @@ namespace rpp /* ReCpp */
         Mode = mode;
         return (Handle = OpenOrCreate<strview>(filename, mode)) != nullptr;
     }
+#if RPP_ENABLE_UNICODE
     bool file::open(ustrview filename, mode mode) noexcept
     {
         close();
         Mode = mode;
         return (Handle = OpenOrCreate<ustrview>(filename, mode)) != nullptr;
     }
+#endif // RPP_ENABLE_UNICODE
     void file::close() noexcept
     {
         if (Handle)
@@ -429,11 +433,14 @@ namespace rpp /* ReCpp */
         file f { filename, mode::CREATENEW };
         return f.write(buffer, bytesToWrite);
     }
+    
+#if RPP_ENABLE_UNICODE
     int file::write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept
     {
         file f { filename, mode::CREATENEW };
         return f.write(buffer, bytesToWrite);
     }
+#endif // RPP_ENABLE_UNICODE
 
     // ReSharper disable once CppMemberFunctionMayBeConst
     int file::seek(int filepos, int seekmode) noexcept

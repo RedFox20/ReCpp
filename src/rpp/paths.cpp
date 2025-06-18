@@ -11,37 +11,37 @@ namespace rpp /* ReCpp */
     {
         return (read_file_flags(filename) & FF_FILE) != 0;
     }
-    bool file_exists(ustrview filename) noexcept
-    {
-        return (read_file_flags(filename) & FF_FILE) != 0;
-    }
-
     bool is_symlink(strview filename) noexcept
     {
         return (read_file_flags(filename) & FF_SYMLINK) != 0;
+    }
+    bool folder_exists(strview folder) noexcept
+    {
+        return (read_file_flags(folder) & FF_FOLDER) != 0;
+    }
+    bool file_or_folder_exists(strview fileOrFolder) noexcept
+    {
+        return (read_file_flags(fileOrFolder) & FF_FILE_OR_FOLDER) != 0;
+    }
+
+#if RPP_ENABLE_UNICODE
+    bool file_exists(ustrview filename) noexcept
+    {
+        return (read_file_flags(filename) & FF_FILE) != 0;
     }
     bool is_symlink(ustrview filename) noexcept
     {
         return (read_file_flags(filename) & FF_SYMLINK) != 0;
     }
-
-    bool folder_exists(strview folder) noexcept
-    {
-        return (read_file_flags(folder) & FF_FOLDER) != 0;
-    }
     bool folder_exists(ustrview folder) noexcept
     {
         return (read_file_flags(folder) & FF_FOLDER) != 0;
-    }
-
-    bool file_or_folder_exists(strview fileOrFolder) noexcept
-    {
-        return (read_file_flags(fileOrFolder) & FF_FILE_OR_FOLDER) != 0;
     }
     bool file_or_folder_exists(ustrview fileOrFolder) noexcept
     {
         return (read_file_flags(fileOrFolder) & FF_FILE_OR_FOLDER) != 0;
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -69,10 +69,12 @@ namespace rpp /* ReCpp */
     {
         return sys_symlink<strview>(target, link);
     }
+#if RPP_ENABLE_UNICODE
     bool create_symlink(ustrview target, ustrview link) noexcept
     {
         return sys_symlink<ustrview>(target, link);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
     
@@ -141,6 +143,7 @@ namespace rpp /* ReCpp */
         return false;
     }
 
+#if RPP_ENABLE_UNICODE
     bool file_info(ustrview filename, int64*  filesize, time_t* created,
                                       time_t* accessed, time_t* modified) noexcept
     {
@@ -154,6 +157,7 @@ namespace rpp /* ReCpp */
         }
         return false;
     }
+#endif // RPP_ENABLE_UNICODE
 
     bool file_info(intptr_t fd, int64*  filesize, time_t* created,
                                 time_t* accessed, time_t* modified) noexcept
@@ -193,19 +197,9 @@ namespace rpp /* ReCpp */
         int64 s; 
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
     }
-    int file_size(ustrview filename) noexcept
-    {
-        int64 s;
-        return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
-    }
     int64 file_sizel(strview filename) noexcept
     {
         int64 s; 
-        return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
-    }
-    int64 file_sizel(ustrview filename) noexcept
-    {
-        int64 s;
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
     time_t file_created(strview filename) noexcept
@@ -213,19 +207,9 @@ namespace rpp /* ReCpp */
         time_t t; 
         return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
     }
-    time_t file_created(ustrview filename) noexcept
-    {
-        time_t t;
-        return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
-    }
     time_t file_accessed(strview filename) noexcept
     {
         time_t t; 
-        return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
-    }
-    time_t file_accessed(ustrview filename) noexcept
-    {
-        time_t t;
         return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
     }
     time_t file_modified(strview filename) noexcept
@@ -233,11 +217,34 @@ namespace rpp /* ReCpp */
         time_t t; 
         return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
     }
+
+#if RPP_ENABLE_UNICODE
+    int file_size(ustrview filename) noexcept
+    {
+        int64 s;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
+    }
+    int64 file_sizel(ustrview filename) noexcept
+    {
+        int64 s;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
+    }
+    time_t file_created(ustrview filename) noexcept
+    {
+        time_t t;
+        return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
+    }
+    time_t file_accessed(ustrview filename) noexcept
+    {
+        time_t t;
+        return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
+    }
     time_t file_modified(ustrview filename) noexcept
     {
         time_t t;
         return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -258,10 +265,12 @@ namespace rpp /* ReCpp */
     {
 		return sys_delete<strview>(filename);
     }
+#if RPP_ENABLE_UNICODE
     bool delete_file(ustrview filename) noexcept
     {
 		return sys_delete<ustrview>(filename);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -312,10 +321,12 @@ namespace rpp /* ReCpp */
     {
 		return sys_copy_file<strview>(sourceFile, destinationFile);
     }
+#if RPP_ENABLE_UNICODE
     bool copy_file(ustrview sourceFile, ustrview destinationFile) noexcept
     {
         return sys_copy_file<ustrview>(sourceFile, destinationFile);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -335,10 +346,12 @@ namespace rpp /* ReCpp */
     {
 		return copy_file_mode<strview>(sourceFile, destinationFile);
     }
+#if RPP_ENABLE_UNICODE
     bool copy_file_mode(ustrview sourceFile, ustrview destinationFile) noexcept
     {
         return copy_file_mode<ustrview>(sourceFile, destinationFile);
     }
+#endif
 
     bool copy_file_if_needed(strview sourceFile, strview destinationFile) noexcept
     {
@@ -346,23 +359,27 @@ namespace rpp /* ReCpp */
             return true;
         return copy_file(sourceFile, destinationFile);
     }
+#if RPP_ENABLE_UNICODE
     bool copy_file_if_needed(ustrview sourceFile, ustrview destinationFile) noexcept
     {
         if (file_exists(destinationFile))
             return true;
         return copy_file(sourceFile, destinationFile);
     }
+#endif
 
     bool copy_file_into_folder(strview sourceFile, strview destinationFolder) noexcept
     {
         string destFile = path_combine(destinationFolder, file_nameext(sourceFile));
         return copy_file(sourceFile, destFile);
     }
+#if RPP_ENABLE_UNICODE
     bool copy_file_into_folder(ustrview sourceFile, ustrview destinationFolder) noexcept
     {
         ustring destFile = path_combine(destinationFolder, file_nameext(sourceFile));
         return copy_file(sourceFile, destFile);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -471,10 +488,12 @@ namespace rpp /* ReCpp */
     {
         return create_folder<strview>(foldername);
     }
+#if RPP_ENABLE_UNICODE
     bool create_folder(ustrview foldername) noexcept
     {
         return create_folder<ustrview>(foldername);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -528,10 +547,12 @@ namespace rpp /* ReCpp */
     {
         return delete_folder<strview>(foldername, mode);
     }
+#if RPP_ENABLE_UNICODE
     bool delete_folder(ustrview foldername, delete_mode mode) noexcept
     {
         return delete_folder<ustrview>(foldername, mode);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -556,6 +577,7 @@ namespace rpp /* ReCpp */
 		return string{};
     #endif
     }
+#if RPP_ENABLE_UNICODE
     ustring full_path(ustrview path) noexcept
     {
     #if _WIN32
@@ -577,6 +599,7 @@ namespace rpp /* ReCpp */
 		return {};
     #endif
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -616,10 +639,12 @@ namespace rpp /* ReCpp */
     {
         return merge_dirups<strview>(path);
     }
+#if RPP_ENABLE_UNICODE
     ustring merge_dirups(ustrview path) noexcept
     {
         return merge_dirups<ustrview>(path);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -637,10 +662,12 @@ namespace rpp /* ReCpp */
     {
         return file_name<strview>(path);
     }
+#if RPP_ENABLE_UNICODE
     ustrview file_name(ustrview path) noexcept
     {
         return file_name<ustrview>(path);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -655,10 +682,12 @@ namespace rpp /* ReCpp */
     {
         return file_nameext<strview>(path);
     }
+#if RPP_ENABLE_UNICODE
     ustrview file_nameext(ustrview path) noexcept
     {
         return file_nameext<ustrview>(path);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -675,10 +704,12 @@ namespace rpp /* ReCpp */
     {
         return file_ext<strview>(path);
     }
+#if RPP_ENABLE_UNICODE
     ustrview file_ext(ustrview path) noexcept
     {
         return file_ext<ustrview>(path);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -701,10 +732,12 @@ namespace rpp /* ReCpp */
     {
         return file_replace_ext<strview>(path, ext);
     }
+#if RPP_ENABLE_UNICODE
     ustring file_replace_ext(ustrview path, ustrview ext) noexcept
     {
         return file_replace_ext<ustrview>(path, ext);
     }
+#endif
     
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -722,10 +755,12 @@ namespace rpp /* ReCpp */
     {
         return file_name_append<strview>(path, add);
     }
+#if RPP_ENABLE_UNICODE
     ustring file_name_append(ustrview path, ustrview add) noexcept
     {
         return file_name_append<ustrview>(path, add);
     }
+#endif
     
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -743,10 +778,12 @@ namespace rpp /* ReCpp */
     {
         return file_name_replace<strview>(path, newFileName);
     }
+#if RPP_ENABLE_UNICODE
     ustring file_name_replace(ustrview path, ustrview newFileName) noexcept
     {
         return file_name_replace<ustrview>(path, newFileName);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
     
@@ -754,10 +791,12 @@ namespace rpp /* ReCpp */
     {
         return concat(folder_path(path), newFileNameAndExt);
     }
+#if RPP_ENABLE_UNICODE
     ustring file_nameext_replace(ustrview path, ustrview newFileNameAndExt) noexcept
     {
         return concat(folder_path(path), newFileNameAndExt);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -776,10 +815,12 @@ namespace rpp /* ReCpp */
     {
         return folder_name<strview>(path);
     }
+#if RPP_ENABLE_UNICODE
     ustrview folder_name(ustrview path) noexcept
     {
         return folder_name<ustrview>(path);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -794,10 +835,12 @@ namespace rpp /* ReCpp */
     {
         return folder_path<strview>(path);
     }
+#if RPP_ENABLE_UNICODE
     ustrview folder_path(ustrview path) noexcept
     {
         return folder_path<ustrview>(path);
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -825,6 +868,13 @@ namespace rpp /* ReCpp */
         normalize_nullterm(path, sep);
         return path;
     }
+    string normalized(strview path, char sep) noexcept
+    {
+        string res = path.to_string();
+        normalize_nullterm(res.data(), sep);
+        return res;
+    }
+#if RPP_ENABLE_UNICODE
     ustring& normalize(ustring& path, char16_t sep) noexcept
     {
         normalize_nullterm(path.data(), sep);
@@ -835,18 +885,13 @@ namespace rpp /* ReCpp */
         normalize_nullterm(path, sep);
         return path;
     }
-    string normalized(strview path, char sep) noexcept
-    {
-        string res = path.to_string();
-        normalize_nullterm(res.data(), sep);
-        return res;
-    }
     ustring normalized(ustrview path, char16_t sep) noexcept
     {
         ustring res = path.to_string();
         normalize_nullterm(res.data(), sep);
         return res;
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -897,6 +942,7 @@ namespace rpp /* ReCpp */
         return slash_combine(std::array<strview, 4>{{path1, path2, path3, path4}});
     }
 
+#if RPP_ENABLE_UNICODE
     ustring path_combine(ustrview path1, ustrview path2) noexcept
     {
         path1.trim_end(constants<ustrview>::slashes_a);
@@ -918,6 +964,7 @@ namespace rpp /* ReCpp */
         path4.trim(constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 4>{{ path1, path2, path3, path4 }});
     }
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -1025,10 +1072,12 @@ namespace rpp /* ReCpp */
     {
         s->open(dir);
     }
+#if RPP_ENABLE_UNICODE
     dir_iter_base::dir_iter_base(ustrview dir) noexcept
     {
         s->open(dir);
     }
+#endif
     dir_iter_base::~dir_iter_base() noexcept
     {
         s->close();
@@ -1049,12 +1098,14 @@ namespace rpp /* ReCpp */
             #else
                 return string{ name_a };
             #endif
+    #if RPP_ENABLE_UNICODE
         } else if constexpr (std::is_same_v<T, rpp::ustrview>) {
             #if _MSC_VER
                 return ustring{ (const char16_t*)name_w };
             #else
                 return rpp::to_ustring(name_a);
             #endif
+    #endif // RPP_ENABLE_UNICODE
         }
         return {};
     }
@@ -1178,10 +1229,12 @@ namespace rpp /* ReCpp */
     {
         return list_dirs<strview>(out, dir, flags);
     }
+#if RPP_ENABLE_UNICODE
     int list_dirs(ustring_list& out, ustrview dir, list_dir_flags flags) noexcept
     {
         return list_dirs<ustrview>(out, dir, flags);
     }
+#endif
 
 
     template<StringViewType T>
@@ -1202,10 +1255,12 @@ namespace rpp /* ReCpp */
     {
         return list_files<strview>(out, dir, suffix, flags);
     }
+#if RPP_ENABLE_UNICODE
     int list_files(ustring_list& out, ustrview dir, ustrview suffix, list_dir_flags flags) noexcept
     {
         return list_files<ustrview>(out, dir, suffix, flags);
     }
+#endif
 
 
     template<StringViewType T>
@@ -1226,10 +1281,12 @@ namespace rpp /* ReCpp */
     {
         return list_files<strview>(out, dir, suffixes, flags);
     }
+#if RPP_ENABLE_UNICODE
     int list_files(ustring_list& out, ustrview dir, const std::vector<ustrview>& suffixes, list_dir_flags flags) noexcept
     {
         return list_files<ustrview>(out, dir, suffixes, flags);
     }
+#endif
 
 
     template<StringViewType T>
@@ -1247,10 +1304,12 @@ namespace rpp /* ReCpp */
     {
         return list_alldir<strview>(outDirs, outFiles, dir, flags);
     }
+#if RPP_ENABLE_UNICODE
     int list_alldir(ustring_list& outDirs, ustring_list& outFiles, ustrview dir, list_dir_flags flags) noexcept
     {
         return list_alldir<ustrview>(outDirs, outFiles, dir, flags);
     }
+#endif
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1345,10 +1404,12 @@ namespace rpp /* ReCpp */
     {
         return change_dir<strview>(new_wd);
     }
+#if RPP_ENABLE_UNICODE
     bool change_dir(ustrview new_wd) noexcept
     {
         return change_dir<ustrview>(new_wd);
     }
+#endif
 
     string temp_dir() noexcept
     {
@@ -1394,6 +1455,7 @@ namespace rpp /* ReCpp */
         #endif
     }
 
+#if RPP_ENABLE_UNICODE
     ustring home_diru() noexcept
     {
         #if _MSC_VER
@@ -1409,6 +1471,7 @@ namespace rpp /* ReCpp */
             return to_ustring(home_dir());
         #endif
     }
+#endif // RPP_ENABLE_UNICODE
     
     ////////////////////////////////////////////////////////////////////////////////
 } // namespace rpp

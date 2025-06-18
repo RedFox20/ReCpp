@@ -27,25 +27,33 @@ namespace rpp /* ReCpp */
      * @return TRUE if the file exists, arg ex: "dir/file.ext"
      */
     RPPAPI bool file_exists(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool file_exists(ustrview filename) noexcept;
+#endif
 
     /**
      * @return TRUE if the file is a symlink
      */
     RPPAPI bool is_symlink(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool is_symlink(ustrview filename) noexcept;
+#endif
 
     /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
     RPPAPI bool folder_exists(strview folder) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool folder_exists(ustrview filename) noexcept;
+#endif
 
     /**
      * @return TRUE if either a file or a folder exists at the given path
      */
     RPPAPI bool file_or_folder_exists(strview fileOrFolder) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool file_or_folder_exists(ustrview fileOrFolder) noexcept;
+#endif
 
     /**
      * @brief Creates a symbolic link to a file or folder
@@ -53,7 +61,9 @@ namespace rpp /* ReCpp */
      * @param link   Name of the link to create
      */
     RPPAPI bool create_symlink(strview target, strview link) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool create_symlink(ustrview target, ustrview link) noexcept;
+#endif
 
     /**
      * @brief Gets basic information of a file
@@ -67,8 +77,10 @@ namespace rpp /* ReCpp */
     RPPAPI bool file_info(strview filename, int64*  filesize, time_t* created,
                                             time_t* accessed, time_t* modified) noexcept;
 
+#if RPP_ENABLE_UNICODE
     RPPAPI bool file_info(ustrview filename, int64*  filesize, time_t* created,
                                              time_t* accessed, time_t* modified) noexcept;
+#endif // RPP_ENABLE_UNICODE
 
     /**
      * @brief Gets basic information of a file
@@ -86,38 +98,50 @@ namespace rpp /* ReCpp */
      * @return Short size of a file
      */
     RPPAPI int file_size(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI int file_size(ustrview filename) noexcept;
+#endif
 
     /**
      * @return Long size of a file
      */
     RPPAPI int64 file_sizel(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI int64 file_sizel(ustrview filename) noexcept;
+#endif
 
     /**
      * @return File creation date
      */
     RPPAPI time_t file_created(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI time_t file_created(ustrview filename) noexcept;
+#endif
 
     /**
      * @return Last file access date
      */
     RPPAPI time_t file_accessed(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI time_t file_accessed(ustrview filename) noexcept;
+#endif
 
     /**
      * @return Last file modification date
      */
     RPPAPI time_t file_modified(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI time_t file_modified(ustrview filename) noexcept;
+#endif
 
     /**
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
     RPPAPI bool delete_file(strview filename) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool delete_file(ustrview filename) noexcept;
+#endif
 
     /**
      * @brief Copies sourceFile to destinationFile, overwriting the previous file!
@@ -125,28 +149,36 @@ namespace rpp /* ReCpp */
      * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
      */
     RPPAPI bool copy_file(strview sourceFile, strview destinationFile) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool copy_file(ustrview sourceFile, ustrview destinationFile) noexcept;
+#endif
 
     /**
      * @brief Copies file access rights from sourceFile to destinationFile
      * @return TRUE if file access rights were copied successfully
      */
     RPPAPI bool copy_file_mode(strview sourceFile, strview destinationFile) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool copy_file_mode(ustrview sourceFile, ustrview destinationFile) noexcept;
+#endif
 
     /**
      * @brief Copies sourceFile to destinationFile IF destinationFile doesn't exist
      * @return TRUE if destinationFile exists or copy_file return true
      */
     RPPAPI bool copy_file_if_needed(strview sourceFile, strview destinationFile) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool copy_file_if_needed(ustrview sourceFile, ustrview destinationFile) noexcept;
+#endif
 
     /**
      * @brief Copies sourceFile into destinationFolder, overwriting the previous file!
      * @return TRUE if sourceFile was opened && destinationFolder was created && copied successfully
      */
     RPPAPI bool copy_file_into_folder(strview sourceFile, strview destinationFolder) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool copy_file_into_folder(ustrview sourceFile, ustrview destinationFolder) noexcept;
+#endif
 
     /**
      * Creates a folder, recursively creating folders that do not exist
@@ -154,7 +186,9 @@ namespace rpp /* ReCpp */
      * @return TRUE if the final folder was actually created (can fail due to access rights)
      */
     RPPAPI bool create_folder(strview foldername) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool create_folder(ustrview foldername) noexcept;
+#endif
 
 
     enum class delete_mode
@@ -170,21 +204,27 @@ namespace rpp /* ReCpp */
      * @return TRUE if the folder was deleted
      */
     RPPAPI bool delete_folder(strview foldername, delete_mode mode = delete_mode::non_recursive) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool delete_folder(ustrview foldername, delete_mode mode = delete_mode::non_recursive) noexcept;
+#endif
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
      * @result "path" ==> "C:\Projects\Test\path" 
      */
     RPPAPI string full_path(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring full_path(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Merges all ../ inside of a path
      * @result  ../lib/../bin/file.txt ==> ../bin/file.txt
      */
     RPPAPI string merge_dirups(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring merge_dirups(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Extract the filename (no extension) from a file path
@@ -197,7 +237,9 @@ namespace rpp /* ReCpp */
      * @result /.git/filewnoext   ==> filewnoext
      */
     RPPAPI strview file_name(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustrview file_name(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Extract the file part (with ext) from a file path
@@ -207,7 +249,9 @@ namespace rpp /* ReCpp */
      * @result file.ext           ==> file.ext
      */
     RPPAPI strview file_nameext(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustrview file_nameext(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Extract the extension from a file path
@@ -219,7 +263,9 @@ namespace rpp /* ReCpp */
      * @result /.git/filewnoext   ==> 
      */
     RPPAPI strview file_ext(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustrview file_ext(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Replaces the current file path extension
@@ -230,7 +276,9 @@ namespace rpp /* ReCpp */
      * @result file.old      ==> file.new
      */
     RPPAPI string file_replace_ext(strview path, strview ext) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring file_replace_ext(ustrview path, ustrview ext) noexcept;
+#endif
     
     /**
      * @brief Changes only the file name by appending a string, leaving directory and extension untouched
@@ -240,7 +288,9 @@ namespace rpp /* ReCpp */
      * @result file.txt      ==> fileadd.txt
      */
     RPPAPI string file_name_append(strview path, strview add) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring file_name_append(ustrview path, ustrview add) noexcept;
+#endif
     
     /**
      * @brief Replaces only the file name of the path, leaving directory and extension untouched
@@ -250,7 +300,9 @@ namespace rpp /* ReCpp */
      * @result file.txt      ==> replaced.txt
      */
     RPPAPI string file_name_replace(strview path, strview newFileName) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring file_name_replace(ustrview path, ustrview newFileName) noexcept;
+#endif
     
     /**
      * @brief Replaces the file name and extension, leaving directory untouched
@@ -260,7 +312,9 @@ namespace rpp /* ReCpp */
      * @result file.txt      ==> replaced.bin
      */
     RPPAPI string file_nameext_replace(strview path, strview newFileNameAndExt) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring file_nameext_replace(ustrview path, ustrview newFileNameAndExt) noexcept;
+#endif
 
     /**
      * @brief Extract the foldername from a path name
@@ -271,7 +325,9 @@ namespace rpp /* ReCpp */
      * @result file.ext           ==> 
      */
     RPPAPI strview folder_name(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustrview folder_name(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Extracts the full folder path from a file path.
@@ -283,7 +339,9 @@ namespace rpp /* ReCpp */
      * @result file.ext           ==> 
      */
     RPPAPI strview folder_path(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustrview folder_path(ustrview path) noexcept;
+#endif
 
     /**
      * @brief Normalizes the path string to use a specific type of slash
@@ -294,15 +352,19 @@ namespace rpp /* ReCpp */
      */
     RPPAPI string& normalize(string& path, char sep = '/') noexcept;
     RPPAPI char*   normalize(char* path, char sep = '/') noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring&  normalize(ustring& path, char16_t sep = u'/') noexcept;
     RPPAPI char16_t* normalize(char16_t* path, char16_t sep = u'/') noexcept;
+#endif
 
     /**
      * @brief Normalizes the path string to use a specific type of slash
      * @note A copy of the string is made
      */
     RPPAPI string normalized(strview path, char sep = '/') noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring normalized(ustrview path, char16_t sep = u'/') noexcept;
+#endif
     
     /**
      * @brief Efficiently combines path strings, removing any repeated / or \
@@ -326,7 +388,9 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     using string_list = std::vector<string>;
+#if RPP_ENABLE_UNICODE
     using ustring_list = std::vector<ustring>;
+#endif
 
     // common base class which doesn't rely on specific string type
     class RPPAPI dir_iter_base
@@ -348,7 +412,9 @@ namespace rpp /* ReCpp */
         state s; // iterator state
 
 		dir_iter_base(strview dir) noexcept;
+    #if RPP_ENABLE_UNICODE
         dir_iter_base(ustrview dir) noexcept;
+    #endif
         ~dir_iter_base() noexcept;
 
         explicit operator bool() const noexcept;
@@ -491,9 +557,11 @@ namespace rpp /* ReCpp */
     using dir_iterator = directory_iter<strview>;
     using dir_entry    = directory_entry<strview>;
 
+#if RPP_ENABLE_UNICODE
 	// unicode version of the directory iterator
     using udir_iterator = directory_iter<ustrview>;
     using udir_entry    = directory_entry<ustrview>;
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -554,10 +622,12 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_dirs( string_list& out,  strview dir, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_dirs( string_list& out, strview dir, list_dir_flags flags = {}) noexcept;
+    inline string_list list_dirs( strview dir, list_dir_flags flags = {}) noexcept { string_list out; list_dirs(out, dir, flags); return out; }
+#if RPP_ENABLE_UNICODE
     RPPAPI int list_dirs(ustring_list& out, ustrview dir, list_dir_flags flags = {}) noexcept;
-    inline string_list  list_dirs( strview dir, list_dir_flags flags = {}) noexcept {  string_list out; list_dirs(out, dir, flags); return out; }
     inline ustring_list list_dirs(ustrview dir, list_dir_flags flags = {}) noexcept { ustring_list out; list_dirs(out, dir, flags); return out; }
+#endif
 
 
     /**
@@ -606,11 +676,12 @@ namespace rpp /* ReCpp */
      * };
      * @endcode
      */
-    RPPAPI int list_files( string_list& out,  strview dir,  strview suffix, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_files( string_list& out, strview dir, strview suffix, list_dir_flags flags = {}) noexcept;
+    inline string_list list_files(strview dir, strview suffix, list_dir_flags flags = {}) noexcept { string_list out; list_files(out, dir, suffix, flags); return out; }
+#if RPP_ENABLE_UNICODE
     RPPAPI int list_files(ustring_list& out, ustrview dir, ustrview suffix, list_dir_flags flags = {}) noexcept;
-    inline string_list  list_files( strview dir,  strview suffix, list_dir_flags flags = {}) noexcept {  string_list out; list_files(out, dir, suffix, flags); return out; }
     inline ustring_list list_files(ustrview dir, ustrview suffix, list_dir_flags flags = {}) noexcept { ustring_list out; list_files(out, dir, suffix, flags); return out; }
-
+#endif
 
     /**
      * Recursively lists all files under this directory and its subdirectories that match the list of suffixes.
@@ -622,10 +693,12 @@ namespace rpp /* ReCpp */
      *        dir_relpath_combine - combines input_dir with relpaths
      * @return vector of resulting relative file paths
      */
-    RPPAPI int list_files(string_list&  out,  strview dir, const std::vector<strview>&  suffixes, list_dir_flags flags = {}) noexcept;
+    RPPAPI int list_files(string_list& out, strview dir, const std::vector<strview>& suffixes, list_dir_flags flags = {}) noexcept;
+    inline string_list list_files( strview dir, const std::vector<strview>& suffixes, list_dir_flags flags = {}) noexcept { string_list out;  list_files(out, dir, suffixes, flags); return out; }
+#if RPP_ENABLE_UNICODE
     RPPAPI int list_files(ustring_list& out, ustrview dir, const std::vector<ustrview>& suffixes, list_dir_flags flags = {}) noexcept;
-    inline string_list  list_files( strview dir, const std::vector<strview>&  suffixes, list_dir_flags flags = {}) noexcept { string_list out;  list_files(out, dir, suffixes, flags); return out; }
     inline ustring_list list_files(ustrview dir, const std::vector<ustrview>& suffixes, list_dir_flags flags = {}) noexcept { ustring_list out; list_files(out, dir, suffixes, flags); return out; }
+#endif
 
 
     /**
@@ -648,7 +721,9 @@ namespace rpp /* ReCpp */
      * @endcode
      */
     RPPAPI int list_alldir( string_list& outDirs,  string_list& outFiles,  strview dir, list_dir_flags flags = {}) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI int list_alldir(ustring_list& outDirs, ustring_list& outFiles, ustrview dir, list_dir_flags flags = {}) noexcept;
+#endif
 
 
     /**
@@ -659,7 +734,9 @@ namespace rpp /* ReCpp */
      * @example Windows: "C:/Projects/ReCpp/"
      */
     RPPAPI string working_dir() noexcept;
+#if RPP_ENABLE_UNICODE
     inline ustring working_diru() noexcept { return to_ustring(working_dir()); }
+#endif
 
 
     /**
@@ -702,7 +779,9 @@ namespace rpp /* ReCpp */
      * @return TRUE if chdir() is successful
      */
     RPPAPI bool change_dir(strview new_wd) noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI bool change_dir(ustrview new_wd) noexcept;
+#endif
 
     /**
      * @return The system temporary directory for storing misc files
@@ -712,8 +791,10 @@ namespace rpp /* ReCpp */
      * Path is always normalized to forward slashes /
      */
     RPPAPI string temp_dir() noexcept;
+#if RPP_ENABLE_UNICODE
     inline ustring temp_diru() noexcept { return to_ustring(temp_dir()); }
-    
+#endif
+
     /**
      * @return The system home directory for this user
      * @note ENV $HOME is used
@@ -721,7 +802,9 @@ namespace rpp /* ReCpp */
      * Path is always normalized to forward slashes /
      */
     RPPAPI string home_dir() noexcept;
+#if RPP_ENABLE_UNICODE
     RPPAPI ustring home_diru() noexcept;
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
 

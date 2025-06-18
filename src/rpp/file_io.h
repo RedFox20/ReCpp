@@ -116,7 +116,9 @@ namespace rpp /* ReCpp */
          * @param mode File open mode
          */
         file(strview filename, mode mode = READONLY) noexcept;
+    #if RPP_ENABLE_UNICODE
         file(ustrview filename, mode mode = READONLY) noexcept;
+    #endif // RPP_ENABLE_UNICODE
         file(file&& f) noexcept;
         ~file();
 
@@ -133,7 +135,9 @@ namespace rpp /* ReCpp */
          * @return TRUE if file open/create succeeded, FALSE if failed
          */
         bool open(strview filename, mode mode = READONLY) noexcept;
+    #if RPP_ENABLE_UNICODE
         bool open(ustrview filename, mode mode = READONLY) noexcept;
+    #endif // RPP_ENABLE_UNICODE
         void close() noexcept;
 
         /**
@@ -207,10 +211,12 @@ namespace rpp /* ReCpp */
         {
             return file{ filename, READONLY }.read_all();
         }
+    #if RPP_ENABLE_UNICODE
         static load_buffer read_all(ustrview filename) noexcept
         {
             return file{ filename, READONLY }.read_all();
         }
+    #endif // RPP_ENABLE_UNICODE
 
         /**
          * Reads the entire contents of the file into a std::string
@@ -220,10 +226,12 @@ namespace rpp /* ReCpp */
         {
             return file{ filename, READONLY }.read_text();
         }
+    #if RPP_ENABLE_UNICODE
         static std::string read_all_text(ustrview filename) noexcept
         {
             return file{ filename, READONLY }.read_text();
         }
+    #endif
 
         /**
          * Writes a block of bytes to the file. Regular Windows IO
@@ -245,9 +253,11 @@ namespace rpp /* ReCpp */
         int write(strview str) noexcept {
             return write(str.str, str.len);
         }
+    #if RPP_ENABLE_UNICODE
         int write(ustrview str) noexcept {
             return write(str.str, int(sizeof(ustrview::char_t) * str.len));
         }
+    #endif // RPP_ENABLE_UNICODE
         template<typename Char>
         int write(const std::basic_string<Char>& str) noexcept {
             return write(str.data(), int(sizeof(Char) * str.size()));
@@ -273,11 +283,13 @@ namespace rpp /* ReCpp */
             return write(str.str, str.len)
                  + write("\n", 1);
         }
+    #if RPP_ENABLE_UNICODE
         int writeln(ustrview str) noexcept
         {
             return write(str.str, int(sizeof(ustrview::char_t) * str.len))
                  + write(u"\n", sizeof(ustrview::char_t));
         }
+    #endif // RPP_ENABLE_UNICODE
 
         /**
          * Just append a newline
@@ -345,24 +357,10 @@ namespace rpp /* ReCpp */
          * @return Number of bytes actually written to the file
          */
         static int write_new(strview filename, const void* buffer, int bytesToWrite) noexcept;
-        static int write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept;
 
         static int write_new(strview filename, strview data) noexcept
         {
             return write_new(filename, data.str, data.len);
-        }
-        static int write_new(strview filename, ustrview data) noexcept
-        {
-            return write_new(filename, data.str, data.len * sizeof(char16_t));
-        }
-
-        static int write_new(ustrview filename, strview data) noexcept
-        {
-            return write_new(filename, data.str, data.len);
-        }
-        static int write_new(ustrview filename, ustrview data) noexcept
-        {
-            return write_new(filename, data.str, data.len * sizeof(char16_t));
         }
 
         template<class T, class U>
@@ -370,11 +368,29 @@ namespace rpp /* ReCpp */
         {
             return write_new(filename, plainOldData.data(), int(plainOldData.size()*sizeof(T)));
         }
+
+    #if RPP_ENABLE_UNICODE
+        static int write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept;
+
+        static int write_new(ustrview filename, strview data) noexcept
+        {
+            return write_new(filename, data.str, data.len);
+        }
+        static int write_new(strview filename, ustrview data) noexcept
+        {
+            return write_new(filename, data.str, data.len * sizeof(char16_t));
+        }
+        static int write_new(ustrview filename, ustrview data) noexcept
+        {
+            return write_new(filename, data.str, data.len * sizeof(char16_t));
+        }
+
         template<class T, class U>
         static int write_new(ustrview filename, const std::vector<T, U>& plainOldData) noexcept
         {
             return write_new(filename, plainOldData.data(), int(plainOldData.size() * sizeof(T)));
         }
+    #endif // RPP_ENABLE_UNICODE
 
         /**
          * Seeks to the specified position in a file. Seekmode is

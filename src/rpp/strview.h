@@ -1261,16 +1261,21 @@ namespace rpp
         using strview_t = strview;
         using string_t = string;
     };
+#if RPP_ENABLE_UNICODE
     template<>
     struct strview_traits<ustrview>
     {
         using strview_t = ustrview;
         using string_t = ustring;
     };
+#endif
 
     template<typename T>
     concept StringViewType = std::same_as<std::decay_t<T>, rpp::strview>
-                          || std::same_as<std::decay_t<T>, rpp::ustrview>;
+                        #if RPP_ENABLE_UNICODE
+                          || std::same_as<std::decay_t<T>, rpp::ustrview>
+                        #endif
+                          ;
 
     //////////////// strview literal operator ///////////////
 

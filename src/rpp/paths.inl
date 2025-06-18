@@ -50,6 +50,7 @@ namespace rpp
                 return (const wchar_t*)path_u;
             return nullptr; // else: cannot be converted due to invalid UTF8 sequence
         }
+        #if RPP_ENABLE_UNICODE
         FINLINE const wchar_t* to_wstr(ustrview path) noexcept
         {
             int len = path.len;
@@ -60,6 +61,7 @@ namespace rpp
             path_w[n] = L'\0';
             return (const wchar_t*)path_w;
         }
+        #endif // RPP_ENABLE_UNICODE
     #endif
         FINLINE const char* to_cstr(strview path) noexcept // UTF8 strview to UTF8 nullterm string
         {
@@ -71,12 +73,14 @@ namespace rpp
             path_a[n] = '\0';
             return path_a;
         }
+    #if RPP_ENABLE_UNICODE
         FINLINE const char* to_cstr(ustrview path) noexcept // UTF16 --> UTF8
         {
             if (to_string(path_a, MAX_A, path.str, path.len) >= 0)
                 return path_a;
             return nullptr; // contains invalid UTF16 sequence, there is no point to continue
         }
+    #endif
     };
 
 #if _MSC_VER
