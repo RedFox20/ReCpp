@@ -1389,16 +1389,28 @@ namespace rpp
 
     //////////////// optimized string join /////////////////
 
-    RPPAPI string concat(const strview& a, const strview& b);
-    RPPAPI string concat(const strview& a, const strview& b, const strview& c);
-    RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d);
-    RPPAPI string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e);
+    template<typename... Args>
+    inline string concat(const strview& first, const Args&... args)
+    {
+        string str;
+        size_t totalLength = size_t(first.len) + (size_t(args.len) + ...);
+        str.reserve(totalLength);
+        str.append(first.str, size_t(first.len));
+        (str.append(args.str, size_t(args.len)), ...);
+        return str;
+    }
 
 #if RPP_ENABLE_UNICODE
-    RPPAPI ustring concat(const ustrview& a, const ustrview& b);
-    RPPAPI ustring concat(const ustrview& a, const ustrview& b, const ustrview& c);
-    RPPAPI ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d);
-    RPPAPI ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e);
+    template<typename... Args>
+    inline ustring concat(const ustrview& first, const Args&... args)
+    {
+        ustring str;
+        size_t totalLength = size_t(first.len) + (size_t(args.len) + ...);
+        str.reserve(totalLength);
+        str.append(first.str, size_t(first.len));
+        (str.append(args.str, size_t(args.len)), ...);
+        return str;
+    }
 #endif // RPP_ENABLE_UNICODE
 
     //////////////// string compare operators /////////////////

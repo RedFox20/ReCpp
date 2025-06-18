@@ -604,7 +604,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
-    static auto merge_dirups(T path) noexcept -> T::string_t
+    static auto merge_dirups(T path) noexcept -> typename T::string_t
     {
         using tchar = typename T::char_t;
         T pathstr = path;
@@ -714,7 +714,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
-    static auto file_replace_ext(T path, T ext) noexcept -> T::string_t
+    static auto file_replace_ext(T path, T ext) noexcept -> typename T::string_t
     {
         if (T oldext = file_ext(path))
         {
@@ -742,7 +742,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
-    static auto file_name_append(T path, T add) noexcept -> T::string_t
+    static auto file_name_append(T path, T add) noexcept -> typename T::string_t
     {
         typename T::string_t result = concat(folder_path(path), file_name(path), add);
         if (T ext = file_ext(path)) {
@@ -765,7 +765,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
-    static auto file_name_replace(T path, T newFileName) noexcept -> T::string_t
+    static auto file_name_replace(T path, T newFileName) noexcept -> typename T::string_t
     {
         typename T::string_t result = concat(folder_path(path), newFileName);
         if (T ext = file_ext(path)) {
@@ -896,7 +896,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T, size_t N>
-    static T::string_t slash_combine(const std::array<T, N>& args)
+    static auto slash_combine(const std::array<T, N>& args) -> typename T::string_t
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {

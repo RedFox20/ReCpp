@@ -581,7 +581,7 @@ namespace rpp /* ReCpp */
         dir_relpath_combine_recursive = dir_relpath_combine | dir_recursive,
     };
 
-    inline list_dir_flags operator|(list_dir_flags a, list_dir_flags b) noexcept { return list_dir_flags(a | b); }
+    inline list_dir_flags operator|(list_dir_flags a, list_dir_flags b) noexcept { return list_dir_flags(int(a) | int(b)); }
 
     /**
      * Lists all folders inside this directory

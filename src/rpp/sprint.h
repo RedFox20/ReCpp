@@ -152,7 +152,7 @@ namespace rpp
         FINLINE void write(const ustring& value)  noexcept { write_utf16_as_utf8(value.data(), static_cast<int>(value.size())); }
         FINLINE void write(ustrview value)        noexcept { write_utf16_as_utf8(value.data(), static_cast<int>(value.size())); }
     #ifdef __cpp_char8_t // fundamental type char8_t since C++20
-        FINLINE void write(const char16_t* value) noexcept { write_utf16_as_utf8(value, RPP_UTF8LEN(value)); }
+        FINLINE void write(const char16_t* value) noexcept { write_utf16_as_utf8(value, RPP_UTF16LEN(value)); }
         FINLINE void write(const char8_t* value)  noexcept { append(reinterpret_cast<const char*>(value), RPP_UTF8LEN(value)); }
     #endif
 #endif // RPP_ENABLE_UNICODE
