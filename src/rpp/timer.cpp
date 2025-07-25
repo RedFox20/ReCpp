@@ -25,6 +25,10 @@
     #include "debugging.h"
 #endif
 
+#ifdef _WIN32
+    #define timegm _mkgmtime
+#endif
+
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -446,7 +450,8 @@ namespace rpp
         {
             time_t now = time(nullptr);
             std::tm local_tm = localtime_safe(now);
-            return static_cast<time_t>(local_tm.tm_gmtoff); // seconds offset from UTC
+            time_t local_now = timegm(&local_tm);
+            return local_now - now;
         }();
         return timezone_offset;
     }
