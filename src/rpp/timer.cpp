@@ -448,8 +448,11 @@ namespace rpp
     {
         static time_t timezone_offset = []() -> time_t
         {
-            time_t now = time(nullptr);
-            std::tm local_tm = localtime_safe(now);
+            time_t now = time(nullptr); // get current UTC time since epoch
+            std::tm local_tm = localtime_safe(now); // convert to local calendar time with timezone offset and DST
+
+            // convert local calendar time to time since epoch with timezone offset remaining
+            // timegm() is used because mktime() assumes we pass a UTC time which leads to incorrect results
             time_t local_now = timegm(&local_tm);
             return local_now - now;
         }();
