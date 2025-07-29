@@ -25,6 +25,10 @@
     #include "debugging.h"
 #endif
 
+#ifdef _WIN32
+    #define timegm _mkgmtime
+#endif
+
 namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -379,6 +383,17 @@ namespace rpp
         return time_tm;
     }
 
+    static std::tm localtime_safe(const time_t& time) noexcept
+    {
+        std::tm time_tm;
+        #if _MSC_VER // MSVC++
+            localtime_s(&time_tm, &time); // arguments reversed for some reason
+        #else
+            localtime_r(&time, &time_tm);
+        #endif
+        return time_tm;
+    }
+
     // YYYY-MM-DD HH:MM:SS.mmm
     NOINLINE static int datetime_to_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
@@ -433,10 +448,13 @@ namespace rpp
     {
         static time_t timezone_offset = []() -> time_t
         {
-            time_t local_now = time(nullptr);
-            std::tm utc_tm = gmtime_safe(local_now);
-            time_t utc_now = mktime(&utc_tm);
-            return local_now - utc_now;
+            time_t now = time(nullptr); // get current UTC time since epoch
+            std::tm local_tm = localtime_safe(now); // convert to local calendar time with timezone offset and DST
+
+            // convert local calendar time to time since epoch with timezone offset remaining
+            // timegm() is used because mktime() assumes we pass a UTC time which leads to incorrect results
+            time_t local_now = timegm(&local_tm);
+            return local_now - now;
         }();
         return timezone_offset;
     }
