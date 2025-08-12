@@ -1160,10 +1160,9 @@ namespace rpp
                 );
 
                 if (hThread) {
-                    std::vector<uint64_t> trace = rpp::get_callstack(rpp::CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, hThread);
+                    // From now on the hThread is managed by ThreadContext
+                    std::vector<uint64_t> trace = rpp::get_callstack(rpp::CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, std::move(hThread));
                     threads.push_back({ std::move(trace), te.th32ThreadID });
-
-                    CloseHandle(hThread);
                 }
             } while (Thread32Next(hSnap, &te));
         }
