@@ -499,7 +499,7 @@ namespace rpp
         return _URC_NO_REASON;
     }
 
-    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, uint64_t threadId) noexcept
     {
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
@@ -977,13 +977,18 @@ namespace rpp
 
         explicit operator bool() const noexcept { return error == nullptr; }
 
-        ThreadContext(HANDLE thread = nullptr) noexcept
+        ThreadContext(uint64_t threadId = 0) noexcept
         {
             // this opens pseudo-handles to the current process and thread
-            if (thread == nullptr) {
+            if (threadId == 0)
+            {
                 hThread = GetCurrentThread();
-            } else {
-                hThread = thread;
+            }
+            else
+            {
+                DWORD flags = THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SUSPEND_RESUME;
+                hThread = OpenThread(flags, FALSE, threadId);
+                openedThread = true;
             }
 
             process = GetCurrentProcess();
@@ -1104,9 +1109,9 @@ namespace rpp
         return count;
     }
 
-    RPPAPI std::vector<uint64_t> _get_callstack(size_t maxDepth, size_t entriesToSkip, HANDLE thread = nullptr) noexcept
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, uint64_t threadId) noexcept
     {
-        ThreadContext tc { thread };
+        ThreadContext tc { threadId };
         if (!tc) return {};
 
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
@@ -1122,11 +1127,6 @@ namespace rpp
         // copy the callstack to a vector
         std::vector<uint64_t> addresses { callstack, callstack + count };
         return addresses;
-    }
-
-    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
-    {
-        return _get_callstack(maxDepth, entriesToSkip);
     }
 
     RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip) noexcept
@@ -1149,30 +1149,22 @@ namespace rpp
         std::vector<ThreadCallstack> threads {};
 
         HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-        if (hSnap == INVALID_HANDLE_VALUE) {
-            return threads;
-        }
+        if (hSnap == INVALID_HANDLE_VALUE) return threads;
 
         THREADENTRY32 te;
         te.dwSize = sizeof(te);
 
         const DWORD currentProcessId = GetCurrentProcessId();
 
-        if (Thread32First(hSnap, &te)) {
+        if (Thread32First(hSnap, &te))
+        {
             do {
-                if (te.th32OwnerProcessID != currentProcessId)
-                    continue;
+                if (te.th32OwnerProcessID != currentProcessId) continue;
 
-                HANDLE hThread = OpenThread(
-                    THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SUSPEND_RESUME,
-                    FALSE,
-                    te.th32ThreadID
-                );
-
-                if (hThread) {
-                    // From now on the hThread is managed by ThreadContext
-                    std::vector<uint64_t> trace = _get_callstack(CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, std::move(hThread));
-                    threads.push_back({ std::move(trace), static_cast<uint32_t>(te.th32ThreadID) });
+                std::vector<uint64_t> trace = get_callstack(CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, static_cast<uint64_t>(te.th32ThreadID));
+                if (!trace.empty())
+                {
+                    threads.push_back({ std::move(trace), static_cast<rpp::uint64>(te.th32ThreadID) });
                 }
             } while (Thread32Next(hSnap, &te));
         }
