@@ -1099,7 +1099,7 @@ namespace rpp
         return count;
     }
 
-    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, HANDLE thread) noexcept
+    RPPAPI std::vector<uint64_t> _get_callstack(size_t maxDepth, size_t entriesToSkip, HANDLE thread = nullptr) noexcept
     {
         ThreadContext tc { thread };
         if (!tc) return {};
@@ -1119,9 +1119,14 @@ namespace rpp
         return addresses;
     }
 
-    RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip, HANDLE thread) noexcept
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
     {
-        ThreadContext tc { thread };
+        return _get_callstack(maxDepth, entriesToSkip);
+    }
+
+    RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip) noexcept
+    {
+        ThreadContext tc {};
         if (!tc) return 0;
 
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
@@ -1161,7 +1166,7 @@ namespace rpp
 
                 if (hThread) {
                     // From now on the hThread is managed by ThreadContext
-                    std::vector<uint64_t> trace = rpp::get_callstack(rpp::CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, std::move(hThread));
+                    std::vector<uint64_t> trace = _get_callstack(CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, std::move(hThread));
                     threads.push_back({ std::move(trace), te.th32ThreadID });
                 }
             } while (Thread32Next(hSnap, &te));
