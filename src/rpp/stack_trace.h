@@ -10,6 +10,10 @@
 #include <vector>
 #include <cstdint>
 
+#if _WIN32
+#include <tlhelp32.h>
+#endif
+
 namespace rpp
 {
     /**
@@ -56,7 +60,11 @@ namespace rpp
      * @param entriesToSkip Number of initial entries to skip in order to hide stack tracing internals
      * @return List of callstack addresses
      */
+#if _WIN32
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth = 32, size_t entriesToSkip = 0, HANDLE thread = nullptr) noexcept;
+#else
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth = 32, size_t entriesToSkip = 0) noexcept;
+#endif
 
     /**
      * @brief Walks the stack and returns a list of callstack addresses.
@@ -67,7 +75,25 @@ namespace rpp
      * @param entriesToSkip Number of initial entries to skip in order to hide stack tracing internals
      * @return Number of callstack entries written to the buffer
      */
+#if _WIN32
+    RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip = 0, HANDLE thread = nullptr) noexcept;
+#else
     RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip = 0) noexcept;
+#endif
+
+#if _WIN32
+    struct ThreadCallstack
+    {
+        std::vector<uint64_t> callstack;
+        DWORD thread_id;
+    };
+
+    /**
+     * @brief Enumerates threads of the current process and returns list of callstacks.
+     * @return List of callstacks along with thread ids
+     */
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks();
+#endif
 
     /**
      * Prepends an error message before formatting the stack trace
