@@ -540,6 +540,11 @@ namespace rpp
         }
         return int(count - entriesToSkip);
     }
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks()
+    {
+        // TODO: not implemented
+        return {};
+    }
 
     RPPAPI std::string format_trace(rpp::strview message, const uint64_t* callstack, size_t depth) noexcept
     {
@@ -1167,7 +1172,7 @@ namespace rpp
                 if (hThread) {
                     // From now on the hThread is managed by ThreadContext
                     std::vector<uint64_t> trace = _get_callstack(CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, std::move(hThread));
-                    threads.push_back({ std::move(trace), te.th32ThreadID });
+                    threads.push_back({ std::move(trace), static_cast<uint32_t>(te.th32ThreadID) });
                 }
             } while (Thread32Next(hSnap, &te));
         }

@@ -69,11 +69,10 @@ namespace rpp
      */
     RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip = 0) noexcept;
 
-#if _WIN32
     struct ThreadCallstack
     {
         std::vector<uint64_t> callstack;
-        DWORD thread_id;
+        uint32_t thread_id;
     };
 
     /**
@@ -81,7 +80,6 @@ namespace rpp
      * @return List of callstacks along with thread ids
      */
     RPPAPI std::vector<ThreadCallstack> get_all_callstacks();
-#endif
 
     /**
      * Prepends an error message before formatting the stack trace
