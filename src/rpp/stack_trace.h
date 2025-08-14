@@ -54,9 +54,10 @@ namespace rpp
      * or use format_trace() to get a formatted stack trace.
      * @param maxDepth Maximum number of stack frames to trace
      * @param entriesToSkip Number of initial entries to skip in order to hide stack tracing internals
+     * @param threadId Thread to get callstack from, only implemented for WIN32
      * @return List of callstack addresses
      */
-    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth = 32, size_t entriesToSkip = 0) noexcept;
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth = 32, size_t entriesToSkip = 0, uint64_t threadId = 0) noexcept;
 
     /**
      * @brief Walks the stack and returns a list of callstack addresses.
@@ -68,6 +69,20 @@ namespace rpp
      * @return Number of callstack entries written to the buffer
      */
     RPPAPI int get_callstack(uint64_t* callstack, size_t maxDepth, size_t entriesToSkip = 0) noexcept;
+
+    struct ThreadCallstack
+    {
+        std::vector<uint64_t> callstack;
+        rpp::uint64 thread_id = 0;
+    };
+
+    /**
+     * @brief Enumerates threads of the current process and returns list of callstacks.
+     * @param maxDepth Maximum number of stack frames to trace per thread
+     * @param entriesToSkip Number of initial entries to skip on the calling thread
+     * @return List of callstacks along with thread ids
+     */
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks(size_t maxDepth = 32, size_t entriesToSkip = 0);
 
     /**
      * Prepends an error message before formatting the stack trace

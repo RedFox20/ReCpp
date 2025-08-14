@@ -499,8 +499,10 @@ namespace rpp
         return _URC_NO_REASON;
     }
 
-    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, uint64_t threadId) noexcept
     {
+        (void)threadId;
+
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
         // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
@@ -539,6 +541,14 @@ namespace rpp
             callstack[i] = (uint64_t)cs_temp[entriesToSkip + i];
         }
         return int(count - entriesToSkip);
+    }
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks(size_t maxDepth, size_t entriesToSkip)
+    {
+        (void)maxDepth;
+        (void)entriesToSkip;
+
+        // TODO: not implemented
+        return {};
     }
 
     RPPAPI std::string format_trace(rpp::strview message, const uint64_t* callstack, size_t depth) noexcept
@@ -972,10 +982,28 @@ namespace rpp
 
         explicit operator bool() const noexcept { return error == nullptr; }
 
-        ThreadContext() noexcept
+        ThreadContext(uint64_t threadId = 0) noexcept
         {
             // this opens pseudo-handles to the current process and thread
-            hThread = GetCurrentThread();
+            if (threadId == 0)
+            {
+                hThread = GetCurrentThread();
+            }
+            else
+            {
+                DWORD flags = THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SUSPEND_RESUME;
+
+                HANDLE thread = OpenThread(flags, FALSE, threadId);
+                if (thread == INVALID_HANDLE_VALUE)
+                {
+                    error = "<stack_trace:OpenThreadFailed>";
+                    return;
+                }
+
+                hThread = thread;
+                openedThread = true;
+            }
+
             process = GetCurrentProcess();
 
             static bool modulesLoaded;
@@ -1094,9 +1122,9 @@ namespace rpp
         return count;
     }
 
-    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip) noexcept
+    RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, uint64_t threadId) noexcept
     {
-        ThreadContext tc {};
+        ThreadContext tc { threadId };
         if (!tc) return {};
 
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
@@ -1127,6 +1155,38 @@ namespace rpp
             count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
         }
         return (int)count;
+    }
+
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks(size_t maxDepth, size_t entriesToSkip)
+    {
+        std::vector<ThreadCallstack> threads {};
+
+        HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if (hSnap == INVALID_HANDLE_VALUE) return threads;
+
+        THREADENTRY32 te;
+        te.dwSize = sizeof(te);
+
+        const DWORD currentProcessId = GetCurrentProcessId();
+        const DWORD currentThreadId = GetCurrentThreadId();
+
+        if (Thread32First(hSnap, &te))
+        {
+            do {
+                if (te.th32OwnerProcessID != currentProcessId) continue;
+
+                int entriesToSkip = te.th32ThreadID == currentThreadId ? entriesToSkip : 0;
+                std::vector<uint64_t> trace = get_callstack(maxDepth, entriesToSkip, static_cast<uint64_t>(te.th32ThreadID));
+                if (!trace.empty())
+                {
+                    threads.push_back({ std::move(trace), static_cast<rpp::uint64>(te.th32ThreadID) });
+                }
+            } while (Thread32Next(hSnap, &te));
+        }
+
+        CloseHandle(hSnap);
+
+        return threads;
     }
 
     RPPAPI std::string stack_trace(rpp::strview message, size_t maxDepth, size_t entriesToSkip) noexcept
