@@ -501,6 +501,8 @@ namespace rpp
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, uint64_t threadId) noexcept
     {
+        (void)threadId;
+
         maxDepth = rpp::min<size_t>(maxDepth, CALLSTACK_MAX_DEPTH);
 
         // WARNING: do NOT use alloca()/_malloca() here, otherwise we smash our own stack and backtrace will fail
@@ -540,8 +542,11 @@ namespace rpp
         }
         return int(count - entriesToSkip);
     }
-    RPPAPI std::vector<ThreadCallstack> get_all_callstacks()
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks(size_t maxDepth, size_t entriesToSkip)
     {
+        (void)maxDepth;
+        (void)entriesToSkip;
+
         // TODO: not implemented
         return {};
     }
@@ -987,7 +992,15 @@ namespace rpp
             else
             {
                 DWORD flags = THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SUSPEND_RESUME;
-                hThread = OpenThread(flags, FALSE, threadId);
+
+                HANDLE thread = OpenThread(flags, FALSE, threadId);
+                if (thread == INVALID_HANDLE_VALUE)
+                {
+                    error = "<stack_trace:OpenThreadFailed>";
+                    return;
+                }
+
+                hThread = thread;
                 openedThread = true;
             }
 
@@ -1144,7 +1157,7 @@ namespace rpp
         return (int)count;
     }
 
-    RPPAPI std::vector<ThreadCallstack> get_all_callstacks()
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks(size_t maxDepth, size_t entriesToSkip)
     {
         std::vector<ThreadCallstack> threads {};
 
@@ -1155,13 +1168,15 @@ namespace rpp
         te.dwSize = sizeof(te);
 
         const DWORD currentProcessId = GetCurrentProcessId();
+        const DWORD currentThreadId = GetCurrentThreadId();
 
         if (Thread32First(hSnap, &te))
         {
             do {
                 if (te.th32OwnerProcessID != currentProcessId) continue;
 
-                std::vector<uint64_t> trace = get_callstack(CALLSTACK_MAX_DEPTH, /*entriesToSkip*/1, static_cast<uint64_t>(te.th32ThreadID));
+                int entriesToSkip = te.th32ThreadID == currentThreadId ? entriesToSkip : 0;
+                std::vector<uint64_t> trace = get_callstack(maxDepth, entriesToSkip, static_cast<uint64_t>(te.th32ThreadID));
                 if (!trace.empty())
                 {
                     threads.push_back({ std::move(trace), static_cast<rpp::uint64>(te.th32ThreadID) });

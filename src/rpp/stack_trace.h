@@ -78,9 +78,11 @@ namespace rpp
 
     /**
      * @brief Enumerates threads of the current process and returns list of callstacks.
+     * @param maxDepth Maximum number of stack frames to trace per thread
+     * @param entriesToSkip Number of initial entries to skip on the calling thread
      * @return List of callstacks along with thread ids
      */
-    RPPAPI std::vector<ThreadCallstack> get_all_callstacks();
+    RPPAPI std::vector<ThreadCallstack> get_all_callstacks(size_t maxDepth = 32, size_t entriesToSkip = 0);
 
     /**
      * Prepends an error message before formatting the stack trace
