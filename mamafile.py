@@ -9,12 +9,6 @@ class ReCpp(mama.BuildTarget):
         # for a few specific target we use source-built elfutils for libdw support
         if self.mips:
             self.add_git('elfutils', 'https://github.com/RedFox20/elfutils-package.git')
-        # automatically configure oclea toolchain for cross-compilation
-        if self.oclea:
-            self.config.set_oclea_toolchain(
-                toolchain_dir='/usr/local/',
-                toolchain_file='/build/platforms/cv25/aarch64_toolchain.cmake'
-            )
 
 
     def configure(self):
