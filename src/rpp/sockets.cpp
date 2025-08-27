@@ -6,6 +6,7 @@
 #include <assert.h>
 #include "strview.h" // _tostring
 #include "sort.h"
+#include "math.h" // rpp::min
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG
@@ -71,8 +72,6 @@
      // map linux socket calls to winsock calls via macros
     #define closesocket(fd) ::close(fd)
 #endif
-
-#include <algorithm> // std::min
 
 // For MSVC we don't need to flush logs, but for LINUX, it's necessary for atomic-ish logging
 #if _MSC_VER
@@ -775,19 +774,28 @@ namespace rpp
 
     void socket::close() noexcept
     {
-        std::lock_guard lock { Mtx };
+        std::unique_lock lock { Mtx };
         int sock = os_handle_unsafe();
         if (sock != -1)
         {
-            if (!Shared)
-            {
-                ::shutdown(sock, /*SHUT_RDWR*/2); // send FIN
-                closesocket(sock);
-            }
+            // BUGFIX: need to reset the socket state immediately, otherwise
+            //         ::shutdown() can wake up a blocking thread and try to
+            //         also call close()+shutdown()
             set_os_handle_unsafe(-1);
             Type = ST_Unspecified;
             Category = SC_Unknown;
             Connected = false;
+            bool shared = Shared;
+
+            // Release the lock here, to unblock any other threads that might
+            // be woken by shutdown()/closesocket() and try to call socket::close()
+            lock.unlock();
+
+            if (!shared)
+            {
+                ::shutdown(sock, /*SHUT_RDWR*/2); // send FIN
+                closesocket(sock);
+            }
         }
         // dont clear the address, so we have info on what we just closed
     }
@@ -891,7 +899,7 @@ namespace rpp
         {
             while (skipped < bytesToSkip)
             {
-                int len = recv(dump, std::min<int>(sizeof(dump), remaining));
+                int len = recv(dump, rpp::min<int>(sizeof(dump), remaining));
                 if (len <= 0)
                     break;
                 skipped += len;
@@ -913,7 +921,7 @@ namespace rpp
 
                 //logdebug("CHECK available %d", avail);
 
-                int max = std::min<int>(sizeof(dump), remaining);
+                int max = rpp::min<int>(sizeof(dump), remaining);
                 int len = recvfrom(from, dump, max);
                 if (len < 0)
                 {
@@ -932,7 +940,7 @@ namespace rpp
                         break;
                     }
 
-                    len = std::max<int>(0, avail - after);
+                    len = rpp::max<int>(0, avail - after);
                 #else
                     len = avail; // on LINUX, sockets report available() per datagram
                 #endif
