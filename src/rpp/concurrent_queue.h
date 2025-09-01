@@ -42,24 +42,17 @@ namespace rpp
         mutable mutex_t Mutex;
         mutable rpp::condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
-        std::atomic_bool StopWaiting = false;
+        std::atomic_bool Destroying = false;
 
     public:
         concurrent_queue() = default;
         ~concurrent_queue() noexcept
         {
-            // signal all waiters to exit first, don't clear/destroy yet
-            {
-                auto lock1 = spin_lock();
-                StopWaiting.store(true, std::memory_order_release);
-                notify_all_unlocked();
-            }
-
-            // -- allow other threads to stop waiting, because StopWaiting==true --
-
-            // then lock again, clear items and free the memory
-            auto lock2 = spin_lock();
-            StopWaiting.store(true, std::memory_order_release); // set this again in case another thread still pushed something
+            // signal all waiters to exit and release the memory to force push() operations
+            // to check for capacity -- it will see the Destroying flag then
+            std::lock_guard lock { mutex() };
+            Destroying.store(true, std::memory_order_release);
+            notify_all_unlocked();
             clear_unlocked();
 
             if (ItemsStart)
@@ -82,8 +75,8 @@ namespace rpp
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
-            q.StopWaiting.store(false, std::memory_order_release);
-            StopWaiting.store(false, std::memory_order_release);
+            q.Destroying.store(false, std::memory_order::release);
+            Destroying.store(false, std::memory_order::release);
             // notify only the old queue
             q.notify_all_unlocked();
         }
@@ -96,8 +89,12 @@ namespace rpp
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
-            q.StopWaiting.store(false, std::memory_order_release);
-            StopWaiting.store(false, std::memory_order_release);
+
+            // swap atomics
+            bool destroying = Destroying.load(std::memory_order_acquire);
+            Destroying.store(q.Destroying.load(std::memory_order_acquire), std::memory_order::release);
+            q.Destroying.store(destroying, std::memory_order::release);
+
             // notify all waiters for both queues
             q.notify_all_unlocked();
             notify_all_unlocked();
@@ -140,7 +137,7 @@ namespace rpp
         [[nodiscard]] FINLINE size_t size() const noexcept
         {
             auto lock = spin_lock();
-            return (Tail - Head);
+            return size_unlocked();
         }
 
         /**
@@ -292,39 +289,39 @@ namespace rpp
         /**
          * @brief Thread-safely moves an item into the queue and notifies one waiter
          */
-        void push(T&& item) noexcept
+        void push(T&& item) noexcept(std::is_nothrow_move_constructible_v<T>)
         {
             auto lock = spin_lock();
-            push_unlocked(std::move(item));
+            push_unlocked(lock, std::move(item));
             notify_one_unlocked();
         }
 
         /**
          * @brief Thread-safely copies an item into the queue and notifies one waiter
          */
-        void push(const T& item) noexcept
+        void push(const T& item) noexcept(std::is_nothrow_copy_constructible_v<T>)
         {
             auto lock = spin_lock();
-            push_unlocked(item);
+            push_unlocked(lock, item);
             notify_one_unlocked();
         }
 
         /**
          * @brief Thread-safely moves an item into the queue without notifying waiters
          */
-        void push_no_notify(T&& item) noexcept
+        void push_no_notify(T&& item) noexcept(std::is_nothrow_move_constructible_v<T>)
         {
             auto lock = spin_lock();
-            push_unlocked(std::move(item));
+            push_unlocked(lock, std::move(item));
         }
 
         /**
          * @brief Thread-safely copies an item into the queue without notifying waiters
          */
-        void push_no_notify(const T& item) noexcept
+        void push_no_notify(const T& item) noexcept(std::is_nothrow_copy_constructible_v<T>)
         {
             auto lock = spin_lock();
-            push_unlocked(item);
+            push_unlocked(lock, item);
         }
 
         /**
@@ -652,6 +649,7 @@ namespace rpp
                                const WaitUntil& cancelCondition) noexcept(noexcept(cancelCondition()))
         {
             auto lock = spin_lock();
+            if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
             if (Head == Tail)
             {
                 rpp::Duration remaining = timeout;
@@ -666,7 +664,7 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, prevTime + interval); // may throw
                 #endif
-                    if (StopWaiting.load(std::memory_order_acquire)) return false; // give up immediately
+                    if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
                     if (Head != Tail) break; // got data
 
                     rpp::TimePoint now = rpp::TimePoint::now();
@@ -688,16 +686,23 @@ namespace rpp
         }
 
     private:
-        // waits until any wakeup signal and returns true if there is an item
+        // waits until this thread is notified and returns true if there's an item
         bool wait_notify(lock_t& lock) const noexcept
         {
-            if (Head != Tail) return true; // wait is not needed
+            if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately, always signal false
+            if (Head != Tail) return true; // got an item
+
+            // wait only once, otherwise a lot of code will deadlock forever
+            // if notification is not properly received
             (void)Waiter.wait(lock); // noexcept
+
+            if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately, always signal false
             return Head != Tail;
         }
         // wait_notify with a timeout, returns true if there is an item
         bool wait_notify_for(lock_t& lock, const rpp::Duration& timeout) const noexcept
         {
+            if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
             if (Head != Tail) return true; // wait is not needed
             auto now = rpp::TimePoint::now();
             auto end = now + timeout;
@@ -708,7 +713,7 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, end); // may throw
                 #endif
-                if (StopWaiting.load(std::memory_order_acquire)) return false; // give up immediately
+                if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
                 if (Head != Tail) return true; // got an item
                 now = rpp::TimePoint::now();
             } while (now < end); // handle spurious wakeups
@@ -716,6 +721,7 @@ namespace rpp
         }
         bool wait_notify_until(lock_t& lock, const rpp::TimePoint& until) const noexcept
         {
+            if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
             if (Head != Tail) return true; // wait is not needed
             rpp::TimePoint now;
             #if _MSC_VER
@@ -728,7 +734,7 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, until); // may throw
                 #endif
-                if (StopWaiting.load(std::memory_order_acquire)) return false; // give up immediately
+                if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
                 if (Head != Tail) return true; // got an item
                 now = rpp::TimePoint::now();
             } while (now < until); // handle spurious wakeups
@@ -742,12 +748,12 @@ namespace rpp
         {
             Waiter.notify_all();
         }
-        void push_unlocked(T&& item) noexcept
+        void push_unlocked(lock_t& lock, T&& item) noexcept(std::is_nothrow_move_constructible_v<T>)
         {
             if (Tail == ItemsEnd)
             {
-                if (!ensure_capacity())
-                    return; // alloc failed
+                if (!ensure_capacity(lock))
+                    return; // queue is being destroyed/OOM, abandon ship
             }
 
             if constexpr (std::is_trivially_move_assignable_v<T>)
@@ -755,12 +761,12 @@ namespace rpp
             else
                 new (Tail++) T{ std::move(item) };
         }
-        void push_unlocked(const T& item) noexcept
+        void push_unlocked(lock_t& lock, const T& item) noexcept(std::is_nothrow_copy_constructible_v<T>)
         {
             if (Tail == ItemsEnd)
             {
-                if (!ensure_capacity())
-                    return; // alloc failed
+                if (!ensure_capacity(lock))
+                    return; // queue is being destroyed/OOM, abandon ship
             }
 
             if constexpr (std::is_trivially_copy_assignable_v<T>)
@@ -791,8 +797,10 @@ namespace rpp
                 clear_unlocked();
             }
         }
-        bool ensure_capacity() noexcept
+        bool ensure_capacity(lock_t& lock) noexcept
         {
+            if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
+
             const size_t oldCap = capacity_unlocked();
             // we have enough capacity, just shift the items to the front
             if (oldCap > 0 && size_t(Head - ItemsStart) >= (oldCap / 2))
@@ -808,10 +816,31 @@ namespace rpp
                 size_t growBy = oldCap ? oldCap : 32;
                 if (growBy > (16*1024)) growBy = 16*1024; // put a hard limit to exponential growth
                 const size_t newCap = oldCap + growBy;
+
+                // if alloc fails (OOM), we can't push new items,
+                // consumer should consume items to drain the queue
                 if (!grow_to(newCap))
-                    return false; // if alloc fails, we can't push new items
+                {
+                    for (int i = 0; i < 100; ++i) // wait until there is more space
+                    {
+                        if (Destroying.load(std::memory_order_acquire)) return false; // give up immediately
+                        size_t available = capacity_unlocked() - size_unlocked();
+                        if (available == 0)
+                        {
+                            // notify any waiters to pick up some slack
+                            notify_one_unlocked();
+                            rpp::unlock_guard unlocker { lock };
+                            rpp::sleep_ms(5); // yield heavily
+                        }
+                        else // available > 0
+                        {
+                            return true;
+                        }
+                    }
+                    // all attempts timed out
+                    return false;
+                }
             }
-            StopWaiting.store(false, std::memory_order_release); // reset the stop waiting flag
             return true;
         }
         bool grow_to(size_t newCap) noexcept
@@ -867,6 +896,10 @@ namespace rpp
         [[nodiscard]] FINLINE size_t capacity_unlocked() const noexcept
         {
             return (ItemsEnd - ItemsStart);
+        }
+        [[nodiscard]] FINLINE size_t size_unlocked() const noexcept
+        {
+            return (Tail - Head);
         }
     };
 }
