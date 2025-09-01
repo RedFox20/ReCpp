@@ -580,11 +580,13 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    ScopedPerfTimer::ScopedPerfTimer(const char* prefix, const char* location, const char* detail) noexcept
+    ScopedPerfTimer::ScopedPerfTimer(const char* prefix, const char* location,
+                                     const char* detail, unsigned long threshold_us) noexcept
         : prefix{prefix}
         , location{location}
         , detail{detail}
         , start{TimePoint::now()}
+        , threshold_us{threshold_us}
     {
     }
 
@@ -592,7 +594,11 @@ namespace rpp
     {
         // measure elapsed time as the first operation in the destructor
         TimePoint now = TimePoint::now();
-        double elapsed_ms = start.elapsed_sec(now) * 1000.0;
+        Duration elapsed = start.elapsed(now);
+        if (threshold_us != 0 && elapsed.micros() <= rpp::int64(threshold_us))
+            return; // within threshold, don't report anything
+
+        double elapsed_ms = elapsed.msec();
 
         const char* padDetail = detail ? " " : "";
         detail = detail ? detail : "";

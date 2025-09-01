@@ -107,6 +107,10 @@ namespace rpp
          */
         constexpr double sec() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
         /**
+         * @returns TOTAL fractional milliseconds (positive or negative) of this Duration
+         */
+        constexpr double msec() const noexcept { return double(nsec) / double(NANOS_PER_MILLI); }
+        /**
          * @returns TOTAL int64 seconds (positive or negative) of this Duration
          */
         constexpr int64 seconds() const noexcept { return nsec / NANOS_PER_SEC; }
@@ -423,6 +427,15 @@ namespace rpp
 
     /**
      * Automatically logs performance from constructor to destructor and writes it to log
+     * 
+     * @code 
+     * void slow_function()
+     * {
+     *     ScopedPerfTimer timer{"[perf]", __FUNCTION__, 500};
+     *     do_slow_work();
+     *     // reports elapsed time to log if > 500us elapsed
+     * }
+     * @endcode
      */
     class RPPAPI ScopedPerfTimer
     {
@@ -430,6 +443,7 @@ namespace rpp
         const char* location; // funcname:     "someFunction()"
         const char* detail;   // detail info:  currentItem.name.c_str()
         TimePoint start;
+        unsigned long threshold_us; // microseconds threshold to trigger the logging
     public:
         /**
          * Scoped performance timer with optional prefix, function name and detail info
@@ -437,18 +451,18 @@ namespace rpp
          * @param location Location name where time is being measured
          * @param detail Detailed info of which item is being measured, for example an item name
          */
-        ScopedPerfTimer(const char* prefix, const char* location, const char* detail) noexcept;
-        ScopedPerfTimer(const char* prefix, const char* location) noexcept
-            : ScopedPerfTimer{prefix, location, nullptr} {}
+        ScopedPerfTimer(const char* prefix, const char* location, const char* detail, unsigned long threshold_us) noexcept;
+        ScopedPerfTimer(const char* prefix, const char* location, unsigned long threshold_us = 0) noexcept
+            : ScopedPerfTimer{prefix, location, nullptr, threshold_us} {}
     #if RPP_HAS_CXX20 || _MSC_VER >= 1926 || defined(__GNUC__)
         explicit ScopedPerfTimer(const char* location = __builtin_FUNCTION()) noexcept
-            : ScopedPerfTimer{"[perf]", location, nullptr} {}
+            : ScopedPerfTimer{"[perf]", location, nullptr, 0} {}
     #else
         ScopedPerfTimer() noexcept
-            : ScopedPerfTimer{"[perf]", "unknown location", nullptr} {}
+            : ScopedPerfTimer{"[perf]", "unknown location", nullptr, 0} {}
         /** @brief For backwards compatibility */
         explicit ScopedPerfTimer(const char* location) noexcept
-            : ScopedPerfTimer{"[perf]", location, nullptr} {}
+            : ScopedPerfTimer{"[perf]", location, nullptr, 0} {}
     #endif
         ~ScopedPerfTimer() noexcept;
     };
