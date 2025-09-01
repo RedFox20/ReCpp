@@ -62,12 +62,11 @@ namespace rpp
     // NOTE: the granularity of WinAPI SleepConditionVariable is ~15.6ms
     //       which is the default scheduling rate on Windows systems, and windows is not a realtime OS
     //       This method attempts to use a multimedia timer to achieve higher precision sleeps
-    std::cv_status condition_variable::_wait_for_unlocked(const duration& rel_time) noexcept
+    std::cv_status condition_variable::_wait_for_unlocked(rpp::int64 wait_nanos) noexcept
     {
         // BUGFIX: We can only do ONE SleepConditionVariableSRW call in this function
         //         because the mutex is unlocked and re-locked by SleepConditionVariableSRW
         //         which can cause a race condition and a deadlock to occur
-        const int64_t wait_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(rel_time).count();
         if (wait_nanos <= 0)
         {
             if (SleepConditionVariableSRW(CONDVAR(handle), (PSRWLOCK)cs.native_handle(), 0, 0))
