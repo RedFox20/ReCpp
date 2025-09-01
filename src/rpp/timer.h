@@ -451,7 +451,7 @@ namespace rpp
          * @param location Location name where time is being measured
          * @param detail Detailed info of which item is being measured, for example an item name
          */
-        ScopedPerfTimer(const char* prefix, const char* location, const char* detail, unsigned long threshold_us) noexcept;
+        ScopedPerfTimer(const char* prefix, const char* location, const char* detail, unsigned long threshold_us = 0) noexcept;
         ScopedPerfTimer(const char* prefix, const char* location, unsigned long threshold_us = 0) noexcept
             : ScopedPerfTimer{prefix, location, nullptr, threshold_us} {}
     #if RPP_HAS_CXX20 || _MSC_VER >= 1926 || defined(__GNUC__)
