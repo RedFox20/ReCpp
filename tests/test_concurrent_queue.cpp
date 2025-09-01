@@ -4,7 +4,6 @@
 #include <rpp/scope_guard.h>
 #include <rpp/tests.h>
 using namespace rpp;
-using namespace std::chrono_literals;
 
 TestImpl(test_concurrent_queue)
 {
@@ -18,8 +17,8 @@ TestImpl(test_concurrent_queue)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
-    using Clock = concurrent_queue<std::string>::clock;
-    using Millis = std::chrono::milliseconds;
+    TimePoint Now() { return TimePoint::now(); }
+    constexpr Duration Millis(int millis) { return Duration::from_millis(millis); }
 
     TestInit(test_concurrent_queue)
     {
@@ -33,19 +32,16 @@ TestImpl(test_concurrent_queue)
         std::string item3 = "item3";
         queue.push(item3); // copy
         AssertThat(queue.size(), 3);
-        AssertThat(queue.safe_size(), 3);
         AssertThat(queue.empty(), false);
 
         AssertThat(queue.pop(), "item1");
         AssertThat(queue.pop(), "item2");
         AssertThat(queue.pop(), "item3");
         AssertThat(queue.size(), 0);
-        AssertThat(queue.safe_size(), 0);
         AssertThat(queue.empty(), true);
 
         queue.push_no_notify("item4");
         AssertThat(queue.size(), 1);
-        AssertThat(queue.safe_size(), 1);
         AssertThat(queue.empty(), false);
         AssertThat(queue.pop(), "item4");
     }
@@ -151,7 +147,7 @@ TestImpl(test_concurrent_queue)
 
         int numPopped = 0;
         std::string item;
-        while (queue.wait_pop(item, 50ms))
+        while (queue.wait_pop(item, Millis(50)))
             ++numPopped;
         AssertThat(numPopped, MAX_SIZE);
     }
@@ -169,7 +165,7 @@ TestImpl(test_concurrent_queue)
         rpp::Timer t;
         int numPopped = 0;
         std::string item;
-        while (numPopped < MAX_SIZE && queue.wait_pop(item, 100ms))
+        while (numPopped < MAX_SIZE && queue.wait_pop(item, Millis(100)))
         {
             ++numPopped;
         }
@@ -307,7 +303,7 @@ TestImpl(test_concurrent_queue)
         explicit operator bool() const noexcept { return success; }
     };
 
-    PopResult wait_pop_timed(concurrent_queue<std::string>& queue, Clock::duration timeout)
+    PopResult wait_pop_timed(concurrent_queue<std::string>& queue, Duration timeout)
     {
         PopResult r;
         rpp::Timer t;
@@ -328,14 +324,14 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
-        AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
+        AssertWaitPopTimed(Millis(5), false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
+        AssertWaitPopTimed(Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout, 
         // we should get it immediately
         queue.push("item1");
-        AssertWaitPopTimed(10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 20.0);
+        AssertWaitPopTimed(Millis(10'000), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
+        AssertWaitPopTimed(Millis(15), false, /*item*/"", /*elapsed ms:*/ 14.0, 20.0);
     }
 
     // introduce a slow producer thread so we can test our timeouts
@@ -355,19 +351,19 @@ TestImpl(test_concurrent_queue)
         scope_guard([&]{ slow_producer.get(); });
 
         PopResult r;
-        AssertWaitPopTimed(5ms, false, /*item*/"", /*elapsed ms:*/ 4.0, 11.0);
-        AssertWaitPopTimed(0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
-        AssertWaitPopTimed(15ms, false, /*item*/"", /*elapsed ms:*/ 14.0, 18.0);
+        AssertWaitPopTimed(Millis(5), false, /*item*/"", /*elapsed ms:*/ 4.0, 11.0);
+        AssertWaitPopTimed(Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
+        AssertWaitPopTimed(Millis(15), false, /*item*/"", /*elapsed ms:*/ 14.0, 18.0);
 
-        AssertWaitPopTimed(50ms, true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
-        AssertWaitPopTimed(75ms, true, /*item*/"item2", /*elapsed ms:*/ 25.0, 55.0);
-        AssertWaitPopTimed(75ms, true, /*item*/"item3", /*elapsed ms:*/ 25.0, 55.0);
+        AssertWaitPopTimed(Millis(50), true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
+        AssertWaitPopTimed(Millis(75), true, /*item*/"item2", /*elapsed ms:*/ 25.0, 55.0);
+        AssertWaitPopTimed(Millis(75), true, /*item*/"item3", /*elapsed ms:*/ 25.0, 55.0);
 
         // now we enter a long wait, but we should be notified by the producer
-        AssertWaitPopTimed(1000ms, true, /*item*/"item4", /*elapsed ms:*/ 0.0, 110.0);
+        AssertWaitPopTimed(Millis(1000), true, /*item*/"item4", /*elapsed ms:*/ 0.0, 110.0);
     }
 
-    PopResult wait_pop_until(concurrent_queue<std::string>& queue, Clock::time_point until)
+    PopResult wait_pop_until(concurrent_queue<std::string>& queue, TimePoint until)
     {
         PopResult r;
         rpp::Timer t;
@@ -389,20 +385,20 @@ TestImpl(test_concurrent_queue)
 
         PopResult r;
 
-        AssertWaitPopUntil(Clock::now()+5ms, false, /*item*/"", /*elapsed ms:*/ 2.9, 10.0);
-        AssertWaitPopUntil(Clock::now()+0ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
+        AssertWaitPopUntil(Now()+Millis(5), false, /*item*/"", /*elapsed ms:*/ 2.9, 10.0);
+        AssertWaitPopUntil(Now()+Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout,
         // we should get it immediately
         queue.push("item1");
-        AssertWaitPopUntil(Clock::now()+10s, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
-        AssertWaitPopUntil(Clock::now()+15ms, false, /*item*/"", /*elapsed ms:*/ 12.9, 20.0);
+        AssertWaitPopUntil(Now()+Millis(10'000), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);
+        AssertWaitPopUntil(Now()+Millis(15), false, /*item*/"", /*elapsed ms:*/ 12.9, 20.0);
 
         // if we have an item, but `until` is in the past, it should immediately return false
         queue.push("item2");
-        AssertWaitPopUntil(Clock::now()-15ms, false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
+        AssertWaitPopUntil(Now()-Millis(15), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
         // and now we can consume it
-        AssertWaitPopUntil(Clock::now()+15ms, true, /*item*/"item2", /*elapsed ms:*/ 0.0, 0.2);
+        AssertWaitPopUntil(Now()+Millis(15), true, /*item*/"item2", /*elapsed ms:*/ 0.0, 0.2);
     }
 
     // ensure that `wait_pop_until` gives up if timeout is reached
@@ -422,7 +418,7 @@ TestImpl(test_concurrent_queue)
         PopResult r;
 
         // we should only have time to receive item1 and item2
-        auto until = Clock::now() + 125ms;
+        auto until = Now() + Millis(125);
         AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 20.0, 60.0);
         AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 20.0, 60.0);
         AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 20.0, 60.0);
@@ -449,17 +445,17 @@ TestImpl(test_concurrent_queue)
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
-        AssertFalse(queue.wait_pop(item, 15ms, cancelCondition)); // this should timeout
-        AssertTrue(queue.wait_pop(item, 40ms, cancelCondition));
+        AssertFalse(queue.wait_pop(item, Millis(15), cancelCondition)); // this should timeout
+        AssertTrue(queue.wait_pop(item, Millis(40), cancelCondition));
         AssertThat(item, "item1");
-        AssertTrue(queue.wait_pop(item, 55ms, cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(55), cancelCondition));
         AssertThat(item, "item2");
-        AssertTrue(queue.wait_pop(item, 55ms, cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(55), cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
         // this should not take longer than ~55ms
         rpp::Timer t;
-        AssertFalse(queue.wait_pop(item, 1000ms, cancelCondition));
+        AssertFalse(queue.wait_pop(item, Millis(1000), cancelCondition));
         AssertLess(t.elapsed_millis(), 55);
     }
 
@@ -492,29 +488,29 @@ TestImpl(test_concurrent_queue)
 
         // wait for 100ms with 10ms intervals, but first item will arrive within ~50ms
         std::atomic_int counter0 = 0;
-        AssertTrue(wait_pop_interval(item, 100ms, 10ms, [&] { return ++counter0 >= 10; }));
+        AssertTrue(wait_pop_interval(item, Millis(100), Millis(10), [&] { return ++counter0 >= 10; }));
         AssertThat(item, "item1");
         AssertInRange(int(counter0), 5, 9);
 
         // wait for 20ms with 5ms intervals, it should timeout
         std::atomic_int counter1 = 0;
-        AssertFalse(wait_pop_interval(item, 20ms, 5ms, [&] { return ++counter1 >= 10; }));
+        AssertFalse(wait_pop_interval(item, Millis(20), Millis(5), [&] { return ++counter1 >= 10; }));
         AssertInRange(int(counter1), 1, 6); // tolerance is VERY loose here
 
         // wait another 30ms with 2ms intervals, and it should trigger the cancelcondition
         std::atomic_int counter2 = 0;
-        AssertFalse(wait_pop_interval(item, 30ms, 2ms, [&] { return ++counter2 >= 10; }));
+        AssertFalse(wait_pop_interval(item, Millis(30), Millis(2), [&] { return ++counter2 >= 10; }));
         AssertThat(int(counter2), 10); // it should have cancelled exactly at 10 checks
 
         // wait until we pop the item finally
         std::atomic_int counter3 = 0;
-        AssertTrue(wait_pop_interval(item, 100ms, 5ms, [&] { return ++counter3 >= 20; }));
+        AssertTrue(wait_pop_interval(item, Millis(100), Millis(5), [&] { return ++counter3 >= 20; }));
         AssertThat(item, "item2");
         AssertLess(int(counter3), 20); // we should never have reached all the checks
 
         // now wait with extreme short intervals
         std::atomic_int counter4 = 0;
-        AssertTrue(wait_pop_interval(item, 55ms, 1ms, [&] { return ++counter4 >= 55; }));
+        AssertTrue(wait_pop_interval(item, Millis(55), Millis(1), [&] { return ++counter4 >= 55; }));
         AssertThat(item, "item3");
         // we should never have reached the limit of 55
         // however there is NO guarantee that the sleep will be 1ms, that's just a minimum hint
@@ -554,7 +550,7 @@ TestImpl(test_concurrent_queue)
                     //     ++num_received;
                     // item = *queue.wait_pop();
                     // ++num_received;
-                    if (queue.wait_pop(item, Millis{5})) {
+                    if (queue.wait_pop(item, Millis(5))) {
                         ++num_received;
                     }
                 }
@@ -595,7 +591,7 @@ TestImpl(test_concurrent_queue)
                 int num_received = 0;
                 std::string item;
                 while (num_received < num_items) {
-                    if (queue.wait_pop_interval(item, Millis{15}, Millis{5},
+                    if (queue.wait_pop_interval(item, Millis(15), Millis(5),
                                                 []{ return false; })) {
                         ++num_received;
                     }

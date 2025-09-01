@@ -33,9 +33,8 @@ namespace rpp
         T* ItemsEnd = nullptr;
 
     public:
-        using clock = std::chrono::high_resolution_clock;
-        using duration = clock::duration;
-        using time_point = clock::time_point;
+        using duration = rpp::Duration;
+        using time_point = rpp::TimePoint;
 
     private:
         using mutex_t = rpp::mutex;
@@ -43,16 +42,33 @@ namespace rpp
         mutable mutex_t Mutex;
         mutable rpp::condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
-        std::atomic_bool Cleared = false;
+        std::atomic_bool StopWaiting = false;
 
     public:
         concurrent_queue() = default;
         ~concurrent_queue() noexcept
         {
-            // safely lock, clear and notify all waiters to give up
-            clear();
-            if (ItemsStart) // all items should be destroyed now, free the ringbuffer
+            // signal all waiters to exit first, don't clear/destroy yet
+            {
+                auto lock1 = spin_lock();
+                StopWaiting.store(true, std::memory_order_release);
+                notify_all_unlocked();
+            }
+
+            // -- allow other threads to stop waiting, because StopWaiting==true --
+
+            // then lock again, clear items and free the memory
+            auto lock2 = spin_lock();
+            StopWaiting.store(true, std::memory_order_release); // set this again in case another thread still pushed something
+            clear_unlocked();
+
+            if (ItemsStart)
+            {
+                // all items should be destroyed now, free the ringbuffer
                 free(ItemsStart);
+                ItemsStart = nullptr;
+                ItemsEnd = nullptr;
+            }
         }
 
         concurrent_queue(const concurrent_queue&) = delete;
@@ -61,11 +77,13 @@ namespace rpp
         concurrent_queue(concurrent_queue&& q) noexcept
         {
             // safely swap the states from q to default empty state
-            std::lock_guard lock { q.mutex() };
+            std::scoped_lock dual_lock { mutex(), q.mutex() };
             std::swap(Head, q.Head);
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
+            q.StopWaiting.store(false, std::memory_order_release);
+            StopWaiting.store(false, std::memory_order_release);
             // notify only the old queue
             q.notify_all_unlocked();
         }
@@ -78,6 +96,8 @@ namespace rpp
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
+            q.StopWaiting.store(false, std::memory_order_release);
+            StopWaiting.store(false, std::memory_order_release);
             // notify all waiters for both queues
             q.notify_all_unlocked();
             notify_all_unlocked();
@@ -105,34 +125,22 @@ namespace rpp
         }
 
         /**
-         * @returns Capacity of the queue (unsafe)
+         * @returns Capacity of the queue (safe)
          */
         [[nodiscard]] FINLINE size_t capacity() const noexcept
         {
-            return (ItemsEnd - ItemsStart);
-        }
-
-        /**
-         * @returns Approximate size of the queue (unsafe)
-         */
-        [[nodiscard]] FINLINE size_t size() const noexcept
-        {
-            return (Tail - Head);
+            auto lock = spin_lock();
+            return capacity_unlocked();
         }
 
         /**
          * @returns Synchronized current size of the queue,
          *          however using this value is not atomic
          */
-        [[nodiscard]] size_t safe_size() const noexcept
+        [[nodiscard]] FINLINE size_t size() const noexcept
         {
-            if (mutex().try_lock()) // @note try_lock() for noexcept guarantee
-            {
-                size_t sz = size();
-                mutex().unlock();
-                return sz;
-            }
-            return size();
+            auto lock = spin_lock();
+            return (Tail - Head);
         }
 
         /**
@@ -182,24 +190,28 @@ namespace rpp
         {
             auto lock = spin_lock();
             clear_unlocked(); // destroy all elements
-            Cleared = true; // set the cleared flag
             notify_all_unlocked(); // notify all waiters that the queue was emptied
         }
 
-        void reserve(int newCapacity) noexcept
+        /**
+         * @brief Pre-allocates memory for the queue
+         * @returns TRUE if pre-allocation succeeded, FALSE if allocation failed
+         */
+        bool reserve(size_t newCapacity) noexcept
         {
             auto lock = spin_lock();
-            if (newCapacity > capacity())
-                grow_to(newCapacity);
+            if (newCapacity > capacity_unlocked())
+                return grow_to(newCapacity);
+            return true;
         }
 
         /**
          * @returns An atomic copy of the entire queue items
          */
-        [[nodiscard]] std::vector<T> atomic_copy() const noexcept
+        [[nodiscard]] std::vector<T> atomic_copy() const
         {
             auto lock = spin_lock();
-            return std::vector<T>{Head, Tail};
+            return std::vector<T>{Head, Tail}; // can throw
         }
 
         /** @brief A no-op proxy for iterating an already locked queue */
@@ -257,9 +269,6 @@ namespace rpp
          */
         [[nodiscard]] bool try_pop_all(std::vector<T>& outItems) noexcept
         {
-            if (Head == Tail)
-                return false;
-
             if (mutex().try_lock())
             {
                 if (T* head = Head, *tail = Tail; head != tail)
@@ -324,10 +333,11 @@ namespace rpp
          */
         [[nodiscard]] T pop()
         {
-            T item;
             auto lock = spin_lock();
             if (Head == Tail)
                 throw std::runtime_error{"concurrent_queue<T>::pop(): Queue was empty!"};
+
+            T item;
             pop_unlocked(item);
             return item;
         }
@@ -341,9 +351,6 @@ namespace rpp
          */ 
         [[nodiscard]] bool try_pop(T& outItem) noexcept
         {
-            if (Head == Tail)
-                return false;
-
             if (mutex().try_lock())
             {
                 if (Head == Tail)
@@ -369,9 +376,6 @@ namespace rpp
          */
         [[nodiscard]] bool peek(T& outItem) const noexcept
         {
-            if (Head == Tail)
-                return false;
-
             if (mutex().try_lock())
             {
                 if (Head == Tail)
@@ -408,9 +412,6 @@ namespace rpp
          */
         [[nodiscard]] bool pop_atomic_start(T& outItem) noexcept
         {
-            if (Head == Tail)
-                return false;
-
             if (mutex().try_lock())
             {
                 if (Head == Tail)
@@ -472,7 +473,7 @@ namespace rpp
          * @param timeout Maximum time to wait before returning FALSE
          * @returns TRUE if an item is available to peek or pop
          */
-        [[nodiscard]] bool wait_available(duration timeout) const noexcept
+        [[nodiscard]] bool wait_available(rpp::Duration timeout) const noexcept
         {
             auto lock = spin_lock();
             return wait_notify_for(lock, timeout);
@@ -523,7 +524,7 @@ namespace rpp
          * @return TRUE if an item was popped, FALSE if timed out.
          * @code
          *   string item;
-         *   if (queue.wait_pop(item, std::chrono::milliseconds{100}))
+         *   if (queue.wait_pop(item, rpp::Duration::from_millis(100)))
          *   {
          *       // item is valid
          *   }
@@ -531,7 +532,7 @@ namespace rpp
          * @endcode
          */
         [[nodiscard]]
-        bool wait_pop(T& outItem, duration timeout) noexcept
+        bool wait_pop(T& outItem, rpp::Duration timeout) noexcept
         {
             auto lock = spin_lock();
             if (!wait_notify_for(lock, timeout))
@@ -547,7 +548,7 @@ namespace rpp
          * @return TRUE if an item was peeked successfully
          */
         [[nodiscard]]
-        bool wait_peek(T& outItem, duration timeout) const noexcept
+        bool wait_peek(T& outItem, rpp::Duration timeout) const noexcept
         {
             auto lock = spin_lock();
             if (!wait_notify_for(lock, timeout))
@@ -557,14 +558,14 @@ namespace rpp
         }
 
         /**
-         * Only returns items if `clock::now() < until`. This is excellent for message handling
+         * Only returns items if `rpp::TimePoint::now() < until`. This is excellent for message handling
          * loops that have an absolute time limit for processing messages.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
          * @param until [required] Timepoint to wait until before returning FALSE
          * @return TRUE if an item was popped, FALSE if timed out.
          * @code
-         *   auto until = std::chrono::steady_clock::now() + time_limit;
+         *   auto until = rpp::TimePoint::now() + time_limit;
          *   string item;
          *   // process messages until time limit is reached
          *   while (queue.wait_pop_until(item, until))
@@ -574,9 +575,9 @@ namespace rpp
          * @endcode
          */
         [[nodiscard]]
-        bool wait_pop_until(T& outItem, time_point until) noexcept
+        bool wait_pop_until(T& outItem, rpp::TimePoint until) noexcept
         {
-            auto now = clock::now();
+            auto now = rpp::TimePoint::now();
 
             // if we're already past the time limit, then don't check anything
             // this ensures while() loops don't get stuck processing items endlessly
@@ -604,7 +605,7 @@ namespace rpp
          *         FALSE if no item popped due to: timeout or cancellation.
          * @code
          *   string item;
-         *   auto timeout = std::chrono::milliseconds{100};
+         *   auto timeout = rpp::Duration::from_millis(100);
          *   if (queue.wait_pop(item, timeout, [this]{ return this->cancelled || this->finished; })
          *   {
          *       // item is valid
@@ -613,9 +614,9 @@ namespace rpp
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop(T& outItem, duration timeout, const WaitUntil& cancelCondition)  noexcept(noexcept(cancelCondition()))
+        bool wait_pop(T& outItem, rpp::Duration timeout, const WaitUntil& cancelCondition)  noexcept(noexcept(cancelCondition()))
         {
-            duration interval = timeout / 10;
+            rpp::Duration interval = timeout / 10;
             return wait_pop_interval<WaitUntil>(outItem, timeout, interval, cancelCondition);
         }
 
@@ -638,7 +639,7 @@ namespace rpp
          *         FALSE if no item popped due to: timeout or cancellation
          * @code
          *   string item;
-         *   auto interval = std::chrono::milliseconds{100};
+         *   auto interval = rpp::Duration::from_millis(100);
          *   if (queue.wait_pop_interval(item, timeout, interval, [this]{ return this->cancelled || this->finished; })
          *   {
          *       // item is valid
@@ -647,15 +648,15 @@ namespace rpp
          */
         template<class WaitUntil>
         [[nodiscard]]
-        bool wait_pop_interval(T& outItem, duration timeout, duration interval,
+        bool wait_pop_interval(T& outItem, rpp::Duration timeout, rpp::Duration interval,
                                const WaitUntil& cancelCondition) noexcept(noexcept(cancelCondition()))
         {
             auto lock = spin_lock();
             if (Head == Tail)
             {
-                duration remaining = timeout;
-                time_point prevTime = clock::now();
-                constexpr duration zero = duration{0};
+                rpp::Duration remaining = timeout;
+                rpp::TimePoint prevTime = rpp::TimePoint::now();
+                constexpr rpp::Duration zero = rpp::Duration{0};
                 do
                 {
                     if (cancelCondition())
@@ -665,10 +666,10 @@ namespace rpp
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, prevTime + interval); // may throw
                 #endif
+                    if (StopWaiting.load(std::memory_order_acquire)) return false; // give up immediately
                     if (Head != Tail) break; // got data
-                    if (Cleared) return false; // give up immediately
 
-                    time_point now = clock::now();
+                    rpp::TimePoint now = rpp::TimePoint::now();
                     remaining -= (now - prevTime);
                     if (remaining <= zero)
                         break; // timed out
@@ -695,41 +696,41 @@ namespace rpp
             return Head != Tail;
         }
         // wait_notify with a timeout, returns true if there is an item
-        bool wait_notify_for(lock_t& lock, const duration& timeout) const noexcept
+        bool wait_notify_for(lock_t& lock, const rpp::Duration& timeout) const noexcept
         {
             if (Head != Tail) return true; // wait is not needed
-            auto now = clock::now();
+            auto now = rpp::TimePoint::now();
             auto end = now + timeout;
             do {
                 #if _MSC_VER // on Win32 wait_for is faster
-                    duration remaining = end - now;
+                    rpp::Duration remaining = end - now;
                     (void)Waiter.wait_for(lock, remaining); // noexcept
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, end); // may throw
                 #endif
+                if (StopWaiting.load(std::memory_order_acquire)) return false; // give up immediately
                 if (Head != Tail) return true; // got an item
-                if (Cleared) return false; // give up immediately
-                now = clock::now();
+                now = rpp::TimePoint::now();
             } while (now < end); // handle spurious wakeups
             return false;
         }
-        bool wait_notify_until(lock_t& lock, const time_point& until) const noexcept
+        bool wait_notify_until(lock_t& lock, const rpp::TimePoint& until) const noexcept
         {
             if (Head != Tail) return true; // wait is not needed
-            time_point now;
+            rpp::TimePoint now;
             #if _MSC_VER
-                now = clock::now();
+                now = rpp::TimePoint::now();
             #endif
             do {
                 #if _MSC_VER // on Win32 wait_for is faster
-                    duration remaining = until - now;
+                    rpp::Duration remaining = until - now;
                     (void)Waiter.wait_for(lock, remaining); // noexcept
                 #else // on GCC wait_until is faster
                     (void)Waiter.wait_until(lock, until); // may throw
                 #endif
+                if (StopWaiting.load(std::memory_order_acquire)) return false; // give up immediately
                 if (Head != Tail) return true; // got an item
-                if (Cleared) return false; // give up immediately
-                now = clock::now();
+                now = rpp::TimePoint::now();
             } while (now < until); // handle spurious wakeups
             return false;
         }
@@ -744,7 +745,10 @@ namespace rpp
         void push_unlocked(T&& item) noexcept
         {
             if (Tail == ItemsEnd)
-                ensure_capacity();
+            {
+                if (!ensure_capacity())
+                    return; // alloc failed
+            }
 
             if constexpr (std::is_trivially_move_assignable_v<T>)
                 *Tail++ = std::move(item);
@@ -754,7 +758,10 @@ namespace rpp
         void push_unlocked(const T& item) noexcept
         {
             if (Tail == ItemsEnd)
-                ensure_capacity();
+            {
+                if (!ensure_capacity())
+                    return; // alloc failed
+            }
 
             if constexpr (std::is_trivially_copy_assignable_v<T>)
                 *Tail++ = item;
@@ -784,9 +791,9 @@ namespace rpp
                 clear_unlocked();
             }
         }
-        void ensure_capacity() noexcept
+        bool ensure_capacity() noexcept
         {
-            const size_t oldCap = capacity();
+            const size_t oldCap = capacity_unlocked();
             // we have enough capacity, just shift the items to the front
             if (oldCap > 0 && size_t(Head - ItemsStart) >= (oldCap / 2))
             {
@@ -799,22 +806,27 @@ namespace rpp
             else // grow
             {
                 size_t growBy = oldCap ? oldCap : 32;
-                if (growBy > (16*1024)) growBy = 16*1024;
+                if (growBy > (16*1024)) growBy = 16*1024; // put a hard limit to exponential growth
                 const size_t newCap = oldCap + growBy;
-                grow_to(newCap);
+                if (!grow_to(newCap))
+                    return false; // if alloc fails, we can't push new items
             }
-            Cleared = false; // reset the cleared flag
+            StopWaiting.store(false, std::memory_order_release); // reset the stop waiting flag
+            return true;
         }
-        void grow_to(size_t newCap) noexcept
+        bool grow_to(size_t newCap) noexcept
         {
             T* oldStart = ItemsStart;
             T* newStart = (T*)malloc(newCap * sizeof(T));
+            if (!newStart)
+                return false;
             T* newTail = move_items(Head, Tail, newStart);
             Head = newStart;
             Tail = newTail;
             ItemsStart = newStart;
             ItemsEnd = newStart + newCap;
             free(oldStart);
+            return true;
         }
         static T* move_items(T* oldHead, T* oldTail, T* newStart) noexcept
         {
@@ -844,13 +856,17 @@ namespace rpp
 
             // if the capacity was huge, then free the entire buffer
             // to avoid massive memory usage for a small queue
-            if (capacity() > 8192)
+            if (capacity_unlocked() > 8192)
             {
                 free(ItemsStart);
                 ItemsStart = ItemsEnd = nullptr;
             }
 
             Head = Tail = ItemsStart;
+        }
+        [[nodiscard]] FINLINE size_t capacity_unlocked() const noexcept
+        {
+            return (ItemsEnd - ItemsStart);
         }
     };
 }

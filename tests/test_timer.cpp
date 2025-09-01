@@ -440,6 +440,21 @@ TestImpl(test_timer)
         AssertEqual(t3.to_string(9), "2024-03-04 09:08:07.123456789");
     }
 
+    TestCase(timepoint_handles_timezone_offset)
+    {
+        auto t1 = rpp::TimePoint(2021, 1, 1, 12, 34, 56, 789'010'000LL);
+        auto local = t1.utc_to_local();
+        print_info("time:  %s\n", t1.to_string().c_str());
+        print_info("local: %s\n", local.to_string().c_str());
+
+        rpp::int64 tz_offset = rpp::TimePoint::timezone_offset_seconds();
+        print_info("tz_offset: %lld sec\n", tz_offset);
+        auto expected = t1 + rpp::Duration::from_seconds(tz_offset);
+        print_info("expected: %s\n", expected.to_string().c_str());
+
+        AssertEqual(local.to_string(), expected.to_string());
+    }
+
     TestCase(proc_cpu_times)
     {
         rpp::cpu_usage_info t1 = rpp::proc_total_cpu_usage();

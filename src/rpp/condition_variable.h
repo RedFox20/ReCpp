@@ -16,6 +16,7 @@
 #  include "debugging.h"
 #endif
 
+#include "timer.h" // rpp::Duration, rpp::TimePoint
 #include <condition_variable> // std::cv_status
 
 namespace rpp
@@ -24,7 +25,114 @@ namespace rpp
 #if !_MSC_VER
 
     // for non-windows platforms use the standard condition variable
-    using condition_variable = std::condition_variable;
+    // but with wait() adapters for rpp::TimePoint and rpp::Duration
+    class condition_variable : public std::condition_variable
+    {
+    public:
+        using std::condition_variable::condition_variable;
+
+        using clock = std::chrono::system_clock;
+        using duration = clock::duration;
+        using time_point = clock::time_point;
+
+        /**
+         * @brief Blocks the current thread until the condition variable is awakened.
+         *
+         * @details Atomically releases lock, blocks the current executing thread,
+         *          and adds it to the list of threads waiting on *this.
+         *          The thread will be unblocked when notify_all() or notify_one() is executed,
+         *          or when the relative timeout rel_time expires. It may also be unblocked spuriously.
+         *          When unblocked, regardless of the reason, lock is reacquired and wait_for() exits.
+         *
+         * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
+         * @param rel_time an object of type rpp::Duration representing the maximum time to spend waiting.
+         *                 Note that rel_time must be small enough not to overflow when added to
+         *                 clock::now().
+         *
+         * @returns std::cv_status::timeout if the relative timeout specified by rel_time expired,
+         *          std::cv_status::no_timeout otherwise.
+         */
+        template<class Mutex>
+        [[nodiscard]]
+        std::cv_status wait_for(std::unique_lock<Mutex>& lock, const rpp::Duration& rel_time) noexcept
+        {
+            // convert to absolute time, since on GCC that one is faster
+            auto abs_time = clock::now() + std::chrono::nanoseconds(rel_time.nsec);
+            return std::condition_variable::wait_until(lock, abs_time);
+        }
+
+        /**
+         * @brief Blocks the current thread until the condition variable
+         *        is awakened or after the specified timeout duration.
+         *
+         * @details Atomically releases lock, blocks the current executing thread,
+         *          and adds it to the list of threads waiting on *this.
+         *          The thread will be unblocked when notify_all() or notify_one() is executed,
+         *          or when the absolute time point abs_time is reached.
+         *          It may also be unblocked spuriously. When unblocked, regardless of the reason,
+         *          lock is reacquired and wait_until() exits.
+         *          If this function exits via exception, lock is also reacquired.
+         *
+         * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
+         * @param abs_time an object of type rpp::TimePoint representing the time when to stop waiting
+         * @returns std::cv_status::timeout if the absolute timeout specified
+         *          by abs_time was reached, std::cv_status::no_timeout otherwise.
+         */
+        template<class Mutex>
+        [[nodiscard]]
+        std::cv_status wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time) noexcept
+        {
+            auto abs_chrono_time = time_point{std::chrono::nanoseconds(abs_time.duration.nsec)};
+            return std::condition_variable::wait_until(lock, abs_chrono_time);
+        }
+
+        /**
+         * @brief This overload may be used to ignore spurious awakenings.
+         *
+         * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
+         * @param abs_time an object of type std::chrono::time_point representing the time when to stop waiting
+         * @param stop_waiting predicate which returns ​false if the waiting should be continued.
+         *
+         * @returns false if the predicate pred still evaluates to false
+         *          after the abs_time timeout expired, otherwise true.
+         */
+        template<class Mutex, class Predicate>
+        [[nodiscard]]
+        bool wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time,
+                        const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+        {
+            auto abs_chrono_time = time_point{std::chrono::nanoseconds(abs_time.duration.nsec)};
+            while (!stop_waiting())
+                if (wait_until(lock, abs_chrono_time) == std::cv_status::timeout)
+                    return stop_waiting();
+            return true;
+        }
+
+        /**
+         * @brief This overload may be used to ignore spurious awakenings
+         *
+         * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
+         * @param rel_time an object of type rpp::Duration representing the maximum time to spend waiting.
+         *                 Note that rel_time must be small enough not to overflow when added to
+         *                 clock::now().
+         * @param stop_waiting predicate which returns ​false if the waiting should be continued
+         *
+         * @returns false if the predicate stop_waiting still evaluates
+         *          to false after the rel_time timeout expired, otherwise true.
+         */
+        template<class Mutex, class Predicate>
+        [[nodiscard]]
+        bool wait_for(std::unique_lock<Mutex>& lock, const rpp::Duration& rel_time,
+                      const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+        {
+            // convert to absolute time, since on GCC that one is faster
+            auto abs_time = clock::now() + std::chrono::nanoseconds(rel_time.nsec);
+            while (!stop_waiting())
+                if (wait_until(lock, abs_time) == std::cv_status::timeout)
+                    return stop_waiting();
+            return true;
+        }
+    };
 
 #else
 
@@ -40,8 +148,7 @@ namespace rpp
     public:
         using native_handle_type = void*;
 
-        // freeze to high_resolution_clock only, because anything else is useless for precise waits
-        using clock = std::chrono::high_resolution_clock;
+        using clock = std::chrono::system_clock;
         using duration = clock::duration;
         using time_point = clock::time_point;
 
@@ -175,7 +282,7 @@ namespace rpp
         template<class Mutex, class Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const time_point& abs_time,
-                        const Predicate& stop_waiting) noexcept(stop_waiting())
+                        const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
         {
             while (!stop_waiting())
                 if (wait_until(lock, abs_time) == std::cv_status::timeout)
@@ -198,7 +305,7 @@ namespace rpp
         template<class Mutex, class Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const duration& rel_time,
-                      const Predicate& stop_waiting) noexcept(stop_waiting())
+                      const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
         {
             auto abs_time = clock::now() + rel_time;
             while (!stop_waiting())

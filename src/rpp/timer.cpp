@@ -1,5 +1,5 @@
 #include "timer.h"
-#include <time.h> // gmtime, mktime
+#include <time.h> // gmtime, timegm
 #include "strview.h"
 
 #if _WIN32
@@ -443,22 +443,6 @@ namespace rpp
         return int(end - buf);
     }
 
-    // TODO: this won't handle system time changes correctly, so we need an invalidation condition
-    static time_t get_timezone_offset_seconds() noexcept
-    {
-        static time_t timezone_offset = []() -> time_t
-        {
-            time_t now = time(nullptr); // get current UTC time since epoch
-            std::tm local_tm = localtime_safe(now); // convert to local calendar time with timezone offset and DST
-
-            // convert local calendar time to time since epoch with timezone offset remaining
-            // timegm() is used because mktime() assumes we pass a UTC time which leads to incorrect results
-            time_t local_now = timegm(&local_tm);
-            return local_now - now;
-        }();
-        return timezone_offset;
-    }
-
     TimePoint::TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept
     {
         #if _WIN32
@@ -490,7 +474,7 @@ namespace rpp
         tm.tm_sec  = second;      // [0, 60] after the min allows for 1 positive leap second
         tm.tm_isdst = 0;          // [-1...] -1 for unknown, 0 for not DST, any positive value if DST.
 
-        time_t seconds = mktime(&tm) + get_timezone_offset_seconds();
+        time_t seconds = timegm(&tm); // input time as-is
         duration = Duration{int64(seconds * NANOS_PER_SEC + nanos)};
     }
 
@@ -524,12 +508,34 @@ namespace rpp
     {
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
-            return TimePoint{ ticks_to_ns(ticks_since_epoch()) + get_timezone_offset_seconds() * NANOS_PER_SEC };
+            return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset_seconds() * NANOS_PER_SEC };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
-            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + get_timezone_offset_seconds() * NANOS_PER_SEC };
+            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + timezone_offset_seconds() * NANOS_PER_SEC };
         #endif
+    }
+
+    TimePoint TimePoint::utc_to_local() const noexcept
+    {
+        return TimePoint{ duration.nsec + timezone_offset_seconds() * NANOS_PER_SEC };
+    }
+
+    // TODO: this won't handle system time changes correctly, so we need an invalidation condition
+    int64 TimePoint::timezone_offset_seconds() noexcept
+    {
+        static int64 timezone_offset = []() -> int64
+        {
+            time_t now = time(nullptr); // get current UTC time since epoch
+            std::tm local_tm = localtime_safe(now); // convert to local calendar time with timezone offset and DST
+
+            // convert local calendar time to time since epoch with timezone offset remaining
+            // timegm() takes the TM struct as-is, without additional Timezone adjustment
+            time_t local_now = timegm(&local_tm);
+            time_t timezone_offset_sec = local_now - now;
+            return int64(timezone_offset_sec); // e.g. 10800 if in UTC+3
+        }();
+        return timezone_offset;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

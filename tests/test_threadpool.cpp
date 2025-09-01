@@ -294,7 +294,7 @@ TestImpl(test_threadpool)
         std::atomic_int times_launched {0};
         rpp::parallel_task([&] {
             times_launched += 1; 
-        }).wait(std::chrono::milliseconds{1000});
+        }).wait(rpp::Duration::from_millis(1000));
         AssertThat((int)times_launched, 1);
 
         print_info("Waiting for pool tasks to die naturally...\n");
@@ -303,7 +303,7 @@ TestImpl(test_threadpool)
         print_info("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
             times_launched += 1; 
-        }).wait(std::chrono::milliseconds{1000});
+        }).wait(rpp::Duration::from_millis(1000));
         AssertThat((int)times_launched, 2);
 
         // restore default
@@ -326,7 +326,7 @@ TestImpl(test_threadpool)
             };
 
             for (auto& task : subtasks)
-                AssertThat(task.wait(std::chrono::milliseconds{5000}), wait_result::finished);
+                AssertThat(task.wait(rpp::Duration::from_millis(5000)), wait_result::finished);
         };
         std::vector<pool_task_handle> main_tasks = {
             parallel_task(func),
@@ -337,7 +337,7 @@ TestImpl(test_threadpool)
 
         // TODO: this test is failing, run some stress tests
         for (auto& task : main_tasks)
-            AssertThat(task.wait(std::chrono::milliseconds{5000}), wait_result::finished);
+            AssertThat(task.wait(rpp::Duration::from_millis(5000)), wait_result::finished);
 
         int64 elapsed_ms = t.elapsed_ms();
         if (elapsed_ms >= 5000)

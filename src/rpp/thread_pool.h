@@ -126,7 +126,7 @@ namespace rpp
         std::atomic<pool_task_state*> ptr;
 
     public:
-        using duration = std::chrono::high_resolution_clock::duration;
+        using duration = rpp::Duration;
 
         pool_task_handle(std::nullptr_t) noexcept : ptr{nullptr} {}
         explicit pool_task_handle(pool_worker* w) noexcept
@@ -215,8 +215,8 @@ namespace rpp
         //       This is similar to std::future behaviour
         // @param outErr [out] if outErr != null && *outErr != null, then *outErr
         //                     is initialized with the caught exception (if any)
-        wait_result wait(duration timeout) const;
-        wait_result wait(duration timeout, std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
+        wait_result wait(rpp::Duration timeout) const;
+        wait_result wait(rpp::Duration timeout, std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
 
         // wait for task to finish (no timeout)
         // @note Throws any unhandled exceptions from background thread
@@ -249,7 +249,7 @@ namespace rpp
         rpp::action<int, int> range_task;
         int range_start  = 0;
         int range_end    = 0;
-        std::chrono::milliseconds max_idle_timeout = std::chrono::milliseconds{15'000};
+        rpp::Duration max_idle_timeout = rpp::Duration::from_millis(15'000);
 
         pool_task_handle current_task { nullptr };
         std::atomic_bool killed = false; // this pool_worker is being destroyed/has been destroyed

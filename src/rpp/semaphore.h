@@ -242,12 +242,12 @@ namespace rpp
          * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        FINLINE wait_result wait(const std::chrono::nanoseconds& timeout) noexcept
+        FINLINE wait_result wait(const rpp::Duration& timeout) noexcept
         {
             auto lock = spin_lock();
             return wait(lock, timeout);
         }
-        NOINLINE wait_result wait(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
+        NOINLINE wait_result wait(lock_t& lock, const rpp::Duration& timeout) noexcept
         {
             auto result = wait_no_unset(lock, timeout);
             if (result == semaphore::notified)
@@ -264,20 +264,20 @@ namespace rpp
          * @param timeout Maximum time to wait for this semaphore to be notified
          * @return signaled if wait was successful or timeout if timeoutSeconds had elapsed
          */
-        FINLINE wait_result wait_no_unset(const std::chrono::nanoseconds& timeout) noexcept
+        FINLINE wait_result wait_no_unset(const rpp::Duration& timeout) noexcept
         {
             auto lock = spin_lock();
             return wait_no_unset(lock, timeout);
         }
-        NOINLINE wait_result wait_no_unset(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
+        NOINLINE wait_result wait_no_unset(lock_t& lock, const rpp::Duration& timeout) noexcept
         {
             if (value < 0) LogError("count=%d must not be negative", value.load());
             if (value <= 0)
             {
                 // if timeout is 0, then do not enter this infinite loop, just return instantly
-                if (timeout.count() <= 0)
+                if (timeout.nsec <= 0)
                     return semaphore::timeout;
-                auto until = std::chrono::high_resolution_clock::now() + timeout;
+                auto until = rpp::TimePoint::now() + timeout;
                 while (value <= 0)
                     if (cv.wait_until(lock, until) == std::cv_status::timeout)
                         return semaphore::timeout;
@@ -393,12 +393,12 @@ namespace rpp
         {
             wait_no_unset(lock);
         }
-        FINLINE wait_result wait(const std::chrono::nanoseconds& timeout) noexcept
+        FINLINE wait_result wait(const rpp::Duration& timeout) noexcept
         {
             auto lock = spin_lock();
             return wait_no_unset(lock, timeout);
         }
-        FINLINE wait_result wait(lock_t& lock, const std::chrono::nanoseconds& timeout) noexcept
+        FINLINE wait_result wait(lock_t& lock, const rpp::Duration& timeout) noexcept
         {
             return wait_no_unset(lock, timeout);
         }

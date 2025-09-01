@@ -52,7 +52,7 @@ namespace rpp
         return "none";
     }
 
-    wait_result pool_task_handle::wait(duration timeout) const
+    wait_result pool_task_handle::wait(rpp::Duration timeout) const
     {
         std::exception_ptr err;
         wait_result result = wait(timeout, std::nothrow, &err);
@@ -60,7 +60,7 @@ namespace rpp
         return result;
     }
 
-    wait_result pool_task_handle::wait(duration timeout, std::nothrow_t,
+    wait_result pool_task_handle::wait(rpp::Duration timeout, std::nothrow_t,
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
@@ -113,9 +113,11 @@ namespace rpp
         th = std::thread{[this] { run(); }};
     }
 
-    pool_worker::pool_worker(float max_idle_seconds) : pool_worker{}
+    pool_worker::pool_worker(float max_idle_seconds)
+        : max_idle_timeout(rpp::Duration::from_millis(int(max_idle_seconds*1000)))
     {
-        max_idle_timeout = std::chrono::milliseconds{int(max_idle_seconds*1000)};
+        // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
+        th = std::thread{[this] { run(); }};
     }
 
     pool_worker::~pool_worker() noexcept
@@ -126,7 +128,7 @@ namespace rpp
     void pool_worker::max_idle_time(float max_idle_seconds) noexcept
     {
         auto lock = new_task_flag.spin_lock();
-        max_idle_timeout = std::chrono::milliseconds{int(max_idle_seconds*1000)};
+        max_idle_timeout = rpp::Duration::from_millis(int(max_idle_seconds*1000));
     }
 
     pool_task_handle pool_worker::run_range(int start, int end, const action<int, int>& newTask) noexcept
@@ -203,7 +205,7 @@ namespace rpp
         });
 
         // wait for runner to finish current task before joining the thread
-        wait_result result = current_task.wait(std::chrono::milliseconds{timeoutMillis}, std::nothrow);
+        wait_result result = current_task.wait(rpp::Duration::from_millis(timeoutMillis), std::nothrow);
         return join_or_detach(result);
     }
 
@@ -325,7 +327,7 @@ namespace rpp
         for (;;) // loop until new job, or killed
         {
             // wait for new task flag before checking anything else
-            if (max_idle_timeout.count() > 0)
+            if (max_idle_timeout.nsec > 0)
             {
                 if (new_task_flag.wait(lock, max_idle_timeout) == rpp::semaphore::timeout)
                     return false; // timed out, we should kill the thread
@@ -550,7 +552,7 @@ namespace rpp
                     TaskDebug("parallel_for check_free %s", wait.task.worker_name());
                     // this 1ms wait is necessary, however it slightly slows down the loop
                     // during high contention, so we don't burn CPU trying to get a task
-                    auto result = wait.task.wait(std::chrono::milliseconds{1}, std::nothrow, &err);
+                    auto result = wait.task.wait(rpp::Duration::from_millis(1), std::nothrow, &err);
                     if (result == wait_result::finished)
                     {
                         // try to run next range on the same worker that just finished

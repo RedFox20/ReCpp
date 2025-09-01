@@ -48,7 +48,7 @@ namespace rpp
             to_wchar_str(wname, sizeof(wname), name);
 
             if (FAILED(SetThreadDescription(GetCurrentThread(), wname))) {
-                LogError("failed to set thread name: %s", name);
+                LogError("set_this_thread_name('%s') failed", name);
             }
 
             // and then set it specifically for MSVC Debugger
@@ -68,10 +68,15 @@ namespace rpp
             memcpy(threadName, name.data(), n);
             threadName[n] = '\0';
             #if __APPLE__
-                pthread_setname_np(threadName);
+                int r = pthread_setname_np(threadName);
             #elif __linux__
-                pthread_setname_np(pthread_self(), threadName);
+                int r = pthread_setname_np(pthread_self(), threadName);
             #endif
+            if (r != 0)
+            {
+                int err = errno;
+                LogError("set_this_thread_name('%s') failed: %s", threadName, strerror(err));
+            }
         #endif
     }
 
@@ -99,7 +104,9 @@ namespace rpp
         #else
             char name[64];
             if (pthread_getname_np(pthread_t(thread_id), name, sizeof(name)) == 0)
+            {
                 thread_name = name;
+            }
         #endif
         }
         return thread_name;

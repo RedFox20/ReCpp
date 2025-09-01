@@ -4,7 +4,10 @@
 #include <thread>
 #include <deque>
 
-using millis = std::chrono::milliseconds;
+constexpr rpp::Duration millis(int milliseconds)
+{
+    return rpp::Duration::from_millis(milliseconds);
+}
 
 TestImpl(test_semaphore)
 {
@@ -21,7 +24,7 @@ TestImpl(test_semaphore)
         AssertEqual(1, sem.count());
 
         // wait
-        AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+        AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
         AssertEqual(0, sem.count());
     }
 
@@ -36,11 +39,11 @@ TestImpl(test_semaphore)
         AssertEqual(3, sem.count());
 
         // wait
-        AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+        AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
         AssertEqual(2, sem.count());
-        AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+        AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
         AssertEqual(1, sem.count());
-        AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+        AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
         AssertEqual(0, sem.count());
     }
 
@@ -53,7 +56,7 @@ TestImpl(test_semaphore)
             sem.notify();
 
             rpp::Timer timer;
-            AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+            AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
             AssertLess(timer.elapsed_ms(), 20);
             AssertEqual(0, sem.count());
         }
@@ -70,15 +73,15 @@ TestImpl(test_semaphore)
             sem.notify();
 
             rpp::Timer timer;
-            AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+            AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
             AssertLess(timer.elapsed_ms(), 20);
             AssertEqual(2, sem.count());
             timer.start();
-            AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+            AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
             AssertLess(timer.elapsed_ms(), 20);
             AssertEqual(1, sem.count());
             timer.start();
-            AssertEqual(rpp::semaphore::notified, sem.wait(millis{100}));
+            AssertEqual(rpp::semaphore::notified, sem.wait(millis(100)));
             AssertLess(timer.elapsed_ms(), 20);
             AssertEqual(0, sem.count());
         }
@@ -106,7 +109,7 @@ TestImpl(test_semaphore)
             while (working)
             {
                 rpp::sleep_ms(3); // do some work
-                if (sem.wait(millis{100}) == rpp::semaphore::timeout)
+                if (sem.wait(millis(100)) == rpp::semaphore::timeout)
                     AssertFailed("semaphore was not notified");
                 else if (working)
                     ++num_notified;
@@ -139,7 +142,7 @@ TestImpl(test_semaphore)
             while (working)
             {
                 spin_sleep_for_us(100); // do some work
-                if (sem.wait(millis{100}) == rpp::semaphore::timeout)
+                if (sem.wait(millis(100)) == rpp::semaphore::timeout)
                     AssertFailed("semaphore was not notified");
                 else if (working)
                     ++num_notified;
@@ -183,7 +186,7 @@ TestImpl(test_semaphore)
         });
 
         std::thread consumer([&] {
-            constexpr auto timeout = millis{5000}; // use a huge timeout to make bugs obvious
+            constexpr auto timeout = millis(5000); // use a huge timeout to make bugs obvious
             while (working) {
                 if (sem.wait(timeout) == rpp::semaphore::notified) {
                     if (!working) break; // stopped

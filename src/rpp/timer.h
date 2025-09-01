@@ -245,6 +245,12 @@ namespace rpp
         /** @returns Current OS time with timezone offset */
         static TimePoint local() noexcept;
 
+        /** @returns This timepoint with TimeZone offset added. Does not validate that this is a valid UTC time. */
+        TimePoint utc_to_local() const noexcept;
+
+        /** @returns TimeZone offset in seconds for the current system, e.g. 10800 for UTC+3 timezone */
+        static int64 timezone_offset_seconds() noexcept;
+
         /** @returns only the HH:MM:SS.NANOS part of the Duration */
         constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }
 
