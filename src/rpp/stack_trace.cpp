@@ -993,7 +993,7 @@ namespace rpp
             {
                 DWORD flags = THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SUSPEND_RESUME;
 
-                HANDLE thread = OpenThread(flags, FALSE, threadId);
+                HANDLE thread = OpenThread(flags, FALSE, DWORD(threadId));
                 if (thread == INVALID_HANDLE_VALUE)
                 {
                     error = "<stack_trace:OpenThreadFailed>";
