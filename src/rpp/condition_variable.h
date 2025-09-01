@@ -4,9 +4,10 @@
  * and implements Spin-wait timeouts in wait_for() and wait_until(),
  * which allows timeouts smaller than ~15.6ms (default timer tick) on Windows.
  *
- * For UNIX platforms, the standard std::condition_variable is used
+ * For UNIX platforms, the standard std::condition_variable is used with
+ * rpp::TimePoint adapters
  *
- * Copyright (c) 2023, Jorma Rebane
+ * Copyright (c) 2023-2025, Jorma Rebane
  * Distributed under MIT Software License
  */
 #if _MSC_VER
@@ -82,7 +83,8 @@ namespace rpp
         [[nodiscard]]
         std::cv_status wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time) noexcept
         {
-            auto abs_chrono_time = time_point{std::chrono::nanoseconds(abs_time.duration.nsec)};
+            auto d_since_epoch = std::chrono::duration_cast<duration>(std::chrono::nanoseconds(abs_time.duration.nsec)); // nanos to micros
+            auto abs_chrono_time = time_point(d_since_epoch);
             return std::condition_variable::wait_until(lock, abs_chrono_time);
         }
 
@@ -101,7 +103,8 @@ namespace rpp
         bool wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time,
                         const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
         {
-            auto abs_chrono_time = time_point{std::chrono::nanoseconds(abs_time.duration.nsec)};
+            auto d_since_epoch = std::chrono::duration_cast<duration>(std::chrono::nanoseconds(abs_time.duration.nsec)); // nanos to micros
+            auto abs_chrono_time = time_point(d_since_epoch);
             while (!stop_waiting())
                 if (std::condition_variable::wait_until(lock, abs_chrono_time) == std::cv_status::timeout)
                     return stop_waiting();

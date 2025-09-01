@@ -1,6 +1,6 @@
 #pragma once
 /**
- * Simple performance timer, Copyright (c) 2016-2017, Jorma Rebane
+ * Simple performance Timers and high performance Duration/TimePoint, Copyright (c) 2016-2025, Jorma Rebane
  * Distributed under MIT Software License
  */
 #include "config.h"

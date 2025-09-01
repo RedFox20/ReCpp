@@ -43,6 +43,8 @@ namespace rpp
         mutable rpp::condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
         std::atomic_bool Destroying = false;
+        // state flag for pop_atomic_start()/end()
+        std::atomic_bool SlowPopInProgress = false;
 
     public:
         concurrent_queue() = default;
@@ -50,17 +52,20 @@ namespace rpp
         {
             // signal all waiters to exit and release the memory to force push() operations
             // to check for capacity -- it will see the Destroying flag then
-            std::lock_guard lock { mutex() };
-            Destroying.store(true, std::memory_order_release);
-            notify_all_unlocked();
-            clear_unlocked();
+            {
+                std::lock_guard lock1 { mutex() };
+                Destroying.store(true, std::memory_order_release);
+                notify_all_unlocked();
+            } // release lock so that blocking threads can wake up and see the Destroying flag
 
+            // lock again before destroying items -- hopefully all waiters have exited by now
+            std::lock_guard lock2 { mutex() };
+            clear_unlocked();
             if (ItemsStart)
             {
                 // all items should be destroyed now, free the ringbuffer
                 free(ItemsStart);
-                ItemsStart = nullptr;
-                ItemsEnd = nullptr;
+                ItemsStart = ItemsEnd = nullptr;
             }
         }
 
@@ -76,7 +81,7 @@ namespace rpp
             std::swap(ItemsStart, q.ItemsStart);
             std::swap(ItemsEnd, q.ItemsEnd);
             q.Destroying.store(false, std::memory_order::release);
-            Destroying.store(false, std::memory_order::release);
+            q.SlowPopInProgress.store(false, std::memory_order::release);
             // notify only the old queue
             q.notify_all_unlocked();
         }
@@ -94,6 +99,10 @@ namespace rpp
             bool destroying = Destroying.load(std::memory_order_acquire);
             Destroying.store(q.Destroying.load(std::memory_order_acquire), std::memory_order::release);
             q.Destroying.store(destroying, std::memory_order::release);
+
+            bool slowPop = SlowPopInProgress.load(std::memory_order_acquire);
+            SlowPopInProgress.store(q.SlowPopInProgress.load(std::memory_order_acquire), std::memory_order::release);
+            q.SlowPopInProgress.store(slowPop, std::memory_order::release);
 
             // notify all waiters for both queues
             q.notify_all_unlocked();
@@ -396,6 +405,7 @@ namespace rpp
          * @brief Moves the front item without popping it. This will
          *        allow for proper atomic operations where the item is not removed
          *        until it has been fully processed.
+         * @warning This is only valid for single-consumer scenarios !!!
          * @code
          * T item;
          * if (queue.pop_atomic_start(item))
@@ -407,7 +417,7 @@ namespace rpp
          * @param outItem [out] The front item. Only valid if return value is TRUE
          * @returns true if an item was moved to outItem
          */
-        [[nodiscard]] bool pop_atomic_start(T& outItem) noexcept
+        [[nodiscard]] bool pop_atomic_start(T& outItem)
         {
             if (mutex().try_lock())
             {
@@ -415,6 +425,12 @@ namespace rpp
                 {
                     mutex().unlock();
                     return false;
+                }
+                bool wasPopInProgress = SlowPopInProgress.exchange(true, std::memory_order_acq_rel);
+                if (wasPopInProgress)
+                {
+                    mutex().unlock();
+                    throw std::runtime_error{"concurrent_queue<T>::pop_atomic_start(): Another atomic pop was already in progress!"};
                 }
                 outItem = std::move(*Head);
                 mutex().unlock();
@@ -428,12 +444,22 @@ namespace rpp
             return false;
         }
 
-        /** @see pop_atomic_start() */
-        void pop_atomic_end() noexcept
+        /**
+         * @see pop_atomic_start()
+         * @warning This is only valid for single-consumer scenarios !!!
+         */
+        void pop_atomic_end()
         {
             auto lock = spin_lock();
+            bool wasPopInProgress = SlowPopInProgress.exchange(false, std::memory_order_acq_rel);
+            if (!wasPopInProgress)
+            {
+                throw std::runtime_error{"concurrent_queue<T>::pop_atomic_end(): No atomic pop was in progress!"};
+            }
             if (Head != Tail)
+            {
                 pop_unlocked();
+            }
         }
 
         /**
