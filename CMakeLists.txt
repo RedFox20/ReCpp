@@ -79,7 +79,9 @@ if(CLANG OR GCC)
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
         # -march=x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
         # -march=x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL (generally not available on VM-s in 2023)
+        # NOTE: on Alder Lake and later, AVX512 is no longer supported! So to support broken Intel CPU-s we cannot have AVX512
         add_compile_options(-march=x86-64-v3)
+        message("Using -march=x86-64-v3 for backwards compatibility")
     endif()
     if(BUILD_WITH_MEM_SAFETY)
         message("Building with memory safety checks")
