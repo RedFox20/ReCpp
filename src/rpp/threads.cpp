@@ -63,13 +63,12 @@ namespace rpp
             #pragma warning(pop)
         #else
             // pthread limit is 16 chars, including null terminator
-            char threadName[16];
+            char threadName[16] = {0};
             size_t n = name.size() < 15 ? name.size() : 15;
             memcpy(threadName, name.data(), n);
-            threadName[n] = '\0';
             #if __APPLE__
                 int r = pthread_setname_np(threadName);
-            #elif __linux__
+            #else
                 int r = pthread_setname_np(pthread_self(), threadName);
             #endif
             if (r != 0)
@@ -88,7 +87,7 @@ namespace rpp
     std::string get_thread_name(uint64 thread_id) noexcept
     {
         std::string thread_name;
-        if (thread_id == 0)
+        if (thread_id != 0)
         {
         #if _WIN32
             if (HANDLE thread_handle = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)thread_id))
@@ -103,7 +102,7 @@ namespace rpp
             }
         #else
             char name[64];
-            if (pthread_getname_np(pthread_t(thread_id), name, sizeof(name)) == 0)
+            if (pthread_getname_np(static_cast<pthread_t>(thread_id), name, sizeof(name)) == 0)
             {
                 thread_name = name;
             }

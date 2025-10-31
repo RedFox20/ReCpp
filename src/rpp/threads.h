@@ -8,6 +8,7 @@ namespace rpp
 
     /**
      * @brief Sets the debug name for this thread
+     * @warning Linux pthreads only supports max length 15 characters for thread names
      */
     RPPAPI void set_this_thread_name(rpp::strview name) noexcept;
 

@@ -54,6 +54,17 @@ TestImpl(test_threadpool)
         return (int)ids.size();
     }
 
+    TestCase(basic_thread_utils)
+    {
+        rpp::set_this_thread_name("TestThread");
+        print_info("Current thread name: '%s' (expected: 'TestThread')\n", rpp::get_this_thread_name().c_str());
+        AssertThat(rpp::get_this_thread_name(), "TestThread");
+
+        rpp::set_this_thread_name("AnotherName");
+        print_info("Current thread name: '%s' (expected: 'AnotherName')\n", rpp::get_this_thread_name().c_str());
+        AssertThat(rpp::get_this_thread_name(), "AnotherName");
+    }
+
     TestCase(parallel_for_should_not_exceed_max_parallelism)
     {
         AssertThat(count_parallel_for_thread_ids(1), 1);
