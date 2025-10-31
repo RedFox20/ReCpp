@@ -169,7 +169,7 @@ TestImpl(test_sprint)
         sb.separator = ";";
         sb.write(x, y);
         //println("big_doubles:", sb.view());
-    #if OCLEA || __ANDROID__
+    #if YOCTO_LINUX || __ANDROID__
         // ARMv8 rounds stuff differently
         AssertThat(sb.view(), "9223372036854775807;-9223372036854775807");
     #else
@@ -187,7 +187,7 @@ TestImpl(test_sprint)
         sb.separator = ";";
         sb.write(x, y, z, w);
         //println("float_edge_case:", sb.view());
-    #if OCLEA || __ANDROID__
+    #if YOCTO_LINUX || __ANDROID__
         // ARMv8 rounds stuff differently
         AssertThat(sb.view(), "9223372036854775807;-9223372036854775807;0.0;-0.0");
     #else

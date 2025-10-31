@@ -207,7 +207,7 @@ TestImpl(test_strview)
         AssertThat(toString(+0.99590, 6), "0.9959");
         AssertThat(toString(+0.16, 6), "0.16");
 
-    #if OCLEA || __ANDROID__
+    #if YOCTO_LINUX || __ANDROID__
         // ARMv8 rounds stuff differently
         AssertThat(toString(+4.8418443193907041e+30, 6), "9223372036854775807");
         AssertThat(toString(-4.8418443193907041e+30, 6), "-9223372036854775807");
