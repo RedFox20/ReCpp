@@ -69,7 +69,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 
 # Common define/variable for Yocto-based builds
 if(OCLEA OR XILINX)
-    add_compile_definitions(YOCTO_LINUX)
+    add_compile_definitions(YOCTO_LINUX=1)
     set(YOCTO_LINUX ON)
 endif()
 
