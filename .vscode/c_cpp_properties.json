@@ -64,6 +64,17 @@
             "cppStandard": "c++20",
             "intelliSenseMode": "windows-msvc-x64",
             "compileCommands": "${workspaceFolder}/build/ReCpp/oclea/compile_commands.json"
+        },
+        {
+            "name": "xilinx arm64",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x64",
+            "compileCommands": "${workspaceFolder}/build/ReCpp/xilinx/compile_commands.json"
         }
     ],
     "version": 4

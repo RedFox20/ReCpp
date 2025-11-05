@@ -148,7 +148,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_performance)
     {
-    #if OCLEA || MIPS || __ANDROID__
+    #if YOCTO_LINUX || MIPS || __ANDROID__
         constexpr int COUNT = 81'234'567 / 10;
         constexpr int64 EXPECTED_SUM = 32995264630240LL;
     #else

@@ -155,7 +155,7 @@ namespace rpp
         static int num_cores = []
         {
             // TODO: figure out which types of CPU-s have SMT/HT
-            #if MIPS || RASPI || OCLEA || __ANDROID__
+            #if MIPS || RASPI || YOCTO_LINUX || __ANDROID__
                 constexpr int hyperthreading_factor = 1;
             #else
                 constexpr int hyperthreading_factor = 2;

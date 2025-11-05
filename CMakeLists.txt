@@ -67,6 +67,12 @@ else()
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 
+# Common define/variable for Yocto-based builds
+if(OCLEA OR XILINX)
+    add_compile_definitions(YOCTO_LINUX=1)
+    set(YOCTO_LINUX ON)
+endif()
+
 # Add compiler specific flags
 if(CLANG OR GCC)
     add_compile_options(-g -Wall -Wextra -fPIC)
@@ -175,9 +181,10 @@ elseif(MIPS)
         set(LIBDW_LIB ${elfutils_LIB})
         set(LIBDW_INCLUDE ${elfutils_INCLUDES})
     endif()
-elseif(OCLEA)
+elseif(YOCTO_LINUX)    
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed")
     set(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
+elseif(OCLEA)
     if (BUILD_WITH_LIBDW)
         # TODO: handle differences between build systems
         set(FAKEROOT_DIR "/build/platforms/cv25/fakeroot")
