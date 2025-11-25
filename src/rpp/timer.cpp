@@ -1,5 +1,5 @@
 #include "timer.h"
-#include <time.h> // gmtime, timegm
+#include <ctime> // gmtime, timegm
 #include "strview.h"
 
 #if _WIN32
@@ -20,7 +20,6 @@
     #include <thread>
 #elif RPP_BARE_METAL
     #include <cstdint>
-    #include <ctime>
     #define timegm mktime
 #endif
 
