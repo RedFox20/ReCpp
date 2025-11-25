@@ -18,7 +18,7 @@
         #endif
     #endif
     #include <thread>
-#elif BARE_METAL
+#elif RPP_BARE_METAL
     #include <cstdint>
     #include <ctime>
     #define timegm mktime
@@ -139,7 +139,7 @@ namespace rpp
         }
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
     }
-#elif BARE_METAL
+#elif RPP_BARE_METAL
     /**
      * Function stubs that should be implemented for bare metal platforms
      */
@@ -159,7 +159,7 @@ namespace rpp
             win32_sleep_ns(millis * 1'000'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(millis * 1'000'000ull);
-        #elif BARE_METAL
+        #elif RPP_BARE_METAL
             baremetal::sleep_ms(millis);
         #else
             std::this_thread::sleep_for(std::chrono::milliseconds{millis});
@@ -172,7 +172,7 @@ namespace rpp
             win32_sleep_ns(micros * 1'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(micros * 1'000ull);
-        #elif BARE_METAL
+        #elif RPP_BARE_METAL
             baremetal::sleep_us(micros);
         #else
             std::this_thread::sleep_for(std::chrono::microseconds{micros});
@@ -185,7 +185,7 @@ namespace rpp
             win32_sleep_ns(nanos);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(nanos);
-        #elif BARE_METAL
+        #elif RPP_BARE_METAL
             baremetal::sleep_ns(nanos);
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
@@ -307,14 +307,14 @@ namespace rpp
         return duration_to_string(nanos(), buf, bufsize, fraction_digits);
     }
 
-    #ifndef BARE_METAL
-        std::string Duration::to_string(int fraction_digits) const noexcept
-        {
-            char buf[64];
-            int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
-            return {buf, buf+len};
-        }
-    #endif
+#if !RPP_BARE_METAL
+    std::string Duration::to_string(int fraction_digits) const noexcept
+    {
+        char buf[64];
+        int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
+        return {buf, buf+len};
+    }
+#endif
 
     NOINLINE static int duration_to_stopwatch_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
@@ -387,14 +387,14 @@ namespace rpp
         return duration_to_stopwatch_string(nanos(), buf, bufsize, fraction_digits);
     }
 
-    #ifndef BARE_METAL
-        std::string Duration::to_stopwatch_string(int fraction_digits) const noexcept
-        {
-            char buf[64];
-            int len = duration_to_stopwatch_string(nanos(), buf, sizeof(buf), fraction_digits);
-            return {buf, buf+len};
-        }
-    #endif
+#if !RPP_BARE_METAL
+    std::string Duration::to_stopwatch_string(int fraction_digits) const noexcept
+    {
+        char buf[64];
+        int len = duration_to_stopwatch_string(nanos(), buf, sizeof(buf), fraction_digits);
+        return {buf, buf+len};
+    }
+#endif
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -509,14 +509,14 @@ namespace rpp
         return datetime_to_string(duration.nanos(), buf, bufsize, fraction_digits);
     }
 
-    #ifndef BARE_METAL
-        std::string TimePoint::to_string(int fraction_digits) const noexcept
-        {
-            char buf[64];
-            int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
-            return {buf, buf+len};
-        }
-    #endif
+#if !RPP_BARE_METAL
+    std::string TimePoint::to_string(int fraction_digits) const noexcept
+    {
+        char buf[64];
+        int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
+        return {buf, buf+len};
+    }
+#endif
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -525,7 +525,7 @@ namespace rpp
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) };
-        #elif BARE_METAL
+        #elif RPP_BARE_METAL
             return TimePoint{ int64(baremetal::get_time_ns()) };
         #else
             struct timespec t;
@@ -539,7 +539,7 @@ namespace rpp
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset_seconds() * NANOS_PER_SEC };
-        #elif BARE_METAL
+        #elif RPP_BARE_METAL
             return TimePoint{int64(baremetal::get_time_ns()) + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
             struct timespec t;
@@ -647,7 +647,7 @@ namespace rpp
                 SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // default color
             #elif __ANDROID__
                 __android_log_print(ANDROID_LOG_WARN, "rpp", format, prefix, location, padDetail, detail, elapsed_ms);
-            #elif BARE_METAL
+            #elif RPP_BARE_METAL
                 baremetal::printf(format, prefix, location, padDetail, detail, elapsed_ms);
             #else // @todo Proper Linux & OSX implementations
                 fprintf(stderr, format, prefix, location, padDetail, detail, elapsed_ms);

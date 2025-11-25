@@ -5,8 +5,8 @@
  */
 #include "config.h"
 
-#ifndef BARE_METAL
-    #include <string>
+#if !RPP_BARE_METAL
+#  include <string>
 #endif
 
 #if __cplusplus
@@ -195,9 +195,9 @@ namespace rpp
          */
         int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
 
-        #ifndef BARE_METAL
-            std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
-        #endif
+    #if !RPP_BARE_METAL
+        std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
+    #endif
 
         /**
          * @brief Converts this Duration into a Stopwatch string which is easier for humans to read.
@@ -212,9 +212,9 @@ namespace rpp
          */
         int to_stopwatch_string(char* buf, int bufsize, int fraction_digits = 3) const noexcept;
 
-        #ifndef BARE_METAL
-            std::string to_stopwatch_string(int fraction_digits = 3) const noexcept;
-        #endif
+    #if !RPP_BARE_METAL
+        std::string to_stopwatch_string(int fraction_digits = 3) const noexcept;
+    #endif
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,9 +298,9 @@ namespace rpp
         /** @brief Converts this Duration into a string */
         int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
 
-        #ifndef BARE_METAL
-            std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
-        #endif
+    #if !RPP_BARE_METAL
+        std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
+    #endif
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

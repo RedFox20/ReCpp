@@ -146,6 +146,11 @@
 #  endif
 #endif
 
+/// @brief Bare metal / no OS platform
+#ifndef RPP_BARE_METAL
+#  define RPP_BARE_METAL 0
+#endif
+
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
 ////       Need to hint the compiler to take it easy ^_^'
 #ifndef NOINLINE
