@@ -145,11 +145,11 @@ namespace rpp
      */
     namespace baremetal
     {
-        extern void sleep_ms(unsigned int millis) noexcept;
-        extern void sleep_us(unsigned int micros) noexcept;
-        extern void sleep_ns(uint64 nanos) noexcept;
-        extern uintmax_t get_time_ns() noexcept;
-        extern int printf(const char* format, ...) noexcept;
+        void sleep_ms(unsigned int millis) noexcept;
+        void sleep_us(unsigned int micros) noexcept;
+        void sleep_ns(uint64 nanos) noexcept;
+        uintmax_t get_time_ns() noexcept;
+        int printf(const char* format, ...) noexcept;
     }
 #endif
 
