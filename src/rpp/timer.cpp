@@ -271,7 +271,7 @@ namespace rpp
         if (ns < 0) {
             // handle edge case, INT64_MIN is not representable as positive
             // -9223372036854775808 --> 9223372036854775807
-            ns = (ns == INTMAX_MIN) ? INT64_MAX : -ns;
+            ns = (ns == INT64_MIN) ? INT64_MAX : -ns;
             *end++ = '-';
         }
 
@@ -307,12 +307,14 @@ namespace rpp
         return duration_to_string(nanos(), buf, bufsize, fraction_digits);
     }
 
-    // std::string Duration::to_string(int fraction_digits) const noexcept
-    // {
-    //     char buf[64];
-    //     int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
-    //     return {buf, buf+len};
-    // }
+    #ifndef BARE_METAL
+        std::string Duration::to_string(int fraction_digits) const noexcept
+        {
+            char buf[64];
+            int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
+            return {buf, buf+len};
+        }
+    #endif
 
     NOINLINE static int duration_to_stopwatch_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
@@ -385,12 +387,14 @@ namespace rpp
         return duration_to_stopwatch_string(nanos(), buf, bufsize, fraction_digits);
     }
 
-    // std::string Duration::to_stopwatch_string(int fraction_digits) const noexcept
-    // {
-    //     char buf[64];
-    //     int len = duration_to_stopwatch_string(nanos(), buf, sizeof(buf), fraction_digits);
-    //     return {buf, buf+len};
-    // }
+    #ifndef BARE_METAL
+        std::string Duration::to_stopwatch_string(int fraction_digits) const noexcept
+        {
+            char buf[64];
+            int len = duration_to_stopwatch_string(nanos(), buf, sizeof(buf), fraction_digits);
+            return {buf, buf+len};
+        }
+    #endif
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -505,12 +509,14 @@ namespace rpp
         return datetime_to_string(duration.nanos(), buf, bufsize, fraction_digits);
     }
 
-    // std::string TimePoint::to_string(int fraction_digits) const noexcept
-    // {
-    //     char buf[64];
-    //     int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
-    //     return {buf, buf+len};
-    // }
+    #ifndef BARE_METAL
+        std::string TimePoint::to_string(int fraction_digits) const noexcept
+        {
+            char buf[64];
+            int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
+            return {buf, buf+len};
+        }
+    #endif
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -534,8 +540,8 @@ namespace rpp
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset_seconds() * NANOS_PER_SEC };
         #elif BARE_METAL
-        return TimePoint{int64(baremetal::get_time_ns()) + timezone_offset_seconds() * NANOS_PER_SEC};
-#else
+            return TimePoint{int64(baremetal::get_time_ns()) + timezone_offset_seconds() * NANOS_PER_SEC};
+        #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
             return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + timezone_offset_seconds() * NANOS_PER_SEC };
