@@ -21,6 +21,18 @@
 #elif RPP_BARE_METAL
     #include <cstdint>
     #define timegm mktime
+    #include <printf/printf.h>
+    #include <cstdarg>
+
+    #if RPP_FREERTOS
+        #include "FreeRTOS.h"
+        #include "task.h"
+    #endif
+
+    #if RPP_STM32_HAL
+        #include RPP_STM32_HAL_H
+        #include RPP_STM32_CORE_H
+    #endif
 #endif
 
 #if defined(__has_include) && __has_include("debugging.h")
@@ -139,17 +151,99 @@ namespace rpp
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
     }
 #elif RPP_BARE_METAL
-    /**
-     * Function stubs that should be implemented for bare metal platforms
-     */
+
     namespace baremetal
     {
-        void sleep_ms(unsigned int millis) noexcept;
-        void sleep_us(unsigned int micros) noexcept;
-        void sleep_ns(uint64 nanos) noexcept;
-        uintmax_t get_time_ns() noexcept;
-        int printf(const char* format, ...) noexcept;
+#if RPP_FREERTOS
+        void sleep_ms(unsigned int millis)
+        {
+            vTaskDelay(pdMS_TO_TICKS(millis));
+        }
+
+        void sleep_us(unsigned int micros)
+        {
+            vTaskDelay(pdMS_TO_TICKS((micros + 999) / 1000)); // round up to nearest ms
+        }
+
+        void sleep_ns(uint64 nanos)
+        {
+            vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
+        }
+
+        uintmax_t get_time_ns() noexcept
+        {
+            // FreeRTOS tick count in nanoseconds
+            return uintmax_t(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull;
+        }
+#elif RPP_STM32_HAL
+        uintmax_t _get_time(uintmax_t hz) noexcept
+        {
+            hz /= 1000; // convert to millihertz
+            uint32_t ms;
+            uint32_t st;
+
+            do
+            {
+                ms = HAL_GetTick();
+                st = SysTick->VAL;
+                asm volatile("nop");
+                asm volatile("nop");
+            } while (ms != HAL_GetTick()); // Ensure no rollover
+
+            // Assuming SysTick is configured for 1ms (typical HAL configuration)
+            // SystemCoreClock / 1000 ticks per millisecond
+            uint32_t cycles_per_ms = SysTick->LOAD + 1;
+
+            // SysTick counts DOWN, so we need (LOAD - VAL)
+            uint32_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
+            return (int64_t(ms) * hz) + ns_fraction;
+        }
+
+        void _sleep(uintmax_t hz, uintmax_t duration)
+        {
+            uintmax_t start = _get_time(hz);
+            uintmax_t end = start + duration;
+
+            if (end < start)
+            {
+                // Sleep until timer wraps around
+                while (_get_time(hz) > start) {}
+            }
+
+            while (_get_time(hz) < end) {}
+        }
+
+        void sleep_ms(unsigned int millis)
+        {
+            _sleep(1'000ull, millis);
+        }
+
+        void sleep_us(unsigned int micros)
+        {
+            _sleep(1'000'000ull, micros);
+        }
+
+        void sleep_ns(uint64 nanos)
+        {
+            _sleep(1'000'000'000ull, nanos);
+        }
+
+        uintmax_t get_time_ns() noexcept
+        {
+            return _get_time(1'000'000'000ull);
+        }
+#endif
+
+        int printf(const char* format, ...) noexcept
+        {
+            va_list args;
+            va_start(args, format);
+            int result = vprintf_(format, args);
+            va_end(args);
+            return result;
+        }
     }
+
 #endif
 
     void sleep_ms(unsigned int millis) noexcept
