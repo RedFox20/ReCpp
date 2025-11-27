@@ -170,13 +170,13 @@ namespace rpp
             vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
         }
 
-        uintmax_t get_time_ns() noexcept
+        uint64_t get_time_ns() noexcept
         {
             // FreeRTOS tick count in nanoseconds
-            return uintmax_t(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull;
+            return uint64_t(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull;
         }
 #elif RPP_STM32_HAL
-        uintmax_t _get_time(uintmax_t hz) noexcept
+        uint64_t _get_time(uint64_t hz) noexcept
         {
             hz /= 1000; // convert to millihertz
             uint32_t ms;
@@ -192,17 +192,17 @@ namespace rpp
 
             // Assuming SysTick is configured for 1ms (typical HAL configuration)
             // SystemCoreClock / 1000 ticks per millisecond
-            uint32_t cycles_per_ms = SysTick->LOAD + 1;
+            uint64_t cycles_per_ms = SysTick->LOAD + 1;
 
             // SysTick counts DOWN, so we need (LOAD - VAL)
-            uint32_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
-            return (int64_t(ms) * hz) + ns_fraction;
+            uint64_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
+            return (uint64_t(ms) * hz) + ns_fraction;
         }
 
-        void _sleep(uintmax_t hz, uintmax_t duration)
+        void _sleep(uint64_t hz, uint64_t duration)
         {
-            uintmax_t start = _get_time(hz);
-            uintmax_t end = start + duration;
+            uint64_t start = _get_time(hz);
+            uint64_t end = start + duration;
 
             if (end < start)
             {
@@ -228,7 +228,7 @@ namespace rpp
             _sleep(1'000'000'000ull, nanos);
         }
 
-        uintmax_t get_time_ns() noexcept
+        uint64_t get_time_ns() noexcept
         {
             return _get_time(1'000'000'000ull);
         }
