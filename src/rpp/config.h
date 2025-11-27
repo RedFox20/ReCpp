@@ -157,6 +157,7 @@
 
 #ifndef RPP_STM32_HAL
 #  define RPP_STM32_HAL 0
+#else
 #  ifndef RPP_STM32_HAL_H
 #    error "RPP_STM32_HAL_H has to be defined and has to have a valid path to the STM32 HAL header file, e.g., stm32f1xx_hal.h"
 #  endif
