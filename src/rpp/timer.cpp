@@ -165,7 +165,7 @@ namespace rpp
             vTaskDelay(pdMS_TO_TICKS((micros + 999) / 1000)); // round up to nearest ms
         }
 
-        void sleep_ns(uint64 nanos)
+        void sleep_ns(uint64_t nanos)
         {
             vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
         }
@@ -178,7 +178,7 @@ namespace rpp
 #elif RPP_STM32_HAL
         uint64_t _get_time(uint64_t hz) noexcept
         {
-            hz /= 1000; // convert to millihertz
+            hz /= 1000; // convert to kilohertz
             uint32_t ms;
             uint32_t st;
 
@@ -223,7 +223,7 @@ namespace rpp
             _sleep(1'000'000ull, micros);
         }
 
-        void sleep_ns(uint64 nanos)
+        void sleep_ns(uint64_t nanos)
         {
             _sleep(1'000'000'000ull, nanos);
         }

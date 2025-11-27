@@ -146,11 +146,6 @@
 #  endif
 #endif
 
-/// @brief Bare metal / no OS platform
-#ifndef RPP_BARE_METAL
-#  define RPP_BARE_METAL 0
-#endif
-
 #ifndef RPP_FREERTOS
 #  define RPP_FREERTOS 0
 #endif
@@ -164,6 +159,12 @@
 #  ifndef RPP_STM32_CORE_H
 #    error "RPP_STM32_CORE_H has to be defined and has to have a valid path to the STM32 core header file, e.g., core_cm3.h"
 #  endif
+#endif
+
+#if RPP_FREERTOS || RPP_STM32_HAL
+#  define RPP_BARE_METAL 1
+#else
+#  define RPP_BARE_METAL 0
 #endif
 
 //// @note Some functions get inlined too aggressively, leading to some serious code bloat
