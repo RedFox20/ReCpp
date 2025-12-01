@@ -29,6 +29,10 @@
 # include <signal.h>
 #endif
 
+#if RPP_BARE_METAL
+# include <printf/printf.h>
+#endif
+
 #ifdef QUIETLOG
     static LogSeverity Filter = LogSeverityWarn;
 #else
@@ -154,6 +158,10 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     char* pbuf = errBuf;
     int remaining = N;
     int len = 0;
+
+#if RPP_BARE_METAL
+    int plen = vsnprintf_(pbuf, size_t(remaining - 1) /*spare room for \n*/, format, ap);
+#else
     if (EnableTimestamps) {
         rpp::TimePoint now = rpp::TimePoint::now();
         now.duration.nsec += TimeOffset;
@@ -167,6 +175,8 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     }
 
     int plen = vsnprintf(pbuf, size_t(remaining-1)/*spare room for \n*/, format, ap);
+#endif
+
     if (plen < 0 || plen >= remaining) { // err: didn't fit
         plen = remaining-2; // try to recover gracefully
         pbuf[plen] = '\0';
@@ -199,8 +209,10 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
 {
     _LogError("%s:%u %s: Assertion failed: %s", file, line, function, message);
     // show a nice stack trace if possible
-    rpp::print_trace();
-    fflush(stderr);
+    #if !RPP_BARE_METAL
+        rpp::print_trace();
+        fflush(stderr);
+    #endif
 
     // trap into debugger
     #if __clang__
@@ -213,9 +225,16 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
         __debugbreak();
     #elif __GNUC__
         raise(SIGTRAP);
+    #elif RPP_BARE_METAL
+        __asm__ volatile ("bkpt #0");
     #endif
 
-    std::terminate();
+    #if RPP_BARE_METAL
+        // on bare-metal we cannot continue
+        while (true) {}
+    #else
+        std::terminate();
+    #endif
 }
 
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* str, int len)
@@ -226,6 +245,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
                                                       ANDROID_LOG_ERROR;
         __android_log_write(priority, tag, str);
+
+    #elif RPP_BARE_METAL
+        printf_("%.*s\n", len, str);
     #else
 
         #if _MSC_VER
