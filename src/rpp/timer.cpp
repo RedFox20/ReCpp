@@ -150,33 +150,8 @@ namespace rpp
         }
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
     }
-#elif RPP_BARE_METAL
-
-    namespace baremetal
-    {
-#if RPP_FREERTOS
-        void sleep_ms(unsigned int millis)
-        {
-            vTaskDelay(pdMS_TO_TICKS(millis));
-        }
-
-        void sleep_us(unsigned int micros)
-        {
-            vTaskDelay(pdMS_TO_TICKS((micros + 999) / 1000)); // round up to nearest ms
-        }
-
-        void sleep_ns(uint64_t nanos)
-        {
-            vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
-        }
-
-        uint64_t get_time_ns() noexcept
-        {
-            // FreeRTOS tick count in nanoseconds
-            return uint64_t(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull;
-        }
 #elif RPP_STM32_HAL
-        uint64_t _get_time(uint64_t hz) noexcept
+        static uint64_t _get_time(uint64_t hz) noexcept
         {
             hz /= 1000; // convert to kilohertz
             uint32_t ms;
@@ -199,7 +174,7 @@ namespace rpp
             return (uint64_t(ms) * hz) + ns_fraction;
         }
 
-        void _sleep(uint64_t hz, uint64_t duration)
+        static void _sleep(uint64_t hz, uint64_t duration)
         {
             uint64_t start = _get_time(hz);
             uint64_t end = start + duration;
@@ -213,37 +188,25 @@ namespace rpp
             while (_get_time(hz) < end) {}
         }
 
-        void sleep_ms(unsigned int millis)
+        static void stm32_sleep_ms(unsigned int millis)
         {
             _sleep(1'000ull, millis);
         }
 
-        void sleep_us(unsigned int micros)
+        static void stm32_sleep_us(unsigned int micros)
         {
             _sleep(1'000'000ull, micros);
         }
 
-        void sleep_ns(uint64_t nanos)
+        static void stm32_sleep_ns(uint64_t nanos)
         {
             _sleep(1'000'000'000ull, nanos);
         }
 
-        uint64_t get_time_ns() noexcept
+        static uint64_t stm32_get_time_ns() noexcept
         {
             return _get_time(1'000'000'000ull);
         }
-#endif
-
-        int printf(const char* format, ...) noexcept
-        {
-            va_list args;
-            va_start(args, format);
-            int result = vprintf_(format, args);
-            va_end(args);
-            return result;
-        }
-    }
-
 #endif
 
     void sleep_ms(unsigned int millis) noexcept
@@ -252,8 +215,10 @@ namespace rpp
             win32_sleep_ns(millis * 1'000'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(millis * 1'000'000ull);
-        #elif RPP_BARE_METAL
-            baremetal::sleep_ms(millis);
+        #elif RPP_FREERTOS
+            vTaskDelay(pdMS_TO_TICKS(millis));
+        #elif RPP_STM32_HAL
+            stm32_sleep_ms(millis);
         #else
             std::this_thread::sleep_for(std::chrono::milliseconds{millis});
         #endif
@@ -265,8 +230,10 @@ namespace rpp
             win32_sleep_ns(micros * 1'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(micros * 1'000ull);
-        #elif RPP_BARE_METAL
-            baremetal::sleep_us(micros);
+        #elif RPP_FREERTOS
+            vTaskDelay(pdMS_TO_TICKS((micros + 999) / 1000)); // round up to nearest ms
+        #elif RPP_STM32_HAL
+            stm32_sleep_us(micros);
         #else
             std::this_thread::sleep_for(std::chrono::microseconds{micros});
         #endif
@@ -278,8 +245,10 @@ namespace rpp
             win32_sleep_ns(nanos);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(nanos);
-        #elif RPP_BARE_METAL
-            baremetal::sleep_ns(nanos);
+        #elif RPP_FREERTOS
+            vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
+        #elif RPP_STM32_HAL
+            stm32_sleep_ns(nanos);
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
@@ -618,8 +587,10 @@ namespace rpp
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) };
-        #elif RPP_BARE_METAL
-            return TimePoint{ int64(baremetal::get_time_ns()) };
+        #elif RPP_FREERTOS
+            return TimePoint{ int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull };
+        #elif RPP_STM32_HAL
+            return TimePoint{ int64(stm32_get_time_ns()) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -632,8 +603,10 @@ namespace rpp
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset_seconds() * NANOS_PER_SEC };
-        #elif RPP_BARE_METAL
-            return TimePoint{int64(baremetal::get_time_ns()) + timezone_offset_seconds() * NANOS_PER_SEC};
+        #elif RPP_FREERTOS
+            return TimePoint{int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull + timezone_offset_seconds() * NANOS_PER_SEC};
+        #elif RPP_STM32_HAL
+            return TimePoint{int64() + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -741,7 +714,7 @@ namespace rpp
             #elif __ANDROID__
                 __android_log_print(ANDROID_LOG_WARN, "rpp", format, prefix, location, padDetail, detail, elapsed_ms);
             #elif RPP_BARE_METAL
-                baremetal::printf(format, prefix, location, padDetail, detail, elapsed_ms);
+                printf_(format, prefix, location, padDetail, detail, elapsed_ms);
             #else // @todo Proper Linux & OSX implementations
                 fprintf(stderr, format, prefix, location, padDetail, detail, elapsed_ms);
             #endif
