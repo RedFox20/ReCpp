@@ -151,62 +151,62 @@ namespace rpp
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
     }
 #elif RPP_STM32_HAL
-        static uint64_t _get_time(uint64_t hz) noexcept
+    static uint64_t _get_time(uint64_t hz) noexcept
+    {
+        hz /= 1000; // convert to kilohertz
+        uint32_t ms;
+        uint32_t st;
+
+        do
         {
-            hz /= 1000; // convert to kilohertz
-            uint32_t ms;
-            uint32_t st;
+            ms = HAL_GetTick();
+            st = SysTick->VAL;
+            asm volatile("nop");
+            asm volatile("nop");
+        } while (ms != HAL_GetTick()); // Ensure no rollover
 
-            do
-            {
-                ms = HAL_GetTick();
-                st = SysTick->VAL;
-                asm volatile("nop");
-                asm volatile("nop");
-            } while (ms != HAL_GetTick()); // Ensure no rollover
+        // Assuming SysTick is configured for 1ms (typical HAL configuration)
+        // SystemCoreClock / 1000 ticks per millisecond
+        uint64_t cycles_per_ms = SysTick->LOAD + 1;
 
-            // Assuming SysTick is configured for 1ms (typical HAL configuration)
-            // SystemCoreClock / 1000 ticks per millisecond
-            uint64_t cycles_per_ms = SysTick->LOAD + 1;
+        // SysTick counts DOWN, so we need (LOAD - VAL)
+        uint64_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
+        return (uint64_t(ms) * hz) + ns_fraction;
+    }
 
-            // SysTick counts DOWN, so we need (LOAD - VAL)
-            uint64_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
-            return (uint64_t(ms) * hz) + ns_fraction;
+    static void _sleep(uint64_t hz, uint64_t duration)
+    {
+        uint64_t start = _get_time(hz);
+        uint64_t end = start + duration;
+
+        if (end < start)
+        {
+            // Sleep until timer wraps around
+            while (_get_time(hz) > start) {}
         }
 
-        static void _sleep(uint64_t hz, uint64_t duration)
-        {
-            uint64_t start = _get_time(hz);
-            uint64_t end = start + duration;
+        while (_get_time(hz) < end) {}
+    }
 
-            if (end < start)
-            {
-                // Sleep until timer wraps around
-                while (_get_time(hz) > start) {}
-            }
+    static void stm32_sleep_ms(unsigned int millis)
+    {
+        _sleep(1'000ull, millis);
+    }
 
-            while (_get_time(hz) < end) {}
-        }
+    static void stm32_sleep_us(unsigned int micros)
+    {
+        _sleep(1'000'000ull, micros);
+    }
 
-        static void stm32_sleep_ms(unsigned int millis)
-        {
-            _sleep(1'000ull, millis);
-        }
+    static void stm32_sleep_ns(uint64_t nanos)
+    {
+        _sleep(1'000'000'000ull, nanos);
+    }
 
-        static void stm32_sleep_us(unsigned int micros)
-        {
-            _sleep(1'000'000ull, micros);
-        }
-
-        static void stm32_sleep_ns(uint64_t nanos)
-        {
-            _sleep(1'000'000'000ull, nanos);
-        }
-
-        static uint64_t stm32_get_time_ns() noexcept
-        {
-            return _get_time(1'000'000'000ull);
-        }
+    static uint64_t stm32_get_time_ns() noexcept
+    {
+        return _get_time(1'000'000'000ull);
+    }
 #endif
 
     void sleep_ms(unsigned int millis) noexcept
