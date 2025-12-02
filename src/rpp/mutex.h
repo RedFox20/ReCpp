@@ -3,7 +3,19 @@
 #include "type_traits.h"
 #include "timer.h" // rpp:Timer
 #include <mutex> // lock_guard etc
-#include <thread> // this_thread::yield
+
+#if !RPP_BARE_METAL
+    #include <thread> // this_thread::yield
+#endif
+
+#if RPP_FREERTOS
+    #include "FreeRTOS.h"
+    #include "semphr.h"
+#endif
+
+#if RPP_STM32_HAL
+    #include RPP_STM32_CORE_H
+#endif
 
 namespace rpp
 {
@@ -58,6 +70,134 @@ namespace rpp
         using mutex = std::mutex;
         using recursive_mutex = std::recursive_mutex;
     #endif // USE_CUSTOM_WINDOWS_MUTEX
+
+#elif RPP_BARE_METAL
+#if RPP_FREERTOS
+        class critical_section
+        {
+        public:
+            critical_section() = default;
+
+            bool try_lock()
+            {
+                lock();
+                return true;
+            }
+            void lock() { portENTER_CRITICAL(0); }
+            void unlock() { portEXIT_CRITICAL(0); }
+
+            critical_section(const critical_section&) = delete;
+            critical_section& operator=(const critical_section&) = delete;
+            critical_section(critical_section&& other) = delete;
+            critical_section& operator=(critical_section&& other) = delete;
+
+            void* native_handle() const noexcept { return nullptr; }
+        };
+
+        class mutex
+        {
+            SemaphoreHandle_t _sem;
+
+        public:
+            mutex()
+            {
+                _sem = xSemaphoreCreateBinary(); // binary semaphore is faster than mutex semaphore
+                xSemaphoreGive(_sem);            // Initialize to available
+            }
+
+            ~mutex()
+            {
+                if (_sem)
+                {
+                    vSemaphoreDelete(_sem);
+                    _sem = nullptr;
+                }
+            }
+
+            bool try_lock() { return xSemaphoreTake(_sem, 0) == pdTRUE; }
+            void lock() { xSemaphoreTake(_sem, portMAX_DELAY); }
+            void unlock() { xSemaphoreGive(_sem); }
+
+            mutex(const mutex&) = delete;
+            mutex& operator=(const mutex&) = delete;
+            mutex(mutex&& other) = delete;
+            mutex& operator=(mutex&& other) = delete;
+
+            void* native_handle() const noexcept { return (void*)_sem; }
+        };
+
+        class recursive_mutex
+        {
+            SemaphoreHandle_t _sem;
+
+        public:
+            recursive_mutex()
+            {
+                _sem = xSemaphoreCreateRecursive(); // Recursive semaphore
+                xSemaphoreGiveRecursive(_sem);      // Initialize to available
+            }
+
+            ~recursive_mutex()
+            {
+                if (_sem)
+                {
+                    vSemaphoreDelete(_sem);
+                    _sem = nullptr;
+                }
+            }
+
+            bool try_lock() { return xSemaphoreTakeRecursive(_sem, 0) == pdTRUE; }
+
+            void lock() { xSemaphoreTakeRecursive(_sem, portMAX_DELAY); }
+
+            void unlock() { xSemaphoreGiveRecursive(_sem); }
+
+            recursive_mutex(const recursive_mutex&) = delete;
+            recursive_mutex& operator=(const recursive_mutex&) = delete;
+            recursive_mutex(recursive_mutex&& other) = delete;
+            recursive_mutex& operator=(recursive_mutex&& other) = delete;
+
+            void* native_handle() const noexcept { return (void*)_sem; }
+        };
+    #else
+        class critical_section
+        {
+            uint32_t primask = 0;
+            uint32_t locked = 0;
+        public:
+            critical_section() = default;
+
+            bool try_lock()
+            {
+                lock();
+                return true;
+            }
+
+            void lock() {
+                if (locked++ == 0)
+                    primask = __get_PRIMASK();
+                __disable_irq();
+            }
+
+            void unlock()
+            {
+                if (locked > 0 && --locked == 0)
+                {
+                    __set_PRIMASK(primask);
+                }
+            }
+
+            critical_section(const critical_section&) = delete;
+            critical_section& operator=(const critical_section&) = delete;
+            critical_section(critical_section&& other) = delete;
+            critical_section& operator=(critical_section&& other) = delete;
+
+            void* native_handle() const noexcept { return nullptr; }
+        };
+
+        using mutex = critical_section;
+        using recursive_mutex = critical_section;
+    #endif
 #else
     using mutex = std::mutex;
     using recursive_mutex = std::recursive_mutex;
@@ -95,7 +235,12 @@ namespace rpp
         {
             for (int i = 0; i < 10; ++i)
             {
-                std::this_thread::yield(); // yielding here will improve perf massively
+                 // yielding here will improve perf massively
+                #if RPP_FREERTOS
+                    taskYIELD();
+                #else
+                    std::this_thread::yield();
+                #endif
                 if (m.try_lock())
                     return std::unique_lock<Mutex>{m, std::adopt_lock};
             }
@@ -281,12 +426,12 @@ namespace rpp
      * *str = "Thread safely set new value";
      * @endcode
      */
-    template<class T>
+    template<class T, typename Mutex = rpp::recursive_mutex>
     class synchronized : public synchronizable<synchronized<T>>
     {
     protected:
         T value {};
-        rpp::recursive_mutex mutex {};
+        Mutex mutex {};
     public:
 
         synchronized() noexcept(noexcept(T{})) = default;
