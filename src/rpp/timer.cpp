@@ -165,9 +165,9 @@ namespace rpp
             asm volatile("nop");
         } while (ms != HAL_GetTick()); // Ensure no rollover
 
-        // Assuming SysTick is configured for 1ms (typical HAL configuration)
         // SystemCoreClock / 1000 ticks per millisecond
-        uint64_t cycles_per_ms = SysTick->LOAD + 1;
+        HAL_TickFreqTypeDef tick_freq = HAL_GetTickFreq();
+        uint64_t cycles_per_ms = (SysTick->LOAD + 1) / tick_freq;
 
         // SysTick counts DOWN, so we need (LOAD - VAL)
         uint64_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
