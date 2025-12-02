@@ -78,121 +78,81 @@ namespace rpp
         public:
             critical_section() = default;
 
-            bool try_lock()
-            {
-                lock();
-                return true;
-            }
-            void lock() { portENTER_CRITICAL(0); }
-            void unlock() { portEXIT_CRITICAL(0); }
-
+            // No copy/move
             critical_section(const critical_section&) = delete;
             critical_section& operator=(const critical_section&) = delete;
             critical_section(critical_section&& other) = delete;
             critical_section& operator=(critical_section&& other) = delete;
+
+            bool try_lock();
+            void lock();
+            void unlock();
 
             void* native_handle() const noexcept { return nullptr; }
         };
 
         class mutex
         {
-            SemaphoreHandle_t _sem;
-
+            struct { void* ctx; } mtx;
         public:
-            mutex()
-            {
-                _sem = xSemaphoreCreateBinary(); // binary semaphore is faster than mutex semaphore
-                xSemaphoreGive(_sem);            // Initialize to available
-            }
+            mutex();
+            ~mutex();
 
-            ~mutex()
-            {
-                if (_sem)
-                {
-                    vSemaphoreDelete(_sem);
-                    _sem = nullptr;
-                }
-            }
-
-            bool try_lock() { return xSemaphoreTake(_sem, 0) == pdTRUE; }
-            void lock() { xSemaphoreTake(_sem, portMAX_DELAY); }
-            void unlock() { xSemaphoreGive(_sem); }
-
+            // No copy/move
             mutex(const mutex&) = delete;
             mutex& operator=(const mutex&) = delete;
             mutex(mutex&& other) = delete;
             mutex& operator=(mutex&& other) = delete;
 
-            void* native_handle() const noexcept { return (void*)_sem; }
+            bool try_lock();
+            void lock();
+            void unlock();
+
+
+            void* native_handle() const noexcept { return mtx.ctx; }
         };
 
         class recursive_mutex
         {
-            SemaphoreHandle_t _sem;
+            struct { void* ctx; } mtx;
 
         public:
-            recursive_mutex()
-            {
-                _sem = xSemaphoreCreateRecursive(); // Recursive semaphore
-                xSemaphoreGiveRecursive(_sem);      // Initialize to available
-            }
+            recursive_mutex();
+            ~recursive_mutex();
 
-            ~recursive_mutex()
-            {
-                if (_sem)
-                {
-                    vSemaphoreDelete(_sem);
-                    _sem = nullptr;
-                }
-            }
-
-            bool try_lock() { return xSemaphoreTakeRecursive(_sem, 0) == pdTRUE; }
-
-            void lock() { xSemaphoreTakeRecursive(_sem, portMAX_DELAY); }
-
-            void unlock() { xSemaphoreGiveRecursive(_sem); }
-
+            // No copy/move
             recursive_mutex(const recursive_mutex&) = delete;
             recursive_mutex& operator=(const recursive_mutex&) = delete;
             recursive_mutex(recursive_mutex&& other) = delete;
             recursive_mutex& operator=(recursive_mutex&& other) = delete;
+            
+            bool try_lock();
+            void lock();
+            void unlock();
 
-            void* native_handle() const noexcept { return (void*)_sem; }
+            void* native_handle() const noexcept { return mtx.ctx; }
         };
     #else
         class critical_section
         {
-            uint32_t primask = 0;
-            uint32_t locked = 0;
+            struct {
+                uint32_t primask = 0;
+                uint32_t locked = 0;
+            } mtx;
         public:
             critical_section() = default;
 
-            bool try_lock()
-            {
-                lock();
-                return true;
-            }
-
-            void lock() {
-                if (locked++ == 0)
-                    primask = __get_PRIMASK();
-                __disable_irq();
-            }
-
-            void unlock()
-            {
-                if (locked > 0 && --locked == 0)
-                {
-                    __set_PRIMASK(primask);
-                }
-            }
-
+            // No copy/move
             critical_section(const critical_section&) = delete;
             critical_section& operator=(const critical_section&) = delete;
             critical_section(critical_section&& other) = delete;
             critical_section& operator=(critical_section&& other) = delete;
+            
+            bool try_lock();
+            void lock();
+            void unlock();
 
-            void* native_handle() const noexcept { return nullptr; }
+            void* native_handle() const noexcept { return (void*) &mtx; }
         };
 
         using mutex = critical_section;
