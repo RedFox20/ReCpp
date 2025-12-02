@@ -484,15 +484,15 @@ TestImpl(test_sockets)
 
         std::vector<socket*> sockets = { &recv1, &recv2 };
         std::vector<socket*> ready;
-        auto multi_poll = [&](int timeout)
+        auto multi_poll = [&](int timeout) -> bool
         {
             ready.clear();
             std::vector<int> r;
-            bool any_ready = socket::poll(sockets, r, timeout, socket::PF_Read);
-            if (any_ready) {
+            int num_ready = socket::poll(sockets, r, timeout, socket::PF_Read);
+            if (num_ready > 0) {
                 for (int i : r) ready.push_back(sockets[i]);
             }
-            return any_ready;
+            return num_ready > 0;
         };
 
         // no data to receive, should return false
@@ -649,7 +649,7 @@ TestImpl(test_sockets)
         while ((num_received1 < NUM_MESSAGES || num_received2 < NUM_MESSAGES) && t.elapsed_ms() < 5000)
         {
             // intentionally use a large timeout here
-            if (socket::poll(sockets, ready, /*timeout*/50, socket::PF_Read))
+            if (socket::poll(sockets, ready, /*timeout*/50, socket::PF_Read) > 0)
             {
                 for (int i : ready)
                 {

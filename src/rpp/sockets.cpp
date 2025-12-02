@@ -1793,26 +1793,46 @@ namespace rpp
         return on_poll_result(pfd.revents, pollFlags);
     }
 
-    bool socket::poll(const std::vector<socket*>& in, std::vector<int>& ready,
-                      int timeoutMillis, PollFlag pollFlags) noexcept
+
+#if RPP_HAS_CXX20
+    int socket::poll(std::span<socket* const> in, std::vector<int>& ready,
+                     int timeoutMillis, PollFlag pollFlags) noexcept
+#else
+    int socket::poll(const std::vector<socket*>& in, std::vector<int>& ready,
+                     int timeoutMillis, PollFlag pollFlags) noexcept
+#endif
     {
-        ready.clear();
-        const int n = (int)in.size();
+        ready.resize(in.size());
+
+        int n = poll(in.data(), static_cast<int>(in.size()),
+                     ready.data(), static_cast<int>(ready.size()),
+                     timeoutMillis, pollFlags);
+
+        if (n > 0) ready.resize(n);
+        return n;
+    }
+
+    int socket::poll(socket* const* in, int inCount,
+                     int* outReadyIndexes, int outMaxCount,
+                     int timeoutMillis, PollFlag pollFlags) noexcept
+    {
+        // in 99.9% of cases only 2-4 sockets are polled
+        // 32 sockets takes roughly 256 bytes of stack space
         constexpr int MAX_LOCAL_FDS = 32;
 
         struct pollfd local_pfd[MAX_LOCAL_FDS];
         struct pollfd* pfd = local_pfd;
-        if (n > MAX_LOCAL_FDS)
-            pfd = (struct pollfd*)malloc(sizeof(struct pollfd) * n);
+        if (inCount > MAX_LOCAL_FDS) // too many fds, allocate dynamically
+            pfd = (struct pollfd*)malloc(sizeof(struct pollfd) * inCount);
 
-        memset(pfd, 0, sizeof(struct pollfd) * n);
+        memset(pfd, 0, sizeof(struct pollfd) * inCount);
 
         const short events = short(
             ((pollFlags & PF_Read) ? POLLIN : 0) |
             ((pollFlags & PF_Write) ? POLLOUT : 0)
         );
 
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < inCount; ++i)
         {
             pfd[i].fd = in[i]->os_handle();
             pfd[i].events = events;
@@ -1820,27 +1840,30 @@ namespace rpp
         }
 
     #if _WIN32 || _WIN64
-        int r = WSAPoll(pfd, n, timeoutMillis);
+        int r = WSAPoll(pfd, inCount, timeoutMillis);
     #else
-        int r = ::poll(pfd, n, timeoutMillis);
+        int r = ::poll(pfd, inCount, timeoutMillis);
     #endif
 
-        bool any_ready = false;
+        int readyCount = 0;
         if (r >= 0)
         {
             // BUGFIX: we don't trust the poll() return value, we double-check all of the sockets
-            for (int i = 0; i < n; ++i)
+            for (int i = 0; i < inCount; ++i)
             {
                 if (in[i]->on_poll_result(pfd[i].revents, pollFlags))
-                    ready.push_back(i);
+                {
+                    // null is allowed, and outMaxCount can be smaller than inCount
+                    if (outReadyIndexes && readyCount < outMaxCount)
+                        outReadyIndexes[readyCount] = i;
+                    ++readyCount;
+                }
             }
-
-            any_ready = !ready.empty();
         }
 
         if (pfd != local_pfd)
             free(pfd); // free the dynamically allocated pollfd array
-        return any_ready;
+        return readyCount;
     }
 
     bool socket::on_poll_result(int revents, PollFlag pollFlags) noexcept
