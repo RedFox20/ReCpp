@@ -8,15 +8,6 @@
     #include <thread> // this_thread::yield
 #endif
 
-#if RPP_FREERTOS
-    #include "FreeRTOS.h"
-    #include "semphr.h"
-#endif
-
-#if RPP_STM32_HAL
-    #include RPP_STM32_CORE_H
-#endif
-
 namespace rpp
 {
 #if _MSC_VER
