@@ -1,5 +1,5 @@
 #include "timer.h"
-#include <time.h> // gmtime, timegm
+#include <ctime> // gmtime, timegm
 #include "strview.h"
 
 #if _WIN32
@@ -18,6 +18,21 @@
         #endif
     #endif
     #include <thread>
+#elif RPP_BARE_METAL
+    #include <cstdint>
+    #define timegm mktime
+    #include <printf/printf.h>
+    #include <cstdarg>
+
+    #if RPP_FREERTOS
+        #include "FreeRTOS.h"
+        #include "task.h"
+    #endif
+
+    #if RPP_STM32_HAL
+        #include RPP_STM32_HAL_H
+        #include RPP_STM32_CORE_H
+    #endif
 #endif
 
 #if defined(__has_include) && __has_include("debugging.h")
@@ -135,6 +150,63 @@ namespace rpp
         }
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
     }
+#elif RPP_STM32_HAL
+    static uint64_t _get_time(uint64_t hz) noexcept
+    {
+        hz /= 1000; // convert to kilohertz
+        uint32_t ms;
+        uint32_t st;
+
+        do
+        {
+            ms = HAL_GetTick();
+            st = SysTick->VAL;
+            asm volatile("nop");
+            asm volatile("nop");
+        } while (ms != HAL_GetTick()); // Ensure no rollover
+
+        // SystemCoreClock / 1000 ticks per millisecond
+        HAL_TickFreqTypeDef tick_freq = HAL_GetTickFreq();
+        uint64_t cycles_per_ms = (SysTick->LOAD + 1) / tick_freq;
+
+        // SysTick counts DOWN, so we need (LOAD - VAL)
+        uint64_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
+        return (uint64_t(ms) * hz) + ns_fraction;
+    }
+
+    static void _sleep(uint64_t hz, uint64_t duration)
+    {
+        uint64_t start = _get_time(hz);
+        uint64_t end = start + duration;
+
+        if (end < start)
+        {
+            // Sleep until timer wraps around
+            while (_get_time(hz) > start) {}
+        }
+
+        while (_get_time(hz) < end) {}
+    }
+
+    static void stm32_sleep_ms(unsigned int millis)
+    {
+        _sleep(1'000ull, millis);
+    }
+
+    static void stm32_sleep_us(unsigned int micros)
+    {
+        _sleep(1'000'000ull, micros);
+    }
+
+    static void stm32_sleep_ns(uint64_t nanos)
+    {
+        _sleep(1'000'000'000ull, nanos);
+    }
+
+    static uint64_t stm32_get_time_ns() noexcept
+    {
+        return _get_time(1'000'000'000ull);
+    }
 #endif
 
     void sleep_ms(unsigned int millis) noexcept
@@ -143,6 +215,10 @@ namespace rpp
             win32_sleep_ns(millis * 1'000'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(millis * 1'000'000ull);
+        #elif RPP_FREERTOS
+            vTaskDelay(pdMS_TO_TICKS(millis));
+        #elif RPP_STM32_HAL
+            stm32_sleep_ms(millis);
         #else
             std::this_thread::sleep_for(std::chrono::milliseconds{millis});
         #endif
@@ -154,6 +230,10 @@ namespace rpp
             win32_sleep_ns(micros * 1'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(micros * 1'000ull);
+        #elif RPP_FREERTOS
+            vTaskDelay(pdMS_TO_TICKS((micros + 999) / 1000)); // round up to nearest ms
+        #elif RPP_STM32_HAL
+            stm32_sleep_us(micros);
         #else
             std::this_thread::sleep_for(std::chrono::microseconds{micros});
         #endif
@@ -165,6 +245,10 @@ namespace rpp
             win32_sleep_ns(nanos);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(nanos);
+        #elif RPP_FREERTOS
+            vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
+        #elif RPP_STM32_HAL
+            stm32_sleep_ns(nanos);
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
@@ -285,12 +369,14 @@ namespace rpp
         return duration_to_string(nanos(), buf, bufsize, fraction_digits);
     }
 
+#if !RPP_BARE_METAL
     std::string Duration::to_string(int fraction_digits) const noexcept
     {
         char buf[64];
         int len = duration_to_string(nanos(), buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
+#endif
 
     NOINLINE static int duration_to_stopwatch_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
     {
@@ -363,12 +449,14 @@ namespace rpp
         return duration_to_stopwatch_string(nanos(), buf, bufsize, fraction_digits);
     }
 
+#if !RPP_BARE_METAL
     std::string Duration::to_stopwatch_string(int fraction_digits) const noexcept
     {
         char buf[64];
         int len = duration_to_stopwatch_string(nanos(), buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
+#endif
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -483,12 +571,14 @@ namespace rpp
         return datetime_to_string(duration.nanos(), buf, bufsize, fraction_digits);
     }
 
+#if !RPP_BARE_METAL
     std::string TimePoint::to_string(int fraction_digits) const noexcept
     {
         char buf[64];
         int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
+#endif
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -497,6 +587,10 @@ namespace rpp
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) };
+        #elif RPP_FREERTOS
+            return TimePoint{ int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull };
+        #elif RPP_STM32_HAL
+            return TimePoint{ int64(stm32_get_time_ns()) };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -509,6 +603,10 @@ namespace rpp
         #if _WIN32
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset_seconds() * NANOS_PER_SEC };
+        #elif RPP_FREERTOS
+            return TimePoint{int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull + timezone_offset_seconds() * NANOS_PER_SEC};
+        #elif RPP_STM32_HAL
+            return TimePoint{int64() + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -615,6 +713,8 @@ namespace rpp
                 SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // default color
             #elif __ANDROID__
                 __android_log_print(ANDROID_LOG_WARN, "rpp", format, prefix, location, padDetail, detail, elapsed_ms);
+            #elif RPP_BARE_METAL
+                printf_(format, prefix, location, padDetail, detail, elapsed_ms);
             #else // @todo Proper Linux & OSX implementations
                 fprintf(stderr, format, prefix, location, padDetail, detail, elapsed_ms);
             #endif
