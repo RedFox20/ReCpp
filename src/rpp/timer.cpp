@@ -203,9 +203,9 @@ namespace rpp
         _sleep(1'000'000'000ull, nanos);
     }
 
-    static uint64_t stm32_get_time_ns() noexcept
+    static int64_t stm32_get_time_ns() noexcept
     {
-        return _get_time(1'000'000'000ull);
+        return int64_t(_get_time(1'000'000'000ull));
     }
 #endif
 
@@ -590,7 +590,7 @@ namespace rpp
         #elif RPP_FREERTOS
             return TimePoint{ int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull };
         #elif RPP_STM32_HAL
-            return TimePoint{ int64(stm32_get_time_ns()) };
+            return TimePoint{ stm32_get_time_ns() };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -606,7 +606,7 @@ namespace rpp
         #elif RPP_FREERTOS
             return TimePoint{int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull + timezone_offset_seconds() * NANOS_PER_SEC};
         #elif RPP_STM32_HAL
-            return TimePoint{int64() + timezone_offset_seconds() * NANOS_PER_SEC};
+            return TimePoint{stm32_get_time_ns() + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);

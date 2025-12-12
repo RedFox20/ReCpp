@@ -189,6 +189,8 @@ namespace rpp
                  // yielding here will improve perf massively
                 #if RPP_FREERTOS
                     taskYIELD();
+                #elif RPP_STM32_HAL
+                    __NOP();
                 #else
                     std::this_thread::yield();
                 #endif
@@ -196,13 +198,18 @@ namespace rpp
                     return std::unique_lock<Mutex>{m, std::adopt_lock};
             }
             // suspend until we can lock the mutex
-            try {
-                m.lock(); // may throw if deadlock
-            } catch (...) {
-                // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
-                // simply give up and return a deferred lock
-                return std::unique_lock<Mutex>{m, std::defer_lock};
-            }
+            #if RPP_BARE_METAL
+                // No exceptions in bare-metal mode, just lock
+                m.lock();
+            #else
+                try {
+                    m.lock(); // may throw if deadlock
+                } catch (...) {
+                    // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
+                    // simply give up and return a deferred lock
+                    return std::unique_lock<Mutex>{m, std::defer_lock};
+                }
+            #endif
         }
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }

@@ -123,7 +123,8 @@ namespace rpp
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
 
-        xSemaphoreTake((SemaphoreHandle_t)mtx.ctx, portMAX_DELAY);
+        else
+            xSemaphoreTake((SemaphoreHandle_t)mtx.ctx, portMAX_DELAY);
     }
     
     void mutex::unlock()
@@ -135,7 +136,8 @@ namespace rpp
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
 
-        xSemaphoreGive((SemaphoreHandle_t)mtx.ctx);
+        else
+            xSemaphoreGive((SemaphoreHandle_t)mtx.ctx);
     }
 
     /////////////////////////////////////////////////////////////////
@@ -177,7 +179,8 @@ namespace rpp
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
 
-        xSemaphoreTakeRecursive((SemaphoreHandle_t)mtx.ctx, portMAX_DELAY);
+        else
+            xSemaphoreTakeRecursive((SemaphoreHandle_t)mtx.ctx, portMAX_DELAY);
     }
 
     void recursive_mutex::unlock()
@@ -189,7 +192,8 @@ namespace rpp
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
 
-        xSemaphoreGiveRecursive((SemaphoreHandle_t)mtx.ctx);
+        else
+            xSemaphoreGiveRecursive((SemaphoreHandle_t)mtx.ctx);
     }
 
     /////////////////////////////////////////////////////////////////
@@ -220,9 +224,11 @@ namespace rpp
 
     void critical_section::lock()
     {
-        if (mtx.locked++ == 0)
-            mtx.primask = __get_PRIMASK();
+        uint33_t primask = __get_PRIMASK();
         __disable_irq();
+
+        if (mtx.locked++ == 0)
+            mtx.primask = primask;
     }
 
     void critical_section::unlock()
