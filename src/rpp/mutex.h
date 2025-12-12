@@ -3,7 +3,10 @@
 #include "type_traits.h"
 #include "timer.h" // rpp:Timer
 #include <mutex> // lock_guard etc
-#include <thread> // this_thread::yield
+
+#if !RPP_BARE_METAL
+    #include <thread> // this_thread::yield
+#endif
 
 namespace rpp
 {
@@ -58,6 +61,94 @@ namespace rpp
         using mutex = std::mutex;
         using recursive_mutex = std::recursive_mutex;
     #endif // USE_CUSTOM_WINDOWS_MUTEX
+
+#elif RPP_BARE_METAL
+#if RPP_FREERTOS
+        class critical_section
+        {
+        public:
+            critical_section() = default;
+
+            // No copy/move
+            critical_section(const critical_section&) = delete;
+            critical_section& operator=(const critical_section&) = delete;
+            critical_section(critical_section&& other) = delete;
+            critical_section& operator=(critical_section&& other) = delete;
+
+            bool try_lock();
+            void lock();
+            void unlock();
+
+            void* native_handle() const noexcept { return nullptr; }
+        };
+
+        class mutex
+        {
+            struct { void* ctx; } mtx;
+        public:
+            mutex();
+            ~mutex();
+
+            // No copy/move
+            mutex(const mutex&) = delete;
+            mutex& operator=(const mutex&) = delete;
+            mutex(mutex&& other) = delete;
+            mutex& operator=(mutex&& other) = delete;
+
+            bool try_lock();
+            void lock();
+            void unlock();
+
+
+            void* native_handle() const noexcept { return mtx.ctx; }
+        };
+
+        class recursive_mutex
+        {
+            struct { void* ctx; } mtx;
+
+        public:
+            recursive_mutex();
+            ~recursive_mutex();
+
+            // No copy/move
+            recursive_mutex(const recursive_mutex&) = delete;
+            recursive_mutex& operator=(const recursive_mutex&) = delete;
+            recursive_mutex(recursive_mutex&& other) = delete;
+            recursive_mutex& operator=(recursive_mutex&& other) = delete;
+            
+            bool try_lock();
+            void lock();
+            void unlock();
+
+            void* native_handle() const noexcept { return mtx.ctx; }
+        };
+    #else
+        class critical_section
+        {
+            struct {
+                uint32_t primask = 0;
+                uint32_t locked = 0;
+            } mtx;
+        public:
+            critical_section() = default;
+
+            // No copy/move
+            critical_section(const critical_section&) = delete;
+            critical_section& operator=(const critical_section&) = delete;
+            critical_section(critical_section&& other) = delete;
+            critical_section& operator=(critical_section&& other) = delete;
+            
+            bool try_lock();
+            void lock();
+            void unlock();
+
+            void* native_handle() const noexcept { return (void*) &mtx; }
+        };
+
+        using mutex = critical_section;
+        using recursive_mutex = critical_section;
+    #endif
 #else
     using mutex = std::mutex;
     using recursive_mutex = std::recursive_mutex;
@@ -95,18 +186,30 @@ namespace rpp
         {
             for (int i = 0; i < 10; ++i)
             {
-                std::this_thread::yield(); // yielding here will improve perf massively
+                 // yielding here will improve perf massively
+                #if RPP_FREERTOS
+                    taskYIELD();
+                #elif RPP_STM32_HAL
+                    __NOP();
+                #else
+                    std::this_thread::yield();
+                #endif
                 if (m.try_lock())
                     return std::unique_lock<Mutex>{m, std::adopt_lock};
             }
             // suspend until we can lock the mutex
-            try {
-                m.lock(); // may throw if deadlock
-            } catch (...) {
-                // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
-                // simply give up and return a deferred lock
-                return std::unique_lock<Mutex>{m, std::defer_lock};
-            }
+            #if RPP_BARE_METAL
+                // No exceptions in bare-metal mode, just lock
+                m.lock();
+            #else
+                try {
+                    m.lock(); // may throw if deadlock
+                } catch (...) {
+                    // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
+                    // simply give up and return a deferred lock
+                    return std::unique_lock<Mutex>{m, std::defer_lock};
+                }
+            #endif
         }
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
@@ -281,12 +384,12 @@ namespace rpp
      * *str = "Thread safely set new value";
      * @endcode
      */
-    template<class T>
+    template<class T, typename Mutex = rpp::recursive_mutex>
     class synchronized : public synchronizable<synchronized<T>>
     {
     protected:
         T value {};
-        rpp::recursive_mutex mutex {};
+        Mutex mutex {};
     public:
 
         synchronized() noexcept(noexcept(T{})) = default;

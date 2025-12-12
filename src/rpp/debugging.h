@@ -110,7 +110,11 @@ namespace rpp
 #if __cplusplus
 
 // std::string logging compatibility
+#if !RPP_BARE_METAL
 #include <string>
+#endif
+
+#include <type_traits>
 
 // MacOS Obj-C compatbility
 #if __APPLE__ && __OBJC__
@@ -128,16 +132,18 @@ namespace rpp
     struct __wrap<const char*>
     { FINLINE static constexpr const char* w(const char* arg) noexcept { return arg; } };
 
-    template<>
-    struct __wrap<std::string>
-    {
-        // constexpr c_str() available in C++20 and up, but not on GCC C++20
-        #if RPP_HAS_CXX23 || (RPP_HAS_CXX20 && __cpp_lib_constexpr_string && !RPP_GCC)
-            FINLINE static constexpr const char* w(const std::string& arg) noexcept { return arg.c_str(); }
-        #else
-            FINLINE static const char* w(const std::string& arg) noexcept { return arg.c_str(); }
-        #endif
-    };
+    #if !RPP_BARE_METAL
+        template<>
+        struct __wrap<std::string>
+        {
+            // constexpr c_str() available in C++20 and up, but not on GCC C++20
+            #if RPP_HAS_CXX23 || (RPP_HAS_CXX20 && __cpp_lib_constexpr_string && !RPP_GCC)
+                FINLINE static constexpr const char* w(const std::string& arg) noexcept { return arg.c_str(); }
+            #else
+                FINLINE static const char* w(const std::string& arg) noexcept { return arg.c_str(); }
+            #endif
+        };
+    #endif
 
     #if __APPLE__ && __OBJC__
         template<>
@@ -305,7 +311,7 @@ RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __d
 #endif
 
 #ifdef __cplusplus
-#if !__ANDROID__
+#if !__ANDROID__ && !RPP_BARE_METAL
 #  include <stdexcept>
 #endif
 
