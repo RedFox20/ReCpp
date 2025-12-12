@@ -215,7 +215,10 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
     #endif
 
     // trap into debugger
-    #if __clang__
+    // TODO: replace with std::breakpoint() when we switch to C++26
+    #if RPP_BARE_METAL && RPP_ARM_ARCH
+        __asm__ volatile ("bkpt #0");
+    #elif __clang__
         #if __has_builtin(__builtin_debugtrap)
             __builtin_debugtrap();
         #else
@@ -225,11 +228,11 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
         __debugbreak();
     #elif __GNUC__
         raise(SIGTRAP);
-    #elif RPP_BARE_METAL
-        __asm__ volatile ("bkpt #0");
     #endif
 
-    #if RPP_BARE_METAL
+    #if RPP_STM32_HAL
+        NVIC_SystemReset(); // reset the system 
+    #elif RPP_BARE_METAL
         // on bare-metal we cannot continue
         while (true) {}
     #else
