@@ -4,12 +4,12 @@
     #include <Windows.h>
 #endif
 #if RPP_FREERTOS
-    #include "FreeRTOS.h"
-    #include "semphr.h"
-    #include "task.h"
+    #include <FreeRTOS.h>
+    #include <semphr.h>
+    #include <task.h>
 #endif
 #if RPP_STM32_HAL
-    #include RPP_STM32_CORE_H
+#include RPP_CORTEX_M_CORE_H
 #endif
 
 namespace rpp
@@ -85,156 +85,165 @@ namespace rpp
     }
 #elif RPP_FREERTOS
     /////////////////////////////////////////////////////////////////
+    #define GET_SEMPHR() ((SemaphoreHandle_t)ctx)
 
-    mutex::mutex()
+    mutex::mutex() noexcept
     {
-        mtx.ctx = xSemaphoreCreateBinary(); // binary semaphore is faster than mutex semaphore
-        xSemaphoreGive((SemaphoreHandle_t)mtx.ctx); // Initialize to available
+        ctx = xSemaphoreCreateBinary(); // binary semaphore is faster than mutex semaphore
+        xSemaphoreGive(GET_SEMPHR()); // Initialize to available
     }
 
-    mutex::~mutex()
+    mutex::~mutex() noexcept
     {
-        if (mtx.ctx)
+        if (ctx)
         {
-            vSemaphoreDelete((SemaphoreHandle_t)mtx.ctx);
-            mtx.ctx = nullptr;
+            vSemaphoreDelete(GET_SEMPHR());
+            ctx = nullptr;
         }
     }
 
-    bool mutex::try_lock()
+    bool mutex::try_lock() noexcept
     { 
         if (xPortIsInsideInterrupt())
         {
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            bool r = xSemaphoreTakeFromISR((SemaphoreHandle_t)mtx.ctx, &higherPriorityTaskWoken) == pdTRUE;
+            bool r = xSemaphoreTakeFromISR(GET_SEMPHR(), &higherPriorityTaskWoken) == pdTRUE;
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
             return r;
         }
 
-        return xSemaphoreTake((SemaphoreHandle_t)mtx.ctx, 0) == pdTRUE;
+        return xSemaphoreTake(GET_SEMPHR(), 0) == pdTRUE;
     }
     
-    void mutex::lock()
+    void mutex::lock() noexcept
     {
         if (xPortIsInsideInterrupt())
         {
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xSemaphoreTakeFromISR((SemaphoreHandle_t)mtx.ctx, &higherPriorityTaskWoken);
+            xSemaphoreTakeFromISR(GET_SEMPHR(), &higherPriorityTaskWoken);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
-
         else
-            xSemaphoreTake((SemaphoreHandle_t)mtx.ctx, portMAX_DELAY);
+        {
+            xSemaphoreTake(GET_SEMPHR(), portMAX_DELAY);
+        }
     }
     
-    void mutex::unlock()
+    void mutex::unlock() noexcept
     {
         if (xPortIsInsideInterrupt())
         {
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xSemaphoreGiveFromISR((SemaphoreHandle_t)mtx.ctx, &higherPriorityTaskWoken);
+            xSemaphoreGiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
-
         else
-            xSemaphoreGive((SemaphoreHandle_t)mtx.ctx);
+        {
+            xSemaphoreGive(GET_SEMPHR());
+        }
     }
 
     /////////////////////////////////////////////////////////////////
 
-    recursive_mutex::recursive_mutex()
+    recursive_mutex::recursive_mutex() noexcept
     {
-        mtx.ctx = xSemaphoreCreateRecursiveMutex(); // Recursive semaphore
-        xSemaphoreGiveRecursive((SemaphoreHandle_t)mtx.ctx);      // Initialize to available
+        ctx = xSemaphoreCreateRecursiveMutex(); // Recursive semaphore
+        xSemaphoreGiveRecursive(GET_SEMPHR());      // Initialize to available
     }
 
-    recursive_mutex::~recursive_mutex()
+    recursive_mutex::~recursive_mutex() noexcept
     {
-        if (mtx.ctx)
+        if (ctx)
         {
-            vSemaphoreDelete((SemaphoreHandle_t)mtx.ctx);
-            mtx.ctx = nullptr;
+            vSemaphoreDelete(GET_SEMPHR());
+            ctx = nullptr;
         }
     }
 
-    bool recursive_mutex::try_lock()
+    bool recursive_mutex::try_lock() noexcept
     {
         if (xPortIsInsideInterrupt())
         {
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            bool r = xSemaphoreTakeRecursiveFromISR((SemaphoreHandle_t)mtx.ctx, &higherPriorityTaskWoken) == pdTRUE;
+            bool r = xSemaphoreTakeRecursiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken) == pdTRUE;
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
             return r;
         }
 
-        return xSemaphoreTakeRecursive((SemaphoreHandle_t)mtx.ctx, 0) == pdTRUE;
+        return xSemaphoreTakeRecursive(GET_SEMPHR(), 0) == pdTRUE;
     }
 
-    void recursive_mutex::lock()
+    void recursive_mutex::lock() noexcept
     {
         if (xPortIsInsideInterrupt())
         {
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xSemaphoreTakeRecursiveFromISR((SemaphoreHandle_t)mtx.ctx, &higherPriorityTaskWoken);
+            xSemaphoreTakeRecursiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
-
         else
-            xSemaphoreTakeRecursive((SemaphoreHandle_t)mtx.ctx, portMAX_DELAY);
+        {
+            xSemaphoreTakeRecursive(GET_SEMPHR(), portMAX_DELAY);
+        }
     }
 
-    void recursive_mutex::unlock()
+    void recursive_mutex::unlock() noexcept
     {
         if (xPortIsInsideInterrupt())
         {
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xSemaphoreGiveRecursiveFromISR((SemaphoreHandle_t)mtx.ctx, &higherPriorityTaskWoken);
+            xSemaphoreGiveRecursiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
-
         else
-            xSemaphoreGiveRecursive((SemaphoreHandle_t)mtx.ctx);
+        {
+            xSemaphoreGiveRecursive(GET_SEMPHR());
+        }
     }
 
     /////////////////////////////////////////////////////////////////
 
-    bool critical_section::try_lock()
+    bool critical_section::try_lock() noexcept
     {
         portENTER_CRITICAL(0);
         return true;
     }
 
-    void critical_section::lock()
+    void critical_section::lock() noexcept
     {
         portENTER_CRITICAL(0);
     }
 
-    void critical_section::unlock()
+    void critical_section::unlock() noexcept
     {
         portEXIT_CRITICAL(0);
     }
 #elif RPP_STM32_HAL
     /////////////////////////////////////////////////////////////////
 
-    bool critical_section::try_lock()
+    bool critical_section::try_lock() noexcept
     {
         lock();
         return true;
     }
 
-    void critical_section::lock()
+    void critical_section::lock() noexcept
     {
-        uint33_t primask = __get_PRIMASK();
+        // Save current interrupt state
+        uint32_t primask = __get_PRIMASK();
+
+        // Disable interrupts
         __disable_irq();
 
         if (mtx.locked++ == 0)
             mtx.primask = primask;
     }
 
-    void critical_section::unlock()
+    void critical_section::unlock() noexcept
     {
         if (mtx.locked > 0 && --mtx.locked == 0)
         {
+            // Restore previous interrupt state
             __set_PRIMASK(mtx.primask);
         }
     }

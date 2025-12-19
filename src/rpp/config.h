@@ -154,10 +154,7 @@
 #  define RPP_STM32_HAL 0
 #else
 #  ifndef RPP_STM32_HAL_H
-#    error "RPP_STM32_HAL_H has to be defined and has to have a valid path to the STM32 HAL header file, e.g., stm32f1xx_hal.h"
-#  endif
-#  ifndef RPP_STM32_CORE_H
-#    error "RPP_STM32_CORE_H has to be defined and has to have a valid path to the STM32 core header file, e.g., core_cm3.h"
+#    error "RPP_STM32_HAL_H has to be defined and has to have a valid path to the STM32 HAL header file, e.g., <stm32f1xx_hal.h>"
 #  endif
 #endif
 
@@ -165,6 +162,20 @@
 #  define RPP_BARE_METAL 1
 #else
 #  define RPP_BARE_METAL 0
+#endif
+
+#ifndef RPP_CORTEX_M_ARCH
+#  if RPP_STM32_HAL // STM32 is always Cortex-M
+#    define RPP_CORTEX_M_ARCH 1
+#  else
+#    define RPP_CORTEX_M_ARCH 0
+#  endif
+#endif
+
+#if RPP_CORTEX_M_ARCH
+#  ifndef RPP_CORTEX_M_CORE_H
+#    error "RPP_CORTEX_M_CORE_H has to be defined and has to have a valid path to the STM32 core header file, e.g., <core_cm3.h>"
+#  endif
 #endif
 
 #if defined(__thumb__) || defined(__arm__)

@@ -31,6 +31,9 @@
 
 #if RPP_BARE_METAL
 # include <printf/printf.h>
+# if RPP_STM32_HAL
+#  include RPP_STM32_HAL_H
+# endif
 #endif
 
 #ifdef QUIETLOG
@@ -159,9 +162,6 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     int remaining = N;
     int len = 0;
 
-#if RPP_BARE_METAL
-    int plen = vsnprintf_(pbuf, size_t(remaining - 1) /*spare room for \n*/, format, ap);
-#else
     if (EnableTimestamps) {
         rpp::TimePoint now = rpp::TimePoint::now();
         now.duration.nsec += TimeOffset;
@@ -175,7 +175,6 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     }
 
     int plen = vsnprintf(pbuf, size_t(remaining-1)/*spare room for \n*/, format, ap);
-#endif
 
     if (plen < 0 || plen >= remaining) { // err: didn't fit
         plen = remaining-2; // try to recover gracefully
@@ -230,14 +229,7 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
         raise(SIGTRAP);
     #endif
 
-    #if RPP_STM32_HAL
-        NVIC_SystemReset(); // reset the system 
-    #elif RPP_BARE_METAL
-        // on bare-metal we cannot continue
-        while (true) {}
-    #else
-        std::terminate();
-    #endif
+    std::terminate();
 }
 
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* str, int len)

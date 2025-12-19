@@ -25,13 +25,16 @@
     #include <cstdarg>
 
     #if RPP_FREERTOS
-        #include "FreeRTOS.h"
-        #include "task.h"
+        #include <FreeRTOS.h>
+        #include <task.h>
     #endif
 
     #if RPP_STM32_HAL
         #include RPP_STM32_HAL_H
-        #include RPP_STM32_CORE_H
+    #endif
+
+    #if RPP_CORTEX_M_ARCH
+        #include RPP_CORTEX_M_CORE_H
     #endif
 #endif
 
@@ -150,63 +153,94 @@ namespace rpp
         }
         clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
     }
-#elif RPP_STM32_HAL
-    static uint64_t _get_time(uint64_t hz) noexcept
-    {
-        hz /= 1000; // convert to kilohertz
-        uint32_t ms;
-        uint32_t st;
+#elif RPP_BARE_METAL
+    #if RPP_CORTEX_M_ARCH
+        // Forward declare needed functions for get_time_us
+        FINLINE static int get_tick() noexcept;
+        FINLINE static int get_tick_freq() noexcept;
 
-        do
+        static int64 cortex_m_get_time_us() noexcept
         {
-            ms = HAL_GetTick();
-            st = SysTick->VAL;
-            asm volatile("nop");
-            asm volatile("nop");
-        } while (ms != HAL_GetTick()); // Ensure no rollover
+            int tick;
+            int st;
 
-        // SystemCoreClock / 1000 ticks per millisecond
-        HAL_TickFreqTypeDef tick_freq = HAL_GetTickFreq();
-        uint64_t cycles_per_ms = (SysTick->LOAD + 1) / tick_freq;
+            do
+            {
+                tick = get_tick();
+                st = SysTick->VAL;
 
-        // SysTick counts DOWN, so we need (LOAD - VAL)
-        uint64_t ns_fraction = ((cycles_per_ms - st) * hz) / cycles_per_ms;
-        return (uint64_t(ms) * hz) + ns_fraction;
-    }
+                // Clear the instruction pipeline
+                asm volatile("nop");
+                asm volatile("nop");
+            } while (tick != get_tick()); // Ensure no rollover
 
-    static void _sleep(uint64_t hz, uint64_t duration)
-    {
-        uint64_t start = _get_time(hz);
-        uint64_t end = start + duration;
+            // SystemCoreClock / 1000 ticks per millisecond
+            HAL_TickFreqTypeDef tick_freq = HAL_TickFreqTypeDef(get_tick_freq());
+            int64 cycles_per_tick = (SysTick->LOAD + 1) / tick_freq;
 
-        if (end < start)
+            // SysTick counts DOWN, so we need (LOAD - VAL)
+            int64 us_fraction = ((cycles_per_tick - st) * 1000) / cycles_per_tick;
+            return (int64(tick) * 1000 / tick_freq) + us_fraction;
+        }
+    #endif
+
+    #if RPP_FREERTOS
+        FINLINE static int get_tick() noexcept { return xTaskGetTickCount(); }
+        FINLINE static int get_tick_freq() noexcept { return configTICK_RATE_HZ; }
+
+        // Platform specific implementation of getting time in microseconds
+        static int64 freertos_get_time_us() noexcept
         {
-            // Sleep until timer wraps around
-            while (_get_time(hz) > start) {}
+        #if RPP_CORTEX_M_ARCH
+            return cortex_m_get_time_us();
+        #else
+            return 1000 * pdTICKS_TO_MS(xTaskGetTickCount());
+        #endif
         }
 
-        while (_get_time(hz) < end) {}
-    }
+        static void freertos_sleep_us(unsigned int duration) noexcept
+        {
+            int ticks = duration / configTICK_RATE_HZ;
+            int micros = duration - (ticks * configTICK_RATE_HZ);
 
-    static void stm32_sleep_ms(unsigned int millis)
-    {
-        _sleep(1'000ull, millis);
-    }
+            // Sleep for full ticks
+            if (ticks > 0)
+                vTaskDelay(ticks);
 
-    static void stm32_sleep_us(unsigned int micros)
-    {
-        _sleep(1'000'000ull, micros);
-    }
+            // Spin-wait for remaining microseconds
+            if (micros > 0)
+            {
+                int64 start = freertos_get_time_us();
+                int64 end = start + micros;
 
-    static void stm32_sleep_ns(uint64_t nanos)
-    {
-        _sleep(1'000'000'000ull, nanos);
-    }
+                if (end < start)
+                {
+                    // Sleep until timer wraps around
+                    while (freertos_get_time_us() > start) {}
+                }
 
-    static int64_t stm32_get_time_ns() noexcept
-    {
-        return int64_t(_get_time(1'000'000'000ull));
-    }
+                while (freertos_get_time_us() < end) {}
+            }
+        }
+
+    #elif RPP_STM32_HAL
+        FINLINE static int get_tick() noexcept { return HAL_GetTick(); }
+        FINLINE static int get_tick_freq() noexcept { return HAL_GetTickFreq(); }
+
+        static void stm32_sleep_us(unsigned int duration) noexcept
+        {
+            int64 start = cortex_m_get_time_us();
+            int64 end = start + duration;
+
+            if (end < start)
+            {
+                // Sleep until timer wraps around
+                while (cortex_m_get_time_us() > start) {}
+            }
+
+            while (cortex_m_get_time_us() < end) {}
+        }
+    #endif
 #endif
 
     void sleep_ms(unsigned int millis) noexcept
@@ -218,7 +252,7 @@ namespace rpp
         #elif RPP_FREERTOS
             vTaskDelay(pdMS_TO_TICKS(millis));
         #elif RPP_STM32_HAL
-            stm32_sleep_ms(millis);
+            stm32_sleep_us(millis * 1000);
         #else
             std::this_thread::sleep_for(std::chrono::milliseconds{millis});
         #endif
@@ -231,7 +265,7 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(micros * 1'000ull);
         #elif RPP_FREERTOS
-            vTaskDelay(pdMS_TO_TICKS((micros + 999) / 1000)); // round up to nearest ms
+            freertos_sleep_us(micros); // round up to nearest ms
         #elif RPP_STM32_HAL
             stm32_sleep_us(micros);
         #else
@@ -246,9 +280,9 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(nanos);
         #elif RPP_FREERTOS
-            vTaskDelay(pdMS_TO_TICKS((nanos + 999'999) / 1'000'000)); // round up to nearest ms
+            freertos_sleep_us(nanos / 1000);
         #elif RPP_STM32_HAL
-            stm32_sleep_ns(nanos);
+            stm32_sleep_us(nanos / 1000); // TODO: sleep has us precision only
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
@@ -524,7 +558,18 @@ namespace rpp
         struct tm tm_utc = gmtime_safe(seconds);
 
         // Format the date and time in the buffer
+    #if RPP_BARE_METAL
+        // Use snprintf since strftime footprint is very large (~7KB)
+        char* end = buf + snprintf_(buf, bufsize, "%04d-%02d-%02d %02d:%02d:%02d",
+            tm_utc.tm_year + 1900,
+            tm_utc.tm_mon + 1,
+            tm_utc.tm_mday,
+            tm_utc.tm_hour,
+            tm_utc.tm_min,
+            tm_utc.tm_sec);
+    #else
         char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", &tm_utc);
+    #endif
         if (fraction_digits > 0)
             end += print_fraction(nanos, end, fraction_digits);
         *end = '\0';
@@ -588,9 +633,9 @@ namespace rpp
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) };
         #elif RPP_FREERTOS
-            return TimePoint{ int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull };
+            return TimePoint{ freertos_get_time_us() * 1000 };
         #elif RPP_STM32_HAL
-            return TimePoint{ stm32_get_time_ns() };
+            return TimePoint{ cortex_m_get_time_us() * 1000 };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -606,7 +651,7 @@ namespace rpp
         #elif RPP_FREERTOS
             return TimePoint{int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull + timezone_offset_seconds() * NANOS_PER_SEC};
         #elif RPP_STM32_HAL
-            return TimePoint{stm32_get_time_ns() + timezone_offset_seconds() * NANOS_PER_SEC};
+            return TimePoint{cortex_m_get_time_us() * 1000 + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);

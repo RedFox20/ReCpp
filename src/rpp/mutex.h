@@ -67,7 +67,7 @@ namespace rpp
         class critical_section
         {
         public:
-            critical_section() = default;
+            critical_section() noexcept = default;
 
             // No copy/move
             critical_section(const critical_section&) = delete;
@@ -75,19 +75,19 @@ namespace rpp
             critical_section(critical_section&& other) = delete;
             critical_section& operator=(critical_section&& other) = delete;
 
-            bool try_lock();
-            void lock();
-            void unlock();
+            bool try_lock() noexcept;
+            void lock() noexcept;
+            void unlock() noexcept;
 
-            void* native_handle() const noexcept { return nullptr; }
+            void* native_handle() const noexcept { return this; }
         };
 
         class mutex
         {
-            struct { void* ctx; } mtx;
+            void* ctx;
         public:
-            mutex();
-            ~mutex();
+            mutex() noexcept;
+            ~mutex() noexcept;
 
             // No copy/move
             mutex(const mutex&) = delete;
@@ -95,21 +95,20 @@ namespace rpp
             mutex(mutex&& other) = delete;
             mutex& operator=(mutex&& other) = delete;
 
-            bool try_lock();
-            void lock();
-            void unlock();
+            bool try_lock() noexcept;
+            void lock() noexcept;
+            void unlock() noexcept;
 
-
-            void* native_handle() const noexcept { return mtx.ctx; }
+            void* native_handle() const noexcept { return ctx; }
         };
 
         class recursive_mutex
         {
-            struct { void* ctx; } mtx;
+            void* ctx;
 
         public:
-            recursive_mutex();
-            ~recursive_mutex();
+            recursive_mutex() noexcept;
+            ~recursive_mutex() noexcept;
 
             // No copy/move
             recursive_mutex(const recursive_mutex&) = delete;
@@ -117,13 +116,17 @@ namespace rpp
             recursive_mutex(recursive_mutex&& other) = delete;
             recursive_mutex& operator=(recursive_mutex&& other) = delete;
             
-            bool try_lock();
-            void lock();
-            void unlock();
+            bool try_lock() noexcept;
+            void lock() noexcept;
+            void unlock() noexcept;
 
-            void* native_handle() const noexcept { return mtx.ctx; }
+            void* native_handle() const noexcept { return ctx; }
         };
     #else
+        /**
+         * @brief Disables interrupts, preventing context switches
+         * Locking and unlocking always succeeds.
+         */
         class critical_section
         {
             struct {
@@ -131,7 +134,7 @@ namespace rpp
                 uint32_t locked = 0;
             } mtx;
         public:
-            critical_section() = default;
+            critical_section() noexcept = default;
 
             // No copy/move
             critical_section(const critical_section&) = delete;
@@ -139,9 +142,9 @@ namespace rpp
             critical_section(critical_section&& other) = delete;
             critical_section& operator=(critical_section&& other) = delete;
             
-            bool try_lock();
-            void lock();
-            void unlock();
+            bool try_lock() noexcept; // Always succeed, so it's an alias for lock();
+            void lock() noexcept;
+            void unlock() noexcept;
 
             void* native_handle() const noexcept { return (void*) &mtx; }
         };
@@ -172,6 +175,22 @@ namespace rpp
             mtx.lock();
         }
     };
+
+    /**
+     * @brief Yields the current thread, allowing other threads to run.
+     */
+    FINLINE void yield() noexcept
+    {
+        #if RPP_FREERTOS
+            if (xPortIsInsideInterrupt())
+                return; // cannot yield from ISR
+            taskYIELD();
+        #elif RPP_STM32_HAL
+            __NOP();
+        #else
+            std::this_thread::yield();
+        #endif
+    }
 
     /**
      * @brief Performs a few spins before locking and suspending the thread.
@@ -384,12 +403,12 @@ namespace rpp
      * *str = "Thread safely set new value";
      * @endcode
      */
-    template<class T, typename Mutex = rpp::recursive_mutex>
+    template<class T>
     class synchronized : public synchronizable<synchronized<T>>
     {
     protected:
         T value {};
-        Mutex mutex {};
+        rpp::recursive_mutex mutex {};
     public:
 
         synchronized() noexcept(noexcept(T{})) = default;
@@ -399,4 +418,25 @@ namespace rpp
         auto& get_mutex() noexcept { return mutex; }
         T& get_ref() noexcept { return value; }
     };
+
+#if RPP_BARE_METAL
+    /**
+     * @brief Same as rpp::synchronized but uses rpp::critical_section for mutexing.
+     */
+    template<class T>
+    class synchronized_critical : public synchronizable<synchronized_critical<T>>
+    {
+    protected:
+        T value {};
+        rpp::critical_section mutex {};
+    public:
+
+        synchronized_critical() noexcept(noexcept(T{})) = default;
+        synchronized_critical(T&& value) noexcept : value{std::move(value)} {}
+        synchronized_critical(const T& value) noexcept : value{value} {}
+
+        auto& get_mutex() noexcept { return mutex; }
+        T& get_ref() noexcept { return value; }
+    }
+#endif
 }
