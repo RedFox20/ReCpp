@@ -62,118 +62,126 @@ namespace rpp
         using recursive_mutex = std::recursive_mutex;
     #endif // USE_CUSTOM_WINDOWS_MUTEX
 
-#elif RPP_BARE_METAL
-#if RPP_FREERTOS
-        class critical_section
-        {
-        public:
-            critical_section() noexcept = default;
+#elif RPP_FREERTOS
+    class critical_section
+    {
+    public:
+        critical_section() noexcept = default;
 
-            // No copy/move
-            critical_section(const critical_section&) = delete;
-            critical_section& operator=(const critical_section&) = delete;
-            critical_section(critical_section&& other) = delete;
-            critical_section& operator=(critical_section&& other) = delete;
+        // No copy/move
+        critical_section(const critical_section&) = delete;
+        critical_section& operator=(const critical_section&) = delete;
+        critical_section(critical_section&& other) = delete;
+        critical_section& operator=(critical_section&& other) = delete;
 
-            bool try_lock() noexcept;
-            void lock() noexcept;
-            void unlock() noexcept;
+        bool try_lock() noexcept;
+        void lock() noexcept;
+        void unlock() noexcept;
 
-            void* native_handle() const noexcept { return this; }
-        };
+        void* native_handle() const noexcept { return this; }
+    };
 
-        class mutex
-        {
-            void* ctx;
-        public:
-            mutex() noexcept;
-            ~mutex() noexcept;
+    class mutex
+    {
+        void* ctx;
+    public:
+        mutex() noexcept;
+        ~mutex() noexcept;
 
-            // No copy/move
-            mutex(const mutex&) = delete;
-            mutex& operator=(const mutex&) = delete;
-            mutex(mutex&& other) = delete;
-            mutex& operator=(mutex&& other) = delete;
+        // No copy/move
+        mutex(const mutex&) = delete;
+        mutex& operator=(const mutex&) = delete;
+        mutex(mutex&& other) = delete;
+        mutex& operator=(mutex&& other) = delete;
 
-            bool try_lock() noexcept;
-            void lock() noexcept;
-            void unlock() noexcept;
+        bool try_lock() noexcept;
+        void lock() noexcept;
+        void unlock() noexcept;
 
-            void* native_handle() const noexcept { return ctx; }
-        };
+        void* native_handle() const noexcept { return ctx; }
+    };
 
-        class recursive_mutex
-        {
-            void* ctx;
+    class recursive_mutex
+    {
+        void* ctx;
 
-        public:
-            recursive_mutex() noexcept;
-            ~recursive_mutex() noexcept;
+    public:
+        recursive_mutex() noexcept;
+        ~recursive_mutex() noexcept;
 
-            // No copy/move
-            recursive_mutex(const recursive_mutex&) = delete;
-            recursive_mutex& operator=(const recursive_mutex&) = delete;
-            recursive_mutex(recursive_mutex&& other) = delete;
-            recursive_mutex& operator=(recursive_mutex&& other) = delete;
-            
-            bool try_lock() noexcept;
-            void lock() noexcept;
-            void unlock() noexcept;
+        // No copy/move
+        recursive_mutex(const recursive_mutex&) = delete;
+        recursive_mutex& operator=(const recursive_mutex&) = delete;
+        recursive_mutex(recursive_mutex&& other) = delete;
+        recursive_mutex& operator=(recursive_mutex&& other) = delete;
+        
+        bool try_lock() noexcept;
+        void lock() noexcept;
+        void unlock() noexcept;
 
-            void* native_handle() const noexcept { return ctx; }
-        };
-    #else
-        /**
-         * @brief Disables interrupts, preventing context switches
-         * Locking and unlocking always succeeds.
-         */
-        class critical_section
-        {
-            struct {
-                uint32_t primask = 0;
-                uint32_t locked = 0;
-            } mtx;
-        public:
-            critical_section() noexcept = default;
+        void* native_handle() const noexcept { return ctx; }
+    };
 
-            // No copy/move
-            critical_section(const critical_section&) = delete;
-            critical_section& operator=(const critical_section&) = delete;
-            critical_section(critical_section&& other) = delete;
-            critical_section& operator=(critical_section&& other) = delete;
-            
-            bool try_lock() noexcept; // Always succeed, so it's an alias for lock();
-            void lock() noexcept;
-            void unlock() noexcept;
+    #define RPP_HAS_CRITICAL_SECTION_MUTEX 1
+#elif RPP_CORTEX_M_ARCH
+    /**
+     * @brief Disables interrupts, preventing context switches.
+     * Locking and unlocking always succeeds.
+     */
+    class critical_section
+    {
+        struct {
+            uint32_t primask = 0;
+            uint32_t locked = 0;
+        } mtx;
+    public:
+        critical_section() noexcept = default;
 
-            void* native_handle() const noexcept { return (void*) &mtx; }
-        };
+        // No copy/move
+        critical_section(const critical_section&) = delete;
+        critical_section& operator=(const critical_section&) = delete;
+        critical_section(critical_section&& other) = delete;
+        critical_section& operator=(critical_section&& other) = delete;
+        
+        bool try_lock() noexcept; // Always succeed, so it's an alias for lock();
+        void lock() noexcept;
+        void unlock() noexcept;
 
-        using mutex = critical_section;
-        using recursive_mutex = critical_section;
-    #endif
+        void* native_handle() const noexcept { return (void*) &mtx; }
+    };
+
+    using mutex = critical_section;
+    using recursive_mutex = critical_section;
+
+#define RPP_HAS_CRITICAL_SECTION_MUTEX 1
 #else
     using mutex = std::mutex;
     using recursive_mutex = std::recursive_mutex;
 #endif
 
-    /**
-     * @brief Unlock Guard: RAII unlocks and then relocks on scope exit.
-     */
-    template<class Mutex>
-    struct unlock_guard final
-    {
-        std::unique_lock<Mutex>& mtx;
-        explicit unlock_guard(std::unique_lock<Mutex>& mtx) : mtx{mtx} {
-            mtx.unlock();
-        }
-        ~unlock_guard() noexcept /* terminates */ { // MSVC++ defined
-            // relock mutex or terminate()
-            // condition_variable_any wait functions are required to terminate if
-            // the mutex cannot be relocked;
-            // we slam into noexcept here for easier user debugging.
-            mtx.lock();
-        }
+#ifndef RPP_HAS_CRITICAL_SECTION_MUTEX
+    #define RPP_HAS_CRITICAL_SECTION_MUTEX 0
+#endif
+
+        /**
+         * @brief Unlock Guard: RAII unlocks and then relocks on scope exit.
+         */
+        template <class Mutex>
+        struct unlock_guard final
+        {
+            std::unique_lock<Mutex>& mtx;
+            explicit unlock_guard(std::unique_lock<Mutex>& mtx) : mtx{mtx}
+            {
+                mtx.unlock();
+            }
+            ~unlock_guard() noexcept /* terminates */
+            {                        // MSVC++ defined
+                // relock mutex or terminate()
+                // condition_variable_any wait functions are required to terminate if
+                // the mutex cannot be relocked;
+                // we slam into noexcept here for easier user debugging.
+                mtx.lock();
+            }
     };
 
     /**
@@ -419,7 +427,7 @@ namespace rpp
         T& get_ref() noexcept { return value; }
     };
 
-#if RPP_BARE_METAL
+#if RPP_HAS_CRITICAL_SECTION_MUTEX
     /**
      * @brief Same as rpp::synchronized but uses rpp::critical_section for mutexing.
      */

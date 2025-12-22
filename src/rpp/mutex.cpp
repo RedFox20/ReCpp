@@ -8,8 +8,8 @@
     #include <semphr.h>
     #include <task.h>
 #endif
-#if RPP_STM32_HAL
-#include RPP_CORTEX_M_CORE_H
+#if RPP_CORTEX_M_ARCH
+    #include RPP_CORTEX_M_CORE_H
 #endif
 
 namespace rpp
@@ -90,7 +90,7 @@ namespace rpp
     mutex::mutex() noexcept
     {
         ctx = xSemaphoreCreateBinary(); // binary semaphore is faster than mutex semaphore
-        xSemaphoreGive(GET_SEMPHR()); // Initialize to available
+        xSemaphoreGive(GET_SEMPHR());   // Initialize to available
     }
 
     mutex::~mutex() noexcept
@@ -148,7 +148,7 @@ namespace rpp
     recursive_mutex::recursive_mutex() noexcept
     {
         ctx = xSemaphoreCreateRecursiveMutex(); // Recursive semaphore
-        xSemaphoreGiveRecursive(GET_SEMPHR());      // Initialize to available
+        xSemaphoreGiveRecursive(GET_SEMPHR());  // Initialize to available
     }
 
     recursive_mutex::~recursive_mutex() noexcept
@@ -218,7 +218,7 @@ namespace rpp
     {
         portEXIT_CRITICAL(0);
     }
-#elif RPP_STM32_HAL
+#elif RPP_CORTEX_M_ARCH
     /////////////////////////////////////////////////////////////////
 
     bool critical_section::try_lock() noexcept
