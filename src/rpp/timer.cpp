@@ -155,10 +155,14 @@ namespace rpp
     }
 #elif RPP_BARE_METAL
     #if RPP_CORTEX_M_ARCH
-        // Forward declare needed functions for get_time_ns
+        /**
+         * Cortex-M platform alone does not have a timer. Timing
+         * depends on a higher-level platform (e.g., FreeRTOS, STM32 HAL).
+         */
         FINLINE static int get_tick() noexcept;
         FINLINE static int get_tick_freq() noexcept;
 
+        /** @brief Get time in nanoseconds. This depends on get_tick and get_tick_freq. */
         static int64 cortex_m_get_time_ns() noexcept
         {
             int tick;
@@ -185,6 +189,21 @@ namespace rpp
 
             return tick_time + tick_fraction;
         }
+
+        /** @brief Wait for a specified duration in nanoseconds. */
+        static void cortex_m_sleep_ns(unsigned int duration) noexcept
+        {
+            int64 start = cortex_m_get_time_ns();
+            int64 end = start + duration;
+
+            if (end < start)
+            {
+                // Sleep until timer wraps around
+                while (cortex_m_get_time_ns() > start) {}
+            }
+
+            while (cortex_m_get_time_ns() < end) {}
+        }
     #endif
 
     #if RPP_FREERTOS
@@ -197,7 +216,7 @@ namespace rpp
         #if RPP_CORTEX_M_ARCH
             return cortex_m_get_time_ns();
         #else
-            return 1'000'000 * pdTICKS_TO_MS(xTaskGetTickCount());
+            return 1'000'000'000ull * xTaskGetTickCount() / configTICK_RATE_HZ;
         #endif
         }
 
@@ -229,20 +248,6 @@ namespace rpp
     #elif RPP_STM32_HAL
         FINLINE static int get_tick() noexcept { return HAL_GetTick(); }
         FINLINE static int get_tick_freq() noexcept { return HAL_GetTickFreq(); }
-
-        static void stm32_sleep_ns(unsigned int duration) noexcept
-        {
-            int64 start = cortex_m_get_time_ns();
-            int64 end = start + duration;
-
-            if (end < start)
-            {
-                // Sleep until timer wraps around
-                while (cortex_m_get_time_ns() > start) {}
-            }
-
-            while (cortex_m_get_time_ns() < end) {}
-        }
     #endif
 #endif
 
@@ -255,7 +260,7 @@ namespace rpp
         #elif RPP_FREERTOS
             freertos_sleep_ns(millis * 1'000'000ull);
         #elif RPP_STM32_HAL
-            stm32_sleep_ns(millis * 1'000'000ull);
+            cortex_m_sleep_ns(millis * 1'000'000ull);
         #else
             std::this_thread::sleep_for(std::chrono::milliseconds{millis});
         #endif
@@ -270,7 +275,7 @@ namespace rpp
         #elif RPP_FREERTOS
             freertos_sleep_ns(micros * 1'000ull);
         #elif RPP_STM32_HAL
-            stm32_sleep_ns(micros * 1'000ull);
+            cortex_m_sleep_ns(micros * 1'000ull);
         #else
             std::this_thread::sleep_for(std::chrono::microseconds{micros});
         #endif
@@ -285,7 +290,7 @@ namespace rpp
         #elif RPP_FREERTOS
             freertos_sleep_ns(nanos);
         #elif RPP_STM32_HAL
-            stm32_sleep_ns(nanos);
+            cortex_m_sleep_ns(nanos);
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
