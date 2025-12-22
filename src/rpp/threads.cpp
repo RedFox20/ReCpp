@@ -26,6 +26,12 @@
     };
     #pragma pack(pop)
 # endif
+#else
+# if RPP_FREERTOS
+    #include <FreeRTOS.h>
+    #include <task.h>
+    #include <portmacro.h>
+# endif
 #endif // !RPP_BARE_METAL
 
 namespace rpp
