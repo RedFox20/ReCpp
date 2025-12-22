@@ -155,11 +155,11 @@ namespace rpp
     }
 #elif RPP_BARE_METAL
     #if RPP_CORTEX_M_ARCH
-        // Forward declare needed functions for get_time_us
+        // Forward declare needed functions for get_time_ns
         FINLINE static int get_tick() noexcept;
         FINLINE static int get_tick_freq() noexcept;
 
-        static int64 cortex_m_get_time_us() noexcept
+        static int64 cortex_m_get_time_ns() noexcept
         {
             int tick;
             int st;
@@ -174,15 +174,14 @@ namespace rpp
             } while (tick != get_tick()); // Ensure no rollover
 
             int ticks_per_second = get_tick_freq();
-            int us_per_tick = 1'000'000 / ticks_per_second;
+            int ns_per_tick = 1'000'000'000 / ticks_per_second;
             int64 cycles_per_tick = SysTick->LOAD + 1;
 
-            // Current tick count times us_per_tick
-            int64 tick_time = int64{tick} * us_per_tick;
-
-            // How far along we are into the next tick in microseconds
+            // Current tick count times ns_per_tick
+            int64 tick_time = int64{tick} * ns_per_tick;
+            // How far along we are into the next tick in nanoseconds
             // NOTE: SysTick counts down, therefore we use (cycles_per_tick - st)
-            int64 tick_fraction = int64{cycles_per_tick - st} * us_per_tick / cycles_per_tick;
+            int64 tick_fraction = int64{cycles_per_tick - st} * ns_per_tick / cycles_per_tick;
 
             return tick_time + tick_fraction;
         }
@@ -192,38 +191,38 @@ namespace rpp
         FINLINE static int get_tick() noexcept { return xTaskGetTickCount(); }
         FINLINE static int get_tick_freq() noexcept { return configTICK_RATE_HZ; }
 
-        // Platform specific implementation of getting time in microseconds
-        static int64 freertos_get_time_us() noexcept
+        // Platform specific implementation of getting time in nanoseconds
+        static int64 freertos_get_time_ns() noexcept
         {
         #if RPP_CORTEX_M_ARCH
-            return cortex_m_get_time_us();
+            return cortex_m_get_time_ns();
         #else
-            return 1000 * pdTICKS_TO_MS(xTaskGetTickCount());
+            return 1'000'000 * pdTICKS_TO_MS(xTaskGetTickCount());
         #endif
         }
 
-        static void freertos_sleep_us(unsigned int duration) noexcept
+        static void freertos_sleep_ns(unsigned int duration) noexcept
         {
             int ticks = duration / configTICK_RATE_HZ;
-            int micros = duration - (ticks * configTICK_RATE_HZ);
+            int nanos = duration - (ticks * configTICK_RATE_HZ);
 
             // Sleep for full ticks
             if (ticks > 0)
                 vTaskDelay(ticks);
 
-            // Spin-wait for remaining microseconds
-            if (micros > 0)
+            // Spin-wait for remaining nanoseconds
+            if (nanos > 0)
             {
-                int64 start = freertos_get_time_us();
-                int64 end = start + micros;
+                int64 start = freertos_get_time_ns();
+                int64 end = start + nanos;
 
                 if (end < start)
                 {
                     // Sleep until timer wraps around
-                    while (freertos_get_time_us() > start) {}
+                    while (freertos_get_time_ns() > start) {}
                 }
 
-                while (freertos_get_time_us() < end) {}
+                while (freertos_get_time_ns() < end) {}
             }
         }
 
@@ -231,18 +230,18 @@ namespace rpp
         FINLINE static int get_tick() noexcept { return HAL_GetTick(); }
         FINLINE static int get_tick_freq() noexcept { return HAL_GetTickFreq(); }
 
-        static void stm32_sleep_us(unsigned int duration) noexcept
+        static void stm32_sleep_ns(unsigned int duration) noexcept
         {
-            int64 start = cortex_m_get_time_us();
+            int64 start = cortex_m_get_time_ns();
             int64 end = start + duration;
 
             if (end < start)
             {
                 // Sleep until timer wraps around
-                while (cortex_m_get_time_us() > start) {}
+                while (cortex_m_get_time_ns() > start) {}
             }
 
-            while (cortex_m_get_time_us() < end) {}
+            while (cortex_m_get_time_ns() < end) {}
         }
     #endif
 #endif
@@ -254,9 +253,9 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(millis * 1'000'000ull);
         #elif RPP_FREERTOS
-            vTaskDelay(pdMS_TO_TICKS(millis));
+            freertos_sleep_ns(millis * 1'000'000ull);
         #elif RPP_STM32_HAL
-            stm32_sleep_us(millis * 1000);
+            stm32_sleep_ns(millis * 1'000'000ull);
         #else
             std::this_thread::sleep_for(std::chrono::milliseconds{millis});
         #endif
@@ -269,9 +268,9 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(micros * 1'000ull);
         #elif RPP_FREERTOS
-            freertos_sleep_us(micros);
+            freertos_sleep_ns(micros * 1'000ull);
         #elif RPP_STM32_HAL
-            stm32_sleep_us(micros);
+            stm32_sleep_ns(micros * 1'000ull);
         #else
             std::this_thread::sleep_for(std::chrono::microseconds{micros});
         #endif
@@ -284,9 +283,9 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(nanos);
         #elif RPP_FREERTOS
-            freertos_sleep_us(nanos / 1000); // NOTE: sleep has us precision only
+            freertos_sleep_ns(nanos);
         #elif RPP_STM32_HAL
-            stm32_sleep_us(nanos / 1000); // NOTE: sleep has us precision only
+            stm32_sleep_ns(nanos);
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
@@ -637,9 +636,9 @@ namespace rpp
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) };
         #elif RPP_FREERTOS
-            return TimePoint{ freertos_get_time_us() * 1000 };
+            return TimePoint{ freertos_get_time_ns() };
         #elif RPP_STM32_HAL
-            return TimePoint{ cortex_m_get_time_us() * 1000 };
+            return TimePoint{ cortex_m_get_time_ns() };
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
@@ -655,7 +654,7 @@ namespace rpp
         #elif RPP_FREERTOS
             return TimePoint{int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull + timezone_offset_seconds() * NANOS_PER_SEC};
         #elif RPP_STM32_HAL
-            return TimePoint{cortex_m_get_time_us() * 1000 + timezone_offset_seconds() * NANOS_PER_SEC};
+            return TimePoint{cortex_m_get_time_ns() + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
             struct timespec t;
             clock_gettime(CLOCK_REALTIME, &t);
