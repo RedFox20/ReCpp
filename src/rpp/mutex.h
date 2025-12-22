@@ -2,11 +2,8 @@
 #include "config.h"
 #include "type_traits.h"
 #include "timer.h" // rpp:Timer
+#include "threads.h" // rpp::yield
 #include <mutex> // lock_guard etc
-
-#if !RPP_BARE_METAL
-    #include <thread> // this_thread::yield
-#endif
 
 namespace rpp
 {
@@ -163,42 +160,26 @@ namespace rpp
     #define RPP_HAS_CRITICAL_SECTION_MUTEX 0
 #endif
 
-        /**
-         * @brief Unlock Guard: RAII unlocks and then relocks on scope exit.
-         */
-        template <class Mutex>
-        struct unlock_guard final
-        {
-            std::unique_lock<Mutex>& mtx;
-            explicit unlock_guard(std::unique_lock<Mutex>& mtx) : mtx{mtx}
-            {
-                mtx.unlock();
-            }
-            ~unlock_guard() noexcept /* terminates */
-            {                        // MSVC++ defined
-                // relock mutex or terminate()
-                // condition_variable_any wait functions are required to terminate if
-                // the mutex cannot be relocked;
-                // we slam into noexcept here for easier user debugging.
-                mtx.lock();
-            }
-    };
-
     /**
-     * @brief Yields the current thread, allowing other threads to run.
+     * @brief Unlock Guard: RAII unlocks and then relocks on scope exit.
      */
-    FINLINE void yield() noexcept
+    template <class Mutex>
+    struct unlock_guard final
     {
-        #if RPP_FREERTOS
-            if (xPortIsInsideInterrupt())
-                return; // cannot yield from ISR
-            taskYIELD();
-        #elif RPP_STM32_HAL
-            __NOP();
-        #else
-            std::this_thread::yield();
-        #endif
-    }
+        std::unique_lock<Mutex>& mtx;
+        explicit unlock_guard(std::unique_lock<Mutex>& mtx) : mtx{mtx}
+        {
+            mtx.unlock();
+        }
+        ~unlock_guard() noexcept /* terminates */
+        {                        // MSVC++ defined
+            // relock mutex or terminate()
+            // condition_variable_any wait functions are required to terminate if
+            // the mutex cannot be relocked;
+            // we slam into noexcept here for easier user debugging.
+            mtx.lock();
+        }
+    };
 
     /**
      * @brief Performs a few spins before locking and suspending the thread.
@@ -213,14 +194,9 @@ namespace rpp
         {
             for (int i = 0; i < 10; ++i)
             {
-                 // yielding here will improve perf massively
-                #if RPP_FREERTOS
-                    taskYIELD();
-                #elif RPP_STM32_HAL
-                    __NOP();
-                #else
-                    std::this_thread::yield();
-                #endif
+                // yielding here will improve perf massively
+                yield();
+
                 if (m.try_lock())
                     return std::unique_lock<Mutex>{m, std::adopt_lock};
             }
