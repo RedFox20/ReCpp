@@ -168,19 +168,23 @@ namespace rpp
             {
                 tick = get_tick();
                 st = SysTick->VAL;
-
                 // Clear the instruction pipeline
                 asm volatile("nop");
                 asm volatile("nop");
             } while (tick != get_tick()); // Ensure no rollover
 
-            // SystemCoreClock / 1000 ticks per millisecond
-            HAL_TickFreqTypeDef tick_freq = HAL_TickFreqTypeDef(get_tick_freq());
-            int64 cycles_per_tick = (SysTick->LOAD + 1) / tick_freq;
+            int ticks_per_second = get_tick_freq();
+            int us_per_tick = 1'000'000 / ticks_per_second;
+            int64 cycles_per_tick = SysTick->LOAD + 1;
 
-            // SysTick counts DOWN, so we need (LOAD - VAL)
-            int64 us_fraction = ((cycles_per_tick - st) * 1000) / cycles_per_tick;
-            return (int64(tick) * 1000 / tick_freq) + us_fraction;
+            // Current tick count times us_per_tick
+            int64 tick_time = int64{tick} * us_per_tick;
+
+            // How far along we are into the next tick in microseconds
+            // NOTE: SysTick counts down, therefore we use (cycles_per_tick - st)
+            int64 tick_fraction = int64{cycles_per_tick - st} * us_per_tick / cycles_per_tick;
+
+            return tick_time + tick_fraction;
         }
     #endif
 
@@ -265,7 +269,7 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(micros * 1'000ull);
         #elif RPP_FREERTOS
-            freertos_sleep_us(micros); // round up to nearest ms
+            freertos_sleep_us(micros);
         #elif RPP_STM32_HAL
             stm32_sleep_us(micros);
         #else
@@ -280,9 +284,9 @@ namespace rpp
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(nanos);
         #elif RPP_FREERTOS
-            freertos_sleep_us(nanos / 1000);
+            freertos_sleep_us(nanos / 1000); // NOTE: sleep has us precision only
         #elif RPP_STM32_HAL
-            stm32_sleep_us(nanos / 1000); // TODO: sleep has us precision only
+            stm32_sleep_us(nanos / 1000); // NOTE: sleep has us precision only
         #else
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
