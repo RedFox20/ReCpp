@@ -5,7 +5,8 @@
  */
 #pragma once
 #include "config.h"
-#include "semaphore.h"
+#include "mutex.h"
+#include "condition_variable.h"
 #include <vector>
 #include <thread> // std::this_thread::yield()
 #include <type_traits> // std::is_trivially_destructible_v
@@ -22,7 +23,7 @@ namespace rpp
      * @note This is not optimized for speed, but has acceptable performance
      *       and due to its simplicity it won't randomly deadlock on you.
      */
-    template<class T>
+    template<class T, class mutex_t = rpp::mutex, class cond_var_t = rpp::condition_variable>
     class concurrent_queue
     {
         // for faster performance the Head and Tail are always within the linear range
@@ -37,17 +38,27 @@ namespace rpp
         using time_point = rpp::TimePoint;
 
     private:
-        using mutex_t = rpp::mutex;
-        using lock_t = rpp::semaphore::lock_t;
-        mutable mutex_t Mutex;
-        mutable rpp::condition_variable Waiter;
+        using lock_t = std::unique_lock<mutex_t>;
+        std::optional<mutex_t> MutexStorage;
+        std::optional<cond_var_t> WaiterStorage;
+        mutex_t& Mutex;
+        cond_var_t& Waiter;
         // special state flag for all waiters to immediately exit the queue
         std::atomic_bool Destroying = false;
         // state flag for pop_atomic_start()/end()
         std::atomic_bool SlowPopInProgress = false;
 
     public:
-        concurrent_queue() = default;
+        concurrent_queue()
+            : Mutex{MutexStorage.emplace()}
+            , Waiter{WaiterStorage.emplace()}
+        {}
+
+        concurrent_queue(mutex_t& mutex, cond_var_t& waiter)
+            : Mutex{mutex}
+            , Waiter{waiter}
+        {}
+
         ~concurrent_queue() noexcept
         {
             clear_and_destroy();
@@ -57,6 +68,8 @@ namespace rpp
         concurrent_queue& operator=(const concurrent_queue&) = delete;
 
         concurrent_queue(concurrent_queue&& q) noexcept
+            : Mutex{MutexStorage.emplace()}
+            , Waiter{WaiterStorage.emplace()}
         {
             // safely swap the states from q to default empty state
             std::scoped_lock dual_lock { mutex(), q.mutex() };
