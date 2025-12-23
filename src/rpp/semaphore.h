@@ -343,6 +343,11 @@ namespace rpp
         [[nodiscard]] FINLINE bool is_set() const noexcept { return count() > 0; }
         [[nodiscard]] FINLINE bool is_set(lock_t& lock) const noexcept { return count(lock) > 0; }
 
+        // unsets the semaphore flag without notifying
+        FINLINE void unset() noexcept { reset(0); }
+
+        using semaphore::reset;
+
         using semaphore::mutex;
         using semaphore::spin_lock;
 
