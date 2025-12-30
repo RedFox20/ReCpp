@@ -1,14 +1,16 @@
 #include "threads.h"
 #include "debugging.h"
-#include <thread> // hardware_concurrency
-#include <vector>
-#if __APPLE__ || __linux__
-# include <pthread.h>
-# include <unistd.h> // getpid()
-#endif
+
+#if !RPP_BARE_METAL
+# include <thread> // hardware_concurrency
+# include <vector>
+# if __APPLE__ || __linux__
+#  include <pthread.h>
+#  include <unistd.h> // getpid()
+# endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
-#if _WIN32
+# if _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
     #  define WIN32_LEAN_AND_MEAN 1
     #endif
@@ -23,13 +25,20 @@
         DWORD dwFlags; // Reserved for future use, must be zero.
     };
     #pragma pack(pop)
-#endif
+# endif
+#else
+# if RPP_FREERTOS
+    #include <FreeRTOS.h>
+    #include <task.h>
+    #include <portmacro.h>
+# endif
+#endif // !RPP_BARE_METAL
 
 namespace rpp
 {
     //////////////////////////////////////////////////////////////////////////////////////////
-
-#if _MSC_VER
+#if !RPP_BARE_METAL
+# if _MSC_VER
     static int to_wchar_str(wchar_t* out, int maxlen, rpp::strview str) noexcept
     {
         int outlen = str.size() < maxlen ? str.size() : maxlen-1;
@@ -38,7 +47,7 @@ namespace rpp
         out[outlen] = L'\0';
         return outlen;
     }
-#endif
+# endif
 
     void set_this_thread_name(rpp::strview name) noexcept
     {
@@ -61,7 +70,7 @@ namespace rpp
                     RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
                 } __except (1){}
             #pragma warning(pop)
-        #else
+        #elif !RPP_BARE_METAL
             // pthread limit is 16 chars, including null terminator
             char threadName[16] = {0};
             size_t n = name.size() < 15 ? name.size() : 15;
@@ -129,7 +138,7 @@ namespace rpp
     #endif
     }
 
-#if _WIN32
+# if _WIN32
     int num_physical_cores() noexcept
     {
         static int num_cores = []
@@ -149,7 +158,7 @@ namespace rpp
         }();
         return num_cores;
     }
-#else
+# else
     int num_physical_cores() noexcept
     {
         static int num_cores = []
@@ -165,7 +174,22 @@ namespace rpp
         }();
         return num_cores;
     }
-#endif
+# endif
+
+#endif // !RPP_BARE_METAL
+
+    void yield() noexcept
+    {
+        #if RPP_FREERTOS
+            if (xPortIsInsideInterrupt())
+                return; // cannot yield from ISR
+            taskYIELD();
+        #elif RPP_STM32_HAL
+            asm volatile("nop");
+        #else
+            std::this_thread::yield();
+        #endif
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////////
 }

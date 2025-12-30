@@ -5,7 +5,7 @@
 namespace rpp
 {
     //////////////////////////////////////////////////////////////////////////////////////////
-
+#if !RPP_BARE_METAL
     /**
      * @brief Sets the debug name for this thread
      * @warning Linux pthreads only supports max length 15 characters for thread names
@@ -36,6 +36,12 @@ namespace rpp
      * @returns Number of physicals cores on the system
      */
     RPPAPI int num_physical_cores() noexcept;
+#endif // !RPP_BARE_METAL
+
+    /**
+     * @brief Yields execution to another thread
+     */
+    RPPAPI void yield() noexcept;
 
     //////////////////////////////////////////////////////////////////////////////////////////
 }

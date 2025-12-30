@@ -1025,7 +1025,7 @@ namespace rpp
 
             if (GetThreadId(hThread) == GetCurrentThreadId())
             {
-                #if NTDDI_VERSION >= NTDDI_WIN10_VB
+                #if NTDDI_VERSION >= NTDDI_WIN10_VB && NTDDI_VERSION < NTDDI_WIN11_GE
                     RtlCaptureContext2(&c); // Windows 10 and higher
                 #else
                     RtlCaptureContext(&c); // Windows 2k and higher
