@@ -145,6 +145,7 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////
 
+#if (configUSE_RECURSIVE_MUTEXES == 1)
     recursive_mutex::recursive_mutex() noexcept
     {
         ctx = xSemaphoreCreateRecursiveMutex(); // Recursive semaphore
@@ -200,23 +201,24 @@ namespace rpp
             xSemaphoreGiveRecursive(GET_SEMPHR());
         }
     }
+#endif // configUSE_RECURSIVE_MUTEXES
 
     /////////////////////////////////////////////////////////////////
 
     bool critical_section::try_lock() noexcept
     {
-        portENTER_CRITICAL(0);
+        portENTER_CRITICAL();
         return true;
     }
 
     void critical_section::lock() noexcept
     {
-        portENTER_CRITICAL(0);
+        portENTER_CRITICAL();
     }
 
     void critical_section::unlock() noexcept
     {
-        portEXIT_CRITICAL(0);
+        portEXIT_CRITICAL();
     }
 #elif RPP_CORTEX_M_ARCH
     /////////////////////////////////////////////////////////////////

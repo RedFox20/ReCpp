@@ -657,7 +657,7 @@ namespace rpp
             // convert 100ns ticks to nanoseconds, this would overflow in 292 years
             return TimePoint{ ticks_to_ns(ticks_since_epoch()) + timezone_offset_seconds() * NANOS_PER_SEC };
         #elif RPP_FREERTOS
-            return TimePoint{int64(pdTICKS_TO_MS(xTaskGetTickCount())) * 1'000'000ull + timezone_offset_seconds() * NANOS_PER_SEC};
+            return TimePoint{freertos_get_time_ns() + timezone_offset_seconds() * NANOS_PER_SEC};
         #elif RPP_STM32_HAL
             return TimePoint{cortex_m_get_time_ns() + timezone_offset_seconds() * NANOS_PER_SEC};
         #else

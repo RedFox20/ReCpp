@@ -75,7 +75,7 @@ namespace rpp
         void lock() noexcept;
         void unlock() noexcept;
 
-        void* native_handle() const noexcept { return this; }
+        void* native_handle() const noexcept { return nullptr; }
     };
 
     class mutex
@@ -421,6 +421,6 @@ namespace rpp
 
         auto& get_mutex() noexcept { return mutex; }
         T& get_ref() noexcept { return value; }
-    }
+    };
 #endif
 }

@@ -15,14 +15,21 @@
 #  include <unistd.h> // usleep
 #  include <android/log.h>
 // #  include <linux/memfd.h>
-#else
+#elif RPP_BARE_METAL
+#  if RPP_FREERTOS
+#    include <FreeRTOS.h>
+#    include <task.h>
+#  elif RPP_CORTEX_M_ARCH
+#    include RPP_CORTEX_M_CORE_H
+#  endif
+#elif
 #  include <unistd.h>
 #  include <termios.h>
 #endif
 #if __APPLE__
 #  include <TargetConditionals.h>
 #endif
-#if !_WIN32 // mmap, shm_open
+#if !_WIN32 && !RPP_BARE_METAL // mmap, shm_open
 #  include <sys/mman.h>
 #  include <fcntl.h>
 #endif
@@ -85,6 +92,10 @@ namespace rpp
                 shared_mem = new shared();
                 shared_mem->initialized = 1;
                 return shared_mem->stored_object;
+            #elif RPP_BARE_METAL
+                // no shared memory on bare-metal, just use a normal static variable
+                static shared local_shared;
+                shared_mem = &local_shared;
             #else
                 std::string name = "/rpp_tests_state_"s + rpp::to_string(getpid());
                 #if __ANDROID__
@@ -134,6 +145,8 @@ namespace rpp
                 handle = INVALID_HANDLE_VALUE;
             #elif __ANDROID__
                 delete shared_mem;
+            #elif RPP_BARE_METAL
+                // nothing to unmap on bare-metal
             #else // _WIN32
                 munmap(shared_mem, sizeof(shared));
                 close(shm_fd);
@@ -639,6 +652,10 @@ namespace rpp
         Sleep(millis);
 #elif __ANDROID__
         usleep(useconds_t(millis) * 1000);
+#elif RPP_FREERTOS
+        vTaskDelay(millis / portTICK_PERIOD_MS);
+#elif RPP_CORTEX_M
+        spin_sleep_for_ms(uint64_t(millis));
 #else
         usleep(millis * 1000);
 #endif
@@ -656,6 +673,29 @@ namespace rpp
 
     void test::spin_sleep_for_us(uint64_t microseconds) noexcept
     {
+#if RPP_CORTEX_M
+        const uint32_t cpu_freq_mhz = SystemCoreClock / 1'000'000u;
+#  ifdef DWT
+        // on Cortex-M we can use the DWT cycle counter for precise timing
+        const uint32_t cpu_freq_mhz = SystemCoreClock / 1'000'000u;
+        const uint32_t start_cycles = DWT->CYCCNT;
+        const uint32_t wait_cycles = static_cast<uint32_t>(microseconds * cpu_freq_mhz);
+        while ((DWT->CYCCNT - start_cycles) < wait_cycles)
+        {
+        }
+#  else
+        uint32_t loops = microseconds * (cpu_freq_mhz / 2);
+
+        // This loop takes exactly 2 CPU cycles per iteration (SUBS + BNE)
+        asm volatile(
+            "1: subs %[l], %[l], #1 \n"  // Decrement loop
+            "   bne  1b             \n"  // Branch if not zero
+            : [l] "+r" (loops)
+            :
+            : "cc"
+        );
+#  endif
+#else
         // NOTE: high_resolution_clock might not be available on some target systems
         //       which would require a fallback to rolling our own.
         //       However, we want to avoid using rpp/timer.h here, since that would
@@ -667,6 +707,7 @@ namespace rpp
         while (time::high_resolution_clock::now() < end)
         {
         }
+#endif
     }
 
     void test::cleanup_all_tests()
