@@ -138,7 +138,7 @@ namespace rpp
         if (current_task.is_running())
         {
             TaskDebug("%s task already running", name);
-            return nullptr;
+            return { nullptr };
         }
 
         current_task = pool_task_handle{this};
@@ -146,7 +146,8 @@ namespace rpp
         range_start  = start;
         range_end    = end;
         new_task_flag.notify_all(lock);
-        lock.unlock();
+        if (lock.owns_lock())
+            lock.unlock();
 
         if (killed)
         {
@@ -163,20 +164,21 @@ namespace rpp
         return current_task;
     }
 
-    pool_task_handle pool_worker::run_generic(task_delegate<void()>&& newTask) noexcept
+    pool_task_handle pool_worker::run_generic(task_delegate<void()>& newTask) noexcept
     {
         auto lock = new_task_flag.spin_lock();
         // we always need to double-check if a task is already running
         if (current_task.is_running())
         {
             TaskDebug("%s task already running", name);
-            return nullptr;
+            return { nullptr };
         }
 
         current_task = pool_task_handle{this};
         generic_task = std::move(newTask);
         new_task_flag.notify_all(lock);
-        lock.unlock();
+        if (lock.owns_lock())
+            lock.unlock();
 
         if (killed)
         {
@@ -611,8 +613,8 @@ namespace rpp
                 pool_worker* worker = t.get();
                 if (!worker->running())
                 {
-                    if (auto task = worker->run_generic(std::move(generic_task));
-                        task.was_started())
+                    auto task = worker->run_generic(generic_task);
+                    if (task.was_started())
                         return task;
                     // else: race condition (someone else held pointer to the task and restarted it)
                 }
@@ -621,7 +623,7 @@ namespace rpp
         
         // create and run a new task atomically
         auto w = std::make_unique<pool_worker>(TaskMaxIdleTime);
-        auto task = w->run_generic(std::move(generic_task));
+        auto task = w->run_generic(generic_task);
         AssertTerminate(task.was_started(), "brand new pool_task->run_generic() failed");
 
         std::lock_guard lock{TasksMutex};

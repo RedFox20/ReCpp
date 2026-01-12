@@ -54,10 +54,21 @@ namespace rpp
                 newcap += align - rem;
 
             if (cap == SIZE)
-                ptr = (char*)memcpy(malloc(newcap), buf, len);
+            {
+                if (char* newp = (char*)malloc(newcap))
+                {
+                    ptr = (char*)memcpy(newp, buf, len);
+                    cap = newcap;
+                }
+            }
             else
-                ptr = (char*)realloc(ptr, newcap);
-            cap = newcap;
+            {
+                if (char* newp = (char*)realloc(ptr, newcap))
+                {
+                    ptr = newp;
+                    cap = newcap;
+                }
+            }
         }
     }
 

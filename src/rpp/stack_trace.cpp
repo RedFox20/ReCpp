@@ -147,8 +147,8 @@ namespace rpp
 #endif
                 buf[len++] = ch;
             }
-            if (buf[len - 1] == ']') --len; // remove Objective-C method ending bracket
-            buf[len++] = '\0';
+            if (len > 0 && buf[len - 1] == ']') --len; // remove Objective-C method ending bracket
+            buf[len] = '\0';
             return buf;
         }
     };
@@ -1175,8 +1175,8 @@ namespace rpp
             do {
                 if (te.th32OwnerProcessID != currentProcessId) continue;
 
-                int entriesToSkip = te.th32ThreadID == currentThreadId ? entriesToSkip : 0;
-                std::vector<uint64_t> trace = get_callstack(maxDepth, entriesToSkip, static_cast<uint64_t>(te.th32ThreadID));
+                size_t skip = te.th32ThreadID == currentThreadId ? entriesToSkip : 0;
+                std::vector<uint64_t> trace = get_callstack(maxDepth, skip, static_cast<uint64_t>(te.th32ThreadID));
                 if (!trace.empty())
                 {
                     threads.push_back({ std::move(trace), static_cast<rpp::uint64>(te.th32ThreadID) });

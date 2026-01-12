@@ -243,7 +243,7 @@ namespace rpp
     private:
         rpp::semaphore_flag new_task_flag;
         std::thread th;
-        char name[32];
+        char name[32] {};
 
         rpp::task_delegate<void()> generic_task;
         rpp::action<int, int> range_task;
@@ -281,7 +281,7 @@ namespace rpp
         // assigns a new generic task to run
         // undefined behaviour if called when already running
         // @return TRUE if run started successfully (task was not already running)
-        [[nodiscard]] pool_task_handle run_generic(task_delegate<void()>&& newTask) noexcept;
+        [[nodiscard]] pool_task_handle run_generic(task_delegate<void()>& newTask) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;

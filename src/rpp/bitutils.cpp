@@ -25,7 +25,7 @@ namespace rpp
         if (capacity == 0)
             return;
         data = (uint8_t*)malloc(capacity);
-        memset(data, 0, capacity);
+        if (data) memset(data, 0, capacity);
     }
 
     bit_array::bit_array(const uint8_t* buf, uint32_t len) noexcept
@@ -35,7 +35,7 @@ namespace rpp
         if (capacity == 0)
             return;
         data = (uint8_t*)malloc(capacity);
-        memcpy(data, buf, len);
+        if (data) memcpy(data, buf, len);
     }
 
     bit_array::bit_array(const uint8_t* buf, uint32_t len, uint32_t numBits) noexcept
@@ -45,6 +45,7 @@ namespace rpp
         if (capacity == 0)
             return;
         data = (uint8_t*)malloc(capacity);
+        if (!data) return;
 
         uint32_t bitsToCopy = numBits;
         if (bitsToCopy > len*8)
@@ -52,6 +53,7 @@ namespace rpp
         uint32_t bytesToCopy = bitsToCopy / 8;
         if (bitsToCopy % 8 != 0)
             ++bytesToCopy;
+
         memcpy(data, buf, bytesToCopy);
 
         // zero the bits at the end
@@ -108,10 +110,13 @@ namespace rpp
         }
         if (newCapacity != capacity)
         {
-            capacity = newCapacity;
-            data = (uint8_t*)realloc(data, capacity);
+            if (uint8_t* newData = (uint8_t*)realloc(data, newCapacity))
+            {
+                data = newData;
+                capacity = newCapacity;
+            }
         }
-        memset(data, 0, capacity);
+        if (data) memset(data, 0, capacity);
     }
 
     void bit_array::set(uint32_t bit) noexcept
