@@ -3,6 +3,10 @@
  * Minimal Unit Testing Framework, Copyright (c) 2016-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
+#include "config.h"
+#include "sprint.h" // we love strview and sprint, so it's a common dependency
+#include "debugging.h" // for adapting debugging API-s with tests API
+#include "math.h" // rpp::min, rpp::max
 
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
@@ -11,11 +15,7 @@
 #include <cfloat>  // FLT_EPSILON, DBL_EPSILON
 #include <vector>  // access to std::vector and std::string
 #include <atomic>  // std::atomic<T> type support
-#include <typeinfo>
-
-#include "sprint.h" // we love strview and sprint, so it's a common dependency
-#include "debugging.h" // for adapting debugging API-s with tests API
-#include "math.h" // rpp::min, rpp::max
+#include <typeinfo> // std::type_info for exception type checking
 
 namespace rpp
 {

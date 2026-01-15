@@ -29,6 +29,13 @@
 # include <signal.h>
 #endif
 
+#if RPP_BARE_METAL
+# include <printf/printf.h>
+# if RPP_STM32_HAL
+#  include RPP_STM32_HAL_H
+# endif
+#endif
+
 #ifdef QUIETLOG
     static LogSeverity Filter = LogSeverityWarn;
 #else
@@ -154,6 +161,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     char* pbuf = errBuf;
     int remaining = N;
     int len = 0;
+
     if (EnableTimestamps) {
         rpp::TimePoint now = rpp::TimePoint::now();
         now.duration.nsec += TimeOffset;
@@ -167,6 +175,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     }
 
     int plen = vsnprintf(pbuf, size_t(remaining-1)/*spare room for \n*/, format, ap);
+
     if (plen < 0 || plen >= remaining) { // err: didn't fit
         plen = remaining-2; // try to recover gracefully
         pbuf[plen] = '\0';
@@ -199,11 +208,16 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
 {
     _LogError("%s:%u %s: Assertion failed: %s", file, line, function, message);
     // show a nice stack trace if possible
-    rpp::print_trace();
-    fflush(stderr);
+    #if !RPP_BARE_METAL
+        rpp::print_trace();
+        fflush(stderr);
+    #endif
 
     // trap into debugger
-    #if __clang__
+    // TODO: replace with std::breakpoint() when we switch to C++26
+    #if RPP_BARE_METAL && RPP_ARM_ARCH
+        __asm__ volatile ("bkpt #0");
+    #elif __clang__
         #if __has_builtin(__builtin_debugtrap)
             __builtin_debugtrap();
         #else
@@ -226,6 +240,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
                         severity == LogSeverityWarn ? ANDROID_LOG_WARN :
                                                       ANDROID_LOG_ERROR;
         __android_log_write(priority, tag, str);
+
+    #elif RPP_BARE_METAL
+        printf_("%.*s\n", len, str);
     #else
 
         #if _MSC_VER
