@@ -1,5 +1,6 @@
 #include <rpp/tests.h>
 #include <rpp/mutex.h>
+#include <thread>
 
 TestImpl(test_mutex)
 {

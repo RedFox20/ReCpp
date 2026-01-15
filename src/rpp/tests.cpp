@@ -22,7 +22,7 @@
 #  elif RPP_CORTEX_M_ARCH
 #    include RPP_CORTEX_M_CORE_H
 #  endif
-#elif
+#else
 #  include <unistd.h>
 #  include <termios.h>
 #endif
