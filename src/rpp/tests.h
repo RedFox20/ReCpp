@@ -544,6 +544,22 @@ namespace rpp
     } \
 }while(0)
 
+
+// compatibility with Google Test style
+#ifndef EXPECT_EQ
+#define EXPECT_EQ(a, b) AssertEqual(a, b)
+#define EXPECT_NE(a, b) AssertNotEqual(a, b)
+#define EXPECT_LT(a, b) AssertLess(a, b)
+#define EXPECT_LE(a, b) AssertLessOrEqual(a, b)
+#define EXPECT_GT(a, b) AssertGreater(a, b)
+#define EXPECT_GE(a, b) AssertGreaterOrEqual(a, b)
+#define EXPECT_TRUE(a)  AssertTrue(a)
+#define EXPECT_FALSE(a) AssertFalse(a)
+#define EXPECT_THROW(a, b) AssertThrows(a, b)
+#define EXPECT_NO_THROW(a) AssertNoThrowAny(a)
+#endif
+
+
 #define TestImpl(testclass) struct testclass : public rpp::test
 
 #define __TestInit(testclass, autorun)                                \
