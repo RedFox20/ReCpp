@@ -875,8 +875,8 @@ namespace rpp
             const bool exactMatch = testName.starts_with("test:");
             testName = exactMatch ? testName.skip_after(':') : testName;
             LogTestLabel(
-                if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", arg.len, arg.str);
-                else            consolef(Yellow, "Filtering substr tests '%.*s'\n", arg.len, arg.str);
+                if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", testName.len, testName.str);
+                else            consolef(Yellow, "Filtering substr tests '%.*s'\n", testName.len, testName.str);
             );
 
             bool match = false;
@@ -889,7 +889,7 @@ namespace rpp
                     if (disableTest) disabled.insert(t.name);
                     else              enabled.insert(t.name);
                     match = true;
-                    break;
+                    if (exactMatch) break; // no need to continue searching if exact match
                 }
             }
             if (!match) {
