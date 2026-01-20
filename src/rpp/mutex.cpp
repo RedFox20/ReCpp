@@ -9,6 +9,7 @@
     #include <task.h>
 #endif
 #if RPP_CORTEX_M_ARCH
+    #include RPP_CORTEX_M_DEVICE_H
     #include RPP_CORTEX_M_CORE_H
 #endif
 

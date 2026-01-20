@@ -1,7 +1,10 @@
 #pragma once
 #include "config.h"
-#include <string> // std::to_string
 #include <type_traits>
+
+#if !RPP_BARE_METAL
+    #include <string> // std::to_string
+#endif // !RPP_BARE_METAL
 
 namespace rpp
 {
@@ -25,14 +28,17 @@ namespace rpp
     template<template<class...> class Operation, typename... Arguments>
     constexpr bool is_detected_v = detail::is_detected<detail::void_t<>, Operation, Arguments...>::value;
 
-
+#if !RPP_BARE_METAL
     template<class T> using std_to_string_expression  = decltype(std::to_string(std::declval<T>()));
+#endif
     template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
     template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
     template<class T> using get_memb_expression       = decltype(std::declval<T>().get());
     template<class T, class U> using set_memb_expression = decltype(std::declval<T>().set(std::declval<U>()));
 
+#if !RPP_BARE_METAL
     template<class T> constexpr bool has_std_to_string  = is_detected_v<std_to_string_expression, T>;
+#endif
     template<class T> constexpr bool has_to_string      = is_detected_v<to_string_expression, T>;
     template<class T> constexpr bool has_to_string_memb = is_detected_v<to_string_memb_expression, T>;
     template<class T> constexpr bool has_get_memb       = is_detected_v<get_memb_expression, T>;

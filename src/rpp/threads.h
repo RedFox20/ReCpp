@@ -1,6 +1,9 @@
 #pragma once
 #include "config.h"
-#include "strview.h"
+
+#if !RPP_BARE_METAL
+    #include "strview.h"
+#endif // !RPP_BARE_METAL
 
 namespace rpp
 {
