@@ -176,6 +176,9 @@
 #  ifndef RPP_CORTEX_M_CORE_H
 #    error "RPP_CORTEX_M_CORE_H has to be defined and has to have a valid path to the STM32 core header file, e.g., <core_cm3.h>"
 #  endif
+#  ifndef RPP_CORTEX_M_DEVICE_H
+#    error "RPP_CORTEX_M_DEVICE_H has to be defined and has to have a valid path to the device header file (provided by vendor), e.g., <stm32f103xx.h>"
+#  endif
 #endif
 
 #if defined(__thumb__) || defined(__arm__)
