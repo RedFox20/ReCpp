@@ -256,7 +256,7 @@ TestImpl(test_sockets)
                 iface.gateway.str().c_str()
             );
             AssertNotEqual(iface.name, "");
-            // AssertTrue(iface.addr.has_address());
+            AssertTrue(iface.addr.has_address());
             // AssertTrue(iface.broadcast.has_address());
         }
     }
