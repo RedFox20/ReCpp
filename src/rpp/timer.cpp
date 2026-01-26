@@ -248,7 +248,7 @@ namespace rpp
     #elif RPP_STM32_HAL
         /** @note HAL_GetTick returns milliseconds, convert to ticks */
         FINLINE static int get_tick() noexcept { return HAL_GetTick() / HAL_GetTickFreq(); }
-        FINLINE static int get_tick_freq() noexcept { return HAL_GetTickFreq(); }
+        FINLINE static int get_tick_freq() noexcept { return 1000 / HAL_GetTickFreq(); }
     #endif
 #endif
 
