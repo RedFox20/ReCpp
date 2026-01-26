@@ -248,9 +248,11 @@ namespace rpp
     #elif RPP_STM32_HAL
         /**
          * @note While it is called HAL_GetTick, it actually returns time in milliseconds
-         * since system start.
-         * @note HAL_GetTickFreq returns the tick period in milliseconds, e.g, if the tick
-         * frequency is 1000Hz, it returns 1 (ms).
+         * since system start (ticks * tick period in ms). This needs to be divided by
+         * the tick period in ms to get the actual tick count.
+         * @note While it is called HAL_GetTickFreq, it actually returns the tick period in
+         * milliseconds, e.g, if the tick frequency is 1000Hz, it returns 1 (ms). Divide 1000ms
+         * by this value to get the tick frequency in Hz.
          */
         FINLINE static int get_tick() noexcept {
             uint32_t current_ms = HAL_GetTick();
