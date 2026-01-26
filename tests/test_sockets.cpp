@@ -833,6 +833,35 @@ TestImpl(test_sockets)
         AssertNotEqual(client.last_err_type(), rpp::socket::SE_NONE);
     }
 
+    TestCase(tcp_connect_to_zero_ipaddr_fails)
+    {
+        ipaddress zero_addr { "0.0.0.0:12345" };
+        AssertTrue(zero_addr.is_valid());
+        AssertFalse(zero_addr.address().has_address());
+
+        socket client;
+        AssertFalse(client.connect(zero_addr, 50/*ms*/));
+        AssertFalse(client.good());
+        AssertFalse(client.connected());
+
+        print_info("connect result: %s\n", client.last_err().c_str());
+        AssertNotEqual(client.last_err_type(), rpp::socket::SE_NONE);
+    }
+
+    TestCase(tcp_connect_to_invalid_ip_fails)
+    {
+        ipaddress invalid_addr { "256.256.256.256:12345" };
+        AssertFalse(invalid_addr.has_address());
+
+        socket client;
+        AssertFalse(client.connect(invalid_addr, 50/*ms*/));
+        AssertFalse(client.good());
+        AssertFalse(client.connected());
+
+        print_info("connect result: %s\n", client.last_err().c_str());
+        AssertNotEqual(client.last_err_type(), rpp::socket::SE_NONE);
+    }
+
     /**
      * This test simulates a very simple client - server setup
      */
