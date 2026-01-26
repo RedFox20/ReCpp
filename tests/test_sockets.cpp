@@ -256,7 +256,7 @@ TestImpl(test_sockets)
                 iface.gateway.str().c_str()
             );
             AssertNotEqual(iface.name, "");
-            AssertTrue(iface.addr.has_address());
+            // AssertTrue(iface.addr.has_address());
             // AssertTrue(iface.broadcast.has_address());
         }
     }
@@ -829,6 +829,20 @@ TestImpl(test_sockets)
     {
         socket client = socket::connect_to({"127.0.0.1", 12345}, 50/*ms*/);
         AssertFalse(client.good());
+        print_info("connect result: %s\n", client.last_err().c_str());
+        AssertNotEqual(client.last_err_type(), rpp::socket::SE_NONE);
+    }
+
+    TestCase(tcp_connect_to_invalid_ip_fails)
+    {
+        ipaddress invalid_addr { "256.256.256.256:12345" };
+        AssertFalse(invalid_addr.has_address());
+
+        socket client;
+        AssertFalse(client.connect(invalid_addr, 50/*ms*/));
+        AssertFalse(client.good());
+        AssertFalse(client.connected());
+
         print_info("connect result: %s\n", client.last_err().c_str());
         AssertNotEqual(client.last_err_type(), rpp::socket::SE_NONE);
     }

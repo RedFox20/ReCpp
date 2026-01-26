@@ -1596,7 +1596,11 @@ namespace rpp
         if (err != 0)
         {
             if (handle_errno(err > 0 ? err : 0) == 0)
-                return true; // still connected, but pending something
+            {
+                // After some of the errors socket might still be considered valid,
+                // but the connection is lost
+                return Connected;
+            }
             return false; // it was a fatal error
         }
 
@@ -1975,6 +1979,14 @@ namespace rpp
     bool socket::connect(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
         std::unique_lock lock { Mtx };
+
+        // disallow connecting to an unspecified address
+        if (!remoteAddr.has_address())
+        {
+            set_errno_unlocked(ESOCK(EINVAL));
+            return false;
+        }
+
         if (!good())
         {
             // need to use SO_Blocking for infinite wait
@@ -2002,6 +2014,14 @@ namespace rpp
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
         std::unique_lock lock { Mtx };
+
+        // disallow connecting to an unspecified address
+        if (!remoteAddr.has_address())
+        {
+            set_errno_unlocked(ESOCK(EINVAL));
+            return false;
+        }
+
         if (!good())
         {
             // needs to be a non-blocking socket to do connect() + poll()
