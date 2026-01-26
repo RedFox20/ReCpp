@@ -160,9 +160,9 @@ namespace rpp
          * depends on a higher-level platform (e.g., FreeRTOS, STM32 HAL).
          */
         FINLINE static int get_tick() noexcept;
-        FINLINE static int get_tick_freq() noexcept;
+        FINLINE static int get_tick_rate_hz() noexcept;
 
-        /** @brief Get time in nanoseconds. This depends on get_tick and get_tick_freq. */
+        /** @brief Get time in nanoseconds. This depends on get_tick and get_tick_rate_hz. */
         static int64 cortex_m_get_time_ns() noexcept
         {
             int tick;
@@ -177,7 +177,7 @@ namespace rpp
                 asm volatile("nop");
             } while (tick != get_tick()); // Ensure no rollover
 
-            int ticks_per_second = get_tick_freq();
+            int ticks_per_second = get_tick_rate_hz();
             int ns_per_tick = 1'000'000'000 / ticks_per_second;
             int64 cycles_per_tick = SysTick->LOAD + 1;
 
@@ -208,7 +208,7 @@ namespace rpp
 
     #if RPP_FREERTOS
         FINLINE static int get_tick() noexcept { return xTaskGetTickCount(); }
-        FINLINE static int get_tick_freq() noexcept { return configTICK_RATE_HZ; }
+        FINLINE static int get_tick_rate_hz() noexcept { return configTICK_RATE_HZ; }
 
         // Platform specific implementation of getting time in nanoseconds
         static int64 freertos_get_time_ns() noexcept
@@ -246,9 +246,22 @@ namespace rpp
         }
 
     #elif RPP_STM32_HAL
-        /** @note HAL_GetTick returns milliseconds, convert to ticks */
-        FINLINE static int get_tick() noexcept { return HAL_GetTick() / HAL_GetTickFreq(); }
-        FINLINE static int get_tick_freq() noexcept { return 1000 / HAL_GetTickFreq(); }
+        /**
+         * @note While it is called HAL_GetTick, it actually returns time in milliseconds
+         * since system start.
+         * @note HAL_GetTickFreq returns the tick period in milliseconds, e.g, if the tick
+         * frequency is 1000Hz, it returns 1 (ms).
+         */
+        FINLINE static int get_tick() noexcept {
+            uint32_t current_ms = HAL_GetTick();
+            uint32_t tick_period_in_ms = HAL_GetTickFreq();
+            return current_ms / tick_period_in_ms;        
+        }
+        
+        FINLINE static int get_tick_rate_hz() noexcept {
+            uint32_t tick_period_in_ms = HAL_GetTickFreq();
+            return 1000 / tick_period_in_ms;
+        }
     #endif
 #endif
 
