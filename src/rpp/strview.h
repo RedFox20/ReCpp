@@ -1283,12 +1283,12 @@ namespace rpp
     {
         using namespace std::string_literals;
 
-        inline constexpr strview operator "" _sv(const char* str, std::size_t len) noexcept
+        inline constexpr strview operator ""_sv(const char* str, std::size_t len) noexcept
         {
             return strview{ str, (int)len };
         }
     #if RPP_ENABLE_UNICODE
-        inline constexpr ustrview operator "" _sv(const char16_t* str, std::size_t len) noexcept
+        inline constexpr ustrview operator ""_sv(const char16_t* str, std::size_t len) noexcept
         {
             return ustrview{ str, len };
         }
