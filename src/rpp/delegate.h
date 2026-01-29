@@ -57,6 +57,7 @@
 #include <type_traits> // std::decay_t<>
 #include <utility> // std::forward
 #include <stdexcept> // std::terminate
+#include <cstdint> // uint8_t
 
 namespace rpp
 {
@@ -176,7 +177,7 @@ namespace rpp
                 destructor(obj);
             }
         }
-        
+
         void copy(delegate& to) const noexcept
         {
             if (destructor) // looks like we have a functor
@@ -209,7 +210,7 @@ namespace rpp
         }
 
         /** @brief Forward reference initialization (move) */
-        delegate(delegate&& d) noexcept 
+        delegate(delegate&& d) noexcept
             : f{d.f}, obj{d.obj}, destructor{d.destructor}, proxy_copy{d.proxy_copy}
         {
             d.f.fun = nullptr;
@@ -787,7 +788,7 @@ namespace rpp
                 ptr->capacity += 3;
                 if (int rem = ptr->capacity % 4)
                     ptr->capacity += 4 - rem;
-                auto* p = static_cast<container*>(realloc(reinterpret_cast<void*>(ptr), 
+                auto* p = static_cast<container*>(realloc(reinterpret_cast<void*>(ptr),
                                                   sizeof(container) + sizeof(deleg) * (ptr->capacity - 1)));
                 if (!p) { std::terminate(); }
                 ptr = p;
