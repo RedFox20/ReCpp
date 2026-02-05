@@ -945,13 +945,13 @@ namespace rpp
     }
 
     // optimized for simplicity and performance
-    // detects HEX integer strings as 0xBA or 0BA. Regular integers also parsed
+    // detects HEX integer strings as 0xBA, 0XBA or 0BA. Regular integers also parsed
     int to_inthx(const char* str, int len, const char** end) noexcept
     {
         const char* s = str;
         const char* e = str + len;
         unsigned intPart = 0;
-        if (s[0] == '0' && s[1] == 'x') s += 2;
+        if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) s += 2;
         for (char ch; s < e; ++s) {
             int digit;
             ch = *s;
