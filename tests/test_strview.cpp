@@ -118,6 +118,16 @@ TestImpl(test_strview)
         AssertThat(strview{"12345abcdefgh"}.to_int(), 12345);
     }
 
+    TestCase(parse_int_hex_empty)
+    {
+        AssertThat(strview{""}.to_int_hex(), 0);
+    }
+    TestCase(parse_int_hex_normal)
+    {
+        AssertThat(strview{"0x1234"}.to_int_hex(), 0x1234);
+        AssertThat(strview{"01234"}.to_int_hex(), 0x1234);
+        AssertThat(strview{"0X1234"}.to_int_hex(), 0x1234);
+    }
 
     TestCase(parse_float_empty)
     {
