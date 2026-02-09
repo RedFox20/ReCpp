@@ -164,43 +164,23 @@ namespace rpp
 
     bool recursive_mutex::try_lock() noexcept
     {
-        if (xPortIsInsideInterrupt())
-        {
-            BaseType_t higherPriorityTaskWoken = pdFALSE;
-            bool r = xSemaphoreTakeRecursiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken) == pdTRUE;
-            portYIELD_FROM_ISR(higherPriorityTaskWoken);
-            return r;
-        }
+        if (!xPortIsInsideInterrupt())
+            return xSemaphoreTakeRecursive(GET_SEMPHR(), 0) == pdTRUE;
 
-        return xSemaphoreTakeRecursive(GET_SEMPHR(), 0) == pdTRUE;
+        // Cannot take recursive FreeRTOS semaphore from ISR
+        return false;
     }
 
     void recursive_mutex::lock() noexcept
     {
-        if (xPortIsInsideInterrupt())
-        {
-            BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xSemaphoreTakeRecursiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken);
-            portYIELD_FROM_ISR(higherPriorityTaskWoken);
-        }
-        else
-        {
+        if (!xPortIsInsideInterrupt())
             xSemaphoreTakeRecursive(GET_SEMPHR(), portMAX_DELAY);
-        }
     }
 
     void recursive_mutex::unlock() noexcept
     {
-        if (xPortIsInsideInterrupt())
-        {
-            BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xSemaphoreGiveRecursiveFromISR(GET_SEMPHR(), &higherPriorityTaskWoken);
-            portYIELD_FROM_ISR(higherPriorityTaskWoken);
-        }
-        else
-        {
+        if (!xPortIsInsideInterrupt())
             xSemaphoreGiveRecursive(GET_SEMPHR());
-        }
     }
 #endif // configUSE_RECURSIVE_MUTEXES
 
