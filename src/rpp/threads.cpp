@@ -184,8 +184,9 @@ namespace rpp
             if (xPortIsInsideInterrupt())
                 return; // cannot yield from ISR
             taskYIELD();
-        #elif RPP_STM32_HAL
-            asm volatile("nop");
+        #elif RPP_BARE_METAL && RPP_ARM_ARCH
+            asm volatile("dsb");
+            asm volatile("wfi"); // Wait For Interrupt - puts the CPU to sleep until the next interrupt occurs
         #else
             std::this_thread::yield();
         #endif
