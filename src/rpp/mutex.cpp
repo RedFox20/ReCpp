@@ -4,6 +4,7 @@
     #include <Windows.h>
 #endif
 #if RPP_FREERTOS
+    #include "debugging.h"
     #include <FreeRTOS.h>
     #include <semphr.h>
     #include <task.h>
@@ -164,23 +165,20 @@ namespace rpp
 
     bool recursive_mutex::try_lock() noexcept
     {
-        if (!xPortIsInsideInterrupt())
-            return xSemaphoreTakeRecursive(GET_SEMPHR(), 0) == pdTRUE;
-
-        // Cannot take recursive FreeRTOS semaphore from ISR
-        return false;
+        Assert(xPortIsInsideInterrupt(), "Cannot take recursive mutex from ISR");
+        return xSemaphoreTakeRecursive(GET_SEMPHR(), 0) == pdTRUE;
     }
 
     void recursive_mutex::lock() noexcept
     {
-        if (!xPortIsInsideInterrupt())
-            xSemaphoreTakeRecursive(GET_SEMPHR(), portMAX_DELAY);
+        Assert(xPortIsInsideInterrupt(), "Cannot take recursive mutex from ISR");
+        xSemaphoreTakeRecursive(GET_SEMPHR(), portMAX_DELAY);
     }
 
     void recursive_mutex::unlock() noexcept
     {
-        if (!xPortIsInsideInterrupt())
-            xSemaphoreGiveRecursive(GET_SEMPHR());
+        Assert(xPortIsInsideInterrupt(), "Cannot give recursive mutex from ISR");
+        xSemaphoreGiveRecursive(GET_SEMPHR());
     }
 #endif // configUSE_RECURSIVE_MUTEXES
 
@@ -188,18 +186,30 @@ namespace rpp
 
     bool critical_section::try_lock() noexcept
     {
-        portENTER_CRITICAL();
+        // When called from interrupt
+        if (xPortIsInsideInterrupt())
+            saved_interrupt_state = taskENTER_CRITICAL_FROM_ISR();
+        
+        // When called from task
+        else
+            portENTER_CRITICAL();
         return true;
     }
 
     void critical_section::lock() noexcept
     {
-        portENTER_CRITICAL();
+        try_lock();
     }
 
     void critical_section::unlock() noexcept
     {
-        portEXIT_CRITICAL();
+        // When called from interrupt
+        if (xPortIsInsideInterrupt())
+            taskEXIT_CRITICAL_FROM_ISR(saved_interrupt_state);
+
+        // When called from task
+        else
+            portEXIT_CRITICAL();
     }
 #elif RPP_CORTEX_M_ARCH
     /////////////////////////////////////////////////////////////////

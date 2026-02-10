@@ -62,6 +62,10 @@ namespace rpp
 #elif RPP_FREERTOS
     class critical_section
     {
+        // Interrupt state before entering critical section.
+        // This state is restored after unlocking.
+        // Only used when called from an ISR, otherwise ignored.
+        uint32_t saved_interrupt_state = 0;
     public:
         critical_section() noexcept = default;
 
