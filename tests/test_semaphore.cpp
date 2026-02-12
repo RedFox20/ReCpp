@@ -198,8 +198,14 @@ TestImpl(test_semaphore)
         });
 
         producer.join();
-        // we need to a tiny amount of time for consumer to finish receiving all of the data
-        rpp::sleep_ms(15);
+
+        // wait for consumer to finish receiving all of the data
+        for (int i = 0; i < 20; ++i) { // with a max wait limit
+            { std::lock_guard lock { producer_mutex };
+              if (producer_queue.empty()) break;
+            }
+            rpp::sleep_ms(5);
+        }
 
         working = false;
         sem.notify(); // notify finished
