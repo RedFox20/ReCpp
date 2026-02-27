@@ -35,6 +35,10 @@ class ReCpp(mama.BuildTarget):
         if self.raspi or self.oclea:
             self.export_syslib('dl')
             self.export_syslib('rt')
+        elif self.yocto_linux:
+            self.export_syslib('dw')
+            self.export_syslib('elf')
+            self.export_syslib('z')
         elif self.mips:
             self.export_syslib('dl')
             self.export_syslib('rt')
