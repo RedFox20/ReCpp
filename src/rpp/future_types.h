@@ -44,9 +44,6 @@ namespace rpp
     };
 
     template<typename F>
-    concept NotFuture = requires(F f) {
-        requires !std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
-              && !std::is_same_v<F, std::future<decltype(f.get())>>;
-    };
+    concept NotFuture = !IsFuture<F>;
 #endif // RPP_HAS_CXX20
 }

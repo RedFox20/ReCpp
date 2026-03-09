@@ -8,12 +8,10 @@
 #include "debugging.h"
 #include "traits.h"
 #include "future_types.h"
+#include "timer.h"
 
 #if RPP_HAS_COROUTINES
 #include <chrono>
-#if _MSC_VER
-#  include "timer.h"
-#endif
 
 namespace rpp
 {

@@ -217,6 +217,35 @@ TestImpl(test_coroutines)
     }
 
 
+    cfuture<void> functor_nonfuture_void_coro()
+    {
+        std::string result = "default";
+        co_await [&]() -> void {
+            rpp::sleep_ms(1);
+            result = "string from lambda coro";
+        };
+        AssertThat(result, "string from lambda coro"s);
+    }
+    TestCase(functor_nonfuture_void_coro)
+    {
+        functor_nonfuture_void_coro().get();
+    }
+
+
+    cfuture<void> functor_nonfuture_string_coro()
+    {
+        std::string result = co_await [&]() -> std::string {
+            rpp::sleep_ms(1);
+            std::string r = "string from lambda coro";
+            return r;
+        };
+        AssertThat(result, "string from lambda coro"s);
+    }
+    TestCase(functor_nonfuture_string_coro)
+    {
+        functor_nonfuture_string_coro().get();
+    }
+
     cfuture<void> std_future_void_coro()
     {
         co_await std::chrono::milliseconds{10};
