@@ -128,7 +128,7 @@ namespace rpp
      * @endcode
      */
     template<typename T>
-    class NODISCARD cfuture : public std::future<T>
+    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture : public std::future<T>
     {
     public:
         using super = std::future<T>;
@@ -170,7 +170,7 @@ namespace rpp
          *     co_await async_task(operation1).then(operation2).then();
          * @endcode
          */
-        cfuture<void> then() noexcept;
+        RPP_CORO_WRAPPER cfuture<void> then() noexcept;
 
         /**
          * Continuation: after this future is complete, forwards the result to `task`.
@@ -187,7 +187,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task>
-        auto then(Task&& task) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task&& task) noexcept -> cfuture<decltype(task(this->get()))>
         {
             return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 return task(f.get());
@@ -214,7 +214,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task, class ExceptHA>
-        auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
@@ -224,7 +224,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -236,7 +236,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -250,7 +250,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
-        auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task(this->get()))>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -266,7 +266,7 @@ namespace rpp
         }
 
         template<typename U>
-        auto then(cfuture<U>&& next) noexcept -> cfuture<U>
+        RPP_CORO_WRAPPER auto then(cfuture<U>&& next) noexcept -> cfuture<U>
         {
             return rpp::async_task([f=std::move(*this), n=std::move(next)]() mutable {
                 { (void)f.get(); } // wait for this future to complete
@@ -492,7 +492,7 @@ namespace rpp
             /**
              * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
              */
-            rpp::cfuture<T> get_return_object() noexcept { return this->get_future(); }
+            RPP_CORO_WRAPPER rpp::cfuture<T> get_return_object() noexcept { return this->get_future(); }
             RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
             RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
             void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
@@ -516,7 +516,7 @@ namespace rpp
      * Composable Futures with Coroutine support. See docs in cfuture<T>.
      */
     template<>
-    class NODISCARD cfuture<void> : public std::future<void>
+    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture<void> : public std::future<void>
     {
     public:
         using super = future<void>;
@@ -553,7 +553,7 @@ namespace rpp
         /**
          * @brief This is a no-op on cfuture<void>
          */
-        cfuture<void> then() noexcept { return { std::move(*this) }; }
+        RPP_CORO_WRAPPER cfuture<void> then() noexcept { return { std::move(*this) }; }
 
         /**
          * Standard continuation of a void future:
@@ -563,7 +563,7 @@ namespace rpp
          * });
          */
         template<typename Task>
-        auto then(Task&& task) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task) noexcept -> cfuture<decltype(task())>
         {
             return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
@@ -592,7 +592,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task, class ExceptHA>
-        auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
@@ -602,7 +602,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -614,7 +614,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -628,7 +628,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
-        auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task())>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -644,7 +644,7 @@ namespace rpp
         }
 
         template<typename U>
-        auto then(cfuture<U>&& next) noexcept -> cfuture<U>
+        RPP_CORO_WRAPPER auto then(cfuture<U>&& next) noexcept -> cfuture<U>
         {
             return rpp::async_task([f=std::move(*this), n=std::move(next)]() mutable {
                 { f.get(); } // wait for this future to complete
@@ -865,7 +865,7 @@ namespace rpp
          */
         struct promise_type : rpp::cpromise<void>
         {
-            rpp::cfuture<void> get_return_object() noexcept { return this->get_future(); }
+            RPP_CORO_WRAPPER rpp::cfuture<void> get_return_object() noexcept { return this->get_future(); }
             RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
             RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
             void return_void() noexcept { this->set_value(); }

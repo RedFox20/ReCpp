@@ -1,0 +1,6 @@
+Checks: >
+  cppcoreguidelines-avoid-reference-coroutine-parameters
+WarningsAsErrors: >
+  cppcoreguidelines-avoid-reference-coroutine-parameters
+ExtraArgsBefore:
+  - -Wno-unknown-warning-option

@@ -4,10 +4,7 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
-#include "thread_pool.h"
-#include "debugging.h"
-#include "traits.h"
-#include "future_types.h"
+#include "future.h"
 #include "timer.h"
 
 #if RPP_HAS_COROUTINES

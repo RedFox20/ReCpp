@@ -527,7 +527,7 @@ namespace rpp
             AssertThat(lambda(data), "nested_lambda");
 
             DataDelegate moved_lambda = std::move(lambda);
-            AssertThat(lambda.good(), false);
+            AssertThat(lambda.good(), false); // NOLINT (this is a test for clean move semantics)
             AssertThat(moved_lambda(data), "nested_lambda");
         }
 
