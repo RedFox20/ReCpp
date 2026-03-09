@@ -300,11 +300,26 @@
 #      define RPP_LIFETIMEBOUND
 #    endif
 #  elif defined(__clang__)
-#   define RPP_LIFETIMEBOUND [[clang::lifetimebound]]
+#    define RPP_LIFETIMEBOUND [[clang::lifetimebound]]
 #  else
-#   define RPP_LIFETIMEBOUND
+#    define RPP_LIFETIMEBOUND
 #  endif
 #endif // RPP_LIFETIMEBOUND
+
+// Provides a hint to the compiler that this type is a CRT (Coroutine Return Type)
+// Clang will enforce that all functions that return a CRT are either coroutines or
+// or marked with [[clang::coro_wrapper]]. Clang will enforce this with an error.
+#ifndef RPP_CORO_RETURN_TYPE
+#  if defined(__clang__)
+#    define RPP_CORO_RETURN_TYPE [[clang::coro_return_type]]
+#    define RPP_CORO_WRAPPER [[clang::coro_wrapper]]
+#    define RPP_CORO_LIFETIMEBOUND [[clang::coro_lifetimebound]]
+#  else
+#    define RPP_CORO_RETURN_TYPE
+#    define RPP_CORO_WRAPPER
+#    define RPP_CORO_LIFETIMEBOUND
+#  endif
+#endif // RPP_CORO_RETURN_TYPE
 
 
 // Define the basic size of integer types

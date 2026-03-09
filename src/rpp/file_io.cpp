@@ -496,9 +496,11 @@ namespace rpp /* ReCpp */
 
     bool file::time_info(time_t* outCreated, time_t* outAccessed, time_t* outModified) const noexcept
     {
-        intptr_t fd = intptr_t(Handle);
+        intptr_t fd;
         #if !_MSC_VER
             fd = fileno((FILE*)Handle);
+        #else
+            fd = intptr_t(Handle);
         #endif
         return rpp::file_info(fd, nullptr, outCreated, outAccessed, outModified);
     }

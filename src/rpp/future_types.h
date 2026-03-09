@@ -27,7 +27,7 @@
 namespace rpp
 {
     template<class T = void>
-    class NODISCARD cfuture;
+    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture;
 
 
 #if RPP_HAS_COROUTINES

@@ -394,7 +394,7 @@ namespace rpp
             {
                 auto& t = *(struct VCallThunk*)&method;
                 if (size_t(t.method) & 1u) { // is_thunk?
-                    auto* vtable = (struct VTable*) *(void**)inst;
+                    auto* vtable = (struct VTable*) *(void**)inst; // NOLINT: clang-tidy does not like this hack
                     size_t voffset = (t.vtable_index-1)/8;
                     if (out_inst) {
                         *out_inst = (void*)((const uint8_t*)inst + t.this_adjustment);

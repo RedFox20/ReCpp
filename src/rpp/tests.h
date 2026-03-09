@@ -596,6 +596,11 @@ namespace rpp
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
     void test_##testname()
 
+// allows to use co_await in test cases
+#define TestCaseCoro(testname) \
+    const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
+    rpp::cfuture<void> test_##testname()
+
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname, &typeid(expectedExceptionType)); \
     void test_##testname()
