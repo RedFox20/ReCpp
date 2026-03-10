@@ -19,7 +19,7 @@
             "cStandard": "c17",
             "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-gcc-x64",
-            "compileCommands": "${workspaceFolder}/build/ReCpp/linux/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/linux/compile_commands.json"
         },
         {
             "name": "Linux Clang",
@@ -30,7 +30,7 @@
             "cStandard": "c17",
             "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-clang-x64",
-            "compileCommands": "${workspaceFolder}/build/ReCpp/linux/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/linux/compile_commands.json"
         },
         {
             "name": "Android",
@@ -39,9 +39,9 @@
             ],
             "defines": [],
             "cStandard": "c17",
-            "cppStandard": "c++20",
-            "intelliSenseMode": "linux-clang-arm64",
-            "compileCommands": "${workspaceFolder}/build/ReCpp/android/compile_commands.json"
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "clang-arm64",
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/android/compile_commands.json"
         },
         {
             "name": "mips mipsel",
@@ -50,9 +50,9 @@
             ],
             "defines": [],
             "cStandard": "c17",
-            "cppStandard": "c++20",
-            "intelliSenseMode": "windows-msvc-x64",
-            "compileCommands": "${workspaceFolder}/build/ReCpp/mips/compile_commands.json"
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "gcc-arm",
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/mips/compile_commands.json"
         },
         {
             "name": "oclea arm64",
@@ -61,9 +61,20 @@
             ],
             "defines": [],
             "cStandard": "c17",
-            "cppStandard": "c++20",
-            "intelliSenseMode": "windows-msvc-x64",
-            "compileCommands": "${workspaceFolder}/build/ReCpp/oclea/compile_commands.json"
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "gcc-arm64",
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/oclea/compile_commands.json"
+        },
+        {
+            "name": "imx8mp arm64",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "gcc-arm64",
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/imx8mp/compile_commands.json"
         },
         {
             "name": "xilinx arm64",
@@ -72,9 +83,9 @@
             ],
             "defines": [],
             "cStandard": "c17",
-            "cppStandard": "c++20",
-            "intelliSenseMode": "windows-msvc-x64",
-            "compileCommands": "${workspaceFolder}/build/ReCpp/xilinx/compile_commands.json"
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "gcc-arm64",
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/xilinx/compile_commands.json"
         }
     ],
     "version": 4
