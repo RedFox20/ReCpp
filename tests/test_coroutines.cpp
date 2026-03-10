@@ -69,16 +69,16 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<void> void_coro(std::string& result)
+    cfuture<void> void_coro(std::string* result) // NOLINT: disable linter here, since this is normally a bug
     {
         co_await std::chrono::milliseconds{1};
-        set_locked(result, co_await string_coro());
+        set_locked(*result, co_await string_coro());
         co_return;
     }
     TestCase(basic_void_coro)
     {
         std::string result = "default";
-        auto f = void_coro(result);
+        auto f = void_coro(&result);
         AssertThat(get_locked(result), "default"s);
         f.get();
         AssertThat(result, "string from coro"s);

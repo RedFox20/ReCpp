@@ -40,7 +40,7 @@ namespace rpp
      * @endcode
      */
     template<typename T>
-    struct functor_awaiter
+    struct RPP_CORO_RETURN_TYPE functor_awaiter
     {
         rpp::delegate<T()> action;
         T result {};
@@ -75,7 +75,7 @@ namespace rpp
     };
 
     template<>
-    struct functor_awaiter<void>
+    struct RPP_CORO_RETURN_TYPE functor_awaiter<void>
     {
         rpp::delegate<void()> action;
 
@@ -109,7 +109,7 @@ namespace rpp
     };
 
     template<IsFuture Future>
-    struct functor_awaiter_fut
+    struct RPP_CORO_RETURN_TYPE functor_awaiter_fut
     {
         rpp::delegate<Future()> action;
         Future f {};
@@ -149,7 +149,7 @@ namespace rpp
     // TODO: should reimplement this using coroutine traits
     // TODO: https://en.cppreference.com/w/cpp/coroutine/coroutine_traits
     template<typename T>
-    struct std_future_awaiter
+    struct RPP_CORO_RETURN_TYPE std_future_awaiter
     {
         std::future<T> f;
         std::exception_ptr ex {};
@@ -188,7 +188,7 @@ namespace rpp
      * @brief Awaiter object for std::chrono durations
      */
     template<class Clock = std::chrono::high_resolution_clock>
-    struct chrono_awaiter
+    struct RPP_CORO_RETURN_TYPE chrono_awaiter
     {
         using time_point = typename Clock::time_point;
         using duration = typename Clock::duration;
@@ -240,7 +240,7 @@ namespace rpp
          * @endcode
          */
         template<NotFuture T>
-        inline functor_awaiter<T> operator co_await(rpp::delegate<T()>&& action) noexcept
+        RPP_CORO_WRAPPER inline functor_awaiter<T> operator co_await(rpp::delegate<T()>&& action) noexcept
         {
             return functor_awaiter<T>{ std::move(action) };
         }
@@ -258,7 +258,7 @@ namespace rpp
          * @endcode
          */
         template<IsFuture F>
-        inline functor_awaiter_fut<F> operator co_await(rpp::delegate<F()>&& action) noexcept
+        RPP_CORO_WRAPPER inline functor_awaiter_fut<F> operator co_await(rpp::delegate<F()>&& action) noexcept
         {
             return functor_awaiter_fut<F>{ std::move(action) };
         }
@@ -272,7 +272,7 @@ namespace rpp
          * @endcode
          */
         template<IsFunctionNotReturningFuture F>
-        inline auto operator co_await(F&& action) noexcept -> functor_awaiter<decltype(action())>
+        RPP_CORO_WRAPPER inline auto operator co_await(F&& action) noexcept -> functor_awaiter<decltype(action())>
         {
             return functor_awaiter<decltype(action())>{ std::move(action) };
         }
@@ -289,7 +289,7 @@ namespace rpp
          * @endcode
          */
         template<IsFunctionReturningFuture FF>
-        inline auto operator co_await(FF&& action) noexcept -> functor_awaiter_fut<decltype(action())>
+        RPP_CORO_WRAPPER inline auto operator co_await(FF&& action) noexcept -> functor_awaiter_fut<decltype(action())>
         {
             return functor_awaiter_fut<decltype(action())>{ std::move(action) };
         }
@@ -307,13 +307,13 @@ namespace rpp
         }
 
         template<typename T>
-        inline std_future_awaiter<T> operator co_await(std::future<T>& future) noexcept
+        RPP_CORO_WRAPPER inline std_future_awaiter<T> operator co_await(std::future<T>& future) noexcept
         {
             return std_future_awaiter<T>{ std::move(future) };
         }
 
         template<typename T>
-        inline std_future_awaiter<T> operator co_await(std::future<T>&& future) noexcept
+        RPP_CORO_WRAPPER inline std_future_awaiter<T> operator co_await(std::future<T>&& future) noexcept
         {
             return std_future_awaiter<T>{ std::move(future) };
         }
@@ -326,7 +326,7 @@ namespace rpp
          * @endcode
          */
         template<typename Rep, typename Period>
-        inline auto operator co_await(const std::chrono::duration<Rep, Period>& duration) noexcept
+        RPP_CORO_WRAPPER inline auto operator co_await(const std::chrono::duration<Rep, Period>& duration) noexcept
         {
             return chrono_awaiter<>{ duration };
         }

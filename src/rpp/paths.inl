@@ -199,10 +199,12 @@ namespace rpp
     enum file_flags
     {
         FF_INVALID = 0, // does not exist
-        FF_FILE    = (1<<1),   // exists and is a file
+        FF_FILE    = (1 << 1), // exists and is a file
         FF_FOLDER  = (1 << 2), // exists and is a folder
         FF_SYMLINK = (1 << 3), // exists and is a symlink
         FF_FILE_OR_FOLDER = FF_FILE | FF_FOLDER, // exists and is either a file or a folder
+        FF_FILE_SYMLINK = FF_FILE | FF_SYMLINK, // exists and is a file symlink
+        FF_FOLDER_SYMLINK = FF_FOLDER | FF_SYMLINK, // exists and is a folder symlink
     };
 
 #if _MSC_VER

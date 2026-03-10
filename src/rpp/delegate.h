@@ -52,6 +52,7 @@
  *     onMouseMove.clear();               // unregister all
  *  @endcode
  */
+#include "config.h"
 #include <cstdlib> // malloc/free for event<()>
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
@@ -399,7 +400,7 @@ namespace rpp
                     if (out_inst) {
                         *out_inst = (void*)((const uint8_t*)inst + t.this_adjustment);
                     }
-                    return { .pfunc = vtable->entries[voffset] }; // resolve thunk
+                    return { .pfunc = vtable->entries[voffset] }; // resolve thunk NOLINT: null pointer dereference
                 }
                 return func{ .pfunc = t.method }; // not a virtual method thunk
             }
@@ -530,7 +531,7 @@ namespace rpp
             }
         };
     #else // for G++ and Clang++ we use mfunc call for everything
-        template<class FunctorType> static Ret functor_call(void* instance, Args... args) // may throw
+        template<class FunctorType> RPP_CORO_WRAPPER static Ret functor_call(void* instance, Args... args) // may throw
         {
             FunctorType& functor = *reinterpret_cast<FunctorType*>(instance);
             return functor(std::forward<Args>(args)...);
@@ -654,12 +655,12 @@ namespace rpp
         /**
          * @brief Invoke the delegate with specified args list
          */
-        DELEGATE_FINLINE Ret operator()(Args... args) const;
-        DELEGATE_FINLINE Ret invoke(Args... args) const;
+        RPP_CORO_WRAPPER DELEGATE_FINLINE Ret operator()(Args... args) const;
+        RPP_CORO_WRAPPER DELEGATE_FINLINE Ret invoke(Args... args) const;
     };
 
 
-    template<class Ret, class... Args> DELEGATE_FINLINE
+    template<class Ret, class... Args> RPP_CORO_WRAPPER DELEGATE_FINLINE
     Ret delegate<Ret(Args...)>::operator()(Args... args) const
     {
     #if _MSC_VER
@@ -670,7 +671,7 @@ namespace rpp
     }
 
 
-    template<class Ret, class... Args> DELEGATE_FINLINE
+    template<class Ret, class... Args> RPP_CORO_WRAPPER DELEGATE_FINLINE
     Ret delegate<Ret(Args...)>::invoke(Args... args) const
     {
     #if _MSC_VER

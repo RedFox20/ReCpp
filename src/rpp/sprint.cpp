@@ -100,6 +100,7 @@ namespace rpp
         va_start(ap, format);
         char buffer[8192];
         int n = vsnprintf(buffer, sizeof(buffer), format, ap);
+        va_end(ap);
         if (n < 0 || n >= (int)sizeof(buffer))
             n = sizeof(buffer) - 1;
         reserve(n);
