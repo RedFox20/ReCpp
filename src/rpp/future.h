@@ -68,9 +68,9 @@ namespace rpp
      * @returns Composable future with return value set to task() return value.
      */
     template<typename Task>
-    RPP_CORO_WRAPPER auto async_task(Task&& task) noexcept -> cfuture<decltype(task())>
+    RPP_CORO_WRAPPER auto async_task(Task&& task) noexcept -> cfuture<std::decay_t<decltype(task())>>
     {
-        using T = decltype(task());
+        using T = std::decay_t<decltype(task())>;
         cpromise<T> p;
         cfuture<T> f = p.get_future();
         rpp::parallel_task([move_args(p, task)]() mutable noexcept
@@ -187,7 +187,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task>
-        RPP_CORO_WRAPPER auto then(Task&& task) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task&& task) noexcept -> cfuture<std::decay_t<decltype(task(this->get()))>>
         {
             return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 return task(f.get());
@@ -214,7 +214,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task, class ExceptHA>
-        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<std::decay_t<decltype(task(this->get()))>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
@@ -224,7 +224,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB>
-        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<std::decay_t<decltype(task(this->get()))>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -236,7 +236,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        RPP_CORO_WRAPPER auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<std::decay_t<decltype(task(this->get()))>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -250,7 +250,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
-        RPP_CORO_WRAPPER auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task(this->get()))>
+        RPP_CORO_WRAPPER auto then(Task task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<std::decay_t<decltype(task(this->get()))>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -563,7 +563,7 @@ namespace rpp
          * });
          */
         template<typename Task>
-        RPP_CORO_WRAPPER auto then(Task&& task) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task) noexcept -> cfuture<std::decay_t<decltype(task())>>
         {
             return rpp::async_task([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
@@ -592,7 +592,7 @@ namespace rpp
          * @endcode
          */
         template<typename Task, class ExceptHA>
-        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA) noexcept -> cfuture<std::decay_t<decltype(task())>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             return async_task([f=std::move(*this), move_args(task, exhA)]() mutable {
@@ -602,7 +602,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB>
-        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB) noexcept -> cfuture<std::decay_t<decltype(task())>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -614,7 +614,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC>
-        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC) noexcept -> cfuture<std::decay_t<decltype(task())>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
@@ -628,7 +628,7 @@ namespace rpp
         }
 
         template<typename Task, class ExceptHA, class ExceptHB, class ExceptHC, class ExceptHD>
-        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<decltype(task())>
+        RPP_CORO_WRAPPER auto then(Task&& task, ExceptHA&& exhA, ExceptHB&& exhB, ExceptHC&& exhC, ExceptHD&& exhD) noexcept -> cfuture<std::decay_t<decltype(task())>>
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
