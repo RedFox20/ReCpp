@@ -174,7 +174,9 @@ namespace rpp
 
         template<class T> void write_ptr_type(T* ptr) noexcept
         {
-            if (ptr == nullptr) return write(nullptr);
+            if (!ptr)
+                return write(nullptr);
+
             if constexpr (std::is_function<T>::value)
             {
                 this->write_ptr(reinterpret_cast<const void*>(ptr));

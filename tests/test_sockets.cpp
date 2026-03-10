@@ -686,14 +686,14 @@ TestImpl(test_sockets)
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         rpp::Timer t;
-        auto sender = rpp::async_task([&]()
+        auto sender = rpp::async_task([&send,&recv_addr]()
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
                 send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
             }
         });
-        auto receiver = rpp::async_task([&]()
+        auto receiver = rpp::async_task([this, &recv, &t]()
         {
             char buffer[4096];
             int num_received = 0;

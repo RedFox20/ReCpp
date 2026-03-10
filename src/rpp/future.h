@@ -68,7 +68,7 @@ namespace rpp
      * @returns Composable future with return value set to task() return value.
      */
     template<typename Task>
-    auto async_task(Task&& task) noexcept -> cfuture<decltype(task())>
+    RPP_CORO_WRAPPER auto async_task(Task&& task) noexcept -> cfuture<decltype(task())>
     {
         using T = decltype(task());
         cpromise<T> p;
@@ -128,7 +128,7 @@ namespace rpp
      * @endcode
      */
     template<typename T>
-    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture : public std::future<T>
+    class NODISCARD RPP_CORO_RETURN_TYPE cfuture : public std::future<T>
     {
     public:
         using super = std::future<T>;
@@ -516,7 +516,7 @@ namespace rpp
      * Composable Futures with Coroutine support. See docs in cfuture<T>.
      */
     template<>
-    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture<void> : public std::future<void>
+    class NODISCARD RPP_CORO_RETURN_TYPE cfuture<void> : public std::future<void>
     {
     public:
         using super = future<void>;
@@ -893,7 +893,7 @@ namespace rpp
 
     /** @brief Creates a future<T> which is already completed. Useful for some chaining edge cases. */
     template<typename T>
-    inline cfuture<T> make_ready_future(T&& value)
+    RPP_CORO_WRAPPER inline auto make_ready_future(T&& value) -> cfuture<T>
     {
         std::promise<T> p;
         p.set_value(std::move(value));
@@ -901,7 +901,7 @@ namespace rpp
     }
 
     /** @brief Creates a future<void> which is already completed. Useful for some chaining edge cases. */
-    inline cfuture<void> make_ready_future()
+    RPP_CORO_WRAPPER inline auto make_ready_future() -> cfuture<void>
     {
         std::promise<void> p;
         p.set_value();
@@ -910,7 +910,7 @@ namespace rpp
 
     /** @brief Creates a future<T> which is already errored with the exception. Useful for some chaining edge cases. */
     template<typename T, typename E>
-    inline cfuture<T> make_exceptional_future(E&& e)
+    RPP_CORO_WRAPPER inline auto make_exceptional_future(E&& e) -> cfuture<T>
     {
         std::promise<T> p;
         p.set_exception(std::make_exception_ptr(std::forward<E>(e)));

@@ -482,7 +482,7 @@ namespace rpp /* ReCpp */
             const string_t name; // name of the entry, file, dir, etc.
 
             entry(const directory_iter* it) noexcept
-                : it{it}, name{it->name()}
+                : it{it}, name{dir_iter_base::name_util<view_t>::get(it)}
             {}
 
             /** @returns "{input_dir}/{entry.name}" */
@@ -495,13 +495,13 @@ namespace rpp /* ReCpp */
             bool is_valid() const noexcept { return (is_file() || is_dir()); }
 
             /** @returns TRUE if this is a directory */
-            bool is_dir() const noexcept { return it->is_dir(); }
+            bool is_dir() const noexcept { return it && it->is_dir(); }
             /** @returns TRUE if this is a regular file */
-            bool is_file() const noexcept { return it->is_file(); }
+            bool is_file() const noexcept { return it && it->is_file(); }
             /** @returns TRUE if this is a symbolic link */
-            bool is_symlink() const noexcept { return it->is_symlink(); }
+            bool is_symlink() const noexcept { return it && it->is_symlink(); }
             /** @returns TRUE if this is a block device, character device, named pipe or socket */
-            bool is_device() const noexcept { return it->is_device(); }
+            bool is_device() const noexcept { return it && it->is_device(); }
 
             bool add_path_to(std::vector<string_t>& out) const noexcept {
                 if (is_valid()) {
@@ -525,7 +525,7 @@ namespace rpp /* ReCpp */
             bool operator!=(const iter& other) const noexcept { return it != other.it; }
             entry operator*() const noexcept { return { it }; }
             iter& operator++() noexcept {
-                if (!it->next()) it = nullptr;
+                if (!it || !it->next()) it = nullptr;
                 return *this;
             }
         };

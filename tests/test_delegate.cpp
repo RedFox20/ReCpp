@@ -552,7 +552,7 @@ namespace rpp
 
             DataDelegate init { std::move(lambda) };
             AssertThat(init.good(), true);
-            AssertThat(lambda.good(), false);
+            AssertThat(lambda.good(), false); // NOLINT (this is a test for clean move semantics)
             AssertThat(init(data), "move_init");
         }
 

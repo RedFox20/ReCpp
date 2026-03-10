@@ -1,8 +1,9 @@
 #pragma once
+#include "config.h"
+#include "collections.h"
 #include <vector>
 #include <cstdlib>
-#include "collections.h"
-#include "config.h"
+#include <cstring>
 
 namespace rpp
 {
@@ -79,9 +80,12 @@ namespace rpp
         char* Ptr;
 
     public:
-        explicit linear_static_pool(int staticBlockSize)
-            : Remaining{staticBlockSize}, Buffer{(char*)malloc(staticBlockSize)}, Ptr{Buffer}
+        explicit linear_static_pool(int staticBlockSize) noexcept
+            : Remaining{staticBlockSize}
+            , Buffer{(char*)malloc(staticBlockSize)}
+            , Ptr{Buffer}
         {
+            memset(Buffer, 0, staticBlockSize); // initialize memory to make static analyzers happy
             if (int rem = size_t(Buffer) % 16) { // always align Ptr to 16 bytes
                 Remaining -= (16 - rem);
                 Ptr       += (16 - rem);
@@ -89,7 +93,7 @@ namespace rpp
         }
         ~linear_static_pool() noexcept
         {
-            free(Buffer);
+            if (Buffer) free(Buffer);
         }
 
         linear_static_pool(linear_static_pool&& pool) noexcept
@@ -112,10 +116,10 @@ namespace rpp
         linear_static_pool(const linear_static_pool&) = delete;
         linear_static_pool& operator=(const linear_static_pool&) = delete;
 
-        int capacity()  const { return int(Ptr - Buffer) + Remaining; }
-        int available() const { return Remaining; }
+        int capacity()  const noexcept { return int(Ptr - Buffer) + Remaining; }
+        int available() const noexcept { return Remaining; }
 
-        NODISCARD void* allocate(int size, int align = 8)
+        NODISCARD void* allocate(int size, int align = 8) noexcept
         {
             int alignOffset = 0;
             int alignedSize = size;
@@ -135,7 +139,7 @@ namespace rpp
         }
 
         // There is no deallocate -- by design !!
-        void deallocate(void*) { }
+        void deallocate(void*) noexcept { }
     };
 
 

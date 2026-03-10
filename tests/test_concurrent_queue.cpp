@@ -156,7 +156,7 @@ TestImpl(test_concurrent_queue)
     {
         constexpr int MAX_SIZE = 40'000;
         concurrent_queue<std::string> queue;
-        cfuture<> producer = rpp::async_task([&] {
+        cfuture<> producer = rpp::async_task([&queue] {
             for (int i = 0; i < MAX_SIZE; ++i)
                 queue.push("item");
         });
