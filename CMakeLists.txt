@@ -5,19 +5,12 @@ option(BUILD_TESTS "Build RppTests executable for unit testing?" OFF)
 option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
-option(ENABLE_CLANG_TIDY "Run clang-tidy during build" OFF)
 
 # These are only for build systems that don't use `mamabuild` which supports these by default:
 # -- mama build test asan ubsan coverage ReCpp
 option(BUILD_WITH_MEM_SAFETY "Build Rpp and RppTests with memory safety checks" OFF)
 option(BUILD_WITH_THREAD_SAFETY "Build Rpp and RppTests with thread safety checks" OFF)
 option(BUILD_WITH_CODE_COVERAGE "Build with code coverage for unit tests" OFF)
-
-# this is only enabled as a separate build step, because clang-tidy is quite slow
-if(ENABLE_CLANG_TIDY)
-    find_program(CLANG_TIDY_EXE NAMES clang-tidy REQUIRED)
-    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
-endif()
 
 # include mama dependencies for platforms that require it
 if(MIPS)

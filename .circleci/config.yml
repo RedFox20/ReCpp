@@ -7,7 +7,7 @@ jobs:
     description: Ubuntu Clang C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
       - run: sudo apt-get update
@@ -24,7 +24,7 @@ jobs:
     description: Ubuntu Clang C++20 x64 Build with Clang-Tidy
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
       - run: sudo apt-get update
@@ -38,7 +38,7 @@ jobs:
     description: Ubuntu GCC C++20 x64 Build
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
       - run: sudo apt-get update
@@ -53,7 +53,7 @@ jobs:
     description: Ubuntu GCC C++20 x64 Build with Clang-Tidy
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
       - run: sudo apt-get update
@@ -67,7 +67,7 @@ jobs:
     description: Ubuntu GCC C++20 x64 Build with ThreadSanitizer
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
       - run: sudo apt-get update
@@ -82,7 +82,7 @@ jobs:
   #   description: Ubuntu GCC C++20 x64 Build with UndefinedBehaviorSanitizer
   #   resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
   #   docker:
-  #     - image: cimg/python:3.10
+  #     - image: cimg/python:3.14
   #   steps:
   #     - checkout
   #     - run: sudo apt-get update
@@ -117,7 +117,7 @@ jobs:
     description: MIPSEL C++20 GCC Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
       - run: sudo apt-get update
@@ -141,7 +141,9 @@ workflows:
   build_all:
     jobs:
       - clang-ubuntu-cpp20
+      - clang-tidy-ubuntu-cpp20
       - gcc-ubuntu-cpp20
+      - gcc-tidy-ubuntu-cpp20
       - gcc-ubuntu-tsan-cpp20
       # - gcc-ubuntu-ubsan-cpp20
       - msvc-win64-cpp20
