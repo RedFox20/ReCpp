@@ -1,6 +1,7 @@
 #include "timer.h"
-#include <ctime> // gmtime, timegm
 #include "strview.h"
+#include <ctime> // gmtime, timegm
+#include <cstdint>
 
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -19,7 +20,6 @@
     #endif
     #include <thread>
 #elif RPP_BARE_METAL
-    #include <cstdint>
     #define timegm mktime
     #include <printf/printf.h>
     #include <cstdarg>
@@ -521,7 +521,7 @@ namespace rpp
     static std::tm gmtime_safe(const time_t& time) noexcept
     {
         std::tm time_tm;
-        #if _MSC_VER // MSVC++
+        #if _MSC_VER || __MINGW32__ // MSVC++ or MinGW
             gmtime_s(&time_tm, &time); // arguments reversed for some reason
         #else
             gmtime_r(&time, &time_tm);
@@ -532,7 +532,7 @@ namespace rpp
     static std::tm localtime_safe(const time_t& time) noexcept
     {
         std::tm time_tm;
-        #if _MSC_VER // MSVC++
+        #if _MSC_VER || __MINGW32__ // MSVC++ or MinGW
             localtime_s(&time_tm, &time); // arguments reversed for some reason
         #else
             localtime_r(&time, &time_tm);

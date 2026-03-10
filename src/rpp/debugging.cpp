@@ -208,7 +208,7 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
 {
     _LogError("%s:%u %s: Assertion failed: %s", file, line, function, message);
     // show a nice stack trace if possible
-    #if !RPP_BARE_METAL
+    #if !RPP_BARE_METAL && ENABLE_STACK_TRACE
         rpp::print_trace();
         fflush(stderr);
     #endif
@@ -223,7 +223,7 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
         #else
             raise(SIGTRAP);
         #endif
-    #elif _MSC_VER
+    #elif _MSC_VER || __MINGW32__
         __debugbreak();
     #elif __GNUC__
         raise(SIGTRAP);
