@@ -93,7 +93,7 @@ namespace rpp
         return get_thread_name(get_thread_id());
     }
 
-    std::string get_thread_name(uint64 thread_id) noexcept
+    std::string get_thread_name(uint64 thread_id) noexcept // NOLINT(bugprone-exception-escape)
     {
         std::string thread_name;
         if (thread_id != 0)

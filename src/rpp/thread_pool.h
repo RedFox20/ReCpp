@@ -316,7 +316,7 @@ namespace rpp
         rpp::mutex TasksMutex;
         std::vector<worker_ptr> Workers;
         float TaskMaxIdleTime = 15; // new task timeout in seconds
-        uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for
+        uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for, 0 to disable
 
     public:
         using duration = pool_task_handle::duration;
@@ -327,7 +327,7 @@ namespace rpp
         thread_pool();
 
         /**
-         * @param max_parallelism Sets the max number of concurrent tasks in parallel_for
+         * @param max_parallelism Sets the max number of concurrent tasks in parallel_for, 0 to disable parallelism
          * @see set_max_parallelism
          */
         explicit thread_pool(int max_parallelism);
@@ -337,7 +337,8 @@ namespace rpp
         /**
          * This sets the maximum number of concurrent tasks in parallel_for.
          * The default value is thread_pool::global_max_parallelism(),
-         * however you can adjust this to fit your specific use cases
+         * however you can adjust this to fit your specific use cases.
+         * Use 0 to disable parallelism.
          */
         void set_max_parallelism(int max_parallelism) noexcept;
 
@@ -345,7 +346,8 @@ namespace rpp
         int max_parallelism() const { return MaxParallelism; }
 
         /**
-         * Sets the max parallelism for the global thread pool
+         * Sets the max parallelism for the global thread pool.
+         * Use 0 to disable parallelism.
          * @see set_max_parallelism
          */
         static void set_global_max_parallelism(int max_parallelism);

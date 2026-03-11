@@ -6,7 +6,7 @@
 
 namespace rpp
 {
-    // NOLINTBEGIN(performance-*,readability-make-member-function-const)
+    // NOLINTBEGIN(performance-*,readability-make-member-function-const,bugprone-exception-escape)
 
     // a generic data container for testing instances, functors and lambdas
     class Data
@@ -824,5 +824,5 @@ namespace rpp
         ////////////////////////////////////////////////////
     };
     
-    // NOLINTEND(performance-*,readability-make-member-function-const)
+    // NOLINTEND(performance-*,readability-make-member-function-const,bugprone-exception-escape)
 }

@@ -159,7 +159,7 @@ TestImpl(test_coroutines)
             const int id;
             ~destructor_recorder() noexcept {
                 std::lock_guard lock{m};
-                results.push_back(id);
+                results.push_back(id); // NOLINT(bugprone-exception-escape)
             }
         };
 

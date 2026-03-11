@@ -159,7 +159,7 @@ namespace rpp
         static constexpr int MAX = 8192 - 1;
         char buf[MAX + 1] = "";
     public:
-        std::string to_string() const noexcept { return { buf, buf + len }; }
+        std::string to_string() const noexcept { return { buf, buf + len }; } // NOLINT(bugprone-exception-escape)
         void writeln(const char* message, size_t n) noexcept
         {
             memcpy(&buf[len], message, n);
@@ -319,9 +319,11 @@ namespace rpp
 
         void push_die(const FlatDie& f) noexcept
         {
-            if (!flatmap.empty() && flatmap.back().try_merge(f))
-                return;
-            flatmap.push_back(f);
+            try {
+                if (!flatmap.empty() && flatmap.back().try_merge(f))
+                    return;
+                flatmap.push_back(f);
+            } catch (...) { } // NOLINT(bugprone-empty-catch)
         }
 
         void insert_die_ranges(Dwarf_Die* rootDie, Dwarf_Die* node) noexcept

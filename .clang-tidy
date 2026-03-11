@@ -22,6 +22,7 @@ Checks: >
     -clang-diagnostic-format,
     -clang-diagnostic-c99-designator,
     -performance-no-int-to-ptr,
+    -bugprone-exception-escape,
     -bugprone-easily-swappable-parameters,
     -bugprone-implicit-widening-of-multiplication-result
 

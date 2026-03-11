@@ -1,5 +1,6 @@
 #include "file_io.h"
 #include "strview.h"
+#include "debugging.h"
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
@@ -269,13 +270,16 @@ namespace rpp /* ReCpp */
         int pos   = tell();
         int count = size() - pos;
         if (count <= 0) return out;
-
-        out.resize(size_t(count));
-
-        int n = read(const_cast<char*>(out.data()), count);
-        if (n != count) {
-            out.resize(size_t(n));
-            out.shrink_to_fit();
+        try {
+            out.resize(size_t(count));
+            int n = read(const_cast<char*>(out.data()), count);
+            if (n != count) {
+                out.resize(size_t(n));
+                out.shrink_to_fit();
+            }
+        } catch (...) {
+            LogError("file::read_text %d bytes failed", count);
+            return {};
         }
         return out;
     }
@@ -368,13 +372,44 @@ namespace rpp /* ReCpp */
 
         int64 bytesToTrunc = len - newLength;
         seekl(bytesToTrunc, SEEK_SET);
-        
-        std::vector<char> buf; buf.resize(static_cast<size_t>(newLength));
-        int bytesRead = read(buf.data(), static_cast<int>(newLength));
 
-        truncate(newLength);
-        seek(0, SEEK_SET);
-        write(buf.data(), bytesRead);
+        constexpr int64 MAX_SINGLE_READ_BUFSIZE = (32LL * 1024LL * 1024LL); // max MB buffer size
+        bool useSmallBufTruncate = newLength > MAX_SINGLE_READ_BUFSIZE;
+        try {
+            if (!useSmallBufTruncate)
+            {
+                std::vector<char> buf;
+                buf.resize(static_cast<size_t>(newLength)); // throws
+                int bytesRead = read(buf.data(), static_cast<int>(newLength));
+                truncate(newLength);
+                seek(0, SEEK_SET);
+                write(buf.data(), bytesRead);
+                return;
+            }
+        } catch (...) { // resize failed to allocate enough memory
+            useSmallBufTruncate = true;
+        }
+
+        // fallback to small buffer read loop
+        if (useSmallBufTruncate)
+        {
+            constexpr int64 blockSize = 64LL * 1024LL; // a much smaller buffer
+            uint8_t buf[blockSize];
+            int64 readPos = bytesToTrunc;
+            int64 writePos = 0;
+            while (readPos < len)
+            {
+                seekl(readPos, SEEK_SET);
+                int bytesRead = read(buf, static_cast<int>(blockSize));
+                if (bytesRead == 0) break; // EOF or error
+
+                seekl(writePos, SEEK_SET);
+                if (write(buf, bytesRead) != bytesRead) break; // error writing (disk error?)
+
+                readPos += bytesRead;
+                writePos += bytesRead;
+            }
+        }
     }
 
     void file::truncate_end(int64 newLength) noexcept
