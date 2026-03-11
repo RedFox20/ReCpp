@@ -48,7 +48,7 @@ TestImpl(test_bitutils)
         }
 
         rpp::bit_array emptyCopy;
-        rpp::bit_array emptyCopy2{emptyCopy};
+        rpp::bit_array emptyCopy2{emptyCopy}; // NOLINT
         AssertEqual(emptyCopy2.sizeBits(), 0U);
         AssertEqual(emptyCopy2.sizeBytes(), 0U);
         AssertEqual(emptyCopy2.sizeBits(), 0U);
@@ -67,9 +67,9 @@ TestImpl(test_bitutils)
             AssertEqual(move1.sizeBits(), BITS);
             AssertEqual(move1.sizeBytes(), 4U);
             AssertNotEqual(move1.getBuffer(), nullptr);
-            AssertEqual(bitarray.sizeBits(), 0U);
-            AssertEqual(bitarray.sizeBytes(), 0U);
-            AssertEqual(bitarray.getBuffer(), nullptr);
+            AssertEqual(bitarray.sizeBits(), 0U); // NOLINT(bugprone-use-after-move)
+            AssertEqual(bitarray.sizeBytes(), 0U); // NOLINT(bugprone-use-after-move)
+            AssertEqual(bitarray.getBuffer(), nullptr); // NOLINT(bugprone-use-after-move)
 
             // now check scoping effects
             move2 = std::move(move1);
@@ -227,13 +227,13 @@ TestImpl(test_bitutils)
         uint8_t* buf = reinterpret_cast<uint8_t*>(paddedBuf.space);
         const uint32_t sizeBytes = sizeof(paddedBuf.space);
 
-        bitarray.copy(0, (uint8_t*)buf, sizeBytes);
+        bitarray.copy(0, buf, sizeBytes);
         for (uint32_t i = 0; i < sizeBytes; i++)
         {
             AssertEqual(buf[i], uint8_t(std::pow(2, i)));
         }
 
-        bitarray.copy(6, (uint8_t*)buf, sizeBytes);
+        bitarray.copy(6, buf, sizeBytes);
 
         for (uint32_t i = 0; i < sizeBytes; i++)
         {
@@ -243,15 +243,15 @@ TestImpl(test_bitutils)
                 AssertMsg(buf[i] == uint8_t(std::pow(2, i)), "Buffer must not be overriden out of len");
         }
 
-        bitarray.copyNegated(0, (uint8_t*)buf, sizeBytes);
+        bitarray.copyNegated(0, buf, sizeBytes);
         for (uint32_t i = 0; i < sizeBytes; ++i)
         {
             AssertEqual(buf[i], uint8_t(255 - std::pow(2, i)));
         }
 
         // check for overflow
-        bitarray.copy(1024, (uint8_t*)buf, sizeBytes);
-        bitarray.copyNegated(1024, (uint8_t*)buf, sizeBytes);
+        bitarray.copy(1024, buf, sizeBytes);
+        bitarray.copyNegated(1024, buf, sizeBytes);
 
         AssertMsg(paddedBuf.padding1 == 0xBAADF00D, "Underflow check failed, stack is smashed");
         AssertMsg(paddedBuf.padding2 == 0xCAFEF00D, "Overflow check failed, stack is smashed");

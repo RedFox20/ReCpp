@@ -32,15 +32,15 @@ TestImpl(test_collections)
         const std::vector<int> v = { 1, 1, 1, 1, 1 };
 
         int n = 0;
-        for (auto& i : range(v)) n += i;
+        for (const auto& i : range(v)) n += i;
         AssertThat(n, 5);
 
         int m = 0;
-        for (auto& i : range(v, 4)) m += i;
+        for (const auto& i : range(v, 4)) m += i;
         AssertThat(m, 4);
 
         int k = 0;
-        for (auto& i : range(v.data(), v.data()+5)) k += i;
+        for (const auto& i : range(v.data(), v.data()+5)) k += i;
         AssertThat(k, 5);
     }
 
@@ -48,7 +48,7 @@ TestImpl(test_collections)
     {
         auto sumRange = [](element_range<const int> range) {
             int n = 0;
-            for (auto& i : range) n += i;
+            for (const auto& i : range) n += i;
             return n;
         };
         int n = sumRange(range(std::vector<int>{ 1, 1, 1, 1, 1 }));
@@ -326,8 +326,8 @@ TestImpl(test_collections)
         std::vector<std::string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
 
         AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  );
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  );
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  ); // NOLINT(readability-*)
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  ); // NOLINT(readability-*)
     }
 
     TestCase(vector_find_last_if)
@@ -335,20 +335,20 @@ TestImpl(test_collections)
         std::vector<std::string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
 
         AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  );
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  );
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  ); // NOLINT(readability-*)
+        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  ); // NOLINT(readability-*)
     }
 
     TestCase(vector_find_smallest)
     {
         std::vector<std::string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
-        AssertThat(find_smallest(v, [](const std::string& s) { return s.size(); }), &v[3]);
+        AssertThat(find_smallest(v, [](const std::string& s) { return s.size(); }), &v[3]); // NOLINT(readability-*)
     }
 
     TestCase(vector_find_largest)
     {
         std::vector<std::string> v { "100"s, "50"s, "25"s, "5"s, "2"s };
-        AssertThat(find_largest(v, [](const std::string& s) { return s.size(); }), &v[0]);
+        AssertThat(find_largest(v, [](const std::string& s) { return s.size(); }), &v[0]); // NOLINT(readability-*)
     }
 
     TestCase(any_of)

@@ -19,9 +19,9 @@
 #endif
 
 typedef enum {
-    LogSeverityInfo,  // merely information;
-    LogSeverityWarn,  // warning unexpected behaviour; -- but we can recover
-    LogSeverityError, // critical error or bug; -- a spectacular failure
+    LogSeverityInfo=0,  // merely information;
+    LogSeverityWarn=1,  // warning unexpected behaviour; -- but we can recover
+    LogSeverityError=2, // critical error or bug; -- a spectacular failure
 } LogSeverity;
 
 typedef void (*LogMessageCallback) (LogSeverity severity, const char* message, int len);

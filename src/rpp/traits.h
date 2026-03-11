@@ -48,6 +48,13 @@ namespace rpp
 
         template<typename T>
         using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
+    
+        // return type of a continuation Task functor which takes argument T
+        template<typename Task, typename T>
+        using cont_return_t = std::decay_t<decltype(std::declval<Task>()(std::declval<T>()))>;
+
+        template<typename Task>
+        using task_return_t = std::decay_t<decltype(std::declval<Task>()())>;
     }
 
     #if RPP_HAS_CXX20

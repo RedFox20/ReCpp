@@ -1,12 +1,12 @@
 #include "sockets.h"
 #include "debugging.h"
-#include <stdlib.h>    // malloc
-#include <stdio.h>     // printf
-#include <string.h>    // memcpy,memset,strlen
-#include <assert.h>
 #include "strview.h" // _tostring
 #include "sort.h"
-#include "math.h" // rpp::min
+#include "./math.h" // rpp::min
+#include <cstdlib>    // malloc
+#include <cstdio>     // printf
+#include <cstring>    // memcpy,memset,strlen
+#include <cassert>
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG
@@ -45,7 +45,7 @@
     #include <netdb.h>              // addrinfo, freeaddrinfo...
     #include <netinet/in.h>         // sockaddr_in
     #include <netinet/tcp.h>        // TCP_NODELAY
-    #include <errno.h>              // last error number
+    #include <cerrno>               // last error number
     #include <sys/ioctl.h>          // ioctl()
     #if __has_include(<fcntl.h>)
         #include <fcntl.h>          // fcntl()
@@ -352,9 +352,8 @@ namespace rpp
     {
         if (Family == AF_IPv4)
             return Addr4 != INADDR_ANY;
-        for (int i = 0; i < 16; ++i)
-            if (Addr6[i] != 0)
-                return true;
+        for (unsigned char i : Addr6) // NOLINT(readability-use-anyofallof)
+            if (i != 0) return true;
         return false;
     }
 
@@ -642,12 +641,12 @@ namespace rpp
         if (!getifaddrs(&if_addrs))
         {
             int count = 0;
-            for (auto ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next) {
+            for (auto* ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next) {
                 if (!family || ifa->ifa_addr->sa_family == family) ++count;
             }
             out.reserve(count);
 
-            for (auto ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next)
+            for (auto* ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next)
             {
                 if (!family || ifa->ifa_addr->sa_family == family)
                 {
@@ -720,7 +719,8 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////
 
     socket::socket() noexcept
-        : Mtx{}, Sock{INVALID}, Addr{}, LastErr{0}
+        : Sock{INVALID}
+        , LastErr{0}
         , Shared{DEFAULT_SHARED}
         , Blocking{DEFAULT_BLOCKING}
         , AutoClose{DEFAULT_AUTOCLOSE}
@@ -729,7 +729,7 @@ namespace rpp
         , Type{ST_Unspecified}
     {
     }
-    socket socket::from_os_handle(int handle, const ipaddress& addr, bool shared, bool blocking)
+    socket socket::from_os_handle(int handle, const ipaddress& addr, bool shared, bool blocking) noexcept
     {
         socket s{}; // set the defaults
         s.set_os_handle_unsafe(handle);
@@ -737,8 +737,6 @@ namespace rpp
         s.Shared = shared;
         s.Blocking = blocking;
         s.Category = SC_Unknown;
-        if (s.update_socket_type() == ST_Unspecified) // validate the socket handle
-            throw std::invalid_argument{"socket::from_os_handle(int): invalid handle " + s.last_err()};
         return s;
     }
     socket socket::from_err_code(int last_err, const ipaddress& addr) noexcept
@@ -971,7 +969,7 @@ namespace rpp
     #endif
     }
 
-    int socket::peek_datagram_size() noexcept
+    int socket::peek_datagram_size() noexcept // NOLINT: readability-make-member-function-const
     {
     #if !_WIN32
         return available();
@@ -1137,22 +1135,25 @@ namespace rpp
                 return -1;
             }
             // The connection has been broken due to keep-alive activity detecting a failure while the operation was in progress.
-            case ESOCK(ENETRESET):   return 0; // ignore net reset errors
-            case ESOCK(EMSGSIZE):    return 0; // message too large to fit into buffer and was truncated
-            case ESOCK(EINPROGRESS): return 0; // request is in progress, you should call wait
-            case ESOCK(EWOULDBLOCK): return 0; // no data available right now
+            case ESOCK(ENETRESET):     // ignore net reset errors
+            case ESOCK(EMSGSIZE):      // message too large to fit into buffer and was truncated
+            case ESOCK(EINPROGRESS):   // request is in progress, you should call wait
+            case ESOCK(EWOULDBLOCK):   // no data available right now
             #if EAGAIN != ESOCK(EWOULDBLOCK)
-            case EAGAIN:             return 0; // no data available right now
+            case EAGAIN:               // no data available right now
             #endif
-            case ESOCK(ENOTCONN):      return 0; // this Socket is not Connection oriented! (aka LISTEN SOCKET)
-            case ESOCK(EADDRNOTAVAIL): return 0; // address doesn't exist
-            case ESOCK(ENETUNREACH):   return 0; // network is unreachable
-            case ESOCK(EISCONN):       return 0; // socket is already connected
-            case ESOCK(EINTR):         return 0; // the operation was interrupted
+            case ESOCK(ENOTCONN):      // this Socket is not Connection oriented! (aka LISTEN SOCKET)
+            case ESOCK(EADDRNOTAVAIL): // address doesn't exist
+            case ESOCK(ENETUNREACH):   // network is unreachable
+            case ESOCK(EISCONN):       // socket is already connected
+            case ESOCK(EINTR):         // the operation was interrupted
+                return 0; // all of these are not fatal errors, so we return 0
             // Cannot send after transport endpoint shutdown
             // but do not close the socket, it may have data available to read
-            case ESOCK(ESHUTDOWN): Connected = false; return 0;
-
+            case ESOCK(ESHUTDOWN): {
+                Connected = false;
+                return 0;
+            }
             case ESOCK(EADDRINUSE): {
                 logerror("socket fh:%d EADDRINUSE %s", os_handle_unsafe(), last_os_socket_err(errcode).c_str());
                 if (AutoClose) close(); else Connected = false;
@@ -1202,14 +1203,15 @@ namespace rpp
         if (errtype > 0)
             return to_string(errtype);
 
-        // otherwise use a more detailed and localized error message from the OS:
-        #if _WIN32
-            char* msg = buf + 1024;
-            int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, errcode, 0, msg, 1024, nullptr);
-            if (msg[len - 2] == '\r') msg[len -= 2] = '\0';
-        #else
-            char* msg = strerror(errcode);
-        #endif
+    // otherwise use a more detailed and localized error message from the OS:
+    #if _WIN32
+        char* msg = buf + 1024;
+        int len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, errcode, 0, msg, 1024, nullptr);
+        if (msg[len - 2] == '\r') msg[len -= 2] = '\0';
+    #else
+        char* msg = strerror(errcode);
+    #endif
+
         int errlen = snprintf(buf, sizeof(buf), "OSError %d: %s", errcode, msg);
         if (errlen < 0) errlen = (int)strlen(buf);
         return std::string{ buf, buf + errlen };
@@ -1217,6 +1219,7 @@ namespace rpp
 
     socket::error socket::last_os_socket_err_type(int err) noexcept
     {
+        // NOLINTBEGIN(bugprone-branch-clone)
         int errcode = err ? err : os_getsockerr();
         switch (errcode) {
             case 0: return SE_NONE;
@@ -1247,6 +1250,7 @@ namespace rpp
             case ESOCK(EAFNOSUPPORT):  return SE_SOCKFAMILY;
             case ESOCK(ESHUTDOWN):     return SE_SHUTDOWN;
         }
+        // NOLINTEND(bugprone-branch-clone)
     }
 
     std::string socket::to_string(socket::error socket_error) noexcept
@@ -1327,12 +1331,14 @@ namespace rpp
         switch (iocmd)
         {
             case FIONREAD: return "FIONREAD";
-            case FIONBIO: return "FIONBIO";
+            case FIONBIO:  return "FIONBIO";
             case FIOASYNC: return "FIOASYNC";
+            default: {
+                static char buf[32];
+                snprintf(buf, sizeof(buf), "%d", iocmd);
+                return buf;
+            }
         }
-        static char buf[32];
-        snprintf(buf, sizeof(buf), "%d", iocmd);
-        return buf;
     }
 #endif
 
@@ -1660,7 +1666,7 @@ namespace rpp
         auto stype = to_socktype(ipp);
         int type   = socktype_int(stype);
         int proto  = ipproto_int(ipp);
-        set_os_handle_unsafe((int)::socket(family, type, proto));
+        set_os_handle_unsafe((int)::socket(family, type, proto)); // NOLINT(readability-redundant-casting)
         if (os_handle_unsafe() == INVALID)
         {
             handle_errno();
@@ -1886,9 +1892,7 @@ namespace rpp
 
             // BUGFIX: if TCP socket is SHUTDOWN, sending is no longer possible
             //         and polling makes no sense, however there might be data to read
-            if ((pollFlags & PF_Read) && ((revents & POLLIN) || available() > 0))
-                return true;
-            return false;
+            return (pollFlags & PF_Read) != 0 && ((revents & POLLIN) != 0 || available() > 0);
         }
 
         if ((revents & POLLERR) != 0) // some other socket error
@@ -1901,10 +1905,10 @@ namespace rpp
 
         // BUGFIX: it's possible for poll() to miss some READ events
         //         so double-check with available() to be sure
-        if ((pollFlags & PF_Read) && ((revents & POLLIN) || available() > 0))
+        if ((pollFlags & PF_Read) != 0 && ((revents & POLLIN) != 0 || available() > 0))
             return true;
 
-        if ((revents & POLLOUT) && (pollFlags & PF_Write))
+        if ((revents & POLLOUT) != 0 && (pollFlags & PF_Write) != 0)
             return true;
 
         // timeout, do not consider this as an error
@@ -1959,7 +1963,7 @@ namespace rpp
         saddr saddr;
         socklen_t len = sizeof(saddr);
         std::unique_lock lock = rpp::spin_lock(Mtx);
-        int handle = (int)::accept(os_handle_unsafe(), &saddr.sa, &len);
+        int handle = (int)::accept(os_handle_unsafe(), &saddr.sa, &len); // NOLINT(readability-redundant-casting)
         if (handle == -1)
         {
             handle_errno();
@@ -1967,6 +1971,12 @@ namespace rpp
         }
 
         socket client = socket::from_os_handle(handle, ipaddress{handle});
+        if (client.update_socket_type() == ST_Unspecified) // validate the socket handle
+        {
+            LogError("socket::from_os_handle(int): invalid handle %s", client.last_err());
+            return socket::from_err_code(get_errno_unlocked());
+        }
+
         // set the accepted socket with same options as the listener
         if (is_nodelay()) client.set_nagle(false);
         client.set_blocking(is_blocking());

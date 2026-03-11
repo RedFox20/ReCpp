@@ -168,12 +168,12 @@ namespace rpp
      * throw a traced_exception instead of quietly terminating
      * @note Will cause std::terminate if SIGSEGV happens in noexcept context
      */
-    RPPAPI void register_segfault_tracer();
+    RPPAPI void register_segfault_tracer() noexcept;
 
     /**
      * Installs a default handler for SIGSEGV which will
      * prints stack trace to stderr and then calls std::terminate
      */
-    RPPAPI void register_segfault_tracer(std::nothrow_t);
+    RPPAPI void register_segfault_tracer(std::nothrow_t nothrow) noexcept;
 
 }

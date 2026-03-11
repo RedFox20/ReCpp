@@ -1,8 +1,33 @@
 Checks: >
-  cppcoreguidelines-avoid-reference-coroutine-parameters
+    cppcoreguidelines-avoid-reference-coroutine-parameters,
+    cppcoreguidelines-avoid-capturing-lambda-coroutines,
+    cppcoreguidelines-rvalue-reference-param-not-moved,
+    bugprone-*,
+    modernize-*,
+    readability-*,
+    performance-*,
+    clang-diagnostic-*,
+    -readability-function-cognitive-complexity,
+    -readability-identifier-length,
+    -readability-braces-around-statements,
+    -readability-uppercase-literal-suffix,
+    -readability-math-missing-parentheses,
+    -readability-magic-numbers,
+    -readability-implicit-bool-conversion,
+    -readability-else-after-return,
+    -readability-use-anyofallof,
+    -modernize-use-trailing-return-type,
+    -modernize-avoid-c-arrays,
+    -modernize-avoid-variadic-functions,
+    -modernize-use-nodiscard,
+    -modernize-use-auto,
+    -clang-diagnostic-format,
+    -clang-diagnostic-c99-designator,
+    -performance-no-int-to-ptr,
+    -bugprone-easily-swappable-parameters,
+    -bugprone-implicit-widening-of-multiplication-result
 
-WarningsAsErrors: >
-  cppcoreguidelines-avoid-reference-coroutine-parameters
+WarningsAsErrors: '*'
 
 ExtraArgsBefore:
-  - -Wno-unknown-warning-option
+    - -Wno-unknown-warning-option

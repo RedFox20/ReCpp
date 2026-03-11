@@ -172,7 +172,7 @@ TestImpl(memory_pool)
 
         // allocate enough bytes to cause virtual size to increase
         // TODO: may have to use OS level allocation functions to ensure this works
-        size_t num_bytes = 50 * 1000 * 1000;
+        size_t num_bytes = 50ULL * 1000ULL * 1000ULL;
         print_info("-- Allocating %llu KB --\n", num_bytes / 1000);
 
         char* mem = (char*)malloc(num_bytes);

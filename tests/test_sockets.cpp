@@ -25,8 +25,8 @@ TestImpl(test_sockets)
         AssertTrue(!addr.is_empty());
         AssertTrue(addr.is_valid());
         AssertTrue(addr.has_address());
-        for (int i = 0; i < 4; ++i) AssertEqual(before[i], 0xBB);
-        for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA);
+        for (int i = 0; i < 4; ++i) AssertEqual(before[i], 0xBB); // NOLINT(modernize-*)
+        for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA); // NOLINT(modernize-*)
     }
 
     TestCase(socket_doesnt_smash_stack)
@@ -39,8 +39,8 @@ TestImpl(test_sockets)
         AssertTrue(s.good());
         AssertTrue(!s.address().is_empty());
         AssertTrue(s.address().is_valid());
-        for (int i = 0; i < 4; ++i) AssertEqual(before[i], 0xBB);
-        for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA);
+        for (int i = 0; i < 4; ++i) AssertEqual(before[i], 0xBB); // NOLINT(modernize-*)
+        for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA); // NOLINT(modernize-*)
     }
 
     TestCase(init_ipv4)
@@ -795,7 +795,7 @@ TestImpl(test_sockets)
 
     //////////////////////////////////////////////////////////////////
 
-    socket create(std::string msg, socket&& s)
+    socket create(std::string msg, socket&& s) // NOLINT(performance-unnecessary-value-param)
     {
         AssertMsg(s.good(), "expected good() for '%s'", msg.c_str());
         AssertMsg(s.connected(), "expected connected() for '%s'", msg.c_str());
@@ -819,7 +819,7 @@ TestImpl(test_sockets)
     {
         return create("server: accepted client", server.accept(5000/*ms*/));
     }
-    socket connect(std::string ip, int port, rpp::socket_option opt = rpp::SO_None)
+    socket connect(std::string ip, int port, rpp::socket_option opt = rpp::SO_None) // NOLINT(performance-unnecessary-value-param)
     {
         return create("remote: connected to "+ip+":"+std::to_string(port),
                       socket::connect_to({ip, port}, 5000/*ms*/, opt));
@@ -879,7 +879,7 @@ TestImpl(test_sockets)
             while (to_server.connected())
             {
                 std::string resp = to_server.recv_str();
-                if (resp != "")
+                if (!resp.empty())
                 {
                     print_info("remote: received '%s'\n", resp.c_str());
                     Assert(to_server.send("Client says: Thanks!") > 0);
@@ -1043,7 +1043,7 @@ TestImpl(test_sockets)
         for (int i = 0; i < 20; ++i)
         {
             std::string data = remote_client.recv_str();
-            if (data != "")
+            if (!data.empty())
             {
                 print_info("server: received %d bytes of data from remote_client ", (int)data.length());
                 AssertThat(data.size(), TransmitSize);

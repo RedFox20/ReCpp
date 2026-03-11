@@ -78,7 +78,7 @@ TestImpl(test_file_io)
                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
                            "0123456789!@#$%^&*()_+-=[]{};':\",.<>/?`~";
         out.write(TestFileContents);
-        TestFileSize = (int)out.size();
+        TestFileSize = out.size();
         out.close();
     }
 #endif
@@ -114,9 +114,12 @@ TestImpl(test_file_io)
         create_test_file(TestFile);
         if (file f = { TestFile, file::READONLY })
         {
-            Assert(f.good() && !f.bad());
+            Assert(f.good() && !f.bad()); // NOLINT(readability-simplify-boolean-expr)
         }
-        else Assert(f.good() && !f.bad());
+        else
+        {
+            Assert(f.good() && !f.bad()); // NOLINT(readability-simplify-boolean-expr)
+        }
     }
 
     TestCase(current_source_file_and_folder_exists)
@@ -425,14 +428,14 @@ TestImpl(test_file_io)
         return false;
     }
 
-    void print_paths(const char* what, const std::vector<string>& paths)
+    static void print_paths(const char* what, const std::vector<string>& paths)
     {
         for (size_t i = 0; i < paths.size(); ++i) {
             print_info("%s[%zu] = '%s'\n", what, i, paths[i].c_str());
         }
     }
 #if RPP_ENABLE_UNICODE
-    void print_paths(const char* what, const std::vector<ustring>& paths)
+    static void print_paths(const char* what, const std::vector<ustring>& paths)
     {
         for (size_t i = 0; i < paths.size(); ++i) {
             print_info("%s[%zu] = '%s'\n", what, i, rpp::to_string(paths[i]).c_str());
@@ -499,7 +502,7 @@ TestImpl(test_file_io)
         Assert(contains(dirs_r, "folder/path"));
 
         // TEST: list_alldir dir_recursive
-        std::vector<std::string> dirs, files;
+        std::vector<std::string> dirs, files; // NOLINT(readability-isolate-declaration)
         list_alldir(dirs, files, "", rpp::dir_recursive);
         print_paths("dirs", dirs);
         print_paths("files", files);
@@ -575,7 +578,7 @@ TestImpl(test_file_io)
         Assert(contains(dirs_r, u"folder/path"));
 
         // TEST: list_alldir dir_recursive
-        std::vector<ustring> dirs, files;
+        std::vector<ustring> dirs, files; // NOLINT(readability-isolate-declaration)
         list_alldir(dirs, files, u""_sv, rpp::dir_recursive);
         print_paths("dirs", dirs);
         print_paths("files", files);

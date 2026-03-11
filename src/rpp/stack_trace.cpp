@@ -74,19 +74,19 @@ namespace rpp
 
     static signal_handler_t OldHandler;
 
-    void register_segfault_tracer()
+    void register_segfault_tracer() noexcept
     {
         OldHandler = signal(SIGSEGV, [](int sig)
         {
-            if (OldHandler) OldHandler(sig);
+            if (OldHandler != nullptr) OldHandler(sig);
             throw traced_exception("SIGSEGV");
         });
     }
-    void register_segfault_tracer(std::nothrow_t)
+    void register_segfault_tracer([[maybe_unused]] std::nothrow_t nothrow) noexcept
     {
         OldHandler = signal(SIGSEGV, [](int sig)
         {
-            if (OldHandler) OldHandler(sig);
+            if (OldHandler != nullptr) OldHandler(sig);
             print_trace();
         });
     }
@@ -110,7 +110,7 @@ namespace rpp
         {
             if (!replace("<lambda", "lambda")) return false;
             ptr += sizeof("<lambda");
-            for (int i = 0; i < 64 && *ptr && *ptr != '>'; ++i)
+            for (int i = 0; i < 64 && *ptr != 0 && *ptr != '>'; ++i)
                 ++ptr;
             return true;
         }
@@ -184,8 +184,8 @@ namespace rpp
             if (len >= MAX)
                 return;
             FuncnameCleaner fc{};
-            if (c.line) writef("  at %20s:%-4d  in  %s\n", c.short_path(), c.line, fc.clean_name(c.name));
-            else        writef("  at %20s:%-4s  in  %s\n", c.short_path(), "??", fc.clean_name(c.name));
+            if (c.line != 0) writef("  at %20s:%-4d  in  %s\n", c.short_path(), c.line, fc.clean_name(c.name));
+            else             writef("  at %20s:%-4s  in  %s\n", c.short_path(), "??", fc.clean_name(c.name));
         }
     };
 
@@ -212,8 +212,8 @@ namespace rpp
     {
         CallstackFormatter fmt;
         FuncnameCleaner fc{};
-        if (line) fmt.writef("%20s:%-4d  in  %s\n", short_path(), line, fc.clean_name(name));
-        else      fmt.writef("%20s:%-4s  in  %s\n", short_path(), "??", fc.clean_name(name));
+        if (line != 0) fmt.writef("%20s:%-4d  in  %s\n", short_path(), line, fc.clean_name(name));
+        else           fmt.writef("%20s:%-4s  in  %s\n", short_path(), "??", fc.clean_name(name));
         return fmt.to_string();
     }
 
@@ -255,14 +255,10 @@ namespace rpp
             else if (f.hi < lo) { return (lo - f.hi) <= 256; }
             return false;
         }
-        bool try_merge(const FlatDie& f) noexcept
+        bool try_merge(const FlatDie& f) const noexcept
         {
             // same address ranges but different Compilation Units. Should be safe to merge:
-            if (lo == f.lo && hi == f.hi)
-                return true;
-
-            // @todo Add more safe merge options
-            return false;
+            return lo == f.lo && hi == f.hi;
         }
         void merge(const FlatDie& f) noexcept
         {
@@ -294,8 +290,8 @@ namespace rpp
 
         void init(Dwfl_Module* mod) noexcept
         {
-            flatmap.reserve(1024*16);
-            rootDies.reserve(1024);
+            flatmap.reserve(1024ul*16ul);
+            rootDies.reserve(1024ul);
 
             Dwarf_Die* rootDie = nullptr;
             while ((rootDie = dwfl_module_nextcu(mod, rootDie, &bias))) {
@@ -330,7 +326,7 @@ namespace rpp
 
         void insert_die_ranges(Dwarf_Die* rootDie, Dwarf_Die* node) noexcept
         {
-            Dwarf_Addr base, low, high;
+            Dwarf_Addr base, low, high; // NOLINT(readability-isolate-declaration)
             ptrdiff_t offset = 0;
             while ((offset = dwarf_ranges(node, offset, &base, &low, &high)) > 0)
             {
@@ -425,11 +421,11 @@ namespace rpp
         if (Dwfl_Module* mod = dwfl_addrmodule(dwfl, cse.addr))
         {
             // .so or binary name
-            auto* module_name = dwfl_module_info(mod, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            const auto* module_name = dwfl_module_info(mod, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
             if (module_name) cse.module = module_name;
 
             // get mangled function name and demangle it
-            auto* function_name = dwfl_module_addrname(mod, cse.addr);
+            const auto* function_name = dwfl_module_addrname(mod, cse.addr);
             function_name = d.Demangle(function_name);
             if (function_name) cse.name = function_name;
 
@@ -441,7 +437,7 @@ namespace rpp
             {
                 if (Dwarf_Line* src = dwarf_getsrc_die(die, cse.addr - bias))
                 {
-                    auto* file = dwarf_linesrc(src, nullptr, nullptr);
+                    const auto* file = dwarf_linesrc(src, nullptr, nullptr);
                     if (file) cse.file = file;
                     dwarf_lineno(src, &cse.line);
                 }

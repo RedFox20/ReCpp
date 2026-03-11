@@ -231,13 +231,13 @@ namespace rpp /* ReCpp */
         return (int64)s.st_size;
     #else // Linux version is more complicated. It won't report correct size unless file is flushed:
         int64 pos = tell64();
-        int64 size = const_cast<file*>(this)->seekl(0LL, SEEK_END);
+        int64 size = (int64)const_cast<file*>(this)->seekl(0LL, SEEK_END);
         const_cast<file*>(this)->seekl(pos, SEEK_SET);
         return size;
     #endif
     }
     // ReSharper disable once CppMemberFunctionMayBeConst
-    int file::read(void* buffer, int bytesToRead) noexcept
+    int file::read(void* buffer, int bytesToRead) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle) return 0;
     #if _MSC_VER
@@ -254,7 +254,7 @@ namespace rpp /* ReCpp */
         if (fileSize > 0)
         {
             // allocate +1 bytes for null terminator; this is for legacy API-s
-            if (auto buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
+            if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
             {
                 int bytesRead = read(buffer, fileSize);
                 buffer[bytesRead] = '\0';
@@ -290,7 +290,7 @@ namespace rpp /* ReCpp */
         int64 startPos = tell64();
         seek(0);
 
-        constexpr int64 blockSize = 64*1024;
+        constexpr int64 blockSize = 64LL * 1024LL;
         char buf[blockSize];
         int64 totalBytesRead    = 0;
         int64 totalBytesWritten = 0;
@@ -311,7 +311,7 @@ namespace rpp /* ReCpp */
     }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
-    int file::write(const void* buffer, int bytesToWrite) noexcept
+    int file::write(const void* buffer, int bytesToWrite) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (bytesToWrite <= 0)
             return 0;
@@ -330,7 +330,7 @@ namespace rpp /* ReCpp */
         return (int)fwrite(buffer, 1, bytesToWrite, (FILE*)Handle);
     #endif
     }
-    int file::writef(PRINTF_FMTSTR const char* format, ...) noexcept
+    int file::writef(PRINTF_FMTSTR const char* format, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle)
             return 0;
@@ -385,7 +385,7 @@ namespace rpp /* ReCpp */
         truncate(newLength);
     }
 
-    void file::truncate(int64 newLength) noexcept
+    void file::truncate(int64 newLength) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle) return;
     #if _MSC_VER
@@ -419,7 +419,7 @@ namespace rpp /* ReCpp */
     }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
-    void file::flush() noexcept
+    void file::flush() noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle) return;
     #if _MSC_VER
@@ -443,7 +443,7 @@ namespace rpp /* ReCpp */
 #endif // RPP_ENABLE_UNICODE
 
     // ReSharper disable once CppMemberFunctionMayBeConst
-    int file::seek(int filepos, int seekmode) noexcept
+    int file::seek(int filepos, int seekmode) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle)
             return 0;
@@ -456,7 +456,7 @@ namespace rpp /* ReCpp */
     }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
-    uint64 file::seekl(int64 filepos, int seekmode) noexcept
+    uint64 file::seekl(int64 filepos, int seekmode) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle)
             return 0LL;

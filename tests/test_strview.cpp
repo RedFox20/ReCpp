@@ -176,7 +176,7 @@ TestImpl(test_strview)
     TestCase(decompose)
     {
         strview input = "hello,,strview,1556,true\n";
-        strview a, b, c;
+        strview a, b, c; // NOLINT
         int x = 0;
         bool y = false;
         input.decompose(',', a, b, c, x, y);
@@ -198,7 +198,7 @@ TestImpl(test_strview)
         AssertThat(map["strview"], 3);
     }
 
-    std::string toString(double f, int maxDecimals) {
+    std::string toString(double f, int maxDecimals) { // NOLINT(readability-convert-member-functions-to-static)
         char buf[32];
         return std::string{buf, buf + _tostring(buf, f, maxDecimals)};
     }
@@ -256,8 +256,8 @@ TestImpl(test_strview)
         AssertTrue(strview{"hello"} == strview{"hello"});
         AssertTrue(strview{"hello"} == std::string{"hello"});
         AssertTrue(std::string{"hello"} == strview{"hello"});
-        AssertFalse(strview{"hello"} == "");
-        AssertFalse("" == strview{"hello"});
+        AssertFalse(strview{"hello"} == ""); // NOLINT(readability-container-size-empty)
+        AssertFalse("" == strview{"hello"}); // NOLINT(readability-container-size-empty)
     }
 
     TestCase(empty_string_equals_empty_string)

@@ -467,7 +467,8 @@ TestImpl(test_timer)
         rpp::int64 kernel_delta = t2.kernel_time_us - t1.kernel_time_us;
         rpp::int64 user_delta = t2.user_time_us - t1.user_time_us;
         rpp::int64 cpu_delta = t2.cpu_time_us - t1.cpu_time_us;
-        print_info("# diff all:%.1fms usr:%.1fms sys:%.1fms\n", cpu_delta/1000.0, user_delta/1000.0, kernel_delta/1000.0);
+        print_info("# diff all:%.1fms usr:%.1fms sys:%.1fms\n",
+                   double(cpu_delta)/1000.0, double(user_delta)/1000.0, double(kernel_delta)/1000.0);
 
         AssertGreater(t1.kernel_time_us, 0u);
         AssertGreater(t1.user_time_us, 0u);

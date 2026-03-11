@@ -10,7 +10,7 @@
     #include <sysinfoapi.h> // GetSystemTimePreciseAsFileTime
     #pragma comment(lib, "Winmm.lib") // MM time library
 #elif __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
-    #include <stdio.h>  // fprintf
+    #include <cstdio>  // fprintf
     #include <unistd.h> // usleep()
     #if __linux__ || __ANDROID__ 
         #include <sys/time.h>
@@ -140,7 +140,7 @@ namespace rpp
         }
     }
 #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-    inline void unix_sleep_ns_abstime(uint64 nanos)
+    inline void unix_sleep_ns_abstime(int64 nanos)
     {
         struct timespec deadline;
         clock_gettime(CLOCK_REALTIME, &deadline);
@@ -151,7 +151,7 @@ namespace rpp
             deadline.tv_nsec -= NANOS_PER_SEC;
             deadline.tv_sec++;
         }
-        clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
+        clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, nullptr);
     }
 #elif RPP_BARE_METAL
     #if RPP_CORTEX_M_ARCH
@@ -272,7 +272,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_ns(millis * 1'000'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(millis * 1'000'000ull);
+            unix_sleep_ns_abstime(int64(millis) * 1'000'000ll);
         #elif RPP_FREERTOS
             freertos_sleep_ns(millis * 1'000'000ull);
         #elif RPP_STM32_HAL
@@ -287,7 +287,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_ns(micros * 1'000ull);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(micros * 1'000ull);
+            unix_sleep_ns_abstime(int64(micros) * 1'000ll);
         #elif RPP_FREERTOS
             freertos_sleep_ns(micros * 1'000ull);
         #elif RPP_STM32_HAL
@@ -302,7 +302,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_ns(nanos);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(nanos);
+            unix_sleep_ns_abstime(int64(nanos));
         #elif RPP_FREERTOS
             freertos_sleep_ns(nanos);
         #elif RPP_STM32_HAL
@@ -316,6 +316,7 @@ namespace rpp
 
     NOINLINE static int print_fraction(int64 ns, char* out, int fraction_digits) noexcept
     {
+        // clamp to [1..9] range
         if      (fraction_digits < 1) fraction_digits = 1;
         else if (fraction_digits > 9) fraction_digits = 9;
         int number = 0;
@@ -330,6 +331,7 @@ namespace rpp
             case 7: number = int(ns / 100); break;
             case 8: number = int(ns / 10); break;
             case 9: number = int(ns); break;
+            default: break; // should never hit this, but to satisfy linter
         }
         char buf[16];
         int len = rpp::to_string(buf, number);
@@ -344,23 +346,23 @@ namespace rpp
 
     inline static int print_3digits(int value, char* out) noexcept
     {
-        *out++ = (value / 100) + '0';
-        *out++ = ((value / 10) % 10) + '0';
-        *out++ = (value % 10) + '0';
+        *out++ = char((value / 100) + '0');
+        *out++ = char(((value / 10) % 10) + '0');
+        *out++ = char((value % 10) + '0');
         return 3;
     }
 
     inline static int print_2digits(int value, char* out) noexcept
     {
-        *out++ = (value / 10) + '0';
-        *out++ = (value % 10) + '0';
+        *out++ = char((value / 10) + '0');
+        *out++ = char((value % 10) + '0');
         return 2;
     }
 
     inline static int print_2digits(int value, char* out, char sep) noexcept
     {
-        *out++ = (value / 10) + '0';
-        *out++ = (value % 10) + '0';
+        *out++ = char((value / 10) + '0');
+        *out++ = char((value % 10) + '0');
         *out++ = sep;
         return 3;
     }
@@ -370,7 +372,7 @@ namespace rpp
         int len = 0;
         value = abs(value);
         do {
-            out[len++] = (value % 10) + '0';
+            out[len++] = char((value % 10) + '0');
             value /= 10;
         } while (value > 0);
 
@@ -472,7 +474,7 @@ namespace rpp
         {
             *end++ = ' ';
             int frac_ns = static_cast<int>(ns - seconds * NANOS_PER_SEC);
-            int frac_ms = frac_ns / NANOS_PER_MILLI;
+            int frac_ms = int(frac_ns / NANOS_PER_MILLI);
 
             if (fraction_digits >= 1)
             {
@@ -483,7 +485,7 @@ namespace rpp
             if (fraction_digits >= 4)
             {
                 *end++ = ' ';
-                int frac_us = frac_ns / NANOS_PER_MICRO - (frac_ms * 1000);
+                int frac_us = int(frac_ns / NANOS_PER_MICRO) - (frac_ms * 1000);
                 end += print_3digits(frac_us, end);
                 *end++ = 'u';
                 *end++ = 's';
@@ -631,8 +633,8 @@ namespace rpp
         tm.tm_sec  = second;      // [0, 60] after the min allows for 1 positive leap second
         tm.tm_isdst = 0;          // [-1...] -1 for unknown, 0 for not DST, any positive value if DST.
 
-        time_t seconds = timegm(&tm); // input time as-is
-        duration = Duration{int64(seconds * NANOS_PER_SEC + nanos)};
+        int64 seconds = int64(timegm(&tm)); // input time as-is
+        duration = Duration{seconds * NANOS_PER_SEC + nanos};
     }
 
     int TimePoint::to_string(char* buf, int bufsize, int fraction_digits) const noexcept

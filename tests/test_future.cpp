@@ -4,6 +4,8 @@ using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
 
+// NOLINTBEGIN(performance-*)
+
 TestImpl(test_future)
 {
     TestInit(test_future)
@@ -21,7 +23,7 @@ TestImpl(test_future)
         cfuture<std::string> futureString = loadString.get_future();
         cfuture<bool> chain = futureString.then([](std::string arg) -> bool
         {
-            return arg.length() > 0;
+            return !arg.empty() && arg == "future string";
         });
 
         bool chainResult = chain.get();
@@ -358,4 +360,7 @@ TestImpl(test_future)
         f1.get();
         AssertThat(f1.valid(), false);
     }
+
 };
+
+// NOLINTEND(performance-*)

@@ -298,7 +298,7 @@ namespace rpp /* ReCpp */
         int64 size = src.sizel();
         if (size == 0) return true;
 
-        constexpr int64 blockSize = 64 * 1024;
+        constexpr int64 blockSize = 64LL * 1024LL;
         char buf[blockSize];
         int64 totalBytesRead = 0;
         int64 totalBytesWritten = 0;
@@ -1430,10 +1430,10 @@ namespace rpp /* ReCpp */
             // return getContext().getExternalFilesDir(null).getPath();
             return "/data/local/tmp";
         #else
-            if (auto path = getenv("TMP"))     return path;
-            if (auto path = getenv("TEMP"))    return path;
-            if (auto path = getenv("TMPDIR"))  return path;
-            if (auto path = getenv("TEMPDIR")) return path;
+            if (char* path = getenv("TMP"))     return path;
+            if (char* path = getenv("TEMP"))    return path;
+            if (char* path = getenv("TMPDIR"))  return path;
+            if (char* path = getenv("TEMPDIR")) return path;
             return "/tmp/";
         #endif
     }

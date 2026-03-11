@@ -6,6 +6,8 @@
 
 namespace rpp
 {
+    // NOLINTBEGIN(performance-*,readability-make-member-function-const)
+
     // a generic data container for testing instances, functors and lambdas
     class Data
     {
@@ -215,7 +217,7 @@ namespace rpp
             T result {};
             rpp::delegate<void(const T& value)> func;
             TemplatedVar(T default_value, rpp::delegate<void(const T& value)>&& fn)
-                : value{default_value}, result{}, func{std::move(fn)}
+                : value{default_value}, func{std::move(fn)}
             {
             }
             void set_value(T new_value)
@@ -464,7 +466,7 @@ namespace rpp
             struct noop
             {
                 static void int_func(int val) noexcept { int_result = val; }
-                static void str_func(std::string val) noexcept { str_result = val; }
+                static void str_func(std::string val) noexcept { str_result = val; } // NOLINT(performance-unnecessary-value-param)
             };
 
             int_result = 0;
@@ -527,7 +529,7 @@ namespace rpp
             AssertThat(lambda(data), "nested_lambda");
 
             DataDelegate moved_lambda = std::move(lambda);
-            AssertThat(lambda.good(), false); // NOLINT (this is a test for clean move semantics)
+            AssertThat(lambda.good(), false); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
             AssertThat(moved_lambda(data), "nested_lambda");
         }
 
@@ -552,13 +554,14 @@ namespace rpp
 
             DataDelegate init { std::move(lambda) };
             AssertThat(init.good(), true);
-            AssertThat(lambda.good(), false); // NOLINT (this is a test for clean move semantics)
+            AssertThat(lambda.good(), false); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
             AssertThat(init(data), "move_init");
         }
 
         TestCase(delegate_vector_push_back)
         {
             std::vector<DataDelegate> delegates;
+            // NOLINTBEGIN(modernize-use-emplace)
             delegates.push_back([](Data a) { return validate("vector_0", a); });
             delegates.push_back([](Data a) { return validate("vector_1", a); });
             delegates.push_back([](Data a) { return validate("vector_2", a); });
@@ -567,6 +570,7 @@ namespace rpp
             delegates.push_back([](Data a) { return validate("vector_5", a); });
             delegates.push_back([](Data a) { return validate("vector_6", a); });
             delegates.push_back([](Data a) { return validate("vector_7", a); });
+            // NOLINTEND(modernize-use-emplace)
             AssertThat(delegates[0](data), "vector_0");
             AssertThat(delegates[1](data), "vector_1");
             AssertThat(delegates[2](data), "vector_2");
@@ -659,7 +663,7 @@ namespace rpp
 
         TestCase(compare_methods)
         {
-            Base inst, inst2;
+            Base inst, inst2; // NOLINT(readability-isolate-declaration)
             DataDelegate func1 {&inst, &Base::method};
             DataDelegate func2 {&inst, &Base::method};
             AssertThat(func1.good(), true);
@@ -786,7 +790,7 @@ namespace rpp
         TestCase(std_function_args)
         {
             std::function<void(Data, Data&, const Data&, Data&&)> fun =
-                [&](Data a, Data& b, const Data& c, Data&& d)
+                [&](Data a, Data& b, const Data& c, Data&& d) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
             {
                 (void)validate("stdfun", a, b, c, d); 
             };
@@ -798,12 +802,12 @@ namespace rpp
         {
             int count = 0;
             multicast_delegate<Data, Data&, const Data&, Data&&> evt;
-            evt += [&](Data a, Data& b, const Data& c, Data&& d)
+            evt += [&](Data a, Data& b, const Data& c, Data&& d) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
             {
                 ++count;
                 (void)validate("evt1", a, b, c, d); 
             };
-            evt += [&](Data a, Data& b, const Data& c, Data&& d)
+            evt += [&](Data a, Data& b, const Data& c, Data&& d) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
             {
                 ++count;
                 (void)validate("evt2", a, b, c, d); 
@@ -820,4 +824,5 @@ namespace rpp
         ////////////////////////////////////////////////////
     };
     
+    // NOLINTEND(performance-*,readability-make-member-function-const)
 }
