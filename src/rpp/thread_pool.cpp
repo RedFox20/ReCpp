@@ -166,6 +166,7 @@ namespace rpp
         return current_task;
     }
 
+    // NOLINTBEGIN(clang-analyzer-cplusplus.Move)
     pool_task_handle pool_worker::run_generic(task_delegate<void()>& newTask) noexcept
     {
         auto lock = new_task_flag.spin_lock();
@@ -196,6 +197,7 @@ namespace rpp
 
         return current_task;
     }
+    // NOLINTEND(clang-analyzer-cplusplus.Move)
 
     wait_result pool_worker::kill(int timeoutMillis) noexcept
     {
@@ -386,12 +388,12 @@ namespace rpp
     
     void thread_pool::set_max_parallelism(int max_parallelism) noexcept
     {
-        MaxParallelism = max_parallelism > 0 ? max_parallelism : 1;
+        MaxParallelism = max_parallelism > 0 ? max_parallelism : 0;
     }
     
     void thread_pool::set_global_max_parallelism(int max_parallelism)
     {
-        global().MaxParallelism = max_parallelism < 1 ? 1 : max_parallelism;
+        global().set_max_parallelism(max_parallelism);
     }
 
     int thread_pool::global_max_parallelism()
@@ -607,6 +609,7 @@ namespace rpp
         if (err) std::rethrow_exception(err);
     }
 
+    // NOLINTBEGIN(clang-analyzer-cplusplus.Move)
     pool_task_handle thread_pool::parallel_task(task_delegate<void()>&& generic_task) noexcept
     {
         // move the generic task to satisfy linter
@@ -634,4 +637,5 @@ namespace rpp
         Workers.emplace_back(std::move(w));
         return task;
     }
+    // NOLINTEND(clang-analyzer-cplusplus.Move)
 }

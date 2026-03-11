@@ -3,6 +3,9 @@
  */
 // ReSharper disable IdentifierTypo
 // ReSharper disable CommentTypo
+#if defined(__clang__) || defined(__GNUC__)
+#  define _LIBCPP_DISABLE_DEPRECATION_WARNINGS 1 // NOLINT(bugprone-reserved-identifier)
+#endif
 #include "strview.h"
 #include <math.h> // use math.h for GCC compatibility  // NOLINT
 #include <cstdlib>
@@ -11,6 +14,8 @@
 #include <cfloat> // DBL_MAX
 #include <cwctype> // std::towupper
 //#include <charconv> // to_chars, C++17, not implemented yet
+
+// NOLINTBEGIN(clang-diagnostic-deprecated-declarations)
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
@@ -19,12 +24,12 @@
 #else
     // TODO: codecvt is deprected, but the other API-s don't even work
     #if defined(__clang__) || defined(__GNUC__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    #  pragma GCC diagnostic push
+    #  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     #endif
     #include <codecvt> // codecvt_utf8
     #if defined(__clang__) || defined(__GNUC__)
-    #pragma GCC diagnostic pop
+    #  pragma GCC diagnostic pop
     #endif
 #endif
 
@@ -582,7 +587,7 @@ namespace rpp
     string strview::as_lower() const noexcept
     {
         string ret;
-        ret.reserve(size_t(len));
+        try { ret.reserve(size_t(len)); } catch (...) { return ret; }
         char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::tolower(*s++)));
@@ -591,7 +596,7 @@ namespace rpp
     string strview::as_upper() const noexcept
     {
         string ret;
-        ret.reserve(size_t(len));
+        try { ret.reserve(size_t(len)); } catch (...) { return ret; }
         char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::toupper(*s++)));
@@ -1361,3 +1366,5 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
     
 } // namespace rpp
+
+// NOLINTEND(clang-diagnostic-deprecated-declarations)

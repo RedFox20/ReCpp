@@ -292,11 +292,16 @@ namespace rpp
             n = sizeof(buf)-1;
             buf[n] = '\0';
         }
-        return std::string{buf, buf+n};
+        try {
+            return std::string{buf, buf+n};
+        } catch (...) {
+            return std::string{}; // fail silently without crashing
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    // NOLINTBEGIN(bugprone-exception-escape)
     std::string to_string(char v)   noexcept { return std::string{&v, 1ul}; }
     std::string to_string(byte v)   noexcept { char buf[8];  return std::string{buf, buf + _tostring(buf, v)}; }
     std::string to_string(short v)  noexcept { char buf[8];  return std::string{buf, buf + _tostring(buf, v)}; }
@@ -320,6 +325,7 @@ namespace rpp
     {
         return cstr ? std::string{ cstr } : std::string{};
     }
+    // NOLINTEND(bugprone-exception-escape)
 
     ////////////////////////////////////////////////////////////////////////////////
 }

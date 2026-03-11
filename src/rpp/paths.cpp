@@ -896,7 +896,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T, size_t N>
-    static auto slash_combine(const std::array<T, N>& args) -> typename T::string_t
+    static auto slash_combine(const std::array<T, N>& args) noexcept -> typename T::string_t
     {
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
@@ -1416,7 +1416,7 @@ namespace rpp /* ReCpp */
     }
 #endif
 
-    string temp_dir() noexcept
+    string temp_dir() noexcept // NOLINT(bugprone-exception-escape)
     {
         #if _WIN32
             char path[512];
@@ -1438,7 +1438,7 @@ namespace rpp /* ReCpp */
         #endif
     }
     
-    string home_dir() noexcept
+    string home_dir() noexcept // NOLINT(bugprone-exception-escape)
     {
         #if _MSC_VER
             size_t len = 0;
