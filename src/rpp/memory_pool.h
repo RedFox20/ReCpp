@@ -85,10 +85,13 @@ namespace rpp
             , Buffer{(char*)malloc(staticBlockSize)}
             , Ptr{Buffer}
         {
-            memset(Buffer, 0, staticBlockSize); // initialize memory to make static analyzers happy
-            if (int rem = size_t(Buffer) % 16) { // always align Ptr to 16 bytes
-                Remaining -= (16 - rem);
-                Ptr       += (16 - rem);
+            if (staticBlockSize > 0)
+            {
+                memset(Buffer, 0, staticBlockSize); // initialize memory to make static analyzers happy
+                if (int rem = size_t(Buffer) % 16) { // always align Ptr to 16 bytes
+                    Remaining -= (16 - rem);
+                    Ptr       += (16 - rem);
+                }
             }
         }
         ~linear_static_pool() noexcept

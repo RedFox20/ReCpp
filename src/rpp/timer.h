@@ -22,7 +22,7 @@ namespace rpp
     RPPAPI void sleep_us(unsigned int micros) noexcept;
 
     /** Let this thread sleep for provided NANOSECONDS */
-    RPPAPI void sleep_ns(uint64 nanos) noexcept;
+    RPPAPI void sleep_ns(int64 nanos) noexcept;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -100,7 +100,7 @@ namespace rpp
     }
 
     // uses multimedia timer API-s to sleep more accurately
-    static void win32_sleep_ns(uint64 nanos)
+    static void win32_sleep_ns(int64 nanos)
     {
         if (nanos == 0)
         {
@@ -270,7 +270,7 @@ namespace rpp
     void sleep_ms(unsigned int millis) noexcept
     {
         #if _WIN32
-            win32_sleep_ns(millis * 1'000'000ull);
+            win32_sleep_ns(int64(millis) * 1'000'000ll);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(int64(millis) * 1'000'000ll);
         #elif RPP_FREERTOS
@@ -285,7 +285,7 @@ namespace rpp
     void sleep_us(unsigned int micros) noexcept
     {
         #if _WIN32
-            win32_sleep_ns(micros * 1'000ull);
+            win32_sleep_ns(int64(micros) * 1'000ll);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
             unix_sleep_ns_abstime(int64(micros) * 1'000ll);
         #elif RPP_FREERTOS
@@ -297,12 +297,12 @@ namespace rpp
         #endif
     }
 
-    void sleep_ns(uint64 nanos) noexcept
+    void sleep_ns(int64 nanos) noexcept
     {
         #if _WIN32
             win32_sleep_ns(nanos);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(int64(nanos));
+            unix_sleep_ns_abstime(nanos);
         #elif RPP_FREERTOS
             freertos_sleep_ns(nanos);
         #elif RPP_STM32_HAL
