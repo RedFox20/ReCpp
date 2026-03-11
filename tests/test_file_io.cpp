@@ -443,6 +443,19 @@ TestImpl(test_file_io)
     }
 #endif // RPP_ENABLE_UNICODE
 
+    static std::vector<char> generate_test_data(int size)
+    {
+        std::vector<char> result(size);
+        // Fill with random alphanumeric characters to enable content validation
+        const char alphanumeric[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        const int alphanumeric_len = std::size(alphanumeric) - 1; // -1 for null terminator
+        srand((unsigned int)time(nullptr));
+        for (int i = 0; i < size; ++i) {
+            result[i] = alphanumeric[rand() % alphanumeric_len];
+        }
+        return result;
+    }
+
     TestCase(file_and_folder_listing)
     {
         std::string originalDir = rpp::working_dir();
@@ -640,5 +653,49 @@ TestImpl(test_file_io)
         AssertTrue(delete_folder(TestUnicodeDir, delete_mode::recursive));
     }
 #endif 
+
+    TestCase(truncate_front)
+    {
+        const int FILE_SIZE = 4096;
+        const int TRUNCATE_SIZE = FILE_SIZE / 2;
+        std::vector<char> testData = generate_test_data(FILE_SIZE);
+        AssertThat(file::write_new(TestFile, testData.data(), testData.size()),
+                   FILE_SIZE);
+
+        file f { TestFile, file::READWRITE };
+        f.truncate_front(TRUNCATE_SIZE);
+        AssertThat(f.size(), TRUNCATE_SIZE);
+        f.close();
+        AssertThat(file_size(TestFile), TRUNCATE_SIZE);
+        
+        // Read file back and verify content matches the last portion of original data
+        std::string content = file::read_all_text(TestFile);
+        AssertThat((int)content.size(), TRUNCATE_SIZE);
+        std::string expectedContent(testData.data() + FILE_SIZE - TRUNCATE_SIZE, TRUNCATE_SIZE);
+        AssertThat(content, expectedContent);
+    }
+
+    TestCase(truncate_front_sb)
+    {
+        const int FILE_SIZE = 4 * 1024 * 1024;
+        const int TRUNCATE_SIZE = FILE_SIZE / 2;
+        std::vector<char> testData = generate_test_data(FILE_SIZE);
+        AssertThat(file::write_new(TestFile, testData.data(), testData.size()),
+                   FILE_SIZE);
+
+        file f = { TestFile, file::READWRITE };
+        f.truncate_front_sb(TRUNCATE_SIZE);
+        AssertThat(f.size(), TRUNCATE_SIZE);
+        f.close();
+        
+        // Verify file size on disk
+        AssertThat(file_sizel(TestFile), (int64)TRUNCATE_SIZE);
+        
+        // Read file back and verify content matches the last portion of original data
+        std::string content = file::read_all_text(TestFile);
+        AssertThat((int)content.size(), TRUNCATE_SIZE);
+        std::string expectedContent(testData.data() + FILE_SIZE - TRUNCATE_SIZE, TRUNCATE_SIZE);
+        AssertThat(content, expectedContent);
+    }
 
 };

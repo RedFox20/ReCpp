@@ -370,46 +370,67 @@ namespace rpp /* ReCpp */
         if (len <= newLength)
             return;
 
-        int64 bytesToTrunc = len - newLength;
-        seekl(bytesToTrunc, SEEK_SET);
-
         constexpr int64 MAX_SINGLE_READ_BUFSIZE = (32LL * 1024LL * 1024LL); // max MB buffer size
         bool useSmallBufTruncate = newLength > MAX_SINGLE_READ_BUFSIZE;
-        try {
-            if (!useSmallBufTruncate)
+        try
+        {
+            if (useSmallBufTruncate)
             {
+                // small buf version reads in relatively tiny but safe chunks
+                // it will be slow, but will not run out of memory
+                truncate_front_sb(newLength);
+            }
+            else
+            {
+                // attempt to read entire file from new offset to memory
+                // this is generally the fastest approach on modern NVMe SSD systems
                 std::vector<char> buf;
                 buf.resize(static_cast<size_t>(newLength)); // throws
+                int64 bytesToTrunc = len - newLength;
+                seekl(bytesToTrunc, SEEK_SET);
                 int bytesRead = read(buf.data(), static_cast<int>(newLength));
                 truncate(newLength);
                 seek(0, SEEK_SET);
                 write(buf.data(), bytesRead);
-                return;
             }
-        } catch (...) { // resize failed to allocate enough memory
-            useSmallBufTruncate = true;
         }
-
-        // fallback to small buffer read loop
-        if (useSmallBufTruncate)
+        catch (...) // resize failed to allocate enough memory
         {
-            constexpr int64 blockSize = 64LL * 1024LL; // a much smaller buffer
-            uint8_t buf[blockSize];
-            int64 readPos = bytesToTrunc;
-            int64 writePos = 0;
-            while (readPos < len)
-            {
-                seekl(readPos, SEEK_SET);
-                int bytesRead = read(buf, static_cast<int>(blockSize));
-                if (bytesRead == 0) break; // EOF or error
-
-                seekl(writePos, SEEK_SET);
-                if (write(buf, bytesRead) != bytesRead) break; // error writing (disk error?)
-
-                readPos += bytesRead;
-                writePos += bytesRead;
-            }
+            truncate_front_sb(newLength);
         }
+    }
+
+    void file::truncate_front_sb(int64 newLength) noexcept
+    {
+        int64 len = sizel();
+        if (len <= newLength)
+            return;
+
+    #if YOCTO_LINUX
+        // a much smaller buffer on embedded systems
+        constexpr int64 SMALL_BLOCK_SIZE = 64LL * 1024LL;
+    #else
+        constexpr int64 SMALL_BLOCK_SIZE = 512LL * 1024LL;
+    #endif
+        uint8_t buf[SMALL_BLOCK_SIZE];
+        int64 readPos = len - newLength;
+        int64 writePos = 0;
+        while (readPos < len)
+        {
+            seekl(readPos, SEEK_SET);
+            int bytesRead = read(buf, static_cast<int>(SMALL_BLOCK_SIZE));
+            if (bytesRead <= 0) break; // EOF or error
+
+            seekl(writePos, SEEK_SET);
+            if (write(buf, bytesRead) != bytesRead)
+                break; // disk error?
+
+            readPos += bytesRead;
+            writePos += bytesRead;
+        }
+
+        // truncate remainder after shifting all blocks to front
+        truncate(newLength);
     }
 
     void file::truncate_end(int64 newLength) noexcept
