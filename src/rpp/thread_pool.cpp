@@ -484,42 +484,42 @@ namespace rpp
         return parallel_for_task{ std::move(w), std::move(task) };
     }
 
-    void thread_pool::parallel_for(int range_start, int range_end, int max_range_size,
-                                   const action<int, int>& range_task)
+    thread_pool::parallel_for_params::parallel_for_params(int range, int max_range_size, int max_parallelism) noexcept
     {
-        if (range_start >= range_end)
-            return;
-
-        const int range = range_end - range_start;
-        int maxTasks = (int)MaxParallelism; // maximum number of Tasks to use, 0 disables parallelism
-        int minTasks;  // minimum number of Tasks needed
-        int maxLength; // max iter length in a single task except the last element,
-                       // eg rng=11, cor=4 ==> len 3; resulting task lengths: 3,3,3,2
+        max_tasks = max_parallelism; // maximum number of Tasks to use, 0 disables parallelism
         if (max_range_size <= 0)
         {
             // not more Tasks than range size, range is guaranteed to be > 0
-            minTasks = range < maxTasks ? range : maxTasks;
-            if (minTasks < 1) minTasks = 1; // avoid zero div
+            min_tasks = range < max_tasks ? range/*cannot be neg/zero*/ : max_tasks/*can be zero*/;
+            if (min_tasks < 1) min_tasks = 1; // avoid zero div
             // spread the range over all available cores, with last task getting the remainder
             // ex 11 / 4 --> round(2.75) --> 3
             // ex 128 / 18 --> round(7.11) --> 7
-            maxLength = (int)roundf((float)range / float(minTasks));
+            max_length = (int)roundf((float)range / float(min_tasks));
         }
         else
         {
             // user specified minLength, ex: 1, 10, 10000, guaranteed positive
-            maxLength = max_range_size;
+            max_length = max_range_size;
             // see how many Tasks would be needed to satisfy task length
             // eg 50 / 1 => 50;  50 / 10 => 5;  50 / 10000 => 0.0025
-            minTasks = (int)ceilf((float)range / float(maxLength));
+            min_tasks = (int)ceilf((float)range / float(max_length));
             // clamp Tasks to number of physical cores
             // eg 50 => 4; 5 => 4; 1 => 1
-            minTasks = maxTasks < minTasks ? maxTasks : minTasks;
+            min_tasks = max_tasks < min_tasks ? max_tasks : min_tasks;
         }
+    }
 
+    void thread_pool::parallel_for(int range_start, int range_end, int max_range_size,
+                                   const action<int, int>& range_task)
+    {
+        if (range_start >= range_end)
+            return; // discard negative/zero ranges
+
+        parallel_for_params p { /*range*/(range_end - range_start), max_range_size, (int)MaxParallelism };
         // either the range is too small OR maxRangeSize calculated effective Tasks as 1
         // OR the number of physical cores is simply 1
-        if (range <= 1 || minTasks <= 1)
+        if (p.min_tasks <= 1)
         {
             TaskDebug("parallel_for parallelism disabled");
             range_task(range_start, range_end);
@@ -527,23 +527,23 @@ namespace rpp
         }
 
         auto* active = static_cast<parallel_for_task*>(
-            alloca(unsigned(maxTasks) * sizeof(parallel_for_task))
+            alloca(unsigned(p.max_tasks) * sizeof(parallel_for_task))
         );
 
         std::exception_ptr err;
         int spawned = 0; // actual number of spawned Tasks
-        int nextWait = 0;
+        int next_wait = 0;
 
-        for (int start = range_start; start < range_end; start += maxLength)
+        for (int start = range_start; start < range_end; start += p.max_length)
         {
-            int end = start + maxLength;
+            int end = start + p.max_length;
             if (end > range_end) end = range_end; // clamp the last task
 
             // we have enough tasks to choose from
-            if (spawned < maxTasks)
+            if (spawned < p.max_tasks)
             {
                 // placement new on stack
-                TaskDebug("parallel_for spawning %d < %d maxTasks", spawned, maxTasks);
+                TaskDebug("parallel_for spawning %d < %d max_tasks", spawned, p.max_tasks);
                 new (&active[spawned]) parallel_for_task{start_range_task(start, end, range_task)};
                 ++spawned;
             }
@@ -551,11 +551,11 @@ namespace rpp
             {
                 // we need to wait for an available task to solve the remainder
                 // in most cases this will only be a single wait
-                for (;; ++nextWait) // loop forever
+                for (;; ++next_wait) // loop forever
                 {
-                    if (nextWait >= spawned) nextWait = 0;
+                    if (next_wait >= spawned) next_wait = 0;
 
-                    auto& wait = active[nextWait];
+                    auto& wait = active[next_wait];
                     TaskDebug("parallel_for check_free %s", wait.task.worker_name());
                     // this 1ms wait is necessary, however it slightly slows down the loop
                     // during high contention, so we don't burn CPU trying to get a task
@@ -582,8 +582,8 @@ namespace rpp
             }
         }
 
-        if (spawned > maxTasks)
-            ThrowErr("BUG: parallel_for spawned:%d > maxTasks:%d", spawned, maxTasks);
+        if (spawned > p.max_tasks)
+            ThrowErr("BUG: parallel_for spawned:%d > max_tasks:%d", spawned, p.max_tasks);
 
         // wait on all the spawned tasks to finish
         TaskDebug("parallel_for waiting on %d tasks", spawned);

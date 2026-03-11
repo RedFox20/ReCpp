@@ -377,9 +377,19 @@ namespace rpp
     private:
         // starts a single range task atomically
         // the task is removed from TaskPool to avoid concurrency issues with regular parallel tasks
-        parallel_for_task
-        start_range_task(int range_start, int range_end,
-                         const action<int, int>& range_task) noexcept;
+        parallel_for_task start_range_task(int range_start, int range_end,
+                                           const action<int, int>& range_task) noexcept;
+
+        struct parallel_for_params
+        {
+            int max_tasks; // maximum number of Tasks to use, 0 disables parallelism
+            int min_tasks;  // minimum number of Tasks needed
+            int max_length; // max iter length in a single task except the last element,
+                            // eg rng=11, cor=4 ==> len 3; resulting task lengths: 3,3,3,2
+
+            // initializes parallel_for parameters based on range and max_range_size
+            parallel_for_params(int range, int max_range_size, int max_parallelism) noexcept;
+        };
     
     public:
     

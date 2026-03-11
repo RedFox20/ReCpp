@@ -244,6 +244,7 @@ namespace rpp
         test_results* current_results = nullptr;
         test_func* current_func = nullptr;
         std::chrono::nanoseconds elapsed_time{};
+        int title_length = 80;
 
         ~test_impl()
         {
@@ -484,36 +485,35 @@ namespace rpp
         impl->current_results = &results;
         TestVerbosity verb = state().verbosity;
 
-        char title[256];
-        int titleLength = 0;
-
-        if (verb >= TestVerbosity::TestLabels)
-        {
-            titleLength = methodFilter
-                ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
-                : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
-            consolef(Yellow, "%s\n", title);
-        }
+        print_test_suite_title(verb, methodFilter);
 
         auto t1 = std::chrono::high_resolution_clock::now();
+        suite_results r = run_test_suite(methodFilter);
+        auto t2 = std::chrono::high_resolution_clock::now();
+        impl->elapsed_time = t2 - t1;
+        impl->current_results = nullptr;
+
+        print_test_suite_summary(verb, r);
+
+        return r.num_tests_run > 0 && r.all_success();
+    }
+
+    test::suite_results test::run_test_suite(strview methodFilter)
+    {
+        suite_results r {};
         run_init();
-
-        int numTestsRun = 0;
-        int numTestsOk = 0;
-        int numTestsFailed = 0;
-
         if (methodFilter)
         {
             for (test_func* fn : impl->test_functions)
             {
                 if (fn->name.find(methodFilter))
                 {
-                    if (run_test_func(*fn)) ++numTestsOk;
-                    else                    ++numTestsFailed;
-                    ++numTestsRun;
+                    if (run_test_func(*fn)) ++r.num_tests_passed;
+                    else                    ++r.num_tests_failed;
+                    ++r.num_tests_run;
                 }
             }
-            if (numTestsRun == 0)
+            if (r.num_tests_run == 0)
             {
                 consolef(Yellow, "No tests matching '%.*s' in %s\n", methodFilter.len, methodFilter.str, name.str);
             }
@@ -524,41 +524,55 @@ namespace rpp
             {
                 if (fn->autorun)
                 {
-                    if (run_test_func(*fn)) ++numTestsOk;
-                    else                    ++numTestsFailed;
-                    ++numTestsRun;
+                    if (run_test_func(*fn)) ++r.num_tests_passed;
+                    else                    ++r.num_tests_failed;
+                    ++r.num_tests_run;
                 }
             }
-            if (numTestsRun == 0)
+            if (r.num_tests_run == 0)
             {
                 consolef(Yellow, "No autorun tests discovered in %s\n", name.str);
             }
         }
-
         run_cleanup();
-        auto t2 = std::chrono::high_resolution_clock::now();
-        impl->elapsed_time = t2 - t1;
+        return r;
+    }
 
-        const bool allSuccess = (numTestsOk == numTestsRun);
+    void test::print_test_suite_title(TestVerbosity verb, strview methodFilter)
+    {
+        if (verb >= TestVerbosity::TestLabels)
+        {
+            char title[256];
+            // store the title length for later use in printing the closing "-------" line
+            impl->title_length = methodFilter
+                ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------", name.str, methodFilter.len, methodFilter.str)
+                : snprintf(title, sizeof(title), "--------  running '%s'  --------", name.str);
+            consolef(Yellow, "%s\n", title);
+        }
+    }
+
+    void test::print_test_suite_summary(TestVerbosity verb, const suite_results& r)
+    {
         if (verb >= TestVerbosity::Summary)
         {
-            if (allSuccess)
+            if (r.all_success())
             {
-                char run[64]; snprintf(run, sizeof(run), "%d/%d", numTestsOk, numTestsRun);
+                char run[64]; snprintf(run, sizeof(run), "%d/%d", r.num_tests_passed, r.num_tests_run);
                 consolef(Green, "TEST %-32s  %-5s  [OK] %s\n", name.str, run, get_time_str(impl->elapsed_time));
             }
             else
             {
-                char run[64]; snprintf(run, sizeof(run), "%d/%d", numTestsFailed, numTestsRun);
+                char run[64]; snprintf(run, sizeof(run), "%d/%d", r.num_tests_failed, r.num_tests_run);
                 consolef(Red,   "TEST %-32s  %-5s  [FAILED] %s\n", name.str, run, get_time_str(impl->elapsed_time));
             }
         }
 
         if (verb >= TestVerbosity::TestLabels)
         {
-            consolef(Yellow, "%s\n\n", (char*)memset(title, '-', (size_t)titleLength)); // "-------------"
+            char summary[256];
+            consolef(Yellow, "%s\n\n", (char*)memset(summary, '-', (size_t)impl->title_length)); // "-------------"
         }
-        else if (verb >= TestVerbosity::Summary && !allSuccess)
+        else if (verb >= TestVerbosity::Summary && !r.all_success())
         {
             for (test_func* fn : impl->test_functions)
             {
@@ -576,10 +590,6 @@ namespace rpp
                 }
             }
         }
-
-        impl->current_results = nullptr;
-
-        return allSuccess && numTestsRun > 0;
     }
 
     bool test::run_test_func(test_func& test)
