@@ -46,9 +46,8 @@ jobs:
       - run: pipenv install mama
       - run: sudo apt-get install gcc-13 -y
       - run: make configure-cmake
-      - run: CXX20=1 pipenv run mama gcc verbose build with_tests coverage asan
-      - run: pipenv run mama gcc verbose test="nogdb -vv"
-      - run: pipenv run mama coverage-report=src
+      - run: CXX20=1 pipenv run mama gcc verbose build with_tests coverage=src asan
+      - run: pipenv run mama gcc coverage-report=src verbose test="nogdb -vv"
   gcc-tidy-ubuntu-cpp20:
     description: Ubuntu GCC C++20 x64 Build with Clang-Tidy
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
