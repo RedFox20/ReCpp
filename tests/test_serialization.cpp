@@ -6,7 +6,7 @@ struct Struct1 : serializable<Struct1>
 {
     float a = 0.0f;
 
-    Struct1() {}
+    Struct1() = default;
     Struct1(float a) : a(a) {}
 
     void introspect()
@@ -19,10 +19,10 @@ struct Struct2 : serializable<Struct2>
 {
     float a = 0.0f;
     int b = 0;
-    std::string c = "";
+    std::string c = ""; // NOLINT(readability-redundant-string-init)
 
-    Struct2(){}
-    Struct2(float a, int b, std::string c) : a(a), b(b), c(c) {}
+    Struct2() = default;
+    Struct2(float a, int b, std::string c) : a(a), b(b), c(c) {} // NOLINT(performance-*,modernize-*)
 
     void introspect()
     {
@@ -33,10 +33,10 @@ struct Struct2 : serializable<Struct2>
 struct Struct3 : serializable<Struct3>
 {
     int a = 0;
-    std::string b = "";
+    std::string b = ""; // NOLINT(readability-redundant-string-init)
 
-    Struct3(){}
-    Struct3(int a, std::string b) : a(a), b(b) {}
+    Struct3() = default;
+    Struct3(int a, std::string b) : a(a), b(b) {} // NOLINT(performance-*,modernize-*)
 
     void introspect()
     {

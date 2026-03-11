@@ -1,16 +1,16 @@
 #include "bitutils.h"
-#include "math.h" // min
+#include "./math.h" // min
 #include <cstring> // memcpy
-#include <stdlib.h> // malloc, free
+#include <cstdlib> // malloc, free
 #include <utility> // std::swap
 
 namespace rpp
 {
     ////////////////////////////////////////////////////////////////////////////////
 
-    static int num_bytes_for_bits(uint32_t numBits) noexcept
+    static uint32_t num_bytes_for_bits(uint32_t numBits) noexcept
     {
-        int numBytes = numBits / 8;
+        uint32_t numBytes = numBits / 8;
         if (numBits % 8 != 0)
             ++numBytes;
         return numBytes;
@@ -57,7 +57,7 @@ namespace rpp
         memcpy(data, buf, bytesToCopy);
 
         // zero the bits at the end
-        int trailingBits = 8 - (bitsToCopy % 8);
+        uint32_t trailingBits = 8 - (bitsToCopy % 8);
         if (trailingBits)
         {
             data[bytesToCopy - 1] &= ~uint8_t(0xFF << trailingBits);
@@ -110,7 +110,7 @@ namespace rpp
         }
         if (newCapacity != capacity)
         {
-            if (uint8_t* newData = (uint8_t*)realloc(data, newCapacity))
+            if (auto* newData = (uint8_t*)realloc(data, newCapacity))
             {
                 data = newData;
                 capacity = newCapacity;

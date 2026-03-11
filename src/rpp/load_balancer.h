@@ -14,7 +14,7 @@ namespace rpp
         uint32 maxBytesPerSec;
         uint32 nanosBetweenBytes;
         rpp::TimePoint lastSendTime;
-        int32 nextSendTimeout = 0;
+        int64 nextSendTimeout = 0;
 
     public:
         explicit load_balancer(uint32 maxBytesPerSec) noexcept

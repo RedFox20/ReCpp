@@ -45,7 +45,11 @@ namespace rpp
 
     void binary_stream::rewind(int pos) noexcept
     {
-        ReadPos = WritePos = pos < 0 ? 0 : pos <= End ? pos : End;
+        int newPos;
+        if      (pos < 0)    newPos = 0;
+        else if (pos <= End) newPos = pos;
+        else                 newPos = End;
+        ReadPos = WritePos = newPos;
     }
 
     bool binary_stream::good() const noexcept
@@ -122,6 +126,8 @@ namespace rpp
         return *this;
     }
 
+    // NOLINTBEGIN(bugprone-narrowing-conversions)
+
     void binary_stream::unsafe_write(rpp::uint16 data) noexcept
     {
         // write int as 2 bytes in Little-Endian order, into unaligned address
@@ -156,6 +162,8 @@ namespace rpp
         WritePos += 8;
         End += 8;
     }
+
+    // NOLINTEND(bugprone-narrowing-conversions)
 
     void binary_stream::unsafe_write(float data) noexcept
     {
@@ -317,7 +325,7 @@ namespace rpp
         strview s;
         int avail = peek_fetch_avail();
         if (avail < (int)sizeof(strlen_t)) return s;
-        s.len = min<int>(peek<strlen_t>(), avail - sizeof(strlen_t));
+        s.len = min<int>(peek<strlen_t>(), avail - (int)sizeof(strlen_t));
         s.str = &Ptr[ReadPos + sizeof(strlen_t)];
         undo(sizeof(strlen_t));
         return s;
@@ -347,7 +355,7 @@ namespace rpp
 
     socket_writer::~socket_writer() noexcept
     {
-        try { flush(); } catch (...) {}
+        flush();
     }
 
     int socket_writer::stream_write(const void* data, int numBytes) noexcept
@@ -405,7 +413,7 @@ namespace rpp
 
     file_writer::~file_writer() noexcept
     {
-        try { flush(); } catch (...) {}
+        flush();
     }
 
     int file_writer::stream_write(const void* data, int numBytes) noexcept

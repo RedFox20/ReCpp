@@ -369,17 +369,17 @@ namespace rpp
         /**
          * Sets a new max idle time for spawned Tasks
          * This does not notify already idle Tasks
-         * @param maxIdleSeconds Maximum idle seconds before Tasks are abandoned and thread handle is released
+         * @param max_idle_seconds Maximum idle seconds before Tasks are abandoned and thread handle is released
          *                       Setting this to 0 keeps pool Tasks alive forever
          */
-        void max_task_idle_time(float maxIdleSeconds = 15) noexcept;
+        void max_task_idle_time(float max_idle_seconds = 15.0f) noexcept;
 
     private:
         // starts a single range task atomically
         // the task is removed from TaskPool to avoid concurrency issues with regular parallel tasks
         parallel_for_task
-        start_range_task(int rangeStart, int rangeEnd,
-                         const action<int, int>& rangeTask) noexcept;
+        start_range_task(int range_start, int range_end,
+                         const action<int, int>& range_task) noexcept;
     
     public:
     
@@ -391,30 +391,30 @@ namespace rpp
          * which yields better loop performance. If your callback Tasks are heavy, then
          * consider `rpp::parallel_foreach`
          *
-         * If range and maxRangeSize calculate # of Tasks as 1, then this will run sequentially
+         * If range and max_range_size calculate # of Tasks as 1, then this will run sequentially
          *
-         * @param rangeStart Usually 0
-         * @param rangeEnd Usually vec.size()
-         * @param maxRangeSize Maximum range size for a single task to execute (if possible)
+         * @param range_start Usually 0
+         * @param range_end Usually vec.size()
+         * @param max_range_size Maximum range size for a single task to execute (if possible)
          *                     Ex: size=10 will execute Tasks as T0[0,10); T1[10,20); ...
-         *                     For very slow individual Tasks, recommend maxRangeSize=1 so that T0[0,10); T1[1,2); T2[2,3); ...
+         *                     For very slow individual Tasks, recommend max_range_size=1 so that T0[0,10); T1[1,2); T2[2,3); ...
          *                     Size 0 will attempt to auto-detect a reasonable size
          *                     For very fast Tasks, this should be high enough so that individual
          *                     task threads can maximize throughput.
-         * @param rangeTask Non-owning callback action:  void(int start, int end)
+         * @param range_task Non-owning callback action:  void(int start, int end)
          */
-        void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize,
-                          const action<int, int>& rangeTask);
+        void parallel_for(int range_start, int range_end, int max_range_size,
+                          const action<int, int>& range_task);
 
         template<class Func> 
-        void parallel_for(int rangeStart, int rangeEnd, int maxRangeSize, const Func& func)
+        void parallel_for(int range_start, int range_end, int max_range_size, const Func& func)
         {
-            this->parallel_for(rangeStart, rangeEnd, maxRangeSize,
+            this->parallel_for(range_start, range_end, max_range_size,
                                action<int, int>::from_function<Func, &Func::operator()>(&func));
         }
 
         // runs a generic parallel task
-        pool_task_handle parallel_task(task_delegate<void()>&& genericTask) noexcept;
+        pool_task_handle parallel_task(task_delegate<void()>&& generic_task) noexcept;
 
         /**
          * Enables tracing of parallel task calls. This makes it possible
@@ -423,7 +423,7 @@ namespace rpp
          * @note This will slow down parallel task startup since the call stack is unwound for debugging
          * @warning This can severely impact performance, so only use for debugging purposes
          */
-        void set_task_tracer(pool_trace_provider traceProvider);
+        void set_task_tracer(pool_trace_provider trace_provider);
     };
 
 

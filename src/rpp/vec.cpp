@@ -295,16 +295,20 @@ namespace rpp
     {
         x -= extrude;
         y -= extrude;
-        if ((w += extrude*2) < 0.0f) w = 0.0f;
-        if ((h += extrude*2) < 0.0f) h = 0.0f;
+        w += extrude*2;
+        h += extrude*2;
+        if (w < 0.0f) w = 0.0f;
+        if (h < 0.0f) h = 0.0f;
     }
 
     void RectF::extrude(const Vector2& extrude)
     {
         x -= extrude.x;
         y -= extrude.y;
-        if ((w += extrude.x*2) < 0.0f) w = 0.0f;
-        if ((h += extrude.y*2) < 0.0f) h = 0.0f;
+        w += extrude.x*2;
+        h += extrude.y*2;
+        if (w < 0.0f) w = 0.0f;
+        if (h < 0.0f) h = 0.0f;
     }
 
     RectF RectF::joined(const RectF& b) const
@@ -313,12 +317,13 @@ namespace rpp
         float newY = min(y, b.y);
         float newW = max(x + w, b.x + b.w) - newX;
         float newH = max(y + h, b.y + b.h) - newY;
-        return{ newX, newY, newW, newH };
+        return { newX, newY, newW, newH };
     }
 
     void RectF::join(const RectF & b)
     {
-        float ax = x, ay = y;
+        float ax = x;
+        float ay = y;
         x = min(ax, b.x);
         w = max(ax + w, b.x + b.w) - x;
         y = min(ay, b.y);
@@ -394,16 +399,20 @@ namespace rpp
     {
         x -= extrude;
         y -= extrude;
-        if ((w += extrude * 2) < 0) w = 0;
-        if ((h += extrude * 2) < 0) h = 0;
+        w += extrude * 2;
+        h += extrude * 2;
+        if (w < 0) w = 0;
+        if (h < 0) h = 0;
     }
 
     void Recti::extrude(const Point& extrude)
     {
         x -= extrude.x;
         y -= extrude.y;
-        if ((w += extrude.x * 2) < 0) w = 0;
-        if ((h += extrude.y * 2) < 0) h = 0;
+        w += extrude.x * 2;
+        h += extrude.y * 2;
+        if (w < 0) w = 0;
+        if (h < 0) h = 0;
     }
 
     Recti Recti::joined(const Recti& b) const
@@ -412,12 +421,13 @@ namespace rpp
         int newY = min(y, b.y);
         int newW = max(x + w, b.x + b.w) - newX;
         int newH = max(y + h, b.y + b.h) - newY;
-        return{ newX, newY, newW, newH };
+        return { newX, newY, newW, newH };
     }
 
     void Recti::join(const Recti& b)
     {
-        int ax = x, ay = y;
+        int ax = x;
+        int ay = y;
         x = min(ax, b.x);
         w = max(ax + w, b.x + b.w) - x;
         y = min(ay, b.y);
@@ -814,10 +824,10 @@ namespace rpp
             strview g = s.substr(3, 2);
             strview b = s.substr(5, 2);
             strview a = s.substr(7, 2);
-            c.r = r.to_int_hex() / 255.0f;
-            c.g = g.to_int_hex() / 255.0f;
-            c.b = b.to_int_hex() / 255.0f;
-            c.a = a ? a.to_int_hex() / 255.0f : 1.0f;
+            c.r = float(r.to_int_hex()) / 255.0f;
+            c.g = float(g.to_int_hex()) / 255.0f;
+            c.b = float(b.to_int_hex()) / 255.0f;
+            c.a = a ? float(a.to_int_hex()) / 255.0f : 1.0f;
         }
         return c;
     }
@@ -890,12 +900,14 @@ namespace rpp
 
     Matrix3& Matrix3::multiply(const Matrix3& mb)
     {
+        // NOLINTBEGIN(readability-isolate-declaration)
         float a00 = m00, a01 = m01, a02 = m02;
         float a10 = m10, a11 = m11, a12 = m12;
         float a20 = m20, a21 = m21, a22 = m22;
         float B00 = mb.m00, B01 = mb.m01, B02 = mb.m02;
         float B10 = mb.m10, B11 = mb.m11, B12 = mb.m12;
         float B20 = mb.m20, B21 = mb.m21, B22 = mb.m22;
+        // NOLINTEND(readability-isolate-declaration)
         m00 = a00 * B00 + a10 * B01 + a20 * B02;
         m01 = a01 * B00 + a11 * B01 + a21 * B02;
         m02 = a02 * B00 + a12 * B01 + a22 * B02;
@@ -910,12 +922,14 @@ namespace rpp
 
     Matrix3 Matrix3::operator*(const Matrix3& mb) const
     {
+        // NOLINTBEGIN(readability-isolate-declaration)
         float a00 = m00, a01 = m01, a02 = m02;
         float a10 = m10, a11 = m11, a12 = m12;
         float a20 = m20, a21 = m21, a22 = m22;
         float B00 = mb.m00, B01 = mb.m01, B02 = mb.m02;
         float B10 = mb.m10, B11 = mb.m11, B12 = mb.m12;
         float B20 = mb.m20, B21 = mb.m21, B22 = mb.m22;
+        // NOLINTEND(readability-isolate-declaration)
         return {
             a00 * B00 + a10 * B01 + a20 * B02,
             a01 * B00 + a11 * B01 + a21 * B02,
@@ -978,9 +992,11 @@ namespace rpp
 
     float Matrix3::norm(const Matrix3& b) const
     {
+        // NOLINTBEGIN(readability-isolate-declaration)
         float f0 = m00-b.m00, f1 = m10-b.m10, f2 = m20-b.m20;
         float f3 = m01-b.m01, f4 = m11-b.m11, f5 = m21-b.m21;
         float f6 = m02-b.m02, f7 = m12-b.m12, f8 = m22-b.m22;
+        // NOLINTEND(readability-isolate-declaration)
         float s = f0*f0 + f1*f1 + f2*f2 
                 + f3*f3 + f4*f4 + f5*f5
                 + f6*f6 + f7*f7 + f8*f8;
@@ -1127,7 +1143,7 @@ namespace rpp
 
     Matrix3 Matrix4::getRotationMatrix() const
     {
-        Vector3 r0v = r0.xyz, r1v = r1.xyz, r2v = r2.xyz;
+        Vector3 r0v = r0.xyz, r1v = r1.xyz, r2v = r2.xyz; // NOLINT(readability-isolate-declaration)
         Vector3 tempZ = r0v.cross(r1v);
         if (tempZ.dot(r2v) < 0)
         {
@@ -1565,7 +1581,7 @@ namespace rpp
     // (ftp://download.intel.com/design/pentiumiii/sml/24504301.pdf)
     static inline void invert4x4(const float* src, float* dst)
     {
-        __m128 row1 = {}, row3 = {}, tmp1 = {};
+        __m128 row1 = {}, row3 = {}, tmp1 = {}; // NOLINT(readability-isolate-declaration)
 
         tmp1 = _mm_loadh_pi(_mm_loadl_pi(tmp1, (__m64*)(src)), (__m64*)(src + 4));
         row1 = _mm_loadh_pi(_mm_loadl_pi(row1, (__m64*)(src + 8)), (__m64*)(src + 12));
@@ -1823,8 +1839,8 @@ namespace rpp
         if (points.empty())
             return { Vector3::Zero(), Vector3::Zero() };
 
-        auto* verts = points.data(); // better debug iteration performance
-        size_t size = points.size();
+        const Vector3* verts = points.data(); // better debug iteration performance
+        const size_t size = points.size();
 
         Vector3 min = verts[0];
         Vector3 max = min;
@@ -1846,9 +1862,9 @@ namespace rpp
         if (points.empty() || ids.empty())
             return { Vector3::Zero(), Vector3::Zero() };
 
-        auto* verts = points.data(); // better debug iteration performance
-        auto*  data = ids.data();
-        size_t size = ids.size();
+        const Vector3* verts = points.data(); // better debug iteration performance
+        const IdVector3* data = ids.data();
+        const size_t size = ids.size();
 
         Vector3 min = verts[data[0].ID];
         Vector3 max = min;
@@ -1870,9 +1886,9 @@ namespace rpp
         if (points.empty() || ids.empty())
             return { Vector3::Zero(), Vector3::Zero() };
 
-        auto* verts = points.data(); // better debug iteration performance
-        auto*  data = ids.data();
-        size_t size = ids.size();
+        const Vector3* verts = points.data(); // better debug iteration performance
+        const int * data = ids.data();
+        const size_t size = ids.size();
 
         Vector3 min = verts[data[0]];
         Vector3 max = min;
@@ -1964,7 +1980,7 @@ namespace rpp
         return t0;
     }
 
-    // M�ller�Trumbore ray-triangle intersection algorithm
+    // Möller-Trumbore ray-triangle intersection algorithm
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     float Ray::intersectTriangle(Vector3 v0, Vector3 v1, Vector3 v2) const noexcept
     {

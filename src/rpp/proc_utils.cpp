@@ -101,8 +101,8 @@ namespace rpp
         struct rusage usg;
         getrusage(RUSAGE_SELF, &usg);
         // convert timeval to microseconds
-        r.kernel_time_us = usg.ru_stime.tv_sec * 1'000'000ull + (uint64)usg.ru_stime.tv_usec;
-        r.user_time_us   = usg.ru_utime.tv_sec * 1'000'000ull + (uint64)usg.ru_utime.tv_usec;
+        r.kernel_time_us = usg.ru_stime.tv_sec * 1'000'000ll + (int64)usg.ru_stime.tv_usec;
+        r.user_time_us   = usg.ru_utime.tv_sec * 1'000'000ll + (int64)usg.ru_utime.tv_usec;
         r.cpu_time_us    = r.kernel_time_us + r.user_time_us;
     #endif
         return r;

@@ -35,7 +35,7 @@ TestImpl(test_stack_trace)
     TestCaseExpectedEx(trace_ex, traced_exception)
     {
         struct inner_struct {
-            void method() {
+            void method() { // NOLINT(readability-convert-member-functions-to-static)
                 throw traced_exception{ "TracedException message" };
             }
         };

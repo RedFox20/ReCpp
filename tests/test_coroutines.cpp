@@ -36,7 +36,7 @@ TestImpl(test_coroutines)
         return value;
     }
 
-    rpp::cfuture<void> chrono_coro(int millis)
+    static rpp::cfuture<void> chrono_coro(int millis)
     {
         co_await std::chrono::milliseconds{millis};
     }
@@ -58,7 +58,7 @@ TestImpl(test_coroutines)
     }
 
 
-    rpp::cfuture<std::string> string_coro()
+    static rpp::cfuture<std::string> string_coro()
     {
         co_await std::chrono::milliseconds{1};
         co_return "string from coro";
@@ -69,7 +69,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<void> void_coro(std::string* result) // NOLINT: disable linter here, since this is normally a bug
+    cfuture<void> void_coro(std::string* result)
     {
         co_await std::chrono::milliseconds{1};
         set_locked(*result, co_await string_coro());
@@ -85,12 +85,12 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<std::string> as_async(std::string s)
+    static cfuture<std::string> as_async(std::string s)
     {
         co_await std::chrono::milliseconds{1};
         co_return s;
     }
-    cfuture<std::string> multi_stage_coro()
+    static cfuture<std::string> multi_stage_coro()
     {
         std::string s = co_await as_async("123_");
         s += co_await as_async("456_");
@@ -103,7 +103,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<std::string> future_string_coro()
+    static cfuture<std::string> future_string_coro()
     {
         co_return co_await async_task([] {
             return "future string"s;
@@ -115,7 +115,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<std::string> exceptional_coro()
+    static cfuture<std::string> exceptional_coro()
     {
         co_await std::chrono::milliseconds{1};
 
@@ -164,7 +164,7 @@ TestImpl(test_coroutines)
         };
 
         rpp::Timer t1;
-        co_await [&m, &destructor_ids]() -> cfuture<void>
+        co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr {m, destructor_ids, 1};
             co_await std::chrono::milliseconds{10};
@@ -177,7 +177,7 @@ TestImpl(test_coroutines)
         }
 
         rpp::Timer t2;
-        std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string>
+        std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr {m, destructor_ids, 2};
             co_await std::chrono::milliseconds{5};
@@ -192,7 +192,7 @@ TestImpl(test_coroutines)
         }
 
         rpp::Timer t3;
-        co_await [&m, &destructor_ids]() -> cfuture<void>
+        co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr {m, destructor_ids, 3};
             co_return;
@@ -246,7 +246,7 @@ TestImpl(test_coroutines)
         functor_nonfuture_string_coro().get();
     }
 
-    cfuture<void> std_future_void_coro()
+    static cfuture<void> std_future_void_coro()
     {
         co_await std::chrono::milliseconds{10};
         co_return;
@@ -257,7 +257,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<std::string> std_future_string_coro()
+    static cfuture<std::string> std_future_string_coro()
     {
         std::string s = co_await std::async(std::launch::async, [] {
             return "future string"s;
@@ -271,7 +271,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<std::string> std_future_lambda_coro()
+    static cfuture<std::string> std_future_lambda_coro()
     {
         // await on a lambda which returns a future
         std::string s = co_await []() -> std::future<std::string> {

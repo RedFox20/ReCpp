@@ -516,13 +516,13 @@ namespace rpp
          * WARNING: socket will take ownership of the handle, 
          *          unless you set shared=true, which is equivalent of
          *          set_shared(true) OR calling release_noclose()
-         * @note THROWS is handle is invalid
+         * @note You must validate the socket on your own after initialization from OS handle
          * @param shared If TRUE, then this socket is not closed in socket destructor
          * @param blocking Whether the socket is configured as blocking or not.
          *                 On Windows, there is no way to query this from socket handle
          */
         static socket from_os_handle(int handle, const ipaddress& addr,
-                                     bool shared=false, bool blocking=true);
+                                     bool shared=false, bool blocking=true) noexcept;
 
         /**
          * @brief Creates an invalid socket object with the last_err() set to the given error code

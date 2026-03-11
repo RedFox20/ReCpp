@@ -46,8 +46,8 @@ namespace rpp
 
     const char* pool_task_handle::worker_name() const noexcept
     {
-        if (auto p = get())
-            if (auto w = p->worker)
+        if (auto* p = get())
+            if (auto* w = p->worker)
                 return w->name;
         return "none";
     }
@@ -60,11 +60,12 @@ namespace rpp
         return result;
     }
 
-    wait_result pool_task_handle::wait(rpp::Duration timeout, std::nothrow_t,
+    wait_result pool_task_handle::wait(rpp::Duration timeout,
+                                       [[maybe_unused]] std::nothrow_t nothrow,
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto p = get())
+        if (auto* p = get())
         {
             auto lock = p->finished.spin_lock();
             if (p->finished.wait(lock, timeout) == rpp::semaphore::timeout)
@@ -83,10 +84,11 @@ namespace rpp
         return result;
     }
 
-    wait_result pool_task_handle::wait(std::nothrow_t, std::exception_ptr* outErr) const noexcept
+    wait_result pool_task_handle::wait([[maybe_unused]] std::nothrow_t nothrow,
+                                       std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto p = get())
+        if (auto* p = get())
         {
             auto lock = p->finished.spin_lock();
             p->finished.wait(lock);
@@ -98,7 +100,7 @@ namespace rpp
 
     void pool_task_handle::signal_finished() noexcept
     {
-        if (auto p = get())
+        if (auto* p = get())
         {
             auto lock = p->finished.spin_lock();
             p->finished.notify_all(lock);
@@ -215,6 +217,7 @@ namespace rpp
     {
         if (th.joinable())
         {
+            // NOLINTBEGIN(bugprone-branch-clone)
             if (result == wait_result::timeout)
             {
                 TaskDebug("%s detaching", name);
@@ -238,6 +241,7 @@ namespace rpp
                 if (elapsed_ms >= 2.0) LogError("%s joining took excessively long", name);
             #endif
             }
+            // NOLINTEND(bugprone-branch-clone)
         }
         return result;
     }
@@ -357,10 +361,10 @@ namespace rpp
         return globalPool;
     }
 
-    void thread_pool::set_task_tracer(pool_trace_provider traceProvider)
+    void thread_pool::set_task_tracer(pool_trace_provider trace_provider)
     {
         std::lock_guard lock{ TasksMutex };
-        TraceProvider = traceProvider;
+        TraceProvider = trace_provider;
     }
 
     thread_pool::thread_pool()
@@ -392,7 +396,7 @@ namespace rpp
 
     int thread_pool::global_max_parallelism()
     {
-        return global().MaxParallelism;
+        return (int)global().MaxParallelism;
     }
 
     int thread_pool::active_tasks() noexcept
@@ -435,10 +439,10 @@ namespace rpp
         return cleared;
     }
 
-    void thread_pool::max_task_idle_time(float maxIdleSeconds) noexcept
+    void thread_pool::max_task_idle_time(float max_idle_seconds) noexcept
     {
         std::lock_guard lock{TasksMutex};
-        TaskMaxIdleTime = maxIdleSeconds;
+        TaskMaxIdleTime = max_idle_seconds;
         for (auto& task : Workers)
             task->max_idle_time(TaskMaxIdleTime);
     }
@@ -480,33 +484,34 @@ namespace rpp
         return parallel_for_task{ std::move(w), std::move(task) };
     }
 
-    void thread_pool::parallel_for(int rangeStart, int rangeEnd, int maxRangeSize,
-                                   const action<int, int>& rangeTask)
+    void thread_pool::parallel_for(int range_start, int range_end, int max_range_size,
+                                   const action<int, int>& range_task)
     {
-        if (rangeStart >= rangeEnd)
+        if (range_start >= range_end)
             return;
 
-        const uint32_t range = rangeEnd - rangeStart;
-        uint32_t maxTasks = MaxParallelism; // maximum number of Tasks to use
-        uint32_t minTasks;  // minimum number of Tasks needed
-        uint32_t maxLength; // max iter length in a single task except the last element,
-                            // eg rng=11, cor=4 ==> len 3; resulting task lengths: 3,3,3,2
-        if (maxRangeSize <= 0)
+        const int range = range_end - range_start;
+        int maxTasks = (int)MaxParallelism; // maximum number of Tasks to use, 0 disables parallelism
+        int minTasks;  // minimum number of Tasks needed
+        int maxLength; // max iter length in a single task except the last element,
+                       // eg rng=11, cor=4 ==> len 3; resulting task lengths: 3,3,3,2
+        if (max_range_size <= 0)
         {
             // not more Tasks than range size, range is guaranteed to be > 0
             minTasks = range < maxTasks ? range : maxTasks;
+            if (minTasks < 1) minTasks = 1; // avoid zero div
             // spread the range over all available cores, with last task getting the remainder
             // ex 11 / 4 --> round(2.75) --> 3
             // ex 128 / 18 --> round(7.11) --> 7
-            maxLength = (int)roundf((float)range / minTasks);
+            maxLength = (int)roundf((float)range / float(minTasks));
         }
         else
         {
-            // user specified minLength, ex: 1, 10, 10000
-            maxLength = maxRangeSize;
+            // user specified minLength, ex: 1, 10, 10000, guaranteed positive
+            maxLength = max_range_size;
             // see how many Tasks would be needed to satisfy task length
             // eg 50 / 1 => 50;  50 / 10 => 5;  50 / 10000 => 0.0025
-            minTasks = (int)ceilf((float)range / maxLength);
+            minTasks = (int)ceilf((float)range / float(maxLength));
             // clamp Tasks to number of physical cores
             // eg 50 => 4; 5 => 4; 1 => 1
             minTasks = maxTasks < minTasks ? maxTasks : minTasks;
@@ -514,32 +519,32 @@ namespace rpp
 
         // either the range is too small OR maxRangeSize calculated effective Tasks as 1
         // OR the number of physical cores is simply 1
-        if (minTasks <= 1)
+        if (range <= 1 || minTasks <= 1)
         {
             TaskDebug("parallel_for parallelism disabled");
-            rangeTask(rangeStart, rangeEnd);
+            range_task(range_start, range_end);
             return;
         }
 
         auto* active = static_cast<parallel_for_task*>(
-            alloca(maxTasks * sizeof(parallel_for_task))
+            alloca(unsigned(maxTasks) * sizeof(parallel_for_task))
         );
 
         std::exception_ptr err;
-        uint32_t spawned = 0; // actual number of spawned Tasks
-        uint32_t nextWait = 0;
+        int spawned = 0; // actual number of spawned Tasks
+        int nextWait = 0;
 
-        for (int start = rangeStart; start < rangeEnd; start += maxLength)
+        for (int start = range_start; start < range_end; start += maxLength)
         {
             int end = start + maxLength;
-            if (end > rangeEnd) end = rangeEnd; // clamp the last task
+            if (end > range_end) end = range_end; // clamp the last task
 
             // we have enough tasks to choose from
             if (spawned < maxTasks)
             {
                 // placement new on stack
                 TaskDebug("parallel_for spawning %d < %d maxTasks", spawned, maxTasks);
-                new (&active[spawned]) parallel_for_task{start_range_task(start, end, rangeTask)};
+                new (&active[spawned]) parallel_for_task{start_range_task(start, end, range_task)};
                 ++spawned;
             }
             else
@@ -560,7 +565,7 @@ namespace rpp
                         // try to run next range on the same worker that just finished
                         InTaskDebug(rpp::Timer try_run);
                         TaskDebug("parallel_for check_free try_run %s", wait.task.worker_name());
-                        if (auto task = wait.worker->run_range(start, end, rangeTask);
+                        if (auto task = wait.worker->run_range(start, end, range_task);
                             task.was_started())
                         {
                             wait.task = std::move(task);
@@ -583,10 +588,7 @@ namespace rpp
         // wait on all the spawned tasks to finish
         TaskDebug("parallel_for waiting on %d tasks", spawned);
         InTaskDebug(rpp::Timer wait_on_all);
-        // wait in reverse order, since last task is probably the slowest
-        // and suspending this thread until then makes most sense
-        for (uint32_t i = 0; i < spawned; ++i)
-        // for (int32_t i = spawned - 1; i >= 0; --i)
+        for (int i = 0; i < spawned; ++i)
         {
             active[i].task.wait(std::nothrow, &err);
         }
@@ -595,7 +597,7 @@ namespace rpp
         // and finally throw them back into the pool
         {
             std::lock_guard lock{TasksMutex};
-            for (uint32_t i = 0; i < spawned; ++i)
+            for (int i = 0; i < spawned; ++i)
             {
                 Workers.emplace_back(std::move(active[i].worker));
                 active[i].~parallel_for_task(); // manually clean up since we used alloca
@@ -607,13 +609,15 @@ namespace rpp
 
     pool_task_handle thread_pool::parallel_task(task_delegate<void()>&& generic_task) noexcept
     {
+        // move the generic task to satisfy linter
+        task_delegate<void()> gen_task { std::move(generic_task) };
         { std::lock_guard lock{TasksMutex};
             for (worker_ptr& t : Workers)
             {
                 pool_worker* worker = t.get();
                 if (!worker->running())
                 {
-                    auto task = worker->run_generic(generic_task);
+                    auto task = worker->run_generic(gen_task); // only moves if task.was_started()
                     if (task.was_started())
                         return task;
                     // else: race condition (someone else held pointer to the task and restarted it)
@@ -623,7 +627,7 @@ namespace rpp
         
         // create and run a new task atomically
         auto w = std::make_unique<pool_worker>(TaskMaxIdleTime);
-        auto task = w->run_generic(generic_task);
+        auto task = w->run_generic(gen_task); // only moves if task.was_started()
         AssertTerminate(task.was_started(), "brand new pool_task->run_generic() failed");
 
         std::lock_guard lock{TasksMutex};

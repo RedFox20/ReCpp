@@ -216,8 +216,8 @@ TestImpl(test_threadpool)
             sum2 += ptr[i];
         double serial_elapsed = timer2.elapsed();
 
-        print_info("Singlethread elapsed: %.4fs  result: %lld\n", serial_elapsed, (int64)sum2);
-        AssertThat((int64)sum2, EXPECTED_SUM);
+        print_info("Singlethread elapsed: %.4fs  result: %lld\n", serial_elapsed, sum2);
+        AssertThat(sum2, EXPECTED_SUM);
 
         const int parallelism = thread_pool::global_max_parallelism();
         print_info("Test System # Max Parallelism: %d\n", parallelism);

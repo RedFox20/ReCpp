@@ -48,7 +48,7 @@ namespace rpp
      * @note This function is optimized for 4-8 char str and 3-4 char control.
      */
     const char* strcontains(const char* str, int nstr, const char* control, int ncontrol) noexcept {
-        for (auto s = str; nstr; --nstr, ++s)
+        for (const char* s = str; nstr; --nstr, ++s)
             if (strcontains(control, ncontrol, *s)) return s; // done
         return nullptr; // not found
     }
@@ -69,7 +69,7 @@ namespace rpp
         return false;
     }
     const char16_t* strcontains(const char16_t* str, int nstr, const char16_t* control, int ncontrol) noexcept {
-        for (auto s = str; nstr; --nstr, ++s)
+        for (const char16_t* s = str; nstr; --nstr, ++s)
             if (strcontains(control, ncontrol, *s)) return s; // done
         return nullptr; // not found
     }
@@ -139,8 +139,9 @@ namespace rpp
 
     bool strview::is_whitespace() const noexcept
     {
-        auto* s = str, *e = s+len;
-        for (; s < e && *const_cast<char*>(s) <= ' '; ++s) {} // loop while is whitespace
+        const char* s = str;
+        const char* e = s + len;
+        for (; s < e && *s <= ' '; ++s) {} // loop while is whitespace
         return s == e;
     }
 
@@ -171,7 +172,8 @@ namespace rpp
         const char* s2 = s;
         for (int len1 = len; len1 > 0; --len1, ++s1, ++s2)
         {
-            char c1 = *s1, c2 = *s2;
+            char c1 = *s1;
+            char c2 = *s2;
             if (c1 < c2) return -1;
             if (c1 > c2) return +1;
         }
@@ -180,17 +182,17 @@ namespace rpp
 
     strview& strview::trim_start() noexcept
     {
-        auto s = str;
-        auto n = len;
-        for (; n && *const_cast<char*>(s) <= ' '; ++s, --n) {} // loop while is whitespace
+        const char* s = str;
+        int n = len;
+        for (; n && *s <= ' '; ++s, --n) {} // loop while is whitespace
         str = s; len = n; // result writeout
         return *this;
     }
 
     strview& strview::trim_start(const char ch) noexcept
     {
-        auto s = str;
-        auto n = len;
+        const char* s = str;
+        int n = len;
         for (; n && *s == ch; ++s, --n) {}
         str = s; len = n; // result writeout
         return *this;
@@ -198,8 +200,8 @@ namespace rpp
 
     strview& strview::trim_start(const char* chars, int nchars) noexcept
     {
-        auto s = str;
-        auto n = len;
+        const char* s = str;
+        int n = len;
         for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
         str = s; len = n;
         return *this;
@@ -207,8 +209,8 @@ namespace rpp
 
     strview& strview::trim_end() noexcept
     {
-        auto n = len;
-        auto e = str + n;
+        int n = len;
+        const char* e = str + n;
         for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
         len = n;
         return *this;
@@ -216,8 +218,8 @@ namespace rpp
 
     strview& strview::trim_end(char ch) noexcept
     {
-        auto n = len;
-        auto e = str + n;
+        int n = len;
+        const char* e = str + n;
         for (; n && *--e == ch; --n) {}
         len = n;
         return *this;
@@ -225,8 +227,8 @@ namespace rpp
 
     strview& strview::trim_end(const char* chars, int nchars) noexcept
     {
-        auto n = len;
-        auto e = str + n;
+        int n = len;
+        const char* e = str + n;
         for (; n && strcontains(chars, nchars, *--e); --n) {}
         len = n;
         return *this;
@@ -239,7 +241,7 @@ namespace rpp
             const char* needle = substr;
             const char* haystr = str;
             const char* hayend = haystr + len;
-            int firstChar = *needle;
+            int firstChar = static_cast<unsigned char>(*needle);
             while (haystr < hayend)
             {
                 haystr = static_cast<const char*>(memchr(haystr, firstChar, hayend - haystr));
@@ -262,11 +264,11 @@ namespace rpp
             const char* needle = substr;
             const char* haystr = str;
             const char* hayend = haystr + len;
-            int firstChar = *needle;
+            char firstChar = *needle;
             while (haystr < hayend)
             {
-                haystr = static_cast<const char*>(strfindi(haystr, int(hayend - haystr), firstChar));
-                if (!haystr) 
+                haystr = strfindi(haystr, int(hayend - haystr), firstChar);
+                if (!haystr)
                     return nullptr; // definitely not found
 
                 size_t haylen = hayend - haystr;
@@ -307,7 +309,9 @@ namespace rpp
     int strview::count(char ch) const noexcept
     {
         int count = 0;
-        for (auto* p = str, *e = str+len; p < e; ++p)
+        const char* p = str;
+        const char* e = str + len;
+        for (; p < e; ++p)
             if (*p == ch) ++count;
         return count;
     }
@@ -356,9 +360,9 @@ namespace rpp
 
     strview strview::split_first(char delim) const noexcept
     {
-        if (auto splitEnd = static_cast<const char*>(memchr(str, delim, size_t(len))))
-            return strview(str, splitEnd); // if we find a separator, readjust end of strview to that
-        return strview(str, len);
+        if (const auto* splitEnd = static_cast<const char*>(memchr(str, delim, size_t(len))))
+            return { str, splitEnd }; // if we find a separator, readjust end of strview to that
+        return { str, len };
     }
 
     strview strview::split_first(const char* substr, int sublen) const noexcept
@@ -370,18 +374,18 @@ namespace rpp
         while ((s = static_cast<const char*>(memchr(s, ch, size_t(l)))) != nullptr) {
             l = int(e - s);
             if (l >= sublen && strequals(s, substr, sublen)) {
-                return strview(str, s);
+                return { str, s };
             }
             --l; ++s;
         }
-        return strview(str, len);
+        return { str, len };
     }
 
     strview strview::split_second(char delim) const noexcept
     {
-        if (auto splitstart = static_cast<const char*>(memchr(str, delim, size_t(len))))
-            return strview(splitstart + 1, str+len); // readjust start, also skip the char we split at
-        return strview(str, len);
+        if (const auto* splitstart = static_cast<const char*>(memchr(str, delim, size_t(len))))
+            return { splitstart + 1, str+len }; // readjust start, also skip the char we split at
+        return { str, len };
     }
 
 
@@ -446,7 +450,8 @@ namespace rpp
 
     double strview::next_double() noexcept
     {
-        auto s = str, e = s + len;
+        const char* s = str;
+        const char* e = s + len;
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-0.25" || ".25" || "25":
             if (ch == '-' || ch == '.' || ('0' <= ch && ch <= '9')) {
@@ -461,7 +466,8 @@ namespace rpp
 
     int strview::next_int() noexcept
     {
-        auto s = str, e = s + len;
+        const char* s = str;
+        const char* e = s + len;
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-25" || "25":
             if (ch == '-' || ('0' <= ch && ch <= '9')) {
@@ -476,7 +482,8 @@ namespace rpp
 
     int64 strview::next_int64() noexcept
     {
-        auto s = str, e = s + len;
+        const char* s = str;
+        const char* e = s + len;
         for (; s < e; ++s) {
             char ch = *s; // check if we have the start of a number: "-25" || "25":
             if (ch == '-' || ('0' <= ch && ch <= '9')) {
@@ -491,8 +498,9 @@ namespace rpp
 
     NOINLINE strview& strview::skip(int nchars) noexcept
     {
-        auto s = str;
-        auto l = len, n = nchars;
+        const char* s = str;
+        int l = len;
+        int n = nchars;
         for (; l && n > 0; --l, --n, ++s) {}
         str = s; len = l;
         return *this;
@@ -500,18 +508,19 @@ namespace rpp
 
     strview& strview::skip_until(char ch) noexcept
     {
-        auto s = str;
-        auto n = len;
+        const char* s = str;
+        int n = len;
         for (; n && *s != ch; --n, ++s) {}
         str = s; len = n;
         return *this;
     }
     strview& strview::skip_until(const char* substr, int sublen) noexcept
     {
-        auto s = str, e = s + len;
+        const char* s = str;
+        const char* e = s + len;
         char ch = *substr; // starting char of the sequence
         while (s < e) {
-            if (auto p = static_cast<const char*>(memchr(s, ch, e - s))) {
+            if (const char* p = static_cast<const char*>(memchr(s, ch, e - s))) {
                 if (memcmp(p, substr, size_t(sublen)) == 0) { // match found
                     str = p; len = int(e - p);
                     return *this;
@@ -540,7 +549,8 @@ namespace rpp
 
     static void transform_chars(char* str, int len, int func(int)) noexcept
     {
-        auto s = str, e = s + len;
+        char* s = str;
+        const char* e = s + len;
         for (; s < e; ++s)
             *s = static_cast<char>(func(*s));
     }
@@ -553,8 +563,8 @@ namespace rpp
         transform_chars(const_cast<char*>(str), len, ::toupper); return *this;
     }
     char* strview::as_lower(char* dst) const noexcept {
-        auto p = dst;
-        auto s = str;
+        char* p = dst;
+        const char* s = str;
         for (int n = len; n > 0; --n)
             *p++ = static_cast<char>(::tolower(*s++));
         *p = 0;
@@ -562,8 +572,8 @@ namespace rpp
     }
     char* strview::as_upper(char* dst) const noexcept
     {
-        auto p = dst;
-        auto s = str;
+        char* p = dst;
+        const char* s = str;
         for (int n = len; n > 0; --n)
             *p++ = static_cast<char>(::toupper(*s++));
         *p = 0;
@@ -573,7 +583,7 @@ namespace rpp
     {
         string ret;
         ret.reserve(size_t(len));
-        auto s = const_cast<char*>(str);
+        char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::tolower(*s++)));
         return ret;
@@ -582,7 +592,7 @@ namespace rpp
     {
         string ret;
         ret.reserve(size_t(len));
-        auto s = const_cast<char*>(str);
+        char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::toupper(*s++)));
         return ret;
@@ -593,7 +603,7 @@ namespace rpp
     string concat(const strview& a, const strview& b)
     {
         string str;
-        auto sa = size_t(a.len), sb = size_t(b.len);
+        auto sa = size_t(a.len), sb = size_t(b.len); // NOLINT
         str.reserve(sa + sb);
         str.append(a.str, sa).append(b.str, sb);
         return str;
@@ -601,7 +611,7 @@ namespace rpp
     string concat(const strview& a, const strview& b, const strview& c)
     {
         string str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len); // NOLINT
         str.reserve(sa + sb + sc);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
         return str;
@@ -609,7 +619,7 @@ namespace rpp
     string concat(const strview& a, const strview& b, const strview& c, const strview& d)
     {
         string str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len); // NOLINT
         str.reserve(sa + sb + sc + sd);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
         return str;
@@ -617,7 +627,7 @@ namespace rpp
     string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
     {
         string str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len); // NOLINT
         str.reserve(sa + sb + sc + sd + se);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
         return str;
@@ -627,7 +637,7 @@ namespace rpp
     ustring concat(const ustrview& a, const ustrview& b)
     {
         ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len);
+        auto sa = size_t(a.len), sb = size_t(b.len); // NOLINT
         str.reserve(sa + sb);
         str.append(a.str, sa).append(b.str, sb);
         return str;
@@ -635,7 +645,7 @@ namespace rpp
     ustring concat(const ustrview& a, const ustrview& b, const ustrview& c)
     {
         ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len);
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len); // NOLINT
         str.reserve(sa + sb + sc);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
         return str;
@@ -643,7 +653,7 @@ namespace rpp
     ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d)
     {
         ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len);
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len); // NOLINT
         str.reserve(sa + sb + sc + sd);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
         return str;
@@ -651,7 +661,7 @@ namespace rpp
     ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e)
     {
         ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len);
+        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len); // NOLINT
         str.reserve(sa + sb + sc + sd + se);
         str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
         return str;
@@ -679,7 +689,8 @@ namespace rpp
 
     char* replace(char* str, int len, char chOld, char chNew) noexcept
     {
-        char* s = str, *e = s + len;
+        char* s = str;
+        char* e = s + len;
         for (; s < e; ++s) if (*s == chOld) *s = chNew;
         return str;
     }
@@ -690,7 +701,7 @@ namespace rpp
 
     strview& strview::replace(char chOld, char chNew) noexcept
     {
-        auto s = const_cast<char*>(str);
+        char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n, ++s)
             if (*s == chOld) *s = chNew;
         return *this;
@@ -711,8 +722,8 @@ namespace rpp
 
     ustrview& ustrview::trim_start() noexcept
     {
-        auto s = str;
-        auto n = len;
+        const auto* s = str;
+        int n = len;
         for (; n && *const_cast<char16_t*>(s) <= ' '; ++s, --n) {} // loop while is whitespace
         str = s; len = n; // result writeout
         return *this;
@@ -720,8 +731,8 @@ namespace rpp
 
     ustrview& ustrview::trim_start(const char16_t ch) noexcept
     {
-        auto s = str;
-        auto n = len;
+        const auto* s = str;
+        int n = len;
         for (; n && *s == ch; ++s, --n) {}
         str = s; len = n; // result writeout
         return *this;
@@ -729,8 +740,8 @@ namespace rpp
 
     ustrview& ustrview::trim_start(const char16_t* chars, int nchars) noexcept
     {
-        auto s = str;
-        auto n = len;
+        const auto* s = str;
+        int n = len;
         for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
         str = s; len = n;
         return *this;
@@ -738,8 +749,8 @@ namespace rpp
 
     ustrview& ustrview::trim_end() noexcept
     {
-        auto n = len;
-        auto e = str + n;
+        int n = len;
+        const auto* e = str + n;
         for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
         len = n;
         return *this;
@@ -747,8 +758,8 @@ namespace rpp
 
     ustrview& ustrview::trim_end(char16_t ch) noexcept
     {
-        auto n = len;
-        auto e = str + n;
+        int n = len;
+        const auto* e = str + n;
         for (; n && *--e == ch; --n) {}
         len = n;
         return *this;
@@ -756,8 +767,8 @@ namespace rpp
 
     ustrview& ustrview::trim_end(const char16_t* chars, int nchars) noexcept
     {
-        auto n = len;
-        auto e = str + n;
+        int n = len;
+        const auto* e = str + n;
         for (; n && strcontains(chars, nchars, *--e); --n) {}
         len = n;
         return *this;
@@ -780,7 +791,7 @@ namespace rpp
         const char16_t* s2 = s;
         for (int len1 = len; len1 > 0; --len1, ++s1, ++s2)
         {
-            char16_t c1 = *s1, c2 = *s2;
+            char16_t c1 = *s1, c2 = *s2; // NOLINT(readability-isolate-declaration)
             if (c1 < c2) return -1;
             if (c1 > c2) return +1;
         }
@@ -962,7 +973,7 @@ namespace rpp
             intPart = (intPart << 4) + digit; // intPart = intPart*16 + digit
         }
         if (end) *end = s; // write end of parsed value
-        return intPart;
+        return int(intPart);
     }
 
     int _tostring(char* buffer, double f, int maxDecimals) noexcept
@@ -975,8 +986,9 @@ namespace rpp
 
         // we need ceil and floor for handling -DBL_MAX edge case, or -2.0119 edge case
         // if decimals=0 the float is rounded
-        double i = maxDecimals == 0 ? round(f)
-                 : f < -0.0 ? ceil(f) : floor(f);
+        double i = maxDecimals == 0 ? round(f) : // NOLINT(readability-avoid-nested-conditional-operator)
+                           f < -0.0 ? ceil(f)  : // NOLINT(readability-avoid-nested-conditional-operator)
+                                      floor(f) ; // NOLINT(readability-avoid-nested-conditional-operator)
         uint64 absIntegral = (int64)abs(i);
 
         char* end = buffer;
@@ -998,17 +1010,17 @@ namespace rpp
                 for (int d = 0; d < maxDecimals; ++d) {
                     x *= 10;
                     int64 ix = (int64)x;
-                    x -= ix;
+                    x -= ix; // NOLINT
 
                     // CUSTOM ROUNDING RULES:
                     // handle case of 0.199999 -> 1.99999 -> int(1), but should be int(2)
                     if (1.0 > x && x > 0.9999) {
                         int64 ix2 = (int64)round(x);
                         ix += ix2;
-                        x -= ix2;
+                        x -= ix2; // NOLINT
                     }
 
-                    *end++ = '0' + (ix % 10);
+                    *end++ = char('0' + (ix % 10));
 
                     if (x < epsilon) // break from 0.750000011 cases
                         break;
@@ -1313,7 +1325,7 @@ namespace rpp
             }
             if (ch == '}')
             {
-                key = strview(buffer.str, 1);
+                key = strview{buffer.str, 1};
                 buffer.chomp_first();
                 value.clear();
                 return --depth; // } and depth dropped -- we're done parsing this section

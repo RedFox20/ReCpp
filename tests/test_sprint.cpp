@@ -8,15 +8,15 @@
 using namespace rpp;
 
 struct external_to_string { };
-std::string to_string(external_to_string) { return "external_to_string"; }
+std::string to_string([[maybe_unused]] external_to_string to_str) { return "external_to_string"; }
 
 struct member_to_string
 {
-    std::string to_string() const { return "member_to_string"; }
+    std::string to_string() const { return "member_to_string"; } // NOLINT
 };
 
 struct string_buffer_operator { };
-string_buffer& operator<<(string_buffer& sb, const string_buffer_operator&)
+string_buffer& operator<<(string_buffer& sb, [[maybe_unused]] const string_buffer_operator& sbuf_op)
 {
     return sb << "string_buffer_operator";
 }
@@ -30,12 +30,12 @@ struct string_buffer_member_operator
 };
 
 struct ostream_operator { };
-std::ostream& operator<<(std::ostream& os, const ostream_operator&)
+std::ostream& operator<<(std::ostream& os, [[maybe_unused]] const ostream_operator& ostrm_op)
 {
     return os << "ostream_operator";
 }
 
-enum stringable_enum
+enum stringable_enum : uint8_t
 {
     strenum_first,
     strenum_last,

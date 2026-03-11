@@ -36,7 +36,7 @@ namespace rpp
         if (!lastSendTime)
             return true;
 
-        const int64 waitTimeNs = int64(nextSendTimeout) - lastSendTime.elapsed_ns(now);
+        const int64 waitTimeNs = nextSendTimeout - lastSendTime.elapsed_ns(now);
         return waitTimeNs <= 0;
     }
 
@@ -51,7 +51,7 @@ namespace rpp
         }
 
         TimePoint end = start;
-        const int64 timeoutNs = int64(nextSendTimeout);
+        const int64 timeoutNs = nextSendTimeout;
         const int64 waitTimeNs = timeoutNs - timeoutStart.elapsed_ns(start);
         if (waitTimeNs > 0)
         {
@@ -84,7 +84,7 @@ namespace rpp
     void load_balancer::notify_sent(const rpp::TimePoint& now, uint32 bytesToSend) noexcept
     {
         lastSendTime = now;
-        nextSendTimeout = bytesToSend * nanosBetweenBytes;
+        nextSendTimeout = int64(bytesToSend) * int64(nanosBetweenBytes);
     }
 
     ////////////////////////////////////////////////////////////////////////////////

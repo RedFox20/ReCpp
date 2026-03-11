@@ -26,7 +26,7 @@
 #endif
 
 #if __GNUC__ || __clang__
-# include <signal.h>
+# include <csignal>
 #endif
 
 #if RPP_BARE_METAL
@@ -261,9 +261,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
             "\x1b[93m", // Warning: bright yellow
             "\x1b[91m", // Error  : bright red
         };
-        int color = severity == LogSeverityInfo ? 0 :
-                    severity == LogSeverityWarn ? 1 :
-                                                  2 ;
+        int color = severity == LogSeverityInfo ? 0 : // NOLINT
+                    severity == LogSeverityWarn ? 1 : // NOLINT
+                                                  2 ; // NOLINT
 
         // perform a double copy to avoid having to mutex lock
         constexpr rpp::strview clear = colors[0];
@@ -405,7 +405,7 @@ struct funcname_builder
     explicit funcname_builder(char* buffer, const char* original)
         : buffer{buffer}, ptr{original-1} {}
 
-    char read_next() { return len < funcname_max ? *++ptr : char('\0'); }
+    char read_next() { return len < funcname_max ? *++ptr : '\0'; }
 
     template<size_t N, size_t M> bool replace(const char (&what)[N], const char (&with)[M])
     {

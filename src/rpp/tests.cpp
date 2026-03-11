@@ -208,7 +208,7 @@ namespace rpp
     struct test::test_func
     {
         strview name;
-        rpp::mutex mutex{};
+        rpp::mutex mutex;
         test_func_type func { nullptr };
         size_t expectedExType = 0;
         std::chrono::nanoseconds elapsed_time{};
@@ -228,7 +228,7 @@ namespace rpp
         }
         void append_message(int type, const char* msg, int len)
         {
-            std::lock_guard lock {mutex};
+            std::lock_guard lock { mutex };
             message m;
             m.start_index = message_buf.size(); // we start at current stringbuf pos
             m.len = (uint16_t)len;
@@ -266,7 +266,7 @@ namespace rpp
         delete impl;
     }
 
-    enum ConsoleColor { Default, Green, Yellow, Red, };
+    enum ConsoleColor : uint8_t { Default, Green, Yellow, Red, };
 
     static void console(ConsoleColor color, const char* str, int len)
     {
@@ -449,30 +449,31 @@ namespace rpp
     static const char* get_time_str(const std::chrono::nanoseconds& time) noexcept
     {
         static thread_local char buffer[128];
-        if (time.count() < 1000ll) // less than 1us, display as 999ns
+        rpp::int64 time_ns = time.count();
+        if (time_ns < 1000ll) // less than 1us, display as 999ns
         {
-            snprintf(buffer, sizeof(buffer), "%dns", (int)time.count());
+            snprintf(buffer, sizeof(buffer), "%dns", (int)time_ns);
         }
-        else if (time.count() < 1'000'000ll) // less than 1ms, display as 999us
+        else if (time_ns < 1'000'000ll) // less than 1ms, display as 999us
         {
-            snprintf(buffer, sizeof(buffer), "%dus", (int)(time.count() / 1'000ll));
+            snprintf(buffer, sizeof(buffer), "%dus", (int)(time_ns / 1'000ll));
         }
-        else if (time.count() < 50'000'000ll) // less than 50ms, display as 49.99ms
+        else if (time_ns < 50'000'000ll) // less than 50ms, display as 49.99ms
         {
-            snprintf(buffer, sizeof(buffer), "%.2fms", time.count() / 1'000'000.0);
+            snprintf(buffer, sizeof(buffer), "%.2fms", double(time_ns) / 1'000'000.0);
         }
-        else if (time.count() < 1'000'000'000ll) // less than 1sec, display as 899.9ms
+        else if (time_ns < 1'000'000'000ll) // less than 1sec, display as 899.9ms
         {
-            snprintf(buffer, sizeof(buffer), "%.1fms", time.count() / 1'000'000.0);
+            snprintf(buffer, sizeof(buffer), "%.1fms", double(time_ns) / 1'000'000.0);
         }
-        else if (time.count() < 60'000'000'000ll) // less than 1min, display as 59.91s
+        else if (time_ns < 60'000'000'000ll) // less than 1min, display as 59.91s
         {
-            snprintf(buffer, sizeof(buffer), "%.2fs", time.count() / 1'000'000'000.0);
+            snprintf(buffer, sizeof(buffer), "%.2fs", double(time_ns) / 1'000'000'000.0);
         }
         else // over 1 min, display as 120m 59s
         {
-            int minutes = (int)(time.count() / 60'000'000'000ll);
-            int seconds = (int)((time.count() % 60'000'000'000ll) / 1'000'000'000ll);
+            int minutes = (int)(time_ns / 60'000'000'000ll);
+            int seconds = (int)((time_ns % 60'000'000'000ll) / 1'000'000'000ll);
             snprintf(buffer, sizeof(buffer), "%dm %ds", minutes, seconds);
         }
         return buffer;
@@ -860,7 +861,7 @@ namespace rpp
         // if arg is provided, we assume they are:
         // test_testname or testname or -test_testname or -testname
         // OR to run a specific test:  testname.specifictest
-        std::unordered_set<strview> enabled, disabled;
+        std::unordered_set<strview> enabled, disabled; // NOLINT
         for (strview arg : args)
         {
             strview testName = arg.next('.');

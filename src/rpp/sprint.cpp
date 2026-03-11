@@ -238,7 +238,7 @@ namespace rpp
 
     void string_buffer::pretty_cont_start(int count, bool newlines) noexcept
     {
-        if (count == 0) return write("{}");
+        if (count == 0) { write("{}"); return; }
         if (count > 4) { write('['); write(count); write("] = { "); }
         else { write("{ "); }
         if (newlines) write('\n');

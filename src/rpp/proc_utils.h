@@ -39,13 +39,13 @@ namespace rpp
     {
         /// @brief Total CPU time used in microseconds.
         ///        User + Kernel.
-        uint64 cpu_time_us = 0;
+        int64 cpu_time_us = 0;
 
         /// @brief Total CPU time used in user mode in microseconds.
-        uint64 user_time_us = 0;
+        int64 user_time_us = 0;
 
         /// @brief Total CPU time used in kernel mode in microseconds.
-        uint64 kernel_time_us = 0;
+        int64 kernel_time_us = 0;
 
         double cpu_time_ms() const noexcept { return cpu_time_us / 1'000.0; }
         double user_time_ms() const noexcept { return user_time_us / 1'000.0; }

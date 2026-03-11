@@ -17,8 +17,8 @@ TestImpl(test_concurrent_queue)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
-    TimePoint Now() { return TimePoint::now(); }
-    constexpr Duration Millis(int millis) { return Duration::from_millis(millis); }
+    static TimePoint Now() { return TimePoint::now(); }
+    static constexpr Duration Millis(int millis) { return Duration::from_millis(millis); }
 
     TestInit(test_concurrent_queue)
     {
@@ -120,7 +120,7 @@ TestImpl(test_concurrent_queue)
 
         {
             auto iterator = queue.iterator();
-            for (auto it = iterator.begin(); it != iterator.end(); )
+            for (auto* it = iterator.begin(); it != iterator.end(); )
             {
                 if (*it % 2 == 0)
                     it = iterator.erase(it);
@@ -277,7 +277,7 @@ TestImpl(test_concurrent_queue)
         });
 
         cfuture<> consumer = rpp::async_task([&] {
-            std::string item1, item2, item3;
+            std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
             AssertTrue(queue.wait_pop(item2));
@@ -303,7 +303,7 @@ TestImpl(test_concurrent_queue)
         explicit operator bool() const noexcept { return success; }
     };
 
-    PopResult wait_pop_timed(concurrent_queue<std::string>& queue, Duration timeout)
+    static PopResult wait_pop_timed(concurrent_queue<std::string>& queue, Duration timeout)
     {
         PopResult r;
         rpp::Timer t;
@@ -363,7 +363,7 @@ TestImpl(test_concurrent_queue)
         AssertWaitPopTimed(Millis(1000), true, /*item*/"item4", /*elapsed ms:*/ 0.0, 110.0);
     }
 
-    PopResult wait_pop_until(concurrent_queue<std::string>& queue, TimePoint until)
+    static PopResult wait_pop_until(concurrent_queue<std::string>& queue, TimePoint until)
     {
         PopResult r;
         rpp::Timer t;
