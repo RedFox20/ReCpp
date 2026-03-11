@@ -13,7 +13,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
-      - run: sudo apt-get install clang-17 libc++-17-dev libc++abi-17-dev -y
+      - run: pipenv run mama install-clang-18
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama clang verbose build with_tests
       - run: pipenv run mama clang verbose test="nogdb -vv"
@@ -30,7 +30,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
-      - run: sudo apt-get install clang-17 libc++-17-dev libc++abi-17-dev -y
+      - run: pipenv run mama install-clang-18
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama clang clang-tidy verbose build with_tests
       - run: pipenv run mama clang verbose test="nogdb -vv"
@@ -44,7 +44,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
-      - run: sudo apt-get install gcc-13 -y
+      - run: pipenv run mama install-gcc-13
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama gcc verbose build with_tests coverage=src asan
       - run: pipenv run mama gcc coverage-report=src verbose test="nogdb -vv"
@@ -58,7 +58,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
-      - run: sudo apt-get install gcc-13 -y
+      - run: pipenv run mama install-gcc-13
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama gcc clang-tidy verbose build with_tests
       - run: pipenv run mama gcc verbose test="nogdb -vv"
@@ -72,7 +72,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
       - run: pipenv install mama
-      - run: sudo apt-get install gcc-13 -y
+      - run: pipenv run mama install-gcc-13
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama gcc verbose build with_tests tsan
       - run: pipenv run mama gcc verbose test="nogdb -vv"
@@ -87,7 +87,7 @@ jobs:
   #     - run: sudo apt-get update
   #     - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
   #     - run: pipenv install mama
-  #     - run: sudo apt-get install gcc-13 -y
+  #     - run: pipenv run mama install-gcc-13
   #     - run: make configure-cmake
   #     - run: CXX20=1 pipenv run mama gcc verbose build with_tests ubsan
   #     - run: pipenv run mama gcc verbose test="nogdb -vv" || true
