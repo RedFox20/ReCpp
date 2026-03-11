@@ -317,6 +317,8 @@ namespace rpp /* ReCpp */
          * @param newLength The new length of the file, with any data in the front discarded
          */
         void truncate_front(int64 newLength) noexcept;
+        // uses a smaller buffer, so uses less memory, but will do more file ops
+        void truncate_front_sb(int64 newLength) noexcept;
 
         /**
          * Truncate end of file
