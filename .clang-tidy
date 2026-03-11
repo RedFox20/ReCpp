@@ -7,11 +7,9 @@ Checks: >
     readability-*,
     performance-*,
     clang-diagnostic-*,
-    -readability-function-cognitive-complexity,
     -readability-identifier-length,
     -readability-braces-around-statements,
     -readability-uppercase-literal-suffix,
-    -readability-math-missing-parentheses,
     -readability-magic-numbers,
     -readability-implicit-bool-conversion,
     -readability-else-after-return,
@@ -31,3 +29,10 @@ WarningsAsErrors: '*'
 
 ExtraArgsBefore:
     - -Wno-unknown-warning-option
+
+CheckOptions:
+    - key: readability-function-cognitive-complexity.Threshold
+      value: 30
+    - key: readability-function-cognitive-complexity.IgnoreMacros
+      value: true
+

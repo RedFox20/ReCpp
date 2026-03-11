@@ -107,10 +107,21 @@ namespace rpp
          * Runs all the registered tests on this test impl.
          * If a non-empty methodFilter is provided, then only test methods that contain
          * the methodFilter substring are run
+         * @param results ALL test results
          * @return TRUE if ALL tests passed, FALSE if any failure
          */
         bool run_test(test_results& results, strview methodFilter = {});
     private:
+        struct suite_results // intermediate results for a test suite run
+        {
+            int num_tests_run = 0;
+            int num_tests_passed = 0;
+            int num_tests_failed = 0;
+            bool all_success() const noexcept { return num_tests_passed == num_tests_run; }
+        };
+        suite_results run_test_suite(strview methodFilter);
+        void print_test_suite_title(TestVerbosity verb, strview methodFilter);
+        void print_test_suite_summary(TestVerbosity verb, const suite_results& r);
         bool run_test_func(test_func& test);
 
     public:
