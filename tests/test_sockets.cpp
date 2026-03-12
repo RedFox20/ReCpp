@@ -29,13 +29,28 @@ TestImpl(test_sockets)
         for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA); // NOLINT(modernize-*)
     }
 
+    socket create_udp_listener(socket_option opt = SO_None)
+    {
+        static int next_port = 30'000 + (rand() % 5000); // randomize the starting port to reduce chance of conflicts in parallel test runs
+        int first_port = next_port;
+        int last_port = first_port + 100;
+        for (int port = first_port; port < last_port; ++port)
+        {
+            ++next_port;
+            socket s = socket::listen_to_udp(port, opt);
+            if (s.good()) return s;
+        }
+        AssertFailed("Failed to create UDP listener socket on any port in range [%d,%d)", first_port, last_port);
+        return make_udp_randomport(opt);
+    }
+
     TestCase(socket_doesnt_smash_stack)
     {
         uint8_t before[4] = { 0xBB,0xBB,0xBB,0xBB };
         socket s;
         uint8_t after[4] = { 0xAA,0xAA,0xAA,0xAA };
 
-        s = socket::listen_to_udp(33010);
+        s = create_udp_listener();
         AssertTrue(s.good());
         AssertTrue(!s.address().is_empty());
         AssertTrue(s.address().is_valid());
@@ -263,7 +278,7 @@ TestImpl(test_sockets)
 
     TestCase(udp_socket_options)
     {
-        socket sock = socket::listen_to_udp(33010);
+        socket sock = create_udp_listener();
 
         AssertThat(sock.is_blocking(), socket::DEFAULT_BLOCKING);
         AssertThat(sock.is_nodelay(), socket::DEFAULT_NODELAY);
@@ -324,8 +339,8 @@ TestImpl(test_sockets)
     TestCase(socket_udp_send_receive)
     {
         std::vector<uint8_t> msg(4000, 'x');
-        socket send = socket::listen_to_udp(33010);
-        socket recv = socket::listen_to_udp(33011);
+        socket send = create_udp_listener();
+        socket recv = create_udp_listener();
         AssertThat(send.is_blocking(), socket::DEFAULT_BLOCKING);
         AssertThat(recv.is_blocking(), socket::DEFAULT_BLOCKING);
 
@@ -428,8 +443,8 @@ TestImpl(test_sockets)
 
     TestCase(udp_poll_nonblocking_select)
     {
-        socket send = socket::listen_to_udp(33010, rpp::SO_NonBlock);
-        socket recv = socket::listen_to_udp(33011, rpp::SO_NonBlock);
+        socket send = create_udp_listener(rpp::SO_NonBlock);
+        socket recv = create_udp_listener(rpp::SO_NonBlock);
         send.set_blocking(false);
         recv.set_blocking(false);
         run_poll_test(send, recv, [&](int timeout)
@@ -440,8 +455,8 @@ TestImpl(test_sockets)
     
     TestCase(udp_poll_nonblocking_poll)
     {
-        socket send = socket::listen_to_udp(33010, rpp::SO_NonBlock);
-        socket recv = socket::listen_to_udp(33011, rpp::SO_NonBlock);
+        socket send = create_udp_listener(rpp::SO_NonBlock);
+        socket recv = create_udp_listener(rpp::SO_NonBlock);
         send.set_blocking(false);
         recv.set_blocking(false);
         run_poll_test(send, recv, [&](int timeout)
@@ -452,8 +467,8 @@ TestImpl(test_sockets)
 
     TestCase(udp_poll_blocking_select)
     {
-        socket send = socket::listen_to_udp(33010, rpp::SO_Blocking);
-        socket recv = socket::listen_to_udp(33011, rpp::SO_Blocking);
+        socket send = create_udp_listener(rpp::SO_Blocking);
+        socket recv = create_udp_listener(rpp::SO_Blocking);
         send.set_blocking(true);
         recv.set_blocking(true);
         run_poll_test(send, recv, [&](int timeout)
@@ -464,8 +479,8 @@ TestImpl(test_sockets)
 
     TestCase(udp_poll_blocking_poll)
     {
-        socket send = socket::listen_to_udp(33010);
-        socket recv = socket::listen_to_udp(33011);
+        socket send = create_udp_listener(rpp::SO_Blocking);
+        socket recv = create_udp_listener(rpp::SO_Blocking);
         send.set_blocking(true);
         recv.set_blocking(true);
         run_poll_test(send, recv, [&](int timeout)
@@ -476,9 +491,9 @@ TestImpl(test_sockets)
 
     TestCase(udp_poll_multi)
     {
-        socket send = socket::listen_to_udp(33010);
-        socket recv1 = socket::listen_to_udp(33011);
-        socket recv2 = socket::listen_to_udp(33012);
+        socket send = create_udp_listener();
+        socket recv1 = create_udp_listener();
+        socket recv2 = create_udp_listener();
         auto recv1_addr = ipaddress(AF_IPv4, "127.0.0.1", recv1.port());
         auto recv2_addr = ipaddress(AF_IPv4, "127.0.0.1", recv2.port());
 
@@ -578,10 +593,14 @@ TestImpl(test_sockets)
     {
         const int NUM_MESSAGES = 500;
         const int MSG_SIZE = 200;
-        socket send = socket::listen_to_udp(33010, rpp::SO_Blocking);
-        socket recv = socket::listen_to_udp(33011, rpp::SO_NonBlock);
+        socket send = create_udp_listener(rpp::SO_Blocking);
+        socket recv = create_udp_listener(rpp::SO_NonBlock);
+        // these will usually fail due to system defined limits, so try to set and then divide send buffer
         send.set_snd_buf_size(512*1024);
-        recv.set_rcv_buf_size(1024*1024);
+        recv.set_rcv_buf_size(512*1024);
+        send.set_snd_buf_size(send.get_snd_buf_size() / 4);
+        print_info("Send buffer size: %d bytes\n", send.get_snd_buf_size());
+        print_info("Recv buffer size: %d bytes\n", recv.get_rcv_buf_size());
         send.set_blocking(true);
         recv.set_blocking(false);
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
@@ -622,9 +641,9 @@ TestImpl(test_sockets)
     {
         const int NUM_MESSAGES = 500;
         const int MSG_SIZE = 200;
-        socket send = socket::listen_to_udp(33010);
-        socket recv1 = socket::listen_to_udp(33011);
-        socket recv2 = socket::listen_to_udp(33012);
+        socket send = create_udp_listener();
+        socket recv1 = create_udp_listener();
+        socket recv2 = create_udp_listener();
         send.set_blocking(true);
         recv1.set_blocking(false);
         recv2.set_blocking(false);
@@ -679,10 +698,14 @@ TestImpl(test_sockets)
         const int NUM_MESSAGES = 2'000;
         const int MSG_SIZE = 200;
         // create a dedicated port to avoid accidental interference
-        socket send = socket::listen_to_udp(33010, rpp::SO_Blocking);
-        socket recv = socket::listen_to_udp(33011, rpp::SO_Blocking);
+        socket send = create_udp_listener(rpp::SO_Blocking);
+        socket recv = create_udp_listener(rpp::SO_Blocking);
+        // these will usually fail due to system defined limits, so try to set and then divide send buffer
         send.set_snd_buf_size(512*1024);
-        recv.set_rcv_buf_size(1024*1024);
+        recv.set_rcv_buf_size(512*1024);
+        send.set_snd_buf_size(send.get_snd_buf_size() / 4);
+        print_info("Send buffer size: %d bytes\n", send.get_snd_buf_size());
+        print_info("Recv buffer size: %d bytes\n", recv.get_rcv_buf_size());
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         rpp::Timer t;
@@ -691,13 +714,14 @@ TestImpl(test_sockets)
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
                 send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
+                if (i % 200 == 0) rpp::sleep_ms(1); // throttle to avoid kernel dropping packets
             }
         });
         auto receiver = rpp::async_task([this, &recv, &t]()
         {
             char buffer[4096];
             int num_received = 0;
-            while (num_received < NUM_MESSAGES && t.elapsed_ms() < 5000)
+            while (num_received < NUM_MESSAGES && t.elapsed_ms() < 4000)
             {
                 rpp::ipaddress from;
                 int r = recv.recvfrom(from, buffer, sizeof(buffer)); // BLOCKING
@@ -733,8 +757,8 @@ TestImpl(test_sockets)
 
     TestCase(udp_flush)
     {
-        socket send = socket::listen_to_udp(33010);
-        socket recv = socket::listen_to_udp(33011);
+        socket send = create_udp_listener();
+        socket recv = create_udp_listener();
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         send.sendto(recv_addr, "udp_flush");
@@ -757,8 +781,8 @@ TestImpl(test_sockets)
 
     TestCase(udp_peek)
     {
-        socket send = socket::listen_to_udp(33010);
-        socket recv = socket::listen_to_udp(33011);
+        socket send = create_udp_listener();
+        socket recv = create_udp_listener();
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         send.sendto(recv_addr, "udp_peek1");
@@ -781,8 +805,8 @@ TestImpl(test_sockets)
 
     TestCase(recv_vector_data)
     {
-        socket send = socket::listen_to_udp(33010);
-        socket recv = socket::listen_to_udp(33011);
+        socket send = create_udp_listener();
+        socket recv = create_udp_listener();
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         std::vector<uint8_t> v1 {'a','b','c','d'};
@@ -1080,7 +1104,7 @@ TestImpl(test_sockets)
         // setup load balancer at 2MB/s
         rpp::load_balancer balancer { 2 * 1024 * 1024 };
 
-        rpp::socket receiverSocket = socket::listen_to_udp(33010);
+        rpp::socket receiverSocket = create_udp_listener();
         AssertTrue(receiverSocket.good());
         std::atomic_bool running { true };
 
@@ -1098,7 +1122,7 @@ TestImpl(test_sockets)
             }
         );
 
-        rpp::socket sender = socket::listen_to_udp(33011);
+        rpp::socket sender = create_udp_listener();
         AssertTrue(sender.good());
         uint8_t buffer[1024];
 

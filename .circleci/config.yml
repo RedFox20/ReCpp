@@ -39,13 +39,13 @@ jobs:
       - run: pipenv run mama install-<< parameters.cc_version >>
       - run: make configure-cmake
       - run:
-          name: Build
+          name: Build << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
             COVERAGE=$([[ $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests
       - run:
-          name: Tests
+          name: Test << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
             COVERAGE=$([[ $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage-report=src" || echo "")
