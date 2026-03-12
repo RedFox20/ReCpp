@@ -303,6 +303,7 @@ namespace rpp
                 {
                     auto lock = new_task_flag.spin_lock();
                     current_task.signal_finished();
+                    current_task = pool_task_handle{nullptr};
                 }
             }
             // prevent failures that would terminate the thread
@@ -328,6 +329,7 @@ namespace rpp
             p->error = std::current_exception();
             current_task.signal_finished();
         }
+        current_task = pool_task_handle{nullptr};
     }
 
     bool pool_worker::wait_for_new_job(std::unique_lock<mutex>& lock) noexcept

@@ -23,10 +23,6 @@ jobs:
         enum: ["asan", "clang-tidy", "tsan"]
         default: "asan"
         description: "Sanitizer/analysis tool to use"
-      coverage_report:
-        type: boolean
-        default: false
-        description: "Enable coverage reporting"
     description: "Ubuntu << parameters.compiler >> << parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     resource_class: medium+
     docker:
@@ -46,13 +42,13 @@ jobs:
           name: Build
           command: |
             export $CPP_STANDARD=1
-            COVERAGE=$(<< parameters.coverage_report >> && echo "coverage=src" || echo "")
+            COVERAGE=$([[ $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests
       - run:
           name: Tests
           command: |
             export $CPP_STANDARD=1
-            COVERAGE=$(<< parameters.coverage_report >> && echo "coverage-report=src" || echo "")
+            COVERAGE=$([[ $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage-report=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $COVERAGE test="nogdb -vv"
   msvc-win64-cpp20:
     description: Windows MSVC C++20 VS2022 x64 Build
@@ -111,28 +107,15 @@ workflows:
           name: clang-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: clang
           cc_version: clang-18
-          coverage_report: false
       # GCC builds on Ubuntu
       - ubuntu-build:
           matrix:
             parameters:
               cpp_version: ["20", "23"]
               sanitizer: ["asan", "clang-tidy", "tsan"]
-            exclude:
-              - cpp_version: "20"
-                sanitizer: asan
           name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: gcc
           cc_version: gcc-13
-          coverage_report: false
-      # GCC C++20 asan with coverage reporting
-      - ubuntu-build:
-          name: gcc-ubuntu-cpp20-asan
-          compiler: gcc
-          cc_version: gcc-13
-          cpp_version: "20"
-          sanitizer: asan
-          coverage_report: true
       # Other platform builds
       - msvc-win64-cpp20
       - gcc-mipsel-cpp20
