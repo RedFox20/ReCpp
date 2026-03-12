@@ -18,6 +18,8 @@ class ReCpp(mama.BuildTarget):
         self.enable_from_env('BUILD_WITH_CODE_COVERAGE')
         self.enable_from_env('CXX17', force=self.is_enabled_cxx17())
         self.enable_from_env('CXX20', force=self.is_enabled_cxx20())
+        self.enable_from_env('CXX23', force=self.is_enabled_cxx23())
+        self.enable_from_env('CXX26', force=self.is_enabled_cxx26())
 
 
     def package(self):
