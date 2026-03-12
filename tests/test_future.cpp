@@ -18,9 +18,11 @@ TestImpl(test_future)
             ::sleep_for(15ms);
             return "future string";
         }};
-        std::thread{[&]{ loadString(); }}.detach();
 
+        // race condition: make sure future is retrieved before starting the task
         cfuture<std::string> futureString = loadString.get_future();
+
+        std::thread{[&]{ loadString(); }}.detach();
         cfuture<bool> chain = futureString.then([](std::string arg) -> bool
         {
             return !arg.empty() && arg == "future string";
@@ -53,10 +55,12 @@ TestImpl(test_future)
             ::sleep_for(15ms);
             return "some string";
         }};
-        std::thread{[&]{ loadString(); }}.detach();
+
+        // race condition: make sure future is retrieved before starting the task
+        cfuture<std::string> futureString = loadString.get_future();
 
         bool continuationCalled = false;
-        cfuture<std::string> futureString = loadString.get_future();
+        std::thread{[&]{ loadString(); }}.detach();
         cfuture<void> async = futureString.then([&](std::string s)
         {
             continuationCalled = true;

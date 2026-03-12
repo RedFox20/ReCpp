@@ -399,18 +399,22 @@ static const int funcname_max = 48;
 
 struct funcname_builder
 {
-    char* buffer;
+    char buffer[64];
     const char* ptr;
-    int len = 0;
+    int len;
 
-    explicit funcname_builder(char* buffer, const char* original)
-        : buffer{buffer}, ptr{original-1} {}
-
-    char read_next() { return len < funcname_max ? *++ptr : '\0'; }
-
-    template<size_t N, size_t M> bool replace(const char (&what)[N], const char (&with)[M])
+    void reset(const char* start)
     {
-        if (memcmp(ptr, what, N - 1) == 0)
+        len = 0;
+        ptr = start;
+    }
+
+    char read_next() noexcept { return len < funcname_max ? *++ptr : '\0'; }
+    void append(char ch) noexcept { buffer[len++] = ch; }
+
+    template<size_t N, size_t M> bool replace(const char (&what)[N], const char (&with)[M]) noexcept
+    {
+        if (cur_ptr_equals<N>(what))
         {
             memcpy(&buffer[len], with, M - 1);
             len += M - 1;
@@ -418,16 +422,20 @@ struct funcname_builder
         }
         return false;
     }
-    template<size_t N> bool skip(const char (&what)[N])
+    template<size_t N> bool skip(const char (&what)[N]) noexcept
     {
-        if (memcmp(ptr, what, N - 1) == 0) {
+        if (cur_ptr_equals<N>(what)) {
             ptr += N - 2; // - 2 because next() will bump the pointer
             return true;
         }
         return false;
     }
-
-    void append(char ch) { buffer[len++] = ch; }
+    template<size_t N> bool cur_ptr_equals(const char (&what)[N]) const noexcept
+    {
+        for (const char* p = ptr, *w = what; (*p || *w); ++p, ++w)
+            if (*p != *w) return false;
+        return true;
+    }
 };
 
 RPPCAPI const char* _LogFuncname(const char* longFuncName)
@@ -435,18 +443,23 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName)
     if (DisableFunctionNames) return "";
     if (longFuncName == nullptr) return "(null)";
 
+    static thread_local funcname_builder fb;
+
     // always skip the first ::
-    const char* ptr = strchr(longFuncName, ':');
-    if (ptr != nullptr) {
+    if (const char* ptr = strchr(longFuncName, ':'))
+    {
         if (*++ptr == ':') ++ptr;
-    } else ptr = longFuncName;
+        fb.reset(ptr);
+    }
+    else
+    {
+        fb.reset(longFuncName);
+    }
 
-    static thread_local char funcname_buf[64];
-
-    funcname_builder fb { funcname_buf, ptr };
     while (char ch = fb.read_next())
     {
-        if (ch == '<') {
+        if (ch == '<')
+        {
             // replace invoke<<lambda_....>&> with just invoke<lambda>
             if (fb.replace("<<lambda", "<lambda>")) break; // no idea how long lambda, so stop here
             if (fb.replace("<lambda", "lambda"))    break;
