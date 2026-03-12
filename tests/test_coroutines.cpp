@@ -220,11 +220,12 @@ TestImpl(test_coroutines)
     cfuture<void> functor_nonfuture_void_coro()
     {
         std::string result = "default";
+        // tests functor_awaiter<void>, lambda is converted to rpp::delegate<void()>
         co_await [&]() -> void {
             rpp::sleep_ms(1);
-            result = "string from lambda coro";
+            result = "string from lambda coro with dynamic alloc";
         };
-        AssertThat(result, "string from lambda coro"s);
+        AssertThat(result, "string from lambda coro with dynamic alloc"s);
     }
     TestCase(functor_nonfuture_void_coro)
     {
@@ -234,12 +235,13 @@ TestImpl(test_coroutines)
 
     cfuture<void> functor_nonfuture_string_coro()
     {
+        // tests functor_awaiter<T> with a return value, lambda is converted to rpp::delegate<std::string()>
         std::string result = co_await [&]() -> std::string {
             rpp::sleep_ms(1);
-            std::string r = "string from lambda coro";
+            std::string r = "string from lambda coro with dynamic alloc";
             return r;
         };
-        AssertThat(result, "string from lambda coro"s);
+        AssertThat(result, "string from lambda coro with dynamic alloc"s);
     }
     TestCase(functor_nonfuture_string_coro)
     {
