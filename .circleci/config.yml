@@ -3,7 +3,7 @@ orbs:
   win: circleci/windows@5.0 # VS2022
 
 jobs:
-  ubuntu-cpp-build:
+  ubuntu-build:
     parameters:
       compiler:
         type: enum
@@ -15,9 +15,9 @@ jobs:
         description: "Compiler version (gcc-13 or clang-18)"
       cpp_version:
         type: enum
-        enum: ["CXX20", "CXX23"]
-        default: "CXX20"
-        description: "C++ standard version"
+        enum: ["20", "23", "26"]
+        default: "20"
+        description: "C++ standard version (20, 23, or 26)"
       sanitizer:
         type: enum
         enum: ["asan", "clang-tidy", "tsan"]
@@ -34,7 +34,7 @@ jobs:
     environment:
       COMPILER_NAME: << parameters.compiler >>
       SANITIZER_FLAG: << parameters.sanitizer >>
-      CPP_STANDARD: << parameters.cpp_version >>
+      CPP_STANDARD: CXX<< parameters.cpp_version >>
     steps:
       - checkout
       - run: sudo apt-get update
@@ -45,13 +45,13 @@ jobs:
       - run:
           name: Build
           command: |
-            export ${CPP_STANDARD}=1
+            export $CPP_STANDARD=1
             COVERAGE=$(<< parameters.coverage_report >> && echo "coverage=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests
       - run:
           name: Tests
           command: |
-            export ${CPP_STANDARD}=1
+            export $CPP_STANDARD=1
             COVERAGE=$(<< parameters.coverage_report >> && echo "coverage-report=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $COVERAGE test="nogdb -vv"
   msvc-win64-cpp20:
@@ -102,50 +102,37 @@ jobs:
 workflows:
   build_all:
     jobs:
-      # Clang C++20 builds
-      - ubuntu-cpp-build:
-          name: clang-ubuntu-cpp20
+      # Clang builds on Ubuntu
+      - ubuntu-build:
+          matrix:
+            parameters:
+              cpp_version: ["20", "23"]
+              sanitizer: ["asan", "clang-tidy", "tsan"]
+          name: clang-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: clang
           cc_version: clang-18
-          cpp_version: CXX20
-          sanitizer: asan
           coverage_report: false
-      - ubuntu-cpp-build:
-          name: clang-ubuntu-tidy-cpp20
-          compiler: clang
-          cc_version: clang-18
-          cpp_version: CXX20
-          sanitizer: clang-tidy
-          coverage_report: false
-      - ubuntu-cpp-build:
-          name: clang-ubuntu-tsan-cpp20
-          compiler: clang
-          cc_version: clang-18
-          cpp_version: CXX20
-          sanitizer: tsan
-          coverage_report: false
-      # GCC C++20 builds
-      - ubuntu-cpp-build:
-          name: gcc-ubuntu-cpp20
+      # GCC builds on Ubuntu
+      - ubuntu-build:
+          matrix:
+            parameters:
+              cpp_version: ["20", "23"]
+              sanitizer: ["asan", "clang-tidy", "tsan"]
+            exclude:
+              - cpp_version: "20"
+                sanitizer: asan
+          name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: gcc
           cc_version: gcc-13
-          cpp_version: CXX20
+          coverage_report: false
+      # GCC C++20 asan with coverage reporting
+      - ubuntu-build:
+          name: gcc-ubuntu-cpp20-asan
+          compiler: gcc
+          cc_version: gcc-13
+          cpp_version: "20"
           sanitizer: asan
           coverage_report: true
-      - ubuntu-cpp-build:
-          name: gcc-ubuntu-tidy-cpp20
-          compiler: gcc
-          cc_version: gcc-13
-          cpp_version: CXX20
-          sanitizer: clang-tidy
-          coverage_report: false
-      - ubuntu-cpp-build:
-          name: gcc-ubuntu-tsan-cpp20
-          compiler: gcc
-          cc_version: gcc-13
-          cpp_version: CXX20
-          sanitizer: tsan
-          coverage_report: false
       # Other platform builds
       - msvc-win64-cpp20
       - gcc-mipsel-cpp20

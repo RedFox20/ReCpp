@@ -19,6 +19,7 @@ Checks: >
     -modernize-avoid-variadic-functions,
     -modernize-use-nodiscard,
     -modernize-use-auto,
+    -modernize-use-std-print,
     -clang-diagnostic-format,
     -clang-diagnostic-c99-designator,
     -performance-no-int-to-ptr,
