@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib> // alloca
+#include <exception> // std::terminate
 
 #if __ANDROID__
 # include <android/log.h>

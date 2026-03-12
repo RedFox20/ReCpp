@@ -543,11 +543,15 @@ namespace rpp
         if (verb >= TestVerbosity::TestLabels)
         {
             char title[256];
-            // store the title length for later use in printing the closing "-------" line
-            impl->title_length = methodFilter
+            int len = methodFilter
                 ? snprintf(title, sizeof(title), "--------  running '%s.%.*s'  --------\n", name.str, methodFilter.len, methodFilter.str)
                 : snprintf(title, sizeof(title), "--------  running '%s'  --------\n", name.str);
-            console(Yellow, title, impl->title_length);
+            if (len < 0 || len >= (int)sizeof(title)) {
+                len = (int)sizeof(title) - 1;
+                title[len] = '\0';
+            }
+            console(Yellow, title, len);
+            impl->title_length = len; // store the title length for later use in printing the closing "-------" line
         }
     }
 
@@ -571,6 +575,10 @@ namespace rpp
         {
             char summary[256];
             int summary_len = impl->title_length - 1;
+            if (summary_len < 0)
+                summary_len = 0;
+            else if (summary_len > (int)sizeof(summary) - 2)
+                summary_len = (int)sizeof(summary) - 2;
             memset(summary, '-', (size_t)summary_len);
             summary[summary_len++] = '\n';
             summary[summary_len++] = '\n';

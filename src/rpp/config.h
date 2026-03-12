@@ -216,6 +216,11 @@
 #  define _HAS_STD_BYTE 0
 #endif
 
+// libc++ headers do transitive includes, which causes some issues with clang-tidy, so we disable them here
+#ifndef _LIBCPP_REMOVE_TRANSITIVE_INCLUDES
+#  define _LIBCPP_REMOVE_TRANSITIVE_INCLUDES 1
+#endif
+
 #ifndef NOCOPY_NOMOVE
 #define NOCOPY_NOMOVE(T) \
     T(T&& fwd)             = delete; \
