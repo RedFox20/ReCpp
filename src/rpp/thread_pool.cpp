@@ -124,7 +124,11 @@ namespace rpp
 
     pool_worker::~pool_worker() noexcept
     {
-        kill();
+        { // only lock briefly and set the flag, then enter the kill wait
+            auto lock = new_task_flag.spin_lock();
+            destroying = true;
+        }
+        kill(0/*0=no timeout*/);
     }
 
     void pool_worker::max_idle_time(float max_idle_seconds) noexcept
@@ -142,28 +146,25 @@ namespace rpp
             TaskDebug("%s task already running", name);
             return { nullptr };
         }
-
-        current_task = pool_task_handle{this};
-        range_task   = newTask;
-        range_start  = start;
-        range_end    = end;
-        new_task_flag.notify_all(lock);
-        if (lock.owns_lock())
-            lock.unlock();
-
-        if (killed)
+        if (destroying)
         {
-            TaskDebug("%s resurrecting", name);
-            killed = false;
-            (void)join_or_detach(wait_result::finished);
-            th = std::thread{[this] { run(); }}; // restart thread if needed
+            TaskDebug("%s pool is beying destroyed", name);
+            return { nullptr };
         }
 
-        // WARNING: this can be VERY slow
-        if (auto tracer = TraceProvider)
-            current_task->trace = tracer();
+        range_task  = newTask;
+        range_start = start;
+        range_end   = end;
+        auto task = set_current_task_and_unlock(lock);
+        // no state modification after this point !
 
-        return current_task;
+        if (auto tracer = TraceProvider) // WARNING: this can be VERY slow
+        {
+            std::string trace = tracer(); // run the trace specifically in this scope and unlocked
+            auto lock = new_task_flag.spin_lock();
+            task->trace = std::move(trace);
+        }
+        return task;
     }
 
     // NOLINTBEGIN(clang-analyzer-cplusplus.Move)
@@ -176,14 +177,33 @@ namespace rpp
             TaskDebug("%s task already running", name);
             return { nullptr };
         }
+        if (destroying)
+        {
+            TaskDebug("%s pool is beying destroyed", name);
+            return { nullptr };
+        }
 
-        current_task = pool_task_handle{this};
         generic_task = std::move(newTask);
-        new_task_flag.notify_all(lock);
-        if (lock.owns_lock())
-            lock.unlock();
+        auto task = set_current_task_and_unlock(lock);
+        // no state modification after this point !
 
-        if (killed)
+        if (auto tracer = TraceProvider) // WARNING: this can be VERY slow
+        {
+            std::string trace = tracer(); // run the trace specifically in this scope and unlocked
+            auto lock = new_task_flag.spin_lock();
+            task->trace = std::move(trace);
+        }
+        return task;
+    }
+    // NOLINTEND(clang-analyzer-cplusplus.Move)
+
+    pool_task_handle pool_worker::set_current_task_and_unlock(lock_t& lock) noexcept
+    {
+        auto task = pool_task_handle{this}; // an additional copy is needed for thread safety
+        current_task = task;
+        new_task_flag.notify_all(lock);
+
+        if (killed) // resurrect runner if killed
         {
             TaskDebug("%s resurrecting", name);
             killed = false;
@@ -191,13 +211,12 @@ namespace rpp
             th = std::thread{[this] { run(); }}; // restart thread if needed
         }
 
-        // WARNING: this can be VERY slow
-        if (auto tracer = TraceProvider)
-            current_task->trace = tracer();
+        if (lock.owns_lock())
+            lock.unlock();
+        // NOTE: after this unlock, another thread could start cancelling this task
 
-        return current_task;
+        return task;
     }
-    // NOLINTEND(clang-analyzer-cplusplus.Move)
 
     wait_result pool_worker::kill(int timeoutMillis) noexcept
     {
@@ -350,7 +369,7 @@ namespace rpp
 
             // now that semaphore count is decremented, it's safe to check for killed
             // or current task
-            if (killed)
+            if (killed || destroying)
                 return false;
             if (current_task.is_running())
                 return true;
