@@ -9,7 +9,6 @@ option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 # These are only for build systems that don't use `mamabuild` which supports these by default:
 # -- mama build test asan ubsan coverage ReCpp
 option(BUILD_WITH_MEM_SAFETY "Build Rpp and RppTests with memory safety checks" OFF)
-option(BUILD_WITH_THREAD_SAFETY "Build Rpp and RppTests with thread safety checks" OFF)
 option(BUILD_WITH_CODE_COVERAGE "Build with code coverage for unit tests" OFF)
 
 # include mama dependencies for platforms that require it
@@ -87,10 +86,6 @@ if(CLANG OR GCC)
         message("Building with memory safety checks")
         add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fPIE -pie)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-    elseif(BUILD_WITH_THREAD_SAFETY)
-        message("Building with thread safety checks")
-        add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -fPIE -pie)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
     endif()
     if(BUILD_WITH_CODE_COVERAGE)
         message("Building with code coverage")
