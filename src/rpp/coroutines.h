@@ -47,7 +47,7 @@ namespace rpp
         std::exception_ptr ex {};
         rpp::pool_task_handle poolTask {nullptr};
 
-        explicit functor_awaiter(rpp::delegate<T()>&& action) noexcept
+        explicit functor_awaiter(rpp::delegate<T()> action) noexcept
             : action{std::move(action)} {}
 
         // is the task ready?
@@ -63,6 +63,7 @@ namespace rpp
             {
                 try { result = std::move(action()); }
                 catch (...) { ex = std::current_exception(); }
+                // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
@@ -82,7 +83,7 @@ namespace rpp
         std::exception_ptr ex {};
         rpp::pool_task_handle poolTask {nullptr};
 
-        explicit functor_awaiter(rpp::delegate<void()>&& action) noexcept
+        explicit functor_awaiter(rpp::delegate<void()> action) noexcept
             : action{std::move(action)} {}
 
         // is the task ready?
@@ -97,7 +98,7 @@ namespace rpp
             poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable {
                 try { action(); }
                 catch (...) { ex = std::current_exception(); }
-                action.reset(); // deallocate the lambda before resuming
+                // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
@@ -116,7 +117,7 @@ namespace rpp
         std::exception_ptr ex {};
         rpp::pool_task_handle poolTask {nullptr};
 
-        explicit functor_awaiter_fut(rpp::delegate<Future()>&& action) noexcept
+        explicit functor_awaiter_fut(rpp::delegate<Future()> action) noexcept
             : action{std::move(action)} {}
 
         // is the task ready?
@@ -134,7 +135,7 @@ namespace rpp
                     f = action(); // get the future from the lambda
                     f.wait(); // wait for the nested coroutine to finish (can throw)
                 } catch (...) { ex = std::current_exception(); }
-                //action.reset(); // deallocate the lambda before resuming
+                // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
