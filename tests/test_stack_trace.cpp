@@ -2,8 +2,9 @@
 #include <rpp/thread_pool.h>
 #include <rpp/timer.h>
 #include <rpp/debugging.h>
-#include <future>
 #include <rpp/tests.h>
+#include <future>
+#include <functional> // std::function
 using namespace rpp;
 
 static std::string stack_tracer() { return stack_trace(); }

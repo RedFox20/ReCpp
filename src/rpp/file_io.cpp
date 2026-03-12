@@ -429,8 +429,11 @@ namespace rpp /* ReCpp */
             writePos += bytesRead;
         }
 
-        // truncate remainder after shifting all blocks to front
-        truncate(newLength);
+        // Only truncate if we successfully copied the full newLength bytes
+        if (writePos == newLength)
+            truncate(newLength);
+        else
+            LogError("file::truncate_front_sb failed: readPos=%lld, writePos=%lld", readPos, writePos);
     }
 
     void file::truncate_end(int64 newLength) noexcept

@@ -9,7 +9,8 @@
 
 #include <cstdio>        // fprintf
 #include <memory>        // std::shared_ptr
-#include <unordered_map> // std::unordered_map for to_string extensions
+// NOTE: had to remove, because clang-18 includes <algorithm> here, which crashes clang-tidy
+//#include <unordered_map> // std::unordered_map for to_string extensions
 #include <atomic>        // std::atomic<T> support
 #include <sstream>       // std::stringstream
 

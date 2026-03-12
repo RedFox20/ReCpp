@@ -6,7 +6,7 @@
 #include "config.h"
 #include "sprint.h" // we love strview and sprint, so it's a common dependency
 #include "debugging.h" // for adapting debugging API-s with tests API
-#include "math.h" // rpp::min, rpp::max
+#include "./math.h" // rpp::min, rpp::max
 
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.

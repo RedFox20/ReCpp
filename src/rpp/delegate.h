@@ -57,7 +57,8 @@
 #include <cstring> // memmove for event<()>
 #include <type_traits> // std::decay_t<>
 #include <utility> // std::forward
-#include <stdexcept> // std::terminate
+#include <exception> // std::terminate
+#include <stdexcept> // std::invalid_argument
 #include <cstdint> // uint8_t
 
 namespace rpp

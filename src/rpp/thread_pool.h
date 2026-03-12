@@ -16,6 +16,7 @@
 #include <thread>
 #include <string>
 #include <atomic> // std::atomic_bool
+#include <exception> // std::exception_ptr
 
 namespace rpp
 {
