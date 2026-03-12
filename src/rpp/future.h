@@ -15,52 +15,10 @@ namespace rpp
 
 
     /**
-     * Composable Promise that provides a way to set value from a task functor.
-     * This allows chaining (composing) futures together.
-     * 
-     * Previous tasks are deallocated before running the next task in the chain,
-     * to allow for very long task chains.
-     * 
-     * The result value is always moved from first task into the second one using std::move().
+     * @brief Alias to std::promise<T>
      */
     template<typename T>
-    struct cpromise : std::promise<T>
-    {
-        /** set_value_from_task_result(task) */
-        template<typename Task>
-        void compose(Task& task) noexcept(noexcept(task()))
-        {
-            T value = task();
-            // run task destructor before calling continuation
-            // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
-            if constexpr (!std::is_trivially_destructible_v<Task>) {
-                Task t = std::move(task);
-                (void)t;
-            }
-            // notify the awaiters that the value is set
-            std::promise<T>::set_value(std::move(value));
-        }
-    };
-
-    template<>
-    struct cpromise<void> : std::promise<void>
-    {
-        /** set_value_from_task_result(task) */
-        template<typename Task>
-        void compose(Task& task) noexcept(noexcept(task()))
-        {
-            task();
-            // run task destructor before calling continuation
-            // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
-            if constexpr (!std::is_trivially_destructible_v<Task>) {
-                Task t = std::move(task);
-                (void)t;
-            }
-            // notify the awaiters that the value is set
-            std::promise<void>::set_value();
-        }
-    };
-
+    using cpromise = std::promise<T>;
 
     /**
      * Runs any task delegate on the rpp::thread_pool using rpp::parallel_task()
@@ -70,13 +28,36 @@ namespace rpp
     template<typename Task>
     RPP_CORO_WRAPPER auto async_task(Task task) noexcept -> cfuture<task_return_t<Task>>
     {
-        using T = task_return_t<Task>;
+        using T = task_return_t<Task>; // decay_t on the return type
         cpromise<T> p;
         cfuture<T> f = p.get_future();
         rpp::parallel_task([move_args(p, task)]() mutable noexcept
         {
             try {
-                p.compose(task);
+                if constexpr (std::is_same_v<T, void>)
+                {
+                    task();
+                    // run task destructor before calling continuation
+                    // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
+                    if constexpr (!std::is_trivially_destructible_v<Task>) {
+                        Task t = std::move(task);
+                        (void)t;
+                    }
+                    // notify the awaiters that the value is set
+                    p.set_value();
+                }
+                else
+                {
+                    T value = task();
+                    // run task destructor before calling continuation
+                    // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
+                    if constexpr (!std::is_trivially_destructible_v<Task>) {
+                        Task t = std::move(task);
+                        (void)t;
+                    }
+                    // notify the awaiters that the value is set
+                    p.set_value(std::move(value));
+                }
             } catch (...) {
                 p.set_exception(std::current_exception());
             }
@@ -150,7 +131,7 @@ namespace rpp
                 if (await_ready())
                 {
                     try { (void)this->get(); }
-                    catch (std::exception& e) { __assertion_failure("cfuture<T> threw exception in destructor: %s", e.what()); }
+                    catch (const std::exception& e) { __assertion_failure("cfuture<T> threw exception in destructor: %s", e.what()); }
                 }
                 // NOTE: This is a fail-fast strategy to catch programming bugs
                 //       and this happens if you forget to await a future before destruction.

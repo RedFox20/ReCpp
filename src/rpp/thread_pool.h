@@ -268,7 +268,14 @@ namespace rpp
         /**
          * @return TRUE if pool_worker is running a task
          */
-        bool running() const noexcept { return current_task.is_running(); }
+        bool running() const noexcept
+        {
+            // must hold new_task_flag lock to prevent use-after-free:
+            // pool_worker::run() deletes the pool_task_state under this same lock,
+            // so without it, is_running() could dereference a freed pointer
+            auto lock = new_task_flag.spin_lock();
+            return current_task.is_running();
+        }
 
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param max_idle_seconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
