@@ -253,10 +253,12 @@ namespace rpp
         rpp::Duration max_idle_timeout = rpp::Duration::from_millis(15'000);
 
         pool_task_handle current_task { nullptr };
-        std::atomic_bool killed = false; // this pool_worker is being destroyed/has been destroyed
+        std::atomic_bool killed = false; // this pool_worker is being killed, but might still resurrect
+        std::atomic_bool destroying = false; // if true, the destructor is waiting for the thread to finish
 
     public:
         using duration = pool_task_handle::duration;
+        using lock_t = typename rpp::semaphore::lock_t;
 
         pool_worker();
         pool_worker(float max_idle_seconds);
@@ -288,9 +290,10 @@ namespace rpp
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
+        pool_task_handle set_current_task_and_unlock(lock_t& lock) noexcept;
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
-        bool wait_for_new_job(std::unique_lock<mutex>& lock) noexcept;
+        bool wait_for_new_job(lock_t& lock) noexcept;
         wait_result join_or_detach(wait_result result = wait_result::finished) noexcept;
     };
 
