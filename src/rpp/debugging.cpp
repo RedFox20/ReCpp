@@ -449,11 +449,11 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName)
     if (const char* ptr = strchr(longFuncName, ':'))
     {
         if (*++ptr == ':') ++ptr;
-        fb.reset(ptr);
+        fb.reset(ptr - 1); // -1 because read_next() uses pre-increment
     }
     else
     {
-        fb.reset(longFuncName);
+        fb.reset(longFuncName - 1);
     }
 
     while (char ch = fb.read_next())

@@ -100,6 +100,7 @@ TestImpl(test_debugging)
         std::string message = rpp::strview{log_output}.split_second('$');
 
         AssertGreater(timestamp.size(), 11);
+        print_info("Timestamp: '%s' message: '%s'\n", timestamp.c_str(), message.c_str());
         AssertEqual(timestamp, time.to_string(3));
         AssertEqual(message, " TimestampTest");
     }
