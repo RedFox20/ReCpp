@@ -103,7 +103,7 @@ namespace rpp /* ReCpp */
                 return false;
         } else {
             return false; // conversions failed
-		}
+        }
         ULARGE_INTEGER li; li.LowPart = data.nFileSizeLow; li.HighPart = data.nFileSizeHigh;
         out->size = (int64)li.QuadPart;
         out->ctime = to_time_t(data.ftCreationTime);
@@ -122,7 +122,7 @@ namespace rpp /* ReCpp */
                 out->ctime = s.st_ctime;
                 out->atime = s.st_atime;
                 out->mtime = s.st_mtime;
-				return true;
+                return true;
             }
         }
         return false;
@@ -252,7 +252,7 @@ namespace rpp /* ReCpp */
     static bool sys_delete(T filename) noexcept
     {
     #if _MSC_VER
-		if (wchar_conv conv { filename })
+        if (wchar_conv conv { filename })
             return ::_wremove(conv.wstr) == 0;
         return false;
     #else
@@ -263,18 +263,18 @@ namespace rpp /* ReCpp */
     }
     bool delete_file(strview filename) noexcept
     {
-		return sys_delete<strview>(filename);
+        return sys_delete<strview>(filename);
     }
 #if RPP_ENABLE_UNICODE
     bool delete_file(ustrview filename) noexcept
     {
-		return sys_delete<ustrview>(filename);
+        return sys_delete<ustrview>(filename);
     }
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
 
-	template<StringViewType T>
+    template<StringViewType T>
     static bool sys_copy_file(T sourceFile, T destinationFile) noexcept
     {
     #if _MSC_VER
@@ -319,7 +319,7 @@ namespace rpp /* ReCpp */
 
     bool copy_file(strview sourceFile, strview destinationFile) noexcept
     {
-		return sys_copy_file<strview>(sourceFile, destinationFile);
+        return sys_copy_file<strview>(sourceFile, destinationFile);
     }
 #if RPP_ENABLE_UNICODE
     bool copy_file(ustrview sourceFile, ustrview destinationFile) noexcept
@@ -330,7 +330,7 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-	template<StringViewType T>
+    template<StringViewType T>
     static bool copy_file_mode(T sourceFile, T destinationFile) noexcept
     {
     #if _WIN32
@@ -338,13 +338,13 @@ namespace rpp /* ReCpp */
         return attr != DWORD(-1) && win32_set_file_attr(destinationFile, attr);
     #else
         os_stat64 s;
-		return sys_stat64(sourceFile, &s) && set_st_mode(destinationFile, s.st_mode);
+        return sys_stat64(sourceFile, &s) && set_st_mode(destinationFile, s.st_mode);
     #endif
     }
     
     bool copy_file_mode(strview sourceFile, strview destinationFile) noexcept
     {
-		return copy_file_mode<strview>(sourceFile, destinationFile);
+        return copy_file_mode<strview>(sourceFile, destinationFile);
     }
 #if RPP_ENABLE_UNICODE
     bool copy_file_mode(ustrview sourceFile, ustrview destinationFile) noexcept
@@ -431,7 +431,7 @@ namespace rpp /* ReCpp */
         
     // on failure, check errno for details, if folder (or file) exists, we consider it a success
     // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
-	template<StringViewType T>
+    template<StringViewType T>
     static bool sys_mkdir(T foldername) noexcept
     {
     #if _WIN32
@@ -440,7 +440,7 @@ namespace rpp /* ReCpp */
             BOOL result = CreateDirectoryW(conv.wstr, nullptr); // -> ERROR_PATH_NOT_FOUND or ERROR_ALREADY_EXISTS
             return result == TRUE || GetLastError() == ERROR_ALREADY_EXISTS;
         }
-		return false; // conversion failed
+        return false; // conversion failed
     #else
         if (multibyte_conv conv { foldername })
             return mkdir(conv.cstr, 0755) == 0 || errno == EEXIST;
@@ -497,7 +497,7 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-	template<StringViewType T>
+    template<StringViewType T>
     static bool sys_rmdir(T foldername) noexcept
     {
     #if _WIN32
@@ -505,9 +505,9 @@ namespace rpp /* ReCpp */
             return _wrmdir(conv.wstr) == 0;
         return false;
     #else
-		if (multibyte_conv conv { foldername })
+        if (multibyte_conv conv { foldername })
             return rmdir(conv.cstr) == 0;
-		return false; // conversion failed
+        return false; // conversion failed
     #endif
     }
 
@@ -515,7 +515,7 @@ namespace rpp /* ReCpp */
     static bool delete_folder(T foldername, delete_mode mode) noexcept
     {
         using tstring = typename T::string_t;
-		using tchar = typename T::char_t;
+        using tchar = typename T::char_t;
 
         // these would delete the root dir...
         if (foldername.empty())
@@ -572,9 +572,9 @@ namespace rpp /* ReCpp */
         if (multibyte_conv conv { path }) {
             conv_buffer out;
             if (char* res = realpath(conv.cstr, out.path_a))
-				return string{ res };
+                return string{ res };
         }
-		return string{};
+        return string{};
     #endif
     }
 #if RPP_ENABLE_UNICODE
@@ -594,9 +594,9 @@ namespace rpp /* ReCpp */
         if (multibyte_conv conv { path }) {
             conv_buffer out;
             if (char* res = realpath(conv.cstr, out.path_a))
-				return to_ustring(res);
+                return to_ustring(res);
         }
-		return {};
+        return {};
     #endif
     }
 #endif
@@ -992,10 +992,10 @@ namespace rpp /* ReCpp */
         #if _MSC_VER
             auto find_first_file = [](WIN32_FIND_DATAW* ffd, const wchar_t* path) {
                 HANDLE h = FindFirstFileW(path, ffd);
-				return h == INVALID_HANDLE_VALUE ? nullptr : h;
-			};
+                return h == INVALID_HANDLE_VALUE ? nullptr : h;
+            };
             if (dir.empty()) { // handle dir=="" special case
-				hFind = find_first_file(&ffd, L"./*");
+                hFind = find_first_file(&ffd, L"./*");
             } else {
                 // only support wstr to simplify API, because internally windows uses WCHAR anyway
                 conv_buffer buf;
