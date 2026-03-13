@@ -6,7 +6,16 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <future> // std::async
-#include <source_location>
+#if __has_include(<source_location>)
+#  include <source_location>
+#  define SOURCE_LOC_DEF std::source_location sl = std::source_location::current()
+#  define SOURCE_LOC_FILE sl.file_name()
+#  define SOURCE_LOC_LINE sl.line()
+#else
+#  define SOURCE_LOC_DEF
+#  define SOURCE_LOC_FILE __FILE__
+#  define SOURCE_LOC_LINE __LINE__
+#endif
 
 using namespace rpp;
 
@@ -599,7 +608,7 @@ TestImpl(test_sockets)
     }
 
     // helper function to pop a single UDP packet and return number of bytes received, discarding data
-    int pop_udp_packet(socket& recv, int expected_size = -1, std::source_location loc = std::source_location::current())
+    int pop_udp_packet(socket& recv, int expected_size = -1, SOURCE_LOC_DEF)
     {
         char buffer[4096];
         int r = recv.recv(buffer, sizeof(buffer));
@@ -608,7 +617,7 @@ TestImpl(test_sockets)
         {
             buffer[r > 0 ? r : 0] = '\0';
             AssertFailed("pop_udp_packet() called from %s:%d: expected %d bytes, got %d: '%s'\n",
-                         loc.file_name(), loc.line(), expected_size, r, buffer);
+                         SOURCE_LOC_FILE, SOURCE_LOC_LINE, expected_size, r, buffer);
         }
         return r;
     }

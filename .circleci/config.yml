@@ -83,17 +83,42 @@ jobs:
       - run: pipenv install mama
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama mips verbose build
-  clang-android-cpp20:
-    description: Android C++20 Build (NO TESTS)
+  android-build:
+    parameters:
+      docker_image:
+        type: enum
+        enum: ["cimg/android:2023.08.1-ndk", "cimg/android:2024.11.1-ndk", "cimg/android:2025.12.1-ndk", "cimg/android:2026.03.1-ndk"]
+        description: "Android NDK docker image"
+      toolchain:
+        type: string
+        description: "Informational toolchain description, e.g. ndk-r25b-clang++14"
+      ndk_version:
+        type: string
+        default: ""
+        description: "Override NDK version, e.g. 29.0.14206865 to use NDK r29 instead of the default LTS"
+    description: "Android C++20 Build << parameters.toolchain >>"
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
-      - image: cimg/android:2023.08.1-ndk
+      - image: << parameters.docker_image >>
     steps:
       - checkout
+      - when:
+          condition: << parameters.ndk_version >>
+          steps:
+            - run:
+                name: Override NDK to << parameters.ndk_version >>
+                command: |
+                  NDK_PATH="/home/circleci/android-sdk/ndk/<< parameters.ndk_version >>"
+                  echo "export ANDROID_NDK_HOME=$NDK_PATH" >> "$BASH_ENV"
+                  echo "export ANDROID_NDK_ROOT=$NDK_PATH" >> "$BASH_ENV"
       - run: make configure-cmake
       - run: make configure-pip3
       - run: pip3 install mama
-      - run: CXX20=1 mama android verbose build with_tests
+      - run: 
+          name: Build Android NDK << parameters.toolchain >>
+          command: |
+              echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+              CXX20=1 mama android verbose build with_tests
 
 workflows:
   build_all:
@@ -119,4 +144,21 @@ workflows:
       # Other platform builds
       - msvc-win64-cpp20
       - gcc-mipsel-cpp20
-      - clang-android-cpp20
+      # Android NDK builds
+      - android-build:
+          name: android-ndk-r25b-clang++14
+          docker_image: "cimg/android:2023.08.1-ndk"
+          toolchain: "ndk-r25b-clang++14"
+      - android-build:
+          name: android-ndk-r28-clang++19
+          docker_image: "cimg/android:2024.11.1-ndk"
+          toolchain: "ndk-r28-clang++19"
+      - android-build:
+          name: android-ndk-r28b-clang++19
+          docker_image: "cimg/android:2025.12.1-ndk"
+          toolchain: "ndk-r28b-clang++19"
+      - android-build:
+          name: android-ndk-r29-clang++20
+          docker_image: "cimg/android:2026.03.1-ndk"
+          toolchain: "ndk-r29-clang++20"
+          ndk_version: "29.0.14206865"
