@@ -312,10 +312,10 @@
 #endif // RPP_LIFETIMEBOUND
 
 // Provides a hint to the compiler that this type is a CRT (Coroutine Return Type)
-// Clang will enforce that all functions that return a CRT are either coroutines or
+// Clang (>18) will enforce that all functions that return a CRT are either coroutines or
 // or marked with [[clang::coro_wrapper]]. Clang will enforce this with an error.
 #ifndef RPP_CORO_RETURN_TYPE
-#  if defined(__clang__)
+#  if defined(__clang__) && __clang_major__ > 18
 #    define RPP_CORO_RETURN_TYPE [[clang::coro_return_type]]
 #    define RPP_CORO_WRAPPER [[clang::coro_wrapper]]
 #    define RPP_CORO_LIFETIMEBOUND [[clang::coro_lifetimebound]]

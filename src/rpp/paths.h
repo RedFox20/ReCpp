@@ -411,7 +411,7 @@ namespace rpp /* ReCpp */
         };
         state s; // iterator state
 
-		dir_iter_base(strview dir) noexcept;
+        dir_iter_base(strview dir) noexcept;
     #if RPP_ENABLE_UNICODE
         dir_iter_base(ustrview dir) noexcept;
     #endif
@@ -446,7 +446,7 @@ namespace rpp /* ReCpp */
     {
     public:
         using view_t = T;
-		using char_t = typename T::char_t;
+        using char_t = typename T::char_t;
         using string_t = typename T::string_t;
 
     private:
@@ -548,17 +548,17 @@ namespace rpp /* ReCpp */
         {
             return fulldir.empty() ? (fulldir = rpp::full_path(dir)) : fulldir;
         }
-	}; // directory_iter<T>
+    }; // directory_iter<T>
 
     template<StringViewType T>
     using directory_entry = typename directory_iter<T>::entry;
 
-	// ascii version of the directory iterator
+    // ascii version of the directory iterator
     using dir_iterator = directory_iter<strview>;
     using dir_entry    = directory_entry<strview>;
 
 #if RPP_ENABLE_UNICODE
-	// unicode version of the directory iterator
+    // unicode version of the directory iterator
     using udir_iterator = directory_iter<ustrview>;
     using udir_entry    = directory_entry<ustrview>;
 #endif
