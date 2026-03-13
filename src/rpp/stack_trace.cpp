@@ -240,7 +240,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////
 
 #if HAS_LIBDW
-    
+
     struct FlatDie
     {
         Dwarf_Addr lo;
@@ -419,7 +419,12 @@ namespace rpp
     static CallstackEntry resolve_trace(Demangler& d, void* addr) noexcept
     {
         static Dwfl* dwfl = init_dwfl();
+        static rpp::mutex dwfl_sync;
         CallstackEntry cse { (uint64_t)addr };
+
+        // libdw/libelf are not thread-safe; serialize all dwfl/dwarf calls
+        std::lock_guard guard { dwfl_sync };
+
         if (Dwfl_Module* mod = dwfl_addrmodule(dwfl, cse.addr))
         {
             // .so or binary name
@@ -448,7 +453,7 @@ namespace rpp
         return cse;
     }
 
-#elif !HAS_LIBDW
+#else // !HAS_LIBDW
 
     static CallstackEntry resolve_trace(Demangler& d, void* addr)
     {
@@ -467,7 +472,7 @@ namespace rpp
         return cse;
     }
 
-#endif // HAS_LIBDW
+#endif // !HAS_LIBDW
 
     struct BacktraceState
     {

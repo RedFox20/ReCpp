@@ -869,12 +869,14 @@ namespace rpp
 
     /**
      * Valid test arguments:
-     * "test_mytest"  enables test with exact match
-     * "-test_mytest" disables test with exact match
+     * "test:mytest"  enables test with exact match
+     * "-test:mytest" disables test with exact match
      * "mytest"     enables test with loose match
      * "-mytest"    disables test with loose match
      * "mytest.mycasefilter"  enables specific test.case
      * "-mytest.mycasefilter" disable specific test.case
+     * "mytest::mycasefilter"  enables specific test.case
+     * "-mytest::mycasefilter" disable specific test.case
      * "*" match all tests  
      * "mytest.*" match mytest and all cases
      * "math -math.numeric" enable all math tests except numeric 
@@ -882,13 +884,23 @@ namespace rpp
     static void select_tests_from_args(const std::vector<strview>& args)
     {
         // if arg is provided, we assume they are:
-        // test_testname or testname or -test_testname or -testname
-        // OR to run a specific test:  testname.specifictest
+        // test:mytest or mytest or -test:mytest or -mytest
+        // OR to run a specific test:  mytest.specifictest
         std::unordered_set<strview> enabled, disabled; // NOLINT
         for (strview arg : args)
         {
-            strview testName = arg.next('.');
-            strview specific = arg.next('.');
+            strview testName = arg; // default is only test name
+            strview specific;
+            if (const char* doubleColon = arg.find("::"))
+            {
+                testName = strview{arg.str, doubleColon};
+                specific = strview{doubleColon + 2, arg.end()}; // +2 to skip "::"
+            }
+            else if (const char* firstDot = arg.find('.'))
+            {
+                testName = strview{arg.str, firstDot};
+                specific = strview{firstDot + 1, arg.end()}; // +1 to skip "."
+            }
 
             bool disableTest = false;
             if (testName[0] == '-')
