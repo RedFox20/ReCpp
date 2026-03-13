@@ -2696,6 +2696,143 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 | [`sum_all(vector)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L495) | Sum all elements |
 | [`append(vector, other)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L336) | Append one vector to another |
 
+### Example: element_range & index_range
+
+```cpp
+#include <rpp/collections.h>
+
+std::vector<int> nums = { 10, 20, 30, 40, 50 };
+
+// create a non-owning view over a vector
+rpp::element_range<int> all = rpp::range(nums);
+for (int v : all) LogInfo("%d", v);  // 10 20 30 40 50
+
+// sub-range: skip first 2 elements
+rpp::element_range<int> tail = rpp::slice(nums, 2);
+// tail: 30, 40, 50
+
+// sub-range with count: 3 elements starting at index 1
+rpp::element_range<int> mid = rpp::slice(nums, 1, 3);
+// mid: 20, 30, 40
+
+// convert range back to vector
+std::vector<int> copy = mid.to_vec();  // { 20, 30, 40 }
+
+// integer index range [0..5)
+for (int i : rpp::range(5))
+    LogInfo("i=%d", i);  // 0 1 2 3 4
+
+// index range with start, end, step: [0, 10) step 2
+for (int i : rpp::range(0, 10, 2))
+    LogInfo("i=%d", i);  // 0 2 4 6 8
+
+// range from raw pointer + size
+int arr[] = { 1, 2, 3 };
+rpp::element_range<int> raw = rpp::range(arr, 3);
+```
+
+### Example: Push, Pop & Erase Utilities
+
+```cpp
+#include <rpp/collections.h>
+
+std::vector<std::string> names = { "alice", "bob", "carol" };
+
+// pop_back returns the removed element
+std::string last = rpp::pop_back(names);  // "carol", names is now { "alice", "bob" }
+
+// push_unique — only adds if not already present
+rpp::push_unique(names, std::string{"dave"});  // added
+rpp::push_unique(names, std::string{"alice"}); // not added (already exists)
+
+// erase_item — remove first matching element
+rpp::erase_item(names, std::string{"bob"});    // names: { "alice", "dave" }
+
+// erase_back_swap — O(1) erase by swapping with last (doesn't preserve order)
+std::vector<int> ids = { 10, 20, 30, 40 };
+rpp::erase_back_swap(ids, 1);  // removes index 1: swap 40→[1], pop → { 10, 40, 30 }
+
+// erase_if — remove ALL elements matching a predicate
+std::vector<int> values = { 1, 2, 3, 4, 5, 6 };
+rpp::erase_if(values, [](int v) { return v % 2 == 0; });
+// values: { 1, 3, 5 }
+
+// append one vector to another
+std::vector<int> a = { 1, 2 };
+std::vector<int> b = { 3, 4 };
+rpp::append(a, b);  // a: { 1, 2, 3, 4 }
+```
+
+### Example: Find, Contains & Predicates
+
+```cpp
+#include <rpp/collections.h>
+
+struct Item {
+    std::string name;
+    float weight;
+};
+
+std::vector<Item> items = {
+    { "sword", 3.5f },
+    { "shield", 5.0f },
+    { "potion", 0.5f },
+    { "armor", 12.0f }
+};
+
+// contains
+std::vector<int> nums = { 1, 2, 3, 4, 5 };
+bool has3 = rpp::contains(nums, 3);  // true
+
+// find — returns pointer or nullptr
+int* found = rpp::find(nums, 4);  // pointer to the element 4
+
+// find_if with predicate
+const Item* potion = rpp::find_if(items, [](const Item& it) {
+    return it.name == "potion";
+});
+
+// find_smallest / find_largest by selector
+Item* lightest = rpp::find_smallest(items, [](const Item& it) { return it.weight; });
+Item* heaviest = rpp::find_largest(items, [](const Item& it) { return it.weight; });
+// lightest->name == "potion", heaviest->name == "armor"
+
+// any_of / all_of / none_of
+bool anyHeavy  = rpp::any_of(items,  [](const Item& it) { return it.weight > 10.0f; }); // true
+bool allLight   = rpp::all_of(items,  [](const Item& it) { return it.weight < 20.0f; }); // true
+bool noneEmpty = rpp::none_of(items, [](const Item& it) { return it.name.empty(); });    // true
+
+// index_of
+int idx = rpp::index_of(nums, 3);  // 2
+
+// sum_all
+int total = rpp::sum_all(nums);  // 15
+```
+
+### Example: Sort & Transform
+
+```cpp
+#include <rpp/collections.h>
+
+// sort a vector (uses insertion sort)
+std::vector<int> vals = { 5, 3, 8, 1, 4 };
+rpp::sort(vals);  // { 1, 3, 4, 5, 8 }
+
+// sort with custom comparator (descending)
+rpp::sort(vals, [](int& a, int& b) { return a > b; });
+// vals: { 8, 5, 4, 3, 1 }
+
+// transform — map elements to a new vector
+std::vector<int> numbers = { 1, 2, 3, 4 };
+auto doubled = rpp::transform(numbers, [](const int& n) { return n * 2; });
+// doubled: { 2, 4, 6, 8 }
+
+auto strings = rpp::transform(numbers, [](const int& n) {
+    return std::to_string(n);
+});
+// strings: { "1", "2", "3", "4" }
+```
+
 ---
 
 ## rpp/concurrent_queue.h
@@ -2721,6 +2858,146 @@ Thread-safe FIFO queue with notification support.
 | [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L130) | Number of items |
 | [`reserve(int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L211) | Reserve capacity |
 | [`notify()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L139) / [`notify_one()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L148) | Wake waiting consumers |
+
+### Example: Producer-Consumer with wait_pop
+
+```cpp
+#include <rpp/concurrent_queue.h>
+#include <rpp/thread_pool.h>
+
+rpp::concurrent_queue<std::string> queue;
+std::atomic_bool done = false;
+
+// producer thread
+rpp::parallel_task([&] {
+    queue.push("hello");
+    queue.push("world");
+    queue.notify([&] { done = true; });  // safely set flag + notify
+});
+
+// consumer — blocks until an item is available or notified
+std::string item;
+while (queue.wait_pop(item)) {
+    LogInfo("got: %s", item);
+}
+// wait_pop returns false when notified with no items (done==true)
+```
+
+### Example: Non-Blocking try_pop Polling
+
+```cpp
+#include <rpp/concurrent_queue.h>
+
+rpp::concurrent_queue<int> workQueue;
+workQueue.reserve(64);  // pre-allocate
+
+// producer pushes work items
+for (int i = 0; i < 10; ++i)
+    workQueue.push(i);
+
+// consumer polls without blocking
+int task;
+while (workQueue.try_pop(task)) {
+    LogInfo("processing task %d", task);
+}
+
+// batch pop: grab all pending items at once
+workQueue.push(100);
+workQueue.push(200);
+
+std::vector<int> batch;
+if (workQueue.try_pop_all(batch)) {
+    LogInfo("got %zu tasks at once", batch.size());  // 2
+}
+```
+
+### Example: Timed wait_pop with Timeout
+
+```cpp
+#include <rpp/concurrent_queue.h>
+
+rpp::concurrent_queue<std::string> events;
+
+// wait up to 100ms for an event
+std::string event;
+if (events.wait_pop(event, rpp::Duration::from_millis(100))) {
+    LogInfo("event: %s", event);
+} else {
+    LogInfo("no event within 100ms");
+}
+
+// process events until a time limit
+auto until = rpp::TimePoint::now() + rpp::Duration::from_seconds(5);
+while (events.wait_pop_until(event, until)) {
+    LogInfo("event: %s", event);
+}
+// loop exits when TimePoint::now() > until
+```
+
+### Example: Cancellable wait_pop with Predicate
+
+```cpp
+#include <rpp/concurrent_queue.h>
+
+rpp::concurrent_queue<std::string> messages;
+std::atomic_bool cancelled = false;
+
+// consumer with cancellation support
+rpp::parallel_task([&] {
+    std::string msg;
+    auto timeout = rpp::Duration::from_millis(500);
+    while (messages.wait_pop(msg, timeout,
+           [&] { return cancelled.load(); }))
+    {
+        LogInfo("msg: %s", msg);
+    }
+    // exits when cancelled==true or timeout with no items
+});
+
+// cancel from another thread — safely sets flag and wakes waiter
+messages.notify([&] { cancelled = true; });
+```
+
+### Example: Safe Iteration & Atomic Pop
+
+```cpp
+#include <rpp/concurrent_queue.h>
+
+rpp::concurrent_queue<int> queue;
+queue.push(10);
+queue.push(20);
+queue.push(30);
+
+// safe iteration — holds lock for the duration of the loop
+{
+    for (int val : queue.iterator()) {
+        LogInfo("val: %d", val);
+    }
+    // lock released when iter goes out of scope
+}
+
+// atomic copy — snapshot the queue without modifying it
+std::vector<int> snapshot = queue.atomic_copy();
+
+// pop_atomic — process and remove in two steps (single-consumer only)
+int item;
+if (queue.pop_atomic_start(item)) {
+    // item is moved out but still in queue until end()
+    processItem(item);        // slow operation while queue is unlocked
+    queue.pop_atomic_end();   // now remove from queue, any waiting threads are notified that the item is fully processed
+}
+
+// or use the callback version
+queue.pop_atomic([](int&& item) {
+    processItem(item);
+});
+
+// peek without removing
+int front;
+if (queue.peek(front)) {
+    LogInfo("front: %d (still in queue)", front);
+}
+```
 
 ---
 
@@ -2752,6 +3029,80 @@ Cross-platform logging with severity filtering, log handlers, timestamps, and as
 |------|--------|
 | [`LogSeverity`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L21) | `LogSeverityInfo`, `LogSeverityWarn`, `LogSeverityError` |
 
+### Example: Logging with Severity & Configuration
+
+```cpp
+#include <rpp/debugging.h>
+
+// basic logging at different severity levels
+LogInfo("server started on port %d", 8080);
+LogWarning("disk usage at %d%%", 92);
+LogError("failed to open file: %s", path.c_str());
+
+// conditional assert — logs error if expression is false
+Assert(connection != nullptr, "connection was null for user %s", username.c_str());
+
+// configure severity filter — suppress info messages
+SetLogSeverityFilter(LogSeverityWarn); // only warnings and errors
+
+// enable timestamps: hh:mm:ss.MMMms
+LogEnableTimestamps(true, 3, /*time_of_day=*/true);
+
+// strip function names from log output
+LogDisableFunctionNames();
+
+// works with std::string, rpp::strview, QString directly — no .c_str() needed
+std::string name = "sensor-01";
+LogInfo("device: %s", name);
+```
+
+### Example: Custom Log Handler
+
+```cpp
+#include <rpp/debugging.h>
+
+// C-style callback — receives all log messages
+void myLogHandler(LogSeverity severity, const char* message, int len)
+{
+    if (severity >= LogSeverityError)
+        writeToFile("errors.log", message, len);
+}
+SetLogHandler(myLogHandler);
+
+// C++ style — add additional handler with context pointer
+struct Logger {
+    FILE* file;
+    static void handler(void* ctx, LogSeverity sev, const char* msg, int len) {
+        auto* self = static_cast<Logger*>(ctx);
+        fwrite(msg, 1, len, self->file);
+    }
+};
+Logger logger { fopen("app.log", "w") };
+rpp::add_log_handler(&logger, Logger::handler);
+
+// later: remove when done
+rpp::remove_log_handler(&logger, Logger::handler);
+```
+
+### Example: Exceptions with ThrowErr & AssertEx
+
+```cpp
+#include <rpp/debugging.h>
+
+// throw a formatted runtime_error
+ThrowErr("invalid config key '%s' on line %d", key, lineNum);
+
+// throw only if assertion fails
+AssertEx(value > 0, "value must be positive, got %d", value);
+
+// log and re-throw an exception
+try {
+    riskyOperation();
+} catch (const std::exception& e) {
+    LogExcept(e, "riskyOperation failed");
+}
+```
+
 ---
 
 ## rpp/stack_trace.h
@@ -2778,6 +3129,46 @@ Cross-platform stack tracing and traced exceptions.
 | [`get_all_callstacks(maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L85) | Get callstacks from all threads |
 | [`register_segfault_tracer()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L171) | Install SIGSEGV handler that throws `traced_exception` |
 
+### Example: Stack Traces & Traced Exceptions
+
+```cpp
+#include <rpp/stack_trace.h>
+
+// get a formatted stack trace from the current location
+std::string trace = rpp::stack_trace();
+LogInfo("trace:\n%s", trace);
+
+// stack trace with an error message prepended
+std::string errTrace = rpp::stack_trace("something went wrong", /*maxDepth=*/16);
+
+// print stack trace directly to stderr
+rpp::print_trace();
+rpp::print_trace("crash context");
+
+// create a runtime_error with embedded stack trace
+throw rpp::error_with_trace("fatal: corrupted state");
+
+// traced_exception — exception with automatic stack trace in what()
+try {
+    throw rpp::traced_exception{"null pointer dereference"};
+} catch (const std::exception& e) {
+    LogError("%s", e.what());  // includes full stack trace
+}
+
+// install SIGSEGV handler — crashes become traced_exceptions, this is quite dangerous, only for throw-away utilities, not full production apps
+rpp::register_segfault_tracer();
+
+// or: print trace and terminate instead of throwing
+rpp::register_segfault_tracer(std::nothrow);
+
+// low-level: walk the stack, then inspect individual frames
+auto callstack = rpp::get_callstack(/*maxDepth=*/32);
+for (uint64_t addr : callstack) {
+    rpp::CallstackEntry entry = rpp::get_address_info(addr);
+    LogInfo("%s", entry.to_string());
+}
+```
+
 ---
 
 ## rpp/bitutils.h
@@ -2801,6 +3192,45 @@ Fixed-length bit array.
 | [`sizeBytes()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L47) / [`sizeBits()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L49) | Size queries |
 | [`getBuffer()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L51) / [`getByte(int i)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L92) | Raw access |
 | [`copy()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L101) / [`copyNegated()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L110) | Copy operations |
+
+### Example: Bit Array Operations
+
+```cpp
+#include <rpp/bitutils.h>
+
+// create a fixed-size bit array with 128 bits (all cleared)
+rpp::bit_array bits { 128 };
+
+// set and test individual bits
+bits.set(0);       // set bit 0
+bits.set(42);      // set bit 42
+bits.set(7, true); // set bit 7 to true
+bits.unset(42);    // clear bit 42
+
+bool b0 = bits.isSet(0);   // true
+bool b42 = bits.isSet(42); // false
+
+// checkAndSet — returns true if the bit was newly set
+bool wasNew = bits.checkAndSet(10); // true (bit 10 was 0, now 1)
+bool again  = bits.checkAndSet(10); // false (already set)
+
+// size queries
+uint32_t totalBits  = bits.sizeBits();   // 128
+uint32_t totalBytes = bits.sizeBytes();  // 16
+
+// raw byte access
+uint8_t byte0 = bits.getByte(0); // first 8 bits as a byte
+
+// copy bytes out
+uint8_t buf[4];
+uint32_t copied = bits.copy(0, buf, 4); // copy first 4 bytes
+
+// copy negated (inverted) bytes
+uint32_t negCopied = bits.copyNegated(0, buf, 4);
+
+// reset to a new size (clears all bits)
+bits.reset(256);
+```
 
 ---
 
@@ -2827,6 +3257,48 @@ Read-write synchronization helper for safe async object destruction.
 | Macro | Description |
 |-------|-------------|
 | [`try_lock_or_return(closeSync)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L60) | Early return if object is being destroyed |
+
+### Example: Safe Async Destruction with close_sync
+
+```cpp
+#include <rpp/close_sync.h>
+#include <rpp/thread_pool.h>
+
+class StreamProcessor
+{
+    rpp::close_sync CloseSync; // must be first for explicit lock_for_close
+    std::vector<char> Buffer;
+
+public:
+    ~StreamProcessor()
+    {
+        // blocks until all async operations holding shared locks finish
+        CloseSync.lock_for_close();
+    }
+
+    void processAsync()
+    {
+        rpp::parallel_task([this] {
+            // acquire shared lock — returns early if destructor is running
+            try_lock_or_return(CloseSync);
+
+            // safe to use members — destructor is blocked
+            Buffer.resize(64 * 1024);
+            doWork(Buffer);
+            // shared lock released at scope exit
+        });
+    }
+
+    void exclusiveReset()
+    {
+        // exclusive lock — blocks until all shared locks are released
+        auto lock = CloseSync.acquire_exclusive_lock();
+        Buffer.clear();
+    }
+
+    bool isAlive() const { return CloseSync.is_alive(); }
+};
+```
 
 ---
 
@@ -2856,11 +3328,52 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 | [`readLEU32(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L100) | Read 32-bit little-endian |
 | [`readLEU64(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L105) | Read 64-bit little-endian |
 
+### Example: Big-Endian & Little-Endian Read/Write
+
+```cpp
+#include <rpp/endian.h>
+
+uint8_t buf[8];
+
+// write big-endian values (network byte order)
+rpp::writeBEU16(buf, 0x1234);       // buf: 12 34
+rpp::writeBEU32(buf, 0xDEADBEEF);   // buf: DE AD BE EF
+rpp::writeBEU64(buf, 0x0102030405060708ULL);
+
+// read big-endian values back to native format
+uint16_t v16 = rpp::readBEU16(buf);  // 0x1234 on any platform
+uint32_t v32 = rpp::readBEU32(buf);  // 0xDEADBEEF
+uint64_t v64 = rpp::readBEU64(buf);
+
+// write little-endian values
+rpp::writeLEU16(buf, 0xABCD);       // buf: CD AB
+rpp::writeLEU32(buf, 0x12345678);   // buf: 78 56 34 12
+rpp::writeLEU64(buf, 0x0807060504030201ULL);
+
+// read little-endian values back
+uint16_t le16 = rpp::readLEU16(buf);
+uint32_t le32 = rpp::readLEU32(buf);
+uint64_t le64 = rpp::readLEU64(buf);
+
+// typical use: parsing a network protocol header
+struct PacketHeader {
+    uint16_t type;
+    uint32_t length;
+};
+
+PacketHeader parseHeader(const uint8_t* data) {
+    return {
+        .type   = rpp::readBEU16(data),
+        .length = rpp::readBEU32(data + 2)
+    };
+}
+```
+
 ---
 
 ## rpp/memory_pool.h
 
-Linear bump-allocator memory pools for arena-style allocation (no per-object deallocation).
+Linear bump-allocator memory pools for arena-style allocation (no per-object deallocation). This is ideal for quickly burning through many short-lived objects without the overhead of `new`/`delete` or `malloc`/`free`. The dynamic pool variant supports multiple blocks that grow as needed. This is ideal for tree/graph data structures that only ever grow and are destroyed all at once.
 
 | Class | Description |
 |-------|-------------|
@@ -2880,15 +3393,93 @@ Linear bump-allocator memory pools for arena-style allocation (no per-object dea
 | [`allocate_range<T>(int count)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L54) | Allocate array |
 | [`construct_range<T>(int count, Args&&... args)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L61) | Allocate and construct array |
 
+### Example: Static Pool — Fixed-Size Arena
+
+```cpp
+#include <rpp/memory_pool.h>
+
+// create a 4KB fixed-size pool (no per-object deallocation)
+rpp::linear_static_pool pool { 4096 };
+
+// allocate raw memory
+void* raw = pool.allocate(128);  // 128 bytes, default 8-byte alignment
+
+// allocate typed memory (zero-initialized in pool constructor)
+float* floats = pool.allocate<float>();
+
+// construct a C++ object in the pool
+struct Particle { float x, y, z; float life; };
+Particle* p = pool.construct<Particle>(1.0f, 2.0f, 3.0f, 1.0f);
+
+// allocate an array
+int* ids = pool.allocate_array<int>(16);
+
+// construct a range of objects (returns element_range)
+rpp::element_range<Particle> particles = pool.construct_range<Particle>(10,
+    0.0f, 0.0f, 0.0f, 1.0f  // all 10 particles initialized with these args
+);
+for (Particle& pt : particles) {
+    pt.life -= 0.1f;
+}
+
+// query remaining space
+int remaining = pool.available();
+int total     = pool.capacity();
+```
+
+### Example: Dynamic Pool — Growing Arena
+
+```cpp
+#include <rpp/memory_pool.h>
+
+// starts at 128KB, doubles when full
+rpp::linear_dynamic_pool pool { 128 * 1024, /*blockGrowth=*/2.0f };
+
+// allocate objects — pool grows automatically
+for (int i = 0; i < 10000; ++i) {
+    auto* node = pool.construct<std::pair<int, float>>(i, float(i) * 0.5f);
+}
+
+// total capacity across all blocks
+int cap = pool.capacity();
+```
+
 ---
 
 ## rpp/sort.h
 
-Minimal insertion sort for smaller binary sizes compared to `std::sort`.
+Minimal insertion sort for smaller binary sizes compared to `std::sort`. The insertion sort algorithm is efficient for small arrays (typically < 20 elements) and has minimal overhead, making it ideal for sorting small collections without the code size of a full quicksort implementation. The `insertion_sort` function is provided with a custom comparator for flexible sorting criteria. The code size difference in embedded environments can be extremely significant
 
 | Function | Description |
 |----------|-------------|
 | [`insertion_sort(data, count, cmp)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sort.h#L20) | In-place insertion sort with comparator |
+
+### Example: Insertion Sort
+
+```cpp
+#include <rpp/sort.h>
+
+// sort a raw array (ascending)
+int data[] = { 5, 3, 8, 1, 4 };
+rpp::insertion_sort(data, 5, [](int& a, int& b) { return a < b; });
+// data: { 1, 3, 4, 5, 8 }
+
+// sort descending
+rpp::insertion_sort(data, 5, [](int& a, int& b) { return a > b; });
+// data: { 8, 5, 4, 3, 1 }
+
+// sort structs by a field
+struct Enemy { std::string name; float distance; };
+Enemy enemies[] = {
+    { "goblin", 15.0f },
+    { "dragon", 5.0f },
+    { "troll",  30.0f }
+};
+rpp::insertion_sort(enemies, 3, [](Enemy& a, Enemy& b) {
+    return a.distance < b.distance;
+});
+// enemies sorted by distance: dragon(5), goblin(15), troll(30)
+```
 
 ---
 
@@ -2927,6 +3518,40 @@ UDP send rate limiter for throttling network traffic.
 | [`get_max_bytes_per_sec()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L26) | Get rate limit |
 | [`set_max_bytes_per_sec(int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L29) | Set rate limit |
 
+### Example: UDP Rate Limiting
+
+```cpp
+#include <rpp/load_balancer.h>
+
+// limit to 1 MB/s
+rpp::load_balancer limiter { 1'000'000 };
+
+void sendPackets(rpp::socket& sock, const uint8_t* data, int totalBytes)
+{
+    int offset = 0;
+    while (offset < totalBytes) {
+        int chunkSize = std::min(1400, totalBytes - offset); // typical MTU
+
+        // blocks until the rate budget allows sending
+        limiter.wait_to_send(chunkSize);
+        sock.send(data + offset, chunkSize);
+        offset += chunkSize;
+    }
+}
+
+// manual control: check before sending, then notify after
+void sendManual(rpp::socket& sock, const void* data, int len)
+{
+    if (limiter.can_send()) {
+        sock.send(data, len);
+        limiter.notify_sent(rpp::TimePoint::now(), len);
+    }
+}
+
+// adjust rate limit dynamically
+limiter.set_max_bytes_per_sec(500'000);  // throttle to 500 KB/s
+```
+
 ---
 
 ## rpp/obfuscated_string.h
@@ -2940,6 +3565,26 @@ Compile-time string obfuscation to prevent strings from appearing in binaries.
 | [`make_obfuscated("str")`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/obfuscated_string.h#L116) | Macro to create obfuscated string |
 | [`"str"_obfuscated`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/obfuscated_string.h#L110) | String literal operator (GCC only) |
 
+### Example: Compile-Time String Obfuscation
+
+```cpp
+#include <rpp/obfuscated_string.h>
+
+// cross-platform macro (works on GCC, Clang, MSVC)
+constexpr auto apiKey = make_obfuscated("sk-live-abc123secret");
+
+// the string is stored obfuscated in the binary
+std::string garbled  = apiKey.obfuscated();  // unreadable bytes
+std::string original = apiKey.to_string();   // "sk-live-abc123secret"
+
+// use the deobfuscated string at runtime
+curl_set_header("Authorization", original.c_str());
+
+// GCC-only: literal operator syntax
+// constexpr auto secret = "super@secret.com"_obfuscated;
+// std::string email = secret.to_string();
+```
+
 ---
 
 ## rpp/proc_utils.h
@@ -2952,6 +3597,33 @@ Process memory and CPU usage information.
 | [`cpu_usage_info`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L38) | CPU time stats: `cpu_time_us`, `user_time_us`, `kernel_time_us` (with `_ms()`, `_sec()`) |
 | [`proc_current_mem_used()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L32) | Get current process memory usage |
 | [`proc_total_cpu_usage()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L63) | Get total CPU time used by process |
+
+### Example: Process Memory & CPU Profiling
+
+```cpp
+#include <rpp/proc_utils.h>
+
+// query current process memory usage
+rpp::proc_mem_info mem = rpp::proc_current_mem_used();
+LogInfo("physical: %.1f MB  virtual: %.1f MB",
+    mem.physical_mem_mb(), mem.virtual_size_mb());
+
+// raw bytes also available
+uint64_t rssBytes = mem.physical_mem;
+uint64_t vszBytes = mem.virtual_size;
+
+// CPU usage profiling: measure over a time interval
+rpp::cpu_usage_info start = rpp::proc_total_cpu_usage();
+doExpensiveWork();
+rpp::cpu_usage_info end = rpp::proc_total_cpu_usage();
+
+double cpuMs    = end.cpu_time_ms()    - start.cpu_time_ms();
+double userMs   = end.user_time_ms()   - start.user_time_ms();
+double kernelMs = end.kernel_time_ms() - start.kernel_time_ms();
+
+LogInfo("CPU: %.1f ms (user: %.1f ms, kernel: %.1f ms)",
+    cpuMs, userMs, kernelMs);
+```
 
 ---
 
@@ -2986,6 +3658,180 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 | [`test::run_tests(patterns)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L183) | Run tests matching patterns |
 | [`test::run_tests(argc, argv)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L194) | Run tests from command line args |
 | [`test::run_tests()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L199) | Run all registered tests |
+
+### Example: Defining a Test Class with TestCase
+
+```cpp
+// test_math.cpp
+#include <rpp/tests.h>
+
+TestImpl(test_math)
+{
+    TestInit(test_math)
+    {
+        // called once when the test class is initialized
+        // setup shared state here
+    }
+
+    TestCleanup()
+    {
+        // called once after all test cases finish
+    }
+
+    TestCase(addition)
+    {
+        AssertThat(1 + 1, 2);
+        AssertThat(10 + 20, 30);
+        AssertNotEqual(1 + 1, 3);
+    }
+
+    TestCase(comparisons)
+    {
+        AssertTrue(5 > 3);
+        AssertFalse(3 > 5);
+        AssertGreater(10, 5);
+        AssertLess(3, 7);
+        AssertGreaterOrEqual(5, 5);
+        AssertLessOrEqual(5, 5);
+    }
+
+    TestCase(range_checks)
+    {
+        // inclusive range [0, 100]
+        AssertInRange(50, 0, 100);
+        // exclusive range (0, 100)
+        AssertExRange(50, 0, 100);
+    }
+
+    TestCase(string_equality)
+    {
+        rpp::strview s = "hello";
+        AssertThat(s, "hello");
+        AssertThat(s.length(), 5);
+        AssertNotEqual(s, "world");
+    }
+
+    TestCase(vectors)
+    {
+        std::vector<int> actual   = { 1, 2, 3 };
+        std::vector<int> expected = { 1, 2, 3 };
+        AssertEqual(actual, expected);
+    }
+};
+```
+
+### Example: Exception & Error Assertions
+
+```cpp
+#include <rpp/tests.h>
+
+TestImpl(test_exceptions)
+{
+    TestInit(test_exceptions) {}
+
+    TestCase(throws_expected)
+    {
+        // assert that an expression throws a specific exception type
+        AssertThrows(throw std::runtime_error{"oops"}, std::runtime_error);
+    }
+
+    TestCase(no_throw)
+    {
+        // assert that no exception is thrown
+        AssertNoThrowAny(int x = 1 + 2; (void)x);
+    }
+
+    TestCase(custom_message)
+    {
+        int value = 42;
+        // assert with a custom formatted error message
+        AssertMsg(value > 0, "value must be positive, got %d", value);
+    }
+
+    // entire test case expects an exception — if it doesn't throw, the test fails
+    TestCaseExpectedEx(must_throw, std::runtime_error)
+    {
+        throw std::runtime_error{"this is expected"};
+    }
+};
+```
+
+### Example: Test Runner & main()
+
+```cpp
+// main.cpp
+#include <rpp/tests.h>
+
+int main(int argc, char** argv)
+{
+    // run tests from command line args:
+    //   ./RppTests test_math          — run all cases in test_math
+    //   ./RppTests test_math.addition — run only the "addition" case
+    //   ./RppTests math string        — run all tests matching "math" or "string"
+    //   ./RppTests                    — run ALL registered tests
+    return rpp::test::run_tests(argc, argv);
+}
+```
+
+```cpp
+// or run programmatically with patterns
+// these can be embedded into your embedded binaries to run tests before main() on actual devices
+rpp::test::set_verbosity(rpp::TestVerbosity::AllMessages);
+int result = rpp::test::run_tests("test_math");
+
+// run all tests
+int result = rpp::test::run_tests();
+
+// cleanup all test state (for leak detection)
+rpp::test::cleanup_all_tests();
+```
+
+### Example: Per-TestCase Setup & Cleanup
+
+```cpp
+#include <rpp/tests.h>
+
+TestImpl(test_database)
+{
+    Database* db = nullptr;
+
+    TestInit(test_database)
+    {
+        // called once before all test cases
+        db = Database::connect("test.db");
+    }
+
+    TestCleanup()
+    {
+        // called once after all test cases
+        delete db;
+    }
+
+    TestCaseSetup()
+    {
+        // called before EACH test case
+        db->beginTransaction();
+    }
+
+    TestCaseCleanup()
+    {
+        // called after EACH test case
+        db->rollback();
+    }
+
+    TestCase(insert)
+    {
+        db->exec("INSERT INTO users VALUES ('alice')");
+        AssertThat(db->count("users"), 1);
+    }
+
+    TestCase(empty_table)
+    {
+        // previous insert was rolled back
+        AssertThat(db->count("users"), 0);
+    }
+};
+```
 
 ---
 
@@ -3050,6 +3896,139 @@ Android JNI C++ utilities (Android-only).
 | [`Method`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L414) | JNI method wrapper |
 | [`Field`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L503) | JNI field wrapper |
 
+### Example: Initialization with JNI_OnLoad
+
+```cpp
+// Option 1: Define RPP_DEFINE_JNI_ONLOAD before including the header
+// This automatically defines JNI_OnLoad for you
+#define RPP_DEFINE_JNI_ONLOAD 1
+#include <rpp/jni_cpp.h>
+
+// Option 2: Manually initialize in your own JNI_OnLoad
+#include <rpp/jni_cpp.h>
+extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
+    return rpp::jni::initVM(vm);
+}
+```
+
+### Example: Smart References with Ref\<T\>
+
+```cpp
+// Ref<T> automatically cleans up JNI local/global references via RAII
+using namespace rpp::jni;
+
+// wrap an untracked local ref for automatic cleanup
+Ref<jobject> localObj = makeRef(env->NewObject(cls, ctor));
+
+// convert to a global ref that can be stored across JNI calls
+Ref<jobject> globalObj = makeGlobalRef(env->NewObject(cls, ctor));
+
+// or convert an existing local ref to global
+Ref<jobject> obj = makeRef(env->CallObjectMethod(...));
+Ref<jobject> stored = obj.toGlobal(); // safe for static/global storage
+```
+
+### Example: JString Conversions
+
+```cpp
+using namespace rpp::jni;
+
+// create a JNI string from C++
+JString greeting = JString::from("Hello from C++!");
+int len = greeting.getLength(); // 15
+
+// convert JNI string back to C++ std::string
+std::string cppStr = greeting.str(); // "Hello from C++!"
+
+// wrap a jstring received from Java
+void handleJavaString(jstring javaStr) {
+    JString s{javaStr}; // takes ownership, auto-freed
+    std::string text = s.str();
+}
+```
+
+### Example: Looking Up Classes, Methods, and Fields
+
+```cpp
+using namespace rpp::jni;
+
+// find a Java class (always stored as GlobalRef internally)
+Class activity{"com/myapp/MainActivity"};
+
+// look up instance and static methods using JNI signatures
+Method getName = activity.method("getName", "()Ljava/lang/String;");
+Method getInstance = activity.staticMethod("getInstance", "()Lcom/myapp/MainActivity;");
+
+// look up fields
+Field appVersion = activity.field("appVersion", "Ljava/lang/String;");
+Field instanceCount = activity.staticField("instanceCount", "I");
+```
+
+### Example: Calling Java Methods
+
+```cpp
+using namespace rpp::jni;
+
+Class player{"com/unity3d/player/UnityPlayer"};
+Method sendMessage = player.staticMethod("UnitySendMessage",
+    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+
+// call static void method with JString arguments
+JString obj  = JString::from("GameManager");
+JString func = JString::from("OnEvent");
+JString data = JString::from("{\"score\":100}");
+sendMessage.voidF(nullptr, obj, func, data);
+
+// call an instance method that returns a string
+Class context{"android/content/Context"};
+Method getPackageName = context.method("getPackageName", "()Ljava/lang/String;");
+
+jobject mainActivity = getMainActivity("com/myapp/MainActivity");
+JString packageName = getPackageName.stringF(mainActivity);
+std::string name = packageName.str(); // "com.myapp"
+```
+
+### Example: Accessing Java Fields
+
+```cpp
+using namespace rpp::jni;
+
+Class config{"com/myapp/AppConfig"};
+
+// read a static int field
+Field maxRetries = config.staticField("MAX_RETRIES", "I");
+jint retries = maxRetries.getInt(); // static: no instance needed
+
+// read an instance string field
+Field userName = config.field("userName", "Ljava/lang/String;");
+JString name = userName.getString(configInstance);
+std::string user = name.str();
+```
+
+### Example: Working with JArray
+
+```cpp
+using namespace rpp::jni;
+
+// create a Java String[] from C++ strings
+std::vector<const char*> tags = {"debug", "network", "ui"};
+JArray tagArray = JArray::from(tags);
+
+// access array elements
+int len = tagArray.getLength(); // 3
+JString first = tagArray.getStringAt(0); // "debug"
+
+// work with primitive arrays (e.g. byte[])
+Method getData = myClass.method("getData", "()[B");
+JArray bytes = getData.arrayF(JniType::Byte, instance);
+{
+    ElementsRef elems = bytes.getElements();
+    int size = elems.getLength();
+    for (int i = 0; i < size; ++i) {
+        jbyte b = elems.byteAt(i);
+    }
+} // elements released automatically
+```
 ---
 
 ## Development > CircleCI Local
