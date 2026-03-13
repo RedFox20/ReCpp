@@ -112,6 +112,7 @@ jobs:
                   echo "export ANDROID_NDK_HOME=$NDK_PATH" >> "$BASH_ENV"
                   echo "export ANDROID_NDK_ROOT=$NDK_PATH" >> "$BASH_ENV"
       - run: make configure-cmake
+      - run: sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED || true
       - run: make configure-pip3
       - run: pip3 install mama
       - run: 
