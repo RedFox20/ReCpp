@@ -211,7 +211,7 @@ TestImpl(test_concurrent_queue)
 
         // count the number of tasks that were atomically processed
         std::atomic_int numProcessed = 0;
-        cfuture<> worker = rpp::async_task([&]
+        cfuture<> worker = rpp::async_task([&queue, &numProcessed]
         {
             std::string item;
             while (queue.pop_atomic_start(item))
@@ -268,7 +268,7 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
 
-        cfuture<> producer = rpp::async_task([&] {
+        cfuture<> producer = rpp::async_task([&queue] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
@@ -276,7 +276,7 @@ TestImpl(test_concurrent_queue)
             queue.notify_one(); // notify consumer
         });
 
-        cfuture<> consumer = rpp::async_task([&] {
+        cfuture<> consumer = rpp::async_task([this,&queue] {
             std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
