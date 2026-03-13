@@ -34,7 +34,7 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr ninja-build
       - run: pipenv install mama
       - run: pipenv run mama install-<< parameters.cc_version >>
       - run: make configure-cmake

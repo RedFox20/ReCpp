@@ -565,6 +565,10 @@ TestImpl(test_sockets)
             AssertTrue(multi_poll(/*millis*/50));
             AssertLessOrEqual(t3.elapsed_millis(), 20.0);
 
+            // now we need to leave time for second packet to arrive, otherwise
+            // when poll a second time, it will immediately return since first socket is still signaled
+            rpp::sleep_ms(1);
+
             // simply poll again; because we haven't read anything ready.size() will be 2
             size_t ready_size = ready.size();
             if (ready_size == 1u)
@@ -656,6 +660,7 @@ TestImpl(test_sockets)
             {
                 send.sendto(recv1_addr, std::string(MSG_SIZE, 'x'));
                 send.sendto(recv2_addr, std::string(MSG_SIZE, 'x'));
+                if (i % 200 == 0) rpp::sleep_ms(1); // throttle to avoid kernel dropping packets
             }
         });
 
