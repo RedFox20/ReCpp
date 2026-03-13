@@ -6,6 +6,7 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <future> // std::async
+#include <source_location>
 
 using namespace rpp;
 
@@ -31,7 +32,11 @@ TestImpl(test_sockets)
 
     socket create_udp_listener(socket_option opt = SO_None)
     {
-        static int next_port = 30'000 + (rand() % 5000); // randomize the starting port to reduce chance of conflicts in parallel test runs
+        static int next_port = []() {
+            // randomize the starting port to reduce chance of conflicts in parallel test runs
+            srand((unsigned int)std::chrono::steady_clock::now().time_since_epoch().count());
+            return 30'000 + (rand() % 5000);
+        }();
         int first_port = next_port;
         int last_port = first_port + 100;
         for (int port = first_port; port < last_port; ++port)
@@ -348,15 +353,15 @@ TestImpl(test_sockets)
         AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
 
         std::vector<uint8_t> buf;
-        Assert(recv.recv(buf));
+        AssertTrue(recv.recv(buf));
 
         AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
         AssertThat(send.sendto(recv_addr, msg), (int)msg.size());
 
-        Assert(recv.recv(buf));
+        AssertTrue(recv.recv(buf));
         AssertThat(buf, msg);
 
-        Assert(recv.recv(buf));
+        AssertTrue(recv.recv(buf));
         AssertThat(buf, msg);
     }
 
@@ -593,6 +598,21 @@ TestImpl(test_sockets)
         }
     }
 
+    // helper function to pop a single UDP packet and return number of bytes received, discarding data
+    int pop_udp_packet(socket& recv, int expected_size = -1, std::source_location loc = std::source_location::current())
+    {
+        char buffer[4096];
+        int r = recv.recv(buffer, sizeof(buffer));
+        if (r <= 0) return 0;
+        if (expected_size >= 0 && r != expected_size)
+        {
+            buffer[r > 0 ? r : 0] = '\0';
+            AssertFailed("pop_udp_packet() called from %s:%d: expected %d bytes, got %d: '%s'\n",
+                         loc.file_name(), loc.line(), expected_size, r, buffer);
+        }
+        return r;
+    }
+
     TestCase(udp_poll_stress_test)
     {
         const int NUM_MESSAGES = 500;
@@ -618,7 +638,6 @@ TestImpl(test_sockets)
         });
 
         rpp::Timer t;
-        char buffer[4096];
         int num_received = 0;
         while (num_received < NUM_MESSAGES && t.elapsed_ms() < 5000)
         {
@@ -627,10 +646,10 @@ TestImpl(test_sockets)
             {
                 while (true)
                 {
-                    int r = recv.recv(buffer, sizeof(buffer));
-                    if (r <= 0) break;
-                    AssertEqual(r, MSG_SIZE);
-                    ++num_received;
+                    if (pop_udp_packet(recv, MSG_SIZE) > 0)
+                        ++num_received;
+                    else
+                        break;
                 }
             }
         }
@@ -665,12 +684,10 @@ TestImpl(test_sockets)
         });
 
         rpp::Timer t;
-        char buffer[4096];
-        int num_received1 = 0;
-        int num_received2 = 0;
+        std::vector<int> num_received = { 0, 0 };
         std::vector<socket*> sockets = { &recv1, &recv2 };
         std::vector<int> ready;
-        while ((num_received1 < NUM_MESSAGES || num_received2 < NUM_MESSAGES) && t.elapsed_ms() < 5000)
+        while ((num_received[0] < NUM_MESSAGES || num_received[1] < NUM_MESSAGES) && t.elapsed_ms() < 5000)
         {
             // intentionally use a large timeout here
             if (socket::poll(sockets, ready, /*timeout*/50, socket::PF_Read) > 0)
@@ -679,11 +696,10 @@ TestImpl(test_sockets)
                 {
                     while (true)
                     {
-                        int r = sockets[i]->recv(buffer, sizeof(buffer));
-                        if (r <= 0) break;
-                        AssertEqual(r, MSG_SIZE);
-                        if (i == 0) ++num_received1;
-                        if (i == 1) ++num_received2;
+                        if (pop_udp_packet(*sockets[i], MSG_SIZE) > 0)
+                            ++num_received[i];
+                        else
+                            break;
                     }
                 }
             }
@@ -691,8 +707,8 @@ TestImpl(test_sockets)
         double elapsed_ms = t.elapsed_millis();
         task.get();
 
-        AssertEqual(num_received1, NUM_MESSAGES);
-        AssertEqual(num_received2, NUM_MESSAGES);
+        AssertEqual(num_received[0], NUM_MESSAGES);
+        AssertEqual(num_received[1], NUM_MESSAGES);
         AssertLess(elapsed_ms, 200.0);
     }
 
@@ -724,19 +740,11 @@ TestImpl(test_sockets)
         });
         auto receiver = rpp::async_task([this, &recv, &t]()
         {
-            char buffer[4096];
             int num_received = 0;
             while (num_received < NUM_MESSAGES && t.elapsed_ms() < 4000)
             {
-                rpp::ipaddress from;
-                int r = recv.recvfrom(from, buffer, sizeof(buffer)); // BLOCKING
-                if (r <= 0) continue;
-                if (r != MSG_SIZE)
-                {
-                    buffer[r > 0 ? r : 0] = '\0';
-                    AssertFailed("expected %d bytes, got %d: '%s'\n", MSG_SIZE, r, buffer);
-                }
-                ++num_received;
+                if (pop_udp_packet(recv, MSG_SIZE) > 0)
+                    ++num_received;
             }
             return num_received;
         });
