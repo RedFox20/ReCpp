@@ -650,7 +650,7 @@ TestImpl(test_sockets)
         auto recv1_addr = ipaddress(AF_IPv4, "127.0.0.1", recv1.port());
         auto recv2_addr = ipaddress(AF_IPv4, "127.0.0.1", recv2.port());
 
-        auto task = rpp::async_task([&]()
+        auto task = rpp::async_task([&send, &recv1_addr, &recv2_addr]()
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {

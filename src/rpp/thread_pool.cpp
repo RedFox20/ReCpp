@@ -274,14 +274,14 @@ namespace rpp
         snprintf(name, sizeof(name), "rpp_task_%d", this_task_id);
         set_this_thread_name(name);
         TaskDebug("%s thread start", name);
+
+        rpp::task_delegate<void()> generic; // keep it top level to avoid errant dtors
         for (;;)
         {
             try
             {
-                decltype(range_task)   range;
-                decltype(generic_task) generic;
-
                 // consume the Tasks atomically
+                rpp::action<int, int> range;
                 {
                     InTaskDebug(rpp::Timer t);
                     TaskDebug("%s wait_for_new_job", name);
@@ -293,10 +293,9 @@ namespace rpp
                     }
                     TaskDebug("%s wait_for_new_job elapsed: %.3fms", name, t.elapsed_millis());
                     // copy the new task state
-                    range   = range_task;
-                    generic = std::move(generic_task);
-                    range_task   = {};
-                    generic_task = {};
+                    range = range_task;
+                    range_task = {};
+                    generic = std::move(generic_task); // this should swap()
                 }
                 InTaskDebug(rpp::Timer task_timer);
                 if (range)
@@ -309,7 +308,11 @@ namespace rpp
                 else if (generic)
                 {
                     TaskDebug("%s (GENERIC)", name);
-                    generic();
+                    generic(); // CAN throw!
+
+                    // release functor immediately to reduce chance of a race condition
+                    // after we signal_finished()
+                    generic.reset();
                     TaskDebug("%s (GENERIC) elapsed %.3fms",
                               name, task_timer.elapsed_millis());
                 }
@@ -322,13 +325,17 @@ namespace rpp
                 {
                     auto lock = new_task_flag.spin_lock();
                     current_task.signal_finished();
+                    // WARNING: this is a critical section for thread-safety
+                    //          any waiting future on another thread will resume after this statement
+                    //          so any modification to the task state would cause a race
                     current_task = pool_task_handle{nullptr};
                 }
             }
             // prevent failures that would terminate the thread
-            catch (const std::exception& e) { unhandled_exception(e.what()); }
-            catch (const char* e)           { unhandled_exception(e);        }
-            catch (...)                     { unhandled_exception("");       }
+            // always manually reset the generic task before signal_finished() is called
+            catch (const std::exception& e) { generic.reset(); unhandled_exception(e.what()); }
+            catch (const char* e)           { generic.reset(); unhandled_exception(e);        }
+            catch (...)                     { generic.reset(); unhandled_exception("");       }
         }
     }
 
