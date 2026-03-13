@@ -817,10 +817,11 @@ namespace rpp
         consolef(Default, "  -test:testname     Exclude test suite (exact match)\n");
         consolef(Default, "  testname.testcase  Run a specific test case\n");
         consolef(Default, "  -testname.testcase Exclude a specific test case\n");
+        consolef(Default, "  testname::testcase  Run a specific test case\n");
+        consolef(Default, "  -testname::testcase Exclude a specific test case\n");
         consolef(Default, "  *                  Run all tests\n");
         consolef(Default, "  testname.*         Run all test cases in a suite\n");
         consolef(Default, "  testname -testname.testcase  Run all tests except a specific case\n");
-        
     }
 
     // parses for any flags and removes the from the args vector
