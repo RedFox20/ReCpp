@@ -24,7 +24,7 @@ jobs:
         default: "asan"
         description: "Sanitizer/analysis tool to use"
     description: "Ubuntu << parameters.compiler >> << parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
-    resource_class: medium+
+    resource_class: large # 4 CPU-s, 8GB RAM (needed for clang-tidy)
     docker:
       - image: cimg/python:3.14
     environment:
@@ -145,6 +145,7 @@ workflows:
           compiler: gcc
           cc_version: gcc-13
       # Run Newer GCC builds on Ubuntu with C++26 and latest sanitizers
+      # TODO: CI does not support gcc-15 yet
       - ubuntu-build:
           matrix:
             parameters:
@@ -152,7 +153,7 @@ workflows:
               sanitizer: ["asan", "clang-tidy", "tsan"]
           name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: gcc
-          cc_version: gcc-15
+          cc_version: gcc-14
       # Other platform builds
       - msvc-win64-cpp20
       - gcc-mipsel-cpp20
