@@ -92,17 +92,23 @@ TestImpl(test_debugging)
         log_output.clear();
 
         ::LogEnableTimestamps(true);
-        rpp::TimePoint time = rpp::TimePoint::now();
+        rpp::TimePoint timeBefore = rpp::TimePoint::now();
         LogInfo("TimestampTest");
+        rpp::TimePoint timeAfter = rpp::TimePoint::now();
         ::LogEnableTimestamps(false);
 
         std::string timestamp = rpp::strview{log_output}.split_first('$').trim();
         std::string message = rpp::strview{log_output}.split_second('$');
 
         AssertGreater(timestamp.size(), 11);
-        print_info("Timestamp: '%s' message: '%s'\n", timestamp.c_str(), message.c_str());
-        AssertEqual(timestamp, time.to_string(3));
         AssertEqual(message, " TimestampTest");
+        print_info("Timestamp: '%s' message: '%s'\n", timestamp.c_str(), message.c_str());
+
+        // the timestamp is captured inside LogInfo, so it can be anywhere between before and after
+        std::string before = timeBefore.to_string(3);
+        std::string after = timeAfter.to_string(3);
+        AssertMsg(timestamp >= before && timestamp <= after,
+                  "timestamp '%s' expected in range ['%s', '%s']", timestamp.c_str(), before.c_str(), after.c_str());
     }
 
     TestCaseExpectedEx(must_throw, std::runtime_error)
