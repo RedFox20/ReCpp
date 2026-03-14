@@ -425,29 +425,14 @@ namespace rpp
          */
         [[nodiscard]] bool pop_atomic_start(T& outItem)
         {
-            if (mutex().try_lock())
-            {
-                if (Head == Tail)
-                {
-                    mutex().unlock();
-                    return false;
-                }
-                bool wasPopInProgress = SlowPopInProgress.exchange(true, std::memory_order_acq_rel);
-                if (wasPopInProgress)
-                {
-                    mutex().unlock();
-                    throw std::runtime_error{"concurrent_queue<T>::pop_atomic_start(): Another atomic pop was already in progress!"};
-                }
-                outItem = std::move(*Head);
-                mutex().unlock();
-                return true;
-            }
-            else
-            {
-                // if we failed to lock, yielding here will improve perf by 5-10x
-                std::this_thread::yield();
-            }
-            return false;
+            lock_t lock_guard = spin_lock();
+            if (Head == Tail)
+                return false;
+            bool wasPopInProgress = SlowPopInProgress.exchange(true, std::memory_order_acq_rel);
+            if (wasPopInProgress)
+                throw std::runtime_error{"concurrent_queue<T>::pop_atomic_start(): Another atomic pop was already in progress!"};
+            outItem = std::move(*Head);
+            return true;
         }
 
         /**
