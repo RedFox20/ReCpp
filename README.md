@@ -1,10 +1,19 @@
 # ReCpp [![CircleCI](https://circleci.com/gh/RedFox20/ReCpp.svg?style=svg)](https://circleci.com/gh/RedFox20/ReCpp) (GCC, Clang, MSVC)
 ## Reusable Standalone C++ Libraries and Modules
 
-The goal of this project is to provide C++17 and C++20 developers with convenient and minimal cross-platform C++ utility libraries.
+The goal of this project is to provide C++20 and C++23 developers with convenient and minimal cross-platform C++ utility libraries.
 All of the modules are heavily performance oriented and provide the least amount of overhead possible.
 
-Currently supported and tested platforms are VC++, Clang on Windows and GCC, Clang on Ubuntu, iOS, Android.
+### Supported Platforms
+
+| Platform | Compilers | Notes |
+|----------|-----------|-------|
+| **Windows** | MSVC++ 2019, 2022, 2026 | x64 |
+| **Ubuntu Linux** | clang++ 14–20, g++ 11–15 | x86_64, ASan/TSan/clang-tidy CI |
+| **Android** | NDK r25b–r29 (clang++ 14–20) | arm64-v8a, armeabi-v7a |
+| **iOS / macOS** | Apple Clang | arm64, x86_64 |
+| **AArch64 Embedded** | g++ 11–15 | i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25 |
+| **MIPSEL** | g++ 11 | Cross-compiled, no tests |
 
 
 ## Building

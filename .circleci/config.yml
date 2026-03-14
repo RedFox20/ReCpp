@@ -133,6 +133,8 @@ workflows:
           name: clang-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: clang
           cc_version: clang-18
+      # TODO: clang++20 C++26 tests crash due to codecvt deprecation
+      # TODO: Clang C++26 build
       # GCC builds on Ubuntu
       - ubuntu-build:
           matrix:
@@ -142,6 +144,15 @@ workflows:
           name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: gcc
           cc_version: gcc-13
+      # Run Newer GCC builds on Ubuntu with C++26 and latest sanitizers
+      - ubuntu-build:
+          matrix:
+            parameters:
+              cpp_version: ["26"]
+              sanitizer: ["asan", "clang-tidy", "tsan"]
+          name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
+          compiler: gcc
+          cc_version: gcc-15
       # Other platform builds
       - msvc-win64-cpp20
       - gcc-mipsel-cpp20
@@ -151,13 +162,15 @@ workflows:
           docker_image: "cimg/android:2023.08.1-ndk"
           toolchain: "ndk-r25b-clang++14"
       - android-build:
-          name: android-ndk-r28-clang++19
+          name: android-ndk-r27-clang++18
           docker_image: "cimg/android:2024.11.1-ndk"
-          toolchain: "ndk-r28-clang++19"
+          toolchain: "ndk-r27-clang++18"
+          ndk_version: "27.2.12479018"
       - android-build:
           name: android-ndk-r28b-clang++19
           docker_image: "cimg/android:2025.12.1-ndk"
           toolchain: "ndk-r28b-clang++19"
+          ndk_version: "28.0.10865935"
       - android-build:
           name: android-ndk-r29-clang++20
           docker_image: "cimg/android:2026.03.1-ndk"
