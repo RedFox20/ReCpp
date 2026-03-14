@@ -104,6 +104,10 @@ namespace rpp /* ReCpp */
         static constexpr mode CREATENEW = mode::CREATENEW; // always creates (overwrite) a new file for read/write
         static constexpr mode APPEND    = mode::APPEND;    // opens or creates file for appending only, seek operations will not work
 
+        static constexpr int BEGIN = SEEK_SET; // seek offset is from the beginning of the file
+        static constexpr int CUR   = SEEK_CUR; // seek offset is from the current position in the file
+        static constexpr int END   = SEEK_END; // seek offset is from the end of the file
+
         void* Handle; // File handle
         mode  Mode;	  // File open mode READWRITE or READONLY
 

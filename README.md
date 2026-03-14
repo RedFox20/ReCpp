@@ -95,111 +95,116 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_MSVC`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L3) | Evaluates to `_MSC_VER` when compiling with MSVC, regardless of standard library |
-| [`RPP_MSVC_WIN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L9) | `1` when compiling with MSVC on Windows (`_WIN32 && _MSC_VER`) |
-| [`RPP_GCC`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L17) | `1` when compiling with GCC (excludes Clang) |
-| [`RPP_CLANG_LLVM`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L25) | `1` when compiling with Clang using GCC/LLVM standard libs |
+| [`RPP_MSVC`](src/rpp/config.h#L5) | Evaluates to `_MSC_VER` when compiling with MSVC, regardless of standard library |
+| [`RPP_MSVC_WIN`](src/rpp/config.h#L11) | `1` when compiling with MSVC on Windows (`_WIN32 && _MSC_VER`) |
+| [`RPP_GCC`](src/rpp/config.h#L20) | `1` when compiling with GCC (excludes Clang) |
+| [`RPP_CLANG_LLVM`](src/rpp/config.h#L29) | `1` when compiling with Clang using GCC/LLVM standard libs |
 
 ### C++ Standard Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_CXX17`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L57) | `1` if C++17 or later is available |
-| [`RPP_HAS_CXX20`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L65) | `1` if C++20 or later is available |
-| [`RPP_HAS_CXX23`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L73) | `1` if C++23 or later is available |
-| [`RPP_INLINE_STATIC`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L82) | `inline static` on C++17+, `static` otherwise |
-| [`RPP_CXX17_IF_CONSTEXPR`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L90) | `if constexpr` when available, falls back to `if` |
+| [`RPP_HAS_CXX17`](src/rpp/config.h#L57) | `1` if C++17 or later is available |
+| [`RPP_HAS_CXX20`](src/rpp/config.h#L65) | `1` if C++20 or later is available |
+| [`RPP_HAS_CXX23`](src/rpp/config.h#L73) | `1` if C++23 or later is available |
+| [`RPP_HAS_CXX26`](src/rpp/config.h#L81) | `1` if C++26 or later is available |
+| [`RPP_INLINE_STATIC`](src/rpp/config.h#L89) | `inline static` on C++17+, `static` otherwise |
+| [`RPP_CXX17_IF_CONSTEXPR`](src/rpp/config.h#L97) | `if constexpr` when available, falls back to `if` |
 
 ### API Export / Linkage
 
 | Macro | Description |
 |-------|-------------|
-| [`RPPAPI`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L35) | DLL visibility attribute: `__declspec(dllexport)` on MSVC, `__attribute__((visibility("default")))` on GCC/Clang |
-| [`RPP_EXTERNC`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L43) | `extern "C"` when compiling as C++, empty otherwise |
-| [`RPPCAPI`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L50) | Combined `RPP_EXTERNC RPPAPI` for C-compatible exported functions |
+| [`RPPAPI`](src/rpp/config.h#L37) | DLL visibility attribute: `__declspec(dllexport)` on MSVC, `__attribute__((visibility("default")))` on GCC/Clang |
+| [`RPP_EXTERNC`](src/rpp/config.h#L45) | `extern "C"` when compiling as C++, empty otherwise |
+| [`RPPCAPI`](src/rpp/config.h#L52) | Combined `RPP_EXTERNC RPPAPI` for C-compatible exported functions |
 
 ### Sanitizer Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_ASAN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L99) | `1` if AddressSanitizer is enabled |
-| [`RPP_TSAN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L108) | `1` if ThreadSanitizer is enabled |
-| [`RPP_UBSAN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L115) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
-| [`RPP_SANITIZERS`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L122) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
+| [`RPP_ASAN`](src/rpp/config.h#L105) | `1` if AddressSanitizer is enabled |
+| [`RPP_TSAN`](src/rpp/config.h#L113) | `1` if ThreadSanitizer is enabled |
+| [`RPP_UBSAN`](src/rpp/config.h#L122) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
+| [`RPP_SANITIZERS`](src/rpp/config.h#L130) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
 
 ### Platform & Architecture
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_BARE_METAL`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L163) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
-| [`RPP_FREERTOS`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L155) | `1` if targeting FreeRTOS |
-| [`RPP_STM32_HAL`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L158) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
-| [`RPP_CORTEX_M_ARCH`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L168) | `1` if targeting ARM Cortex-M architecture |
-| [`RPP_ARM_ARCH`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L183) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
-| [`RPP_64BIT`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L209) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L363) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L357) | `1` if target is big-endian |
+| [`RPP_BARE_METAL`](src/rpp/config.h#L170) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
+| [`RPP_FREERTOS`](src/rpp/config.h#L158) | `1` if targeting FreeRTOS |
+| [`RPP_STM32_HAL`](src/rpp/config.h#L162) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
+| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L177) | `1` if targeting ARM Cortex-M architecture |
+| [`RPP_ARM_ARCH`](src/rpp/config.h#L193) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
+| [`RPP_64BIT`](src/rpp/config.h#L218) | `1` if compiling for a 64-bit target |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L363) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L371) | `1` if target is big-endian |
 
 ### Feature Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_QT`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L131) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
-| [`RPP_ENABLE_UNICODE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L140) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
+| [`RPP_HAS_QT`](src/rpp/config.h#L139) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
+| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L149) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
 
 ### Function Attributes
 
 | Macro | Description |
 |-------|-------------|
-| [`FINLINE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L201) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
-| [`NOINLINE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L192) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L232) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L279) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L225) | Delete copy and move constructors and assignment operators |
+| [`FINLINE`](src/rpp/config.h#L211) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
+| [`NOINLINE`](src/rpp/config.h#L202) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
+| [`NODISCARD`](src/rpp/config.h#L242) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L296) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L233) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L249) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L258) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L260) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L271) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L300) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L315) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L315) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L315) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L311) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L327) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L328) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L329) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L334) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L335) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L336) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L337) | Size of `long long` in bytes |
-| [`RPP_INT64_MAX/MIN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L345) | 64-bit signed integer limits |
-| [`RPP_UINT64_MAX/MIN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L347) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MAX/MIN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L349) | 32-bit signed integer limits |
-| [`RPP_UINT32_MAX/MIN`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L351) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L340) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L341) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L342) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L343) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L352) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L351) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L354) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L353) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L356) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L355) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L358) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L357) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L381) | `unsigned char` |
-| [`ushort`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L382) | `unsigned short` |
-| [`uint`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L383) | `unsigned int` |
-| [`ulong`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L384) | `unsigned long` |
-| [`int16`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L386) | `short` (16-bit signed) |
-| [`uint16`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L387) | `unsigned short` (16-bit unsigned) |
-| [`int32`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L390) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L391) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L396) | `long long` (64-bit signed) |
-| [`uint64`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/config.h#L397) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L383) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L384) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L385) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L386) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L388) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L389) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L392) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L393) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L399) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L400) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -238,84 +243,92 @@ while (text.next(line, '\n'))
 
 | Function | Description |
 |----------|-------------|
-| [`to_double(str, len, end)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L113) | C-locale specific, simplified atof that also outputs the end of parsed string |
-| [`to_int(str, len, end)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L123) | Fast locale-agnostic atoi |
-| [`to_inthx(str, len, end)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L144) | Fast locale-agnostic atoi for HEX strings |
-| [`_tostring(buf, value)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L155) | Fast locale-agnostic itoa/ftoa for int, float, double |
-| [`replace(str, len, chOld, chNew)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1522) | Replaces characters in a string buffer |
-| [`concat(a, b, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1392) | Concatenates multiple strviews into std::string |
-| [`to_lower(str, len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1502) | Converts string to lowercase |
-| [`to_upper(str, len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1507) | Converts string to uppercase |
-| [`operator""_sv`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1286) | String literal for creating `strview` |
+| [`to_double(str, len, end)`](src/rpp/strview.h#L113) | C-locale specific, simplified atof that also outputs the end of parsed string |
+| [`to_int(str, len, end)`](src/rpp/strview.h#L123) | Fast locale-agnostic atoi |
+| [`to_inthx(str, len, end)`](src/rpp/strview.h#L144) | Fast locale-agnostic atoi for HEX strings |
+| [`_tostring(buffer, value)`](src/rpp/strview.h#L165) | Fast locale-agnostic itoa/ftoa for int, float, double |
+| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1522) | Replaces characters in a string buffer |
+| [`concat(a, b, ...)`](src/rpp/strview.h#L1392) | Concatenates multiple strviews into std::string |
+| [`to_lower(str, len)`](src/rpp/strview.h#L1502) | Converts string to lowercase |
+| [`to_upper(str, len)`](src/rpp/strview.h#L1507) | Converts string to uppercase |
+| [`operator""_sv`](src/rpp/strview.h#L1286) | String literal for creating `strview` |
+| [`strcontains(str, len, ch)`](src/rpp/strview.h#L78) | Checks if character is found within a string |
+| [`strcontainsi(str, len, ch)`](src/rpp/strview.h#L79) | Case-insensitive character search |
+| [`strequals(s1, s2, len)`](src/rpp/strview.h#L85) | Case-sensitive string equality for given length |
+| [`strequalsi(s1, s2, len)`](src/rpp/strview.h#L86) | Case-insensitive string equality for given length |
+| [`to_int64(str, len, end)`](src/rpp/strview.h#L133) | Fast locale-agnostic string to 64-bit integer |
+| [`RPP_CONSTEXPR_STRLEN`](src/rpp/strview.h#L220) | Marks strlen as constexpr when compiler supports it |
+| [`RPP_UTF8LEN(c_str)`](src/rpp/strview.h#L231) | Returns int length of a UTF-8 C-string |
+| [`RPP_UTF16LEN(u_str)`](src/rpp/strview.h#L232) | Returns int length of a UTF-16 C-string |
 
 ### Utility Parsers
 
 | Class | Description |
 |-------|-------------|
-| [`line_parser`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1539) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
-| [`keyval_parser`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1577) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
-| [`bracket_parser`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1626) | Parses a buffer for balanced-parentheses structures |
+| [`line_parser`](src/rpp/strview.h#L1539) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
+| [`keyval_parser`](src/rpp/strview.h#L1577) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
+| [`bracket_parser`](src/rpp/strview.h#L1626) | Parses a buffer for balanced-parentheses structures |
 
 ### strview Class
 
-[`struct strview`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L244) — Non-owning string token for efficient parsing. Represents a weak reference string with start pointer and length.
+[`struct strview`](src/rpp/strview.h#L244) — Non-owning string token for efficient parsing. Represents a weak reference string with start pointer and length.
 
 | Method | Description |
 |--------|-------------|
-| [`to_int()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L330) | Parses this strview as an integer |
-| [`to_int_hex()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L332) | Parses this strview as a HEX integer (`0xff` or `0ff` or `ff`) |
-| [`to_long()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L336) | Parse as long |
-| [`to_float()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L338) | Parses as a float |
-| [`to_double()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L340) | Parses as a double |
-| [`to_bool()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L347) | Relaxed parsing as boolean: `"true"`, `"yes"`, `"on"`, `"1"` |
-| [`clear()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L297) | Clears the strview |
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L300) | Returns the length |
-| [`empty()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L302) | True if empty |
-| [`is_whitespace()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L350) | True if all whitespace |
-| [`is_nullterm()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L352) | True if the referenced string is null-terminated |
-| [`trim_start()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L358) | Trims whitespace (or given char/chars) from the start |
-| [`trim_end()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L376) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L390) | Trims both start and end |
-| [`chomp_first()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L401) | Consumes the first character if possible |
-| [`chomp_last()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L403) | Consumes the last character if possible |
-| [`pop_front()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L406) | Pops and returns the first character |
-| [`pop_back()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L408) | Pops and returns the last character |
-| [`contains(char c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L435) | True if contains a char or substring |
-| [`contains_any(const char* chars, int nchars)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L445) | True if contains any of the given chars |
-| [`find(char c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L453) | Pointer to start of substring if found, NULL otherwise |
-| [`rfind(char c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L483) | Reverse search for a character |
-| [`findany(const char* chars, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L489) | Forward search for any of the specified chars |
-| [`rfindany(const char* chars, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L498) | Reverse search for any of the specified chars |
-| [`count(char ch)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L507) | Count occurrences of a character |
-| [`indexof(char ch)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L510) | Index of character, or -1 |
-| [`rindexof(char ch)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L515) | Reverse iterating index of character |
-| [`indexofany(const char* chars, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L518) | First index of any matching char |
-| [`starts_with(const char* s, int len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L524) | True if starts with the string |
-| [`starts_withi(const char* s, int len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L535) | Case-insensitive starts_with |
-| [`ends_with(const char* s, int slen)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L546) | True if ends with the string |
-| [`ends_withi(const char* s, int slen)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L557) | Case-insensitive ends_with |
-| [`equals(const char* s, int len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L568) | Exact equality |
-| [`equalsi(const char* s, int len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L574) | Case-insensitive equality |
-| [`compare(const char* s, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L595) | Compare to another string |
-| [`split_first(char delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L617) | Split into two, return the first part |
-| [`split_second(char delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L633) | Split into two, return the second part |
-| [`next(strview& out, char delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L641) | Gets next token; advances ptr to next delimiter |
-| [`next(char delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L664) | Returns next token directly |
-| [`next_notrim(strview& out, char delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L708) | Gets next token without trimming; stops on delimiter |
-| [`substr(int index, int length)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L839) | Creates a substring from index with given length |
-| [`substr(int index)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L845) | Creates a substring from index to end |
-| [`next_double()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L852) | Parses next double from current position |
-| [`next_float()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L853) | Parses next float from current position |
-| [`next_int()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L859) | Parses next int from current position |
-| [`skip(int nchars)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L870) | Safely skips N characters |
-| [`skip_until(char ch)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L876) | Skips until the specified char is found |
-| [`skip_after(char ch)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L900) | Skips past the specified char |
-| [`to_lower()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L924) | Modifies the referenced string to lowercase |
-| [`as_lower()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L929) | Returns a lowercase copy as std::string |
-| [`to_upper()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L940) | Modifies the referenced string to uppercase |
-| [`as_upper()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L945) | Returns an uppercase copy as std::string |
-| [`replace(char chOld, char chNew)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L959) | Replaces all occurrences of chOld with chNew |
-| [`decompose(delim, T& outFirst, Rest&... rest)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L821) | Decomposes strview into multiple typed outputs |
+| [`to_int()`](src/rpp/strview.h#L330) | Parses this strview as an integer |
+| [`to_int_hex()`](src/rpp/strview.h#L332) | Parses this strview as a HEX integer (`0xff` or `0ff` or `ff`) |
+| [`to_long()`](src/rpp/strview.h#L336) | Parse as long |
+| [`to_float()`](src/rpp/strview.h#L338) | Parses as a float |
+| [`to_double()`](src/rpp/strview.h#L340) | Parses as a double |
+| [`to_bool()`](src/rpp/strview.h#L347) | Relaxed parsing as boolean: `"true"`, `"yes"`, `"on"`, `"1"` |
+| [`clear()`](src/rpp/strview.h#L297) | Clears the strview |
+| [`size()`](src/rpp/strview.h#L300) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L302) | True if empty |
+| [`is_whitespace()`](src/rpp/strview.h#L350) | True if all whitespace |
+| [`is_nullterm()`](src/rpp/strview.h#L352) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L358) | Trims whitespace (or given char/chars) from the start |
+| [`trim_end()`](src/rpp/strview.h#L376) | Trims whitespace (or given char/chars) from the end |
+| [`trim()`](src/rpp/strview.h#L390) | Trims both start and end |
+| [`chomp_first()`](src/rpp/strview.h#L401) | Consumes the first character if possible |
+| [`chomp_last()`](src/rpp/strview.h#L403) | Consumes the last character if possible |
+| [`pop_front()`](src/rpp/strview.h#L406) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L408) | Pops and returns the last character |
+| [`contains(char c)`](src/rpp/strview.h#L435) | True if contains a char or substring |
+| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L445) | True if contains any of the given chars |
+| [`find(char c)`](src/rpp/strview.h#L453) | Pointer to start of substring if found, NULL otherwise |
+| [`rfind(char c)`](src/rpp/strview.h#L483) | Reverse search for a character |
+| [`findany(const char* chars, int n)`](src/rpp/strview.h#L489) | Forward search for any of the specified chars |
+| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L498) | Reverse search for any of the specified chars |
+| [`count(char ch)`](src/rpp/strview.h#L507) | Count occurrences of a character |
+| [`indexof(char ch)`](src/rpp/strview.h#L510) | Index of character, or -1 |
+| [`rindexof(char ch)`](src/rpp/strview.h#L515) | Reverse iterating index of character |
+| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L518) | First index of any matching char |
+| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L524) | True if starts with the string |
+| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L535) | Case-insensitive starts_with |
+| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L546) | True if ends with the string |
+| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L557) | Case-insensitive ends_with |
+| [`equals(const char* s, int len)`](src/rpp/strview.h#L568) | Exact equality |
+| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L574) | Case-insensitive equality |
+| [`compare(const char* s, int n)`](src/rpp/strview.h#L595) | Compare to another string |
+| [`split_first(char delim)`](src/rpp/strview.h#L617) | Split into two, return the first part |
+| [`split_second(char delim)`](src/rpp/strview.h#L633) | Split into two, return the second part |
+| [`next(strview& out, char delim)`](src/rpp/strview.h#L641) | Gets next token; advances ptr to next delimiter |
+| [`next(char delim)`](src/rpp/strview.h#L664) | Returns next token directly |
+| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L708) | Gets next token without trimming; stops on delimiter |
+| [`substr(int index, int length)`](src/rpp/strview.h#L839) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L845) | Creates a substring from index to end |
+| [`next_double()`](src/rpp/strview.h#L852) | Parses next double from current position |
+| [`next_float()`](src/rpp/strview.h#L853) | Parses next float from current position |
+| [`next_int()`](src/rpp/strview.h#L859) | Parses next int from current position |
+| [`skip(int nchars)`](src/rpp/strview.h#L870) | Safely skips N characters |
+| [`skip_until(char ch)`](src/rpp/strview.h#L876) | Skips until the specified char is found |
+| [`skip_after(char ch)`](src/rpp/strview.h#L900) | Skips past the specified char |
+| [`to_lower()`](src/rpp/strview.h#L924) | Modifies the referenced string to lowercase |
+| [`as_lower()`](src/rpp/strview.h#L929) | Returns a lowercase copy as std::string |
+| [`to_upper()`](src/rpp/strview.h#L940) | Modifies the referenced string to uppercase |
+| [`as_upper()`](src/rpp/strview.h#L945) | Returns an uppercase copy as std::string |
+| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L959) | Replaces all occurrences of chOld with chNew |
+| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L821) | Decomposes strview into multiple typed outputs |
 
 ### Example: Splitting Paths and URLs
 
@@ -468,36 +481,36 @@ if (a < b) // true — lexicographic ordering via compare()
 
 ### ustrview Class
 
-[`struct ustrview`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L970) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
+[`struct ustrview`](src/rpp/strview.h#L970) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
 
 | Method | Description |
 |--------|-------------|
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1007) | Returns the length |
-| [`empty()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1009) | True if empty |
-| [`clear()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1001) | Clears the ustrview |
-| [`is_nullterm()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1024) | True if the referenced string is null-terminated |
-| [`trim_start()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1027) | Trims whitespace (or given char/chars) from the start |
-| [`trim_end()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1034) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1041) | Trims both start and end |
-| [`chomp_first()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1048) | Consumes the first character |
-| [`chomp_last()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1050) | Consumes the last character |
-| [`pop_front()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1053) | Pops and returns the first character |
-| [`pop_back()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1055) | Pops and returns the last character |
-| [`starts_with(const char16_t* s, int length)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1075) | True if starts with the string |
-| [`starts_withi(const char16_t* s, int length)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1086) | Case-insensitive starts_with |
-| [`ends_with(const char16_t* s, int slen)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1101) | True if ends with the string |
-| [`ends_withi(const char16_t* s, int slen)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1113) | Case-insensitive ends_with |
-| [`equals(const char16_t* s, int length)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1123) | Exact equality |
-| [`compare(const char16_t* s, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1142) | Compare to another string |
-| [`rfind(char16_t c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1162) | Reverse search for a character |
-| [`findany(const char16_t* chars, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1169) | Forward search for any of the specified chars |
-| [`rfindany(const char16_t* chars, int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1179) | Reverse search for any of the specified chars |
-| [`substr(int index, int length)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1189) | Creates a substring from index with given length |
-| [`substr(int index)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1195) | Creates a substring from index to end |
-| [`next(ustrview& out, char16_t delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1204) | Gets next token; advances ptr to next delimiter |
-| [`next(char16_t delim)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1228) | Returns next token directly |
-| [`to_string()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L995) | Convert to `std::u16string` |
-| [`to_cstr(char16_t* buf, int max)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/strview.h#L1069) | Copy to null-terminated C-string buffer |
+| [`size()`](src/rpp/strview.h#L1003) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L1005) | True if empty |
+| [`clear()`](src/rpp/strview.h#L1000) | Clears the ustrview |
+| [`is_nullterm()`](src/rpp/strview.h#L1023) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L1027) | Trims whitespace (or given char/chars) from the start |
+| [`trim_end()`](src/rpp/strview.h#L1034) | Trims whitespace (or given char/chars) from the end |
+| [`trim()`](src/rpp/strview.h#L1041) | Trims both start and end |
+| [`chomp_first()`](src/rpp/strview.h#L1048) | Consumes the first character |
+| [`chomp_last()`](src/rpp/strview.h#L1050) | Consumes the last character |
+| [`pop_front()`](src/rpp/strview.h#L1053) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L1055) | Pops and returns the last character |
+| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1080) | True if starts with the string |
+| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1091) | Case-insensitive starts_with |
+| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1102) | True if ends with the string |
+| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1113) | Case-insensitive ends_with |
+| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1123) | Exact equality |
+| [`compare(const char16_t* s, int n)`](src/rpp/strview.h#L1141) | Compare to another string |
+| [`rfind(char16_t c)`](src/rpp/strview.h#L1159) | Reverse search for a character |
+| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1165) | Forward search for any of the specified chars |
+| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1174) | Reverse search for any of the specified chars |
+| [`substr(int index, int length)`](src/rpp/strview.h#L1183) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L1189) | Creates a substring from index to end |
+| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1197) | Gets next token; advances ptr to next delimiter |
+| [`next(char16_t delim)`](src/rpp/strview.h#L1223) | Returns next token directly |
+| [`to_string()`](src/rpp/strview.h#L993) | Convert to `std::u16string` |
+| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1074) | Copy to null-terminated C-string buffer |
 
 ```cpp
 #define RPP_ENABLE_UNICODE 1
@@ -535,36 +548,37 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Item | Description |
 |------|-------------|
-| [`string_buffer`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L73) | Fast, always-null-terminated string builder |
-| [`format_opt`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L62) | Format options enum: `none`, `lowercase`, `uppercase` |
+| [`string_buffer`](src/rpp/sprint.h#L73) | Fast, always-null-terminated string builder |
+| [`format_opt`](src/rpp/sprint.h#L62) | Format options enum: `none`, `lowercase`, `uppercase` |
 
 ### string_buffer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`write(const T& v)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L124) | Write a value (auto-converts most types) |
-| [`writeln(const Args&... args)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L300) | Write values followed by newline |
-| [`writef(const char* format, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L118) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L281) | Write data as hex string |
-| [`write_cont(const Container& c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L260) | Write container contents |
-| [`prettyprint(const T& value)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L343) | Pretty-print a value |
-| [`clear()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L109) | Clear the buffer |
-| [`reserve(int capacity)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L110) | Reserve capacity |
-| [`resize(int size)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L111) | Resize buffer |
-| [`append(const char* data, int len)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L114) | Append raw data |
-| [`emplace_buffer(int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L117) | Get writable buffer of N bytes |
+| [`write(const T& v)`](src/rpp/sprint.h#L124) | Write a value (auto-converts most types) |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L335) | Write values followed by newline |
+| [`writef(const char* format, ...)`](src/rpp/sprint.h#L118) | Printf-style formatted write |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L281) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L260) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L343) | Pretty-print a value |
+| [`clear()`](src/rpp/sprint.h#L109) | Clear the buffer |
+| [`reserve(int capacity)`](src/rpp/sprint.h#L110) | Reserve capacity |
+| [`resize(int size)`](src/rpp/sprint.h#L111) | Resize buffer |
+| [`append(const char* data, int len)`](src/rpp/sprint.h#L114) | Append raw data |
+| [`emplace_buffer(int n)`](src/rpp/sprint.h#L117) | Get writable buffer of N bytes |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`to_string(char)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L33) | Locale-agnostic char to string |
-| [`to_string(int)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L41) | Locale-agnostic int to string |
-| [`to_string(float)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L47) | Locale-agnostic float to string |
-| [`to_string(double)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L48) | Locale-agnostic double to string |
-| [`to_string(bool)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L51) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L422) | Print to stdout |
-| [`println(args...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sprint.h#L433) | Print to stdout with newline |
+| [`to_string(char)`](src/rpp/sprint.h#L33) | Locale-agnostic char to string |
+| [`to_string(int)`](src/rpp/sprint.h#L41) | Locale-agnostic int to string |
+| [`to_string(float)`](src/rpp/sprint.h#L47) | Locale-agnostic float to string |
+| [`to_string(double)`](src/rpp/sprint.h#L48) | Locale-agnostic double to string |
+| [`to_string(bool)`](src/rpp/sprint.h#L51) | Bool to `"true"` or `"false"` |
+| [`print(args...)`](src/rpp/sprint.h#L456) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L475) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L403) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -686,63 +700,70 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 
 | Class | Description |
 |-------|-------------|
-| [`load_buffer`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L30) | RAII buffer for loading file contents into memory |
-| [`file`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L93) | Random-access file with read, write, seek, and truncate |
-| [`buffer_parser`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L461) | Generic file-backed parser (line, bracket, keyval variants) |
+| [`load_buffer`](src/rpp/file_io.h#L30) | RAII buffer for loading file contents into memory |
+| [`file`](src/rpp/file_io.h#L93) | Random-access file with read, write, seek, and truncate |
+| [`buffer_parser`](src/rpp/file_io.h#L465) | Generic file-backed parser (line, bracket, keyval variants) |
 
 ### file::mode Enum
 
 | Value | Description |
 |-------|-------------|
-| [`READONLY`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L95) | Open for reading only |
-| [`READWRITE`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L95) | Open for reading and writing |
-| [`CREATENEW`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L95) | Create a new file (truncates existing) |
-| [`APPEND`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L95) | Open for appending |
+| [`READONLY`](src/rpp/file_io.h#L96) | Open for reading only |
+| [`READWRITE`](src/rpp/file_io.h#L97) | Open for reading and writing |
+| [`CREATENEW`](src/rpp/file_io.h#L98) | Create a new file (truncates existing) |
+| [`APPEND`](src/rpp/file_io.h#L99) | Open for appending |
 
 ### load_buffer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L50) | Size of the loaded data |
-| [`data()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L52) | Pointer to the data |
-| [`c_str()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L53) | Null-terminated C string |
-| [`view()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L56) | Get a `strview` over the buffer |
-| [`steal_ptr()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L47) | Release ownership of the buffer |
-| [`operator bool()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L54) | True if buffer contains data |
+| [`size()`](src/rpp/file_io.h#L50) | Size of the loaded data |
+| [`data()`](src/rpp/file_io.h#L52) | Pointer to the data |
+| [`c_str()`](src/rpp/file_io.h#L53) | Null-terminated C string |
+| [`view()`](src/rpp/file_io.h#L56) | Get a `strview` over the buffer |
+| [`steal_ptr()`](src/rpp/file_io.h#L47) | Release ownership of the buffer |
+| [`operator bool()`](src/rpp/file_io.h#L54) | True if buffer contains data |
 
 ### file Methods
 
 | Method | Description |
 |--------|-------------|
-| [`open(const char* filename, mode openMode)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L137) | Open a file |
-| [`close()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L141) | Close the file |
-| [`good()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L146) / [`is_open()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L148) | True if file is open and valid |
-| [`bad()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L158) | True if file is not open |
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L163) / [`sizel()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L168) | File size (32-bit / 64-bit) |
-| [`read(void* buffer, int bytesToRead)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L178) | Read bytes into buffer |
-| [`read_all()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L193) | Read entire file as `load_buffer` |
-| [`read_text()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L198) | Read entire file as `std::string` |
-| [`write(const void* buffer, int bytesToWrite)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L244) | Write bytes from buffer |
-| [`writef(const char* format, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L276) | Printf-style write |
-| [`writeln(strview str)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L281) | Write line with newline |
-| [`seek(int64 offset, int seekmode)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L405) / [`tell()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L411) | Seek/tell file position |
-| [`flush()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L348) | Flush buffered writes |
-| [`truncate(int64 size)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L333) | Truncate file to size |
-| [`truncate_front(int64 bytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L319) | Remove bytes from front |
-| [`truncate_end(int64 bytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L327) | Remove bytes from end |
-| [`preallocate(int64 size)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L342) | Preallocate file space |
-| [`save_as(const char* newPath)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L204) | Copy contents to a new file |
-| [`time_created()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L426) | File creation time |
-| [`time_accessed()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L431) | Last access time |
-| [`time_modified()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L436) | Last modification time |
+| [`open(strview filename, mode openMode)`](src/rpp/file_io.h#L141) | Open a file using an UTF-8 filepath (internally converted to ustring) |
+| [`open(ustrview filename, mode openMode)`](src/rpp/file_io.h#L143) | Open a file using an UTF-16 filepath |
+| [`close()`](src/rpp/file_io.h#L145) | Close the file |
+| [`good()`](src/rpp/file_io.h#L150) / [`is_open()`](src/rpp/file_io.h#L152) | True if file is open and valid |
+| [`bad()`](src/rpp/file_io.h#L162) | True if file is not open |
+| [`size()`](src/rpp/file_io.h#L167) / [`sizel()`](src/rpp/file_io.h#L172) | File size (32-bit / 64-bit) |
+| [`read(void* buffer, int bytesToRead)`](src/rpp/file_io.h#L182) | Read bytes into buffer |
+| [`read_all()`](src/rpp/file_io.h#L197) | Read entire file as `load_buffer` |
+| [`read_text()`](src/rpp/file_io.h#L202) | Read entire file as `std::string` |
+| [`write(const void* buffer, int bytesToWrite)`](src/rpp/file_io.h#L248) | Write bytes from buffer |
+| [`writef(const char* format, ...)`](src/rpp/file_io.h#L280) | Printf-style write |
+| [`writeln(strview str)`](src/rpp/file_io.h#L285) | Write line with newline |
+| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L409) | Seek to filepos |
+| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L410) | Seek to 64-bit filepos |
+| [`tell()`](src/rpp/file_io.h#L415) | Tell file position |
+| [`tell64()`](src/rpp/file_io.h#L420) | Tell 64-bit file position |
+| [`flush()`](src/rpp/file_io.h#L352) | Flush buffered writes |
+| [`truncate(int64 size)`](src/rpp/file_io.h#L337) | Truncate file to size |
+| [`truncate_front(int64 bytes)`](src/rpp/file_io.h#L323) | Remove bytes from front |
+| [`truncate_end(int64 bytes)`](src/rpp/file_io.h#L331) | Remove bytes from end |
+| [`preallocate(int64 size)`](src/rpp/file_io.h#L346) | Preallocate file space |
+| [`save_as(const char* newPath)`](src/rpp/file_io.h#L208) | Copy contents to a new file |
+| [`time_created()`](src/rpp/file_io.h#L430) | File creation time |
+| [`time_accessed()`](src/rpp/file_io.h#L435) | Last access time |
+| [`time_modified()`](src/rpp/file_io.h#L440) | Last modification time |
 
 ### file Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`file::read_all(const char* filename)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L210) | Read entire file into `load_buffer` |
-| [`file::read_all_text(const char* filename)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L225) | Read entire file as `std::string` |
-| [`file::write_new(const char* filename, const void* data, int size)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/file_io.h#L361) | Create/overwrite file with data |
+| [`file::read_all(strview filename)`](src/rpp/file_io.h#L214) | Read entire file into `load_buffer` |
+| [`file::read_all(ustrview filename)`](src/rpp/file_io.h#L219) | Read entire file into `load_buffer` |
+| [`file::read_all_text(strview filename)`](src/rpp/file_io.h#L229) | Read entire file as `std::string` |
+| [`file::read_all_text(ustrview filename)`](src/rpp/file_io.h#L234) | Read entire file as `std::string` |
+| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L365) | Create/overwrite file with data |
+| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L379) | Create/overwrite file with data |
 
 ### Example using file_io for reading and writing files:
 
@@ -873,67 +894,77 @@ Cross-platform path manipulation, directory listing, and filesystem utilities.
 
 | Function | Description |
 |----------|-------------|
-| [`file_exists(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L29) | True if the file exists |
-| [`folder_exists(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L45) | True if the folder exists |
-| [`is_symlink(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L37) | True if the path is a symlink |
-| [`file_size(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L100) | Short file size (32-bit) |
-| [`file_sizel(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L108) | Long file size (64-bit) |
-| [`file_created(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L116) | File creation date |
-| [`file_accessed(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L124) | Last file access date |
-| [`file_modified(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L132) | Last file modification date |
+| [`file_exists(path)`](src/rpp/paths.h#L29) | True if the file exists |
+| [`folder_exists(path)`](src/rpp/paths.h#L45) | True if the folder exists |
+| [`is_symlink(path)`](src/rpp/paths.h#L37) | True if the path is a symlink |
+| [`file_size(path)`](src/rpp/paths.h#L100) | Short file size (32-bit) |
+| [`file_sizel(path)`](src/rpp/paths.h#L108) | Long file size (64-bit) |
+| [`file_created(path)`](src/rpp/paths.h#L116) | File creation date |
+| [`file_accessed(path)`](src/rpp/paths.h#L124) | Last file access date |
+| [`file_modified(path)`](src/rpp/paths.h#L132) | Last file modification date |
+| [`file_or_folder_exists(fileOrFolder)`](src/rpp/paths.h#L53) | True if a file or folder exists at the given path |
+| [`file_info(filename, filesize, created, accessed, modified)`](src/rpp/paths.h#L77) | Gets file info: size, creation, access and modification dates |
 
 ### File Operations
 
 | Function | Description |
 |----------|-------------|
-| [`delete_file(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L141) | Delete a single file |
-| [`copy_file(src, dst)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L151) | Copy file, overwriting destination |
-| [`copy_file_if_needed(src, dst)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L169) | Copy only if destination doesn't exist |
-| [`copy_file_into_folder(src, folder)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L178) | Copy file into a folder |
-| [`create_symlink(target, link)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L63) | Create a symbolic link |
+| [`delete_file(path)`](src/rpp/paths.h#L141) | Delete a single file |
+| [`copy_file(sourceFile, destinationFile)`](src/rpp/paths.h#L151) | Copy file, overwriting destination |
+| [`copy_file_if_needed(sourceFile, destinationFile)`](src/rpp/paths.h#L169) | Copy only if destination doesn't exist |
+| [`copy_file_into_folder(sourceFile, destinationFolder)`](src/rpp/paths.h#L178) | Copy file into a folder |
+| [`create_symlink(target, link)`](src/rpp/paths.h#L63) | Create a symbolic link |
+| [`copy_file_mode(sourceFile, destinationFile)`](src/rpp/paths.h#L160) | Copies file access permissions from source to destination |
 
 ### Folder Operations
 
 | Function | Description |
 |----------|-------------|
-| [`create_folder(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L188) | Create folder recursively |
-| [`delete_folder(path, mode)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L206) | Delete folder (recursive or non-recursive) |
+| [`create_folder(foldername)`](src/rpp/paths.h#L188) | Create folder recursively |
+| [`delete_folder(foldername, mode)`](src/rpp/paths.h#L206) | Delete folder (recursive or non-recursive) |
 
 ### Path Manipulation
 
 | Function | Description |
 |----------|-------------|
-| [`full_path(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L215) | Resolve relative path to absolute |
-| [`merge_dirups(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L224) | Merge all `../` inside a path |
-| [`file_name(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L239) | Extract filename without extension |
-| [`file_nameext(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L251) | Extract filename with extension |
-| [`file_ext(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L265) | Extract file extension |
-| [`file_replace_ext(path, ext)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L278) | Replace file extension |
-| [`file_name_append(path, add)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L290) | Append to filename (before extension) |
-| [`file_name_replace(path, name)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L302) | Replace only the filename |
-| [`file_nameext_replace(path, nameext)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L314) | Replace filename and extension |
-| [`folder_name(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L327) | Extract folder name from path |
-| [`folder_path(path)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L341) | Extract full folder path from file path |
-| [`normalize(path, sep)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L353) | Normalize slashes in-place |
-| [`normalized(path, sep)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L364) | Return normalized copy |
-| [`path_combine(p1, p2, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L376) | Safely combine path segments (up to 4) |
+| [`full_path(path)`](src/rpp/paths.h#L215) | Resolve relative path to absolute |
+| [`merge_dirups(path)`](src/rpp/paths.h#L224) | Merge all `../` inside a path |
+| [`file_name(path)`](src/rpp/paths.h#L239) | Extract filename without extension |
+| [`file_nameext(path)`](src/rpp/paths.h#L251) | Extract filename with extension |
+| [`file_ext(path)`](src/rpp/paths.h#L265) | Extract file extension |
+| [`file_replace_ext(path, ext)`](src/rpp/paths.h#L278) | Replace file extension |
+| [`file_name_append(path, add)`](src/rpp/paths.h#L290) | Append to filename (before extension) |
+| [`file_name_replace(path, newFileName)`](src/rpp/paths.h#L302) | Replace only the filename |
+| [`file_nameext_replace(path, newFileNameAndExt)`](src/rpp/paths.h#L314) | Replace filename and extension |
+| [`folder_name(path)`](src/rpp/paths.h#L327) | Extract folder name from path |
+| [`folder_path(path)`](src/rpp/paths.h#L341) | Extract full folder path from file path |
+| [`normalize(path, sep)`](src/rpp/paths.h#L353) | Normalize slashes in-place |
+| [`normalized(path, sep)`](src/rpp/paths.h#L364) | Return normalized copy |
+| [`path_combine(path1, path2, ...)`](src/rpp/paths.h#L376) | Safely combine path segments (up to 4) |
 
 ### Directory Listing
 
 | Function | Description |
 |----------|-------------|
-| [`list_dirs(dir, recursive, fullpath)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L625) | List all folders inside a directory |
-| [`list_files(dir, suffix, recursive, fullpath)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L679) | List files with optional extension filter |
-| [`directory_iter`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L445) | Range-based directory iterator |
+| [`list_dirs(out, dir, flags)`](src/rpp/paths.h#L625) | List all folders inside a directory |
+| [`list_files(out,dir, suffix, flags)`](src/rpp/paths.h#L679) | List files with optional extension filter |
+| [`dir_iterator`](src/rpp/paths.h#L557) | Range-based UTF-8 directory iterator |
+| [`udir_iterator`](src/rpp/paths.h#L562) | Range-based UTF-16 directory iterator |
+| [`dir_iter_base`](src/rpp/paths.h#L396) | Common base class for directory iteration |
+| [`directory_iter`](src/rpp/paths.h#L445) | Basic non-recursive directory iterator |
+| [`list_alldir(outDirs, outFiles, dir, flags)`](src/rpp/paths.h#L723) | Lists all directories and files in a directory |
 
 ### System Directories
 
 | Function | Description |
 |----------|-------------|
-| [`working_dir()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L736) | Current working directory (with trailing slash) |
-| [`module_dir(moduleObject)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L766) | Directory of the current linked module |
-| [`temp_dir()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L793) | System temporary directory |
-| [`home_dir()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/paths.h#L804) | User home directory |
+| [`working_dir()`](src/rpp/paths.h#L736) | Current working directory (with trailing slash) |
+| [`module_dir(moduleObject)`](src/rpp/paths.h#L766) | Directory of the current linked module |
+| [`temp_dir()`](src/rpp/paths.h#L793) | System temporary directory |
+| [`home_dir()`](src/rpp/paths.h#L804) | User home directory |
+| [`module_path(moduleObject)`](src/rpp/paths.h#L774) | Full path to enclosing binary including filename |
+| [`change_dir(new_wd)`](src/rpp/paths.h#L781) | Changes the application working directory |
+| [`home_diru()`](src/rpp/paths.h#L806) | User home directory as Unicode ustring |
 
 ### Example using paths.h for path manipulation and directory listing:
 
@@ -1085,26 +1116,27 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 
 | Class | Description |
 |-------|-------------|
-| [`delegate<Ret(Args...)>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L119) | Single-target function delegate |
-| [`multicast_delegate<Ret(Args...)>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L703) | Multi-target event delegate (`event<>` alias) |
+| [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L170) | Single-target function delegate |
+| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L718) | Multi-target event delegate (`event<>` alias) |
 
 ### delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`operator()(Args... args)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L659) | Invoke the delegate |
-| [`operator bool()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L620) | True if delegate is bound |
-| [`reset()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L604) | Unbind the delegate |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L659) | Invoke the delegate |
+| [`operator bool()`](src/rpp/delegate.h#L620) | True if delegate is bound |
+| [`reset()`](src/rpp/delegate.h#L604) | Unbind the delegate |
 
 ### multicast_delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L803) / [`operator+=`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L864) | Register a callback |
-| [`operator-=`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L874) | Unregister a callback |
-| [`operator()(Args... args)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L884) | Invoke all registered callbacks |
-| [`clear()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L752) | Remove all callbacks |
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/delegate.h#L771) | Number of registered callbacks |
+| [`add(delegate)`](src/rpp/delegate.h#L803) / [`operator+=`](src/rpp/delegate.h#L864) | Register a callback |
+| [`operator-=`](src/rpp/delegate.h#L874) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L884) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L752) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L771) | Number of registered callbacks |
+| [`multicast_fwd<T>`](src/rpp/delegate.h#L888) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
 
@@ -1125,22 +1157,35 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 
 | Item | Description |
 |------|-------------|
-| [`cfuture<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L112) | Extended `std::future` with composition and coroutine support |
-| [`async_task(task)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L29) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L877) | Create an already-completed future |
-| [`make_exceptional_future(e)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L894) | Create an already-errored future |
-| [`wait_all(futures)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L903) | Block until all futures complete |
-| [`get_all(futures)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L916) | Block and gather results from all futures |
+| [`cfuture<T>`](src/rpp/future.h#L112) | Extended `std::future` with composition and coroutine support |
+| [`async_task(task)`](src/rpp/future.h#L29) | Launch a task on the thread pool, returns `cfuture<T>` |
+| [`make_ready_future(value)`](src/rpp/future.h#L903) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L920) | Create an already-errored future |
+| [`wait_all(futures)`](src/rpp/future.h#L988) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L942) | Block and gather results from all futures |
 
 ### cfuture Methods
 
 | Method | Description |
 |--------|-------------|
-| [`then(Task&& task)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L171) | Chain a continuation (runs via `async_task`) |
-| [`then(Task&& task, ExHandlers&&... handlers)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L171) | Chain with exception recovery |
-| [`continue_with(Task&& task)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L266) | Fire-and-forget continuation |
-| [`detach()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L329) | Abandon future, wait in background |
-| [`await_ready()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/future.h#L388) | Coroutine ready check |
+| [`~cfuture()`](src/rpp/future.h#L126) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
+| [`then()`](src/rpp/future.h#L154) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
+| [`then(Task task)`](src/rpp/future.h#L171) | Chain a continuation that receives the result (runs via `async_task`) |
+| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L198) | Chain with 1–4 typed exception recovery handlers |
+| [`then(cfuture<U>&& next)`](src/rpp/future.h#L250) | Chain by waiting for this future, then returning the result of `next` |
+| [`continue_with(Task task)`](src/rpp/future.h#L266) | Fire-and-forget continuation (moves `*this` into background) |
+| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L274) | Fire-and-forget continuation with 1–4 typed exception handlers |
+| [`detach()`](src/rpp/future.h#L329) | Abandon future, wait in background (swallows exceptions) |
+| [`chain_async(Task task)`](src/rpp/future.h#L361) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
+| [`chain_async(cfuture&& next)`](src/rpp/future.h#L374) | Sequential chaining with another future |
+| [`await_ready()`](src/rpp/future.h#L388) | Non-blocking check if the future is already finished |
+| [`collect_ready(T* result)`](src/rpp/future.h#L415) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L433) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L445) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L457) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L484) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`RPP_HAS_COROUTINES`](src/rpp/future_types.h#L12) | Detects whether C++20 coroutine headers are available |
+| [`RPP_CORO_STD`](src/rpp/future_types.h#L13) | Namespace alias for coroutine types (std or std::experimental) |
 
 ### Example: Composable Futures
 
@@ -1154,16 +1199,100 @@ rpp::async_task([=]{
 });
 ```
 
+### Example: Exception Recovery with `then()`
+
+```cpp
+rpp::async_task([=] {
+    return loadCachedScene(getCachePath(file));
+}, [=](invalid_cache_state e) {
+    return loadCachedScene(downloadAndCacheFile(file)); // recover from bad cache
+}).then([=](std::shared_ptr<SceneData> sceneData) {
+    setCurrentScene(sceneData);
+}, [=](scene_load_failed e) {
+    loadDefaultScene(); // recover from failed scene load
+});
+```
+
+### Example: Sequential Chaining with `chain_async()`
+
+```cpp
+cfuture<void> tasks;
+tasks.chain_async([=]{
+    downloadAssets(manifest);
+}).chain_async([=]{
+    parseAssets(manifest);   // runs after download completes, even if previous task throws an exception
+}).chain_async([=]{
+    initializeRenderer();    // runs after parsing completes
+});
+tasks.get(); // wait for the full chain
+```
+
+### Example: Non-blocking Result Polling with `collect_ready()`
+
+```cpp
+auto f = rpp::async_task([=]{ return computeResult(data); });
+
+// poll in a game loop without blocking
+int result;
+while (!f.collect_ready(&result)) {
+    renderLoadingScreen();
+}
+useResult(result);
+```
+
+### Example: `detach()` for Fire-and-Forget
+
+```cpp
+auto f = rpp::async_task([=]{
+    sendAnalyticsEvent(event);
+});
+
+if (f.wait_for(rpp::millis(100)) == std::future_status::timeout) {
+    LogWarning("Analytics event is taking too long to send, abandoning to unblock UI");
+    f.detach(); // don't care about the result, avoid terminate on destruction
+}
+```
+
 ### Example: C++20 Coroutines
 
 ```cpp
 using namespace rpp::coro_operators;
 rpp::cfuture<void> downloadAndUnzipDataAsync(std::string url)
 {
-    std::string zipPath = co_await [&]{ return downloadZipFile(url); }; // spawns a new task to exec lambda on thread pool
-    std::string extractedDir = co_await [&]{ return extractContents(zipPath); };
+    std::string zipPath = co_await [=]{ return downloadZipFile(url); }; // spawns a new task to exec lambda on thread pool
+    std::string extractedDir = co_await [=]{ return extractContents(zipPath); };
     co_await callOnUIThread([=]{ jobComplete(extractedDir); });
     co_return;
+}
+```
+
+### Example: Coroutine Returning a Value
+
+```cpp
+using namespace rpp::coro_operators;
+rpp::cfuture<UserProfile> fetchUserProfileAsync(std::string userId)
+{
+    std::string json = co_await [=]{ return httpGet("/api/users/" + userId); };
+    UserProfile profile = co_await [=]{ return parseJson<UserProfile>(json); };
+    co_return profile;
+}
+```
+
+### Example: Coroutine with Async Sleep
+
+```cpp
+using namespace rpp::coro_operators;
+rpp::cfuture<std::string> retryDownloadAsync(std::string url, int maxRetries)
+{
+    for (int i = 0; i < maxRetries; ++i) {
+        try {
+            co_return co_await [=]{ return httpGet(url); };
+        } catch (network_error e) {
+            if (i + 1 == maxRetries) throw;
+            co_await std::chrono::seconds{1 << i}; // exponential backoff
+        }
+    }
+    throw network_error{"retries exhausted"};
 }
 ```
 
@@ -1175,18 +1304,18 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 
 | Class | Description |
 |-------|-------------|
-| [`functor_awaiter<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L43) | Awaiter for lambdas/delegates via `parallel_task()` |
-| [`functor_awaiter_fut<F>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L113) | Awaiter for lambdas returning futures |
-| [`chrono_awaiter<Clock>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L192) | Awaiter for `std::chrono` durations (async sleep) |
+| [`functor_awaiter<T>`](src/rpp/coroutines.h#L43) | Awaiter for lambdas/delegates via `parallel_task()` |
+| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L113) | Awaiter for lambdas returning futures |
+| [`chrono_awaiter<Clock>`](src/rpp/coroutines.h#L192) | Awaiter for `std::chrono` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
 | Operator | Description |
 |----------|-------------|
-| [`co_await delegate<T()>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L244) | Run delegate async on thread pool |
-| [`co_await lambda`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L276) | Run lambda async on thread pool |
-| [`co_await cfuture<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L299) | Await a composable future |
-| [`co_await chrono::duration`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/coroutines.h#L330) | Async sleep for a duration |
+| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L244) | Run delegate async on thread pool |
+| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L276) | Run lambda async on thread pool |
+| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L299) | Await a composable future |
+| [`operator co_await(chrono::duration)`](src/rpp/coroutines.h#L330) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;
@@ -1207,30 +1336,31 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L317) | Thread pool manager with auto-scaling workers |
-| [`pool_task_handle`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L125) | Waitable, reference-counted handle for pool tasks |
-| [`pool_worker`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L105) | Individual worker thread in the pool |
+| [`thread_pool`](src/rpp/thread_pool.h#L317) | Thread pool manager with auto-scaling workers |
+| [`pool_task_handle`](src/rpp/thread_pool.h#L125) | Waitable, reference-counted handle for pool tasks |
+| [`pool_worker`](src/rpp/thread_pool.h#L105) | Individual worker thread in the pool |
 
 ### thread_pool Methods
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L429) | Split work across threads |
-| [`parallel_task(Task&& task)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L440) | Run a single async task, returns `pool_task_handle` |
-| [`set_max_parallelism(int max)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L354) | Set max concurrent workers |
-| [`max_parallelism()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L357) | Get max concurrent workers |
-| [`active_tasks()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L370) | Number of currently running tasks |
-| [`idle_tasks()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L373) | Number of idle workers |
-| [`total_tasks()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L376) | Total number of workers |
-| [`clear_idle_tasks()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L380) | Remove idle workers |
+| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L481) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L440) | Run a single async task, returns `pool_task_handle` |
+| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L354) | Set max concurrent workers |
+| [`max_parallelism()`](src/rpp/thread_pool.h#L357) | Get max concurrent workers |
+| [`active_tasks()`](src/rpp/thread_pool.h#L370) | Number of currently running tasks |
+| [`idle_tasks()`](src/rpp/thread_pool.h#L373) | Number of idle workers |
+| [`total_tasks()`](src/rpp/thread_pool.h#L376) | Total number of workers |
+| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L380) | Remove idle workers |
 
 ### Free Functions (Global Pool)
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(start, end, range, func)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L481) | Parallel for on the global thread pool |
-| [`parallel_foreach(container, func)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L502) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/thread_pool.h#L521) | Run async task on the global pool |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L481) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L502) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L521) | Run async task on the global pool |
+| [`action<TArgs...>`](src/rpp/thread_pool.h#L35) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for
 
@@ -1299,12 +1429,13 @@ Thread naming and information utilities.
 
 | Function | Description |
 |----------|-------------|
-| [`set_this_thread_name(name)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/threads.h#L16) | Set current thread debug name (max 15 chars on Linux) |
-| [`get_this_thread_name()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/threads.h#L21) | Get current thread name |
-| [`get_thread_id()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/threads.h#L31) | Get current thread ID (uint64) |
-| [`get_process_id()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/threads.h#L36) | Get current process ID (uint32) |
-| [`num_physical_cores()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/threads.h#L41) | Number of physical CPU cores |
-| [`yield()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/threads.h#L47) | Yield execution to another thread |
+| [`set_this_thread_name(name)`](src/rpp/threads.h#L16) | Set current thread debug name (max 15 chars on Linux) |
+| [`get_this_thread_name()`](src/rpp/threads.h#L21) | Get current thread name |
+| [`get_thread_id()`](src/rpp/threads.h#L31) | Get current thread ID (uint64) |
+| [`get_process_id()`](src/rpp/threads.h#L36) | Get current process ID (uint32) |
+| [`num_physical_cores()`](src/rpp/threads.h#L41) | Number of physical CPU cores |
+| [`yield()`](src/rpp/threads.h#L47) | Yield execution to another thread |
+| [`get_thread_name(thread_id)`](src/rpp/threads.h#L26) | Returns the debug name of a thread by its ID |
 
 ---
 
@@ -1316,17 +1447,19 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/mutex.h#L13) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
-| [`recursive_mutex`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/mutex.h#L34) | Recursive mutex variant |
-| [`unlock_guard<Mutex>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/mutex.h#L171) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/mutex.h#L395) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`mutex`](src/rpp/mutex.h#L13) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
+| [`recursive_mutex`](src/rpp/mutex.h#L34) | Recursive mutex variant |
+| [`unlock_guard<Mutex>`](src/rpp/mutex.h#L171) | RAII unlock guard: unlocks on construction, relocks on destruction |
+| [`synchronized<T>`](src/rpp/mutex.h#L395) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(mutex)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/mutex.h#L195) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(mutex, timeout)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/mutex.h#L231) | Spin-lock with timeout |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L195) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L231) | Spin-lock with timeout |
+| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L126) | Indicates platform provides native critical_section mutex |
+| [`RPP_SYNC_T`](src/rpp/mutex.h#L258) | Template constraint placeholder for SyncableType concept |
 
 ### Example: Basic Mutex and Spin Lock
 
@@ -1392,22 +1525,22 @@ Counting semaphore and lightweight notification flags.
 
 | Class | Description |
 |-------|-------------|
-| [`semaphore`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L15) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L337) | Lighter semaphore using a single atomic flag |
-| [`semaphore_once_flag`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L371) | One-shot semaphore that can only be set once |
+| [`semaphore`](src/rpp/semaphore.h#L15) | Counting semaphore with spin-lock optimization |
+| [`semaphore_flag`](src/rpp/semaphore.h#L337) | Lighter semaphore using a single atomic flag |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L371) | One-shot semaphore that can only be set once |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L88) | Increment and wake one waiter |
-| [`notify_all()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L123) | Wake all waiters |
-| [`notify_once()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L156) | Notify only if not already signaled |
-| [`try_wait()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L194) | Non-blocking wait attempt |
-| [`wait()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L210) | Blocking wait |
-| [`wait(rpp::Duration timeout)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L245) | Wait with timeout |
-| [`count()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L49) | Current count |
-| [`reset()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/semaphore.h#L64) | Reset to zero |
+| [`notify()`](src/rpp/semaphore.h#L88) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L123) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L156) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L194) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L210) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L245) | Wait with timeout |
+| [`count()`](src/rpp/semaphore.h#L49) | Current count |
+| [`reset()`](src/rpp/semaphore.h#L64) | Reset to zero |
 
 ### Example: Producer-Consumer with semaphore
 
@@ -1475,7 +1608,7 @@ Extended condition variable with `rpp::Duration` and `rpp::TimePoint` overloads.
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/condition_variable.h#L30) | Condition variable with high-resolution timeout support |
+| [`condition_variable`](src/rpp/condition_variable.h#L30) | Condition variable with high-resolution timeout support |
 
 ### Example
 
@@ -1518,48 +1651,52 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 
 | Enum | Description |
 |------|-------------|
-| [`address_family`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L21) | `AF_DontCare`, `AF_IPv4`, `AF_IPv6`, `AF_Bth` |
-| [`socket_type`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L29) | `ST_Stream`, `ST_Datagram`, `ST_Raw`, `ST_RDM`, `ST_SeqPacket` |
-| [`socket_category`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L39) | `SC_Unknown`, `SC_Listen`, `SC_Accept`, `SC_Client` |
-| [`ip_protocol`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L47) | `IPP_TCP`, `IPP_UDP`, `IPP_ICMP`, `IPP_BTH`, etc. |
-| [`socket_option`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L59) | `SO_None`, `SO_ReuseAddr`, `SO_Blocking`, `SO_NonBlock`, `SO_Nagle` |
+| [`address_family`](src/rpp/sockets.h#L21) | `AF_DontCare`, `AF_IPv4`, `AF_IPv6`, `AF_Bth` |
+| [`socket_type`](src/rpp/sockets.h#L29) | `ST_Stream`, `ST_Datagram`, `ST_Raw`, `ST_RDM`, `ST_SeqPacket` |
+| [`socket_category`](src/rpp/sockets.h#L39) | `SC_Unknown`, `SC_Listen`, `SC_Accept`, `SC_Client` |
+| [`ip_protocol`](src/rpp/sockets.h#L47) | `IPP_TCP`, `IPP_UDP`, `IPP_ICMP`, `IPP_BTH`, etc. |
+| [`socket_option`](src/rpp/sockets.h#L59) | `SO_None`, `SO_ReuseAddr`, `SO_Blocking`, `SO_NonBlock`, `SO_Nagle` |
 
 ### Classes
 
 | Class | Description |
 |-------|-------------|
-| [`raw_address`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L101) | IP address without port (IPv4/IPv6) |
-| [`ipaddress`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L213) | IP address + port, constructible from `"ip:port"` strings |
-| [`ipaddress4`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L367) | IPv4 convenience wrapper |
-| [`ipaddress6`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L402) | IPv6 convenience wrapper |
-| [`ipinterface`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L434) | Network interface info (name, addr, netmask, broadcast, gateway) |
-| [`socket`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L479) | Full TCP/UDP socket with send, recv, select, etc. |
+| [`raw_address`](src/rpp/sockets.h#L101) | IP address without port (IPv4/IPv6) |
+| [`ipaddress`](src/rpp/sockets.h#L213) | IP address + port, constructible from `"ip:port"` strings |
+| [`ipaddress4`](src/rpp/sockets.h#L367) | IPv4 convenience wrapper |
+| [`ipaddress6`](src/rpp/sockets.h#L402) | IPv6 convenience wrapper |
+| [`ipinterface`](src/rpp/sockets.h#L434) | Network interface info (name, addr, netmask, broadcast, gateway) |
+| [`socket`](src/rpp/sockets.h#L479) | Full TCP/UDP socket with send, recv, select, etc. |
 
 ### socket Methods
 
 | Method | Description |
 |--------|-------------|
-| [`close()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L550) | Close the socket |
-| [`send(const void* data, int numBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L661) | Send data |
-| [`recv(void* buf, int maxBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L785) | Receive data |
-| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L697) | UDP send to address |
-| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L815) | UDP receive with source address |
-| [`flush()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L735) | Flush pending data |
-| [`peek(void* buf, int maxBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L808) | Peek at incoming data without consuming |
-| [`skip(int bytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L758) | Skip incoming bytes |
-| [`available()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L769) | Bytes available to read |
-| [`select(int millis)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L1158) | Wait for socket readability |
-| [`good()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L569) / [`bad()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L571) | Socket state |
-| [`set_nagle(bool enable)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L1007) | Enable/disable Nagle's algorithm |
+| [`close()`](src/rpp/sockets.h#L550) | Close the socket |
+| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L661) | Send data |
+| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L785) | Receive data |
+| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L697) | UDP send to address |
+| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L815) | UDP receive with source address |
+| [`flush()`](src/rpp/sockets.h#L735) | Flush pending data |
+| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L808) | Peek at incoming data without consuming |
+| [`skip(int bytes)`](src/rpp/sockets.h#L758) | Skip incoming bytes |
+| [`available()`](src/rpp/sockets.h#L769) | Bytes available to read |
+| [`select(int millis)`](src/rpp/sockets.h#L1158) | Wait for socket readability |
+| [`good()`](src/rpp/sockets.h#L569) / [`bad()`](src/rpp/sockets.h#L571) | Socket state |
+| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1007) | Enable/disable Nagle's algorithm |
 
 ### socket Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`socket::listen(int port, ip_family family, socket_option opt)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L1251) | Create a listening server socket |
-| [`socket::accept(const socket& listener)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L1304) | Accept an incoming connection |
-| [`socket::connect(const ipaddress& addr, socket_option opt)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L1312) | Connect to an address |
-| [`socket::connect_to(const char* host, int port, socket_option opt)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sockets.h#L1335) | Connect by hostname and port |
+| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1251) | Create a listening server socket |
+| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1260) | Create a listening server socket |
+| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1304) | Accept an incoming connection |
+| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1312) | Connect to an address |
+| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1335) | Connect by hostname and port |
+| [`protocol_info`](src/rpp/sockets.h#L86) | Describes socket protocol version, address family, type and protocol |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1374) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1380) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 
@@ -1710,30 +1847,34 @@ Buffered binary read/write stream with abstract source interface.
 
 | Class | Description |
 |-------|-------------|
-| [`stream_source`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L27) | Abstract stream interface (implement for custom sources) |
-| [`binary_stream`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L128) | Buffered binary stream with typed read/write |
-| [`file_writer`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L641) | File-backed stream_source |
+| [`stream_source`](src/rpp/binary_stream.h#L27) | Abstract stream interface (implement for custom sources) |
+| [`binary_stream`](src/rpp/binary_stream.h#L128) | Buffered binary stream with typed read/write |
+| [`file_writer`](src/rpp/binary_stream.h#L641) | File-backed stream_source |
+| [`binary_buffer`](src/rpp/binary_stream.h#L567) | Binary stream that doesn't flush data |
+| [`socket_writer`](src/rpp/binary_stream.h#L582) | Binary socket writer for UDP/TCP |
+| [`socket_reader`](src/rpp/binary_stream.h#L608) | Binary socket reader for UDP/TCP |
+| [`file_reader`](src/rpp/binary_stream.h#L708) | File-backed binary stream reader |
 
 ### binary_stream Methods
 
 | Method | Description |
 |--------|-------------|
-| [`write(const void* data, int numBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L219) | Write raw bytes |
-| [`write<T>(const T& value)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L227) | Write a typed value |
-| [`write(strview s)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L285) | Write a string |
-| [`read(void* dst, int max)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L354) | Read raw bytes |
-| [`read<T>()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L389) | Read a typed value |
-| [`write_byte()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L260) / [`write_int16()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L262) / [`write_int32()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L266) / [`write_int64()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L270) | Write specific integer sizes |
-| [`write_float()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L274) / [`write_double()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L276) | Write floating point |
-| [`read_byte()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L391) / [`read_int16()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L393) / [`read_int32()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L397) / [`read_int64()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L401) | Read specific integer sizes |
-| [`read_float()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L405) / [`read_double()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L407) | Read floating point |
-| [`read_str()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L473) | Read a length-prefixed string |
-| [`peek(void* buf, int numBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L366) | Peek without consuming |
-| [`skip(int numBytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L380) | Skip bytes |
-| [`flush()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L205) | Flush write buffer |
-| [`good()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L193) | True if stream is valid |
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L170) / [`capacity()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L171) | Buffer metrics |
-| [`data()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L163) / [`view()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_stream.h#L172) | Access buffer data |
+| [`write(const void* data, int numBytes)`](src/rpp/binary_stream.h#L219) | Write raw bytes |
+| [`write<T>(const T& value)`](src/rpp/binary_stream.h#L260) | Write a typed value |
+| [`write(strview s)`](src/rpp/binary_stream.h#L285) | Write a string |
+| [`read(void* dst, int max)`](src/rpp/binary_stream.h#L354) | Read raw bytes |
+| [`read<T>()`](src/rpp/binary_stream.h#L386) | Read a typed value |
+| [`write_byte()`](src/rpp/binary_stream.h#L260) / [`write_int16()`](src/rpp/binary_stream.h#L262) / [`write_int32()`](src/rpp/binary_stream.h#L266) / [`write_int64()`](src/rpp/binary_stream.h#L270) | Write specific integer sizes |
+| [`write_float()`](src/rpp/binary_stream.h#L274) / [`write_double()`](src/rpp/binary_stream.h#L276) | Write floating point |
+| [`read_byte()`](src/rpp/binary_stream.h#L391) / [`read_int16()`](src/rpp/binary_stream.h#L393) / [`read_int32()`](src/rpp/binary_stream.h#L397) / [`read_int64()`](src/rpp/binary_stream.h#L401) | Read specific integer sizes |
+| [`read_float()`](src/rpp/binary_stream.h#L405) / [`read_double()`](src/rpp/binary_stream.h#L407) | Read floating point |
+| [`read_string()`](src/rpp/binary_stream.h#L473) | Read a length-prefixed string |
+| [`peek(void* buf, int numBytes)`](src/rpp/binary_stream.h#L366) | Peek without consuming |
+| [`skip(int numBytes)`](src/rpp/binary_stream.h#L380) | Skip bytes |
+| [`flush()`](src/rpp/binary_stream.h#L205) | Flush write buffer |
+| [`good()`](src/rpp/binary_stream.h#L193) | True if stream is valid |
+| [`size()`](src/rpp/binary_stream.h#L170) / [`capacity()`](src/rpp/binary_stream.h#L171) | Buffer metrics |
+| [`data()`](src/rpp/binary_stream.h#L163) / [`view()`](src/rpp/binary_stream.h#L172) | Access buffer data |
 
 ### Example: In-Memory Binary Read/Write
 
@@ -1839,19 +1980,19 @@ Reflection-based binary and string serialization using CRTP.
 
 | Class | Description |
 |-------|-------------|
-| [`member_serialize<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L15) | Per-member serialization metadata |
-| [`serializable<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L29) | CRTP base class — inherit and call `bind()` to auto-serialize |
+| [`member_serialize<T>`](src/rpp/binary_serializer.h#L15) | Per-member serialization metadata |
+| [`serializable<T>`](src/rpp/binary_serializer.h#L29) | CRTP base class — inherit and call `bind()` to auto-serialize |
 
 ### serializable Methods
 
 | Method | Description |
 |--------|-------------|
-| [`bind(Members... members)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L67) | Bind struct members for serialization |
-| [`bind_name(const char* name, Member member)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L78) | Bind with explicit name |
-| [`serialize(binary_stream& out)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L92) | Serialize to binary stream |
-| [`deserialize(binary_stream& in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L100) | Deserialize from binary stream |
-| [`serialize(string_buffer& out)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L110) | Serialize to string |
-| [`deserialize(strview& in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/binary_serializer.h#L124) | Deserialize from string |
+| [`bind(first, args, ...)`](src/rpp/binary_serializer.h#L84) | Bind struct members for serialization |
+| [`bind_name(name, elem)`](src/rpp/binary_serializer.h#L78) | Bind with explicit name |
+| [`serialize(binary_stream& out)`](src/rpp/binary_serializer.h#L92) | Serialize to binary stream |
+| [`deserialize(binary_stream& in)`](src/rpp/binary_serializer.h#L100) | Deserialize from binary stream |
+| [`serialize(string_buffer& out)`](src/rpp/binary_serializer.h#L110) | Serialize to string |
+| [`deserialize(strview& in)`](src/rpp/binary_serializer.h#L124) | Deserialize from string |
 
 ### Example: Defining a Serializable Struct
 
@@ -1935,45 +2076,46 @@ High-precision timers, duration types, and performance profiling utilities.
 
 | Type | Description |
 |------|-------------|
-| [`Duration`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L42) | Unified nanosecond-precision duration |
-| [`TimePoint`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L231) | System's most accurate time point measurement |
-| [`Timer`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L311) | High-accuracy timer for profiling or deltaTime |
-| [`StopWatch`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L384) | Start/stop/resume event timer |
-| [`ScopedPerfTimer`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L450) | Auto-logs elapsed time from ctor to dtor |
+| [`Duration`](src/rpp/timer.h#L42) | Unified nanosecond-precision duration |
+| [`TimePoint`](src/rpp/timer.h#L231) | System's most accurate time point measurement |
+| [`Timer`](src/rpp/timer.h#L346) | High-accuracy timer for profiling or deltaTime |
+| [`StopWatch`](src/rpp/timer.h#L419) | Start/stop/resume event timer |
+| [`ScopedPerfTimer`](src/rpp/timer.h#L485) | Auto-logs elapsed time from ctor to dtor |
 
 ### Duration Factory & Accessors
 
 | Method | Description |
 |--------|-------------|
-| [`Duration::from_seconds(double s)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L78) | Create from fractional seconds |
-| [`Duration::from_millis(double ms)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L83) | Create from milliseconds |
-| [`Duration::from_micros(double us)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L88) | Create from microseconds |
-| [`Duration::from_nanos(int64 ns)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L93) | Create from nanoseconds |
-| [`Duration::from_hours(double h)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L104) | Create from hours |
-| [`Duration::from_minutes(double m)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L100) | Create from minutes |
-| [`sec()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L111) / [`msec()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L115) | Convert to fractional seconds / milliseconds |
-| [`seconds()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L119) / [`millis()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L123) / [`micros()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L127) / [`nanos()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L132) | Convert to integer time units |
-| [`to_string()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L199) | Human-readable duration string |
-| [`to_stopwatch_string()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L216) | Stopwatch-style format |
+| [`Duration::from_seconds(double s)`](src/rpp/timer.h#L78) | Create from fractional seconds |
+| [`Duration::from_millis(double ms)`](src/rpp/timer.h#L334) | Create from milliseconds |
+| [`Duration::from_micros(double us)`](src/rpp/timer.h#L336) | Create from microseconds |
+| [`Duration::from_nanos(int64 ns)`](src/rpp/timer.h#L93) | Create from nanoseconds |
+| [`Duration::from_hours(double h)`](src/rpp/timer.h#L104) | Create from hours |
+| [`Duration::from_minutes(double m)`](src/rpp/timer.h#L100) | Create from minutes |
+| [`sec()`](src/rpp/timer.h#L111) / [`msec()`](src/rpp/timer.h#L115) | Convert to fractional seconds / milliseconds |
+| [`seconds()`](src/rpp/timer.h#L119) / [`millis()`](src/rpp/timer.h#L123) / [`micros()`](src/rpp/timer.h#L127) / [`nanos()`](src/rpp/timer.h#L132) | Convert to integer time units |
+| [`to_string()`](src/rpp/timer.h#L199) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timer.h#L216) | Stopwatch-style format |
 
 ### Timer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`start()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L331) | Start / restart the timer |
-| [`elapsed()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L337) | Fractional seconds since start |
-| [`elapsed_millis()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L339) | Fractional milliseconds since start |
-| [`next()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L344) | Get elapsed time and restart |
-| [`measure(Func&& func)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L363) | Measure a block's execution time (seconds) |
-| [`measure_millis(Func&& func)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L371) | Measure a block's execution time (ms) |
+| [`start()`](src/rpp/timer.h#L366) | Start / restart the timer |
+| [`elapsed()`](src/rpp/timer.h#L372) | Fractional seconds since start |
+| [`elapsed_millis()`](src/rpp/timer.h#L374) | Fractional milliseconds since start |
+| [`next()`](src/rpp/timer.h#L379) | Get elapsed time and restart |
+| [`measure(Func&& func)`](src/rpp/timer.h#L398) | Measure a block's execution time (seconds) |
+| [`measure_millis(Func&& func)`](src/rpp/timer.h#L406) | Measure a block's execution time (ms) |
 
 ### Global Time Utilities
 
 | Function | Description |
 |----------|-------------|
-| [`sleep_ms(millis)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L19) | Sleep for milliseconds |
-| [`sleep_us(micros)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L22) | Sleep for microseconds |
-| [`sleep_ns(nanos)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/timer.h#L25) | Sleep for nanoseconds |
+| [`sleep_ms(millis)`](src/rpp/timer.h#L19) | Sleep for milliseconds |
+| [`sleep_us(micros)`](src/rpp/timer.h#L22) | Sleep for microseconds |
+| [`sleep_ns(nanos)`](src/rpp/timer.h#L25) | Sleep for nanoseconds |
+| [`time_now_seconds()`](src/rpp/timer.h#L523) | Returns current time in fractional seconds |
 
 ### Example: Sleep Utilities
 
@@ -2163,50 +2305,58 @@ void renderScene()
 
 | Type | Description |
 |------|-------------|
-| [`Vector2`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L20) | 2D float vector |
-| [`Vector2d`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L146) | 2D double vector |
-| [`Point`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L274) | 2D integer point |
-| [`RectF` / `Rect`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L329) | Float rectangle (x, y, w, h) |
-| [`Recti`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L421) | Integer rectangle |
-| [`Vector3`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L523) | 3D float vector |
-| [`Vector3d`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L764) | 3D double vector |
-| [`Vector4`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L904) | 4D float vector / quaternion |
-| [`Matrix4`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L1235) | 4x4 transformation matrix |
+| [`Vector2`](src/rpp/vec.h#L20) | 2D float vector |
+| [`Vector2d`](src/rpp/vec.h#L146) | 2D double vector |
+| [`Point`](src/rpp/vec.h#L274) | 2D integer point |
+| [`RectF`](src/rpp/vec.h#L329) | Float rectangle (x, y, w, h) |
+| [`Rect``](src/rpp/vec.h#L329) | Alias of Float rectangle |
+| [`Recti`](src/rpp/vec.h#L421) | Integer rectangle |
+| [`Vector3`](src/rpp/vec.h#L523) | 3D float vector |
+| [`Vector3d`](src/rpp/vec.h#L764) | 3D double vector |
+| [`Vector4`](src/rpp/vec.h#L904) | 4D float vector / quaternion |
+| [`Matrix4`](src/rpp/vec.h#L1235) | 4x4 transformation matrix |
+| [`point2(int xy)`](src/rpp/vec.h#L314) | Creates a Point with both x and y set to same value |
+| [`AngleAxis`](src/rpp/vec.h#L886) | Rotation axis and angle (degrees) pair |
+| [`Matrix3`](src/rpp/vec.h#L1114) | 3x3 row-major rotation matrix |
+| [`PerspectiveViewport`](src/rpp/vec.h#L1451) | Viewport utility for perspective projection and 2D/3D mapping |
+| [`BoundingBox`](src/rpp/vec.h#L1536) | 3D axis-aligned bounding box with min/max corners |
+| [`BoundingSphere`](src/rpp/vec.h#L1633) | Bounding sphere defined by center point and radius |
+| [`Ray`](src/rpp/vec.h#L1672) | 3D ray with origin and direction for intersection tests |
 
 ### Vector2/Vector3 Common Methods
 
 | Method | Description |
 |--------|-------------|
-| [`length()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L564) | Vector magnitude |
-| [`sqlength()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L567) | Squared magnitude |
-| [`normalize()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L575) | Normalize in-place |
-| [`normalized()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L580) | Return normalized copy |
-| [`dot(const Vector3& b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L587) | Dot product |
-| [`cross(const Vector3& b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L584) | Cross product (Vector3) |
-| [`distanceTo(const Vector3& v)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L570) | Distance to another vector |
-| [`almostZero()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L630) | Near-zero check |
-| [`almostEqual(const Vector3& b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L632) | Approximate equality |
-| [`toString()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L615) | String representation |
+| [`length()`](src/rpp/vec.h#L564) | Vector magnitude |
+| [`sqlength()`](src/rpp/vec.h#L567) | Squared magnitude |
+| [`normalize()`](src/rpp/vec.h#L576) | Normalize in-place |
+| [`normalized()`](src/rpp/vec.h#L580) | Return normalized copy |
+| [`dot(const Vector3& b)`](src/rpp/vec.h#L587) | Dot product |
+| [`cross(const Vector3& b)`](src/rpp/vec.h#L584) | Cross product (Vector3) |
+| [`distanceTo(const Vector3& v)`](src/rpp/vec.h#L570) | Distance to another vector |
+| [`almostZero()`](src/rpp/vec.h#L629) | Near-zero check |
+| [`almostEqual(const Vector3& b)`](src/rpp/vec.h#L632) | Approximate equality |
+| [`toString()`](src/rpp/vec.h#L615) | String representation |
 
 ### Vector3 Extras
 
 | Method | Description |
 |--------|-------------|
-| [`toEulerAngles()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L601) | Convert to Euler angles |
-| [`parseColor(strview str)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L672) | Parse color from string |
-| [`convertGL2CV()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L687) | OpenGL to OpenCV coordinate conversion |
-| [`convertMax2GL()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L699) | 3ds Max to OpenGL conversion |
+| [`toEulerAngles()`](src/rpp/vec.h#L601) | Convert to Euler angles |
+| [`parseColor(strview str)`](src/rpp/vec.h#L672) | Parse color from string |
+| [`convertGL2CV()`](src/rpp/vec.h#L687) | OpenGL to OpenCV coordinate conversion |
+| [`convertMax2GL()`](src/rpp/vec.h#L699) | 3ds Max to OpenGL conversion |
 
 ### Rect Methods
 
 | Method | Description |
 |--------|-------------|
-| [`area()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L354) | Rectangle area |
-| [`center()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L362) | Center point |
-| [`hitTest(float px, float py)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L372) | Point containment test |
-| [`intersectsWith(const Rect& r)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L378) | Intersection test |
-| [`joined(const Rect& r)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L393) | Union of two rectangles |
-| [`clip(const Rect& bounds)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/vec.h#L400) | Clip to bounds |
+| [`area()`](src/rpp/vec.h#L354) | Rectangle area |
+| [`center()`](src/rpp/vec.h#L362) | Center point |
+| [`hitTest(float px, float py)`](src/rpp/vec.h#L373) | Point containment test |
+| [`intersectsWith(const Rect& r)`](src/rpp/vec.h#L378) | Intersection test |
+| [`joined(const Rect& r)`](src/rpp/vec.h#L393) | Union of two rectangles |
+| [`clip(const Rect& bounds)`](src/rpp/vec.h#L400) | Clip to bounds |
 
 ### Example: Vector2 — Basics, Dot Product & Directions
 
@@ -2577,13 +2727,13 @@ Basic math utilities and constants.
 |------|-------------|
 | [`PI` / `PIf`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L11) | Pi as `double` / `float` |
 | [`SQRT2` / `SQRT2f`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L13) | Square root of 2 |
-| [`radf(degrees)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L17) | Degrees to radians |
-| [`degf(radians)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L27) | Radians to degrees |
-| [`clamp(val, min, max)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L38) | Clamp value to range |
-| [`lerp(t, start, end)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L50) | Linear interpolation |
-| [`lerpInverse(val, start, end)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L66) | Inverse linear interpolation |
-| [`nearlyZero(val, eps)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L75) | Near-zero check with epsilon |
-| [`almostEqual(a, b, eps)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/math.h#L81) | Approximate equality |
+| [`radf(degrees)`](src/rpp/math.h#L17) | Degrees to radians |
+| [`degf(radians)`](src/rpp/math.h#L27) | Radians to degrees |
+| [`clamp(value, min, max)`](src/rpp/math.h#L38) | Clamp value to range |
+| [`lerp(t, start, end)`](src/rpp/math.h#L50) | Linear interpolation |
+| [`lerpInverse(value, start, end)`](src/rpp/math.h#L66) | Inverse linear interpolation |
+| [`nearlyZero(value, epsilon)`](src/rpp/math.h#L75) | Near-zero check with epsilon |
+| [`almostEqual(a, b, epsilon)`](src/rpp/math.h#L81) | Approximate equality |
 
 ### Example: Constants, Conversions & Interpolation
 
@@ -2629,12 +2779,13 @@ SSE-optimized min, max, abs, and sqrt with template fallbacks. These are preferr
 
 | Function | Description |
 |----------|-------------|
-| [`min(a, b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/minmax.h#L22) | Minimum (SSE for float/double) |
-| [`max(a, b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/minmax.h#L31) | Maximum (SSE for float/double) |
-| [`min3(a, b, c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/minmax.h#L69) | Three-way minimum |
-| [`max3(a, b, c)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/minmax.h#L73) | Three-way maximum |
-| [`abs(a)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/minmax.h#L40) | Absolute value (SSE for float/double) |
-| [`sqrt(f)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/minmax.h#L49) | Square root (SSE for float/double) |
+| [`min(a, b)`](src/rpp/minmax.h#L22) | Minimum (SSE for float/double) |
+| [`max(a, b)`](src/rpp/minmax.h#L31) | Maximum (SSE for float/double) |
+| [`min3(a, b, c)`](src/rpp/minmax.h#L69) | Three-way minimum |
+| [`max3(a, b, c)`](src/rpp/minmax.h#L73) | Three-way maximum |
+| [`abs(a)`](src/rpp/minmax.h#L40) | Absolute value (SSE for float/double) |
+| [`sqrt(f)`](src/rpp/minmax.h#L49) | Square root (SSE for float/double) |
+| [`RPP_SSE_INTRINSICS`](src/rpp/minmax.h#L7) | Enables SSE2 SIMD intrinsics for optimized min/max operations |
 
 ### Example: SSE-Optimized Math Primitives
 
@@ -2675,35 +2826,35 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 
 | Type | Description |
 |------|-------------|
-| [`element_range<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L18) | Non-owning view over contiguous elements |
-| [`index_range`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L129) | Integer range with optional step |
+| [`element_range<T>`](src/rpp/collections.h#L18) | Non-owning view over contiguous elements |
+| [`index_range`](src/rpp/collections.h#L129) | Integer range with optional step |
 
 ### Range Construction
 
 | Function | Description |
 |----------|-------------|
-| [`range(data, size)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L70) | Create element range from pointer + size |
-| [`range(vector)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L70) | Create element range from vector |
-| [`range(count)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L129) | Create integer range `[0, count)` |
-| [`slice(container, start, count)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L100) | Sub-range of a container |
+| [`range(data, size)`](src/rpp/collections.h#L71) | Create element range from pointer + size |
+| [`range(vector)`](src/rpp/collections.h#L74) | Create element range from vector |
+| [`range(count)`](src/rpp/collections.h#L174) | Create integer range `[0, count)` |
+| [`slice(container, start, count)`](src/rpp/collections.h#L116) | Sub-range of a container |
 
 ### Container Algorithms
 
 | Function | Description |
 |----------|-------------|
-| [`pop_back(vector)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L182) | Pop last element with return value |
-| [`push_unique(vector, item)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L199) | Push only if not already present |
-| [`erase_item(vector, item)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L207) | Erase first matching item |
-| [`erase_back_swap(vector, i)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L259) | O(1) erase by swapping with last element |
-| [`contains(container, item)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L319) | Check membership |
-| [`find(vector, item)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L346) | Find element (returns iterator) |
-| [`find_smallest(range, selector)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L408) | Find minimum by selector |
-| [`find_largest(range, selector)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L430) | Find maximum by selector |
-| [`any_of(vector, pred)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L467) | True if any element matches predicate |
-| [`all_of(vector, pred)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L476) | True if all elements match predicate |
-| [`none_of(vector, pred)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L485) | True if no elements match predicate |
-| [`sum_all(vector)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L495) | Sum all elements |
-| [`append(vector, other)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/collections.h#L336) | Append one vector to another |
+| [`pop_back(vector)`](src/rpp/collections.h#L182) | Pop last element with return value |
+| [`push_unique(vector, item)`](src/rpp/collections.h#L199) | Push only if not already present |
+| [`erase_item(vector, item)`](src/rpp/collections.h#L207) | Erase first matching item |
+| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L259) | O(1) erase by swapping with last element |
+| [`contains(container, item)`](src/rpp/collections.h#L331) | Check membership |
+| [`find(vector, item)`](src/rpp/collections.h#L346) | Find element (returns iterator) |
+| [`find_smallest(range, selector)`](src/rpp/collections.h#L427) | Find minimum by selector |
+| [`find_largest(range, selector)`](src/rpp/collections.h#L449) | Find maximum by selector |
+| [`any_of(vector, predicate)`](src/rpp/collections.h#L467) | True if any element matches predicate |
+| [`all_of(vector, predicate)`](src/rpp/collections.h#L476) | True if all elements match predicate |
+| [`none_of(vector, predicate)`](src/rpp/collections.h#L485) | True if no elements match predicate |
+| [`sum_all(vector)`](src/rpp/collections.h#L495) | Sum all elements |
+| [`append(vector, other)`](src/rpp/collections.h#L336) | Append one vector to another |
 
 ### Example: element_range & index_range
 
@@ -2850,23 +3001,23 @@ Thread-safe FIFO queue with notification support.
 
 | Class | Description |
 |-------|-------------|
-| [`concurrent_queue<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L26) | Thread-safe queue with push/pop/wait |
+| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L26) | Thread-safe queue with push/pop/wait |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`push(T&& item)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L307) | Push an item |
-| [`push(T&&... items)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L307) | Push multiple items |
-| [`try_pop(T& out)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L360) | Non-blocking pop attempt |
-| [`try_pop_all(std::vector<T>& out)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L281) | Pop all items at once |
-| [`wait_pop(Duration timeout)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L567) | Blocking pop with timeout |
-| [`wait_pop(Pred pred, Duration timeout)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L567) | Blocking pop with predicate and timeout |
-| [`clear()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L179) | Clear the queue |
-| [`empty()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L111) | True if empty |
-| [`size()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L130) | Number of items |
-| [`reserve(int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L211) | Reserve capacity |
-| [`notify()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L139) / [`notify_one()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/concurrent_queue.h#L148) | Wake waiting consumers |
+| [`push(T&& item)`](src/rpp/concurrent_queue.h#L307) | Push an item |
+| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L307) | Push multiple items |
+| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L364) | Non-blocking pop attempt |
+| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L281) | Pop all items at once |
+| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L552) | Blocking pop with timeout |
+| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L552) | Blocking pop with predicate and timeout |
+| [`clear()`](src/rpp/concurrent_queue.h#L179) | Clear the queue |
+| [`empty()`](src/rpp/concurrent_queue.h#L111) | True if empty |
+| [`size()`](src/rpp/concurrent_queue.h#L130) | Number of items |
+| [`reserve(int n)`](src/rpp/concurrent_queue.h#L211) | Reserve capacity |
+| [`notify()`](src/rpp/concurrent_queue.h#L139) / [`notify_one()`](src/rpp/concurrent_queue.h#L148) | Wake waiting consumers |
 
 ### Example: Producer-Consumer with wait_pop
 
@@ -3018,25 +3169,25 @@ Cross-platform logging with severity filtering, log handlers, timestamps, and as
 
 | Macro | Description |
 |-------|-------------|
-| [`LogInfo(fmt, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L273) | Log informational message |
-| [`LogWarning(fmt, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L279) | Log warning |
-| [`LogError(fmt, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L285) | Log error (debug assert) |
-| [`Assert(expr, fmt, ...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L299) | Conditional error log |
+| [`LogInfo(format, ...)`](src/rpp/debugging.h#L273) | Log informational message |
+| [`LogWarning(format, ...)`](src/rpp/debugging.h#L279) | Log warning |
+| [`LogError(format, ...)`](src/rpp/debugging.h#L285) | Log error (debug assert) |
+| [`Assert(expression, format, ...)`](src/rpp/debugging.h#L299) | Conditional error log |
 
 ### Configuration Functions
 
 | Function | Description |
 |----------|-------------|
-| [`SetLogHandler(callback)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L31) | Set custom log message handler |
-| [`SetLogSeverityFilter(filter)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L43) | Set minimum log severity |
-| [`LogEnableTimestamps(enable, precision, tod)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L53) | Add timestamps to log entries |
-| [`LogDisableFunctionNames()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L37) | Strip function names from logs |
+| [`SetLogHandler(callback)`](src/rpp/debugging.h#L31) | Set custom log message handler |
+| [`SetLogSeverityFilter(filter)`](src/rpp/debugging.h#L43) | Set minimum log severity |
+| [`LogEnableTimestamps(enable, precision, time_of_day)`](src/rpp/debugging.h#L53) | Add timestamps to log entries |
+| [`LogDisableFunctionNames()`](src/rpp/debugging.h#L37) | Strip function names from logs |
 
 ### Enum
 
 | Enum | Values |
 |------|--------|
-| [`LogSeverity`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/debugging.h#L21) | `LogSeverityInfo`, `LogSeverityWarn`, `LogSeverityError` |
+| [`LogSeverity`](src/rpp/debugging.h#L25) | `LogSeverityInfo`, `LogSeverityWarn`, `LogSeverityError` |
 
 ### Example: Logging with Severity & Configuration
 
@@ -3120,23 +3271,24 @@ Cross-platform stack tracing and traced exceptions.
 
 | Item | Description |
 |------|-------------|
-| [`CallstackEntry`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L18) | Single callstack frame with addr, line, name, file, module |
-| [`traced_exception`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L160) | `runtime_error` with embedded stack trace |
-| [`ThreadCallstack`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L73) | Callstack + thread_id pair |
+| [`CallstackEntry`](src/rpp/stack_trace.h#L18) | Single callstack frame with addr, line, name, file, module |
+| [`traced_exception`](src/rpp/stack_trace.h#L160) | `runtime_error` with embedded stack trace |
+| [`ThreadCallstack`](src/rpp/stack_trace.h#L73) | Callstack + thread_id pair |
 
 ### Functions
 
 | Function | Description |
 |----------|-------------|
-| [`stack_trace(maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L128) | Get formatted stack trace string |
-| [`stack_trace(message, maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L128) | Stack trace with error message |
-| [`print_trace(maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L143) | Print stack trace to stderr |
-| [`print_trace(message, maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L143) | Print stack trace to stderr with message |
-| [`error_with_trace(message)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L153) | Create `runtime_error` with stack trace |
-| [`get_address_info(addr)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L46) | Look up address info → `CallstackEntry` |
-| [`get_callstack(maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L60) | Walk the stack, return addresses |
-| [`get_all_callstacks(maxDepth)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L85) | Get callstacks from all threads |
-| [`register_segfault_tracer()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/stack_trace.h#L171) | Install SIGSEGV handler that throws `traced_exception` |
+| [`stack_trace(maxDepth)`](src/rpp/stack_trace.h#L128) | Get formatted stack trace string |
+| [`stack_trace(message, maxDepth)`](src/rpp/stack_trace.h#L128) | Stack trace with error message |
+| [`print_trace(maxDepth)`](src/rpp/stack_trace.h#L143) | Print stack trace to stderr |
+| [`print_trace(message, maxDepth)`](src/rpp/stack_trace.h#L147) | Print stack trace to stderr with message |
+| [`error_with_trace(message)`](src/rpp/stack_trace.h#L153) | Create `runtime_error` with stack trace |
+| [`get_address_info(addr)`](src/rpp/stack_trace.h#L46) | Look up address info → `CallstackEntry` |
+| [`get_callstack(maxDepth)`](src/rpp/stack_trace.h#L60) | Walk the stack, return addresses |
+| [`get_all_callstacks(maxDepth)`](src/rpp/stack_trace.h#L85) | Get callstacks from all threads |
+| [`register_segfault_tracer()`](src/rpp/stack_trace.h#L171) | Install SIGSEGV handler that throws `traced_exception` |
+| [`format_trace(message, callstack, depth)`](src/rpp/stack_trace.h#L94) | Formats a pre-walked callstack with optional error message prefix |
 
 ### Example: Stack Traces & Traced Exceptions
 
@@ -3186,21 +3338,21 @@ Fixed-length bit array.
 
 | Class | Description |
 |-------|-------------|
-| [`bit_array`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L13) | Dynamic bit array with set/unset/test operations |
+| [`bit_array`](src/rpp/bitutils.h#L13) | Dynamic bit array with set/unset/test operations |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`set(int bit)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L63) | Set a bit |
-| [`set(int bit, bool value)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L63) | Set a bit to a value |
-| [`unset(int bit)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L76) | Clear a bit |
-| [`isSet(int bit)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L81) | Test a bit |
-| [`checkAndSet(int bit)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L87) | Test and set atomically |
-| [`reset(int numBits)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L57) | Reset with new size |
-| [`sizeBytes()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L47) / [`sizeBits()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L49) | Size queries |
-| [`getBuffer()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L51) / [`getByte(int i)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L92) | Raw access |
-| [`copy()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L101) / [`copyNegated()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/bitutils.h#L110) | Copy operations |
+| [`set(int bit)`](src/rpp/bitutils.h#L63) | Set a bit |
+| [`set(int bit, bool value)`](src/rpp/bitutils.h#L70) | Set a bit to a value |
+| [`unset(int bit)`](src/rpp/bitutils.h#L76) | Clear a bit |
+| [`isSet(int bit)`](src/rpp/bitutils.h#L81) | Test a bit |
+| [`checkAndSet(int bit)`](src/rpp/bitutils.h#L87) | Test and set atomically |
+| [`reset(int numBits)`](src/rpp/bitutils.h#L57) | Reset with new size |
+| [`sizeBytes()`](src/rpp/bitutils.h#L47) / [`sizeBits()`](src/rpp/bitutils.h#L49) | Size queries |
+| [`getBuffer()`](src/rpp/bitutils.h#L51) / [`getByte(int i)`](src/rpp/bitutils.h#L92) | Raw access |
+| [`copy()`](src/rpp/bitutils.h#L101) / [`copyNegated()`](src/rpp/bitutils.h#L110) | Copy operations |
 
 ### Example: Bit Array Operations
 
@@ -3249,23 +3401,23 @@ Read-write synchronization helper for safe async object destruction.
 
 | Class | Description |
 |-------|-------------|
-| [`close_sync`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L84) | Destruction synchronization with shared/exclusive locking |
+| [`close_sync`](src/rpp/close_sync.h#L84) | Destruction synchronization with shared/exclusive locking |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`lock_for_close()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L129) | Acquire exclusive lock for destruction |
-| [`try_readonly_lock()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L144) | Try to acquire shared read lock |
-| [`acquire_exclusive_lock()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L151) | Acquire exclusive write lock |
-| [`is_alive()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L113) | True if object is not being destroyed |
-| [`is_closing()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L116) | True if destruction is in progress |
+| [`lock_for_close()`](src/rpp/close_sync.h#L129) | Acquire exclusive lock for destruction |
+| [`try_readonly_lock()`](src/rpp/close_sync.h#L144) | Try to acquire shared read lock |
+| [`acquire_exclusive_lock()`](src/rpp/close_sync.h#L151) | Acquire exclusive write lock |
+| [`is_alive()`](src/rpp/close_sync.h#L113) | True if object is not being destroyed |
+| [`is_closing()`](src/rpp/close_sync.h#L116) | True if destruction is in progress |
 
 ### Macros
 
 | Macro | Description |
 |-------|-------------|
-| [`try_lock_or_return(closeSync)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/close_sync.h#L60) | Early return if object is being destroyed |
+| [`try_lock_or_return(closeSync)`](src/rpp/close_sync.h#L182) | Early return if object is being destroyed |
 
 ### Example: Safe Async Destruction with close_sync
 
@@ -3319,23 +3471,32 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 
 | Function | Description |
 |----------|-------------|
-| [`writeBEU16(out, val)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L46) | Write 16-bit big-endian |
-| [`writeBEU32(out, val)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L51) | Write 32-bit big-endian |
-| [`writeBEU64(out, val)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L56) | Write 64-bit big-endian |
-| [`readBEU16(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L61) | Read 16-bit big-endian |
-| [`readBEU32(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L66) | Read 32-bit big-endian |
-| [`readBEU64(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L71) | Read 64-bit big-endian |
+| [`writeBEU16(out, value)`](src/rpp/endian.h#L46) | Write 16-bit big-endian |
+| [`writeBEU32(out, value)`](src/rpp/endian.h#L51) | Write 32-bit big-endian |
+| [`writeBEU64(out, value)`](src/rpp/endian.h#L56) | Write 64-bit big-endian |
+| [`readBEU16(in)`](src/rpp/endian.h#L61) | Read 16-bit big-endian |
+| [`readBEU32(in)`](src/rpp/endian.h#L66) | Read 32-bit big-endian |
+| [`readBEU64(in)`](src/rpp/endian.h#L71) | Read 64-bit big-endian |
 
 ### Little-Endian
 
 | Function | Description |
 |----------|-------------|
-| [`writeLEU16(out, val)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L80) | Write 16-bit little-endian |
-| [`writeLEU32(out, val)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L85) | Write 32-bit little-endian |
-| [`writeLEU64(out, val)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L90) | Write 64-bit little-endian |
-| [`readLEU16(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L95) | Read 16-bit little-endian |
-| [`readLEU32(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L100) | Read 32-bit little-endian |
-| [`readLEU64(in)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/endian.h#L105) | Read 64-bit little-endian |
+| [`writeLEU16(out, value)`](src/rpp/endian.h#L80) | Write 16-bit little-endian |
+| [`writeLEU32(out, value)`](src/rpp/endian.h#L85) | Write 32-bit little-endian |
+| [`writeLEU64(out, value)`](src/rpp/endian.h#L90) | Write 64-bit little-endian |
+| [`readLEU16(in)`](src/rpp/endian.h#L95) | Read 16-bit little-endian |
+| [`readLEU32(in)`](src/rpp/endian.h#L100) | Read 32-bit little-endian |
+| [`readLEU64(in)`](src/rpp/endian.h#L105) | Read 64-bit little-endian |
+| [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L17) | Platform-specific 16-bit byte swap |
+| [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L18) | Platform-specific 32-bit byte swap |
+| [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L19) | Platform-specific 64-bit byte swap |
+| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L27) | Convert 16-bit value to big-endian byte order |
+| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L28) | Convert 32-bit value to big-endian byte order |
+| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L29) | Convert 64-bit value to big-endian byte order |
+| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L30) | Convert 16-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L31) | Convert 32-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L32) | Convert 64-bit value to little-endian byte order |
 
 ### Example: Big-Endian & Little-Endian Read/Write
 
@@ -3386,21 +3547,21 @@ Linear bump-allocator memory pools for arena-style allocation (no per-object dea
 
 | Class | Description |
 |-------|-------------|
-| [`linear_static_pool`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L76) | Fixed-size bump allocator |
-| [`linear_dynamic_pool`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L158) | Growing bump allocator with configurable block growth |
-| [`pool_types_constructor<Pool>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L16) | CRTP mixin adding typed `allocate<T>()` and `construct<T>(args...)` |
+| [`linear_static_pool`](src/rpp/memory_pool.h#L76) | Fixed-size bump allocator |
+| [`linear_dynamic_pool`](src/rpp/memory_pool.h#L158) | Growing bump allocator with configurable block growth |
+| [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | CRTP mixin adding typed `allocate<T>()` and `construct<T>(args...)` |
 
 ### Common Methods
 
 | Method | Description |
 |--------|-------------|
-| [`capacity()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L126) | Total capacity |
-| [`available()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L127) | Remaining capacity |
-| [`allocate(int size, int align)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L129) | Allocate raw memory |
-| [`allocate<T>()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L18) | Allocate typed memory |
-| [`construct<T>(Args&&... args)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L24) | Allocate and construct |
-| [`allocate_range<T>(int count)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L54) | Allocate array |
-| [`construct_range<T>(int count, Args&&... args)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/memory_pool.h#L61) | Allocate and construct array |
+| [`capacity()`](src/rpp/memory_pool.h#L126) | Total capacity |
+| [`available()`](src/rpp/memory_pool.h#L127) | Remaining capacity |
+| [`allocate(int size, int align)`](src/rpp/memory_pool.h#L129) | Allocate raw memory |
+| [`allocate<T>()`](src/rpp/memory_pool.h#L18) | Allocate typed memory |
+| [`construct<T>(Args&&... args)`](src/rpp/memory_pool.h#L24) | Allocate and construct |
+| [`allocate_range<T>(int count)`](src/rpp/memory_pool.h#L54) | Allocate array |
+| [`construct_range<T>(int count, Args&&... args)`](src/rpp/memory_pool.h#L61) | Allocate and construct array |
 
 ### Example: Static Pool — Fixed-Size Arena
 
@@ -3461,7 +3622,7 @@ Minimal insertion sort for smaller binary sizes compared to `std::sort`. The ins
 
 | Function | Description |
 |----------|-------------|
-| [`insertion_sort(data, count, cmp)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/sort.h#L20) | In-place insertion sort with comparator |
+| [`insertion_sort(data, count, comparison)`](src/rpp/sort.h#L20) | In-place insertion sort with comparator |
 
 ### Example: Insertion Sort
 
@@ -3498,8 +3659,8 @@ RAII scope cleanup guard.
 
 | Item | Description |
 |------|-------------|
-| [`scope_finalizer<Func>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/scope_guard.h#L40) | Calls function on destruction |
-| [`scope_guard(lambda)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/scope_guard.h#L73) | Macro to create anonymous scope guard |
+| [`scope_finalizer<Func>`](src/rpp/scope_guard.h#L40) | Calls function on destruction |
+| [`scope_guard(lambda)`](src/rpp/scope_guard.h#L73) | Macro to create anonymous scope guard |
 
 ```cpp
 auto* resource = acquire();
@@ -3515,17 +3676,17 @@ UDP send rate limiter for throttling network traffic.
 
 | Class | Description |
 |-------|-------------|
-| [`load_balancer`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L12) | Rate-limiter for byte sending |
+| [`load_balancer`](src/rpp/load_balancer.h#L12) | Rate-limiter for byte sending |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`can_send()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L38) | True if send budget is available |
-| [`wait_to_send(int bytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L45) | Block until bytes can be sent |
-| [`notify_sent(TimePoint now, int bytes)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L50) | Report bytes sent |
-| [`get_max_bytes_per_sec()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L26) | Get rate limit |
-| [`set_max_bytes_per_sec(int n)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/load_balancer.h#L29) | Set rate limit |
+| [`can_send()`](src/rpp/load_balancer.h#L38) | True if send budget is available |
+| [`wait_to_send(int bytes)`](src/rpp/load_balancer.h#L45) | Block until bytes can be sent |
+| [`notify_sent(TimePoint now, int bytesToSend)`](src/rpp/load_balancer.h#L50) | Report bytes sent |
+| [`get_max_bytes_per_sec()`](src/rpp/load_balancer.h#L26) | Get rate limit |
+| [`set_max_bytes_per_sec(int n)`](src/rpp/load_balancer.h#L29) | Set rate limit |
 
 ### Example: UDP Rate Limiting
 
@@ -3569,10 +3730,10 @@ Compile-time string obfuscation to prevent strings from appearing in binaries.
 
 | Item | Description |
 |------|-------------|
-| [`obfuscated_string<chars...>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/obfuscated_string.h#L19) | Compile-time obfuscated string (GCC/Clang) |
-| [`macro_obfuscated_string<indices...>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/obfuscated_string.h#L66) | Cross-platform obfuscated string |
-| [`make_obfuscated("str")`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/obfuscated_string.h#L116) | Macro to create obfuscated string |
-| [`"str"_obfuscated`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/obfuscated_string.h#L110) | String literal operator (GCC only) |
+| [`obfuscated_string<chars...>`](src/rpp/obfuscated_string.h#L19) | Compile-time obfuscated string (GCC/Clang) |
+| [`macro_obfuscated_string<indices...>`](src/rpp/obfuscated_string.h#L66) | Cross-platform obfuscated string |
+| [`make_obfuscated("str")`](src/rpp/obfuscated_string.h#L116) | Macro to create obfuscated string |
+| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L110) | String literal operator (GCC only) |
 
 ### Example: Compile-Time String Obfuscation
 
@@ -3602,10 +3763,10 @@ Process memory and CPU usage information.
 
 | Item | Description |
 |------|-------------|
-| [`proc_mem_info`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L13) | Process memory stats: `virtual_size`, `physical_mem` (with `_kb()`, `_mb()` helpers) |
-| [`cpu_usage_info`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L38) | CPU time stats: `cpu_time_us`, `user_time_us`, `kernel_time_us` (with `_ms()`, `_sec()`) |
-| [`proc_current_mem_used()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L32) | Get current process memory usage |
-| [`proc_total_cpu_usage()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/proc_utils.h#L63) | Get total CPU time used by process |
+| [`proc_mem_info`](src/rpp/proc_utils.h#L13) | Process memory stats: `virtual_size`, `physical_mem` (with `_kb()`, `_mb()` helpers) |
+| [`cpu_usage_info`](src/rpp/proc_utils.h#L38) | CPU time stats: `cpu_time_us`, `user_time_us`, `kernel_time_us` (with `_ms()`, `_sec()`) |
+| [`proc_current_mem_used()`](src/rpp/proc_utils.h#L32) | Get current process memory usage |
+| [`proc_total_cpu_usage()`](src/rpp/proc_utils.h#L63) | Get total CPU time used by process |
 
 ### Example: Process Memory & CPU Profiling
 
@@ -3642,31 +3803,32 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Item | Description |
 |------|-------------|
-| [`test`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L53) | Base test class with lifecycle hooks |
-| [`test_info`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L33) | Test registration metadata |
-| [`TestVerbosity`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L45) | `None`, `Summary`, `TestLabels`, `AllMessages` |
+| [`test`](src/rpp/tests.h#L53) | Base test class with lifecycle hooks |
+| [`test_info`](src/rpp/tests.h#L33) | Test registration metadata |
+| [`TestVerbosity`](src/rpp/tests.h#L45) | `None`, `Summary`, `TestLabels`, `AllMessages` |
 
 ### Key Macros
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L574) | Register a test class |
-| [`TestInit(...)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L589) | Test initialization method |
-| [`TestCase(name)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L606) | Define a test case |
-| [`AssertThat(expr, expected)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L454) | Assert equality |
-| [`AssertEqual(a, b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L462) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L498) | Assert inequality |
-| [`AssertTrue(expr)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L444) | Assert expression is true |
-| [`AssertFalse(expr)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L445) | Assert expression is false |
-| [`AssertThrows(expr)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L471) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.h#L574) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.h#L589) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.h#L606) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.h#L454) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.h#L462) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L498) | Assert inequality |
+| [`AssertTrue(expr)`](src/rpp/tests.h#L567) | Assert expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.h#L445) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.h#L471) | Assert expression throws |
 
 ### Running Tests
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(patterns)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L183) | Run tests matching patterns |
-| [`test::run_tests(argc, argv)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L194) | Run tests from command line args |
-| [`test::run_tests()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/tests.h#L199) | Run all registered tests |
+| [`test::run_tests(patterns)`](src/rpp/tests.h#L183) | Run tests matching patterns |
+| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L194) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L199) | Run all registered tests |
+| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L43) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase
 
@@ -3862,13 +4024,14 @@ Detection idiom and type trait helpers for SFINAE.
 
 | Trait | Description |
 |-------|-------------|
-| [`is_detected<Op, Args...>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L26) | Detection idiom |
-| [`has_to_string<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L42) | True if `to_string(T)` is valid |
-| [`has_to_string_memb<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L43) | True if `T::to_string()` exists |
-| [`has_std_to_string<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L40) | True if `std::to_string(T)` is valid |
-| [`is_iterable<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L52) | True if T supports range-for |
-| [`is_container<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L57) | True if T is a container with `size()` |
-| [`is_stringlike<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/type_traits.h#L55) | True if T is string-like |
+| [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L26) | Detection idiom |
+| [`has_to_string<T>`](src/rpp/type_traits.h#L42) | True if `to_string(T)` is valid |
+| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L43) | True if `T::to_string()` exists |
+| [`has_std_to_string<T>`](src/rpp/type_traits.h#L40) | True if `std::to_string(T)` is valid |
+| [`is_iterable<T>`](src/rpp/type_traits.h#L52) | True if T supports range-for |
+| [`is_container<T>`](src/rpp/type_traits.h#L57) | True if T is a container with `size()` |
+| [`is_stringlike<T>`](src/rpp/type_traits.h#L55) | True if T is string-like |
+| [`Operation`](src/rpp/type_traits.h#L25) | Template alias used with `is_detected` for expression validity checks |
 
 ---
 
@@ -3878,8 +4041,8 @@ Function type traits for extracting return types and argument types from callabl
 
 | Trait | Description |
 |-------|-------------|
-| [`function_traits<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/traits.h#L16) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
-| [`first_arg_type<T>`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/traits.h#L50) | First argument type of a callable |
+| [`function_traits<T>`](src/rpp/traits.h#L16) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
+| [`first_arg_type<T>`](src/rpp/traits.h#L50) | First argument type of a callable |
 
 ---
 
@@ -3891,19 +4054,19 @@ Android JNI C++ utilities (Android-only).
 
 | Function | Description |
 |----------|-------------|
-| [`initVM(vm, env)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L18) | Initialize JVM reference |
-| [`getEnv()`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L38) | Get JNIEnv for current thread |
-| [`getMainActivity(const char* className)`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L46) | Get Android main Activity |
+| [`initVM(vm, env)`](src/rpp/jni_cpp.h#L18) | Initialize JVM reference |
+| [`getEnv()`](src/rpp/jni_cpp.h#L38) | Get JNIEnv for current thread |
+| [`getMainActivity(const char* className)`](src/rpp/jni_cpp.h#L46) | Get Android main Activity |
 
 ### Classes
 
 | Class | Description |
 |-------|-------------|
-| [`JniRef`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L74) | Smart JNI object reference (local/global) |
-| [`JString`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L230) | JNI jstring wrapper with `str()`, `getLength()` |
-| [`Class`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L371) | JNI class wrapper |
-| [`Method`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L414) | JNI method wrapper |
-| [`Field`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/jni_cpp.h#L503) | JNI field wrapper |
+| [`JniRef`](src/rpp/jni_cpp.h#L74) | Smart JNI object reference (local/global) |
+| [`JString`](src/rpp/jni_cpp.h#L230) | JNI jstring wrapper with `str()`, `getLength()` |
+| [`Class`](src/rpp/jni_cpp.h#L371) | JNI class wrapper |
+| [`Method`](src/rpp/jni_cpp.h#L414) | JNI method wrapper |
+| [`Field`](src/rpp/jni_cpp.h#L503) | JNI field wrapper |
 
 ### Example: Initialization with JNI_OnLoad
 

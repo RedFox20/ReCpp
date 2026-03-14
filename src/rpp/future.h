@@ -387,7 +387,24 @@ namespace rpp
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
-            return this->valid() && this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+            return this->valid() && super::wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+        }
+
+        // keep original wait_for / wait_until aliases for build compatibility
+        using super::wait_for;
+        using super::wait_until;
+
+        // convenience wrapper for rpp::Duration
+        std::future_status wait_for(rpp::Duration timeout) const
+        {
+            return super::wait_for(std::chrono::nanoseconds(timeout.nsec));
+        }
+
+        // convenience wrapper for rpp::TimePoint
+        std::future_status wait_until(const rpp::TimePoint& until) const
+        {
+            auto until_tp = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(until.to_epoch_ns()));
+            return super::wait_until(until_tp);
         }
 
         /**
@@ -767,7 +784,24 @@ namespace rpp
         // checks if the future is already finished
         bool await_ready() const noexcept
         {
-            return this->valid() && this->wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+            return this->valid() && super::wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+        }
+
+        // keep original wait_for / wait_until aliases for build compatibility
+        using super::wait_for;
+        using super::wait_until;
+
+        // convenience wrapper for rpp::Duration
+        std::future_status wait_for(rpp::Duration timeout) const
+        {
+            return super::wait_for(std::chrono::nanoseconds(timeout.nsec));
+        }
+
+        // convenience wrapper for rpp::TimePoint
+        std::future_status wait_until(const rpp::TimePoint& until) const
+        {
+            auto until_tp = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(until.to_epoch_ns()));
+            return super::wait_until(until_tp);
         }
 
         /**

@@ -14,3 +14,4 @@ build/
 mama\.cmake
 .vscode/
 process.yml
+__pycache__/

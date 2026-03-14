@@ -107,7 +107,7 @@ namespace rpp
 #if __clang__ || __GNUC__
 
 #if __GNUC__ && !__clang__
-    template<class T, T... chars> constexpr auto operator""_obfuscated()
+    template<class T, T... chars> constexpr auto operator ""_obfuscated()
     {
         return obfuscated_string<std::integer_sequence<char, chars...>>{};
     }

@@ -250,6 +250,18 @@ namespace rpp
         /** @returns TimePoint from a UNIX EPOCH microseconds timestamp */
         static constexpr TimePoint from_epoch_us(uint64 unix_epoch_us) noexcept { return TimePoint{ int64(unix_epoch_us) * NANOS_PER_MICRO }; }
 
+        /** 
+         * @returns UNIX EPOCH microseconds timestamp from this TimePoint, which can be used to construct an std::chrono::time_point.
+         * @example auto std_tp = std::chrono::steady_clock::time_point(std::chrono::microseconds(rpp_tp.to_epoch_us()));
+         */
+        uint64 to_epoch_us() const noexcept { return uint64(duration.nsec / NANOS_PER_MICRO); }
+
+        /**
+         * @returns UNIX EPOCH nanoseconds timestamp from this TimePoint, which can be used to construct an std::chrono::time_point.
+         * @example auto std_tp = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(rpp_tp.to_epoch_ns()));
+         */
+        uint64 to_epoch_ns() const noexcept { return uint64(duration.nsec); }
+
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
 
@@ -302,6 +314,29 @@ namespace rpp
         std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
     #endif
     };
+
+    // Convenience functions for constructing Durations, similar to std::chrono::seconds() etc.
+    inline constexpr Duration seconds(double seconds) noexcept { return Duration::from_seconds(seconds); }
+    inline constexpr Duration seconds(int64 seconds) noexcept { return Duration::from_seconds(seconds); }
+    inline constexpr Duration millis(double millis) noexcept { return Duration::from_millis(millis); }
+    inline constexpr Duration millis(int64 millis) noexcept { return Duration::from_millis(millis); }
+    inline constexpr Duration micros(double micros) noexcept { return Duration::from_micros(micros); }
+    inline constexpr Duration micros(int64 micros) noexcept { return Duration::from_micros(micros); }
+    inline constexpr Duration nanos(int64 nanos) noexcept { return Duration::from_nanos(nanos); }
+
+    inline namespace duration_literals
+    {
+        // convenience literals for durations
+        //   using namespace rpp::duration_literals;
+        //   rpp::Duration timeout = 100_ms; // 100 milliseconds
+        inline constexpr Duration operator ""_s (long double s)         noexcept { return Duration::from_seconds(static_cast<double>(s)); }
+        inline constexpr Duration operator ""_s (unsigned long long s)  noexcept { return Duration::from_seconds(static_cast<int64>(s)); }
+        inline constexpr Duration operator ""_ms(long double ms)        noexcept { return Duration::from_millis(static_cast<double>(ms)); }
+        inline constexpr Duration operator ""_ms(unsigned long long ms) noexcept { return Duration::from_millis(static_cast<int64>(ms));  }
+        inline constexpr Duration operator ""_us(long double us)        noexcept { return Duration::from_micros(static_cast<double>(us)); }
+        inline constexpr Duration operator ""_us(unsigned long long us) noexcept { return Duration::from_micros(static_cast<int64>(us)); }
+        inline constexpr Duration operator ""_ns(unsigned long long ns) noexcept { return Duration::from_nanos(static_cast<int64>(ns)); }
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 

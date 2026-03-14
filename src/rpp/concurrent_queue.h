@@ -278,13 +278,13 @@ namespace rpp
         /**
          * @brief Attempts to pop all pending items from the queue without waiting
          */
-        [[nodiscard]] bool try_pop_all(std::vector<T>& outItems) noexcept
+        [[nodiscard]] bool try_pop_all(std::vector<T>& out) noexcept
         {
             if (mutex().try_lock())
             {
                 if (T* head = Head, *tail = Tail; head != tail)
                 {
-                    try { outItems.assign(head, tail); }
+                    try { out.assign(head, tail); }
                     catch (...) { }
                     clear_unlocked();
                     mutex().unlock();

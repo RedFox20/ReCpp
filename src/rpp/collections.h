@@ -328,9 +328,9 @@ namespace rpp
         return false;
     }
 
-    template<class C, class T> bool contains(const C& c, const T& item)
+    template<class C, class T> bool contains(const C& container, const T& item)
     {
-        return c.find(item) != c.end();
+        return container.find(item) != container.end();
     }
 
     template<class T> std::vector<T>& append(std::vector<T>& v, const std::vector<T>& other)
