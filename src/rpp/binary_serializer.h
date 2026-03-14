@@ -67,7 +67,7 @@ namespace rpp
         template<class U> void bind(U& elem) noexcept
         {
             member_serialize<T> m;
-            m.offset       = int((char*)&elem - (char*)this);
+            m.offset       = int(reinterpret_cast<uint8_t*>(&elem) - reinterpret_cast<uint8_t*>(this)); // NOLINT(clang-analyzer-security.PointerSub)
             m.bserialize   = &serializable::template binary_serialize<U>;
             m.bdeserialize = &serializable::template binary_deserialize<U>;
             m.sserialize   = &serializable::template string_serialize<U>;

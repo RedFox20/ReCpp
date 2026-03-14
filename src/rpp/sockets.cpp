@@ -987,7 +987,7 @@ namespace rpp
         int sock = os_handle_unsafe();
         // we can't keep the mutex locked if we're entering a blocking operation
         if (Blocking) lock.unlock();
-        return handle_txres(::recv(sock, (char*)buffer, maxBytes, 0));
+        return handle_txres(::recv(sock, (char*)buffer, maxBytes, 0)); // NOLINT(clang-analyzer-unix.BlockInCriticalSection)
     }
 
     int socket::peek(void* buffer, int numBytes) noexcept

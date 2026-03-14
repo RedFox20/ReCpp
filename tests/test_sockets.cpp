@@ -8,7 +8,7 @@
 #include <future> // std::async
 #if __has_include(<source_location>)
 #  include <source_location>
-#  define SOURCE_LOC_DEF std::source_location sl = std::source_location::current()
+#  define SOURCE_LOC_DEF , std::source_location sl = std::source_location::current()
 #  define SOURCE_LOC_FILE sl.file_name()
 #  define SOURCE_LOC_LINE sl.line()
 #else
@@ -608,7 +608,7 @@ TestImpl(test_sockets)
     }
 
     // helper function to pop a single UDP packet and return number of bytes received, discarding data
-    int pop_udp_packet(socket& recv, int expected_size = -1, SOURCE_LOC_DEF)
+    int pop_udp_packet(socket& recv, int expected_size = -1 SOURCE_LOC_DEF)
     {
         char buffer[4096];
         int r = recv.recv(buffer, sizeof(buffer));

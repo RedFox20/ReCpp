@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.25)
 project(ReCpp)
 
 option(BUILD_TESTS "Build RppTests executable for unit testing?" OFF)
@@ -64,9 +64,16 @@ elseif(CXX17)
     set(RPP_CXX_STANDARD 17)
 endif()
 message("RPP ENABLE C++${RPP_CXX_STANDARD}")
-set(CMAKE_CXX_STANDARD ${RPP_CXX_STANDARD})
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS ON)
+if((CLANG OR GCC) AND RPP_CXX_STANDARD EQUAL 26 AND CMAKE_VERSION VERSION_LESS "3.30")  # CMake < 3.30 lacks compiler tables for C++26 on newer GCC/Clang
+    add_compile_options(-std=gnu++2c)
+    if(CMAKE_CXX_CLANG_TIDY)
+        set(CMAKE_CXX_CLANG_TIDY "${CMAKE_CXX_CLANG_TIDY}" -extra-arg=-std=gnu++23)
+    endif()
+else()
+    set(CMAKE_CXX_STANDARD ${RPP_CXX_STANDARD})
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS ON)
+endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 
 # Add compiler specific flags

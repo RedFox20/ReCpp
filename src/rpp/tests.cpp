@@ -782,7 +782,7 @@ namespace rpp
             for (test_info& t : state().global_tests)
             {
                 if (t.auto_run) { // only consider disabling auto_run tests
-                    t.test_enabled = disabled.find(t.name) == disabled.end();
+                    t.test_enabled = !disabled.contains(t.name);
                     if (!t.test_enabled && verb >= TestVerbosity::TestLabels)
                     {
                         consolef(Red, "  Disabled %s\n", t.name.to_cstr());
@@ -794,7 +794,7 @@ namespace rpp
         {
             for (test_info& t : state().global_tests) // enable whatever was requested
             {
-                t.test_enabled = enabled.find(t.name) != enabled.end();
+                t.test_enabled = enabled.contains(t.name);
                 if (t.test_enabled && verb >= TestVerbosity::TestLabels)
                 {
                     consolef(Green, "  Enabled %s\n", t.name.to_cstr());

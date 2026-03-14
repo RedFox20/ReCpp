@@ -1130,6 +1130,8 @@ namespace rpp
                                 (char*)ret.data(), utf8len, nullptr, nullptr);
         }
         return ret;
+    #elif RPP_HAS_CXX26 && __clang__
+        return string{}; // wstring_convert completely deprecated on Clang
     #else
         // TODO: codecvt is deprected, but the other API-s don't even work
         std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
@@ -1150,6 +1152,9 @@ namespace rpp
         }
 
     #if false && _WIN32
+    #elif RPP_HAS_CXX26 && __clang__
+        (void)out_max;
+        // codecvt_utf8_utf16 completely deprecated on Clang, no alternative API available
     #else
         // TODO: codecvt is deprected, but the other API-s don't even work
         std::codecvt_utf8_utf16<char16_t> cvt;
@@ -1181,6 +1186,8 @@ namespace rpp
             MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)ret.data(), wlen);
         }
         return ret;
+    #elif RPP_HAS_CXX26 && __clang__
+        return ustring{}; // wstring_convert completely deprecated on Clang, no alternative API available
     #else
         // TODO: codecvt is deprected, but the other API-s don't even work
         std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
@@ -1213,6 +1220,10 @@ namespace rpp
         }
         out[utf16len] = u'\0'; // always null terminate
         return utf16len; // success
+    #elif RPP_HAS_CXX26 && __clang__
+        (void)out_max;
+        *out = u'\0'; // always null terminate
+        return -1; // wstring_convert completely deprecated on Clang, no alternative API available
     #else
         // TODO: codecvt is deprected, but the other API-s have even more issues
         std::codecvt_utf8_utf16<char16_t> cvt;
