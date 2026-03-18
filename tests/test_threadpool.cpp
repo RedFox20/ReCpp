@@ -360,4 +360,63 @@ TestImpl(test_threadpool)
         AssertThat((int)times_launched, expected);
     }
 
+    TestCase(pool_task_handle_copy_race_stress)
+    {
+        // Stress test for pool_task_handle concurrent copy + cleanup.
+        //
+        // Simulates a realistic scenario:
+        //   Main thread:   Creates new task handles, "works" briefly, then calls
+        //                  signal_finish_and_cleanup() — mimicking the worker thread
+        //                  finishing a task.
+        //   Waiter thread: Repeatedly copies the shared handle and calls wait()
+        //                  on the copy — mimicking client code waiting for completion.
+        //
+        // The race window:
+        //   Waiter:  pool_task_handle copy{shared}       // load ptr + inc_ref
+        //   Main:    shared.signal_finish_and_cleanup()  // exchange→null, signal, dec_ref
+        //   Main:    shared = new handle                 // old state now only held by copy
+        //
+        // Without proper strong-ref in wait(), the state could be freed
+        // while the waiter is still accessing it.
+
+        constexpr int ITERATIONS = 2'000;
+        std::atomic_bool stop{false};
+        std::atomic_int waits_finished{0};
+        std::atomic_int waits_timeout{0};
+
+        pool_task_handle shared{nullptr};
+
+        // Waiter thread: copies shared handle and waits for completion
+        std::thread waiter([&]() {
+            while (!stop.load(std::memory_order_relaxed)) {
+                // The wait here does a strong ref copy
+                // which simulates the copy constructor's load + inc_ref sequence
+                // use a lower wait period here to increase contention
+                auto wait_result = shared.wait(rpp::Duration::from_micros(20), std::nothrow);
+                if (wait_result == wait_result::finished) {
+                    waits_finished.fetch_add(1, std::memory_order_relaxed);
+                } else if (wait_result == wait_result::timeout) {
+                    waits_timeout.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        });
+
+        for (int i = 0; i < ITERATIONS; ++i) {
+            // Create a fresh task handle (refcount=1)
+            shared = pool_task_handle{static_cast<pool_worker*>(nullptr)};
+            // Small delay to give waiter a chance to copy
+            rpp::sleep_us(100);
+            // Simulate worker finishing: signal + cleanup (exchange→null, dec_ref)
+            // Race: waiter may be between get() and inc_ref() in copy constructor
+            shared.signal_finish_and_cleanup();
+        }
+
+        stop.store(true, std::memory_order_release);
+        waiter.join();
+
+        print_info("copy_race_stress: waits finished=%d, timeouts=%d  (%d iterations)\n",
+                   (int)waits_finished, (int)waits_timeout, ITERATIONS);
+        // Test passes if no crash, use-after-free, or sanitizer error occurred
+    }
+
 };

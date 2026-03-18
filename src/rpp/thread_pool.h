@@ -18,6 +18,8 @@
 #include <atomic> // std::atomic_bool
 #include <exception> // std::exception_ptr
 
+class test_threadpool; // forward declaration for unit tests
+
 namespace rpp
 {
     using seconds_t  = std::chrono::seconds;
@@ -150,6 +152,9 @@ namespace rpp
         {
             ptr.store(other.ptr.exchange(nullptr)); // atomic swap
         }
+        // @warning NOT safe if `other` is concurrently mutated by another thread.
+        //          Same thread-safety contract as std::shared_ptr:
+        //          concurrent reads OK, concurrent read+write requires external sync.
         pool_task_handle& operator=(const pool_task_handle& other) noexcept
         {
             if (this != &other) {
@@ -184,8 +189,9 @@ namespace rpp
             if (refs != 0) return;
             delete &p;
         }
-        pool_task_state* get() const noexcept { return ptr.load(); }
-        pool_task_state* operator->() const noexcept { return ptr.load(); }
+        // these are unsafe, use with care
+        pool_task_state* get()        const noexcept { return ptr.load(std::memory_order_seq_cst); }
+        pool_task_state* operator->() const noexcept { return ptr.load(std::memory_order_seq_cst); }
     public:
 
         /// @returns The name of the worker thread that is running this task 
@@ -229,7 +235,8 @@ namespace rpp
     
     private:
         friend class pool_worker;
-        void signal_finished() noexcept;
+        friend class ::test_threadpool;
+        void signal_finish_and_cleanup() noexcept;
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////

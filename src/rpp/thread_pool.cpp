@@ -46,7 +46,8 @@ namespace rpp
 
     const char* pool_task_handle::worker_name() const noexcept
     {
-        if (auto* p = get())
+        pool_task_handle strong{*this}; // inc_ref
+        if (auto* p = strong.ptr.load(std::memory_order_relaxed))
             if (auto* w = p->worker)
                 return w->name;
         return "none";
@@ -65,7 +66,10 @@ namespace rpp
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto* p = get())
+        // A strong ref is needed here, otherwise the task could be destroyed
+        // while we attempt to wait on it.
+        pool_task_handle strong{*this}; // inc_ref
+        if (auto* p = strong.ptr.load(std::memory_order_relaxed))
         {
             auto lock = p->finished.spin_lock();
             if (p->finished.wait(lock, timeout) == rpp::semaphore::timeout)
@@ -88,7 +92,8 @@ namespace rpp
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        if (auto* p = get())
+        pool_task_handle strong{*this}; // inc_ref
+        if (auto* p = strong.ptr.load(std::memory_order_relaxed))
         {
             auto lock = p->finished.spin_lock();
             p->finished.wait(lock);
@@ -98,12 +103,19 @@ namespace rpp
         return result;
     }
 
-    void pool_task_handle::signal_finished() noexcept
+    void pool_task_handle::signal_finish_and_cleanup() noexcept
     {
-        if (auto* p = get())
+        // null the pointer and atomically get the old value
+        if (auto* p = this->ptr.exchange(nullptr, std::memory_order_seq_cst))
         {
-            auto lock = p->finished.spin_lock();
-            p->finished.notify_all(lock);
+            {
+                auto lock = p->finished.spin_lock();
+                p->finished.notify_all(lock);
+            }
+
+            // release the reference held by the worker thread
+            // this will trigger any destructors or cleanup
+            dec_ref(*p);
         }
     }
 
@@ -224,13 +236,18 @@ namespace rpp
             return join_or_detach(wait_result::finished);
         }
 
+        // Take a strong ref to current_task while holding the lock,
+        // so we can safely wait on it after releasing the lock
+        pool_task_handle task_to_wait{nullptr};
+
         new_task_flag.notify_all([&] {
             TaskDebug("%s set killed", name);
             killed = true;
+            task_to_wait = current_task; // copy the handle to wait on after we release the lock
         });
 
         // wait for runner to finish current task before joining the thread
-        wait_result result = current_task.wait(rpp::Duration::from_millis(timeoutMillis), std::nothrow);
+        wait_result result = task_to_wait.wait(rpp::Duration::from_millis(timeoutMillis), std::nothrow);
         return join_or_detach(result);
     }
 
@@ -324,11 +341,10 @@ namespace rpp
                 // non-exceptional cleanup path:
                 {
                     auto lock = new_task_flag.spin_lock();
-                    current_task.signal_finished();
                     // WARNING: this is a critical section for thread-safety
                     //          any waiting future on another thread will resume after this statement
                     //          so any modification to the task state would cause a race
-                    current_task = pool_task_handle{nullptr};
+                    current_task.signal_finish_and_cleanup();
                 }
             }
             // prevent failures that would terminate the thread
@@ -353,12 +369,11 @@ namespace rpp
             (void)what;
         #endif // POOL_TASK_DEBUG
             p->error = std::current_exception();
-            current_task.signal_finished();
+            current_task.signal_finish_and_cleanup();
         }
-        current_task = pool_task_handle{nullptr};
     }
 
-    bool pool_worker::wait_for_new_job(std::unique_lock<mutex>& lock) noexcept
+    bool pool_worker::wait_for_new_job(lock_t& lock) noexcept
     {
         for (;;) // loop until new job, or killed
         {
