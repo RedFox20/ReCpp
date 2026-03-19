@@ -149,70 +149,79 @@ namespace rpp
         max_idle_timeout = rpp::Duration::from_millis(int(max_idle_seconds*1000));
     }
 
-    pool_task_handle pool_worker::run_range(int start, int end, const action<int, int>& newTask) noexcept
+    bool pool_worker::run_range(int start, int end, const action<int, int>& newTask, pool_task_handle* out) noexcept
     {
         auto lock = new_task_flag.spin_lock();
         // we always need to double-check if a task is already running
         if (current_task.is_running())
         {
             TaskDebug("%s task already running", name);
-            return { nullptr };
+            return false;
         }
         if (destroying)
         {
             TaskDebug("%s pool is beying destroyed", name);
-            return { nullptr };
+            return false;
         }
 
         range_task  = newTask;
         range_start = start;
         range_end   = end;
-        auto task = set_current_task_and_unlock(lock);
-        // no state modification after this point !
+        // >>> no `this` state modification after this point !!!
+        set_current_task_and_unlock(lock, out);
 
         if (auto tracer = TraceProvider) // WARNING: this can be VERY slow
         {
             std::string trace = tracer(); // run the trace specifically in this scope and unlocked
             auto lock = new_task_flag.spin_lock();
-            task->trace = std::move(trace);
+            if (auto* p = current_task.get()) // in theory this could fail if task cancelled instantly due to shutdown
+                p->trace = std::move(trace);
         }
-        return task;
+        return true;
     }
 
     // NOLINTBEGIN(clang-analyzer-cplusplus.Move)
-    pool_task_handle pool_worker::run_generic(task_delegate<void()>& newTask) noexcept
+    bool pool_worker::run_generic(task_delegate<void()>& newTask, pool_task_handle* out) noexcept
     {
         auto lock = new_task_flag.spin_lock();
-        // we always need to double-check if a task is already running
         if (current_task.is_running())
         {
             TaskDebug("%s task already running", name);
-            return { nullptr };
+            return false;
         }
         if (destroying)
         {
             TaskDebug("%s pool is beying destroyed", name);
-            return { nullptr };
+            return false;
         }
 
         generic_task = std::move(newTask);
-        auto task = set_current_task_and_unlock(lock);
-        // no state modification after this point !
+        // >>> no `this` state modification after this point !!!
+        set_current_task_and_unlock(lock, out);
 
         if (auto tracer = TraceProvider) // WARNING: this can be VERY slow
         {
             std::string trace = tracer(); // run the trace specifically in this scope and unlocked
             auto lock = new_task_flag.spin_lock();
-            task->trace = std::move(trace);
+            if (auto* p = current_task.get()) // in theory this could fail if task cancelled instantly due to shutdown
+                p->trace = std::move(trace);
         }
-        return task;
+        return true;
     }
     // NOLINTEND(clang-analyzer-cplusplus.Move)
 
-    pool_task_handle pool_worker::set_current_task_and_unlock(lock_t& lock) noexcept
+    void pool_worker::set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept
     {
-        auto task = pool_task_handle{this}; // an additional copy is needed for thread safety
-        current_task = task;
+        if (out)
+        {
+            auto task = pool_task_handle{this}; // refcount 1
+            current_task = task;                // copy: refcount 2
+            *out = std::move(task);             // move into caller, still refcount 2
+        }
+        else
+        {
+            current_task = pool_task_handle{this}; // move-assign, refcount stays 1
+        }
         new_task_flag.notify_all(lock);
 
         if (killed) // resurrect runner if killed
@@ -226,8 +235,6 @@ namespace rpp
         if (lock.owns_lock())
             lock.unlock();
         // NOTE: after this unlock, another thread could start cancelling this task
-
-        return task;
     }
 
     wait_result pool_worker::kill(int timeoutMillis) noexcept
@@ -510,12 +517,12 @@ namespace rpp
                 pool_worker* worker = worker_ref.get();
                 if (!worker->running())
                 {
-                    if (pool_task_handle task = worker->run_range(range_start, range_end, range_task);
-                        task.was_started())
+                    pool_task_handle existing{nullptr};
+                    if (worker->run_range(range_start, range_end, range_task, &existing))
                     {
                         worker_ptr t = std::move(worker_ref);
                         Workers.erase(Workers.begin()+i);
-                        return parallel_for_task{ std::move(t), std::move(task) };
+                        return parallel_for_task{ std::move(t), std::move(existing) };
                     }
                     // else: race condition (someone else held pointer to the task and restarted it)
                 }
@@ -524,9 +531,10 @@ namespace rpp
 
         // in this case we don't need any locking, because the task is not added to Pool
         auto w = std::make_unique<pool_worker>(TaskMaxIdleTime);
-        pool_task_handle task = w->run_range(range_start, range_end, range_task);
-        AssertTerminate(task.was_started(), "brand new pool_task->run_range() failed");
-        return parallel_for_task{ std::move(w), std::move(task) };
+        pool_task_handle new_task{nullptr};
+        bool started = w->run_range(range_start, range_end, range_task, &new_task);
+        AssertTerminate(started, "brand new pool_task->run_range() failed");
+        return parallel_for_task{ std::move(w), std::move(new_task) };
     }
 
     thread_pool::parallel_for_params::parallel_for_params(int range, int max_range_size, int max_parallelism) noexcept
@@ -610,8 +618,8 @@ namespace rpp
                         // try to run next range on the same worker that just finished
                         InTaskDebug(rpp::Timer try_run);
                         TaskDebug("parallel_for check_free try_run %s", wait.task.worker_name());
-                        if (auto task = wait.worker->run_range(start, end, range_task);
-                            task.was_started())
+                        pool_task_handle task{nullptr};
+                        if (wait.worker->run_range(start, end, range_task, &task))
                         {
                             wait.task = std::move(task);
                             TaskDebug("parallel_for wait_for_task try_run success %.3fms", try_run.elapsed_millis());
@@ -655,7 +663,18 @@ namespace rpp
     // NOLINTBEGIN(clang-analyzer-cplusplus.Move)
     pool_task_handle thread_pool::parallel_task(task_delegate<void()>&& generic_task) noexcept
     {
-        // move the generic task to satisfy linter
+        pool_task_handle out{nullptr};
+        start_generic_task(std::move(generic_task), &out);
+        return out;
+    }
+
+    void thread_pool::parallel_task_detached(task_delegate<void()>&& generic_task) noexcept
+    {
+        start_generic_task(std::move(generic_task), nullptr);
+    }
+
+    void thread_pool::start_generic_task(task_delegate<void()>&& generic_task, pool_task_handle* out) noexcept
+    {
         task_delegate<void()> gen_task { std::move(generic_task) };
         { std::lock_guard lock{TasksMutex};
             for (worker_ptr& t : Workers)
@@ -663,22 +682,18 @@ namespace rpp
                 pool_worker* worker = t.get();
                 if (!worker->running())
                 {
-                    auto task = worker->run_generic(gen_task); // only moves if task.was_started()
-                    if (task.was_started())
-                        return task;
-                    // else: race condition (someone else held pointer to the task and restarted it)
+                    if (worker->run_generic(gen_task, out))
+                        return;
                 }
             }
         }
-        
-        // create and run a new task atomically
+
         auto w = std::make_unique<pool_worker>(TaskMaxIdleTime);
-        auto task = w->run_generic(gen_task); // only moves if task.was_started()
-        AssertTerminate(task.was_started(), "brand new pool_task->run_generic() failed");
+        bool started = w->run_generic(gen_task, out);
+        AssertTerminate(started, "brand new pool_task->run_generic() failed");
 
         std::lock_guard lock{TasksMutex};
         Workers.emplace_back(std::move(w));
-        return task;
     }
     // NOLINTEND(clang-analyzer-cplusplus.Move)
 }

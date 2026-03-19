@@ -302,19 +302,22 @@ namespace rpp
         // @warning This range task does not retain any resources, so you must ensure
         //          it survives until end of the loop
         // undefined behaviour if called when already running
+        // @param out If non-null, receives a copy of the task handle for waiting.
         // @return TRUE if run started successfully (task was not already running)
-        [[nodiscard]] pool_task_handle run_range(int start, int end, const action<int, int>& newTask) noexcept;
+        [[nodiscard]] bool run_range(int start, int end, const action<int, int>& newTask, pool_task_handle* out) noexcept;
 
         // assigns a new generic task to run
         // undefined behaviour if called when already running
+        // @param out If non-null, receives a copy of the task handle for waiting.
+        //           If null (fire-and-forget), avoids refcount contention.
         // @return TRUE if run started successfully (task was not already running)
-        [[nodiscard]] pool_task_handle run_generic(task_delegate<void()>& newTask) noexcept;
+        [[nodiscard]] bool run_generic(task_delegate<void()>& newTask, pool_task_handle* out) noexcept;
 
         // kill the task and wait for it to finish
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
-        pool_task_handle set_current_task_and_unlock(lock_t& lock) noexcept;
+        void set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept;
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
         bool wait_for_new_job(lock_t& lock) noexcept;
@@ -456,6 +459,15 @@ namespace rpp
         // runs a generic parallel task
         pool_task_handle parallel_task(task_delegate<void()>&& generic_task) noexcept;
 
+        // runs a generic parallel task without returning a handle (fire-and-forget)
+        // more efficient than parallel_task() when the caller doesn't need to wait on the handle
+        void parallel_task_detached(task_delegate<void()>&& generic_task) noexcept;
+
+    private:
+        void start_generic_task(task_delegate<void()>&& generic_task, pool_task_handle* out) noexcept;
+
+    public:
+
         /**
          * Enables tracing of parallel task calls. This makes it possible
          * to trace the callstack which triggered the parallel task, otherwise
@@ -538,6 +550,15 @@ namespace rpp
     inline pool_task_handle parallel_task(task_delegate<void()>&& genericTask) noexcept
     {
         return thread_pool::global().parallel_task(std::move(genericTask));
+    }
+
+    /**
+     * Fire-and-forget version of parallel_task that doesn't return a handle.
+     * More efficient: avoids refcount contention between caller and worker thread.
+     */
+    inline void parallel_task_detached(task_delegate<void()>&& genericTask) noexcept
+    {
+        thread_pool::global().parallel_task_detached(std::move(genericTask));
     }
 
 #undef move_args

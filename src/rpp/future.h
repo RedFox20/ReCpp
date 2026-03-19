@@ -31,7 +31,7 @@ namespace rpp
         using T = task_return_t<Task>; // decay_t on the return type
         cpromise<T> p;
         cfuture<T> f = p.get_future();
-        rpp::parallel_task([move_args(p, task)]() mutable noexcept
+        rpp::parallel_task_detached([move_args(p, task)]() mutable noexcept
         {
             try {
                 if constexpr (std::is_same_v<T, void>)
@@ -265,7 +265,7 @@ namespace rpp
         template<typename Task>
         void continue_with(Task task) noexcept
         {
-            rpp::parallel_task([f=std::move(*this), move_args(task)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task)]() mutable {
                 (void)task(f.get());
             });
         }
@@ -274,7 +274,7 @@ namespace rpp
         void continue_with(Task task, ExceptHA exhA) noexcept
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
             });
@@ -285,7 +285,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -298,7 +298,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -313,7 +313,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -330,7 +330,7 @@ namespace rpp
         {
             if (this->valid())
             {
-                rpp::parallel_task([f=std::move(*this)]() mutable {
+                rpp::parallel_task_detached([f=std::move(*this)]() mutable {
                     try { (void)f.get(); }
                     catch (...) {}
                 });
@@ -454,7 +454,7 @@ namespace rpp
                 cont.resume();
                 return;
             }
-            rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
+            rpp::parallel_task_detached([this, cont]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
                     this->wait();
@@ -660,7 +660,7 @@ namespace rpp
         template<typename Task>
         void continue_with(Task task) noexcept
         {
-            rpp::parallel_task([f=std::move(*this), move_args(task)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
                 (void)task();
             });
@@ -670,7 +670,7 @@ namespace rpp
         void continue_with(Task task, ExceptHA exhA) noexcept
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA)]() mutable noexcept {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA)]() mutable noexcept {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
             });
@@ -681,7 +681,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -694,7 +694,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -709,7 +709,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            rpp::parallel_task([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -773,7 +773,7 @@ namespace rpp
         {
             if (this->valid())
             {
-                rpp::parallel_task([f=std::move(*this)]() mutable noexcept
+                rpp::parallel_task_detached([f=std::move(*this)]() mutable noexcept
                 {
                     try { f.get(); }
                     catch (...) {}
@@ -849,7 +849,7 @@ namespace rpp
                 cont.resume();
                 return;
             }
-            rpp::parallel_task([this, cont]() /*clang-12 compat:*/mutable
+            rpp::parallel_task_detached([this, cont]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
                     this->wait();
