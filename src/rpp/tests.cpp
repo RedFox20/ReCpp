@@ -210,8 +210,10 @@ namespace rpp
         strview name;
         rpp::mutex mutex;
         test_func_type func { nullptr };
+        coro_func_type coro_func { nullptr };
         size_t expectedExType = 0;
         std::chrono::nanoseconds elapsed_time{};
+        bool is_coro = false;
         bool autorun = true;
         bool did_run = false;
         bool success = false;
@@ -257,6 +259,7 @@ namespace rpp
 
     // current test func is thread-local, so that tests could be run in parallel
     static thread_local test::test_func* tl_current_test_func;
+    static thread_local test* tl_current_test;
 
     test::test(strview name) : name{ name }
     {
@@ -331,23 +334,44 @@ namespace rpp
     #define LogTestLabel(expr) \
         if (state().verbosity >= TestVerbosity::TestLabels) { expr; }
 
-    void test::assert_failed(const char* file, int line, const char* fmt, ...)
+    void test::assert_failed(const char* file, int line, PRINTF_FMTSTR const char* fmt, ...)
     {
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
         safe_vsnprintf_msg_len(fmt);
         LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg));
 
-        if (impl->current_results)
-            add_assert_failure(filename, line, msg, len);
+        if (auto* test = tl_current_test)
+        {
+            if (test->impl && test->impl->current_results)
+                test->add_assert_failure(filename, line, msg, len);
+        }
+        else
+        {
+            // if we don't have a current test, just print the error and continue
+            // this can happen if an assertion fails in a different thread
+            //   -- this is difficult to handle, so we just print the error and hope for the best
+            if (state().verbosity < TestVerbosity::TestLabels)
+                consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg);
+        }
     }
 
-    void test::assert_failed_custom(const char* fmt, ...)
+    void test::assert_failed_custom(PRINTF_FMTSTR const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
         LogTestLabel(console(Red, msg, len));
 
-        if (impl->current_results)
-            add_assert_failure("", 0, msg, len);
+        if (auto* test = tl_current_test)
+        {
+            if (test->impl && test->impl->current_results)
+                test->add_assert_failure("", 0, msg, len);
+        }
+        else 
+        {
+            // probably asserting from another thread, print if not already printed by caller
+            // because we can't show a summary of test results
+            if (state().verbosity < TestVerbosity::TestLabels)
+                console(Red, msg, len);
+        }
     }
 
     void test::add_assert_failure(const char* file, int line, const char* msg, int len)
@@ -371,7 +395,7 @@ namespace rpp
             func->append_message(type, msg, len);
     }
 
-    void test::print_error(const char* fmt, ...)
+    void test::print_error(PRINTF_FMTSTR const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
         if (state().verbosity >= TestVerbosity::TestLabels) { 
@@ -380,7 +404,7 @@ namespace rpp
         add_message(2, msg, len);
     }
 
-    void test::print_warning(const char* fmt, ...)
+    void test::print_warning(PRINTF_FMTSTR const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
         if (state().verbosity >= TestVerbosity::AllMessages) { 
@@ -389,7 +413,7 @@ namespace rpp
         add_message(1, msg, len);
     }
 
-    void test::print_info(const char* fmt, ...)
+    void test::print_info(PRINTF_FMTSTR const char* fmt, ...)
     {
         safe_vsnprintf_msg_len(fmt);
         if (state().verbosity >= TestVerbosity::AllMessages) { 
@@ -414,18 +438,21 @@ namespace rpp
 
     bool test::run_init()
     {
+        tl_current_test = this;
         test_func init;
         init.name = "init";
         impl->current_func = &init;
         try
         {
             init_test();
+            tl_current_test = nullptr;
             impl->current_func = nullptr;
             return true;
         }
         catch (const std::exception& e)
         {
             assert_failed_custom("FAILED with EXCEPTION in [%s]::TestInit(): %s\n", name.str, e.what());
+            tl_current_test = nullptr;
             impl->current_func = nullptr;
             return false;
         }
@@ -445,6 +472,7 @@ namespace rpp
             assert_failed_custom("FAILED with EXCEPTION in [%s]::TestCleanup(): %s\n", name.str, e.what());
         }
         impl->current_func = nullptr;
+        tl_current_test = nullptr;
     }
 
     static const char* get_time_str(const std::chrono::nanoseconds& time) noexcept
@@ -622,11 +650,23 @@ namespace rpp
         try
         {
             test_case_setup();
-            #if _MSC_VER
-                (reinterpret_cast<dummy*>(this)->*test.func.dfunc)();
-            #else
-                test.func.mfunc(this);
-            #endif
+            if (test.is_coro)
+            {
+                #if _MSC_VER
+                    test_coro coro = (reinterpret_cast<dummy*>(this)->*test.coro_func.dfunc)();
+                #else
+                    test_coro coro = test.coro_func.mfunc(this);
+                #endif
+                coro.run_until_done();
+            }
+            else
+            {
+                #if _MSC_VER
+                    (reinterpret_cast<dummy*>(this)->*test.func.dfunc)();
+                #else
+                    test.func.mfunc(this);
+                #endif
+            }
             test_case_cleanup();
             t2 = std::chrono::high_resolution_clock::now();
             if (test.expectedExType) // we expected an exception, but none happened?!
@@ -751,6 +791,19 @@ namespace rpp
         test_func* func = new test_func{};
         func->name = name;
         func->func = fn;
+        func->expectedExType = expectedExHash;
+        func->autorun = autorun;
+        impl->test_functions.push_back(func);
+        return static_cast<int>(impl->test_functions.size()) - 1;
+    }
+
+    int test::add_coro_test_func(strview name, coro_func_type fn,
+                                 size_t expectedExHash, bool autorun)
+    {
+        test_func* func = new test_func{};
+        func->name = name;
+        func->coro_func = fn;
+        func->is_coro = true;
         func->expectedExType = expectedExHash;
         func->autorun = autorun;
         impl->test_functions.push_back(func);

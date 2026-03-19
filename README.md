@@ -1306,7 +1306,7 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 |-------|-------------|
 | [`functor_awaiter<T>`](src/rpp/coroutines.h#L43) | Awaiter for lambdas/delegates via `parallel_task()` |
 | [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L113) | Awaiter for lambdas returning futures |
-| [`chrono_awaiter<Clock>`](src/rpp/coroutines.h#L192) | Awaiter for `std::chrono` durations (async sleep) |
+| [`time_awaiter`](src/rpp/coroutines.h#L192) | Awaiter for `rpp::Duration` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
@@ -1315,7 +1315,7 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 | [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L244) | Run delegate async on thread pool |
 | [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L276) | Run lambda async on thread pool |
 | [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L299) | Await a composable future |
-| [`operator co_await(chrono::duration)`](src/rpp/coroutines.h#L330) | Async sleep for a duration |
+| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L330) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;

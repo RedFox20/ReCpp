@@ -24,6 +24,14 @@ namespace rpp
     /** Let this thread sleep for provided NANOSECONDS */
     RPPAPI void sleep_ns(int64 nanos) noexcept;
 
+    struct Duration; // forward declaration
+    struct TimePoint; // forward declaration
+
+    /** Let this thread sleep for the provided Duration */
+    RPPAPI void sleep_for(const Duration& d) noexcept;
+    /** Let this thread sleep until the provided system TimePoint */
+    RPPAPI void sleep_until(const TimePoint& tp) noexcept;
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     static constexpr int64 MILLIS_PER_SEC = 1'000LL;
@@ -316,11 +324,11 @@ namespace rpp
     };
 
     // Convenience functions for constructing Durations, similar to std::chrono::seconds() etc.
-    inline constexpr Duration seconds(double seconds) noexcept { return Duration::from_seconds(seconds); }
+    inline constexpr Duration seconds_f(double seconds) noexcept { return Duration::from_seconds(seconds); }
     inline constexpr Duration seconds(int64 seconds) noexcept { return Duration::from_seconds(seconds); }
-    inline constexpr Duration millis(double millis) noexcept { return Duration::from_millis(millis); }
+    inline constexpr Duration millis_f(double millis) noexcept { return Duration::from_millis(millis); }
     inline constexpr Duration millis(int64 millis) noexcept { return Duration::from_millis(millis); }
-    inline constexpr Duration micros(double micros) noexcept { return Duration::from_micros(micros); }
+    inline constexpr Duration micros_f(double micros) noexcept { return Duration::from_micros(micros); }
     inline constexpr Duration micros(int64 micros) noexcept { return Duration::from_micros(micros); }
     inline constexpr Duration nanos(int64 nanos) noexcept { return Duration::from_nanos(nanos); }
 

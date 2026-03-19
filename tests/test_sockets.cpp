@@ -39,7 +39,7 @@ TestImpl(test_sockets)
         for (int i = 0; i < 4; ++i) AssertEqual(after[i], 0xAA); // NOLINT(modernize-*)
     }
 
-    socket create_udp_listener(socket_option opt = SO_None)
+    static socket create_udp_listener(socket_option opt = SO_None)
     {
         static int next_port = []() {
             // randomize the starting port to reduce chance of conflicts in parallel test runs
@@ -608,7 +608,7 @@ TestImpl(test_sockets)
     }
 
     // helper function to pop a single UDP packet and return number of bytes received, discarding data
-    int pop_udp_packet(socket& recv, int expected_size = -1 SOURCE_LOC_DEF)
+    static int pop_udp_packet(socket& recv, int expected_size = -1 SOURCE_LOC_DEF)
     {
         char buffer[4096];
         int r = recv.recv(buffer, sizeof(buffer));
@@ -747,7 +747,7 @@ TestImpl(test_sockets)
                 if (i % 200 == 0) rpp::sleep_ms(1); // throttle to avoid kernel dropping packets
             }
         });
-        auto receiver = rpp::async_task([this, &recv, &t]()
+        auto receiver = rpp::async_task([&recv, &t]()
         {
             int num_received = 0;
             while (num_received < NUM_MESSAGES && t.elapsed_ms() < 4000)
@@ -841,7 +841,7 @@ TestImpl(test_sockets)
 
     //////////////////////////////////////////////////////////////////
 
-    socket create(std::string msg, socket&& s) // NOLINT(performance-unnecessary-value-param)
+    static socket create(std::string msg, socket&& s) // NOLINT(performance-unnecessary-value-param)
     {
         AssertMsg(s.good(), "expected good() for '%s'", msg.c_str());
         AssertMsg(s.connected(), "expected connected() for '%s'", msg.c_str());
@@ -851,21 +851,21 @@ TestImpl(test_sockets)
             print_info("%s %s\n", msg.c_str(), s.str().c_str());
         return std::move(s);
     }
-    socket listen(int port, rpp::socket_option opt = rpp::SO_None)
+    static socket listen(int port, rpp::socket_option opt = rpp::SO_None)
     {
         return create("server: listening on " + std::to_string(port),
             socket::listen_to({AF_IPv4, port}, rpp::IPP_TCP, opt));
     }
-    socket listen(socket&& s)
+    static socket listen(socket&& s)
     {
         int port = s.port();
         return create("server: listening on " + std::to_string(port), std::move(s));
     }
-    socket accept(socket& server)
+    static socket accept(socket& server)
     {
         return create("server: accepted client", server.accept(5000/*ms*/));
     }
-    socket connect(std::string ip, int port, rpp::socket_option opt = rpp::SO_None) // NOLINT(performance-unnecessary-value-param)
+    static socket connect(std::string ip, int port, rpp::socket_option opt = rpp::SO_None) // NOLINT(performance-unnecessary-value-param)
     {
         return create("remote: connected to "+ip+":"+std::to_string(port),
                       socket::connect_to({ip, port}, 5000/*ms*/, opt));
@@ -916,7 +916,7 @@ TestImpl(test_sockets)
         socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock)); // this is our server
         AssertThat(server.is_blocking(), false);
 
-        std::future<void> remote = std::async(std::launch::async, [&,this]()
+        std::future<void> remote = std::async(std::launch::async, [&server]()
         {
             int receivedMessages = 0;
             socket to_server = connect("127.0.0.1", server.port(), rpp::SO_NonBlock);
@@ -973,7 +973,7 @@ TestImpl(test_sockets)
         struct message_stats { int sent = 0; int received = 0; };
 
         // start client thread
-        std::future<message_stats> client_runner = std::async(std::launch::async, [&,this]()
+        std::future<message_stats> client_runner = std::async(std::launch::async, [&server, &running]()
         {
             socket to_server = connect("127.0.0.1", server.port(), SO_Blocking);
             AssertThat(to_server.is_blocking(), true);

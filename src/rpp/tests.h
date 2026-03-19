@@ -7,6 +7,7 @@
 #include "sprint.h" // we love strview and sprint, so it's a common dependency
 #include "debugging.h" // for adapting debugging API-s with tests API
 #include "./math.h" // rpp::min, rpp::max
+#include "future_types.h" // RPP_HAS_COROUTINES and to support TestCaseCoro()
 
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
@@ -54,6 +55,44 @@ namespace rpp
     {
         struct dummy { };
 
+        /**
+         * Simple coroutine return type for test cases.
+         * Runs synchronously with suspend/resume points driven by the test runner.
+         * Use co_await std::suspend_always{} to create yield points.
+         */
+        struct RPP_CORO_RETURN_TYPE test_coro
+        {
+            struct promise_type
+            {
+                std::exception_ptr exception;
+                test_coro get_return_object() noexcept
+                {
+                    return test_coro{std::coroutine_handle<promise_type>::from_promise(*this)};
+                }
+                std::suspend_never initial_suspend() noexcept { return {}; }
+                std::suspend_always final_suspend() noexcept { return {}; }
+                void return_void() noexcept {}
+                void unhandled_exception() noexcept { exception = std::current_exception(); }
+            };
+
+            std::coroutine_handle<promise_type> handle;
+
+            explicit test_coro(std::coroutine_handle<promise_type> h) noexcept : handle{h} {}
+            test_coro(test_coro&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
+            ~test_coro() { if (handle) handle.destroy(); }
+            test_coro(const test_coro&) = delete;
+            test_coro& operator=(const test_coro&) = delete;
+
+            void run_until_done()
+            {
+                while (handle && !handle.done())
+                    handle.resume();
+                if (handle && handle.promise().exception)
+                    std::rethrow_exception(handle.promise().exception);
+            }
+            bool done() const noexcept { return !handle || handle.done(); }
+        };
+
         // minimal version from delegate.h for impossibly fast delegates
         #if _MSC_VER  // VC++
             #if INTPTR_MAX != INT64_MAX // __thiscall only applies for 32-bit MSVC
@@ -75,6 +114,27 @@ namespace rpp
             dummy_type dfunc;
         };
 
+        // function pointer types for coroutine test cases (returning test_coro)
+        #if _MSC_VER  // VC++
+            #if INTPTR_MAX != INT64_MAX // __thiscall only applies for 32-bit MSVC
+                using coro_memb_type = test_coro (__thiscall*)(void*);
+            #else
+                using coro_memb_type = test_coro (*)(void*);
+            #endif
+            using coro_dummy_type = test_coro (dummy::*)();
+        #elif __clang__
+            using coro_memb_type  = test_coro (*)(void*);
+            using coro_dummy_type = test_coro (dummy::*)();
+        #else
+            using coro_memb_type  = test_coro (*)(void*);
+            using coro_dummy_type = test_coro (dummy::*)(void*);
+        #endif
+
+        union coro_func_type {
+            coro_memb_type mfunc;
+            coro_dummy_type dfunc;
+        };
+
         struct test_func;
         struct test_impl;
 
@@ -85,15 +145,15 @@ namespace rpp
     public:
         explicit test(strview name);
         virtual ~test() noexcept;
-        void assert_failed(const char* file, int line, const char* fmt, ...);
-        void assert_failed_custom(const char* fmt, ...);
+        static void assert_failed(const char* file, int line, PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT3;
+        static void assert_failed_custom(PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT1;
     private:
         void add_assert_failure(const char* file, int line, const char* msg, int len);
         static void add_message(int type, const char* msg, int len);
     public:
-        static void print_error(const char* fmt, ...);
-        static void print_warning(const char* fmt, ...);
-        static void print_info(const char* fmt, ...);
+        static void print_error(PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT1;
+        static void print_warning(PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT1;
+        static void print_info(PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT1;
 
         /**
          * Adapter for rpp/debugging.h, enables piping `LogInfo()` etc into test framework output
@@ -248,27 +308,29 @@ namespace rpp
         }
 
         template<class Actual, class Expected>
-        void assumption_failed(const char* file, int line,
+        static void assumption_failed(const char* file, int line,
             const char* expr, const Actual& actual, const char* why, const Expected& expected)
         {
             std::string sActual = as_short_string(actual);
             std::string sExpect = as_short_string(expected);
-            assert_failed(file, line, "%s => '%s' %s '%s'", expr, sActual.c_str(), why, sExpect.c_str());
+            assert_failed(file, line, "%s => '%s' %s '%s'",
+                          expr, sActual.c_str(), why, sExpect.c_str());
         }
 
         template<class Actual, class Min, class Max>
-        void assumption_failed(const char* file, int line,
+        static void assumption_failed(const char* file, int line,
             const char* expr, const Actual& actual, const char* why, const Min& min, const Max& max)
         {
             std::string sActual = as_short_string(actual);
             std::string sMin = as_short_string(min);
             std::string sMax = as_short_string(max);
-            assert_failed(file, line, "%s => '%s' %s min:'%s' max:'%s'", expr, sActual.c_str(), why, sMin.c_str(), sMax.c_str());
+            assert_failed(file, line, "%s => '%s' %s min:'%s' max:'%s'", 
+                          expr, sActual.c_str(), why, sMin.c_str(), sMax.c_str());
         }
 
         // specific support for std::vector type
         template<class T, class A>
-        void assumption_failed(const char* file, int line,
+        static void assumption_failed(const char* file, int line,
             const char* expr, const std::vector<T, A>& actual, const char* why, const std::vector<T, A>& expected)
         {
             // find the first difference:
@@ -315,6 +377,30 @@ namespace rpp
 
             size_t expectedExHash = ti ? ti->hash_code() : 0;
             return self->add_test_func(name, fn, expectedExHash, autorun);
+        }
+
+        int add_coro_test_func(strview name, coro_func_type fn, size_t expectedExHash, bool autorun);
+
+        // adds a coroutine test to the automatic test run list
+        template<class TestClass>
+        static int add_coro_test_func(TestClass* self, strview name, test_coro (TestClass::*test_method)(),
+                                      const std::type_info* ti = nullptr, bool autorun = true)
+        {
+            coro_func_type fn;
+            #if _MSC_VER // VC++ and MSVC clang
+                fn.dfunc = reinterpret_cast<coro_dummy_type>(test_method);
+            #elif __clang__
+                fn.dfunc = reinterpret_cast<coro_dummy_type>(test_method);
+            #elif __GNUG__ // G++
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wpmf-conversions"
+                #pragma GCC diagnostic ignored "-Wpedantic"
+                fn.mfunc = (coro_memb_type)((*self).*test_method); // de-virtualize / pfm-conversion
+                #pragma GCC diagnostic pop
+            #endif
+
+            size_t expectedExHash = ti ? ti->hash_code() : 0;
+            return self->add_coro_test_func(name, fn, expectedExHash, autorun);
         }
     };
 
@@ -448,7 +534,7 @@ namespace rpp
 
 // Asserts that expression is true, otherwise displays a custom formatted error message
 #define AssertMsg(expr, fmt, ...) do { \
-    if (!(expr)) { assert_failed(__FILE__, __LINE__, #expr " $ " fmt, ##__VA_ARGS__); } \
+    if (!(expr)) { assert_failed(__FILE__, __LINE__, "%s $ " fmt, #expr, ##__VA_ARGS__); } \
 }while(0)
 
 #define AssertThat(expr, expected) do { \
@@ -607,10 +693,10 @@ namespace rpp
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
     void test_##testname()
 
-// allows to use co_await in test cases
+// allows to use co_await in test cases, driven synchronously by the test runner
 #define TestCaseCoro(testname) \
-    const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
-    rpp::cfuture<void> test_##testname()
+    const int _test_##testname = add_coro_test_func(self(), #testname, &ClassType::test_##testname ); \
+    rpp::test::test_coro test_##testname()
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname, &typeid(expectedExceptionType)); \

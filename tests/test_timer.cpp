@@ -88,7 +88,7 @@ TestImpl(test_timer)
             rpp::Timer t;
             // going below 100'000ns is not accurate with clock_nanosleep
             rpp::sleep_ns(100'000);
-            int64_t elapsed_ns = t.elapsed_ns(rpp::TimePoint::now());
+            rpp::int64 elapsed_ns = t.elapsed_ns(rpp::TimePoint::now());
             print_info("nanos %d 100000ns sleep time: %lldns\n", i+1, elapsed_ns);
             AssertInRange(elapsed_ns, 99'999, 7'100'200); // OS sleep can never be accurate enough, so the range must be very loose
         }
@@ -234,7 +234,7 @@ TestImpl(test_timer)
         rpp::Duration elapsed1 = t1.elapsed(t2);
         print_info("elapsed: %lldns\n", elapsed1.nanos());
         rpp::Duration one_sec = rpp::Duration::from_millis(1000);
-        print_info("duration::from_millis(1000): %dms\n", one_sec.millis());
+        print_info("duration::from_millis(1000): %lldms\n", one_sec.millis());
         AssertEqual(one_sec.millis(), 1'000);
 
         // now add fake +1sec to t2 and check elapsed_ns again
@@ -261,7 +261,7 @@ TestImpl(test_timer)
         rpp::Duration elapsed1 = t1.elapsed(t2);
         print_info("elapsed: %lldns\n", elapsed1.nanos());
         rpp::Duration one_sec = rpp::Duration::from_micros(1'000'000);
-        print_info("duration::from_micros(1'000'000): %dus\n", one_sec.micros());
+        print_info("duration::from_micros(1'000'000): %lldus\n", one_sec.micros());
         AssertEqual(one_sec.micros(), 1'000'000);
 
         // now add fake +1sec to t2 and check elapsed_ns again
@@ -286,7 +286,7 @@ TestImpl(test_timer)
         spin_sleep_for_us(microseconds);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
-        int64_t elapsed_ns = t1.elapsed_ns(t2);
+        rpp::int64 elapsed_ns = t1.elapsed_ns(t2);
         print_info("elapsed_ns: %lldns\n", elapsed_ns);
         rpp::Duration one_sec = rpp::Duration::from_nanos(1'000'000'000);
         print_info("duration::from_nanos(1'000'000'000): %lldus\n", one_sec.nanos());
@@ -294,13 +294,13 @@ TestImpl(test_timer)
 
         // now add fake +1sec to t2 and check elapsed_ns again
         rpp::TimePoint t3 = t2 + one_sec;
-        int64_t elapsed_ns2 = t1.elapsed_ns(t3);
+        rpp::int64 elapsed_ns2 = t1.elapsed_ns(t3);
         print_info("elapsed_ns2: %lldns\n", elapsed_ns2);
         AssertEqual(elapsed_ns2, 1'000'000'000 + elapsed_ns);
 
         // remove fake -1sec from t2 and check again:
         rpp::TimePoint t4 = t2 - one_sec;
-        int64_t elapsed_ns3 = t1.elapsed_ns(t4);
+        rpp::int64 elapsed_ns3 = t1.elapsed_ns(t4);
         print_info("elapsed_ns3: %lldns\n", elapsed_ns3);
         AssertEqual(elapsed_ns3, -1'000'000'000 + elapsed_ns);
     }

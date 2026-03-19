@@ -31,17 +31,12 @@ TestImpl(test_event_loop)
     {
         rpp::mutex m;
         std::vector<uint64> resume_thread_ids;
-        uint64 loop_thread = 0;
+        uint64 loop_thread = rpp::get_thread_id();
 
         void record()
         {
             std::lock_guard lock{m};
             resume_thread_ids.push_back(rpp::get_thread_id());
-        }
-
-        void set_loop_thread()
-        {
-            loop_thread = rpp::get_thread_id();
         }
 
         bool all_on_loop_thread()
@@ -61,100 +56,117 @@ TestImpl(test_event_loop)
 
     // ─── Basic: run_background with return value ────────────────
 
-    TestCase(basic_run_background)
+    TestCaseCoro(basic_run_background)
     {
-        rpp::event_loop loop;
-        uint64 main_tid = rpp::get_thread_id();
-        uint64 resume_tid = 0;
-
-        auto coro = [&]() -> rpp::cfuture<std::string>
+        struct coro
         {
-            std::string result = co_await loop.run_background([&]() -> std::string {
-                // this should run on a worker thread, not the main thread
-                AssertNotEqual(rpp::get_thread_id(), main_tid);
-                rpp::sleep_ms(5);
-                return "hello from background";
-            });
-            // after co_await, we should be back on the event loop thread
-            resume_tid = rpp::get_thread_id();
-            co_return result;
+            rpp::event_loop& loop;
+            uint64 main_tid = rpp::get_thread_id();
+            uint64 resume_tid = 0;
+            rpp::cfuture<std::string> start_async()
+            {
+                std::string result = co_await loop.run_background([this]() -> std::string
+                {
+                    // this should run on a worker thread, not the main thread
+                    AssertNotEqual(rpp::get_thread_id(), this->main_tid);
+                    rpp::sleep_ms(5);
+                    return "hello from background";
+                });
+                // after co_await, we should be back on the event loop thread
+                resume_tid = rpp::get_thread_id();
+                co_return result;
+            }
         };
 
-        auto future = coro();
-        loop.run_loop();
-        std::string result = future.get();
+        rpp::event_loop loop;
+        coro c{loop};
+        auto future = c.start_async();
+        loop.run_until_idle();
+        std::string result = co_await future;
 
         AssertThat(result, "hello from background"s);
-        AssertThat(resume_tid, main_tid);
+        AssertThat(c.resume_tid, c.main_tid);
+        AssertThat(rpp::get_thread_id(), c.main_tid); // ensure we're still on same thread after co_await future;
     }
 
     // ─── Basic: run_background<void> ────────────────────────────
 
-    TestCase(basic_run_background_void)
+    TestCaseCoro(basic_run_background_void)
     {
-        rpp::event_loop loop;
-        uint64 main_tid = rpp::get_thread_id();
-        std::atomic<bool> work_done{false};
-        uint64 resume_tid = 0;
-
-        auto coro = [&]() -> rpp::cfuture<void>
+        struct coro
         {
-            co_await loop.run_background([&]() {
-                rpp::sleep_ms(5);
-                work_done.store(true);
-            });
-            resume_tid = rpp::get_thread_id();
-            co_return;
+            rpp::event_loop& loop;
+            uint64 main_tid = rpp::get_thread_id();
+            std::atomic<bool> work_done{false};
+            uint64 resume_tid = 0;
+            rpp::cfuture<void> start_async()
+            {
+                co_await loop.run_background([&]() {
+                    rpp::sleep_ms(5);
+                    work_done = true;
+                    work_done.store(true);
+                });
+                resume_tid = rpp::get_thread_id();
+                co_return;
+            }
         };
 
-        auto future = coro();
-        loop.run_loop();
-        future.get();
+        rpp::event_loop loop;
+        coro c{loop};
+        auto future = c.start_async();
+        loop.run_until_idle();
+        co_await future;
 
-        AssertThat(work_done.load(), true);
-        AssertThat(resume_tid, main_tid);
+        AssertThat(c.work_done.load(), true);
+        AssertThat(c.resume_tid, c.main_tid);
+        AssertThat(rpp::get_thread_id(), c.main_tid); // ensure we're still on same thread after co_await future;
     }
 
     // ─── Multi-stage coroutine: all resumes on loop thread ──────
 
-    TestCase(multi_stage_resumes_on_loop_thread)
+    TestCaseCoro(multi_stage_resumes_on_loop_thread)
     {
-        rpp::event_loop loop;
-        thread_recorder rec;
-        rec.set_loop_thread();
-
-        auto coro = [&]() -> rpp::cfuture<std::string>
+        struct coro
         {
-            std::string s;
+            rpp::event_loop& loop;
+            thread_recorder rec {};
 
-            s += co_await loop.run_background([&]() -> std::string {
-                rpp::sleep_ms(2);
-                return "A";
-            });
-            rec.record(); // should be on loop thread
+            rpp::cfuture<std::string> start_async()
+            {
+                std::string s;
 
-            s += co_await loop.run_background([&]() -> std::string {
-                rpp::sleep_ms(2);
-                return "B";
-            });
-            rec.record(); // should be on loop thread
+                s += co_await loop.run_background([&]() -> std::string {
+                    rpp::sleep_ms(2);
+                    return "A";
+                });
+                rec.record(); // should be on loop thread
 
-            s += co_await loop.run_background([&]() -> std::string {
-                rpp::sleep_ms(2);
-                return "C";
-            });
-            rec.record(); // should be on loop thread
+                s += co_await loop.run_background([&]() -> std::string {
+                    rpp::sleep_ms(2);
+                    return "B";
+                });
+                rec.record(); // should be on loop thread
 
-            co_return s;
+                s += co_await loop.run_background([&]() -> std::string {
+                    rpp::sleep_ms(2);
+                    return "C";
+                });
+                rec.record(); // should be on loop thread
+
+                co_return s;
+            };
         };
 
-        auto future = coro();
-        loop.run_loop();
-        std::string result = future.get();
+        rpp::event_loop loop;
+        coro c{loop};
+        auto future = c.start_async();
+        loop.run_until_idle();
+        std::string result = co_await future;
 
         AssertThat(result, "ABC"s);
-        AssertThat(rec.count(), 3u);
-        AssertThat(rec.all_on_loop_thread(), true);
+        AssertThat(c.rec.count(), 3u);
+        AssertThat(c.rec.all_on_loop_thread(), true);
+        AssertThat(rpp::get_thread_id(), c.rec.loop_thread); // ensure we're still on same thread after co_await future;
     }
 
     // ─── Multiple independent coroutines interleave on the loop ─
@@ -196,7 +208,7 @@ TestImpl(test_event_loop)
 
         auto fa = coro_a();
         auto fb = coro_b();
-        loop.run_loop();
+        loop.run_until_idle();
 
         int ra = fa.get();
         int rb = fb.get();
@@ -274,7 +286,7 @@ TestImpl(test_event_loop)
 
         auto fs = coro_slow();
         auto ff = coro_fast();
-        loop.run_loop();
+        loop.run_until_idle();
 
         std::string rs = fs.get();
         std::string rf = ff.get();
@@ -300,7 +312,7 @@ TestImpl(test_event_loop)
         };
 
         auto future = coro();
-        loop.run_loop();
+        loop.run_until_idle();
 
         bool caught = false;
         try
@@ -352,7 +364,7 @@ TestImpl(test_event_loop)
         };
 
         auto future = coro();
-        loop.run_loop();
+        loop.run_until_idle();
 
         AssertThat(future.get(), "step1_step3"s);
     }
@@ -368,7 +380,7 @@ TestImpl(test_event_loop)
         auto coro = [&]() -> rpp::cfuture<void>
         {
             rpp::Timer t;
-            co_await loop.delay(std::chrono::milliseconds{20});
+            co_await loop.delay(rpp::millis(20));
             resume_tid = rpp::get_thread_id();
             double elapsed = t.elapsed_millis();
             // allow some tolerance
@@ -377,7 +389,7 @@ TestImpl(test_event_loop)
         };
 
         auto future = coro();
-        loop.run_loop();
+        loop.run_until_idle();
         future.get();
 
         AssertThat(resume_tid, main_tid);
@@ -444,7 +456,7 @@ TestImpl(test_event_loop)
             callback_tid = rpp::get_thread_id();
         });
 
-        loop.run_loop();
+        loop.run_until_idle();
         AssertThat(callback_value, 42);
         AssertThat(callback_tid, main_tid);
     }
@@ -481,7 +493,7 @@ TestImpl(test_event_loop)
             futures.emplace_back(make_coro(i));
         }
 
-        loop.run_loop();
+        loop.run_until_idle();
 
         int sum = 0;
         for (int i = 0; i < N; ++i)
@@ -532,7 +544,7 @@ TestImpl(test_event_loop)
             futures.emplace_back(make_coro(i));
         }
 
-        loop.run_loop();
+        loop.run_until_idle();
 
         for (int i = 0; i < N; ++i)
         {
@@ -570,7 +582,7 @@ TestImpl(test_event_loop)
         };
 
         auto future = coro();
-        loop.run_loop();
+        loop.run_until_idle();
         future.get();
 
         // all background tasks should have run on different threads
@@ -585,7 +597,6 @@ TestImpl(test_event_loop)
 
         // initially no pending work
         AssertThat(loop.has_pending_work(), false);
-        AssertThat(loop.pending_tasks(), 0);
 
         std::atomic<bool> bg_started{false};
         std::atomic<bool> bg_may_finish{false};
@@ -612,10 +623,10 @@ TestImpl(test_event_loop)
         // let it finish
         bg_may_finish.store(true);
 
-        loop.run_loop();
+        loop.run_until_idle();
         future.get();
 
-        // after run_loop completes, no more pending work
+        // after run_until_idle completes, no more pending work
         AssertThat(loop.has_pending_work(), false);
     }
 
@@ -658,7 +669,7 @@ TestImpl(test_event_loop)
             AssertThat(rpp::get_thread_id(), main_tid);
         });
 
-        loop.run_loop();
+        loop.run_until_idle();
         future.get();
 
         // all three entries should be present
@@ -667,7 +678,9 @@ TestImpl(test_event_loop)
             AssertThat(execution_log.size(), 3u);
             // callbacks 1 and 2 should be present, order between callbacks and coro
             // is not strictly guaranteed, but all must have executed
-            bool has_cb1 = false, has_cb2 = false, has_coro = false;
+            bool has_cb1 = false;
+            bool has_cb2 = false;
+            bool has_coro = false;
             for (auto& s : execution_log)
             {
                 if (s == "callback_1") has_cb1 = true;

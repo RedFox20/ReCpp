@@ -3,7 +3,6 @@
 #include "debugging.h"
 #include "mutex.h"
 #include <atomic>
-#include <thread> // std::this_thread::yield()
 
 namespace rpp
 {
@@ -73,7 +72,7 @@ namespace rpp
         }
 
 
-        /** @brief Returns the internal mutex used by notify() and wait() */
+        /** @returns the internal mutex used by notify() and wait() */
         [[nodiscard]] FINLINE mutex_t& mutex() noexcept { return m; }
 
 

@@ -79,7 +79,7 @@ TestImpl(test_bitutils)
         AssertEqual(move2.sizeBytes(), 4U);
         for (uint32_t bit = 0; bit < move2.sizeBits(); ++bit)
         {
-            AssertMsg(move2.isSet(bit) == (bit % 2 == 0), "bit %d was not copied correctly", bit);
+            AssertMsg(move2.isSet(bit) == (bit % 2 == 0), "bit %u was not copied correctly", bit);
         }
     }
 

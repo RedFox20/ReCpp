@@ -58,19 +58,95 @@ namespace rpp
      */
     class RPPAPI event_loop
     {
+        friend class event_loop_test;
+
+        struct resume_event
+        {
+            rpp::coro_handle<> handle {};
+            rpp::delegate<void()> callback {};
+
+            // resume via coroutine handle
+            explicit resume_event(rpp::coro_handle<> h) noexcept : handle{h} {}
+            // resume via generic callback
+            explicit resume_event(rpp::delegate<void()> cb) noexcept : callback{std::move(cb)} {}
+            resume_event() noexcept = default;
+            ~resume_event() noexcept = default;
+        };
+
+        // the thread that owns and drives this event loop, initialized in CTOR
+        std::atomic_uint64_t owner_thread_id {0};
+
+        // number of tasks currently suspended in a background task
+        std::atomic_int num_background_suspended {0};
+
+        // true if the infinite run_loop() was started, instead of run_once()
+        std::atomic_bool loop_running { false };
+
+        rpp::thread_pool& background_pool;
+
+        // thread-safe FIFO queue of resume events
+        rpp::concurrent_queue<resume_event> resume_queue;
+
+        // user-provided exception handler for any unhandled exceptions from background tasks
+        rpp::delegate<void(std::exception_ptr)> except_handler {};
+
     public:
-        event_loop() noexcept;
+        /**
+         * @brief Initializes a new event loop.
+         * @param main_thr_id Captures the main thread ID where the loop will supposedly run.
+         * @param background_task_pool Optional thread pool for running background tasks.
+         *                             If null, then global thread pool is used.
+         */
+        event_loop(rpp::uint64 main_thr_id = 0/*0=rpp::get_thread_id()*/,
+                   rpp::thread_pool* background_task_pool = nullptr) noexcept;
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
 
+        /** @returns true if there are background tasks currently in progress */
+        bool has_background_tasks() const noexcept { return num_background_suspended.load(std::memory_order_acquire) > 0; }
+
+        /** @returns the number of pending background tasks. */
+        int background_tasks() const noexcept { return num_background_suspended.load(std::memory_order_acquire); }
+
+        /** @returns true if there are any pending resume events for the main thread to handle */
+        bool has_pending_completions() const noexcept { return !resume_queue.empty(); }
+
+        /** @returns the number of pending resume events for the main thread. */
+        int pending_completions() const noexcept { return int(resume_queue.size()); }
+
+        /** @returns true if there are any pending tasks or resume events that the loop should process */
+        bool has_pending_work() const noexcept { return has_background_tasks() || has_pending_completions(); }
+
+        /** @returns the thread ID of the event loop thread. Set in CTOR. */
+        rpp::uint64 main_thread_id() const noexcept { return owner_thread_id.load(std::memory_order_acquire); }
+
         /**
-         * @brief Runs the event loop until there are no more pending tasks.
+         * @brief Signals the event loop to return and finalize all pending tasks.
+         */
+        void stop() noexcept;
+
+        /**
+         * @brief Waits on all pending tasks to fully drain the event loop
+         * @param timeout Maximum time to wait for pending tasks to complete.
+         * @returns true if all tasks were completed within timeout
+         */
+        bool wait_on_all(rpp::Duration timeout = rpp::seconds(1)) noexcept;
+
+        /**
+         * @brief By default exceptions are swallowed and logged as warnings.
+         * This allows the event loop to handle these errors without crashing.
+         */
+        void set_except_handler(rpp::delegate<void(std::exception_ptr)> handler) noexcept
+        { except_handler = std::move(handler); }
+
+        /**
+         * @brief Runs the event loop until stop() is called and all pending tasks are completed.
          *
          * Processes all queued coroutine resumes and waits for new ones.
-         * Returns when both the resume queue is empty and no background
-         * tasks are pending (pending_count == 0).
+         * Returns when stop() is called and attempts to drain any remaining pending tasks before exiting.
+         * @returns true if all pending tasks were completed, false if some tasks still pending
          */
-        void run_loop();
+        bool run_loop() noexcept;
 
         /**
          * @brief Processes at most one pending resume event.
@@ -79,34 +155,13 @@ namespace rpp
          *                Use Duration::zero() for non-blocking poll.
          * @returns true if a resume was processed, false if timed out
          */
-        bool run_once(rpp::Duration timeout);
+        bool run_once(rpp::Duration timeout) noexcept;
 
         /**
-         * @brief Returns true if the event loop has pending work.
-         * This includes both queued resumes and background tasks
-         * that haven't posted their resume yet.
+         * @brief Runs the event loop until there are no more background tasks and nore more resume events
+         * @returns Number of resume events processed before the loop became idle
          */
-        bool has_pending_work() const noexcept
-        {
-            return pending_count.load(std::memory_order_acquire) > 0;
-        }
-
-        /**
-         * @brief Returns the number of pending tasks (background + queued resumes).
-         */
-        int pending_tasks() const noexcept
-        {
-            return pending_count.load(std::memory_order_acquire);
-        }
-
-        /**
-         * @brief Returns the thread ID of the event loop thread.
-         * This is set when run_loop() or run_once() is first called.
-         */
-        uint64 loop_thread_id() const noexcept
-        {
-            return owner_thread_id.load(std::memory_order_acquire);
-        }
+        int run_until_idle() noexcept;
 
         /**
          * @brief Posts a coroutine handle to be resumed on the event loop thread.
@@ -117,6 +172,8 @@ namespace rpp
         /**
          * @brief Posts a generic callback to be executed on the event loop thread.
          * Thread-safe: can be called from any thread.
+         * 
+         * This is often known as `run_on_main_thread()` in GUI frameworks.
          */
         void post(rpp::delegate<void()> callback) noexcept;
 
@@ -134,12 +191,10 @@ namespace rpp
 
             background_awaiter_void(event_loop& loop, rpp::delegate<void()> action) noexcept
                 : loop{loop}, action{std::move(action)} {}
-
             bool await_ready() const noexcept { return false; }
-
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                loop.pending_count.fetch_add(1, std::memory_order_acq_rel);
+                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
                 rpp::parallel_task_detached([this, cont]() mutable
                 {
                     try { action(); }
@@ -147,25 +202,14 @@ namespace rpp
                     loop.post_resume(cont);
                 });
             }
-
-            void await_resume()
-            {
-                if (ex) std::rethrow_exception(ex);
-            }
+            void await_resume() { if (ex) std::rethrow_exception(ex); }
         };
 
         /**
          * @brief Awaiter that runs a lambda on the thread pool and resumes
          *        the coroutine on the event loop thread.
-         *
-         * @code
-         *     std::string result = co_await loop.run_background([&]{
-         *         return expensiveComputation();
-         *     });
-         * @endcode
          */
-        template<typename T>
-        struct background_awaiter
+        template<typename T> struct background_awaiter
         {
             event_loop& loop;
             rpp::delegate<T()> action;
@@ -174,20 +218,18 @@ namespace rpp
 
             background_awaiter(event_loop& loop, rpp::delegate<T()> action) noexcept
                 : loop{loop}, action{std::move(action)} {}
-
             bool await_ready() const noexcept { return false; }
-
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                loop.pending_count.fetch_add(1, std::memory_order_acq_rel);
+                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
                 rpp::parallel_task_detached([this, cont]() mutable
                 {
                     try { result = action(); }
                     catch (...) { ex = std::current_exception(); }
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
                 });
             }
-
             T await_resume()
             {
                 if (ex) std::rethrow_exception(ex);
@@ -198,15 +240,18 @@ namespace rpp
         /**
          * @brief Creates an awaiter that runs the given lambda on the thread pool
          *        and resumes the coroutine on the event loop thread.
+         * @code
+         *     std::string result = co_await loop.run_background([&]{
+         *         return expensiveComputation();
+         *     });
+         * @endcode
          */
         template<typename Func>
         auto run_background(Func&& func) noexcept
         {
             using R = decltype(func());
-            if constexpr (std::is_void_v<R>)
-                return background_awaiter_void{ *this, std::forward<Func>(func) };
-            else
-                return background_awaiter<R>{ *this, std::forward<Func>(func) };
+            if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::forward<Func>(func) };
+            else                             return background_awaiter<R>{ *this, std::forward<Func>(func) };
         }
 
         // ─── Future awaiter ─────────────────────────────────────────
@@ -224,13 +269,10 @@ namespace rpp
 
             future_awaiter(event_loop& loop, rpp::cfuture<T>& fut) noexcept
                 : loop{loop}, fut{fut} {}
-
             bool await_ready() const noexcept
             {
-                return fut.valid()
-                    && fut.wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+                return fut.valid() && fut.wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
             }
-
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 if (!fut.valid())
@@ -239,15 +281,17 @@ namespace rpp
                     loop.post_resume(cont);
                     return;
                 }
-                loop.pending_count.fetch_add(1, std::memory_order_acq_rel);
+                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
                 rpp::parallel_task_detached([this, cont]() mutable
                 {
-                    try { fut.wait(); }
-                    catch (...) { ex = std::current_exception(); }
+                    try {
+                        if (fut.valid())
+                            fut.wait(); 
+                    } catch (...) { ex = std::current_exception(); }
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
                 });
             }
-
             auto await_resume()
             {
                 if (ex) std::rethrow_exception(ex);
@@ -274,28 +318,23 @@ namespace rpp
          * @brief Awaiter that sleeps on a background thread, then resumes
          *        on the event loop thread.
          */
-        template<class Clock = std::chrono::high_resolution_clock>
         struct delay_awaiter
         {
             event_loop& loop;
-            typename Clock::time_point end;
-
-            template<typename Rep, typename Period>
-            delay_awaiter(event_loop& loop, std::chrono::duration<Rep, Period> d) noexcept
-                : loop{loop}, end{Clock::now() + std::chrono::duration_cast<typename Clock::duration>(d)} {}
-
-            bool await_ready() const noexcept { return Clock::now() >= end; }
-
+            rpp::TimePoint end;
+            delay_awaiter(event_loop& loop, rpp::TimePoint tp) noexcept : loop{loop}, end{tp} {}
+            delay_awaiter(event_loop& loop, rpp::Duration d) noexcept : loop{loop}, end{rpp::TimePoint::now() + d} {}
+            bool await_ready() const noexcept { return rpp::TimePoint::now() >= end; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                loop.pending_count.fetch_add(1, std::memory_order_acq_rel);
+                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
                 rpp::parallel_task_detached([this, cont]() mutable
                 {
-                    std::this_thread::sleep_until(end);
+                    rpp::sleep_until(end);
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
                 });
             }
-
             void await_resume() const noexcept {}
         };
 
@@ -303,38 +342,19 @@ namespace rpp
          * @brief Creates an awaiter that sleeps for the given duration,
          *        then resumes on the event loop thread.
          * @code
-         *     co_await loop.delay(std::chrono::milliseconds{100});
+         *     co_await loop.delay(rpp::millis(100));
          * @endcode
          */
-        template<typename Rep, typename Period>
-        delay_awaiter<> delay(std::chrono::duration<Rep, Period> duration) noexcept
+        delay_awaiter delay(rpp::Duration duration) noexcept
         {
-            return delay_awaiter<>{ *this, duration };
+            return delay_awaiter{ *this, duration };
+        }
+        delay_awaiter delay_until(rpp::TimePoint until) noexcept
+        {
+            return delay_awaiter{ *this, until };
         }
 
     private:
-        friend class event_loop_test;
-
-        struct resume_event
-        {
-            rpp::coro_handle<> handle {};
-            rpp::delegate<void()> callback {};
-
-            // resume via coroutine handle
-            explicit resume_event(rpp::coro_handle<> h) noexcept : handle{h} {}
-            // resume via generic callback
-            explicit resume_event(rpp::delegate<void()> cb) noexcept : callback{std::move(cb)} {}
-            resume_event() noexcept = default;
-        };
-
-        // the thread that owns and drives this event loop
-        std::atomic<uint64> owner_thread_id {0};
-
-        // number of pending tasks: background tasks that haven't completed + queued resumes
-        std::atomic_int pending_count {0};
-
-        // thread-safe FIFO queue of resume events
-        rpp::concurrent_queue<resume_event> resume_queue;
 
         // processes a single resume event
         void process_event(resume_event& event) noexcept;

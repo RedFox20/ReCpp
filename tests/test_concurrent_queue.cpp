@@ -276,7 +276,7 @@ TestImpl(test_concurrent_queue)
             queue.notify_one(); // notify consumer
         });
 
-        cfuture<> consumer = rpp::async_task([this,&queue] {
+        cfuture<> consumer = rpp::async_task([&queue] {
             std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
@@ -560,7 +560,7 @@ TestImpl(test_concurrent_queue)
             consumer.get();
             double elapsed = t.elapsed();
             total_time += elapsed;
-            print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed*1000, queue.capacity());
+            print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %zu\n", elapsed*1000, queue.capacity());
         }
 
         double avg_time = total_time / num_iterations;
@@ -602,7 +602,7 @@ TestImpl(test_concurrent_queue)
             consumer.get();
             double elapsed = t.elapsed();
             total_time += elapsed;
-            print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %d\n", elapsed*1000, queue.capacity());
+            print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %zu\n", elapsed*1000, queue.capacity());
         }
 
         double avg_time = total_time / num_iterations;

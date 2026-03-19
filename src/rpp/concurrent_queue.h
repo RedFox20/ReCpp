@@ -5,9 +5,9 @@
  */
 #pragma once
 #include "config.h"
-#include "semaphore.h"
+#include "semaphore.h" // rpp::mutex, rpp::semaphore::lock_t
+#include "threads.h" // rpp::yield
 #include <vector>
-#include <thread> // std::this_thread::yield()
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional
 #include <atomic> // std::atomic_bool
@@ -94,9 +94,7 @@ namespace rpp
             return *this;
         }
 
-        /**
-         * @brief Returns the internal mutex for this queue
-         */
+        /** @returns the internal mutex for this queue */
         [[nodiscard]] FINLINE mutex_t& mutex() const noexcept
         {
             return Mutex;
@@ -280,23 +278,13 @@ namespace rpp
          */
         [[nodiscard]] bool try_pop_all(std::vector<T>& out) noexcept
         {
-            if (mutex().try_lock())
+            auto lock_guard = spin_lock();
+            if (T* head = Head, *tail = Tail; head != tail)
             {
-                if (T* head = Head, *tail = Tail; head != tail)
-                {
-                    try { out.assign(head, tail); }
-                    catch (...) { }
-                    clear_unlocked();
-                    mutex().unlock();
-                    return true;
-                }
-                mutex().unlock();
-                return false;
-            }
-            else
-            {
-                // if we failed to lock, yielding here will improve perf by 5-10x
-                std::this_thread::yield();
+                try { out.assign(head, tail); }
+                catch (...) { }
+                clear_unlocked();
+                return true;
             }
             return false;
         }
@@ -363,23 +351,11 @@ namespace rpp
          */ 
         [[nodiscard]] bool try_pop(T& outItem) noexcept
         {
-            if (mutex().try_lock())
-            {
-                if (Head == Tail)
-                {
-                    mutex().unlock();
-                    return false;
-                }
-                pop_unlocked(outItem);
-                mutex().unlock();
-                return true;
-            }
-            else
-            {
-                // if we failed to lock, yielding here will improve perf by 5-10x
-                std::this_thread::yield();
-            }
-            return false;
+            lock_t lock_guard = spin_lock();
+            if (Head == Tail)
+                return false;
+            pop_unlocked(outItem);
+            return true;
         }
 
         /**
@@ -388,23 +364,11 @@ namespace rpp
          */
         [[nodiscard]] bool peek(T& outItem) const noexcept
         {
-            if (mutex().try_lock())
-            {
-                if (Head == Tail)
-                {
-                    mutex().unlock();
-                    return false;
-                }
-                outItem = *Head;
-                mutex().unlock();
-                return true;
-            }
-            else
-            {
-                // if we failed to lock, yielding here will improve perf by 5-10x
-                std::this_thread::yield();
-            }
-            return false;
+            lock_t lock_guard = spin_lock();
+            if (Head == Tail)
+                return false;
+            outItem = *Head;
+            return true;
         }
 
         /**
@@ -716,7 +680,7 @@ namespace rpp
         bool wait_notify(lock_t& lock_guard) const noexcept
         {
             if (is_destroying()) {
-                std::this_thread::yield(); // need to yield here to avoid burning a hole into the CPU
+                rpp::yield(); // need to yield here to avoid burning a hole into the CPU
                 return false; // give up immediately
             }
             if (Head != Tail) return true; // got an item
@@ -736,7 +700,7 @@ namespace rpp
         bool wait_notify_for(lock_t& lock_guard, const rpp::Duration& timeout) const noexcept
         {
             if (is_destroying()) {
-                std::this_thread::yield(); // need to yield here to avoid burning a hole into the CPU
+                rpp::yield(); // need to yield here to avoid burning a hole into the CPU
                 return false; // give up immediately
             }
             if (Head != Tail) return true; // wait is not needed
@@ -758,7 +722,7 @@ namespace rpp
         bool wait_notify_until(lock_t& lock_guard, const rpp::TimePoint& until) const noexcept
         {
             if (is_destroying()) {
-                std::this_thread::yield(); // need to yield here to avoid burning a hole into the CPU
+                rpp::yield(); // need to yield here to avoid burning a hole into the CPU
                 return false; // give up immediately
             }
             if (Head != Tail) return true; // wait is not needed
