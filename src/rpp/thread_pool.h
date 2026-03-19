@@ -13,6 +13,9 @@
 #include "strview.h"
 #include "mutex.h"
 #include <vector>
+#if RPP_TSAN
+#  include <sanitizer/tsan_interface.h>
+#endif
 #include <thread>
 #include <string>
 #include <atomic> // std::atomic_bool
@@ -185,8 +188,15 @@ namespace rpp
         }
         static void dec_ref(pool_task_state& p) noexcept
         {
-            int refs = p.ref_count.fetch_sub(1, std::memory_order_seq_cst) - 1;
+            int refs = p.ref_count.fetch_sub(1, std::memory_order_acq_rel) - 1;
             if (refs != 0) return;
+            // TSan can't reason about operator delete (non-atomic write) overlapping
+            // the atomic ref_count at the same address. The acq_rel on fetch_sub is
+            // sufficient for correctness, but TSan needs an explicit acquire annotation
+            // to see that all prior releases are visible before the delete.
+            #if RPP_TSAN
+                __tsan_acquire(&p.ref_count);
+            #endif
             delete &p;
         }
         // these are unsafe, use with care

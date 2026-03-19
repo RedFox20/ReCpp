@@ -1,5 +1,6 @@
 #include <rpp/tests.h>
 #include <rpp/thread_pool.h>
+#include <rpp/future.h>
 #include <rpp/semaphore.h>
 #include <rpp/timer.h> // performance measurement
 #include <atomic>
@@ -417,6 +418,33 @@ TestImpl(test_threadpool)
         print_info("copy_race_stress: waits finished=%d, timeouts=%d  (%d iterations)\n",
                    (int)waits_finished, (int)waits_timeout, ITERATIONS);
         // Test passes if no crash, use-after-free, or sanitizer error occurred
+    }
+
+    TestCase(pool_task_handle_fire_and_forget_race)
+    {
+        // Tests the async_task fire-and-forget pattern where
+        // the pool_task_handle temporary is destroyed on the main thread
+        // while the worker thread may still be in signal_finish_and_cleanup.
+        //
+        // The race window in dec_ref: main thread's fetch_sub vs
+        // worker thread's operator delete at the same address (ref_count).
+        // Fixed by __tsan_acquire annotation before delete.
+
+        constexpr int ITERATIONS = 200;
+        std::atomic_int completed{0};
+
+        for (int i = 0; i < ITERATIONS; ++i)
+        {
+            auto future = rpp::async_task([&completed]() noexcept -> int {
+                completed.fetch_add(1, std::memory_order_relaxed);
+                return 0;
+            });
+            (void)future.get();
+        }
+
+        print_info("fire_and_forget_race: %d/%d iterations completed\n",
+                   (int)completed, ITERATIONS);
+        AssertThat((int)completed, ITERATIONS);
     }
 
 };
