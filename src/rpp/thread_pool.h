@@ -21,7 +21,7 @@
 #include <atomic> // std::atomic_bool
 #include <exception> // std::exception_ptr
 
-class test_threadpool; // forward declaration for unit tests
+struct test_threadpool; // forward declaration for unit tests
 
 namespace rpp
 {
