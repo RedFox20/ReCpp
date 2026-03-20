@@ -114,11 +114,12 @@ TestImpl(test_file_io)
         create_test_file(TestFile);
         if (file f = { TestFile, file::READONLY })
         {
-            Assert(f.good() && !f.bad()); // NOLINT(readability-simplify-boolean-expr)
+            Assert(f.good());
+            Assert(!f.bad());
         }
         else
         {
-            Assert(f.good() && !f.bad()); // NOLINT(readability-simplify-boolean-expr)
+            AssertFailed("file if_initializer failed: '%s'", TestFile.c_str());
         }
     }
 

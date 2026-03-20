@@ -334,8 +334,10 @@ namespace rpp
     #define LogTestLabel(expr) \
         if (state().verbosity >= TestVerbosity::TestLabels) { expr; }
 
-    void test::assert_failed(const char* file, int line, PRINTF_FMTSTR const char* fmt, ...)
+    void test::assert_failed(std::source_location loc, PRINTF_FMTSTR const char* fmt, ...)
     {
+        const char* file = loc.file_name();
+        const int line = static_cast<int>(loc.line());
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
         safe_vsnprintf_msg_len(fmt);
         LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg));

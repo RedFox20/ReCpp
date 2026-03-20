@@ -17,6 +17,7 @@
 #include <vector>  // access to std::vector and std::string
 #include <atomic>  // std::atomic<T> type support
 #include <typeinfo> // std::type_info for exception type checking
+#include <source_location> // std::source_location for better assert messages
 
 namespace rpp
 {
@@ -145,7 +146,7 @@ namespace rpp
     public:
         explicit test(strview name);
         virtual ~test() noexcept;
-        static void assert_failed(const char* file, int line, PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT3;
+        static void assert_failed(std::source_location loc, PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT2;
         static void assert_failed_custom(PRINTF_FMTSTR const char* fmt, ...) PRINTF_CHECKFMT1;
     private:
         void add_assert_failure(const char* file, int line, const char* msg, int len);
@@ -308,29 +309,29 @@ namespace rpp
         }
 
         template<class Actual, class Expected>
-        static void assumption_failed(const char* file, int line,
+        static void assumption_failed(std::source_location loc,
             const char* expr, const Actual& actual, const char* why, const Expected& expected)
         {
             std::string sActual = as_short_string(actual);
             std::string sExpect = as_short_string(expected);
-            assert_failed(file, line, "%s => '%s' %s '%s'",
+            assert_failed(loc, "%s => '%s' %s '%s'",
                           expr, sActual.c_str(), why, sExpect.c_str());
         }
 
         template<class Actual, class Min, class Max>
-        static void assumption_failed(const char* file, int line,
+        static void assumption_failed(std::source_location loc,
             const char* expr, const Actual& actual, const char* why, const Min& min, const Max& max)
         {
             std::string sActual = as_short_string(actual);
             std::string sMin = as_short_string(min);
             std::string sMax = as_short_string(max);
-            assert_failed(file, line, "%s => '%s' %s min:'%s' max:'%s'", 
+            assert_failed(loc, "%s => '%s' %s min:'%s' max:'%s'", 
                           expr, sActual.c_str(), why, sMin.c_str(), sMax.c_str());
         }
 
         // specific support for std::vector type
         template<class T, class A>
-        static void assumption_failed(const char* file, int line,
+        static void assumption_failed(std::source_location loc,
             const char* expr, const std::vector<T, A>& actual, const char* why, const std::vector<T, A>& expected)
         {
             // find the first difference:
@@ -343,16 +344,16 @@ namespace rpp
             std::string sExpect = as_short_string(expected, printFrom, diffAt);
             std::string sActualItem = diffAt < actual.size() ? as_short_string(actual[diffAt]) : "";
             std::string sExpectedItem = diffAt < expected.size() ? as_short_string(expected[diffAt]) : "";
-            assert_failed(file, line, "%s[%zu] != expected[%zu]\n"
-                                      "    GOT '%s' AT [%zu]:\n"
-                                      "        %s\n"
-                                      "    %s '%s' AT [%zu]:\n"
-                                      "        %s\n",
-                                      expr, actual.size(), expected.size(),
-                                      sActualItem.c_str(), diffAt,
-                                      sActual.c_str(),
-                                      why, sExpectedItem.c_str(), diffAt,
-                                      sExpect.c_str());
+            assert_failed(loc, "%s[%zu] != expected[%zu]\n"
+                            "    GOT '%s' AT [%zu]:\n"
+                            "        %s\n"
+                            "    %s '%s' AT [%zu]:\n"
+                            "        %s\n",
+                            expr, actual.size(), expected.size(),
+                            sActualItem.c_str(), diffAt,
+                            sActual.c_str(),
+                            why, sExpectedItem.c_str(), diffAt,
+                            sExpect.c_str());
         }
 
         int add_test_func(strview name, test_func_type fn, size_t expectedExHash, bool autorun);
@@ -520,28 +521,36 @@ namespace rpp
 #undef TestCaseExpectedEx
 
 #define Assert(expr) do { \
-    if (!(expr)) { assumption_failed(__FILE__, __LINE__, #expr, false, "BUT EXPECTED", true); } \
+    if (!(expr)) { assumption_failed(std::source_location::current(), #expr, false, "BUT EXPECTED", true); } \
 }while(0)
 
 #define AssertFailed(fmt, ...) do { \
-    assert_failed(__FILE__, __LINE__, "assertion failed => " fmt, ##__VA_ARGS__); \
+    assert_failed(std::source_location::current(), "assertion failed => " fmt, ##__VA_ARGS__); \
 }while(0)
 
 #define AssertTrue Assert
 #define AssertFalse(expr) do { \
-    if ((expr)) { assumption_failed(__FILE__, __LINE__, #expr, true, "BUT EXPECTED", false); } \
+    if ((expr)) { assumption_failed(std::source_location::current(), #expr, true, "BUT EXPECTED", false); } \
 }while(0)
 
 // Asserts that expression is true, otherwise displays a custom formatted error message
 #define AssertMsg(expr, fmt, ...) do { \
-    if (!(expr)) { assert_failed(__FILE__, __LINE__, "%s $ " fmt, #expr, ##__VA_ARGS__); } \
+    if (!(expr)) { assert_failed(std::source_location::current(), "%s $ " fmt, #expr, ##__VA_ARGS__); } \
 }while(0)
 
 #define AssertThat(expr, expected) do { \
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "BUT EXPECTED", __expect); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "BUT EXPECTED", __expect); \
+    } \
+}while(0)
+
+#define AssertThatLoc(source_loc, expr, expected) do { \
+    const auto& __expr   = expr;        \
+    const auto& __expect = expected;    \
+    if (!rpp::Compare::eq(__expr, __expect)) { \
+        assumption_failed((source_loc), #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
@@ -549,7 +558,7 @@ namespace rpp
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "BUT EXPECTED", __expect); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
@@ -557,7 +566,7 @@ namespace rpp
 #define AssertThrows(expr, exceptionType) do { \
     try {                                      \
         expr;                                  \
-        assert_failed(__FILE__, __LINE__, "%s => expected exception of type %s", #expr, #exceptionType); \
+        assert_failed(std::source_location::current(), "%s => expected exception of type %s", #expr, #exceptionType); \
     } catch (const exceptionType&) {} \
 }while(0)
 
@@ -566,9 +575,9 @@ namespace rpp
     try {                           \
         expr;                       \
     } catch (const std::exception& e) { \
-        assert_failed(__FILE__, __LINE__, "%s => expected no exceptions but got: %s", #expr, e.what()); \
+        assert_failed(std::source_location::current(), "%s => expected no exceptions but got: %s", #expr, e.what()); \
     } catch (...) { \
-        assert_failed(__FILE__, __LINE__, "%s => expected no exceptions", #expr); \
+        assert_failed(std::source_location::current(), "%s => expected no exceptions", #expr); \
     } \
 }while(0)
 
@@ -577,7 +586,7 @@ namespace rpp
     try {                                      \
         expr;                                  \
     } catch (const exceptionType&) {           \
-        assert_failed(__FILE__, __LINE__, "%s => expected no exception of type %s", #expr, #exceptionType); \
+        assert_failed(std::source_location::current(), "%s => expected no exception of type %s", #expr, #exceptionType); \
     } catch (...) { /**any other ex is ok**/ }\
 }while(0)
 
@@ -585,7 +594,7 @@ namespace rpp
     const auto& __expr    = expr;               \
     const auto& __mustnot = mustNotEqual;       \
     if (rpp::Compare::eq(__expr, __mustnot)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must not equal", __mustnot); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must not equal", __mustnot); \
     } \
 }while(0)
 
@@ -593,7 +602,7 @@ namespace rpp
     const auto& __expr = expr;         \
     const auto& __than = than;         \
     if (!rpp::Compare::gt(__expr, __than)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater than", __than); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must be greater than", __than); \
     } \
 }while(0)
 
@@ -601,7 +610,7 @@ namespace rpp
     const auto& __expr = expr;      \
     const auto& __than = than;      \
     if (!rpp::Compare::lt(__expr, __than)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less than", __than); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must be less than", __than); \
     } \
 }while(0)
 
@@ -609,7 +618,7 @@ namespace rpp
     const auto& __expr = expr;                \
     const auto& __than = than;                \
     if (!rpp::Compare::gte(__expr, __than)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be greater or equal than", __than); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must be greater or equal than", __than); \
     } \
 }while(0)
 
@@ -617,7 +626,7 @@ namespace rpp
     const auto& __expr = expr;             \
     const auto& __than = than;             \
     if (!rpp::Compare::lte(__expr, __than)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be less or equal than", __than); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must be less or equal than", __than); \
     } \
 }while(0)
 
@@ -627,7 +636,7 @@ namespace rpp
     const auto& __rmin = rangeMin;                   \
     const auto& __rmax = rangeMax;                   \
     if (!rpp::Compare::rngInc(__expr, __rmin, __rmax)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be within inclusive range ["#rangeMin","#rangeMax"]", __rmin, __rmax); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must be within inclusive range ["#rangeMin","#rangeMax"]", __rmin, __rmax); \
     } \
 }while(0)
 
@@ -637,7 +646,7 @@ namespace rpp
     const auto& __rmin = rangeMin;                   \
     const auto& __rmax = rangeMax;                   \
     if (!rpp::Compare::rngEx(__expr, __rmin, __rmax)) { \
-        assumption_failed(__FILE__, __LINE__, #expr, __expr, "must be within exclusive range ("#rangeMin","#rangeMax")", __rmin, __rmax); \
+        assumption_failed(std::source_location::current(), #expr, __expr, "must be within exclusive range ("#rangeMin","#rangeMax")", __rmin, __rmax); \
     } \
 }while(0)
 
