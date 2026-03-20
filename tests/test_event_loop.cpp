@@ -53,7 +53,7 @@ TestImpl(test_event_loop)
     void idle() const { loop->run_until_idle(); }
 
     template<typename F>
-    auto run_bg(F&& f) { return loop->run_background(std::forward<F>(f)); }
+    auto run_bg(F&& f) { return loop->run_async(std::forward<F>(f)); }
 
 
     // ─── Helper: record which thread resumed each step ──────────
@@ -81,8 +81,8 @@ TestImpl(test_event_loop)
         }
     };
 
-    // ─── Basic: run_background with return value ────────────────
-    TestCaseCoro(basic_run_background)
+    // ─── Basic: run_async with return value ────────────────
+    TestCaseCoro(basic_run_async)
     {
         std::string result = co_await run_bg([main_tid=main_tid]() -> std::string
         {
@@ -94,8 +94,8 @@ TestImpl(test_event_loop)
         AssertThat(result, "hello from background"s);
     }
 
-    // ─── Basic: run_background<void> ────────────────────────────
-    TestCaseCoro(basic_run_background_void)
+    // ─── Basic: run_async<void> ────────────────────────────
+    TestCaseCoro(basic_run_async_void)
     {
         std::atomic<bool> work_done{false};
         co_await run_bg([&]() {
@@ -149,10 +149,19 @@ TestImpl(test_event_loop)
             resume_order.push_back(id);
         };
 
+        // Deterministic ordering strategy:
+        //   B does its short bg work and resumes on the loop thread first.
+        //   B sets b_resumed=true from the loop thread (inside its coroutine body,
+        //   AFTER its resume event has been fully processed by idle()).
+        //   A's bg task spins on b_resumed, so it only exits AFTER B's resume has
+        //   been fully processed and is no longer racing for the queue head.
+        //   This avoids any reliance on wall-clock timing.
+        std::atomic<bool> b_resumed{false};
+
         auto coro_a = [&]() -> rpp::cfuture<int>
         {
             co_await run_bg([&] {
-                rpp::sleep_ms(15); // slower task
+                while (!b_resumed.load()) rpp::sleep_ms(1);
             });
             record(1);
             co_return 10;
@@ -160,9 +169,10 @@ TestImpl(test_event_loop)
 
         auto coro_b = [&]() -> rpp::cfuture<int>
         {
-            co_await run_bg([&] {
-                rpp::sleep_ms(2); // faster task
-            });
+            co_await run_bg([&] { rpp::sleep_ms(2); });
+            // On loop thread: signal A's bg task that B has been resumed.
+            // A's post_resume will land in the queue only after this point.
+            b_resumed.store(true);
             record(2);
             co_return 20;
         };
@@ -174,7 +184,7 @@ TestImpl(test_event_loop)
         AssertThat(fa.get(), 10);
         AssertThat(fb.get(), 20);
         AssertThat(resume_order.size(), 2u);
-        // B (2ms) finishes before A (15ms), so B resumes first
+        // B was resumed and set b_resumed before A could post its resume → B first
         AssertThat(resume_order[0], 2); // B first
         AssertThat(resume_order[1], 1); // A second
     }
@@ -203,7 +213,11 @@ TestImpl(test_event_loop)
 
         auto coro_fast = [&]() -> rpp::cfuture<std::string>
         {
+            // Wait in background until the slow task has confirmed it is running
+            // before proceeding.  This makes the assertion deterministic: we no
+            // longer rely on wall-clock timing to observe slow_bg_running == true.
             co_await run_bg([&]() {
+                while (!slow_bg_running.load()) rpp::sleep_ms(1);
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
@@ -215,6 +229,8 @@ TestImpl(test_event_loop)
             fast_resume_count.fetch_add(1);
             assert_on_loop_thread();
 
+            // slow task sleeps for 50ms total; we've only spent ~4ms since it
+            // started, so it must still be running.
             if (slow_bg_running.load())
                 fast_completed_while_slow_suspended.store(true);
 
@@ -485,7 +501,7 @@ TestImpl(test_event_loop)
         rpp::synchronized<std::vector<std::string>> log;
 
         loop->post([&]() {
-            log->push_back("callback_1");
+            log->emplace_back("callback_1");
             assert_on_loop_thread();
         });
 
@@ -494,14 +510,14 @@ TestImpl(test_event_loop)
             co_await run_bg([&]() {
                 rpp::sleep_ms(5);
             });
-            log->push_back("coro_resume");
+            log->emplace_back("coro_resume");
             assert_on_loop_thread();
             co_return;
         };
 
         auto future = coro();
         loop->post([&]() {
-            log->push_back("callback_2");
+            log->emplace_back("callback_2");
             assert_on_loop_thread();
         });
         idle();
@@ -650,9 +666,12 @@ TestImpl(test_event_loop)
 
         AssertGreater(loop->background_tasks(), 0);
 
-        // let it finish and give time for the resume event to arrive
+        // let it finish, then spin until the awaiter has posted the resume event.
+        // A bare sleep_ms(N) would be a race: the bg thread must finish its work,
+        // call fetch_sub, and call post_resume before we sample the counters.
         bg_may_finish.store(true);
-        rpp::sleep_ms(15);
+        while (loop->pending_completions() == 0)
+            rpp::sleep_ms(1);
 
         // the background task finished: the resume event should be pending
         // and background_tasks should drop back to 0
@@ -726,6 +745,202 @@ TestImpl(test_event_loop)
         AssertThat(callback_ran.load(), true);
         // future should be ready
         future.get();
+    }
+
+    // ─── UI simulation: two serialized execution paths interleaving ─
+    //
+    // Models a real UI application where the main (event-loop) thread makes
+    // decisions, dispatches slow background work, and resumes to commit results
+    // to shared state – with NO mutex on the shared state because every write
+    // happens on the loop thread.
+    //
+    // Two independent coroutines run concurrently as "serialized paths":
+    //
+    //   Path 1 – message_processor
+    //     Simulates incoming UI commands (e.g., from a network socket).
+    //     Each command is parsed on a background thread (slow), then the
+    //     parsed result is committed on the main thread.  The next command
+    //     is NOT dispatched until the current one is committed → strictly
+    //     ordered within the path.
+    //
+    //   Path 2 – video_pipeline
+    //     Simulates async init / configure / run / teardown of a camera
+    //     pipeline.  Every stage is heavier than one message parse so the
+    //     two paths visibly interleave on the event loop.
+    //
+    // Verified properties:
+    //   1. Within each path the steps are ordered (sequential co_await chain).
+    //   2. The two paths run concurrently (the video pipeline does NOT block
+    //      the message processor and vice-versa).
+    //   3. All shared-state mutations happen on the loop thread (asserted at
+    //      every resume point – no locks required).
+    //   4. The interleaved timeline proves concurrent progress: at least one
+    //      message is committed before the first video stage resumes.
+    TestCase(ui_simulation_message_and_video_pipelines)
+    {
+        // ── Shared state – written ONLY on the event loop thread ─────────
+        // No mutex needed: the event loop serialises all resumes onto a
+        // single thread, giving us thread-safe access "for free".
+        struct SharedState
+        {
+            std::vector<std::string> messages;      // processed messages in arrival order
+            std::vector<std::string> pipeline_log;  // pipeline stage names in stage order
+            std::vector<std::string> timeline;      // interleaved event log (both paths)
+            int total_frames = 0;
+            bool pipeline_active = false;
+        };
+        SharedState state;
+
+        // ── Serialized path 1: message processor ────────────────────────
+        // Four incoming UI commands, each "parsed" on a background thread
+        // (simulated by an 8 ms sleep), then committed on the main thread.
+        // The for-loop + co_await means command N+1 is only dispatched after
+        // command N has been committed → strictly serialized within this path.
+        const std::vector<std::string> raw_messages = {
+            "connect_camera",
+            "set_resolution_720p",
+            "start_recording",
+            "apply_filter_blur",
+        };
+
+        auto message_processor = [&]() -> rpp::cfuture<void>
+        {
+            for (const std::string& msg : raw_messages)
+            {
+                // background: slow parse / validation (8 ms per message)
+                std::string result = co_await run_bg([msg]() -> std::string {
+                    rpp::sleep_ms(8);
+                    return "cmd:" + msg;
+                });
+
+                // main thread: commit result to shared state (no lock needed)
+                assert_on_loop_thread();
+                state.messages.push_back(result);
+                state.timeline.push_back("msg:" + msg);
+            }
+        };
+
+        // ── Serialized path 2: video pipeline ───────────────────────────
+        // Five distinct pipeline stages, each slow.  Within the coroutine they
+        // are strictly sequential (each co_await blocks the coroutine until
+        // that stage's background work completes and the loop resumes it).
+        // Concurrently, the message_processor makes progress on the loop.
+        //
+        // Stage timings (background sleep):
+        //   init       20 ms  → message_processor should commit ~2 messages first
+        //   add_source 15 ms
+        //   start      25 ms
+        //   frames ×3  10 ms each
+        //   teardown   15 ms
+        auto video_pipeline = [&]() -> rpp::cfuture<void>
+        {
+            // Stage 1 – init (20 ms)
+            // While we wait here, the message_processor will commit at least
+            // one (likely two) messages on the main thread.
+            co_await run_bg([] { rpp::sleep_ms(20); });
+
+            // DESIGN: resume always happens on main thread !
+            assert_on_loop_thread();
+            state.pipeline_active = true;
+            state.pipeline_log.emplace_back("init");
+            state.timeline.emplace_back("vid:init");
+
+            // Stage 2 – add video source (15 ms)
+            co_await run_bg([] { rpp::sleep_ms(15); });
+            assert_on_loop_thread();
+            state.pipeline_log.emplace_back("add_source");
+            state.timeline.emplace_back("vid:add_source");
+
+            // Stage 3 – start pipeline (25 ms)
+            co_await run_bg([] { rpp::sleep_ms(25); });
+            assert_on_loop_thread();
+            state.pipeline_log.emplace_back("start");
+            state.timeline.emplace_back("vid:start");
+
+            // Stage 4 – process 3 frame batches (10 ms each)
+            // Decisions (how many frames) are made on main thread between batches.
+            for (int batch = 0; batch < 3; ++batch)
+            {
+                int frames = co_await run_bg([batch]() -> int {
+                    rpp::sleep_ms(10);
+                    return (batch + 1) * 10; // 10, 20, 30
+                });
+                assert_on_loop_thread();
+                state.total_frames += frames; // safe: main thread only
+                state.pipeline_log.emplace_back("frames_" + std::to_string(batch));
+                state.timeline.emplace_back("vid:frames_" + std::to_string(batch));
+            }
+
+            // Stage 5 – teardown (15 ms)
+            co_await run_bg([] { rpp::sleep_ms(15); });
+            assert_on_loop_thread();
+            state.pipeline_active = false;
+            state.pipeline_log.emplace_back("teardown");
+            state.timeline.emplace_back("vid:teardown");
+        };
+
+        // ── Main thread decision: launch both serialized paths ───────────
+        // This mirrors real UI code: the main thread decides to kick off
+        // background work, then yields control to the event loop.
+        assert_on_loop_thread();
+        auto msg_fut = message_processor(); // immediately suspends at first co_await
+        auto vid_fut = video_pipeline();    // immediately suspends at first co_await
+
+        // ── Drive the event loop until both paths finish ─────────────────
+        idle();
+
+        msg_fut.get(); // must be ready; verifies no exception escaped
+        vid_fut.get();
+
+        // ── Verify message path: order preserved ─────────────────────────
+        AssertThat(state.messages.size(), 4u);
+        AssertThat(state.messages[0], "cmd:connect_camera"s);
+        AssertThat(state.messages[1], "cmd:set_resolution_720p"s);
+        AssertThat(state.messages[2], "cmd:start_recording"s);
+        AssertThat(state.messages[3], "cmd:apply_filter_blur"s);
+
+        // ── Verify video path: stage order preserved ──────────────────────
+        AssertThat(state.pipeline_log.size(), 7u);
+        AssertThat(state.pipeline_log[0], "init"s);
+        AssertThat(state.pipeline_log[1], "add_source"s);
+        AssertThat(state.pipeline_log[2], "start"s);
+        AssertThat(state.pipeline_log[3], "frames_0"s);
+        AssertThat(state.pipeline_log[4], "frames_1"s);
+        AssertThat(state.pipeline_log[5], "frames_2"s);
+        AssertThat(state.pipeline_log[6], "teardown"s);
+        AssertThat(state.total_frames, 60); // 10 + 20 + 30
+        AssertThat(state.pipeline_active, false);
+
+        // ── Verify interleaving: both paths progressed concurrently ───────
+        // The combined timeline must contain exactly 4 msg + 7 vid events.
+        AssertThat(state.timeline.size(), 11u);
+
+        int msg_events = 0;
+        int vid_events = 0;
+        for (const auto& e : state.timeline)
+        {
+            if (e.starts_with("msg:")) ++msg_events;
+            if (e.starts_with("vid:")) ++vid_events;
+        }
+        AssertThat(msg_events, 4);
+        AssertThat(vid_events, 7);
+
+        // Locate the position of the first video event in the shared timeline.
+        // Because video_pipeline's init stage takes 20 ms and each message
+        // parse takes only 8 ms, at least one "msg:" entry must appear before
+        // "vid:init" – proving the message_processor made progress on the loop
+        // while the video_pipeline was suspended in its slow background task.
+        size_t first_vid_pos = state.timeline.size();
+        for (size_t i = 0; i < state.timeline.size(); ++i)
+            if (state.timeline[i].starts_with("vid:")) { first_vid_pos = i; break; }
+
+        int msgs_before_first_vid = 0;
+        for (size_t i = 0; i < first_vid_pos; ++i)
+            if (state.timeline[i].starts_with("msg:")) ++msgs_before_first_vid;
+
+        // At least one message committed before the first video resume.
+        // (In practice ~2, because 2 × 8 ms < 20 ms, but we guard conservatively.)
+        AssertGreater(msgs_before_first_vid, 0);
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)

@@ -31,28 +31,29 @@ namespace rpp
      * that is running the loop (typically the main thread).
      *
      * Background work (such as lambdas in co_await [&]{...}) is still dispatched
-     * to the global thread_pool, but when the work completes, the coroutine
+     * to the configured thread_pool, but when the work completes, the coroutine
      * resume is posted back to the event loop instead of running inline
      * on the worker thread.
      *
      * This enables a programming model where:
      * - Suspended coroutines are paused while other pending tasks can resume
      * - All resumes are serialized onto a single thread (no data races)
-     * - The user drives the loop via run_loop() or run_once()
+     * - The user drives the loop via run_once(), run_until_idle() or run_loop()
      *
      * @code
      *     rpp::event_loop loop;
      *
      *     rpp::cfuture<std::string> fetchData() {
-     *         std::string raw = co_await loop.run_background([&]{
+     *         std::string raw = co_await loop.run_async([&]{
      *             return downloadFile(url);  // runs on thread pool
      *         });
-     *         // resumed on event_loop thread
+     *         // NOTE: always resumed on event_loop thread, parse data on main thread
+     *         //       the coroutine can be cancelled by throwing an exception in downloadFile()
      *         co_return parseData(raw);
      *     }
      *
      *     auto future = fetchData();
-     *     loop.run_loop();  // drives event processing until no work remains
+     *     loop.run_until_idle();  // drives event processing until no work remains
      *     auto result = future.get();
      * @endcode
      */
@@ -241,14 +242,20 @@ namespace rpp
         /**
          * @brief Creates an awaiter that runs the given lambda on the thread pool
          *        and resumes the coroutine on the event loop thread.
+         * 
+         *  NOTE: The lambda runs in a background thread context,
+         *        but ALWAYS resumes on the Main Thread !
+         *
          * @code
-         *     std::string result = co_await loop.run_background([&]{
+         *     std::string result = co_await loop.run_async([&]{
          *         return expensiveComputation();
          *     });
+         *
+         *     // After co_await, we are back on the event loop thread
          * @endcode
          */
         template<typename Func>
-        auto run_background(Func&& func) noexcept
+        auto run_async(Func&& func) noexcept
         {
             using R = decltype(func());
             if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::forward<Func>(func) };
