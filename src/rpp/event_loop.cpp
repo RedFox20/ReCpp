@@ -26,6 +26,7 @@ namespace rpp
         }
 
         stop();
+
         // give limited time for cleanup, before asserting an error
         if (!wait_on_all(rpp::millis(1000)))
         {
@@ -45,11 +46,16 @@ namespace rpp
         // drain any remaining events to avoid leaking coroutine frames
         rpp::TimePoint end = rpp::TimePoint::now() + timeout;
         resume_event event;
-        while (resume_queue.wait_pop_until(event, end))
+        while (resume_queue.try_pop(event))
         {
             process_event(event);
         }
-        return resume_queue.empty();
+        // only wait with timeout if there are still background tasks that could post events
+        while (has_background_tasks() && resume_queue.wait_pop_until(event, end))
+        {
+            process_event(event);
+        }
+        return resume_queue.empty() && !has_background_tasks();
     }
 
     bool event_loop::run_loop() noexcept

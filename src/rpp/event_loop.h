@@ -199,6 +199,7 @@ namespace rpp
                 {
                     try { action(); }
                     catch (...) { ex = std::current_exception(); }
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
                 });
             }
