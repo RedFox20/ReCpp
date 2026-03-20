@@ -4,6 +4,7 @@
 #include <rpp/thread_pool.h>
 #include <rpp/timer.h>
 #include <rpp/threads.h>
+#include <rpp/collections.h>
 
 #include <rpp/tests.h>
 #include <atomic>
@@ -42,8 +43,14 @@ TestImpl(test_event_loop)
     void assert_on_loop_thread(std::source_location loc = std::source_location::current())
     { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
 
+    void idle() const { loop->run_until_idle(); }
+
     template<typename F>
-    auto run_coro(F&& f) { auto future = f(); loop->run_until_idle(); return future; }
+    auto run_coro(F&& f) { auto future = f(); idle(); return future; }
+
+    template<typename F>
+    auto run_bg(F&& f) { return loop->run_background(std::forward<F>(f)); }
+
 
     // ─── Helper: record which thread resumed each step ──────────
 
@@ -80,7 +87,7 @@ TestImpl(test_event_loop)
     {
         auto future = run_coro([&]() -> rpp::cfuture<std::string>
         {
-            std::string result = co_await loop->run_background([main_tid=main_tid]() -> std::string
+            std::string result = co_await run_bg([main_tid=main_tid]() -> std::string
             {
                 AssertNotEqual(rpp::get_thread_id(), main_tid);
                 rpp::sleep_ms(5);
@@ -103,7 +110,7 @@ TestImpl(test_event_loop)
 
         auto future = run_coro([&]() -> rpp::cfuture<void>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 rpp::sleep_ms(5);
                 work_done = true;
             });
@@ -126,19 +133,19 @@ TestImpl(test_event_loop)
         {
             std::string s;
 
-            s += co_await loop->run_background([&]() -> std::string {
+            s += co_await run_bg([&]() -> std::string {
                 rpp::sleep_ms(2);
                 return "A";
             });
             rec.record();
 
-            s += co_await loop->run_background([&]() -> std::string {
+            s += co_await run_bg([&]() -> std::string {
                 rpp::sleep_ms(2);
                 return "B";
             });
             rec.record();
 
-            s += co_await loop->run_background([&]() -> std::string {
+            s += co_await run_bg([&]() -> std::string {
                 rpp::sleep_ms(2);
                 return "C";
             });
@@ -169,7 +176,7 @@ TestImpl(test_event_loop)
 
         auto coro_a = [&]() -> rpp::cfuture<int>
         {
-            co_await loop->run_background([&] {
+            co_await run_bg([&] {
                 rpp::sleep_ms(15); // slower task
             });
             record(1);
@@ -178,7 +185,7 @@ TestImpl(test_event_loop)
 
         auto coro_b = [&]() -> rpp::cfuture<int>
         {
-            co_await loop->run_background([&] {
+            co_await run_bg([&] {
                 rpp::sleep_ms(2); // faster task
             });
             record(2);
@@ -187,7 +194,7 @@ TestImpl(test_event_loop)
 
         auto fa = coro_a();
         auto fb = coro_b();
-        loop->run_until_idle();
+        idle();
 
         AssertThat(fa.get(), 10);
         AssertThat(fb.get(), 20);
@@ -210,7 +217,7 @@ TestImpl(test_event_loop)
 
         auto coro_slow = [&]() -> rpp::cfuture<std::string>
         {
-            std::string result = co_await loop->run_background([&]() -> std::string {
+            std::string result = co_await run_bg([&]() -> std::string {
                 slow_bg_running.store(true);
                 rpp::sleep_ms(50);
                 return "slow";
@@ -221,13 +228,13 @@ TestImpl(test_event_loop)
 
         auto coro_fast = [&]() -> rpp::cfuture<std::string>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
             assert_on_loop_thread();
 
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
@@ -241,7 +248,7 @@ TestImpl(test_event_loop)
 
         auto fs = coro_slow();
         auto ff = coro_fast();
-        loop->run_until_idle();
+        idle();
 
         AssertThat(fs.get(), "slow"s);
         AssertThat(ff.get(), "fast"s);
@@ -255,7 +262,7 @@ TestImpl(test_event_loop)
     {
         auto future = run_coro([&]() -> rpp::cfuture<std::string>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 throw std::runtime_error{"background error"};
             });
             co_return "should not reach here";
@@ -280,7 +287,7 @@ TestImpl(test_event_loop)
     {
         auto future = run_coro([&]() -> rpp::cfuture<std::string>
         {
-            std::string s = co_await loop->run_background([]() -> std::string {
+            std::string s = co_await run_bg([]() -> std::string {
                 return "step1";
             });
             assert_on_loop_thread();
@@ -288,7 +295,7 @@ TestImpl(test_event_loop)
             bool caught_ex = false;
             try
             {
-                co_await loop->run_background([]() {
+                co_await run_bg([]() {
                     throw std::runtime_error{"step2 failed"};
                 });
             }
@@ -299,7 +306,7 @@ TestImpl(test_event_loop)
             AssertThat(caught_ex, true);
             assert_on_loop_thread();
 
-            s += co_await loop->run_background([]() -> std::string {
+            s += co_await run_bg([]() -> std::string {
                 return "_step3";
             });
             assert_on_loop_thread();
@@ -333,7 +340,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<int>
         {
-            int v = co_await loop->run_background([]() -> int {
+            int v = co_await run_bg([]() -> int {
                 rpp::sleep_ms(5);
                 return 42;
             });
@@ -379,7 +386,7 @@ TestImpl(test_event_loop)
             assert_on_loop_thread();
         });
 
-        loop->run_until_idle();
+        idle();
         AssertThat(callback_value, 42);
     }
 
@@ -393,7 +400,7 @@ TestImpl(test_event_loop)
 
         auto make_coro = [&](int id) -> rpp::cfuture<int>
         {
-            int result = co_await loop->run_background([id]() -> int {
+            int result = co_await run_bg([id]() -> int {
                 rpp::sleep_ms(1 + (id % 5));
                 return id * 10;
             });
@@ -411,7 +418,7 @@ TestImpl(test_event_loop)
             futures.emplace_back(make_coro(i));
         }
 
-        loop->run_until_idle();
+        idle();
 
         int sum = 0;
         for (int i = 0; i < N; ++i)
@@ -437,7 +444,7 @@ TestImpl(test_event_loop)
             int accum = 0;
             for (int stage = 0; stage < STAGES; ++stage)
             {
-                int v = co_await loop->run_background([id, stage]() -> int {
+                int v = co_await run_bg([id, stage]() -> int {
                     rpp::sleep_ms(1);
                     return id * 100 + stage;
                 });
@@ -456,7 +463,7 @@ TestImpl(test_event_loop)
             futures.emplace_back(make_coro(i));
         }
 
-        loop->run_until_idle();
+        idle();
 
         for (int i = 0; i < N; ++i)
         {
@@ -478,7 +485,7 @@ TestImpl(test_event_loop)
         {
             for (int i = 0; i < 5; ++i)
             {
-                co_await loop->run_background([&]() {
+                co_await run_bg([&]() {
                     if (rpp::get_thread_id() != main_tid)
                         bg_on_different_thread.fetch_add(1);
                     rpp::sleep_ms(1);
@@ -504,7 +511,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 bg_started.store(true);
                 while (!bg_may_finish.load())
                     rpp::sleep_ms(1);
@@ -524,7 +531,7 @@ TestImpl(test_event_loop)
         // let it finish
         bg_may_finish.store(true);
 
-        loop->run_until_idle();
+        idle();
         future.get();
 
         // after run_until_idle completes, no more pending work
@@ -551,7 +558,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 rpp::sleep_ms(5);
             });
             log("coro_resume");
@@ -566,24 +573,15 @@ TestImpl(test_event_loop)
             assert_on_loop_thread();
         });
 
-        loop->run_until_idle();
+        idle();
         future.get();
 
         {
             std::lock_guard lock{log_m};
             AssertThat(execution_log.size(), 3u);
-            bool has_cb1 = false;
-            bool has_cb2 = false;
-            bool has_coro = false;
-            for (auto& s : execution_log)
-            {
-                if (s == "callback_1") has_cb1 = true;
-                if (s == "callback_2") has_cb2 = true;
-                if (s == "coro_resume") has_coro = true;
-            }
-            AssertThat(has_cb1, true);
-            AssertThat(has_cb2, true);
-            AssertThat(has_coro, true);
+            AssertThat(rpp::contains(execution_log, "callback_1"), true);
+            AssertThat(rpp::contains(execution_log, "callback_2"), true);
+            AssertThat(rpp::contains(execution_log, "coro_resume"), true);
         }
     }
 
@@ -593,7 +591,7 @@ TestImpl(test_event_loop)
     {
         auto producer = [&]() -> rpp::cfuture<int>
         {
-            co_return co_await loop->run_background([]() -> int {
+            co_return co_await run_bg([]() -> int {
                 rpp::sleep_ms(5);
                 return 99;
             });
@@ -633,7 +631,7 @@ TestImpl(test_event_loop)
 
     // ─── delay_until: time-point based delay ────────────────────
 
-    TestCase(delay_until_resumes_on_loop_thread)
+    TestCaseCoro(delay_until_resumes_on_loop_thread)
     {
         auto future = run_coro([&]() -> rpp::cfuture<void>
         {
@@ -644,7 +642,7 @@ TestImpl(test_event_loop)
             AssertGreater(t.elapsed_millis(), 18.0);
             co_return;
         });
-        future.get();
+        co_await future;
     }
 
     // ─── set_except_handler: custom exception handling ──────────
@@ -662,7 +660,7 @@ TestImpl(test_event_loop)
             throw std::runtime_error{"callback threw"};
         });
 
-        loop->run_until_idle();
+        idle();
         AssertThat(caught_message, "callback threw"s);
     }
 
@@ -674,7 +672,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 rpp::sleep_ms(5);
             });
             resumes.fetch_add(1);
@@ -710,7 +708,7 @@ TestImpl(test_event_loop)
 
         auto future = run_coro([&]() -> rpp::cfuture<int>
         {
-            int result = co_await loop->run_background([&]() -> int {
+            int result = co_await run_bg([&]() -> int {
                 bg_ran_on_custom_pool.store(rpp::get_thread_id() != main_tid);
                 return 7;
             });
@@ -735,7 +733,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 bg_started.store(true);
                 while (!bg_may_finish.load())
                     rpp::sleep_ms(1);
@@ -760,7 +758,7 @@ TestImpl(test_event_loop)
         AssertThat(loop->background_tasks(), 0);
         AssertGreater(loop->pending_completions(), 0);
 
-        loop->run_until_idle();
+        idle();
         future.get();
 
         AssertThat(loop->background_tasks(), 0);
@@ -813,7 +811,7 @@ TestImpl(test_event_loop)
             });
         }
 
-        loop->run_until_idle();
+        idle();
 
         AssertThat(order.size(), 5u);
         for (int i = 0; i < 5; ++i)
@@ -830,7 +828,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await loop->run_background([&]() {
+            co_await run_bg([&]() {
                 rpp::sleep_ms(5);
                 callback_ran.store(true);
             });
