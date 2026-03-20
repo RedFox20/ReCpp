@@ -659,7 +659,7 @@ namespace rpp
                 #else
                     test_coro coro = test.coro_func.mfunc(this);
                 #endif
-                coro.run_until_done();
+                run_coro_test(coro);
             }
             else
             {

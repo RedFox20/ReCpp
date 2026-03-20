@@ -88,6 +88,10 @@ namespace rpp
             {
                 while (handle && !handle.done())
                     handle.resume();
+                rethrow_if_exception();
+            }
+            void rethrow_if_exception()
+            {
                 if (handle && handle.promise().exception)
                     std::rethrow_exception(handle.promise().exception);
             }
@@ -226,6 +230,9 @@ namespace rpp
         // optionally setup / clean up test case funcs
         virtual void test_case_setup() {}
         virtual void test_case_cleanup() {}
+
+        // override to provide a custom coroutine runner (e.g. event loop driven)
+        virtual void run_coro_test(test_coro& coro) { coro.run_until_done(); }
 
         bool run_init();
         void run_cleanup();
