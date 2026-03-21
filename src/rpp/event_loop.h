@@ -17,6 +17,7 @@
 #include "debugging.h"
 #include <atomic>
 #include <functional>
+#include <optional>
 #include <type_traits>
 
 #if RPP_HAS_COROUTINES
@@ -196,12 +197,12 @@ namespace rpp
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                rpp::parallel_task_detached([this, cont]() mutable
+                loop.background_pool.parallel_task_detached([this, cont]() mutable
                 {
                     try { action(); }
                     catch (...) { ex = std::current_exception(); }
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                 });
             }
             void await_resume() { if (ex) std::rethrow_exception(ex); }
@@ -215,7 +216,7 @@ namespace rpp
         {
             event_loop& loop;
             rpp::delegate<T()> action;
-            T result {};
+            std::optional<T> result {};
             std::exception_ptr ex {};
 
             background_awaiter(event_loop& loop, rpp::delegate<T()> action) noexcept
@@ -224,18 +225,18 @@ namespace rpp
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                rpp::parallel_task_detached([this, cont]() mutable
+                loop.background_pool.parallel_task_detached([this, cont]() mutable
                 {
-                    try { result = action(); }
+                    try { result.emplace(action()); }
                     catch (...) { ex = std::current_exception(); }
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                 });
             }
             T await_resume()
             {
                 if (ex) std::rethrow_exception(ex);
-                return std::move(result);
+                return std::move(*result);
             }
         };
 
@@ -290,19 +291,24 @@ namespace rpp
                     return;
                 }
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                rpp::parallel_task_detached([this, cont]() mutable
+                loop.background_pool.parallel_task_detached([this, cont]() mutable
                 {
                     try {
                         if (fut.valid())
-                            fut.wait(); 
+                            fut.wait();
                     } catch (...) { ex = std::current_exception(); }
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                 });
             }
             auto await_resume()
             {
                 if (ex) std::rethrow_exception(ex);
+                if (!fut.valid())
+                {
+                    if constexpr (std::is_void_v<T>) return;
+                    else return T{};
+                }
                 return fut.get();
             }
         };
@@ -336,11 +342,11 @@ namespace rpp
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                rpp::parallel_task_detached([this, cont]() mutable
+                loop.background_pool.parallel_task_detached([this, cont]() mutable
                 {
                     rpp::sleep_until(end);
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     loop.post_resume(cont);
+                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                 });
             }
             void await_resume() const noexcept {}
