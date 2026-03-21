@@ -447,7 +447,6 @@ namespace rpp
         try
         {
             init_test();
-            tl_current_test = nullptr;
             impl->current_func = nullptr;
             return true;
         }
@@ -645,7 +644,6 @@ namespace rpp
 
         test.success = false;
         test.did_run = true;
-        tl_current_test = this;
         tl_current_test_func = impl->current_func = &test;
         int before = impl->current_results->asserts_failed;
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -697,7 +695,6 @@ namespace rpp
             }
         }
 
-        tl_current_test = nullptr;
         tl_current_test_func = impl->current_func = nullptr;
         test.elapsed_time = t2 - t1;
 
