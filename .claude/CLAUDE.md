@@ -2,6 +2,13 @@
 
 Additional instructions can be read from `.github/copilot-instructions.md`.
 
+## Development Requirements
+
+1. **Unit tests are mandatory** — every new feature or bug fix must include corresponding unit tests in `tests/`.
+2. **Validate with clang-tidy** — run `CXX20=1 mama gcc build clang-tidy test` and fix all warnings before considering the task complete.
+3. **Validate with ThreadSanitizer** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"` and ensure no data races are reported.
+4. **Run the full test suite** — run `CXX20=1 mama gcc build test="-vv"` and confirm all tests pass. A task is not complete until all tests pass with clang-tidy, TSAN, and the regular test suite.
+
 ## ReCpp Modules
 
 All headers are in `src/rpp/`. Test files are in `tests/`.
