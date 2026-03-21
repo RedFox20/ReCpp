@@ -201,8 +201,7 @@ namespace rpp
                 {
                     try { action(); }
                     catch (...) { ex = std::current_exception(); }
-                    loop.post_resume(cont);
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
+                    loop.post_resume_from_suspension(cont);
                 });
             }
             void await_resume() { if (ex) std::rethrow_exception(ex); }
@@ -229,8 +228,7 @@ namespace rpp
                 {
                     try { result.emplace(action()); }
                     catch (...) { ex = std::current_exception(); }
-                    loop.post_resume(cont);
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
+                    loop.post_resume_from_suspension(cont);
                 });
             }
             T await_resume()
@@ -297,8 +295,7 @@ namespace rpp
                         if (fut.valid())
                             fut.wait();
                     } catch (...) { ex = std::current_exception(); }
-                    loop.post_resume(cont);
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
+                    loop.post_resume_from_suspension(cont);
                 });
             }
             auto await_resume()
@@ -345,8 +342,7 @@ namespace rpp
                 loop.background_pool.parallel_task_detached([this, cont]() mutable
                 {
                     rpp::sleep_until(end);
-                    loop.post_resume(cont);
-                    loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
+                    loop.post_resume_from_suspension(cont);
                 });
             }
             void await_resume() const noexcept {}
@@ -369,6 +365,9 @@ namespace rpp
         }
 
     private:
+
+        // posts a resume event and decrements the background suspension count
+        void post_resume_from_suspension(rpp::coro_handle<> handle) noexcept;
 
         // processes a single resume event
         void process_event(resume_event& event) noexcept;
