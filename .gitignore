@@ -10,6 +10,7 @@ cmake-build-release/
 cmake-build-relwithdebinfo/
 windows/
 build/
+build-*/
 
 mama\.cmake
 .vscode/
