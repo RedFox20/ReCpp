@@ -5,9 +5,9 @@ Additional instructions can be read from `.github/copilot-instructions.md`.
 ## Development Requirements
 
 1. **Unit tests are mandatory** — every new feature or bug fix must include corresponding unit tests in `tests/`.
-2. **Validate with clang-tidy** — run `CXX20=1 mama gcc build clang-tidy test` and fix all warnings before considering the task complete.
-3. **Validate with ThreadSanitizer** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"` and ensure no data races are reported.
-4. **Run the full test suite** — run `CXX20=1 mama gcc build test="-vv"` and confirm all tests pass. A task is not complete until all tests pass with clang-tidy, TSAN, and the regular test suite.
+2. **Always build with TSAN** — always include `tsan` in build commands to avoid rebuild churn when switching between regular and TSAN builds.
+3. **Validate with clang-tidy** — run `CXX20=1 mama gcc tsan build clang-tidy test="nogdb -vv"` and fix all warnings before considering the task complete.
+4. **Run the full test suite** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"` and confirm all tests pass with no data races. A task is not complete until all tests pass.
 
 ## ReCpp Modules
 
@@ -72,43 +72,37 @@ sudo apt-get install libdw-dev
 
 ## Building with mama
 
+Always include `tsan` in build commands to keep a consistent build configuration.
+
 ```bash
-# basic build and test (C++20)
-CXX20=1 mama gcc build test="-vv"
+# basic build and test (C++20 with TSAN)
+CXX20=1 mama gcc tsan build test="nogdb -vv"
 
 # full reconfigure + rebuild
-CXX20=1 mama gcc rebuild test="-vv"
+CXX20=1 mama gcc tsan rebuild test="nogdb -vv"
 
 # build with clang instead of gcc
-CXX20=1 mama clang build test="-vv"
+CXX20=1 mama clang tsan build test="nogdb -vv"
 
 # run a specific test suite
-CXX20=1 mama gcc build test="-vv test_concurrent_queue"
+CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue"
 
 # run a specific test
-CXX20=1 mama gcc build test="-vv test_concurrent_queue::push_and_pop"
+CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop"
+
+# run a specific test until failure (up to N iterations)
+CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
 ```
 
 ### Address Sanitizer (mama)
+ASAN and TSAN cannot be combined. Use ASAN only when specifically debugging memory issues — this requires a full rebuild.
 ```bash
-# full rebuild with ASAN (needs rebuild when toggling sanitizer flags)
 CXX20=1 mama gcc asan rebuild test="nogdb -vv"
-
-# subsequent builds after initial ASAN rebuild
-CXX20=1 mama gcc asan build test="nogdb -vv"
-```
-
-### Thread Sanitizer (mama)
-```bash
-CXX20=1 mama gcc tsan rebuild test="nogdb -vv"
-
-# run a specific test with TSAN until failure (up to N iterations)
-CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue" test_until_failure=20
 ```
 
 ### clang-tidy (mama)
 ```bash
-CXX20=1 mama gcc build clang-tidy test
+CXX20=1 mama gcc tsan build clang-tidy test="nogdb -vv"
 ```
 
 ## Building with CMake directly
