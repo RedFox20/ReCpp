@@ -72,7 +72,7 @@ TestImpl(test_file_io)
     {
         ustring filePath = filename.to_string();
         rpp::file out { filePath, rpp::file::CREATENEW };
-        AssertMsg(out.good(), "rpp::file unicode create failed: '%s'", reinterpret_cast<const char*>(filePath.c_str()));
+        AssertMsg(out.good(), "rpp::file unicode create failed: '%s'", rpp::to_string(filePath).c_str());
 
         TestFileContents = "abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10"
                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
