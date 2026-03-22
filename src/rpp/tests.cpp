@@ -334,18 +334,17 @@ namespace rpp
     #define LogTestLabel(expr) \
         if (state().verbosity >= TestVerbosity::TestLabels) { expr; }
 
-    void test::assert_failed(std::source_location loc, PRINTF_FMTSTR const char* fmt, ...)
+    void test::assert_failed(rpp::source_loc loc, PRINTF_FMTSTR const char* fmt, ...)
     {
-        const char* file = loc.file_name();
-        const int line = static_cast<int>(loc.line());
+        const char* file = loc.file;
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
         safe_vsnprintf_msg_len(fmt);
-        LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg));
+        LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, loc.line, msg));
 
         if (auto* test = tl_current_test)
         {
             if (test->impl && test->impl->current_results)
-                test->add_assert_failure(filename, line, msg, len);
+                test->add_assert_failure(filename, loc.line, msg, len);
         }
         else
         {
@@ -353,7 +352,7 @@ namespace rpp
             // this can happen if an assertion fails in a different thread
             //   -- this is difficult to handle, so we just print the error and hope for the best
             if (state().verbosity < TestVerbosity::TestLabels)
-                consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, line, msg);
+                consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, loc.line, msg);
         }
     }
 

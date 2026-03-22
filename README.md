@@ -3032,23 +3032,23 @@ Thread-safe FIFO queue with notification support.
 
 | Class | Description |
 |-------|-------------|
-| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L26) | Thread-safe queue with push/pop/wait |
+| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L27) | Thread-safe queue with push/pop/wait |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`push(T&& item)`](src/rpp/concurrent_queue.h#L305) | Push an item |
-| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L305) | Push multiple items |
-| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L352) | Non-blocking pop attempt |
-| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L279) | Pop all items at once |
-| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L516) | Blocking pop with timeout |
-| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L516) | Blocking pop with predicate and timeout |
-| [`clear()`](src/rpp/concurrent_queue.h#L177) | Clear the queue |
-| [`empty()`](src/rpp/concurrent_queue.h#L109) | True if empty |
-| [`size()`](src/rpp/concurrent_queue.h#L128) | Number of items |
-| [`reserve(int n)`](src/rpp/concurrent_queue.h#L209) | Reserve capacity |
-| [`notify()`](src/rpp/concurrent_queue.h#L137) / [`notify_one()`](src/rpp/concurrent_queue.h#L146) | Wake waiting consumers |
+| [`push(T&& item)`](src/rpp/concurrent_queue.h#L306) | Push an item |
+| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L306) | Push multiple items |
+| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L353) | Non-blocking pop attempt |
+| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L280) | Pop all items at once |
+| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L517) | Blocking pop with timeout |
+| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L517) | Blocking pop with predicate and timeout |
+| [`clear()`](src/rpp/concurrent_queue.h#L178) | Clear the queue |
+| [`empty()`](src/rpp/concurrent_queue.h#L110) | True if empty |
+| [`size()`](src/rpp/concurrent_queue.h#L129) | Number of items |
+| [`reserve(int n)`](src/rpp/concurrent_queue.h#L210) | Reserve capacity |
+| [`notify()`](src/rpp/concurrent_queue.h#L138) / [`notify_one()`](src/rpp/concurrent_queue.h#L147) | Wake waiting consumers |
 
 ### Example: Producer-Consumer with wait_pop
 
@@ -3834,32 +3834,32 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Item | Description |
 |------|-------------|
-| [`test`](src/rpp/tests.h#L55) | Base test class with lifecycle hooks |
-| [`test_info`](src/rpp/tests.h#L35) | Test registration metadata |
-| [`TestVerbosity`](src/rpp/tests.h#L47) | `None`, `Summary`, `TestLabels`, `AllMessages` |
+| [`test`](src/rpp/tests.h#L39) | Base test class with lifecycle hooks |
+| [`test_info`](src/rpp/tests.h#L40) | Test registration metadata |
+| [`TestVerbosity`](src/rpp/tests.h#L67) | `None`, `Summary`, `TestLabels`, `AllMessages` |
 
 ### Key Macros
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L676) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L691) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L708) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L548) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L564) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L600) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L669) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L539) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L573) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.h#L699) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.h#L714) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.h#L731) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.h#L571) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.h#L587) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L623) | Assert inequality |
+| [`AssertTrue(expr)`](src/rpp/tests.h#L692) | Assert expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.h#L562) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.h#L596) | Assert expression throws |
 
 ### Running Tests
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(patterns)`](src/rpp/tests.h#L251) | Run tests matching patterns |
-| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L262) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L251) | Run all registered tests |
-| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L45) | Registers a unit test with given name, factory and autorun flag |
+| [`test::run_tests(patterns)`](src/rpp/tests.h#L271) | Run tests matching patterns |
+| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L282) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L271) | Run all registered tests |
+| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L65) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase
 

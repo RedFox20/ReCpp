@@ -115,7 +115,7 @@ namespace rpp
 
             // release the reference held by the worker thread
             // this will trigger any destructors or cleanup
-            dec_ref(*p);
+            dec_ref(p);
         }
     }
 

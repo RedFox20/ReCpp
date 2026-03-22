@@ -141,15 +141,13 @@ namespace rpp
         }
         ~pool_task_handle() noexcept
         {
-            if (auto* p = get()) {
-                dec_ref(*p);
-            }
+            if (auto* p = ptr.exchange(nullptr, std::memory_order_seq_cst))
+                dec_ref(p);
         }
         pool_task_handle(const pool_task_handle& other) noexcept
+            : ptr{nullptr}
         {
-            auto* new_ptr = other.get();
-            if (new_ptr) inc_ref(*new_ptr);
-            ptr.store(new_ptr);
+            inc_ref(*this, other);
         }
         pool_task_handle(pool_task_handle&& other) noexcept
         {
@@ -161,11 +159,9 @@ namespace rpp
         pool_task_handle& operator=(const pool_task_handle& other) noexcept
         {
             if (this != &other) {
-                auto* new_ptr = other.get();
-                auto* old_ptr = get();
-                if (new_ptr) inc_ref(*new_ptr);
-                if (old_ptr) dec_ref(*old_ptr);
-                ptr.store(new_ptr);
+                if (auto* p = ptr.exchange(nullptr, std::memory_order_seq_cst))
+                    dec_ref(p);
+                inc_ref(*this, other);
             }
             return *this;
         }
@@ -178,30 +174,34 @@ namespace rpp
             return *this;
         }
     private:
-        static void inc_ref(pool_task_state& p) noexcept // pre-condition: not null
+        // PRECONDITION: self.ptr must be null
+        static void inc_ref(pool_task_handle& self, const pool_task_handle& other) noexcept
         {
-            int old_refs = p.ref_count.fetch_add(1, std::memory_order_seq_cst);
-            if (old_refs <= 0 || old_refs > 100'000) {
-                __assertion_failure("pool_task_state::inc_ref invalid refcount=%d", old_refs);
-                std::terminate();
+            if (auto* p = other.ptr.load(std::memory_order_seq_cst)) {
+                self.ptr.store(p, std::memory_order_seq_cst);
+                int old_refs = p->ref_count.fetch_add(1, std::memory_order_seq_cst);
+                if (old_refs <= 0 || old_refs > 100'000) {
+                    __assertion_failure("pool_task_state::inc_ref invalid refcount=%d", old_refs);
+                    std::terminate();
+                }
             }
         }
-        static void dec_ref(pool_task_state& p) noexcept
+        static void dec_ref(pool_task_state* p) noexcept
         {
-            int refs = p.ref_count.fetch_sub(1, std::memory_order_acq_rel) - 1;
+            int refs = p->ref_count.fetch_sub(1, std::memory_order_acq_rel) - 1;
             if (refs != 0) return;
             // TSan can't reason about operator delete (non-atomic write) overlapping
             // the atomic ref_count at the same address. The acq_rel on fetch_sub is
             // sufficient for correctness, but TSan needs an explicit acquire annotation
             // to see that all prior releases are visible before the delete.
             #if RPP_TSAN
-                __tsan_acquire(&p.ref_count);
+                __tsan_acquire(&p->ref_count);
             #endif
-            delete &p;
+            delete p;
         }
         // these are unsafe, use with care
-        pool_task_state* get()        const noexcept { return ptr.load(std::memory_order_seq_cst); }
-        pool_task_state* operator->() const noexcept { return ptr.load(std::memory_order_seq_cst); }
+        FINLINE pool_task_state* get()        const noexcept { return ptr.load(std::memory_order_seq_cst); }
+        FINLINE pool_task_state* operator->() const noexcept { return ptr.load(std::memory_order_seq_cst); }
     public:
 
         /// @returns The name of the worker thread that is running this task 
@@ -245,7 +245,7 @@ namespace rpp
     
     private:
         friend class pool_worker;
-        friend class ::test_threadpool;
+        friend struct ::test_threadpool;
         void signal_finish_and_cleanup() noexcept;
     };
 

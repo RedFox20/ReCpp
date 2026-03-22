@@ -48,7 +48,7 @@ TestImpl(test_event_loop)
     }
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-    void assert_on_loop_thread(std::source_location loc = std::source_location::current())
+    void assert_on_loop_thread(RPP_SOURCE_LOC)
     { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
 
@@ -574,9 +574,9 @@ TestImpl(test_event_loop)
     TestCase(set_except_handler_catches_callback_exception)
     {
         std::string caught_message;
-        loop->set_except_handler([&](std::exception_ptr ep)
+        loop->set_except_handler([&](const std::exception_ptr& ep)
         {
-            try { std::rethrow_exception(std::move(ep)); }
+            try { std::rethrow_exception(ep); }
             catch (const std::runtime_error& e) { caught_message = e.what(); }
         });
 

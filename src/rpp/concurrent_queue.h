@@ -12,6 +12,7 @@
 #include <optional> // std::optional
 #include <atomic> // std::atomic_bool
 #include <cstring> // memmove
+#include <malloc.h> // malloc, free
 
 namespace rpp
 {

@@ -72,7 +72,7 @@ sudo apt-get install libdw-dev
 
 ## Building with mama
 
-Always include `tsan` in build commands to keep a consistent build configuration.
+Always include `tsan` in build commands to keep a consistent build configuration. The `nogdb` argument is used to reduce noise in output, but can be omitted if you want mama to attach GDB when starting tests.
 
 ```bash
 # basic build and test (C++20 with TSAN)
@@ -96,8 +96,9 @@ CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop"
 
 ### Address Sanitizer (mama)
 ASAN and TSAN cannot be combined. Use ASAN only when specifically debugging memory issues — this requires a full rebuild.
+In this case, omit `nogdb`, since by default mama will start tests with GDB attached, which will provide rich stack traces on fatal crashes.
 ```bash
-CXX20=1 mama gcc asan rebuild test="nogdb -vv"
+CXX20=1 mama gcc asan rebuild test="-vv"
 ```
 
 ### clang-tidy (mama)
