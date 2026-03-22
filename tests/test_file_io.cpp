@@ -72,7 +72,7 @@ TestImpl(test_file_io)
     {
         ustring filePath = filename.to_string();
         rpp::file out { filePath, rpp::file::CREATENEW };
-        AssertMsg(out.good(), "rpp::file unicode create failed: '%s'", filePath.c_str());
+        AssertMsg(out.good(), "rpp::file unicode create failed: '%s'", rpp::to_string(filePath).c_str());
 
         TestFileContents = "abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10"
                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -114,11 +114,12 @@ TestImpl(test_file_io)
         create_test_file(TestFile);
         if (file f = { TestFile, file::READONLY })
         {
-            Assert(f.good() && !f.bad()); // NOLINT(readability-simplify-boolean-expr)
+            Assert(f.good());
+            Assert(!f.bad());
         }
         else
         {
-            Assert(f.good() && !f.bad()); // NOLINT(readability-simplify-boolean-expr)
+            AssertFailed("file if_initializer failed: '%s'", TestFile.c_str());
         }
     }
 

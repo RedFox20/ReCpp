@@ -46,9 +46,8 @@ namespace rpp
 
     const char* pool_task_handle::worker_name() const noexcept
     {
-        pool_task_handle strong{*this}; // inc_ref
-        if (auto* p = strong.ptr.load(std::memory_order_relaxed))
-            if (auto* w = p->worker)
+        if (auto strong = get())
+            if (auto* w = strong->worker)
                 return w->name;
         return "none";
     }
@@ -68,13 +67,12 @@ namespace rpp
         wait_result result = wait_result::finished;
         // A strong ref is needed here, otherwise the task could be destroyed
         // while we attempt to wait on it.
-        pool_task_handle strong{*this}; // inc_ref
-        if (auto* p = strong.ptr.load(std::memory_order_relaxed))
+        if (auto strong = get())
         {
-            auto lock = p->finished.spin_lock();
-            if (p->finished.wait(lock, timeout) == rpp::semaphore::timeout)
+            auto lock = strong->finished.spin_lock();
+            if (strong->finished.wait(lock, timeout) == rpp::semaphore::timeout)
                 result = wait_result::timeout;
-            if (auto e = p->error; outErr != nullptr && !*outErr)
+            if (auto e = strong->error; outErr != nullptr && !*outErr)
                 *outErr = e;
         }
         return result;
@@ -92,12 +90,11 @@ namespace rpp
                                        std::exception_ptr* outErr) const noexcept
     {
         wait_result result = wait_result::finished;
-        pool_task_handle strong{*this}; // inc_ref
-        if (auto* p = strong.ptr.load(std::memory_order_relaxed))
+        if (auto strong = get())
         {
-            auto lock = p->finished.spin_lock();
-            p->finished.wait(lock);
-            if (auto e = p->error; outErr != nullptr && !*outErr)
+            auto lock = strong->finished.spin_lock();
+            strong->finished.wait(lock);
+            if (auto e = strong->error; outErr != nullptr && !*outErr)
                 *outErr = e;
         }
         return result;
@@ -105,17 +102,12 @@ namespace rpp
 
     void pool_task_handle::signal_finish_and_cleanup() noexcept
     {
-        // null the pointer and atomically get the old value
-        if (auto* p = this->ptr.exchange(nullptr, std::memory_order_seq_cst))
+        if (auto strong = take()) // takes ownership and nulls this handle
         {
-            {
-                auto lock = p->finished.spin_lock();
-                p->finished.notify_all(lock);
-            }
+            auto lock = strong->finished.spin_lock();
+            strong->finished.notify_all(lock);
 
-            // release the reference held by the worker thread
-            // this will trigger any destructors or cleanup
-            dec_ref(*p);
+            // cleanup (decref) at the end of this scope:
         }
     }
 
@@ -174,8 +166,8 @@ namespace rpp
         {
             std::string trace = tracer(); // run the trace specifically in this scope and unlocked
             auto lock = new_task_flag.spin_lock();
-            if (auto* p = current_task.get()) // in theory this could fail if task cancelled instantly due to shutdown
-                p->trace = std::move(trace);
+            if (auto strong = current_task.get()) // in theory this could fail if task cancelled instantly due to shutdown
+                strong->trace = std::move(trace);
         }
         return true;
     }
@@ -203,8 +195,8 @@ namespace rpp
         {
             std::string trace = tracer(); // run the trace specifically in this scope and unlocked
             auto lock = new_task_flag.spin_lock();
-            if (auto* p = current_task.get()) // in theory this could fail if task cancelled instantly due to shutdown
-                p->trace = std::move(trace);
+            if (auto strong = current_task.get()) // in theory this could fail if task cancelled instantly due to shutdown
+                strong->trace = std::move(trace);
         }
         return true;
     }
@@ -365,17 +357,17 @@ namespace rpp
     void pool_worker::unhandled_exception(const char* what) noexcept
     {
         auto lock = new_task_flag.spin_lock();
-        if (auto* p = current_task.get())
+        if (auto strong = current_task.get())
         {
         #if POOL_TASK_DEBUG
-            if (p->trace.empty())
+            if (strong->trace.empty())
                 UnhandledEx("%s", what);
             else
-                UnhandledEx("%s\nTask Start Trace:\n%s", what, p->trace.c_str());
+                UnhandledEx("%s\nTask Start Trace:\n%s", what, strong->trace.c_str());
         #else
             (void)what;
         #endif // POOL_TASK_DEBUG
-            p->error = std::current_exception();
+            strong->error = std::current_exception();
             current_task.signal_finish_and_cleanup();
         }
     }

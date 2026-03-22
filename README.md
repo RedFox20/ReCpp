@@ -54,6 +54,7 @@ mama gcc tsan build test test_until_failure
 | [Delegate](#rppdelegateh) | [`delegate.h`](src/rpp/delegate.h) | Fast function delegates and multicast events |
 | [Futures](#rppfutureh) | [`future.h`](src/rpp/future.h) | Composable futures with continuations and C++20 coroutine support |
 | [Coroutines](#rppcoroutinesh) | [`coroutines.h`](src/rpp/coroutines.h) | C++20 coroutine awaiters and `co_await` operators |
+| [Event Loop](#rppevent_looph) | [`event_loop.h`](src/rpp/event_loop.h) | Single-threaded coroutine event loop for serializing async completions |
 | [Thread Pool](#rppthread_poolh) | [`thread_pool.h`](src/rpp/thread_pool.h) | Thread pool with `parallel_for`, `parallel_foreach`, and async tasks |
 | [Threads](#rppthreadsh) | [`threads.h`](src/rpp/threads.h) | Thread naming, ID queries, and CPU core info |
 | [Mutex](#rppmutexh) | [`mutex.h`](src/rpp/mutex.h) | Cross-platform mutex, spin locks, and `synchronized<T>` wrapper |
@@ -138,8 +139,8 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L177) | `1` if targeting ARM Cortex-M architecture |
 | [`RPP_ARM_ARCH`](src/rpp/config.h#L193) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
 | [`RPP_64BIT`](src/rpp/config.h#L218) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L363) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L371) | `1` if target is big-endian |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L368) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L376) | `1` if target is big-endian |
 
 ### Feature Detection
 
@@ -155,56 +156,56 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | [`FINLINE`](src/rpp/config.h#L211) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
 | [`NOINLINE`](src/rpp/config.h#L202) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
 | [`NODISCARD`](src/rpp/config.h#L242) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L296) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`RPP_NORETURN`](src/rpp/config.h#L301) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
 | [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L233) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L260) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L271) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L265) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L276) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L311) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L327) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L328) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L329) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L316) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L332) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L333) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L334) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](src/rpp/config.h#L340) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](src/rpp/config.h#L341) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](src/rpp/config.h#L342) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L343) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L352) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L351) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L354) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L353) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L356) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L355) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L358) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L357) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L345) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L346) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L347) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L348) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L357) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L356) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L359) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L358) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L361) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L360) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L363) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L362) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.h#L383) | `unsigned char` |
-| [`ushort`](src/rpp/config.h#L384) | `unsigned short` |
-| [`uint`](src/rpp/config.h#L385) | `unsigned int` |
-| [`ulong`](src/rpp/config.h#L386) | `unsigned long` |
-| [`int16`](src/rpp/config.h#L388) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.h#L389) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.h#L392) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.h#L393) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.h#L399) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.h#L400) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L388) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L389) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L390) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L391) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L393) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L394) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L397) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L398) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L404) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L405) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -1159,10 +1160,10 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 |------|-------------|
 | [`cfuture<T>`](src/rpp/future.h#L112) | Extended `std::future` with composition and coroutine support |
 | [`async_task(task)`](src/rpp/future.h#L29) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L903) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L920) | Create an already-errored future |
-| [`wait_all(futures)`](src/rpp/future.h#L988) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L942) | Block and gather results from all futures |
+| [`make_ready_future(value)`](src/rpp/future.h#L911) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L928) | Create an already-errored future |
+| [`wait_all(futures)`](src/rpp/future.h#L996) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L950) | Block and gather results from all futures |
 
 ### cfuture Methods
 
@@ -1179,11 +1180,11 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 | [`chain_async(Task task)`](src/rpp/future.h#L361) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
 | [`chain_async(cfuture&& next)`](src/rpp/future.h#L374) | Sequential chaining with another future |
 | [`await_ready()`](src/rpp/future.h#L388) | Non-blocking check if the future is already finished |
-| [`collect_ready(T* result)`](src/rpp/future.h#L415) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
-| [`collect_wait(T* result)`](src/rpp/future.h#L433) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
-| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L445) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L457) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L484) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`collect_ready(T* result)`](src/rpp/future.h#L419) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L437) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L449) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L461) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L488) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`RPP_HAS_COROUTINES`](src/rpp/future_types.h#L12) | Detects whether C++20 coroutine headers are available |
 | [`RPP_CORO_STD`](src/rpp/future_types.h#L13) | Namespace alias for coroutine types (std or std::experimental) |
 
@@ -1304,18 +1305,18 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 
 | Class | Description |
 |-------|-------------|
-| [`functor_awaiter<T>`](src/rpp/coroutines.h#L43) | Awaiter for lambdas/delegates via `parallel_task()` |
-| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L113) | Awaiter for lambdas returning futures |
-| [`chrono_awaiter<Clock>`](src/rpp/coroutines.h#L192) | Awaiter for `std::chrono` durations (async sleep) |
+| [`functor_awaiter<T>`](src/rpp/coroutines.h#L42) | Awaiter for lambdas/delegates via `parallel_task()` |
+| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L112) | Awaiter for lambdas returning futures |
+| [`time_awaiter`](src/rpp/coroutines.h#L190) | Awaiter for `rpp::Duration` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
 | Operator | Description |
 |----------|-------------|
-| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L244) | Run delegate async on thread pool |
-| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L276) | Run lambda async on thread pool |
-| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L299) | Await a composable future |
-| [`operator co_await(chrono::duration)`](src/rpp/coroutines.h#L330) | Async sleep for a duration |
+| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L243) | Run delegate async on thread pool |
+| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L274) | Run lambda async on thread pool |
+| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L286) | Await a composable future |
+| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L310) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;
@@ -1328,6 +1329,36 @@ rpp::cfuture<void> example() {
 
 ---
 
+## rpp/event_loop.h
+
+Single-threaded event loop that serializes coroutine completions. Unlike `thread_pool`, which resumes coroutines on background threads, `event_loop` ensures all coroutine resumes happen on the thread that drives the loop (typically the main thread).
+
+### Classes
+
+| Class | Description |
+|-------|-------------|
+| [`event_loop`](src/rpp/event_loop.h#L61) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()` |
+
+### Usage
+
+```cpp
+rpp::event_loop loop;
+
+rpp::cfuture<std::string> fetchData(rpp::event_loop& loop) {
+    std::string raw = co_await loop.run_async([&]{
+        return downloadFile(url);  // runs on thread pool
+    });
+    // resumed on event loop thread
+    co_return parseData(raw);
+}
+
+auto future = fetchData(loop);
+loop.run_until_idle();
+auto result = future.get();
+```
+
+---
+
 ## rpp/thread_pool.h
 
 Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
@@ -1336,31 +1367,31 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](src/rpp/thread_pool.h#L317) | Thread pool manager with auto-scaling workers |
-| [`pool_task_handle`](src/rpp/thread_pool.h#L125) | Waitable, reference-counted handle for pool tasks |
-| [`pool_worker`](src/rpp/thread_pool.h#L105) | Individual worker thread in the pool |
+| [`thread_pool`](src/rpp/thread_pool.h#L337) | Thread pool manager with auto-scaling workers |
+| [`pool_task_handle`](src/rpp/thread_pool.h#L130) | Waitable, reference-counted handle for pool tasks |
+| [`pool_worker`](src/rpp/thread_pool.h#L110) | Individual worker thread in the pool |
 
 ### thread_pool Methods
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L481) | Split work across threads |
-| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L440) | Run a single async task, returns `pool_task_handle` |
-| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L354) | Set max concurrent workers |
-| [`max_parallelism()`](src/rpp/thread_pool.h#L357) | Get max concurrent workers |
-| [`active_tasks()`](src/rpp/thread_pool.h#L370) | Number of currently running tasks |
-| [`idle_tasks()`](src/rpp/thread_pool.h#L373) | Number of idle workers |
-| [`total_tasks()`](src/rpp/thread_pool.h#L376) | Total number of workers |
-| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L380) | Remove idle workers |
+| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L510) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L460) | Run a single async task, returns `pool_task_handle` |
+| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L374) | Set max concurrent workers |
+| [`max_parallelism()`](src/rpp/thread_pool.h#L377) | Get max concurrent workers |
+| [`active_tasks()`](src/rpp/thread_pool.h#L390) | Number of currently running tasks |
+| [`idle_tasks()`](src/rpp/thread_pool.h#L393) | Number of idle workers |
+| [`total_tasks()`](src/rpp/thread_pool.h#L396) | Total number of workers |
+| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L400) | Remove idle workers |
 
 ### Free Functions (Global Pool)
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L481) | Parallel for on the global thread pool |
-| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L502) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](src/rpp/thread_pool.h#L521) | Run async task on the global pool |
-| [`action<TArgs...>`](src/rpp/thread_pool.h#L35) | Lightweight non-owning delegate for blocking call contexts |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L510) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L531) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L550) | Run async task on the global pool |
+| [`action<TArgs...>`](src/rpp/thread_pool.h#L40) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for
 
@@ -1525,22 +1556,22 @@ Counting semaphore and lightweight notification flags.
 
 | Class | Description |
 |-------|-------------|
-| [`semaphore`](src/rpp/semaphore.h#L15) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](src/rpp/semaphore.h#L337) | Lighter semaphore using a single atomic flag |
-| [`semaphore_once_flag`](src/rpp/semaphore.h#L371) | One-shot semaphore that can only be set once |
+| [`semaphore`](src/rpp/semaphore.h#L14) | Counting semaphore with spin-lock optimization |
+| [`semaphore_flag`](src/rpp/semaphore.h#L336) | Lighter semaphore using a single atomic flag |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L370) | One-shot semaphore that can only be set once |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](src/rpp/semaphore.h#L88) | Increment and wake one waiter |
-| [`notify_all()`](src/rpp/semaphore.h#L123) | Wake all waiters |
-| [`notify_once()`](src/rpp/semaphore.h#L156) | Notify only if not already signaled |
-| [`try_wait()`](src/rpp/semaphore.h#L194) | Non-blocking wait attempt |
-| [`wait()`](src/rpp/semaphore.h#L210) | Blocking wait |
-| [`wait(Duration timeout)`](src/rpp/semaphore.h#L245) | Wait with timeout |
-| [`count()`](src/rpp/semaphore.h#L49) | Current count |
-| [`reset()`](src/rpp/semaphore.h#L64) | Reset to zero |
+| [`notify()`](src/rpp/semaphore.h#L87) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L122) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L155) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L193) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L209) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L244) | Wait with timeout |
+| [`count()`](src/rpp/semaphore.h#L48) | Current count |
+| [`reset()`](src/rpp/semaphore.h#L63) | Reset to zero |
 
 ### Example: Producer-Consumer with semaphore
 
@@ -2076,37 +2107,37 @@ High-precision timers, duration types, and performance profiling utilities.
 
 | Type | Description |
 |------|-------------|
-| [`Duration`](src/rpp/timer.h#L42) | Unified nanosecond-precision duration |
-| [`TimePoint`](src/rpp/timer.h#L231) | System's most accurate time point measurement |
-| [`Timer`](src/rpp/timer.h#L346) | High-accuracy timer for profiling or deltaTime |
-| [`StopWatch`](src/rpp/timer.h#L419) | Start/stop/resume event timer |
-| [`ScopedPerfTimer`](src/rpp/timer.h#L485) | Auto-logs elapsed time from ctor to dtor |
+| [`Duration`](src/rpp/timer.h#L50) | Unified nanosecond-precision duration |
+| [`TimePoint`](src/rpp/timer.h#L239) | System's most accurate time point measurement |
+| [`Timer`](src/rpp/timer.h#L354) | High-accuracy timer for profiling or deltaTime |
+| [`StopWatch`](src/rpp/timer.h#L427) | Start/stop/resume event timer |
+| [`ScopedPerfTimer`](src/rpp/timer.h#L493) | Auto-logs elapsed time from ctor to dtor |
 
 ### Duration Factory & Accessors
 
 | Method | Description |
 |--------|-------------|
-| [`Duration::from_seconds(double s)`](src/rpp/timer.h#L78) | Create from fractional seconds |
-| [`Duration::from_millis(double ms)`](src/rpp/timer.h#L334) | Create from milliseconds |
-| [`Duration::from_micros(double us)`](src/rpp/timer.h#L336) | Create from microseconds |
-| [`Duration::from_nanos(int64 ns)`](src/rpp/timer.h#L93) | Create from nanoseconds |
-| [`Duration::from_hours(double h)`](src/rpp/timer.h#L104) | Create from hours |
-| [`Duration::from_minutes(double m)`](src/rpp/timer.h#L100) | Create from minutes |
-| [`sec()`](src/rpp/timer.h#L111) / [`msec()`](src/rpp/timer.h#L115) | Convert to fractional seconds / milliseconds |
-| [`seconds()`](src/rpp/timer.h#L119) / [`millis()`](src/rpp/timer.h#L123) / [`micros()`](src/rpp/timer.h#L127) / [`nanos()`](src/rpp/timer.h#L132) | Convert to integer time units |
-| [`to_string()`](src/rpp/timer.h#L199) | Human-readable duration string |
-| [`to_stopwatch_string()`](src/rpp/timer.h#L216) | Stopwatch-style format |
+| [`Duration::from_seconds(double s)`](src/rpp/timer.h#L86) | Create from fractional seconds |
+| [`Duration::from_millis(double ms)`](src/rpp/timer.h#L342) | Create from milliseconds |
+| [`Duration::from_micros(double us)`](src/rpp/timer.h#L344) | Create from microseconds |
+| [`Duration::from_nanos(int64 ns)`](src/rpp/timer.h#L101) | Create from nanoseconds |
+| [`Duration::from_hours(double h)`](src/rpp/timer.h#L112) | Create from hours |
+| [`Duration::from_minutes(double m)`](src/rpp/timer.h#L108) | Create from minutes |
+| [`sec()`](src/rpp/timer.h#L119) / [`msec()`](src/rpp/timer.h#L123) | Convert to fractional seconds / milliseconds |
+| [`seconds()`](src/rpp/timer.h#L127) / [`millis()`](src/rpp/timer.h#L131) / [`micros()`](src/rpp/timer.h#L135) / [`nanos()`](src/rpp/timer.h#L140) | Convert to integer time units |
+| [`to_string()`](src/rpp/timer.h#L204) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timer.h#L221) | Stopwatch-style format |
 
 ### Timer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`start()`](src/rpp/timer.h#L366) | Start / restart the timer |
-| [`elapsed()`](src/rpp/timer.h#L372) | Fractional seconds since start |
-| [`elapsed_millis()`](src/rpp/timer.h#L374) | Fractional milliseconds since start |
-| [`next()`](src/rpp/timer.h#L379) | Get elapsed time and restart |
-| [`measure(Func&& func)`](src/rpp/timer.h#L398) | Measure a block's execution time (seconds) |
-| [`measure_millis(Func&& func)`](src/rpp/timer.h#L406) | Measure a block's execution time (ms) |
+| [`start()`](src/rpp/timer.h#L374) | Start / restart the timer |
+| [`elapsed()`](src/rpp/timer.h#L380) | Fractional seconds since start |
+| [`elapsed_millis()`](src/rpp/timer.h#L382) | Fractional milliseconds since start |
+| [`next()`](src/rpp/timer.h#L387) | Get elapsed time and restart |
+| [`measure(Func&& func)`](src/rpp/timer.h#L406) | Measure a block's execution time (seconds) |
+| [`measure_millis(Func&& func)`](src/rpp/timer.h#L414) | Measure a block's execution time (ms) |
 
 ### Global Time Utilities
 
@@ -2115,7 +2146,7 @@ High-precision timers, duration types, and performance profiling utilities.
 | [`sleep_ms(millis)`](src/rpp/timer.h#L19) | Sleep for milliseconds |
 | [`sleep_us(micros)`](src/rpp/timer.h#L22) | Sleep for microseconds |
 | [`sleep_ns(nanos)`](src/rpp/timer.h#L25) | Sleep for nanoseconds |
-| [`time_now_seconds()`](src/rpp/timer.h#L523) | Returns current time in fractional seconds |
+| [`time_now_seconds()`](src/rpp/timer.h#L531) | Returns current time in fractional seconds |
 
 ### Example: Sleep Utilities
 
@@ -3001,23 +3032,23 @@ Thread-safe FIFO queue with notification support.
 
 | Class | Description |
 |-------|-------------|
-| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L26) | Thread-safe queue with push/pop/wait |
+| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L27) | Thread-safe queue with push/pop/wait |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`push(T&& item)`](src/rpp/concurrent_queue.h#L307) | Push an item |
-| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L307) | Push multiple items |
-| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L364) | Non-blocking pop attempt |
-| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L281) | Pop all items at once |
-| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L552) | Blocking pop with timeout |
-| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L552) | Blocking pop with predicate and timeout |
-| [`clear()`](src/rpp/concurrent_queue.h#L179) | Clear the queue |
-| [`empty()`](src/rpp/concurrent_queue.h#L111) | True if empty |
-| [`size()`](src/rpp/concurrent_queue.h#L130) | Number of items |
-| [`reserve(int n)`](src/rpp/concurrent_queue.h#L211) | Reserve capacity |
-| [`notify()`](src/rpp/concurrent_queue.h#L139) / [`notify_one()`](src/rpp/concurrent_queue.h#L148) | Wake waiting consumers |
+| [`push(T&& item)`](src/rpp/concurrent_queue.h#L306) | Push an item |
+| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L306) | Push multiple items |
+| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L353) | Non-blocking pop attempt |
+| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L280) | Pop all items at once |
+| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L517) | Blocking pop with timeout |
+| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L517) | Blocking pop with predicate and timeout |
+| [`clear()`](src/rpp/concurrent_queue.h#L178) | Clear the queue |
+| [`empty()`](src/rpp/concurrent_queue.h#L110) | True if empty |
+| [`size()`](src/rpp/concurrent_queue.h#L129) | Number of items |
+| [`reserve(int n)`](src/rpp/concurrent_queue.h#L210) | Reserve capacity |
+| [`notify()`](src/rpp/concurrent_queue.h#L138) / [`notify_one()`](src/rpp/concurrent_queue.h#L147) | Wake waiting consumers |
 
 ### Example: Producer-Consumer with wait_pop
 
@@ -3169,10 +3200,10 @@ Cross-platform logging with severity filtering, log handlers, timestamps, and as
 
 | Macro | Description |
 |-------|-------------|
-| [`LogInfo(format, ...)`](src/rpp/debugging.h#L273) | Log informational message |
-| [`LogWarning(format, ...)`](src/rpp/debugging.h#L279) | Log warning |
-| [`LogError(format, ...)`](src/rpp/debugging.h#L285) | Log error (debug assert) |
-| [`Assert(expression, format, ...)`](src/rpp/debugging.h#L299) | Conditional error log |
+| [`LogInfo(format, ...)`](src/rpp/debugging.h#L272) | Log informational message |
+| [`LogWarning(format, ...)`](src/rpp/debugging.h#L278) | Log warning |
+| [`LogError(format, ...)`](src/rpp/debugging.h#L284) | Log error (debug assert) |
+| [`Assert(expression, format, ...)`](src/rpp/debugging.h#L298) | Conditional error log |
 
 ### Configuration Functions
 
@@ -3803,32 +3834,32 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Item | Description |
 |------|-------------|
-| [`test`](src/rpp/tests.h#L53) | Base test class with lifecycle hooks |
-| [`test_info`](src/rpp/tests.h#L33) | Test registration metadata |
-| [`TestVerbosity`](src/rpp/tests.h#L45) | `None`, `Summary`, `TestLabels`, `AllMessages` |
+| [`test`](src/rpp/tests.h#L39) | Base test class with lifecycle hooks |
+| [`test_info`](src/rpp/tests.h#L40) | Test registration metadata |
+| [`TestVerbosity`](src/rpp/tests.h#L67) | `None`, `Summary`, `TestLabels`, `AllMessages` |
 
 ### Key Macros
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L574) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L589) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L606) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L454) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L462) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L498) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L567) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L445) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L471) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.h#L699) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.h#L714) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.h#L731) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.h#L571) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.h#L587) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L623) | Assert inequality |
+| [`AssertTrue(expr)`](src/rpp/tests.h#L692) | Assert expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.h#L562) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.h#L596) | Assert expression throws |
 
 ### Running Tests
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(patterns)`](src/rpp/tests.h#L183) | Run tests matching patterns |
-| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L194) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L199) | Run all registered tests |
-| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L43) | Registers a unit test with given name, factory and autorun flag |
+| [`test::run_tests(patterns)`](src/rpp/tests.h#L271) | Run tests matching patterns |
+| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L282) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L271) | Run all registered tests |
+| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L65) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase
 

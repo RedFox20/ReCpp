@@ -180,7 +180,7 @@ TestImpl(test_binary_stream)
                 const auto& __expect = expected;       \
                 if (!(__expr == __expect)) {           \
                     print_error("file_reader failed at index=%d  %s\n", i, #expr); \
-                    assumption_failed(__FILE__, __LINE__, #expr, __expr, "but expected", __expect); \
+                    assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "but expected", __expect); \
                 } \
             } while (false)
 

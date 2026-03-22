@@ -4,6 +4,7 @@
 #include <rpp/semaphore.h>
 #include <rpp/timer.h> // performance measurement
 #include <atomic>
+#include <latch>
 #include <unordered_set>
 using namespace rpp;
 using namespace std::this_thread;
@@ -257,17 +258,6 @@ TestImpl(test_threadpool)
         AssertThat(checksum, 1337);
     }
 
-    TestCase(repeat_tests)
-    {
-        for (int i = 0; i < 2; ++i)
-        {
-            test_case_setup(); // reset defaults
-            test_parallel_for_should_not_exceed_max_parallelism();
-            test_generic_task();
-            test_parallel_for_performance();
-        }
-    }
-
     TestCaseExpectedEx(parallel_task_exception, std::logic_error)
     {
         int times_launched = 0; // this makes sure the threadpool loop doesn't retrigger our task
@@ -418,6 +408,70 @@ TestImpl(test_threadpool)
         print_info("copy_race_stress: waits finished=%d, timeouts=%d  (%d iterations)\n",
                    (int)waits_finished, (int)waits_timeout, ITERATIONS);
         // Test passes if no crash, use-after-free, or sanitizer error occurred
+    }
+
+    TestCase(pool_task_handle_inc_ref_uaf_race)
+    {
+        // Reliably reproduces the load-then-increment UAF in pool_task_handle.
+        //
+        // === The Race ===
+        //
+        //   Copier (N threads):   p = other.ptr.load()         // (1) atomic load of raw ptr
+        //                         --- race window ---
+        //                         p->ref_count.fetch_add(1)    // (2) inc_ref: UB if p is freed
+        //
+        //   Destroyer (main):     ptr.exchange(nullptr)        // nulls shared.ptr atomically
+        //                         ref_count.fetch_sub(1) → 0   // dec_ref: last reference gone
+        //                         delete p                     // p freed ← copier still has it!
+        //
+        // (1) and (2) are individually atomic, but NOT atomic together.
+        // Between them, the destroyer can run fully (exchange + dec_ref → 0 + delete).
+        // When the copier resumes at (2), it reads/writes freed memory:
+        //   - ASAN reports: heap-use-after-free (WRITE of size 4 on ref_count field)
+        //   - Assertion fires: inc_ref sees old_refs==0
+        //
+        constexpr int ITERATIONS = 5'000;
+        constexpr int N_COPIERS  = 4;
+
+        std::atomic_bool stop{false};
+        pool_task_handle shared{nullptr};
+
+        // All threads start simultaneously for maximum initial contention
+        std::latch ready{N_COPIERS + 1};
+
+        std::vector<std::thread> copiers;
+        copiers.reserve(N_COPIERS);
+        for (int t = 0; t < N_COPIERS; ++t)
+        {
+            copiers.emplace_back([&]() {
+                ready.arrive_and_wait(); // synchronize start with main + other copiers
+                while (!stop.load(std::memory_order_relaxed))
+                {
+                    pool_task_handle copy{shared}; // THE RACING OPERATION: load + inc_ref
+                    (void)copy;                    // drop ref immediately → dec_ref
+                }
+            });
+        }
+
+        ready.arrive_and_wait(); // release all copiers at once
+
+        for (int i = 0; i < ITERATIONS; ++i)
+        {
+            // Fresh handle: refcount=1 owned by shared
+            shared = pool_task_handle{static_cast<pool_worker*>(nullptr)};
+            // yield once — enough for a copier to load ptr but not yet inc_ref
+            std::this_thread::yield();
+            // Immediately destroy: exchange→null, dec_ref → 0, delete
+            // Races with any copier that loaded ptr but hasn't called inc_ref yet
+            shared.signal_finish_and_cleanup();
+        }
+
+        stop.store(true, std::memory_order_release);
+        for (auto& t : copiers) t.join();
+
+        print_info("inc_ref_uaf_race: completed %d iterations with %d copier threads\n",
+                   ITERATIONS, N_COPIERS);
+        // Test passes if no assertion, crash, or ASAN error occurs
     }
 
     TestCase(pool_task_handle_fire_and_forget_race)

@@ -189,12 +189,12 @@ namespace rpp
         bool has_address() const noexcept;
 
         /** 
-         * @brief Returns the IP address as a string. Example result: "192.168.1.110"
+         * @returns the IP address as a string. Example result: "192.168.1.110"
          */
         std::string str() const noexcept;
 
         /**
-         * @brief Returns the IP address as a string. Example result: "192.168.1.110"
+         * @returns the IP address as a string. Example result: "192.168.1.110"
          * WARNING: uses a hidden global buffer, so this is safe to use only once per line
          */
         char* c_str() const noexcept;

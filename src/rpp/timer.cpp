@@ -312,6 +312,26 @@ namespace rpp
         #endif
     }
 
+    void sleep_for(const Duration& d) noexcept
+    {
+        sleep_ns(d.nsec);
+    }
+
+    void sleep_until(const TimePoint& tp) noexcept
+    {
+        #if __APPLE__ || __linux__ || __EMSCRIPTEN__
+            struct timespec deadline;
+            deadline.tv_sec  = (tp.duration.nsec / NANOS_PER_SEC);
+            deadline.tv_nsec = (tp.duration.nsec % NANOS_PER_SEC);
+            clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, nullptr);
+        #else // generic sleep_ns()
+            int64 remaining_ns = tp.duration.nsec - TimePoint::now().duration.nsec;
+            // sleep even if at least 1ns is remaining to avoid complete busy waits
+            if (remaining_ns > 0)
+                sleep_ns(remaining_ns);
+        #endif
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     NOINLINE static int print_fraction(int64 ns, char* out, int fraction_digits) noexcept

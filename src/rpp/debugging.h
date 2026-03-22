@@ -86,9 +86,8 @@ RPPCAPI const char* _LogFuncname(const char* longFuncName); // shortens the func
 namespace rpp
 {
     /**
-     * @brief Returns the filename part of a long file path.
      * @param path The full file path
-     * @return The filename part of the path
+     * @return The filename part of a long file path.
      */
     constexpr inline const char* shorten_filename(const char* path) noexcept
     {

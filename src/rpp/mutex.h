@@ -237,7 +237,7 @@ namespace rpp
 
             rpp::TimePoint start = rpp::TimePoint::now();
             do {
-                rpp::sleep_us(100); // yielding here will improve perf massively
+                rpp::sleep_us(50); // yielding here will improve perf massively
                 if (m.try_lock()) return std::unique_lock<Mutex>{m, std::adopt_lock};
             }
             while ((rpp::TimePoint::now() - start) < timeout);

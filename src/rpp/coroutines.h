@@ -5,10 +5,9 @@
  */
 #include "config.h"
 #include "future.h"
-#include "timer.h"
+#include "timer.h" // rpp::Duration
 
 #if RPP_HAS_COROUTINES
-#include <chrono>
 
 namespace rpp
 {
@@ -188,39 +187,21 @@ namespace rpp
     /**
      * @brief Awaiter object for std::chrono durations
      */
-    template<class Clock = std::chrono::high_resolution_clock>
-    struct RPP_CORO_RETURN_TYPE chrono_awaiter
+    struct RPP_CORO_RETURN_TYPE time_awaiter
     {
-        using time_point = typename Clock::time_point;
-        using duration = typename Clock::duration;
-        time_point end;
+        rpp::TimePoint end;
 
-        explicit chrono_awaiter(const time_point& end) noexcept : end{end} {}
-        explicit chrono_awaiter(const duration& d) noexcept : end{Clock::now() + d} {}
-
-        template<typename Rep, typename Period>
-        explicit chrono_awaiter(std::chrono::duration<Rep, Period> d) noexcept
-            : end{Clock::now() + std::chrono::duration_cast<duration>(d)} {}
-
+        explicit time_awaiter(const rpp::TimePoint& end) noexcept : end{end} {}
+        explicit time_awaiter(const rpp::Duration& d) noexcept : end{rpp::TimePoint::now() + d} {}
         bool await_ready() const noexcept
         {
-            return Clock::now() >= end;
+            return rpp::TimePoint::now() >= end;
         }
         void await_suspend(rpp::coro_handle<> cont) const
         {
-            rpp::parallel_task([cont,end=end]() /*clang-12 compat*/mutable
+            rpp::parallel_task_detached([cont,end=end]() /*clang-12 compat*/mutable
             {
-            #if _MSC_VER
-                // win32 internal Sleep is incredibly inaccurate, so rpp::sleep_us must be used
-                auto d = std::chrono::duration_cast<std::chrono::microseconds>(end - Clock::now());
-                int micros = static_cast<int>(d.count());
-                if (micros > 0)
-                {
-                    rpp::sleep_us(micros);
-                }
-            #else
-                std::this_thread::sleep_until(end);
-            #endif
+                rpp::sleep_until(end);
                 // resume execution while still inside the background thread
                 cont.resume();
             });
@@ -323,13 +304,12 @@ namespace rpp
          * @brief Allows to co_await on a std::chrono::duration
          * @code
          *     using namespace rpp::coro_operators;
-         *     co_await std::chrono::milliseconds{100};
+         *     co_await rpp::millis(100);
          * @endcode
          */
-        template<typename Rep, typename Period>
-        RPP_CORO_WRAPPER inline auto operator co_await(const std::chrono::duration<Rep, Period>& duration) noexcept
+        RPP_CORO_WRAPPER inline auto operator co_await(const rpp::Duration& duration) noexcept
         {
-            return chrono_awaiter<>{ duration };
+            return time_awaiter{ duration };
         }
     }
 } // namespace rpp

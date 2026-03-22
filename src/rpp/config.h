@@ -255,6 +255,11 @@
 #endif
 
 // MSVC printf format string validator
+// USAGE:
+//   void foobar(int arg1, PRINTF_FMTSTR const char* formatArg2, ...) PRINTF_CHECKFMT2;
+//   void foobar(int arg1, PRINTF_FMTSTR const char* formatArg2, ...)
+//   {
+//   }
 #ifndef PRINTF_FMTSTR
 #  if _MSC_VER
 #    define PRINTF_FMTSTR _In_z_ _Printf_format_string_

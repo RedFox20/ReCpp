@@ -5,7 +5,6 @@
 
 #include <rpp/tests.h>
 using namespace rpp;
-using namespace std::chrono_literals;
 using namespace std::this_thread;
 
 TestImpl(test_coroutines)
@@ -36,21 +35,21 @@ TestImpl(test_coroutines)
         return value;
     }
 
-    static rpp::cfuture<void> chrono_coro(int millis)
+    static rpp::cfuture<void> duration_coro(int millis)
     {
-        co_await std::chrono::milliseconds{millis};
+        co_await rpp::millis(millis);
     }
-    TestCase(basic_chrono_coro)
+    TestCase(basic_duration_coro)
     {
         rpp::Timer t1;
-        chrono_coro(50).get();
+        duration_coro(50).get();
         double e = t1.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
         AssertGreater(e, 49.0);
         AssertLess(e, 55.0);
 
         rpp::Timer t2;
-        chrono_coro(15).get();
+        duration_coro(15).get();
         double e2 = t2.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
         AssertGreater(e2, 14.0);
@@ -60,7 +59,7 @@ TestImpl(test_coroutines)
 
     static rpp::cfuture<std::string> string_coro()
     {
-        co_await std::chrono::milliseconds{1};
+        co_await rpp::millis(1);
         co_return "string from coro";
     }
     TestCase(basic_string_coro)
@@ -71,7 +70,7 @@ TestImpl(test_coroutines)
 
     cfuture<void> void_coro(std::string* result)
     {
-        co_await std::chrono::milliseconds{1};
+        co_await rpp::millis(1);
         set_locked(*result, co_await string_coro());
         co_return;
     }
@@ -87,7 +86,7 @@ TestImpl(test_coroutines)
 
     static cfuture<std::string> as_async(std::string s)
     {
-        co_await std::chrono::milliseconds{1};
+        co_await rpp::millis(1);
         co_return s;
     }
     static cfuture<std::string> multi_stage_coro()
@@ -117,12 +116,12 @@ TestImpl(test_coroutines)
 
     static cfuture<std::string> exceptional_coro()
     {
-        co_await std::chrono::milliseconds{1};
+        co_await rpp::millis(1);
 
         throw std::runtime_error{"aargh!"};
         co_return "aargh!";
     }
-    cfuture<std::string> exception_handling_coro()
+    static cfuture<std::string> exception_handling_coro()
     {
         std::string s = co_await as_async("abc");
         bool exceptionWasThrown = false;
@@ -147,7 +146,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<std::vector<int>> destructor_sequence_coro()
+    static cfuture<std::vector<int>> destructor_sequence_coro()
     {
         rpp::mutex m;
         std::vector<int> destructor_ids;
@@ -167,7 +166,7 @@ TestImpl(test_coroutines)
         co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr {m, destructor_ids, 1};
-            co_await std::chrono::milliseconds{10};
+            co_await rpp::millis(10);
         };
         print_warning("dtor sequence #1 elapsed: %.2fms\n", t1.elapsed_millis());
         {
@@ -180,7 +179,7 @@ TestImpl(test_coroutines)
         std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr {m, destructor_ids, 2};
-            co_await std::chrono::milliseconds{5};
+            co_await rpp::millis(5);
             co_return "test";
         };
         print_warning("dtor sequence #2 elapsed: %.2fms\n", t2.elapsed_millis());
@@ -217,7 +216,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<void> functor_nonfuture_void_coro()
+    static cfuture<void> functor_nonfuture_void_coro()
     {
         std::string result = "default";
         // tests functor_awaiter<void>, lambda is converted to rpp::delegate<void()>
@@ -233,7 +232,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<void> functor_nonfuture_string_coro()
+    static cfuture<void> functor_nonfuture_string_coro()
     {
         // tests functor_awaiter<T> with a return value, lambda is converted to rpp::delegate<std::string()>
         std::string result = co_await [&]() -> std::string {
@@ -250,7 +249,7 @@ TestImpl(test_coroutines)
 
     static cfuture<void> std_future_void_coro()
     {
-        co_await std::chrono::milliseconds{10};
+        co_await rpp::millis(10);
         co_return;
     }
     TestCase(std_future_void_coro)

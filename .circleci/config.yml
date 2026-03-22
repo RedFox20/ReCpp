@@ -23,6 +23,10 @@ jobs:
         enum: ["asan", "clang-tidy", "tsan"]
         default: "asan"
         description: "Sanitizer/analysis tool to use"
+      coverage:
+        type: boolean
+        default: false
+        description: "Whether to generate code coverage report (only supported for gcc with ASAN)"
     description: "Ubuntu << parameters.compiler >> << parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     resource_class: large # 4 CPU-s, 8GB RAM (needed for clang-tidy)
     docker:
@@ -31,6 +35,7 @@ jobs:
       COMPILER_NAME: << parameters.compiler >>
       SANITIZER_FLAG: << parameters.sanitizer >>
       CPP_STANDARD: CXX<< parameters.cpp_version >>
+      COVERAGE_FLAG: << parameters.coverage >>
     steps:
       - checkout
       - run: sudo apt-get update
@@ -42,13 +47,13 @@ jobs:
           name: Build << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
-            COVERAGE=$([[ $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage=src" || echo "")
+            COVERAGE=$([[ $COVERAGE_FLAG == "true" && $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests
       - run:
           name: Test << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
-            COVERAGE=$([[ $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage-report=src" || echo "")
+            COVERAGE=$([[ $COVERAGE_FLAG == "true" && $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage-report=src" || echo "")
             pipenv run mama $COMPILER_NAME verbose $COVERAGE test="nogdb -vv"
   msvc-win64-cpp20:
     description: Windows MSVC C++20 VS2022 x64 Build
@@ -133,6 +138,7 @@ workflows:
           name: clang-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: clang
           cc_version: clang-18
+          coverage: true
       # TODO: clang++20 C++26 tests crash due to codecvt deprecation
       # TODO: Clang C++26 build
       # GCC builds on Ubuntu
@@ -144,16 +150,18 @@ workflows:
           name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: gcc
           cc_version: gcc-13
+          coverage: true
       # Run Newer GCC builds on Ubuntu with C++26 and latest sanitizers
       # TODO: CI does not support gcc-15 yet
       - ubuntu-build:
           matrix:
             parameters:
               cpp_version: ["26"]
-              sanitizer: ["asan", "clang-tidy", "tsan"]
+              sanitizer: [ "asan", "clang-tidy", "tsan"]
           name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
           compiler: gcc
           cc_version: gcc-14
+          coverage: false # this can cause OOM in CI with GCC-14, disabling for now
       # Other platform builds
       - msvc-win64-cpp20
       - gcc-mipsel-cpp20
