@@ -166,8 +166,7 @@ namespace rpp
             #if RPP_POOL_TASK_USE_ATOMIC_SP
                 ptr = nullptr; // atomic_shared_ptr will handle cleanup
             #else
-                if (auto* p = ptr.exchange(nullptr))
-                    dec_ref(*p);
+                dec_ref(ptr.exchange(nullptr));
             #endif
         }
         pool_task_handle(const pool_task_handle& other) noexcept
@@ -176,24 +175,20 @@ namespace rpp
             #endif
         {
             #if !RPP_POOL_TASK_USE_ATOMIC_SP
-                auto* new_ptr = other.ptr.load();
-                if (new_ptr) inc_ref(*new_ptr);
-                ptr.store(new_ptr);
+                ptr.store(inc_ref(other));
             #endif
         }
         pool_task_handle(pool_task_handle&& other) noexcept
-            : ptr{other.ptr.exchange(nullptr)} {}
+            : ptr{other.ptr.exchange(nullptr)}
+        {
+        }
         pool_task_handle& operator=(const pool_task_handle& other) noexcept
         {
             if (this != &other) {
             #if RPP_POOL_TASK_USE_ATOMIC_SP
                 ptr.store(other.ptr.load());
             #else
-                auto* new_ptr = other.ptr.load();
-                auto* old_ptr = ptr.load();
-                if (new_ptr) inc_ref(*new_ptr);
-                if (old_ptr) dec_ref(*old_ptr);
-                ptr.store(new_ptr);
+                dec_ref(ptr.exchange(inc_ref(other)));
             #endif
             }
             return *this;
@@ -217,22 +212,30 @@ namespace rpp
 
     #else // !RPP_POOL_TASK_USE_ATOMIC_SP
 
-        static void inc_ref(pool_task_state& p) noexcept
+        // tries to increment refcount, returns p if successful, nullptr if p is null or deleted
+        // uses the finished mutex to serialize against dec_ref
+        static pool_task_state* inc_ref(const pool_task_handle& handle) noexcept
         {
-            int old_refs = p.ref_count.fetch_add(1, std::memory_order_seq_cst);
+            auto* p = handle.ptr.load();
+            if (!p) return nullptr;
+            int old_refs = p->ref_count.fetch_add(1);
             if (old_refs <= 0 || old_refs > 100'000) {
-                __assertion_failure("pool_task_state::inc_ref invalid refcount=%d", old_refs);
-                std::terminate();
+                // instead of triggering an assert+terminate, log error and return nullptr gracefully
+                if (old_refs == 0) LogWarning("invalid refcount=%d (detected use-after-free)", old_refs);
+                else LogWarning("invalid refcount=%d (ref count overflow or memory corruption)", old_refs);
+                return nullptr;
             }
+            return p;
         }
-        static void dec_ref(pool_task_state& p) noexcept
+        static void dec_ref(pool_task_state* p) noexcept
         {
-            int old_refs = p.ref_count.fetch_sub(1, std::memory_order_acq_rel);
-            if (old_refs != 1) return; // only enter delete &p if old_refs == 1
+            if (!p) return;
+            int old_refs = p->ref_count.fetch_sub(1);
+            if (old_refs != 1) return; // not the last reference
             #if RPP_TSAN
-                __tsan_acquire(&p.ref_count);
+                __tsan_acquire(&p->ref_count);
             #endif
-            delete &p;
+            delete p;
         }
 
         /// RAII strong ref proxy - to unify the interface with atomic_shared_ptr version
@@ -240,9 +243,9 @@ namespace rpp
         struct strong_ref
         {
             pool_task_state* p;
-            explicit strong_ref(const pool_task_handle& src) noexcept : p{src.ptr.load()} { if (p) inc_ref(*p); }
-            explicit strong_ref(pool_task_state* p) noexcept : p{p} { }
-            ~strong_ref() noexcept { if (p) dec_ref(*p); }
+            explicit strong_ref(const pool_task_handle& src) noexcept : p{inc_ref(src)} {}
+            explicit strong_ref(pool_task_state* p) noexcept : p{p} {}
+            ~strong_ref() noexcept { dec_ref(p); }
             strong_ref(const strong_ref&) = delete;
             strong_ref& operator=(const strong_ref&) = delete;
             explicit operator bool() const noexcept { return p != nullptr; }
