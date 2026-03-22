@@ -21,6 +21,14 @@
 #include <atomic> // std::atomic_bool
 #include <exception> // std::exception_ptr
 
+// Feature flag: 1 = use rpp::atomic_shared_ptr for pool_task_handle
+//               0 = use raw atomic pointer + manual refcount (old implementation)
+#define RPP_POOL_TASK_USE_ATOMIC_SP 1
+
+#if RPP_POOL_TASK_USE_ATOMIC_SP
+#  include "atomic_shared_ptr.h"
+#endif
+
 struct test_threadpool; // forward declaration for unit tests
 
 namespace rpp
@@ -111,119 +119,166 @@ namespace rpp
 
     struct pool_task_state
     {
+    #if !RPP_POOL_TASK_USE_ATOMIC_SP
         std::atomic_int ref_count;
+    #endif
         rpp::semaphore_once_flag finished;
         std::string trace;
         std::exception_ptr error;
         pool_worker* worker = nullptr;
         explicit pool_task_state(pool_worker* w) noexcept
-            : ref_count{1}, worker{w} {}
+            :
+        #if !RPP_POOL_TASK_USE_ATOMIC_SP
+            ref_count{1},
+        #endif
+            worker{w} {}
     };
 
     /**
-     * A waitable pool task handle that can thread safely passed around.
-     * 
-     * This is an atomic shared ptr, specialized to pool_task_state.
-     * It's not easy to generalize this to an atomic<shared_ptr<T>>,
-     * so this wrapper is used to provide a correct implementation.
+     * A waitable pool task handle that can be thread-safely passed around.
+     *
+     * Two implementations controlled by RPP_POOL_TASK_USE_ATOMIC_SP:
+     *   1 = rpp::atomic_shared_ptr<pool_task_state> -- race-free, fixes load-then-increment UAF
+     *   0 = raw atomic pointer + manual refcount -- original implementation
      */
     class RPPAPI pool_task_handle
     {
+    #if RPP_POOL_TASK_USE_ATOMIC_SP
+        rpp::atomic_shared_ptr<pool_task_state> ptr;
+    #else
         std::atomic<pool_task_state*> ptr;
+    #endif
 
     public:
         using duration = rpp::Duration;
 
         pool_task_handle(std::nullptr_t) noexcept : ptr{nullptr} {}
         explicit pool_task_handle(pool_worker* w) noexcept
-            : ptr{new pool_task_state{w}}
+            #if RPP_POOL_TASK_USE_ATOMIC_SP
+                : ptr{std::make_shared<pool_task_state>(w)}
+            #else
+                : ptr{new pool_task_state{w}}
+            #endif
         {
         }
         ~pool_task_handle() noexcept
         {
-            if (auto* p = ptr.exchange(nullptr, std::memory_order_seq_cst))
-                dec_ref(p);
+            #if RPP_POOL_TASK_USE_ATOMIC_SP
+                ptr = nullptr; // atomic_shared_ptr will handle cleanup
+            #else
+                if (auto* p = ptr.exchange(nullptr))
+                    dec_ref(*p);
+            #endif
         }
         pool_task_handle(const pool_task_handle& other) noexcept
-            : ptr{nullptr}
+            #if RPP_POOL_TASK_USE_ATOMIC_SP
+                : ptr{other.ptr.load()}
+            #endif
         {
-            inc_ref(*this, other);
+            #if !RPP_POOL_TASK_USE_ATOMIC_SP
+                auto* new_ptr = other.ptr.load();
+                if (new_ptr) inc_ref(*new_ptr);
+                ptr.store(new_ptr);
+            #endif
         }
         pool_task_handle(pool_task_handle&& other) noexcept
-        {
-            ptr.store(other.ptr.exchange(nullptr)); // atomic swap
-        }
-        // @warning NOT safe if `other` is concurrently mutated by another thread.
-        //          Same thread-safety contract as std::shared_ptr:
-        //          concurrent reads OK, concurrent read+write requires external sync.
+            : ptr{other.ptr.exchange(nullptr)} {}
         pool_task_handle& operator=(const pool_task_handle& other) noexcept
         {
             if (this != &other) {
-                if (auto* p = ptr.exchange(nullptr, std::memory_order_seq_cst))
-                    dec_ref(p);
-                inc_ref(*this, other);
+            #if RPP_POOL_TASK_USE_ATOMIC_SP
+                ptr.store(other.ptr.load());
+            #else
+                auto* new_ptr = other.ptr.load();
+                auto* old_ptr = ptr.load();
+                if (new_ptr) inc_ref(*new_ptr);
+                if (old_ptr) dec_ref(*old_ptr);
+                ptr.store(new_ptr);
+            #endif
             }
             return *this;
         }
         pool_task_handle& operator=(pool_task_handle&& other) noexcept
         {
             if (this != &other) {
-                 // atomic exchange (no need to inc/dec refcount)
-                other.ptr.store(ptr.exchange(other.ptr.load()));
+                ptr.store(other.ptr.exchange(nullptr));
             }
             return *this;
         }
     private:
-        // PRECONDITION: self.ptr must be null
-        static void inc_ref(pool_task_handle& self, const pool_task_handle& other) noexcept
+
+    #if RPP_POOL_TASK_USE_ATOMIC_SP
+
+        /// Returns a strong reference that keeps the state alive
+        FINLINE std::shared_ptr<pool_task_state> get() const noexcept { return ptr.load(); }
+
+        /// Atomically takes ownership, nulls this handle, returns owned ref
+        FINLINE std::shared_ptr<pool_task_state> take() noexcept { return ptr.exchange(nullptr); }
+
+    #else // !RPP_POOL_TASK_USE_ATOMIC_SP
+
+        static void inc_ref(pool_task_state& p) noexcept
         {
-            if (auto* p = other.ptr.load(std::memory_order_seq_cst)) {
-                self.ptr.store(p, std::memory_order_seq_cst);
-                int old_refs = p->ref_count.fetch_add(1, std::memory_order_seq_cst);
-                if (old_refs <= 0 || old_refs > 100'000) {
-                    __assertion_failure("pool_task_state::inc_ref invalid refcount=%d", old_refs);
-                    std::terminate();
-                }
+            int old_refs = p.ref_count.fetch_add(1, std::memory_order_seq_cst);
+            if (old_refs <= 0 || old_refs > 100'000) {
+                __assertion_failure("pool_task_state::inc_ref invalid refcount=%d", old_refs);
+                std::terminate();
             }
         }
-        static void dec_ref(pool_task_state* p) noexcept
+        static void dec_ref(pool_task_state& p) noexcept
         {
-            int refs = p->ref_count.fetch_sub(1, std::memory_order_acq_rel) - 1;
-            if (refs != 0) return;
-            // TSan can't reason about operator delete (non-atomic write) overlapping
-            // the atomic ref_count at the same address. The acq_rel on fetch_sub is
-            // sufficient for correctness, but TSan needs an explicit acquire annotation
-            // to see that all prior releases are visible before the delete.
+            int old_refs = p.ref_count.fetch_sub(1, std::memory_order_acq_rel);
+            if (old_refs != 1) return; // only enter delete &p if old_refs == 1
             #if RPP_TSAN
-                __tsan_acquire(&p->ref_count);
+                __tsan_acquire(&p.ref_count);
             #endif
-            delete p;
+            delete &p;
         }
-        // these are unsafe, use with care
-        FINLINE pool_task_state* get()        const noexcept { return ptr.load(std::memory_order_seq_cst); }
-        FINLINE pool_task_state* operator->() const noexcept { return ptr.load(std::memory_order_seq_cst); }
+
+        /// RAII strong ref proxy - to unify the interface with atomic_shared_ptr version
+        /// Secondary ctor for taking full ownership of a pool task state
+        struct strong_ref
+        {
+            pool_task_state* p;
+            explicit strong_ref(const pool_task_handle& src) noexcept : p{src.ptr.load()} { if (p) inc_ref(*p); }
+            explicit strong_ref(pool_task_state* p) noexcept : p{p} { }
+            ~strong_ref() noexcept { if (p) dec_ref(*p); }
+            strong_ref(const strong_ref&) = delete;
+            strong_ref& operator=(const strong_ref&) = delete;
+            explicit operator bool() const noexcept { return p != nullptr; }
+            pool_task_state* operator->() const noexcept { return p; }
+        };
+
+        /// @returns a strong reference that keeps the state alive
+        FINLINE strong_ref get() const noexcept { return strong_ref{*this}; }
+
+        /// @returns strong ref by Atomically taking ownership, nulls this handle
+        FINLINE strong_ref take() noexcept { return strong_ref{ptr.exchange(nullptr)}; }
+
+    #endif // RPP_POOL_TASK_USE_ATOMIC_SP
+
     public:
 
-        /// @returns The name of the worker thread that is running this task 
+        /// @returns The name of the worker thread that is running this task
         const char* worker_name() const noexcept;
 
         /// @brief True if task was started -- and it may have already finished @see is_finished
-        bool was_started() const noexcept { return ptr != nullptr; }
+        bool was_started() const noexcept { return !!get(); }
 
         /// @returns True if task is running and has not finished yet
         bool is_running() const noexcept
         {
-            auto* p = get();
-            if (p == nullptr) return false; // a null task cannot be running
-            return !p->finished.is_set();
+            auto strong = get();
+            if (!strong) return false; // a null task cannot be running
+            return !strong->finished.is_set();
         }
 
         /// @returns True if task has finished running
         bool is_finished() const noexcept
         {
-            auto* p = get();
-            if (p == nullptr) return false; // a null task can never be finished
-            return p->finished.is_set();
+            auto strong = get();
+            if (!strong) return false; // a null task can never be finished
+            return strong->finished.is_set();
         }
 
         // wait for task to finish with timeout
@@ -233,7 +288,8 @@ namespace rpp
         // @param outErr [out] if outErr != null && *outErr != null, then *outErr
         //                     is initialized with the caught exception (if any)
         wait_result wait(rpp::Duration timeout) const;
-        wait_result wait(rpp::Duration timeout, std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
+        wait_result wait(rpp::Duration timeout, std::nothrow_t nothrow,
+                         std::exception_ptr* outErr = nullptr) const noexcept;
 
         // wait for task to finish (no timeout)
         // @note Throws any unhandled exceptions from background thread
@@ -241,8 +297,8 @@ namespace rpp
         // @param outErr [out] if outErr != null && *outErr != null, then *outErr
         //                     is initialized with the caught exception (if any)
         wait_result wait() const;
-        wait_result wait(std::nothrow_t, std::exception_ptr* outErr = nullptr) const noexcept;
-    
+        wait_result wait(std::nothrow_t nothrow, std::exception_ptr* outErr = nullptr) const noexcept;
+
     private:
         friend class pool_worker;
         friend struct ::test_threadpool;

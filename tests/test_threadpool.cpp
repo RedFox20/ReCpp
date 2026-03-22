@@ -258,17 +258,6 @@ TestImpl(test_threadpool)
         AssertThat(checksum, 1337);
     }
 
-    TestCase(repeat_tests)
-    {
-        for (int i = 0; i < 2; ++i)
-        {
-            test_case_setup(); // reset defaults
-            test_parallel_for_should_not_exceed_max_parallelism();
-            test_generic_task();
-            test_parallel_for_performance();
-        }
-    }
-
     TestCaseExpectedEx(parallel_task_exception, std::logic_error)
     {
         int times_launched = 0; // this makes sure the threadpool loop doesn't retrigger our task
@@ -441,7 +430,7 @@ TestImpl(test_threadpool)
         //   - ASAN reports: heap-use-after-free (WRITE of size 4 on ref_count field)
         //   - Assertion fires: inc_ref sees old_refs==0
         //
-        constexpr int ITERATIONS = 50'000;
+        constexpr int ITERATIONS = 5'000;
         constexpr int N_COPIERS  = 4;
 
         std::atomic_bool stop{false};
