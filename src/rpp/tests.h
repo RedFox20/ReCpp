@@ -76,6 +76,7 @@ namespace rpp
     {
         struct dummy { };
 
+    #if RPP_HAS_COROUTINES
         /**
          * Simple coroutine return type for test cases.
          * Runs synchronously with suspend/resume points driven by the test runner.
@@ -88,17 +89,17 @@ namespace rpp
                 std::exception_ptr exception;
                 test_coro get_return_object() noexcept
                 {
-                    return test_coro{std::coroutine_handle<promise_type>::from_promise(*this)};
+                    return test_coro{RPP_CORO_STD::coroutine_handle<promise_type>::from_promise(*this)};
                 }
-                std::suspend_never initial_suspend() noexcept { return {}; }
-                std::suspend_always final_suspend() noexcept { return {}; }
+                RPP_CORO_STD::suspend_never initial_suspend() noexcept { return {}; }
+                RPP_CORO_STD::suspend_always final_suspend() noexcept { return {}; }
                 void return_void() noexcept {}
                 void unhandled_exception() noexcept { exception = std::current_exception(); }
             };
 
-            std::coroutine_handle<promise_type> handle;
+            RPP_CORO_STD::coroutine_handle<promise_type> handle;
 
-            explicit test_coro(std::coroutine_handle<promise_type> h) noexcept : handle{h} {}
+            explicit test_coro(RPP_CORO_STD::coroutine_handle<promise_type> h) noexcept : handle{h} {}
             test_coro(test_coro&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
             ~test_coro() { if (handle) handle.destroy(); }
             test_coro(const test_coro&) = delete;
@@ -117,6 +118,7 @@ namespace rpp
             }
             bool done() const noexcept { return !handle || handle.done(); }
         };
+    #endif // RPP_HAS_COROUTINES
 
         // minimal version from delegate.h for impossibly fast delegates
         #if _MSC_VER  // VC++
@@ -139,6 +141,7 @@ namespace rpp
             dummy_type dfunc;
         };
 
+    #if RPP_HAS_COROUTINES
         // function pointer types for coroutine test cases (returning test_coro)
         #if _MSC_VER  // VC++
             #if INTPTR_MAX != INT64_MAX // __thiscall only applies for 32-bit MSVC
@@ -159,7 +162,8 @@ namespace rpp
             coro_memb_type mfunc;
             coro_dummy_type dfunc;
         };
-
+    #endif // RPP_HAS_COROUTINES
+    
         struct test_func;
         struct test_impl;
 
@@ -251,8 +255,10 @@ namespace rpp
         virtual void test_case_setup() {}
         virtual void test_case_cleanup() {}
 
+    #if RPP_HAS_COROUTINES
         // override to provide a custom coroutine runner (e.g. event loop driven)
         virtual void run_coro_test(test_coro& coro) { coro.run_until_done(); }
+    #endif // RPP_HAS_COROUTINES
 
         bool run_init();
         void run_cleanup();
@@ -407,6 +413,7 @@ namespace rpp
             return self->add_test_func(name, fn, expectedExHash, autorun);
         }
 
+    #if RPP_HAS_COROUTINES
         int add_coro_test_func(strview name, coro_func_type fn, size_t expectedExHash, bool autorun);
 
         // adds a coroutine test to the automatic test run list
@@ -430,6 +437,7 @@ namespace rpp
             size_t expectedExHash = ti ? ti->hash_code() : 0;
             return self->add_coro_test_func(name, fn, expectedExHash, autorun);
         }
+    #endif // RPP_HAS_COROUTINES
     };
 
     struct Compare
@@ -732,10 +740,12 @@ namespace rpp
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
     void test_##testname()
 
+#if RPP_HAS_COROUTINES
 // allows to use co_await in test cases, driven synchronously by the test runner
 #define TestCaseCoro(testname) \
     const int _test_##testname = add_coro_test_func(self(), #testname, &ClassType::test_##testname ); \
     rpp::test::test_coro test_##testname()
+#endif // RPP_HAS_COROUTINES
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname, &typeid(expectedExceptionType)); \

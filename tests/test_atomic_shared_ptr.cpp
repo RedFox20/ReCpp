@@ -2,6 +2,7 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <vector>
+#include <latch>
 
 TestImpl(test_atomic_shared_ptr)
 {
@@ -110,6 +111,7 @@ TestImpl(test_atomic_shared_ptr)
         std::atomic_bool stop{false};
         std::atomic_int valid_reads{0};
         std::atomic_int invalid_reads{0};
+        std::latch readers_ready{NUM_READERS};
 
         std::vector<std::thread> readers;
         readers.reserve(NUM_READERS);
@@ -117,6 +119,7 @@ TestImpl(test_atomic_shared_ptr)
         {
             readers.emplace_back([&]
             {
+                readers_ready.arrive_and_wait();
                 while (!stop.load(std::memory_order_acquire))
                 {
                     auto sp = asp.load(std::memory_order_acquire);
@@ -131,6 +134,8 @@ TestImpl(test_atomic_shared_ptr)
                 }
             });
         }
+
+        readers_ready.wait(); // ensure all readers are spinning before we start writing
 
         for (int i = 1; i <= NUM_ITERATIONS; ++i)
             asp.store(std::make_shared<int>(i), std::memory_order_release);
