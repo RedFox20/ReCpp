@@ -1,4 +1,5 @@
 #include <rpp/tests.h>
+#include <array>
 #include <vector>
 #include <string>
 #include <rpp/sort.h>
@@ -140,7 +141,7 @@ TestImpl(test_sort)
         // all elements are equal, so a correct implementation should perform zero swaps
         std::vector<counted_int> array;
         for (int i = 0; i < 10; ++i)
-            array.push_back(counted_int{42, &swap_count});
+            array.emplace_back(counted_int{42, &swap_count});
 
         swap_count = 0; // reset after vector construction
         rpp::insertion_sort(array.data(), array.size(),
@@ -174,8 +175,8 @@ TestImpl(test_sort)
         // valid comparator: bool(const T&, const T&)
         static_assert(rpp::sort_comparison<int, decltype([](const int& a, const int& b) { return a < b; })>);
 
-        // valid: comparator returning int (convertible to bool)
-        static_assert(rpp::sort_comparison<int, decltype([](const int& a, const int& b) -> int { return a - b; })>);
+        // invalid: comparator returning int instead of bool
+        static_assert(!rpp::sort_comparison<int, decltype([](const int& a, const int& b) -> int { return a - b; })>);
 
         // invalid: comparator with wrong parameter types should not match
         static_assert(!rpp::sort_comparison<int, decltype([](const std::string& a, const std::string& b) { return a < b; })>);
@@ -184,14 +185,21 @@ TestImpl(test_sort)
         static_assert(!rpp::sort_comparison<int, decltype([](const int&, const int&) -> void { })>);
     }
 
-    TestCase(sortable_container_concept)
+    TestCase(contiguous_container_concept)
     {
-        static_assert(rpp::sortable_container<std::vector<int>>);
-        static_assert(rpp::sortable_container<std::vector<std::string>>);
+        static_assert(rpp::contiguous_container<std::vector<int>>);
+        static_assert(rpp::contiguous_container<std::vector<std::string>>);
+        static_assert(rpp::contiguous_container<std::array<int, 10>>);
 
-        // a type without .data()/.size()/operator[] should not satisfy the concept
-        struct not_a_container { int x; };
-        static_assert(!rpp::sortable_container<not_a_container>);
+        // a type that doesn't completely satisfy the contiguous_container requirements should not match
+        // even if it looks slightly similar
+        struct not_a_container { 
+            int x{}, y{}, z{};
+            int& data() { return x; } // similar, but not actually a container
+            int size() const { return x*x; } // similar, but not actually a container
+            int operator[](size_t index) const { return (&x)[index]; } // similar, but not actually a container
+        };
+        static_assert(!rpp::contiguous_container<not_a_container>);
     }
 
     TestCase(insertion_sort_custom_container)
@@ -206,7 +214,7 @@ TestImpl(test_sort)
             int& operator[](int index) { return v[index]; }
         };
 
-        static_assert(rpp::sortable_container<int_container>);
+        static_assert(rpp::contiguous_container<int_container>);
 
         int_container c;
         c.v = array_random_int(32);

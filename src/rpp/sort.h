@@ -8,8 +8,8 @@
 #include "config.h"
 #include <stddef.h> // size_t
 #if RPP_HAS_CXX20
-#  include <concepts> // std::convertible_to
-#  include <iterator>  // std::contiguous_iterator
+#  include <concepts> // std::same_as
+#  include <type_traits> // std::is_pointer
 #endif
 
 namespace rpp
@@ -23,7 +23,7 @@ namespace rpp
      */
     template<typename T, typename Comparison>
     concept sort_comparison = requires(const Comparison& cmp, const T& a, const T& b) {
-        { cmp(a, b) } -> std::convertible_to<bool>;
+        { cmp(a, b) } -> std::same_as<bool>;
     };
 
     /**
@@ -35,11 +35,17 @@ namespace rpp
      *         - operator[](size_t|int) const for random access to elements
      */
     template<typename Container>
-    concept sortable_container = requires(Container& c) {
-        { c.data() } -> std::contiguous_iterator;
-        { c.size() } -> std::convertible_to<size_t>;
-        c[size_t{}];
+    concept contiguous_container = requires(Container& c, size_t index) {
+        *c.data(); // data() must be dereferenceable (pointer-like)
+        c.size();
+        c[index];
     };
+
+    /** 
+     * @brief Deduces the raw element type from a contiguous container's data() pointer.
+     */
+    template<contiguous_container Container>
+    using container_element_t = std::decay_t<decltype(std::declval<Container&>().data()[0])>;
 #endif
 
     /**
@@ -76,8 +82,8 @@ namespace rpp
     FINLINE void insertion_sort(Container& container, const Comparison& comparison)
         noexcept(noexcept(insertion_sort(container.data(), container.size(), comparison)))
         #if RPP_HAS_CXX20
-            requires sortable_container<Container> &&
-                     sort_comparison<std::remove_pointer_t<decltype(std::declval<Container&>().data())>, Comparison>
+            requires contiguous_container<Container> &&
+                     sort_comparison<container_element_t<Container>, Comparison>
         #endif
     {
         insertion_sort(container.data(), container.size(), comparison);

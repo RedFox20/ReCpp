@@ -11,15 +11,22 @@
         #include <coroutine>
         #define RPP_HAS_COROUTINES 1
         #define RPP_CORO_STD std
-    #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang
+    #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang-14 and older
         #include <experimental/coroutine>
         #define RPP_HAS_COROUTINES 1
         #define RPP_CORO_STD std::experimental
+        // Clang 14 warns about std::experimental coroutines being removed in LLVM 15,
+        // suppress globally since it triggers at every co_await/co_return usage site
+        #if defined(__clang__) && defined(__has_warning)
+            #if __has_warning("-Wdeprecated-experimental-coroutine")
+                #pragma clang diagnostic ignored "-Wdeprecated-experimental-coroutine"
+            #endif
+        #endif
     #else
         #define RPP_HAS_COROUTINES 0
         #define RPP_CORO_STD
     #endif
-#else
+#else // no coroutine support for C++17 and below
     #define RPP_HAS_COROUTINES 0
     #define RPP_CORO_STD
 #endif

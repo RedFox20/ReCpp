@@ -48,7 +48,7 @@ jobs:
           command: |
             export $CPP_STANDARD=1
             COVERAGE=$([[ $COVERAGE_FLAG == "true" && $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage=src" || echo "")
-            pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests
+            pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests jobs=3
       - run:
           name: Test << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
