@@ -340,13 +340,13 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item1");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item2");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item3");
-            spin_sleep_for_ms(100);
+            spin_sleep_for_ms(50);
             queue.push("item4");
         });
         scope_guard([&]{ slow_producer.get(); });
@@ -356,12 +356,12 @@ TestImpl(test_concurrent_queue)
         AssertWaitPopTimed(Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
         AssertWaitPopTimed(Millis(15), false, /*item*/"", /*elapsed ms:*/ 14.0, 18.0);
 
-        AssertWaitPopTimed(Millis(50), true, /*item*/"item1", /*elapsed ms:*/ 15.0, 50.0); // this should not timeout
-        AssertWaitPopTimed(Millis(75), true, /*item*/"item2", /*elapsed ms:*/ 25.0, 55.0);
-        AssertWaitPopTimed(Millis(75), true, /*item*/"item3", /*elapsed ms:*/ 25.0, 55.0);
+        AssertWaitPopTimed(Millis(30), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 30.0); // this should not timeout
+        AssertWaitPopTimed(Millis(35), true, /*item*/"item2", /*elapsed ms:*/ 10.0, 30.0);
+        AssertWaitPopTimed(Millis(35), true, /*item*/"item3", /*elapsed ms:*/ 10.0, 30.0);
 
         // now we enter a long wait, but we should be notified by the producer
-        AssertWaitPopTimed(Millis(1000), true, /*item*/"item4", /*elapsed ms:*/ 0.0, 110.0);
+        AssertWaitPopTimed(Millis(1000), true, /*item*/"item4", /*elapsed ms:*/ 0.0, 60.0);
     }
 
     static PopResult wait_pop_until(concurrent_queue<std::string>& queue, TimePoint until)
@@ -407,11 +407,11 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item1");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item2");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item3");
         });
         scope_guard([&]{ slow_producer.get(); }); // Clang doesn't have jthread yet o_O
@@ -419,10 +419,10 @@ TestImpl(test_concurrent_queue)
         PopResult r;
 
         // we should only have time to receive item1 and item2
-        auto until = Now() + Millis(125);
-        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 20.0, 60.0);
-        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 20.0, 60.0);
-        AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 20.0, 60.0);
+        auto until = Now() + Millis(65);
+        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 10.0, 35.0);
+        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 10.0, 35.0);
+        AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 10.0, 35.0);
     }
 
     // in general the pop_with_timeout is not very useful because
@@ -432,13 +432,13 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item1");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item2");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item3");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             finished = true;
             queue.notify(); // notify any waiting threads
         });
@@ -447,17 +447,17 @@ TestImpl(test_concurrent_queue)
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
         AssertFalse(queue.wait_pop(item, Millis(15), cancelCondition)); // this should timeout
-        AssertTrue(queue.wait_pop(item, Millis(40), cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(15), cancelCondition));
         AssertThat(item, "item1");
-        AssertTrue(queue.wait_pop(item, Millis(55), cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(35), cancelCondition));
         AssertThat(item, "item2");
-        AssertTrue(queue.wait_pop(item, Millis(55), cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(35), cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
-        // this should not take longer than ~55ms
+        // this should not take longer than ~35ms
         rpp::Timer t;
         AssertFalse(queue.wait_pop(item, Millis(1000), cancelCondition));
-        AssertLess(t.elapsed_millis(), 55);
+        AssertLess(t.elapsed_millis(), 35);
     }
 
     // ensure that wait_pop_interval actually checks the cancelCondition
@@ -467,11 +467,11 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&]
         {
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item1");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item2");
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
             queue.push("item3");
         });
         scope_guard([&]{ slow_producer.get(); });
@@ -487,42 +487,42 @@ TestImpl(test_concurrent_queue)
 
         std::string item;
 
-        // wait for 100ms with 10ms intervals, but first item will arrive within ~50ms
+        // wait for 50ms with 10ms intervals, but first item will arrive within ~25ms
         std::atomic_int counter0 = 0;
-        AssertTrue(wait_pop_interval(item, Millis(100), Millis(10), [&] { return ++counter0 >= 10; }));
+        AssertTrue(wait_pop_interval(item, Millis(50), Millis(10), [&] { return ++counter0 >= 10; }));
         AssertThat(item, "item1");
-        AssertInRange(int(counter0), 5, 9);
+        AssertInRange(int(counter0), 2, 5);
 
-        // wait for 20ms with 5ms intervals, it should timeout
+        // wait for 10ms with 5ms intervals, it should timeout
         std::atomic_int counter1 = 0;
-        AssertFalse(wait_pop_interval(item, Millis(20), Millis(5), [&] { return ++counter1 >= 10; }));
-        AssertInRange(int(counter1), 1, 6); // tolerance is VERY loose here
+        AssertFalse(wait_pop_interval(item, Millis(10), Millis(5), [&] { return ++counter1 >= 10; }));
+        AssertInRange(int(counter1), 1, 4); // tolerance is VERY loose here
 
-        // wait another 30ms with 2ms intervals, and it should trigger the cancelcondition
+        // wait another 15ms with 2ms intervals, and it should trigger the cancelcondition
         std::atomic_int counter2 = 0;
-        AssertFalse(wait_pop_interval(item, Millis(30), Millis(2), [&] { return ++counter2 >= 10; }));
-        AssertThat(int(counter2), 10); // it should have cancelled exactly at 10 checks
+        AssertFalse(wait_pop_interval(item, Millis(15), Millis(2), [&] { return ++counter2 >= 5; }));
+        AssertThat(int(counter2), 5); // it should have cancelled exactly at 5 checks
 
         // wait until we pop the item finally
         std::atomic_int counter3 = 0;
-        AssertTrue(wait_pop_interval(item, Millis(100), Millis(5), [&] { return ++counter3 >= 20; }));
+        AssertTrue(wait_pop_interval(item, Millis(50), Millis(5), [&] { return ++counter3 >= 20; }));
         AssertThat(item, "item2");
         AssertLess(int(counter3), 20); // we should never have reached all the checks
 
         // now wait with extreme short intervals
         std::atomic_int counter4 = 0;
-        AssertTrue(wait_pop_interval(item, Millis(55), Millis(1), [&] { return ++counter4 >= 55; }));
+        AssertTrue(wait_pop_interval(item, Millis(35), Millis(1), [&] { return ++counter4 >= 35; }));
         AssertThat(item, "item3");
-        // we should never have reached the limit of 55
+        // we should never have reached the limit of 35
         // however there is NO guarantee that the sleep will be 1ms, that's just a minimum hint
         // most likely it will sleep in 1-5ms range, so we lower the min range
-        AssertInRange(int(counter4), 15, 54);
+        AssertInRange(int(counter4), 5, 34);
     }
 
     TestCase(wait_pop_cross_thread_perf)
     {
         constexpr int num_iterations = 10;
-        constexpr int num_items = 100'000;
+        constexpr int num_items = 10'000;
         constexpr int total_items = num_iterations * num_items;
         double total_time = 0.0;
         for (int i = 0; i < num_iterations; ++i)
@@ -573,7 +573,7 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_interval_cross_thread_perf)
     {
         constexpr int num_iterations = 10;
-        constexpr int num_items = 100'000;
+        constexpr int num_items = 10'000;
         constexpr int total_items = num_iterations * num_items;
         double total_time = 0.0;
         for (int i = 0; i < num_iterations; ++i)

@@ -371,16 +371,17 @@ TestImpl(test_sockets)
 
         // no data to receive, should return false
         rpp::Timer t0;
-        AssertFalse(pollin(/*millis*/50));
-        AssertGreaterOrEqual(t0.elapsed_millis(), 48.0);
+        AssertFalse(pollin(/*millis*/10));
+        AssertGreaterOrEqual(t0.elapsed_millis(), 8.0);
         AssertTrue(recv.good());
 
         // TEST1: data already in the pipe, must return immediately
         // must be ready to receive almost immediately
         {
             send.sendto(recv_addr, "udp_poll");
+            rpp::sleep_ms(1); // yield a bit so client has time to recv
             rpp::Timer t1;
-            AssertTrue(pollin(/*millis*/50));
+            AssertTrue(pollin(/*millis*/10));
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll"s);
             AssertLessOrEqual(t1.elapsed_millis(), 1.0);
@@ -390,14 +391,14 @@ TestImpl(test_sockets)
         {
             auto f2 = rpp::async_task([&]()
             {
-                rpp::sleep_ms(20);
+                rpp::sleep_ms(5);
                 send.sendto(recv_addr, "udp_poll");
             });
             rpp::Timer t2;
-            AssertTrue(pollin(/*millis*/50));
+            AssertTrue(pollin(/*millis*/20));
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll"s);
-            AssertLessOrEqual(t2.elapsed_millis(), 40.0);
+            AssertLessOrEqual(t2.elapsed_millis(), 19.0);
             f2.get();
         }
 
@@ -405,8 +406,8 @@ TestImpl(test_sockets)
         //        it should time out
         {
             rpp::Timer t3;
-            AssertFalse(pollin(/*millis*/50));
-            AssertGreaterOrEqual(t3.elapsed_millis(), 49.0);
+            AssertFalse(pollin(/*millis*/10));
+            AssertGreaterOrEqual(t3.elapsed_millis(), 8.0);
         }
 
         // TEST4: two consecutive datagrams arrive
@@ -415,17 +416,17 @@ TestImpl(test_sockets)
         {
             auto f4 = rpp::async_task([&]()
             {
-                rpp::sleep_ms(10);
+                rpp::sleep_ms(5);
                 send.sendto(recv_addr, "udp_poll1");
                 send.sendto(recv_addr, "udp_poll2");
             });
             rpp::Timer t4;
-            AssertTrue(pollin(/*millis*/50));
-            AssertLess(t4.elapsed_millis(), 40.0);
+            AssertTrue(pollin(/*millis*/15));
+            AssertLess(t4.elapsed_millis(), 8.0);
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll1"s);
             rpp::Timer t4_2;
-            AssertTrue(pollin(/*millis*/50));
+            AssertTrue(pollin(/*millis*/15));
             AssertLessOrEqual(t4_2.elapsed_millis(), 1.0);
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll2"s);
@@ -438,8 +439,8 @@ TestImpl(test_sockets)
             AssertTrue(recv.good());
             AssertThat(recv.available(), 0);
             rpp::Timer t5;
-            AssertFalse(pollin(/*millis*/50));
-            AssertGreaterOrEqual(t5.elapsed_millis(), 49.0);
+            AssertFalse(pollin(/*millis*/10));
+            AssertGreaterOrEqual(t5.elapsed_millis(), 8.0);
             AssertTrue(recv.good());
             AssertThat(recv.available(), 0);
         }
@@ -923,9 +924,12 @@ TestImpl(test_sockets)
                     print_info("remote: received '%s'\n", resp.c_str());
                     Assert(to_server.send("Client says: Thanks!") > 0);
                     ++receivedMessages;
-                    sleep(10);
+                    rpp::sleep_ms(5);
                 }
-                //sleep(0);
+                else
+                {
+                    rpp::yield();
+                }
             }
             AssertThat(receivedMessages, 1);
             print_info("remote: server disconnected: %s\n", to_server.last_err().c_str());
@@ -941,12 +945,12 @@ TestImpl(test_sockets)
         std::string msg = "Server says: Hello!";
         print_info("server: sending '%s'\n", msg.c_str());
         client.send(msg);
-        sleep(100);
+        rpp::sleep_ms(20);
 
         std::string resp = client.recv_str();
         print_info("server: received '%s'\n", resp.c_str());
         AssertNotEqual(resp, "");
-        sleep(50);
+        rpp::sleep_ms(10);
 
         print_info("server: closing down\n");
         client.close();
@@ -979,7 +983,7 @@ TestImpl(test_sockets)
                 if (!is_connected) break;
 
                 // make the client busy for a while
-                rpp::sleep_ms(10);
+                rpp::sleep_ms(5);
 
                 char buf[128];
                 if (to_server.peek(buf, sizeof(buf)))
@@ -1003,8 +1007,8 @@ TestImpl(test_sockets)
 
         message_stats server_stats{};
 
-        int operation_time = 400;
-        int idle_time = 200; // run without sending new messages
+        int operation_time = 50;
+        int idle_time = 50; // run without sending new messages
 
         rpp::Timer t;
         while (t.elapsed_ms() <= (operation_time+idle_time))
@@ -1013,9 +1017,9 @@ TestImpl(test_sockets)
             AssertMsg(is_connected, "remote_client disconnected prematurely");
             if (!is_connected) break;
 
-            rpp::sleep_ms(30); // make the server busier than the client
+            rpp::sleep_ms(10); // make the server busier than the client
 
-            if (remote_client.poll(10, socket::PF_Read))
+            if (remote_client.poll(5, socket::PF_Read))
             {
                 std::string message = remote_client.recv_str();
                 AssertEqual(message, "response from client");
@@ -1079,7 +1083,7 @@ TestImpl(test_sockets)
         socket remote_client = accept(server);
         remote_client.set_nagle(false); // disable nagle
 
-        for (int i = 0; i < 20; ++i)
+        for (int i = 0; i < 10; ++i)
         {
             std::string data = remote_client.recv_str();
             if (!data.empty())
@@ -1102,7 +1106,7 @@ TestImpl(test_sockets)
                     print_info("(valid)\n");
                 }
             }
-            sleep(5);
+            rpp::sleep_ms(2);
         }
 
         print_info("server: closing down\n");
@@ -1117,7 +1121,10 @@ TestImpl(test_sockets)
     TestCase(udp_load_balancer)
     {
         // setup load balancer at 2MB/s
-        rpp::load_balancer balancer { 2 * 1024 * 1024 };
+        constexpr double DATA_RATE_MiBps = 2 * 1024 * 1024; // 2 MiB/s
+        constexpr double TEST_RUNTIME_SEC = 0.1; // don't run for too long
+        constexpr int PACKET_SIZE = 280; // Mavlink max
+        rpp::load_balancer balancer { uint32_t(DATA_RATE_MiBps) };
 
         rpp::socket receiverSocket = create_udp_listener();
         AssertTrue(receiverSocket.good());
@@ -1146,11 +1153,10 @@ TestImpl(test_sockets)
         print_info("sender: %s\n", sender.address().cstr());
 
         rpp::Timer t;
-        while (t.elapsed() < 1.0)
+        while (t.elapsed() < TEST_RUNTIME_SEC)
         {
-            int packetSize = 280;
-            balancer.wait_to_send(packetSize);
-            if (sender.sendto(receiverAddr, buffer, packetSize) <= 0)
+            balancer.wait_to_send(PACKET_SIZE);
+            if (sender.sendto(receiverAddr, buffer, PACKET_SIZE) <= 0)
             {
                 AssertFailed("sender.sendto failed: %s", sender.last_err().c_str());
                 break;
@@ -1163,10 +1169,10 @@ TestImpl(test_sockets)
         int32_t actualReceivedKB = actualReceived / 1024;
         print_info("elapsed: %.3fs, actual received: %d KB\n", elapsed, actualReceivedKB);
 
-        // we should not have sent more than 2MB within this time
-        AssertLessOrEqual(actualReceivedKB, (int)(2.05 * 1024));
+        // we should not have sent more than max limit here
+        AssertLessOrEqual(actualReceivedKB, (int)(1.05 * DATA_RATE_MiBps * TEST_RUNTIME_SEC / 1024));
         // however, we should have sent at least 1.5MB, otherwise the load balancer is inefficient
-        AssertGreaterOrEqual(actualReceivedKB, (int)(1.5 * 1024));
+        AssertGreaterOrEqual(actualReceivedKB, (int)(0.75 * DATA_RATE_MiBps * TEST_RUNTIME_SEC / 1024));
     }
 
     //////////////////////////////////////////////////////////////////

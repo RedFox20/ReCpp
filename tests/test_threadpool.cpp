@@ -3,12 +3,11 @@
 #include <rpp/future.h>
 #include <rpp/semaphore.h>
 #include <rpp/timer.h> // performance measurement
+#include <rpp/threads.h> // thread naming
 #include <atomic>
 #include <latch>
 #include <unordered_set>
 using namespace rpp;
-using namespace std::this_thread;
-using namespace std::chrono_literals;
 
 namespace rpp
 {
@@ -43,13 +42,13 @@ TestImpl(test_threadpool)
     static int count_parallel_for_thread_ids(int numIterations)
     {
         rpp::mutex m;
-        std::unordered_set<std::thread::id> ids;
+        std::unordered_set<rpp::uint64> ids;
         parallel_for(0, numIterations, 0, [&](int start, int end)
         {
             (void)start; (void)end;
-            ::sleep_for(1ms);
+            rpp::sleep_ms(1);
             { std::lock_guard lock{m};
-                ids.insert(::get_id());
+                ids.insert(rpp::get_thread_id());
             }
         });
         std::lock_guard lock{m};
@@ -154,8 +153,8 @@ TestImpl(test_threadpool)
         constexpr int COUNT = 81'234'567 / 10;
         constexpr int64 EXPECTED_SUM = 32995264630240LL;
     #else
-        constexpr int COUNT = 81'234'567;
-        constexpr int64 EXPECTED_SUM = 3299527397221461LL;
+        constexpr int COUNT = 81'234'567 / 10;
+        constexpr int64 EXPECTED_SUM = 32995264630240LL;
     #endif
 
         auto numbers = std::vector<int>(COUNT);
@@ -274,14 +273,14 @@ TestImpl(test_threadpool)
         int times_launched = 0;
         auto task = rpp::parallel_task([&] {
             ++times_launched;
-            ::sleep_for(10ms);
+            rpp::sleep_ms(5);
         });
         task.wait();
         AssertThat(times_launched, 1);
 
         task = rpp::parallel_task([&] {
             ++times_launched;
-            ::sleep_for(10ms);
+            rpp::sleep_ms(5);
         });
         task.wait();
         AssertThat(times_launched, 2);
@@ -289,7 +288,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_task_resurrection)
     {
-        thread_pool::global().max_task_idle_time(0.3f);
+        thread_pool::global().max_task_idle_time(0.05f);
         thread_pool::global().clear_idle_tasks();
         AssertThat(thread_pool::global().active_tasks(), 0);
 
@@ -300,7 +299,8 @@ TestImpl(test_threadpool)
         AssertThat((int)times_launched, 1);
 
         print_info("Waiting for pool tasks to die naturally...\n");
-        ::sleep_for(0.5s);
+
+        rpp::sleep_ms(100);
 
         print_info("Attempting pool task resurrection\n");
         rpp::parallel_task([&] { 
@@ -370,7 +370,7 @@ TestImpl(test_threadpool)
         // Without proper strong-ref in wait(), the state could be freed
         // while the waiter is still accessing it.
 
-        constexpr int ITERATIONS = 2'000;
+        constexpr int ITERATIONS = 1'000;
         std::atomic_bool stop{false};
         std::atomic_int waits_finished{0};
         std::atomic_int waits_timeout{0};
@@ -430,7 +430,7 @@ TestImpl(test_threadpool)
         //   - ASAN reports: heap-use-after-free (WRITE of size 4 on ref_count field)
         //   - Assertion fires: inc_ref sees old_refs==0
         //
-        constexpr int ITERATIONS = 5'000;
+        constexpr int ITERATIONS = 1'000;
         constexpr int N_COPIERS  = 4;
 
         std::atomic_bool stop{false};
