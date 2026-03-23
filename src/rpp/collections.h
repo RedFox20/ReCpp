@@ -202,7 +202,7 @@ namespace rpp
         v.push_back(item);
         return true; // item was pushed
     }
-    
+
     // erases a SINGLE item
     template<class T, class U> bool erase_item(std::vector<T>& v, const U& item)
     {
@@ -262,7 +262,7 @@ namespace rpp
             v[i] = std::move(v.back());
         v.pop_back();
     }
-    
+
     // erases a SINGLE item using ERASE-BACK-SWAP idiom
     template<class T, class U> void erase_item_back_swap(std::vector<T>& v, const U& item)
     {
@@ -278,7 +278,7 @@ namespace rpp
             }
         }
     }
-    
+
     // erases a SINGLE item using ERASE-BACK-SWAP idiom
     template<class T, class Pred> bool erase_back_swap_first_if(std::vector<T>& v, const Pred& condition)
     {
@@ -462,7 +462,7 @@ namespace rpp
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
-    
+
     /** @return TRUE if any predicate(element) yields true */
     template<class T, class Pred> bool any_of(const std::vector<T>& v, const Pred& predicate)
     {
@@ -471,7 +471,7 @@ namespace rpp
             if (predicate(*it)) return true;
         return false;
     }
-    
+
     /** @return TRUE if ALL predicate(element) yield true */
     template<class T, class Pred> bool all_of(const std::vector<T>& v, const Pred& predicate)
     {
@@ -532,7 +532,7 @@ namespace rpp
 
     template<class T, class A> void sort(std::vector<T, A>& v)
     {
-        rpp::insertion_sort(v.data(), v.size(), [](T& a, T& b) { return a < b; });
+        rpp::insertion_sort(v.data(), v.size(), [](const T& a, const T& b) { return a < b; });
     }
 
     template<typename T, typename Comparison>
