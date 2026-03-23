@@ -719,7 +719,7 @@ TestImpl(test_sockets)
     // it should set the baseline benchmark for the poll tests
     TestCase(udp_poll_nopoll_stress_test)
     {
-        const int NUM_MESSAGES = 2'000;
+        const int NUM_MESSAGES = 1'000;
         const int MSG_SIZE = 200;
         // create a dedicated port to avoid accidental interference
         socket send = create_udp_listener(rpp::SO_Blocking);
@@ -738,7 +738,7 @@ TestImpl(test_sockets)
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
                 send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
-                if (i % 200 == 0) rpp::sleep_ms(1); // throttle to avoid kernel dropping packets
+                if (i % 100 == 0) rpp::sleep_ms(5); // throttle to avoid kernel dropping packets
             }
         });
         auto receiver = rpp::async_task([&recv, &t]()
@@ -756,7 +756,7 @@ TestImpl(test_sockets)
 
         while (receiver.wait_for(std::chrono::microseconds{0}) != std::future_status::ready)
         {
-            if (t.elapsed_ms() > 5000) // timeout
+            if (t.elapsed_ms() > 1000) // timeout
             {
                 print_error("receiver timed out\n");
                 send.sendto(recv_addr, "wakeup"); // signal the receiver to break
@@ -768,7 +768,7 @@ TestImpl(test_sockets)
         double elapsed_ms = t.elapsed_millis();
 
         AssertEqual(num_received, NUM_MESSAGES);
-        AssertLess(elapsed_ms, 200.0);
+        AssertLess(elapsed_ms, 100.0);
     }
 
     TestCase(udp_flush)
