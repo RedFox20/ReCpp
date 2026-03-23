@@ -706,7 +706,8 @@ namespace rpp
             }
             if (Head != Tail) return true; // wait is not needed
             if (timeout <= rpp::Duration::zero()) {
-                rpp::yield(); // need to yield here to avoid burning a hole into the CPU
+                // NOTE: this makes CI fail, because a yield() on a busy CI machine can take more than 1ms
+                //rpp::yield(); // need to yield here to avoid burning a hole into the CPU
                 return false; // zero timeout, don't enter wait loop
             }
             auto now = rpp::TimePoint::now();

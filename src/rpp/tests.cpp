@@ -771,8 +771,17 @@ namespace rpp
         namespace time = std::chrono;
         auto start = time::high_resolution_clock::now();
         auto end = start + time::nanoseconds(microseconds * 1000ull);
-        while (time::high_resolution_clock::now() < end)
+        while (true)
         {
+            auto remaining = (end - time::high_resolution_clock::now());
+            if (remaining <= time::nanoseconds::zero())
+                break;
+
+            // if we have more than 16ms remaining, it's safe to sleep the thread
+            if (remaining > time::milliseconds(16))
+            {
+                std::this_thread::sleep_for(time::milliseconds(15));
+            }
         }
 #endif
     }

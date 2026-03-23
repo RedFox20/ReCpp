@@ -309,7 +309,8 @@ TestImpl(test_concurrent_queue)
         rpp::Timer t;
         r.success = queue.wait_pop(r.item, timeout);
         r.elapsed_ms = t.elapsed_millis();
-        print_info("wait_pop_timed elapsed: %.2f ms item: %s\n", r.elapsed_ms, r.item.c_str());
+        print_info("wait_pop_timed(%dms) elapsed: %.2f ms item: %s\n",
+                   (int)timeout.millis(), r.elapsed_ms, r.item.c_str());
         return r;
     }
 
