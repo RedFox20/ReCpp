@@ -778,10 +778,11 @@ namespace rpp
             if (remaining <= time::nanoseconds::zero())
                 break;
 
-            // if we have more than 16ms remaining, it's safe to sleep the thread
-            if (!full_spin && remaining > time::milliseconds(16))
+            // if we have more than win32 timeslice + suspend remaining, it's safe to sleep the thread
+            constexpr int suspend_ms = 5;
+            if (!full_spin && remaining > time::milliseconds(16+suspend_ms))
             {
-                std::this_thread::sleep_for(time::milliseconds(15));
+                std::this_thread::sleep_for(time::milliseconds(suspend_ms));
             }
         }
 #endif
