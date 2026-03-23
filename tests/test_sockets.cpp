@@ -633,12 +633,14 @@ TestImpl(test_sockets)
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
                 send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
+                if (i % 100 == 0) rpp::sleep_ms(1); // throttle to avoid overflowing the small send buffer
             }
         });
 
         rpp::Timer t;
         int num_received = 0;
-        while (num_received < NUM_MESSAGES && t.elapsed_ms() < 5000)
+        constexpr int FAILSAFE_TIMEOUT_MS = 1000; // avoid test running infinitely if packets get dropped
+        while (num_received < NUM_MESSAGES && t.elapsed_ms() < FAILSAFE_TIMEOUT_MS)
         {
             // intentionally use a large timeout here
             if (recv.poll(/*timeout*/50, socket::PF_Read))
@@ -656,7 +658,8 @@ TestImpl(test_sockets)
         task.get();
 
         AssertEqual(num_received, NUM_MESSAGES);
-        AssertLess(elapsed_ms, 200.0);
+        AssertMsg(elapsed_ms < 200.0, "Elapsed time must be less than 200ms, but was %.2fms. "
+                                      "This is either packet loss or a timeout bug in poll() impl.", elapsed_ms);
     }
 
     TestCase(udp_poll_multi_stress_test)

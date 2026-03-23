@@ -705,6 +705,10 @@ namespace rpp
                 return false; // give up immediately
             }
             if (Head != Tail) return true; // wait is not needed
+            if (timeout <= rpp::Duration::zero()) {
+                rpp::yield(); // need to yield here to avoid burning a hole into the CPU
+                return false; // zero timeout, don't enter wait loop
+            }
             auto now = rpp::TimePoint::now();
             auto end = now + timeout;
             do {
@@ -720,6 +724,7 @@ namespace rpp
             } while (now < end); // handle spurious wakeups
             return false;
         }
+        // PRECONDITION: until.is_valid()
         bool wait_notify_until(lock_t& lock_guard, const rpp::TimePoint& until) const noexcept
         {
             if (is_destroying()) {

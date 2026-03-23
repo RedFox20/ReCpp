@@ -3,7 +3,7 @@
 ## Testing changes
 This project uses mama build tool, and a custom RppTest framework for unit tests.
 
-1. **Compile with C++20 and run all tests**: After modifying any code, ensure that the project compiles with C++20 and that all tests pass.
+1. **Compile with C++20 and run all tests**: After modifying any code, ensure that the project compiles with C++20 and that all tests pass. If you minimize output with `tail`, then include at least 50-80 lines of output. Make sure you don't accidentally confuse a random warning with the actual error.
 ```bash
 # build without reconfigure (faster if you do not need to fully reconfigure)
 # -vv means extra verbose, -v means medium verbose
