@@ -27,7 +27,7 @@ jobs:
         type: boolean
         default: false
         description: "Whether to generate code coverage report (only supported for gcc with ASAN)"
-    description: "Ubuntu << parameters.compiler >> << parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
+    description: "Ubuntu << parameters.cc_version >> C++<< parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -46,7 +46,7 @@ jobs:
       - run: pipenv run mama install-<< parameters.cc_version >>
       - run: make configure-cmake
       - run:
-          name: Build << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
+          name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
             COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage=src" || echo "")
@@ -54,7 +54,7 @@ jobs:
             SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
             pipenv run mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=3
       - run:
-          name: Test << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
+          name: Test << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
             COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
@@ -71,7 +71,7 @@ jobs:
                   # only keep the first entry for each source file, since we're skipping tests which recompile with RPP_DEBUG=1
                   ./.circleci/dedup_compile_commands.py packages/ReCpp/linux/compile_commands.json
                   run-clang-tidy -j 3 -p packages/ReCpp/linux/ src/rpp/
-  msvc-win64-cpp20:
+  win64-cpp20-msvc2022:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:
       name: win/default
@@ -92,7 +92,7 @@ jobs:
           command: |
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
               mama windows verbose test="-vv"
-  gcc-mipsel-cpp20:
+  mipsel-cpp20-gcc12:
     description: MIPSEL C++20 GCC Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -151,7 +151,7 @@ workflows:
             parameters:
               cpp_version: ["20", "23"]
               sanitizer: ["asan", "clang-tidy", "tsan"]
-          name: clang-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
+          name: ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>-clang18
           compiler: clang
           cc_version: clang-18
           coverage: true
@@ -163,7 +163,7 @@ workflows:
             parameters:
               cpp_version: ["20", "23"]
               sanitizer: ["asan", "clang-tidy", "tsan"]
-          name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
+          name: ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>-gcc13
           compiler: gcc
           cc_version: gcc-13
           coverage: true
@@ -174,30 +174,30 @@ workflows:
             parameters:
               cpp_version: ["26"]
               sanitizer: [ "asan", "clang-tidy", "tsan"]
-          name: gcc-ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>
+          name: ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>-gcc14
           compiler: gcc
           cc_version: gcc-14
           coverage: false # this can cause OOM in CI with GCC-14, disabling for now
       # Other platform builds
-      - msvc-win64-cpp20
-      - gcc-mipsel-cpp20
+      - win64-cpp20-msvc2022
+      - mipsel-cpp20-gcc12
       # Android NDK builds
       - android-build:
-          name: android-ndk-r25b-clang++14
+          name: android-cpp20-r25b-clang14
           docker_image: "cimg/android:2023.08.1-ndk"
           toolchain: "ndk-r25b-clang++14"
       - android-build:
-          name: android-ndk-r27-clang++18
+          name: android-cpp20-r27-clang18
           docker_image: "cimg/android:2024.11.1-ndk"
           toolchain: "ndk-r27-clang++18"
           ndk_version: "27.2.12479018"
       - android-build:
-          name: android-ndk-r28b-clang++19
+          name: android-cpp20-r28b-clang19
           docker_image: "cimg/android:2025.12.1-ndk"
           toolchain: "ndk-r28b-clang++19"
           ndk_version: "28.0.10865935"
       - android-build:
-          name: android-ndk-r29-clang++20
+          name: android-cpp20-r29-clang20
           docker_image: "cimg/android:2026.03.1-ndk"
           toolchain: "ndk-r29-clang++20"
           ndk_version: "29.0.14206865"
