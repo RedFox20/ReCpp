@@ -111,6 +111,7 @@ TestImpl(test_atomic_shared_ptr)
         std::atomic_bool stop{false};
         std::atomic_int valid_reads{0};
         std::atomic_int invalid_reads{0};
+        std::atomic_int readers_spinning{0};
         std::latch readers_ready{NUM_READERS};
 
         std::vector<std::thread> readers;
@@ -120,6 +121,7 @@ TestImpl(test_atomic_shared_ptr)
             readers.emplace_back([&]
             {
                 readers_ready.arrive_and_wait();
+                readers_spinning.fetch_add(1, std::memory_order_release);
                 while (!stop.load(std::memory_order_acquire))
                 {
                     auto sp = asp.load(std::memory_order_acquire);
@@ -135,7 +137,9 @@ TestImpl(test_atomic_shared_ptr)
             });
         }
 
-        readers_ready.wait(); // ensure all readers are spinning before we start writing
+        // wait until all readers have entered the while-loop
+        while (readers_spinning.load(std::memory_order_acquire) < NUM_READERS)
+            std::this_thread::yield();
 
         for (int i = 1; i <= NUM_ITERATIONS; ++i)
             asp.store(std::make_shared<int>(i), std::memory_order_release);

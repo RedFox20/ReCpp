@@ -140,8 +140,9 @@ TestImpl(test_sort)
         int swap_count = 0;
         // all elements are equal, so a correct implementation should perform zero swaps
         std::vector<counted_int> array;
+        array.reserve(10);
         for (int i = 0; i < 10; ++i)
-            array.emplace_back(counted_int{42, &swap_count});
+            array.emplace_back(42, &swap_count);
 
         swap_count = 0; // reset after vector construction
         rpp::insertion_sort(array.data(), array.size(),

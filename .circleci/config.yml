@@ -36,6 +36,7 @@ jobs:
       SANITIZER_FLAG: << parameters.sanitizer >>
       CPP_STANDARD: CXX<< parameters.cpp_version >>
       COVERAGE_FLAG: << parameters.coverage >>
+      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads
     steps:
       - checkout
       - run: sudo apt-get update
