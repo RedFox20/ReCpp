@@ -728,19 +728,20 @@ namespace rpp
 #endif
     }
 
-    void test::spin_sleep_for(double seconds) noexcept
+    void test::spin_sleep_for(double seconds, bool full_spin) noexcept
     {
-        spin_sleep_for_us(static_cast<uint64_t>(seconds * 1'000'000.0));
+        spin_sleep_for_us(static_cast<uint64_t>(seconds * 1'000'000.0), full_spin);
     }
 
-    void test::spin_sleep_for_ms(uint64_t milliseconds) noexcept
+    void test::spin_sleep_for_ms(uint64_t milliseconds, bool full_spin) noexcept
     {
-        spin_sleep_for_us(milliseconds * 1000ull);
+        spin_sleep_for_us(milliseconds * 1000ull, full_spin);
     }
 
-    void test::spin_sleep_for_us(uint64_t microseconds) noexcept
+    void test::spin_sleep_for_us(uint64_t microseconds, bool full_spin) noexcept
     {
 #if RPP_CORTEX_M
+        (void)full_spin; // always full spin on Cortex-M
         const uint32_t cpu_freq_mhz = SystemCoreClock / 1'000'000u;
 #  ifdef DWT
         // on Cortex-M we can use the DWT cycle counter for precise timing
@@ -778,7 +779,7 @@ namespace rpp
                 break;
 
             // if we have more than 16ms remaining, it's safe to sleep the thread
-            if (remaining > time::milliseconds(16))
+            if (!full_spin && remaining > time::milliseconds(16))
             {
                 std::this_thread::sleep_for(time::milliseconds(15));
             }

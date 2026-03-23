@@ -30,10 +30,10 @@ TestImpl(test_timer)
         for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(20);
             double elapsed = t.elapsed();
-            print_info("timer %d 50ms spin_sleep timer result: %fs\n", i+1, elapsed);
-            AssertInRange(elapsed, 0.05, 0.05 + sigma_s);
+            print_info("timer %d 20ms spin_sleep timer result: %fs\n", i+1, elapsed);
+            AssertInRange(elapsed, 0.02, 0.02 + sigma_s);
         }
     }
 
@@ -42,10 +42,10 @@ TestImpl(test_timer)
         for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(20);
             double elapsed_ms = t.elapsed_millis();
-            print_info("timer_ms %d 50ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 50.0, 50.0 + sigma_ms);
+            print_info("timer_ms %d 20ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
+            AssertInRange(elapsed_ms, 20.0, 20.0 + sigma_ms);
         }
     }
 
@@ -339,13 +339,13 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), false);
 
-        spin_sleep_for_ms(100);
+        spin_sleep_for_ms(50);
 
         sw.stop();
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), true);
-        print_info("100ms stopwatch time: %fs\n", sw.elapsed());
-        AssertInRange(sw.elapsed(), 0.1, 0.1 + sigma_s);
+        print_info("50ms stopwatch time: %fs\n", sw.elapsed());
+        AssertInRange(sw.elapsed_millis(), 50.0, 50.0 + sigma_ms);
         AssertThat(sw.elapsed(), sw.elapsed()); // ensure time is stable after stop
 
         sw.resume();
@@ -372,19 +372,19 @@ TestImpl(test_timer)
     {
         {
             auto spt = rpp::ScopedPerfTimer{};
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
         }
         {
             auto spt = rpp::ScopedPerfTimer { __FUNCTION__ }; // backwards compatibility
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
         }
         {
             auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__ };
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
         }
         {
             auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__, "detail-item" };
-            spin_sleep_for_ms(50);
+            spin_sleep_for_ms(25);
         }
     }
 
@@ -459,7 +459,7 @@ TestImpl(test_timer)
     {
         rpp::cpu_usage_info t1 = rpp::proc_total_cpu_usage();
         int spin_us = 50'000;
-        spin_sleep_for_us(spin_us); // spin wait for accurate time counts
+        spin_sleep_for_us(spin_us, /*full_spin*/true); // spin wait for accurate time counts
         rpp::cpu_usage_info t2 = rpp::proc_total_cpu_usage();
 
         print_info("#1 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t1.cpu_time_ms(), t1.user_time_ms(), t1.kernel_time_ms());
