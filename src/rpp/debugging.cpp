@@ -175,7 +175,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
         remaining -= len;
     }
 
-    int plen = vsnprintf(pbuf, size_t(remaining-1)/*spare room for \n*/, format, ap);
+    int plen = vsnprintf(pbuf, size_t(remaining-1)/*spare room for \n*/, format, ap); // NOLINT(clang-analyzer-valist.Uninitialized)
 
     if (plen < 0 || plen >= remaining) { // err: didn't fit
         plen = remaining-2; // try to recover gracefully
@@ -389,7 +389,8 @@ void _LogExcept(const char* exceptionWhat, PRINTF_FMTSTR const char* format, ...
 RPPCAPI const char* _FmtString(PRINTF_FMTSTR const char* format, ...)
 {
     static thread_local char errBuf[4096];
-    va_list ap; va_start(ap, format);
+    va_list ap;
+    va_start(ap, format);
     SafeFormat(errBuf, sizeof(errBuf), format, ap);
     va_end(ap);
     return errBuf;

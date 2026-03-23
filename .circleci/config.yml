@@ -28,14 +28,15 @@ jobs:
         default: false
         description: "Whether to generate code coverage report (only supported for gcc with ASAN)"
     description: "Ubuntu << parameters.compiler >> << parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
-    resource_class: large # 4 CPU-s, 8GB RAM (needed for clang-tidy)
+    #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.14
     environment:
-      COMPILER_NAME: << parameters.compiler >>
-      SANITIZER_FLAG: << parameters.sanitizer >>
+      COMPILER: << parameters.compiler >>
+      SANITIZE: << parameters.sanitizer >>
       CPP_STANDARD: CXX<< parameters.cpp_version >>
-      COVERAGE_FLAG: << parameters.coverage >>
+      COV_PARAM: << parameters.coverage >>
       NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads
     steps:
       - checkout
@@ -48,14 +49,28 @@ jobs:
           name: Build << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
-            COVERAGE=$([[ $COVERAGE_FLAG == "true" && $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage=src" || echo "")
-            pipenv run mama $COMPILER_NAME verbose $SANITIZER_FLAG $COVERAGE build with_tests jobs=3
+            COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage=src" || echo "")
+            # disable clang + clang-tidy sanitizer combination
+            SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
+            pipenv run mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=3
       - run:
           name: Test << parameters.compiler >> << parameters.cpp_version >> << parameters.sanitizer >>
           command: |
             export $CPP_STANDARD=1
-            COVERAGE=$([[ $COVERAGE_FLAG == "true" && $COMPILER_NAME == "gcc" && $SANITIZER_FLAG == "asan" ]] && echo "coverage-report=src" || echo "")
-            pipenv run mama $COMPILER_NAME verbose $COVERAGE test="nogdb -vv"
+            COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
+            pipenv run mama $COMPILER verbose $COV_FLAGS test="nogdb -vv"
+      - when:
+          condition:
+            and:
+              - equal: [ "clang-tidy", << parameters.sanitizer >> ]
+              - equal: [ "clang", << parameters.compiler >> ]
+          steps:
+            - run:
+                name: Clang Tidy Analysis # run clang-tidy separately for Clang++ because it's super slow during build
+                command: |
+                  # only keep the first entry for each source file, since we're skipping tests which recompile with RPP_DEBUG=1
+                  ./.circleci/dedup_compile_commands.py packages/ReCpp/linux/compile_commands.json
+                  run-clang-tidy -j 3 -p packages/ReCpp/linux/ src/rpp/
   msvc-win64-cpp20:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:

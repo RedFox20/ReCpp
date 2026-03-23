@@ -99,7 +99,7 @@ namespace rpp
         va_list ap;
         va_start(ap, format);
         char buffer[8192];
-        int n = vsnprintf(buffer, sizeof(buffer), format, ap);
+        int n = vsnprintf(buffer, sizeof(buffer), format, ap);  // NOLINT(clang-analyzer-valist.Uninitialized)
         va_end(ap);
         if (n < 0 || n >= (int)sizeof(buffer))
             n = sizeof(buffer) - 1;
@@ -286,7 +286,7 @@ namespace rpp
         va_list ap;
         va_start(ap, format);
         char buf[8192];
-        int n = vsnprintf(buf, sizeof(buf), format, ap);
+        int n = vsnprintf(buf, sizeof(buf), format, ap); // NOLINT(clang-analyzer-valist.Uninitialized)
         va_end(ap);
         if (n < 0 || n >= (int)sizeof(buf)) {
             n = sizeof(buf)-1;

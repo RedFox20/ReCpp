@@ -338,7 +338,8 @@ namespace rpp /* ReCpp */
     {
         if (!Handle)
             return 0;
-        va_list ap; va_start(ap, format);
+        va_list ap;
+        va_start(ap, format);
     #if _MSC_VER // @note This is heavily optimized
         char buf[4096];
         int n = vsnprintf(buf, sizeof(buf), format, ap);
@@ -353,7 +354,7 @@ namespace rpp /* ReCpp */
         }
         int written = this->write(buf, n);
     #else
-        int written = vfprintf((FILE*)Handle, format, ap);
+        int written = vfprintf((FILE*)Handle, format, ap); // NOLINT(clang-analyzer-valist.Uninitialized)
     #endif
         va_end(ap);
         return written;

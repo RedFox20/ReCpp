@@ -168,8 +168,9 @@ namespace rpp
         }
         void writef(const char* fmt, ...) noexcept
         {
-            va_list ap; va_start(ap, fmt);
-            int n = vsnprintf(&buf[len], size_t(MAX - len), fmt, ap);
+            va_list ap;
+            va_start(ap, fmt);
+            int n = vsnprintf(&buf[len], size_t(MAX - len), fmt, ap); // NOLINT(clang-analyzer-valist.Uninitialized)
             va_end(ap);
             if (n > 0) {
                 len += n;

@@ -316,7 +316,9 @@ namespace rpp
     }
 
     #define safe_vsnprintf_msg_len(fmt) \
-        char msg[8192]; va_list ap; va_start(ap, fmt); \
+        char msg[8192]; \
+        va_list ap; \
+        va_start(ap, fmt); \
         int len = vsnprintf(msg, sizeof(msg), fmt, ap); \
         va_end(ap); \
         if (len < 0 || len >= (int)sizeof(msg)) { \
@@ -326,7 +328,7 @@ namespace rpp
 
     static void consolef(ConsoleColor color, const char* fmt, ...)
     {
-        safe_vsnprintf_msg_len(fmt);
+        safe_vsnprintf_msg_len(fmt); // NOLINT(clang-analyzer-valist.Uninitialized)
         console(color, msg, len);
     }
 
@@ -338,7 +340,7 @@ namespace rpp
     {
         const char* file = loc.file;
         const char* filename = file + int(strview{ file }.rfindany("\\/") - file) + 1;
-        safe_vsnprintf_msg_len(fmt);
+        safe_vsnprintf_msg_len(fmt); // NOLINT(clang-analyzer-valist.Uninitialized)
         LogTestLabel(consolef(Red, "FAILED ASSERTION %12s:%d    %s\n", filename, loc.line, msg));
 
         if (auto* test = tl_current_test)
@@ -358,7 +360,7 @@ namespace rpp
 
     void test::assert_failed_custom(PRINTF_FMTSTR const char* fmt, ...)
     {
-        safe_vsnprintf_msg_len(fmt);
+        safe_vsnprintf_msg_len(fmt); // NOLINT(clang-analyzer-valist.Uninitialized)
         LogTestLabel(console(Red, msg, len));
 
         if (auto* test = tl_current_test)
@@ -398,7 +400,7 @@ namespace rpp
 
     void test::print_error(PRINTF_FMTSTR const char* fmt, ...)
     {
-        safe_vsnprintf_msg_len(fmt);
+        safe_vsnprintf_msg_len(fmt); // NOLINT(clang-analyzer-valist.Uninitialized)
         if (state().verbosity >= TestVerbosity::TestLabels) { 
             console(Red, msg, len);
         }
@@ -407,7 +409,7 @@ namespace rpp
 
     void test::print_warning(PRINTF_FMTSTR const char* fmt, ...)
     {
-        safe_vsnprintf_msg_len(fmt);
+        safe_vsnprintf_msg_len(fmt); // NOLINT(clang-analyzer-valist.Uninitialized)
         if (state().verbosity >= TestVerbosity::AllMessages) { 
             console(Yellow, msg, len);
         }
@@ -416,7 +418,7 @@ namespace rpp
 
     void test::print_info(PRINTF_FMTSTR const char* fmt, ...)
     {
-        safe_vsnprintf_msg_len(fmt);
+        safe_vsnprintf_msg_len(fmt); // NOLINT(clang-analyzer-valist.Uninitialized)
         if (state().verbosity >= TestVerbosity::AllMessages) { 
             console(Default, msg, len);
         }

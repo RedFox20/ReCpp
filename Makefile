@@ -1,4 +1,5 @@
 # This is a Legacy Makefile for CI setup. It is not intended for local development.
+# Note: this is not use for anything important in the current CI setup or build system
 CLANG_FLAGS := -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
 GCC_FLAGS := -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++
 all: clang
