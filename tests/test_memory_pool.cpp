@@ -176,6 +176,7 @@ TestImpl(memory_pool)
         print_info("-- Allocating %zu KB --\n", num_bytes / 1000);
 
         char* mem = (char*)malloc(num_bytes);
+        if (!mem) throw std::runtime_error("Memory allocation failed");
         scope_guard([mem] { free(mem); });
 
         for (size_t i = 0; i < num_bytes; ++i)

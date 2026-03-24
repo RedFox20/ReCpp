@@ -447,7 +447,7 @@ TestImpl(test_threadpool)
                 ready.arrive_and_wait(); // synchronize start with main + other copiers
                 while (!stop.load(std::memory_order_relaxed))
                 {
-                    pool_task_handle copy{shared}; // THE RACING OPERATION: load + inc_ref
+                    pool_task_handle copy{shared}; // THE RACING OPERATION: load + inc_ref // NOLINT(performance-unnecessary-copy-initialization)
                     (void)copy;                    // drop ref immediately → dec_ref
                 }
             });

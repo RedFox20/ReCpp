@@ -51,17 +51,17 @@ namespace rpp
             std::exception_ptr exception;
             event_task get_return_object() noexcept
             {
-                return event_task{RPP_CORO_STD::coroutine_handle<promise_type>::from_promise(*this)};
+                return event_task{rpp::coro_handle<promise_type>::from_promise(*this)};
             }
-            RPP_CORO_STD::suspend_never initial_suspend() noexcept { return {}; }
-            RPP_CORO_STD::suspend_always final_suspend() noexcept { return {}; }
+            rpp::suspend_never initial_suspend() noexcept { return {}; }
+            rpp::suspend_always final_suspend() noexcept { return {}; }
             void return_void() noexcept {}
             void unhandled_exception() noexcept { exception = std::current_exception(); }
         };
 
-        RPP_CORO_STD::coroutine_handle<promise_type> handle;
+        rpp::coro_handle<promise_type> handle;
 
-        explicit event_task(RPP_CORO_STD::coroutine_handle<promise_type> h) noexcept : handle{h} {}
+        explicit event_task(rpp::coro_handle<promise_type> h) noexcept : handle{h} {}
         event_task(event_task&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
         ~event_task() { if (handle) handle.destroy(); }
         event_task(const event_task&) = delete;
@@ -244,7 +244,7 @@ namespace rpp
          * 
          * This is often known as `run_on_main_thread()` in GUI frameworks.
          */
-        void post(rpp::delegate<void()> callback) noexcept;
+        void post(rpp::delegate<void()>&& callback) noexcept;
 
         // ─── Awaiter types ──────────────────────────────────────────
 
@@ -344,7 +344,7 @@ namespace rpp
          *        then resumes the coroutine on the event loop thread.
          */
         template<typename T>
-        struct future_awaiter
+        struct RPP_CORO_RETURN_TYPE future_awaiter
         {
             event_loop& loop;
             rpp::cfuture<T> fut;
@@ -414,7 +414,7 @@ namespace rpp
          * @endcode
          */
         template<typename FutureOrCallback>
-        auto RPP_CORO_WRAPPER run_async(FutureOrCallback&& fut_or_cb) noexcept
+        RPP_CORO_WRAPPER auto run_async(FutureOrCallback&& fut_or_cb) noexcept
         {
             using Decayed = std::decay_t<FutureOrCallback>;
             if constexpr (IsFuture<Decayed>) // rpp::cfuture<R> or std::future<R>

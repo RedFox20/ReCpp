@@ -160,7 +160,7 @@ namespace rpp
         num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
     }
 
-    void event_loop::post(rpp::delegate<void()> callback) noexcept
+    void event_loop::post(rpp::delegate<void()>&& callback) noexcept
     {
         resume_queue.push(resume_event{std::move(callback)});
     }

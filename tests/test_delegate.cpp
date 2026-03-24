@@ -15,7 +15,9 @@ namespace rpp
         char* data = nullptr;
         static char* alloc(const char* str) {
             size_t n = strlen(str) + 1;
-            return static_cast<char*>(memcpy(malloc(n), str, n));
+            void* mem = malloc(n);
+            if (!mem) { AssertFailed("Memory allocation failed"); return nullptr; }
+            return static_cast<char*>(memcpy(mem, str, n));
         }
         Data() noexcept : data(alloc("data")) {}
         Data(Data&& d) noexcept { std::swap(data, d.data); }

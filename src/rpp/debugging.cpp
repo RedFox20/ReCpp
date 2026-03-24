@@ -237,9 +237,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
 {
     #if __ANDROID__
         (void)len;
-        auto priority = severity == LogSeverityInfo ? ANDROID_LOG_INFO :
-                        severity == LogSeverityWarn ? ANDROID_LOG_WARN :
-                                                      ANDROID_LOG_ERROR;
+        auto priority = ANDROID_LOG_ERROR;
+        if      (severity == LogSeverityInfo) priority = ANDROID_LOG_INFO;
+        else if (severity == LogSeverityWarn) priority = ANDROID_LOG_WARN;
         __android_log_write(priority, tag, str);
 
     #elif RPP_BARE_METAL

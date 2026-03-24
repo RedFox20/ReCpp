@@ -562,31 +562,31 @@ namespace rpp
 #undef TestCaseExpectedEx
 
 #define Assert(expr) do { \
-    if (!(expr)) { assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, false, "BUT EXPECTED", true); } \
+    if (!(expr)) { rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, false, "BUT EXPECTED", true); } \
 }while(0)
 
 #define AssertFailed(fmt, ...) do { \
-    assert_failed(RPP_SOURCE_LOC_CURRENT, "assertion failed => " fmt, ##__VA_ARGS__); \
+    rpp::test::assert_failed(RPP_SOURCE_LOC_CURRENT, "assertion failed => " fmt, ##__VA_ARGS__); \
 }while(0)
 #define AssertFailedLoc(source_loc, fmt, ...) do { \
-    assert_failed((source_loc), "assertion failed => " fmt, ##__VA_ARGS__); \
+    rpp::test::assert_failed((source_loc), "assertion failed => " fmt, ##__VA_ARGS__); \
 }while(0)
 
 #define AssertTrue Assert
 #define AssertFalse(expr) do { \
-    if ((expr)) { assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, true, "BUT EXPECTED", false); } \
+    if ((expr)) { rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, true, "BUT EXPECTED", false); } \
 }while(0)
 
 // Asserts that expression is true, otherwise displays a custom formatted error message
 #define AssertMsg(expr, fmt, ...) do { \
-    if (!(expr)) { assert_failed(RPP_SOURCE_LOC_CURRENT, "%s $ " fmt, #expr, ##__VA_ARGS__); } \
+    if (!(expr)) { rpp::test::assert_failed(RPP_SOURCE_LOC_CURRENT, "%s $ " fmt, #expr, ##__VA_ARGS__); } \
 }while(0)
 
 #define AssertThat(expr, expected) do { \
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "BUT EXPECTED", __expect); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
@@ -594,7 +594,7 @@ namespace rpp
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed((source_loc), #expr, __expr, "BUT EXPECTED", __expect); \
+        rpp::test::assumption_failed((source_loc), #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
@@ -602,7 +602,7 @@ namespace rpp
     const auto& __expr   = expr;        \
     const auto& __expect = expected;    \
     if (!rpp::Compare::eq(__expr, __expect)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "BUT EXPECTED", __expect); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "BUT EXPECTED", __expect); \
     } \
 }while(0)
 
@@ -610,7 +610,7 @@ namespace rpp
 #define AssertThrows(expr, exceptionType) do { \
     try {                                      \
         expr;                                  \
-        assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected exception of type %s", #expr, #exceptionType); \
+        rpp::test::assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected exception of type %s", #expr, #exceptionType); \
     } catch (const exceptionType&) {} \
 }while(0)
 
@@ -619,9 +619,9 @@ namespace rpp
     try {                           \
         expr;                       \
     } catch (const std::exception& e) { \
-        assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected no exceptions but got: %s", #expr, e.what()); \
+        rpp::test::assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected no exceptions but got: %s", #expr, e.what()); \
     } catch (...) { \
-        assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected no exceptions", #expr); \
+        rpp::test::assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected no exceptions", #expr); \
     } \
 }while(0)
 
@@ -630,7 +630,7 @@ namespace rpp
     try {                                      \
         expr;                                  \
     } catch (const exceptionType&) {           \
-        assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected no exception of type %s", #expr, #exceptionType); \
+        rpp::test::assert_failed(RPP_SOURCE_LOC_CURRENT, "%s => expected no exception of type %s", #expr, #exceptionType); \
     } catch (...) { /**any other ex is ok**/ }\
 }while(0)
 
@@ -638,7 +638,7 @@ namespace rpp
     const auto& __expr    = expr;               \
     const auto& __mustnot = mustNotEqual;       \
     if (rpp::Compare::eq(__expr, __mustnot)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must not equal", __mustnot); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must not equal", __mustnot); \
     } \
 }while(0)
 
@@ -646,7 +646,7 @@ namespace rpp
     const auto& __expr = expr;         \
     const auto& __than = than;         \
     if (!rpp::Compare::gt(__expr, __than)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be greater than", __than); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be greater than", __than); \
     } \
 }while(0)
 
@@ -654,7 +654,7 @@ namespace rpp
     const auto& __expr = expr;      \
     const auto& __than = than;      \
     if (!rpp::Compare::lt(__expr, __than)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be less than", __than); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be less than", __than); \
     } \
 }while(0)
 
@@ -662,7 +662,7 @@ namespace rpp
     const auto& __expr = expr;                \
     const auto& __than = than;                \
     if (!rpp::Compare::gte(__expr, __than)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be greater or equal than", __than); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be greater or equal than", __than); \
     } \
 }while(0)
 
@@ -670,7 +670,7 @@ namespace rpp
     const auto& __expr = expr;             \
     const auto& __than = than;             \
     if (!rpp::Compare::lte(__expr, __than)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be less or equal than", __than); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be less or equal than", __than); \
     } \
 }while(0)
 
@@ -680,7 +680,7 @@ namespace rpp
     const auto& __rmin = rangeMin;                   \
     const auto& __rmax = rangeMax;                   \
     if (!rpp::Compare::rngInc(__expr, __rmin, __rmax)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be within inclusive range ["#rangeMin","#rangeMax"]", __rmin, __rmax); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be within inclusive range ["#rangeMin","#rangeMax"]", __rmin, __rmax); \
     } \
 }while(0)
 
@@ -690,7 +690,7 @@ namespace rpp
     const auto& __rmin = rangeMin;                   \
     const auto& __rmax = rangeMax;                   \
     if (!rpp::Compare::rngEx(__expr, __rmin, __rmax)) { \
-        assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be within exclusive range ("#rangeMin","#rangeMax")", __rmin, __rmax); \
+        rpp::test::assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "must be within exclusive range ("#rangeMin","#rangeMax")", __rmin, __rmax); \
     } \
 }while(0)
 

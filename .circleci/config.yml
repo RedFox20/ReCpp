@@ -37,7 +37,7 @@ jobs:
       SANITIZE: << parameters.sanitizer >>
       CPP_STANDARD: CXX<< parameters.cpp_version >>
       COV_PARAM: << parameters.coverage >>
-      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads
+      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
     steps:
       - checkout
       - run: sudo apt-get update
@@ -97,13 +97,15 @@ jobs:
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.14
+    environment:
+      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
     steps:
       - checkout
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install gcc-mipsel-linux-gnu g++-mipsel-linux-gnu
       - run: pipenv install mama
       - run: make configure-cmake
-      - run: CXX20=1 pipenv run mama mips verbose build
+      - run: CXX20=1 pipenv run mama mips verbose build jobs=3
   android-build:
     parameters:
       docker_image:
@@ -117,10 +119,17 @@ jobs:
         type: string
         default: ""
         description: "Override NDK version, e.g. 29.0.14206865 to use NDK r29 instead of the default LTS"
+      sanitizer:
+        type: enum
+        enum: ["", "clang-tidy"]
+        default: ""
+        description: "Sanitizer/analysis tool to use"
     description: "Android C++20 Build << parameters.toolchain >>"
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: << parameters.docker_image >>
+    environment:
+      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
     steps:
       - checkout
       - when:
@@ -140,7 +149,8 @@ jobs:
           name: Build Android NDK << parameters.toolchain >>
           command: |
               echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-              CXX20=1 mama android verbose build with_tests
+              SAN_FLAGS=$([[ << parameters.sanitizer >> == "clang-tidy" ]] && echo "clang-tidy" || echo "")
+              CXX20=1 mama android $SAN_FLAGS verbose build with_tests
 
 workflows:
   build_all:
@@ -183,20 +193,32 @@ workflows:
       - mipsel-cpp20-gcc12
       # Android NDK builds
       - android-build:
+          matrix:
+            parameters:
+              sanitizer: ["", "clang-tidy"]
           name: android-cpp20-r25b-clang14
           docker_image: "cimg/android:2023.08.1-ndk"
           toolchain: "ndk-r25b-clang++14"
       - android-build:
+          matrix:
+            parameters:
+              sanitizer: ["", "clang-tidy"]
           name: android-cpp20-r27-clang18
           docker_image: "cimg/android:2024.11.1-ndk"
           toolchain: "ndk-r27-clang++18"
           ndk_version: "27.2.12479018"
       - android-build:
+          matrix:
+            parameters:
+              sanitizer: ["", "clang-tidy"]
           name: android-cpp20-r28b-clang19
           docker_image: "cimg/android:2025.12.1-ndk"
           toolchain: "ndk-r28b-clang++19"
           ndk_version: "28.0.10865935"
       - android-build:
+          matrix:
+            parameters:
+              sanitizer: ["", "clang-tidy"]
           name: android-cpp20-r29-clang20
           docker_image: "cimg/android:2026.03.1-ndk"
           toolchain: "ndk-r29-clang++20"

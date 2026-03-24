@@ -6,7 +6,7 @@
 #include "jni_cpp.h"
 #include <android/log.h>
 
-namespace rpp { namespace jni
+namespace rpp::jni
 {
     //////////////////////////////////////////////////////////////////////////////////////
 
@@ -298,11 +298,11 @@ namespace rpp { namespace jni
     {
         JNIEnv* env = getEnv();
         Class stringClass{"java/lang/String"};
-        jobjectArray arr = env->NewObjectArray(strings.size(), stringClass.get(), 0);
+        jobjectArray arr = env->NewObjectArray((jsize)strings.size(), stringClass.get(), nullptr);
         if (!arr) JniThrow("Failed to create java.lang.String[]");
         for (size_t i = 0; i < strings.size(); ++i)
         {
-            env->SetObjectArrayElement(arr, i, env->NewStringUTF(strings[i]));
+            env->SetObjectArrayElement(arr, (jsize)i, env->NewStringUTF(strings[i]));
         }
         return JArray{ makeRef((jarray)arr), JniType::Object };
     }
@@ -317,7 +317,7 @@ namespace rpp { namespace jni
         name = className;
     }
 
-    Class::Class(const char* className, std::nothrow_t) noexcept
+    Class::Class(const char* className, std::nothrow_t /*unused*/) noexcept
     {
         auto* env = getEnv();
         clazz = makeGlobalRef<jclass>(env->FindClass(className));
@@ -350,7 +350,7 @@ namespace rpp { namespace jni
         if (!method) JniThrow("Method '%s' not found in '%s'", methodName, name);
         return {*this, method, methodName, signature, /*isStatic*/false};
     }
-    Method Class::method(const char* methodName, const char* signature, std::nothrow_t) noexcept
+    Method Class::method(const char* methodName, const char* signature, std::nothrow_t /*unused*/) noexcept
     {
         checkMethodSignature(*this, methodName, signature, /*throwOnError*/false);
         auto* env = getEnv();
@@ -368,7 +368,7 @@ namespace rpp { namespace jni
         return {*this, method, methodName, signature, /*isStatic*/true};
     }
 
-    Method Class::staticMethod(const char* methodName, const char* signature, std::nothrow_t) noexcept
+    Method Class::staticMethod(const char* methodName, const char* signature, std::nothrow_t /*unused*/) noexcept
     {
         checkMethodSignature(*this, methodName, signature, /*throwOnError*/false);
         auto* env = getEnv();
@@ -385,7 +385,7 @@ namespace rpp { namespace jni
         if (!field) JniThrow("Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
         return {*this, field, fieldName, type, /*isStatic*/false};
     }
-    Field Class::field(const char* fieldName, const char* type, std::nothrow_t) noexcept
+    Field Class::field(const char* fieldName, const char* type, std::nothrow_t /*unused*/) noexcept
     {
         checkFieldSignature(*this, fieldName, type, /*throwOnError*/false);
         auto* env = getEnv();
@@ -402,7 +402,7 @@ namespace rpp { namespace jni
         if (!field) JniThrow("Static Field '%s' of type '%s' not found in '%s'", fieldName, type, name);
         return {*this, field, fieldName, type, /*isStatic*/true};
     }
-    Field Class::staticField(const char* fieldName, const char* type, std::nothrow_t) noexcept
+    Field Class::staticField(const char* fieldName, const char* type, std::nothrow_t /*unused*/) noexcept
     {
         checkFieldSignature(*this, fieldName, type, /*throwOnError*/false);
         auto* env = getEnv();
@@ -419,15 +419,15 @@ namespace rpp { namespace jni
     }
 
     #define CheckMethodInstance(instance, retval) do { \
-        if (!isStatic && !instance) { \
+        if (!isStatic && !(instance)) { \
             __android_log_print(ANDROID_LOG_ERROR, "ReCpp", "NonStatic jni::Method %s called with null instance", name); \
             /*return retval;*/ \
-        } else if (isStatic && instance) { \
-            __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Method %s called with instance=%p", name, instance); \
+        } else if (isStatic && (instance)) { \
+            __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Method %s called with instance=%p", name, (instance)); \
         } \
     } while(0)
 
-    Ref<jobject> Method::objectV(jobject instance, ...) noexcept
+    Ref<jobject> Method::objectV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -439,7 +439,7 @@ namespace rpp { namespace jni
         return Ref<jobject>{o};
     }
 
-    JString Method::stringV(jobject instance, ...) noexcept
+    JString Method::stringV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -451,7 +451,7 @@ namespace rpp { namespace jni
         return JString{ s };
     }
 
-    JArray Method::arrayV(JniType type, jobject instance, ...) noexcept
+    JArray Method::arrayV(JniType type, jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -463,7 +463,7 @@ namespace rpp { namespace jni
         return { a, type };
     }
 
-    void Method::voidV(jobject instance, ...) noexcept
+    void Method::voidV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, );
         va_list args; va_start(args, instance);
@@ -473,7 +473,7 @@ namespace rpp { namespace jni
         va_end(args);
     }
 
-    jboolean Method::booleanV(jobject instance, ...) noexcept
+    jboolean Method::booleanV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -485,7 +485,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jbyte Method::byteV(jobject instance, ...) noexcept
+    jbyte Method::byteV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -497,7 +497,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jchar Method::charV(jobject instance, ...) noexcept
+    jchar Method::charV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -509,7 +509,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jshort Method::shortV(jobject instance, ...) noexcept
+    jshort Method::shortV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -521,7 +521,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jint Method::intV(jobject instance, ...) noexcept
+    jint Method::intV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -533,7 +533,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jlong Method::longV(jobject instance, ...) noexcept
+    jlong Method::longV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -545,7 +545,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jfloat Method::floatV(jobject instance, ...) noexcept
+    jfloat Method::floatV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -557,7 +557,7 @@ namespace rpp { namespace jni
         return v;
     }
 
-    jdouble Method::doubleV(jobject instance, ...) noexcept
+    jdouble Method::doubleV(jobject instance, ...) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckMethodInstance(instance, {});
         va_list args; va_start(args, instance);
@@ -577,15 +577,15 @@ namespace rpp { namespace jni
     }
 
     #define CheckFieldInstance(instance, retval) do { \
-        if (!isStatic && !instance) { \
+        if (!isStatic && !(instance)) { \
             __android_log_print(ANDROID_LOG_ERROR, "ReCpp", "NonStatic jni::Field %s called with null instance", name); \
             return retval; \
-        } else if (isStatic && instance) { \
-            __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Field %s called with instance=%p", name, instance); \
+        } else if (isStatic && (instance)) { \
+            __android_log_print(ANDROID_LOG_WARN, "ReCpp", "Static jni::Field %s called with instance=%p", name, (instance)); \
         } \
     } while(0)
 
-    Ref<jobject> Field::getObject(jobject instance) noexcept
+    Ref<jobject> Field::getObject(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -595,7 +595,7 @@ namespace rpp { namespace jni
         return Ref<jobject>{obj};
     }
 
-    Ref<jobject> Field::getGlobalObject(jobject instance) noexcept
+    Ref<jobject> Field::getGlobalObject(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -605,7 +605,7 @@ namespace rpp { namespace jni
         return makeGlobalRef(obj);
     }
 
-    JString Field::getString(jobject instance) noexcept
+    JString Field::getString(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -615,7 +615,7 @@ namespace rpp { namespace jni
         return JString{str};
     }
 
-    JArray Field::getArray(JniType type, jobject instance) noexcept
+    JArray Field::getArray(JniType type, jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -625,7 +625,7 @@ namespace rpp { namespace jni
         return JArray{arr, type};
     }
 
-    jboolean Field::getBoolean(jobject instance) noexcept
+    jboolean Field::getBoolean(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -634,7 +634,7 @@ namespace rpp { namespace jni
             : env->GetBooleanField(instance, field);
     }
 
-    jbyte Field::getByte(jobject instance) noexcept
+    jbyte Field::getByte(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -643,7 +643,7 @@ namespace rpp { namespace jni
             : env->GetByteField(instance, field);
     }
 
-    jchar Field::getChar(jobject instance) noexcept
+    jchar Field::getChar(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -652,7 +652,7 @@ namespace rpp { namespace jni
             : env->GetCharField(instance, field);
     }
 
-    jshort Field::getShort(jobject instance) noexcept
+    jshort Field::getShort(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -661,7 +661,7 @@ namespace rpp { namespace jni
             : env->GetShortField(instance, field);
     }
 
-    jint Field::getInt(jobject instance) noexcept
+    jint Field::getInt(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -670,7 +670,7 @@ namespace rpp { namespace jni
             : env->GetIntField(instance, field);
     }
 
-    jlong Field::getLong(jobject instance) noexcept
+    jlong Field::getLong(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -679,7 +679,7 @@ namespace rpp { namespace jni
             : env->GetLongField(instance, field);
     }
 
-    jfloat Field::getFloat(jobject instance) noexcept
+    jfloat Field::getFloat(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -688,7 +688,7 @@ namespace rpp { namespace jni
             : env->GetFloatField(instance, field);
     }
 
-    jdouble Field::getDouble(jobject instance) noexcept
+    jdouble Field::getDouble(jobject instance) noexcept // NOLINT(readability-make-member-function-const)
     {
         CheckFieldInstance(instance, {});
         auto* env = getEnv();
@@ -699,6 +699,6 @@ namespace rpp { namespace jni
 
     //////////////////////////////////////////////////////////////////////////////////////
 
-}} // namespace rpp::jni
+} // namespace rpp::jni
 
 #endif // !__ANDROID__

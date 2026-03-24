@@ -14,7 +14,11 @@
     #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang-14 and older
         #include <experimental/coroutine>
         #define RPP_HAS_COROUTINES 1
-        #define RPP_CORO_STD std::experimental
+        #ifdef _VSTD_EXPERIMENTAL
+            #define RPP_CORO_STD _VSTD_EXPERIMENTAL
+        #else
+            #define RPP_CORO_STD std::experimental
+        #endif
         // Clang 14 warns about std::experimental coroutines being removed in LLVM 15,
         // suppress globally since it triggers at every co_await/co_return usage site
         #if defined(__clang__) && defined(__has_warning)
@@ -40,6 +44,8 @@ namespace rpp
 #if RPP_HAS_COROUTINES
     template<typename T = void>
     using coro_handle = RPP_CORO_STD::coroutine_handle<T>;
+    using suspend_never = RPP_CORO_STD::suspend_never;
+    using suspend_always = RPP_CORO_STD::suspend_always;
 #endif // RPP_HAS_COROUTINES
 
 
