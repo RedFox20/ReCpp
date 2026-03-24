@@ -119,17 +119,11 @@ jobs:
         type: string
         default: ""
         description: "Override NDK version, e.g. 29.0.14206865 to use NDK r29 instead of the default LTS"
-      sanitizer:
-        type: enum
-        enum: ["none", "clang-tidy"]
-        default: "none"
-        description: "Sanitizer/analysis tool to use"
-    description: "Android << parameters.toolchain >> C++20 build with << parameters.sanitizer >> sanitizer"
+    description: "Android << parameters.toolchain >> C++20 build with clang-tidy sanitizer"
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: << parameters.docker_image >>
     environment:
-      SANITIZE: << parameters.sanitizer >>
       NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
     steps:
       - checkout
@@ -146,12 +140,21 @@ jobs:
       - run: sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED || true
       - run: make configure-pip3
       - run: pip3 install mama
-      - run: 
-          name: Build Android NDK << parameters.toolchain >> << parameters.sanitizer >>
+      - run:
+          name: Build Android NDK << parameters.toolchain >>
           command: |
               echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-              SAN_FLAGS=$([[ "$SANITIZE" == "clang-tidy" ]] && echo "clang-tidy" || echo "")
-              CXX20=1 mama android $SAN_FLAGS verbose build with_tests jobs=3
+              CXX20=1 mama android verbose build with_tests jobs=3
+      - run:
+          name: Clang Tidy Analysis # run clang-tidy separately because it's super slow during build
+          command: |
+            echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+            NDK_CLANG_TIDY="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang-tidy"
+            echo "Using clang-tidy: $NDK_CLANG_TIDY"
+            sudo apt-get update -q && apt-get install -y clang-tidy # install run-clang-tidy wrapper
+            # only keep the first entry for each source file, since we're skipping tests which recompile with RPP_DEBUG=1
+            ./.circleci/dedup_compile_commands.py packages/ReCpp/android/compile_commands.json
+            run-clang-tidy -clang-tidy-binary "$NDK_CLANG_TIDY" -j 3 -p packages/ReCpp/android/ src/rpp/
 
 workflows:
   build_all:
@@ -194,33 +197,21 @@ workflows:
       - mipsel-cpp20-gcc12
       # Android NDK builds
       - android-build:
-          matrix:
-            parameters:
-              sanitizer: ["none", "clang-tidy"]
-          name: android-cpp20-r25b-<< matrix.sanitizer >>-clang14
+          name: android-cpp20-r25b-clang-tidy-clang14
           docker_image: "cimg/android:2023.08.1-ndk"
           toolchain: "ndk-r25b-clang++14"
       - android-build:
-          matrix:
-            parameters:
-              sanitizer: ["none", "clang-tidy"]
-          name: android-cpp20-r27-<< matrix.sanitizer >>-clang18
+          name: android-cpp20-r27-clang-tidy-clang18
           docker_image: "cimg/android:2024.11.1-ndk"
           toolchain: "ndk-r27-clang++18"
           ndk_version: "27.2.12479018"
       - android-build:
-          matrix:
-            parameters:
-              sanitizer: ["none", "clang-tidy"]
-          name: android-cpp20-r28b-<< matrix.sanitizer >>-clang19
+          name: android-cpp20-r28b-clang-tidy-clang19
           docker_image: "cimg/android:2025.12.1-ndk"
           toolchain: "ndk-r28b-clang++19"
           ndk_version: "28.0.10865935"
       - android-build:
-          matrix:
-            parameters:
-              sanitizer: ["none", "clang-tidy"]
-          name: android-cpp20-r29-<< matrix.sanitizer >>-clang20
+          name: android-cpp20-r29-clang-tidy-clang20
           docker_image: "cimg/android:2026.03.1-ndk"
           toolchain: "ndk-r29-clang++20"
           ndk_version: "29.0.14206865"
