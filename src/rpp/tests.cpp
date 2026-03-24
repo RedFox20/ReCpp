@@ -169,7 +169,7 @@ namespace rpp
 
     void register_test(strview name, test_factory factory, bool autorun)
     {
-        state().global_tests.emplace_back(test_info{ name, factory, {}, true, autorun });
+        state().global_tests.emplace_back(test_info{ name, factory, {}, true, autorun }); // NOLINT(modernize-use-emplace)
     }
 
     ///////////////////////////////////////////////////////////////////////////

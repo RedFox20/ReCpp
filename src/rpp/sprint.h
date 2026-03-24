@@ -434,6 +434,7 @@ namespace rpp
 
     template<class T> int println(FILE* file, const T& value) noexcept
     {
+        if (!file) return 0;
         string_buffer buf;
         // using operator<< here to support global operator<< overloads more easily
         // since trying to implement them inside write<T>() leads to cyclic recursion
@@ -455,6 +456,7 @@ namespace rpp
      */
     template<class T, class... Args> int print(FILE* file, const T& first, const Args&... args) noexcept
     {
+        if (!file) return 0;
         string_buffer buf;
         buf << first;
         (..., (buf << ' ', buf << args));
@@ -474,6 +476,7 @@ namespace rpp
      */
     template<class T, class... Args> int println(FILE* file, const T& first, const Args&... args) noexcept
     {
+        if (!file) return 0;
         string_buffer buf;
         buf << first;
         (..., (buf << ' ', buf << args));
