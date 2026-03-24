@@ -121,8 +121,8 @@ jobs:
         description: "Override NDK version, e.g. 29.0.14206865 to use NDK r29 instead of the default LTS"
       sanitizer:
         type: enum
-        enum: ["no", "clang-tidy"]
-        default: "no"
+        enum: ["none", "clang-tidy"]
+        default: "none"
         description: "Sanitizer/analysis tool to use"
     description: "Android << parameters.toolchain >> C++20 build with << parameters.sanitizer >> sanitizer"
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
