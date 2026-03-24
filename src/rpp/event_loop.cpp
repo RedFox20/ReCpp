@@ -123,8 +123,11 @@ namespace rpp
                 continue; // loop around one more time just in case
             }
 
-            if (!has_background_tasks())
-                break; // no more pending tasks, we are idle
+            // Break only when BOTH: no background tasks AND no queued resume events.
+            // If count==0 but queue is non-empty, a task pushed its event just before
+            // decrementing - we must process those events before exiting.
+            if (!has_pending_work())
+                break; // truly idle: no pending tasks and no queued resumes
         }
         return processed_count;
     }

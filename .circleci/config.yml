@@ -136,6 +136,7 @@ jobs:
                   NDK_PATH="/home/circleci/android-sdk/ndk/<< parameters.ndk_version >>"
                   echo "export ANDROID_NDK_HOME=$NDK_PATH" >> "$BASH_ENV"
                   echo "export ANDROID_NDK_ROOT=$NDK_PATH" >> "$BASH_ENV"
+      - run: sudo apt-get update -q && sudo apt-get install -y clang-tidy # install run-clang-tidy wrapper
       - run: make configure-cmake
       - run: sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED || true
       - run: make configure-pip3
@@ -151,9 +152,10 @@ jobs:
             echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
             NDK_CLANG_TIDY="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang-tidy"
             echo "Using clang-tidy: $NDK_CLANG_TIDY"
-            sudo apt-get update -q && apt-get install -y clang-tidy # install run-clang-tidy wrapper
             # only keep the first entry for each source file, since we're skipping tests which recompile with RPP_DEBUG=1
             ./.circleci/dedup_compile_commands.py packages/ReCpp/android/compile_commands.json
+            ls /home/circleci/android-sdk/ndk/
+            ls -la "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/"
             run-clang-tidy -clang-tidy-binary "$NDK_CLANG_TIDY" -j 3 -p packages/ReCpp/android/ src/rpp/
 
 workflows:

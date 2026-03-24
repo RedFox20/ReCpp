@@ -22,8 +22,11 @@ CXX20=1 mama gcc build test="-vv test_concurrent_queue::push_and_pop"
 ```
 4. **Run tests with sanitizers**: If you want to check for memory or threading errors, you can build and run the tests with sanitizers enabled. It usually needs a full rebuild to apply a change in sanitizer flags. Later you can use regular build command.
 ```bash
-# run AddressSanitizer without gdb, because it can interfere with ASAN
-CXX20=1 mama gcc asan build test="nogdb -vv"
+# run AddressSanitizer, by default it runs with gdb
+CXX20=1 mama gcc asan build test="-vv"
+
+# run with AddressSanitizer until failure
+CXX20=1 mama gcc asan build test="-vv test_event_loop::ui_simulation_message_and_video_pipelines" test_until_failure=20
 
 # run ThreadSanitizer
 CXX20=1 mama gcc tsan build test="nogdb -vv"

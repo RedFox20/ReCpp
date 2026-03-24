@@ -994,12 +994,30 @@ TestImpl(test_event_loop)
         // This mirrors real UI code: the main thread decides to kick off
         // background work, then yields control to the event loop.
         assert_on_main_thread();
+
+        print_info("Launch message and video coroutines\n");
         auto msg_fut = message_processor(); // immediately suspends at first co_await
         auto vid_fut = video_pipeline();    // immediately suspends at first co_await
 
         // ── Drive the event loop until both paths finish ─────────────────
+        print_info("Pump events until both idle\n");
         idle();
 
+        // wait up to 10 seconds for either paths to complete
+        print_info("Wait up to 10s for futures to complete\n");
+        bool msg_done = msg_fut.wait_for(rpp::seconds(10)) == std::future_status::ready;
+        bool vid_done = vid_fut.wait_for(rpp::seconds(10)) == std::future_status::ready;
+        AssertThat(msg_done, true);
+        AssertThat(vid_done, true);
+        if (!msg_done || !vid_done)
+        {
+            print_info("Timeline of events before deadlock:");
+            for (const std::string& e : state.timeline)
+                print_info("  %s\n", e.c_str());
+            std::terminate(); // fail hard to dump thread stacks for debugging
+        }
+
+        print_info("Both futures completed, check for exceptions\n");
         msg_fut.get(); // must be ready; verifies no exception escaped
         vid_fut.get();
 
