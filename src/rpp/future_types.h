@@ -44,6 +44,7 @@ namespace rpp
 
 
 #if RPP_HAS_CXX20
+
     template<typename F>
     concept IsFuture = requires(F f) {
         requires std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
@@ -52,5 +53,21 @@ namespace rpp
 
     template<typename F>
     concept NotFuture = !IsFuture<F>;
+
+    template<typename Function>
+    concept IsFunction = std::is_invocable_v<Function>;
+
+    template<typename F>
+    concept IsFunctionReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && IsFuture<decltype(f())>;
+    };
+
+    template<typename F>
+    concept IsFunctionNotReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && NotFuture<decltype(f())>;
+    };
+
 #endif // RPP_HAS_CXX20
 }

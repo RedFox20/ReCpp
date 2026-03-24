@@ -11,18 +11,6 @@
 
 namespace rpp
 {
-    template<typename F>
-    concept IsFunctionReturningFuture = requires(F f)
-    {
-        requires IsFunction<F> && IsFuture<decltype(f())>;
-    };
-
-    template<typename F>
-    concept IsFunctionNotReturningFuture = requires(F f)
-    {
-        requires IsFunction<F> && NotFuture<decltype(f())>;
-    };
-
     /**
      * @brief Allows to asynchronously co_await on any lambdas via rpp::parallel_task()
      * @code

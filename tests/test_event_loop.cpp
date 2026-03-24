@@ -47,13 +47,124 @@ TestImpl(test_event_loop)
         loop.reset();
     }
 
-    // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-    void assert_on_loop_thread(RPP_SOURCE_LOC)
-    { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
+    void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
 
-    template<typename F>
-    auto run_bg(F&& f) { return loop->run_async(std::forward<F>(f)); }
+    // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+
+    // ─── Showcase: event_loop API overview ──────────────────────
+    //   1. run_async()  – dispatch work to a background thread, co_await
+    //                     the result; coroutine resumes on the main thread.
+    //   2. post()       – schedule a callback to run on the main (UI) thread
+    //                     from anywhere; useful for pushing results back to
+    //                     the UI without data-race concerns.
+    //   3. After every co_await the coroutine is guaranteed to resume on
+    //      the main thread – verified with assert_on_main_thread().
+    TestCaseCoro(api_showcase)
+    {
+        // ── 1. Run heavy work on a background thread ────────────────
+        // run_async() dispatches the lambda to the thread pool and suspends
+        // this coroutine.  When the lambda finishes, the event loop resumes
+        // the coroutine on the main thread so we can safely touch UI state.
+        int answer = co_await loop->run_async([]() -> int {
+            rpp::sleep_ms(5); // simulate slow computation
+            return 42;
+        });
+        assert_on_main_thread(); // coroutine resumed on main thread
+        AssertThat(answer, 42);
+
+        // ── 2. Await a lambda coroutine ─────────────────────────────
+        // Lambda coroutines compose naturally: co_await a cfuture-returning
+        // lambda just like co_await run_async.  The lambda does its own
+        // run_async internally and resumes on the main thread.
+        std::string msg = co_await loop->run_async([this,answer]() -> rpp::cfuture<std::string> {
+            std::string raw = co_await loop->run_async([answer]() -> std::string {
+                rpp::sleep_ms(5); // simulate slow I/O
+                return "result_" + std::to_string(answer);
+            });
+            assert_on_main_thread(); // sub-coroutine also resumes on main thread
+            co_return raw;
+        });
+        assert_on_main_thread(); // still on the main thread after resume
+        AssertThat(msg, "result_42"s);
+
+        // ── 3. post() – push a callback onto the main thread queue ──
+        // post() enqueues a callable that will be executed on the main
+        // (event-loop) thread during the next idle() / run_once() cycle.
+        // This is the primary way to marshal work back to the UI thread
+        // from arbitrary contexts (background threads, callbacks, etc.).
+        bool posted_callback_ran = false;
+        loop->post([&]() {
+            assert_on_main_thread(); // runs on main thread
+            posted_callback_ran = true;
+        });
+
+        // The posted callback hasn't run yet – it is just queued.
+        // A third async call will give the loop a chance to drain the
+        // queue between processing resume events.
+        int final_val = co_await loop->run_async([]() -> int {
+            rpp::sleep_ms(2);
+            return 7;
+        });
+        assert_on_main_thread();
+        AssertThat(final_val, 7);
+
+        // By now loop->run_once() inside run_coro_test has processed the posted
+        // callback alongside the coroutine resume events.
+        AssertThat(posted_callback_ran, true);
+    }
+
+    // ─── Showcase: event_task as a top-level coroutine ──────────
+    // event_task is a lightweight coroutine return type designed for
+    // event_loop-driven coroutines.  Unlike cfuture<T>, it does not
+    // carry a return value — it is fire-and-forget with exception
+    // propagation.  The event loop drives it via run_until_idle().
+    TestCase(event_task_showcase)
+    {
+        std::vector<std::string> log;
+
+        // event_task coroutine: starts eagerly, suspends at each co_await,
+        // and the event loop resumes it on the main thread.
+        auto my_task = [&](rpp::event_loop* ev) -> rpp::event_task
+        {
+            // 1. Dispatch work to background, resume on main thread
+            int val = co_await ev->run_async([]() -> int {
+                rpp::sleep_ms(5);
+                return 42;
+            });
+            assert_on_main_thread(); // coroutine resumed on main thread
+            log.emplace_back("step1: " + std::to_string(val));
+
+            // 2. Await a lambda coroutine — composes naturally with event_task.
+            //    The lambda does its own run_async and resumes on main thread.
+            std::string msg = co_await ev->run_async([this,ev,val]() -> rpp::cfuture<std::string> {
+                std::string raw = co_await ev->run_async([val]() -> std::string {
+                    rpp::sleep_ms(2);
+                    return "result_" + std::to_string(val);
+                });
+                assert_on_main_thread(); // sub-coroutine also resumes on main thread
+                co_return raw;
+            });
+            assert_on_main_thread(); // still on main thread after lambda coroutine
+            log.emplace_back("step2: " + msg);
+
+            // 3. Post a callback to the main thread queue
+            ev->post([&]() {
+                log.emplace_back("posted_callback");
+            });
+        };
+
+        auto task = my_task(loop.get()); // starts immediately, suspends at first co_await
+        AssertThat(task.done(), false);
+
+        loop->run_until_done(task); // drives the loop and rethrows on failure
+        AssertThat(task.done(), true);
+
+        AssertThat(log.size(), 3u);
+        AssertThat(log[0], "step1: 42"s);
+        AssertThat(log[1], "step2: result_42"s);
+        AssertThat(log[2], "posted_callback"s);
+    }
 
 
     // ─── Helper: record which thread resumed each step ──────────
@@ -84,13 +195,13 @@ TestImpl(test_event_loop)
     // ─── Basic: run_async with return value ────────────────
     TestCaseCoro(basic_run_async)
     {
-        std::string result = co_await run_bg([main_tid=main_tid]() -> std::string
+        std::string result = co_await loop->run_async([main_tid=main_tid]() -> std::string
         {
             AssertNotEqual(rpp::get_thread_id(), main_tid);
             rpp::sleep_ms(5);
             return "hello from background";
         });
-        assert_on_loop_thread();
+        assert_on_main_thread();
         AssertThat(result, "hello from background"s);
     }
 
@@ -98,11 +209,11 @@ TestImpl(test_event_loop)
     TestCaseCoro(basic_run_async_void)
     {
         std::atomic<bool> work_done{false};
-        co_await run_bg([&]() {
+        co_await loop->run_async([&]() {
             rpp::sleep_ms(5);
             work_done = true;
         });
-        assert_on_loop_thread();
+        assert_on_main_thread();
         AssertThat(work_done.load(), true);
     }
 
@@ -112,19 +223,19 @@ TestImpl(test_event_loop)
         thread_recorder rec {};
         std::string s;
 
-        s += co_await run_bg([&]() -> std::string {
+        s += co_await loop->run_async([&]() -> std::string {
             rpp::sleep_ms(2);
             return "A";
         });
         rec.record();
 
-        s += co_await run_bg([&]() -> std::string {
+        s += co_await loop->run_async([&]() -> std::string {
             rpp::sleep_ms(2);
             return "B";
         });
         rec.record();
 
-        s += co_await run_bg([&]() -> std::string {
+        s += co_await loop->run_async([&]() -> std::string {
             rpp::sleep_ms(2);
             return "C";
         });
@@ -144,7 +255,7 @@ TestImpl(test_event_loop)
 
         auto record = [&](int id)
         {
-            assert_on_loop_thread();
+            assert_on_main_thread();
             std::lock_guard lock{order_m};
             resume_order.push_back(id);
         };
@@ -160,7 +271,7 @@ TestImpl(test_event_loop)
 
         auto coro_a = [&]() -> rpp::cfuture<int>
         {
-            co_await run_bg([&] {
+            co_await loop->run_async([&] {
                 while (!b_resumed.load()) rpp::sleep_ms(1);
             });
             record(1);
@@ -169,7 +280,7 @@ TestImpl(test_event_loop)
 
         auto coro_b = [&]() -> rpp::cfuture<int>
         {
-            co_await run_bg([&] { rpp::sleep_ms(2); });
+            co_await loop->run_async([&] { rpp::sleep_ms(2); });
             // On loop thread: signal A's bg task that B has been resumed.
             // A's post_resume will land in the queue only after this point.
             b_resumed.store(true);
@@ -202,12 +313,12 @@ TestImpl(test_event_loop)
 
         auto coro_slow = [&]() -> rpp::cfuture<std::string>
         {
-            std::string result = co_await run_bg([&]() -> std::string {
+            std::string result = co_await loop->run_async([&]() -> std::string {
                 slow_bg_running.store(true);
                 rpp::sleep_ms(50);
                 return "slow";
             });
-            assert_on_loop_thread();
+            assert_on_main_thread();
             co_return result;
         };
 
@@ -216,18 +327,18 @@ TestImpl(test_event_loop)
             // Wait in background until the slow task has confirmed it is running
             // before proceeding.  This makes the assertion deterministic: we no
             // longer rely on wall-clock timing to observe slow_bg_running == true.
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 while (!slow_bg_running.load()) rpp::sleep_ms(1);
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
-            assert_on_loop_thread();
+            assert_on_main_thread();
 
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
-            assert_on_loop_thread();
+            assert_on_main_thread();
 
             // slow task sleeps for 50ms total; we've only spent ~4ms since it
             // started, so it must still be running.
@@ -253,7 +364,7 @@ TestImpl(test_event_loop)
         bool caught = false;
         try
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 throw std::runtime_error{"background error"};
             });
         }
@@ -268,15 +379,15 @@ TestImpl(test_event_loop)
     // ─── Exception in middle of multi-stage, with recovery ──────
     TestCaseCoro(exception_recovery_multi_stage)
     {
-        std::string s = co_await run_bg([]() -> std::string {
+        std::string s = co_await loop->run_async([]() -> std::string {
             return "step1";
         });
-        assert_on_loop_thread();
+        assert_on_main_thread();
 
         bool caught_ex = false;
         try
         {
-            co_await run_bg([]() {
+            co_await loop->run_async([]() {
                 throw std::runtime_error{"step2 failed"};
             });
         }
@@ -285,12 +396,12 @@ TestImpl(test_event_loop)
             caught_ex = true;
         }
         AssertThat(caught_ex, true);
-        assert_on_loop_thread();
+        assert_on_main_thread();
 
-        s += co_await run_bg([]() -> std::string {
+        s += co_await loop->run_async([]() -> std::string {
             return "_step3";
         });
-        assert_on_loop_thread();
+        assert_on_main_thread();
 
         AssertThat(s, "step1_step3"s);
     }
@@ -300,7 +411,7 @@ TestImpl(test_event_loop)
     {
         rpp::Timer t;
         co_await loop->delay(rpp::millis(20));
-        assert_on_loop_thread();
+        assert_on_main_thread();
         AssertGreater(t.elapsed_millis(), 18.0);
     }
 
@@ -311,12 +422,12 @@ TestImpl(test_event_loop)
         std::atomic<int> resume_count{0};
         auto coro = [&]() -> rpp::cfuture<int>
         {
-            int v = co_await run_bg([]() -> int {
+            int v = co_await loop->run_async([]() -> int {
                 rpp::sleep_ms(5);
                 return 42;
             });
             resume_count.fetch_add(1);
-            assert_on_loop_thread();
+            assert_on_main_thread();
             co_return v;
         };
 
@@ -353,7 +464,7 @@ TestImpl(test_event_loop)
 
         loop->post([&]() {
             callback_value = 42;
-            assert_on_loop_thread();
+            assert_on_main_thread();
         });
 
         idle();
@@ -369,13 +480,13 @@ TestImpl(test_event_loop)
 
         auto make_coro = [&](int id) -> rpp::cfuture<int>
         {
-            int result = co_await run_bg([id]() -> int {
+            int result = co_await loop->run_async([id]() -> int {
                 rpp::sleep_ms(1 + (id % 5));
                 return id * 10;
             });
 
             total_resumes.fetch_add(1);
-            assert_on_loop_thread();
+            assert_on_main_thread();
 
             co_return result;
         };
@@ -410,14 +521,14 @@ TestImpl(test_event_loop)
             int accum = 0;
             for (int stage = 0; stage < STAGES; ++stage)
             {
-                int v = co_await run_bg([id, stage]() -> int {
+                int v = co_await loop->run_async([id, stage]() -> int {
                     rpp::sleep_ms(1);
                     return id * 100 + stage;
                 });
                 accum += v;
 
                 total_resumes.fetch_add(1);
-                assert_on_loop_thread();
+                assert_on_main_thread();
             }
             co_return accum;
         };
@@ -445,12 +556,12 @@ TestImpl(test_event_loop)
         std::atomic<int> bg_on_different_thread{0};
         for (int i = 0; i < 5; ++i)
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 if (rpp::get_thread_id() != main_tid)
                     bg_on_different_thread.fetch_add(1);
                 rpp::sleep_ms(1);
             });
-            assert_on_loop_thread();
+            assert_on_main_thread();
         }
         AssertThat(bg_on_different_thread.load(), 5);
     }
@@ -467,7 +578,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 bg_started.store(true);
                 while (!bg_may_finish.load())
                     rpp::sleep_ms(1);
@@ -502,23 +613,23 @@ TestImpl(test_event_loop)
 
         loop->post([&]() {
             log->emplace_back("callback_1");
-            assert_on_loop_thread();
+            assert_on_main_thread();
         });
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 rpp::sleep_ms(5);
             });
             log->emplace_back("coro_resume");
-            assert_on_loop_thread();
+            assert_on_main_thread();
             co_return;
         };
 
         auto future = coro();
         loop->post([&]() {
             log->emplace_back("callback_2");
-            assert_on_loop_thread();
+            assert_on_main_thread();
         });
         idle();
         future.get();
@@ -534,14 +645,14 @@ TestImpl(test_event_loop)
     {
         auto producer = [&]() -> rpp::cfuture<int>
         {
-            co_return co_await run_bg([]() -> int {
+            co_return co_await loop->run_async([]() -> int {
                 rpp::sleep_ms(5);
                 return 99;
             });
         };
         auto produced_future = producer();
-        int val = co_await loop->await_future(produced_future);
-        assert_on_loop_thread();
+        int val = co_await loop->run_async(produced_future);
+        assert_on_main_thread();
         AssertThat(val, 99);
     }
 
@@ -554,8 +665,8 @@ TestImpl(test_event_loop)
 
         rpp::cfuture<int> ready_future {std::move(std_future)};
 
-        int val = co_await loop->await_future(ready_future);
-        assert_on_loop_thread();
+        int val = co_await loop->run_async(ready_future);
+        assert_on_main_thread();
         AssertThat(val, 42);
     }
 
@@ -565,7 +676,7 @@ TestImpl(test_event_loop)
         rpp::Timer t;
         rpp::TimePoint target = rpp::TimePoint::now() + rpp::millis(20);
         co_await loop->delay_until(target);
-        assert_on_loop_thread();
+        assert_on_main_thread();
         AssertGreater(t.elapsed_millis(), 18.0);
     }
 
@@ -596,11 +707,11 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 rpp::sleep_ms(5);
             });
             resumes.fetch_add(1);
-            assert_on_loop_thread();
+            assert_on_main_thread();
 
             loop->stop();
             co_return;
@@ -628,11 +739,11 @@ TestImpl(test_event_loop)
         loop = std::make_unique<rpp::event_loop>(0, &pool);
 
         std::atomic<bool> bg_ran_on_custom_pool{false};
-        int result = co_await run_bg([&]() -> int {
+        int result = co_await loop->run_async([&]() -> int {
             bg_ran_on_custom_pool.store(rpp::get_thread_id() != main_tid);
             return 7;
         });
-        assert_on_loop_thread();
+        assert_on_main_thread();
         AssertThat(result, 7);
         AssertThat(bg_ran_on_custom_pool.load(), true);
         AssertThat(loop->main_thread_id(), main_tid);
@@ -650,7 +761,7 @@ TestImpl(test_event_loop)
 
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 bg_started.store(true);
                 while (!bg_may_finish.load())
                     rpp::sleep_ms(1);
@@ -703,7 +814,7 @@ TestImpl(test_event_loop)
             void await_resume() const noexcept {}
         };
         co_await manual_suspend{*loop};
-        assert_on_loop_thread();
+        assert_on_main_thread();
     }
 
     // ─── Multiple posted callbacks execute in FIFO order ────────
@@ -730,7 +841,7 @@ TestImpl(test_event_loop)
         std::atomic<bool> callback_ran{false};
         auto coro = [&]() -> rpp::cfuture<void>
         {
-            co_await run_bg([&]() {
+            co_await loop->run_async([&]() {
                 rpp::sleep_ms(5);
                 callback_ran.store(true);
             });
@@ -808,13 +919,13 @@ TestImpl(test_event_loop)
             for (const std::string& msg : raw_messages)
             {
                 // background: slow parse / validation (8 ms per message)
-                std::string result = co_await run_bg([msg]() -> std::string {
+                std::string result = co_await loop->run_async([msg]() -> std::string {
                     rpp::sleep_ms(8);
                     return "cmd:" + msg;
                 });
 
                 // main thread: commit result to shared state (no lock needed)
-                assert_on_loop_thread();
+                assert_on_main_thread();
                 state.messages.push_back(result);
                 state.timeline.push_back("msg:" + msg);
             }
@@ -837,23 +948,23 @@ TestImpl(test_event_loop)
             // Stage 1 – init (20 ms)
             // While we wait here, the message_processor will commit at least
             // one (likely two) messages on the main thread.
-            co_await run_bg([] { rpp::sleep_ms(20); });
+            co_await loop->run_async([] { rpp::sleep_ms(20); });
 
             // DESIGN: resume always happens on main thread !
-            assert_on_loop_thread();
+            assert_on_main_thread();
             state.pipeline_active = true;
             state.pipeline_log.emplace_back("init");
             state.timeline.emplace_back("vid:init");
 
             // Stage 2 – add video source (15 ms)
-            co_await run_bg([] { rpp::sleep_ms(15); });
-            assert_on_loop_thread();
+            co_await loop->run_async([] { rpp::sleep_ms(15); });
+            assert_on_main_thread();
             state.pipeline_log.emplace_back("add_source");
             state.timeline.emplace_back("vid:add_source");
 
             // Stage 3 – start pipeline (25 ms)
-            co_await run_bg([] { rpp::sleep_ms(25); });
-            assert_on_loop_thread();
+            co_await loop->run_async([] { rpp::sleep_ms(25); });
+            assert_on_main_thread();
             state.pipeline_log.emplace_back("start");
             state.timeline.emplace_back("vid:start");
 
@@ -861,19 +972,19 @@ TestImpl(test_event_loop)
             // Decisions (how many frames) are made on main thread between batches.
             for (int batch = 0; batch < 3; ++batch)
             {
-                int frames = co_await run_bg([batch]() -> int {
+                int frames = co_await loop->run_async([batch]() -> int {
                     rpp::sleep_ms(10);
                     return (batch + 1) * 10; // 10, 20, 30
                 });
-                assert_on_loop_thread();
+                assert_on_main_thread();
                 state.total_frames += frames; // safe: main thread only
                 state.pipeline_log.emplace_back("frames_" + std::to_string(batch));
                 state.timeline.emplace_back("vid:frames_" + std::to_string(batch));
             }
 
             // Stage 5 – teardown (15 ms)
-            co_await run_bg([] { rpp::sleep_ms(15); });
-            assert_on_loop_thread();
+            co_await loop->run_async([] { rpp::sleep_ms(15); });
+            assert_on_main_thread();
             state.pipeline_active = false;
             state.pipeline_log.emplace_back("teardown");
             state.timeline.emplace_back("vid:teardown");
@@ -882,7 +993,7 @@ TestImpl(test_event_loop)
         // ── Main thread decision: launch both serialized paths ───────────
         // This mirrors real UI code: the main thread decides to kick off
         // background work, then yields control to the event loop.
-        assert_on_loop_thread();
+        assert_on_main_thread();
         auto msg_fut = message_processor(); // immediately suspends at first co_await
         auto vid_fut = video_pipeline();    // immediately suspends at first co_await
 

@@ -25,6 +25,61 @@
 namespace rpp
 {
     /**
+     * @brief A simple top-level coroutine return type for use with event_loop.
+     *
+     * `event_task` acts as a fire-and-forget coroutine handle that the event loop
+     * drives. It starts eagerly (no initial suspension), suspends at final_suspend
+     * so the caller can query completion, and captures unhandled exceptions.
+     *
+     * Usage:
+     * @code
+     *     rpp::event_task myCoroutine(rpp::event_loop& loop) {
+     *         int val = co_await loop.run_async([]{ return heavyWork(); });
+     *         // resumed on event loop thread
+     *         updateUI(val);
+     *     }
+     *
+     *     rpp::event_loop loop;
+     *     auto task = myCoroutine(loop);
+     *     loop.run_until_done(task); // drives the loop and rethrows on failure
+     * @endcode
+     */
+    struct RPPAPI RPP_CORO_RETURN_TYPE event_task
+    {
+        struct promise_type
+        {
+            std::exception_ptr exception;
+            event_task get_return_object() noexcept
+            {
+                return event_task{RPP_CORO_STD::coroutine_handle<promise_type>::from_promise(*this)};
+            }
+            RPP_CORO_STD::suspend_never initial_suspend() noexcept { return {}; }
+            RPP_CORO_STD::suspend_always final_suspend() noexcept { return {}; }
+            void return_void() noexcept {}
+            void unhandled_exception() noexcept { exception = std::current_exception(); }
+        };
+
+        RPP_CORO_STD::coroutine_handle<promise_type> handle;
+
+        explicit event_task(RPP_CORO_STD::coroutine_handle<promise_type> h) noexcept : handle{h} {}
+        event_task(event_task&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
+        ~event_task() { if (handle) handle.destroy(); }
+        event_task(const event_task&) = delete;
+        event_task& operator=(const event_task&) = delete;
+        event_task& operator=(event_task&&) = delete;
+
+        /** @returns true if the coroutine has finished (or was never started) */
+        bool done() const noexcept { return !handle || handle.done(); }
+
+        /** @brief Rethrows any unhandled exception captured by the coroutine */
+        void rethrow_if_exception() const
+        {
+            if (handle && handle.promise().exception)
+                std::rethrow_exception(handle.promise().exception);
+        }
+    };
+
+    /**
      * @brief A single-threaded event loop that serializes coroutine completions.
      *
      * Unlike thread_pool, which resumes coroutines on background threads,
@@ -166,6 +221,18 @@ namespace rpp
         int run_until_idle() noexcept;
 
         /**
+         * @brief Drives the event loop until the given event_task completes,
+         *        then rethrows any exception captured by the coroutine.
+         *
+         * This is the simplest way to run a top-level event_task coroutine:
+         * @code
+         *     auto task = myCoroutine(loop);
+         *     loop.run_until_done(task);
+         * @endcode
+         */
+        void run_until_done(event_task& task);
+
+        /**
          * @brief Posts a coroutine handle to be resumed on the event loop thread.
          * Thread-safe: can be called from any thread.
          */
@@ -185,7 +252,7 @@ namespace rpp
          * @brief Awaiter that runs a void lambda on the thread pool and resumes
          *        the coroutine on the event loop thread.
          */
-        struct background_awaiter_void
+        struct RPP_CORO_RETURN_TYPE background_awaiter_void
         {
             event_loop& loop;
             rpp::delegate<void()> action;
@@ -196,11 +263,11 @@ namespace rpp
             bool await_ready() const noexcept { return false; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                loop.background_pool.parallel_task_detached([this, cont]() mutable
+                loop.start_in_background([this, cont]() mutable
                 {
                     try { action(); }
                     catch (...) { ex = std::current_exception(); }
+                    // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                     loop.post_resume_from_suspension(cont);
                 });
             }
@@ -211,7 +278,7 @@ namespace rpp
          * @brief Awaiter that runs a lambda on the thread pool and resumes
          *        the coroutine on the event loop thread.
          */
-        template<typename T> struct background_awaiter
+        template<typename T> struct RPP_CORO_RETURN_TYPE background_awaiter
         {
             event_loop& loop;
             rpp::delegate<T()> action;
@@ -223,11 +290,11 @@ namespace rpp
             bool await_ready() const noexcept { return false; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                loop.background_pool.parallel_task_detached([this, cont]() mutable
+                loop.start_in_background([this, cont]() mutable
                 {
                     try { result.emplace(action()); }
                     catch (...) { ex = std::current_exception(); }
+                    // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                     loop.post_resume_from_suspension(cont);
                 });
             }
@@ -239,29 +306,38 @@ namespace rpp
         };
 
         /**
-         * @brief Creates an awaiter that runs the given lambda on the thread pool
-         *        and resumes the coroutine on the event loop thread.
-         * 
-         *  NOTE: The lambda runs in a background thread context,
-         *        but ALWAYS resumes on the Main Thread !
-         *
-         * @code
-         *     std::string result = co_await loop.run_async([&]{
-         *         return expensiveComputation();
-         *     });
-         *
-         *     // After co_await, we are back on the event loop thread
-         * @endcode
+         * @brief Awaiter that runs a future on the thread pool and resumes 
+         *        the coroutine on the event loop thread when the future is ready.
          */
-        template<typename Func>
-        auto run_async(Func&& func) noexcept
+        template<IsFuture Future> struct RPP_CORO_RETURN_TYPE background_awaiter_fut
         {
-            using R = decltype(func());
-            if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::forward<Func>(func) };
-            else                             return background_awaiter<R>{ *this, std::forward<Func>(func) };
-        }
+            event_loop& loop;
+            rpp::delegate<Future()> action;
+            Future f {};
+            std::exception_ptr ex {};
 
-        // ─── Future awaiter ─────────────────────────────────────────
+            background_awaiter_fut(event_loop& loop, rpp::delegate<Future()> action) noexcept
+                : loop{loop}, action{std::move(action)} {}
+            bool await_ready() const noexcept { return false; }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                loop.start_in_background([this, cont]() mutable
+                {
+                    try { 
+                        f = action(); // get the future from the lambda
+                        f.wait(); // wait for the nested coroutine to finish (can throw)
+                    } catch (...) { ex = std::current_exception(); }
+                    // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
+                    loop.post_resume_from_suspension(cont);
+                });
+            }
+            // similar to future<T>, either gets the result T, or throws the caught exception
+            auto await_resume()
+            {
+                if (ex) std::rethrow_exception(ex);
+                return f.get();
+            }
+        };
 
         /**
          * @brief Awaiter that waits for a cfuture on a background thread,
@@ -271,11 +347,14 @@ namespace rpp
         struct future_awaiter
         {
             event_loop& loop;
-            rpp::cfuture<T>& fut;
+            rpp::cfuture<T> fut;
             std::exception_ptr ex {};
 
-            future_awaiter(event_loop& loop, rpp::cfuture<T>& fut) noexcept
-                : loop{loop}, fut{fut} {}
+            future_awaiter(event_loop& loop, rpp::cfuture<T>&& fut) noexcept
+                : loop{loop}, fut{std::move(fut)} {}
+            future_awaiter(event_loop& loop, std::future<T>&& fut) noexcept
+                : loop{loop}, fut{std::move(fut)} {}
+
             bool await_ready() const noexcept
             {
                 return fut.valid() && fut.wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
@@ -288,8 +367,7 @@ namespace rpp
                     loop.post_resume(cont);
                     return;
                 }
-                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                loop.background_pool.parallel_task_detached([this, cont]() mutable
+                loop.start_in_background([this, cont]() mutable
                 {
                     try {
                         if (fut.valid())
@@ -311,16 +389,50 @@ namespace rpp
         };
 
         /**
-         * @brief Creates an awaiter that waits for a future on a background thread,
-         *        then resumes on the event loop thread.
+         * @brief Creates an awaiter that runs the given lambda on the thread pool
+         *        and resumes the coroutine on the event loop thread.
+         * 
+         *  NOTE: The lambda runs in a background thread context,
+         *        but ALWAYS resumes on the Main Thread !
+         *
          * @code
-         *     auto result = co_await loop.await_future(myFuture);
+         *     std::string result = co_await loop.run_async([&]{
+         *         return expensiveComputation();
+         *     });
+         *     // After co_await, we are back on the event loop thread
+         * 
+         *     std::string result2 = co_await loop.run_async([&]() -> rpp::cfuture<std::string> {
+         *         auto input = prepareExpensiveInput();
+         *         std::string output = co_await loop.run_async([&]{
+         *            return expensiveComputation(input);
+         *         });
+         *         // Resumes on event loop thread !
+         *         ui.showResult(output);
+         *         co_return output;
+         *     });
+         *     // After co_await, we are back on the event loop thread
          * @endcode
          */
-        template<typename T>
-        future_awaiter<T> await_future(rpp::cfuture<T>& fut) noexcept
+        template<typename FutureOrCallback>
+        auto RPP_CORO_WRAPPER run_async(FutureOrCallback&& fut_or_cb) noexcept
         {
-            return future_awaiter<T>{ *this, fut };
+            using Decayed = std::decay_t<FutureOrCallback>;
+            if constexpr (IsFuture<Decayed>) // rpp::cfuture<R> or std::future<R>
+            {
+                using T = decltype(fut_or_cb.get());
+                return future_awaiter<T>{ *this, std::move(fut_or_cb) };
+            }
+            else if constexpr (IsFunctionReturningFuture<Decayed>) // lambda[]() -> rpp::cfuture<R>
+            {
+                using Fut = decltype(fut_or_cb());
+                return background_awaiter_fut<Fut>{ *this, std::move(fut_or_cb) };
+            }
+            else // lambda[]()->R or rpp::delegate<R()>
+            {
+                using R = decltype(fut_or_cb());
+                if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::move(fut_or_cb) };
+                else                             return background_awaiter<R>{ *this, std::move(fut_or_cb) };
+            }
         }
 
         // ─── Sleep / delay awaiter ──────────────────────────────────
@@ -338,8 +450,7 @@ namespace rpp
             bool await_ready() const noexcept { return rpp::TimePoint::now() >= end; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                loop.background_pool.parallel_task_detached([this, cont]() mutable
+                loop.start_in_background([this, cont]() mutable
                 {
                     rpp::sleep_until(end);
                     loop.post_resume_from_suspension(cont);
@@ -365,6 +476,12 @@ namespace rpp
         }
 
     private:
+
+        void start_in_background(task_delegate<void()>&& generic_task) noexcept
+        {
+            num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
+            background_pool.parallel_task_detached(std::move(generic_task));
+        }
 
         // posts a resume event and decrements the background suspension count
         void post_resume_from_suspension(rpp::coro_handle<> handle) noexcept;

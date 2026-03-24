@@ -56,11 +56,4 @@ namespace rpp
         template<typename Task>
         using task_return_t = std::decay_t<decltype(std::declval<Task>()())>;
     }
-
-    #if RPP_HAS_CXX20
-
-    template<typename Function>
-        concept IsFunction = std::is_invocable_v<Function>;
-
-    #endif
 }

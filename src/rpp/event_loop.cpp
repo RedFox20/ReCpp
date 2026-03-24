@@ -129,6 +129,26 @@ namespace rpp
         return processed_count;
     }
 
+    void event_loop::run_until_done(event_task& task)
+    {
+        // when task is done, no more background events should rely on this coroutine,
+        // so we can exit the loop
+        while (!task.done())
+        {
+            run_once(rpp::Duration::from_millis(15));
+        }
+
+        // drain any callbacks that were posted during the final resume
+        // (e.g. post() called right before the coroutine returned)
+        // this ignores any other async tasks that were not started by `task` coroutine.
+        resume_event event;
+        while (resume_queue.try_pop(event))
+            process_event(event);
+
+        // propagate the exception
+        task.rethrow_if_exception();
+    }
+
     void event_loop::post_resume(rpp::coro_handle<> handle) noexcept
     {
         resume_queue.push(resume_event{handle});
