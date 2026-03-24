@@ -58,7 +58,7 @@ jobs:
           command: |
             export $CPP_STANDARD=1
             COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
-            pipenv run mama $COMPILER verbose $COV_FLAGS test="nogdb -vv"
+            pipenv run mama $COMPILER verbose $COV_FLAGS test="nogdb -vv" jobs=3
       - when:
           condition:
             and:
@@ -75,7 +75,7 @@ jobs:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:
       name: win/default
-      size: medium # can be medium, large, xlarge, 2xlarge
+      size: medium # can be medium(4 CPU), large, xlarge, 2xlarge
     steps:
       - checkout
       - run: pip3 install mama
@@ -86,12 +86,12 @@ jobs:
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
               $env:BUILD_WITH_MEM_SAFETY="ON";
               $env:CXX20="1";
-              mama windows verbose build with_tests
+              mama windows verbose build with_tests jobs=4
       - run:
           name: Tests
           command: |
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
-              mama windows verbose test="-vv"
+              mama windows verbose test="-vv" jobs=4
   mipsel-cpp20-gcc12:
     description: MIPSEL C++20 GCC Build (NO TESTS)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -121,14 +121,15 @@ jobs:
         description: "Override NDK version, e.g. 29.0.14206865 to use NDK r29 instead of the default LTS"
       sanitizer:
         type: enum
-        enum: ["", "clang-tidy"]
-        default: ""
+        enum: ["no", "clang-tidy"]
+        default: "no"
         description: "Sanitizer/analysis tool to use"
-    description: "Android C++20 Build << parameters.toolchain >>"
+    description: "Android << parameters.toolchain >> C++20 build with << parameters.sanitizer >> sanitizer"
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: << parameters.docker_image >>
     environment:
+      SANITIZE: << parameters.sanitizer >>
       NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
     steps:
       - checkout
@@ -146,11 +147,11 @@ jobs:
       - run: make configure-pip3
       - run: pip3 install mama
       - run: 
-          name: Build Android NDK << parameters.toolchain >>
+          name: Build Android NDK << parameters.toolchain >> << parameters.sanitizer >>
           command: |
               echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-              SAN_FLAGS=$([[ << parameters.sanitizer >> == "clang-tidy" ]] && echo "clang-tidy" || echo "")
-              CXX20=1 mama android $SAN_FLAGS verbose build with_tests
+              SAN_FLAGS=$([[ "$SANITIZE" == "clang-tidy" ]] && echo "clang-tidy" || echo "")
+              CXX20=1 mama android $SAN_FLAGS verbose build with_tests jobs=3
 
 workflows:
   build_all:
@@ -195,31 +196,31 @@ workflows:
       - android-build:
           matrix:
             parameters:
-              sanitizer: ["", "clang-tidy"]
-          name: android-cpp20-r25b-clang14
+              sanitizer: ["none", "clang-tidy"]
+          name: android-cpp20-r25b-<< matrix.sanitizer >>-clang14
           docker_image: "cimg/android:2023.08.1-ndk"
           toolchain: "ndk-r25b-clang++14"
       - android-build:
           matrix:
             parameters:
-              sanitizer: ["", "clang-tidy"]
-          name: android-cpp20-r27-clang18
+              sanitizer: ["none", "clang-tidy"]
+          name: android-cpp20-r27-<< matrix.sanitizer >>-clang18
           docker_image: "cimg/android:2024.11.1-ndk"
           toolchain: "ndk-r27-clang++18"
           ndk_version: "27.2.12479018"
       - android-build:
           matrix:
             parameters:
-              sanitizer: ["", "clang-tidy"]
-          name: android-cpp20-r28b-clang19
+              sanitizer: ["none", "clang-tidy"]
+          name: android-cpp20-r28b-<< matrix.sanitizer >>-clang19
           docker_image: "cimg/android:2025.12.1-ndk"
           toolchain: "ndk-r28b-clang++19"
           ndk_version: "28.0.10865935"
       - android-build:
           matrix:
             parameters:
-              sanitizer: ["", "clang-tidy"]
-          name: android-cpp20-r29-clang20
+              sanitizer: ["none", "clang-tidy"]
+          name: android-cpp20-r29-<< matrix.sanitizer >>-clang20
           docker_image: "cimg/android:2026.03.1-ndk"
           toolchain: "ndk-r29-clang++20"
           ndk_version: "29.0.14206865"

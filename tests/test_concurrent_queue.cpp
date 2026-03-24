@@ -3,6 +3,7 @@
 #include <rpp/timer.h>
 #include <rpp/scope_guard.h>
 #include <rpp/tests.h>
+#include <barrier>
 using namespace rpp;
 
 TestImpl(test_concurrent_queue)
@@ -465,13 +466,26 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_interval)
     {
         concurrent_queue<std::string> queue;
+
+        // this barrier helps us to synchronize the producer and consumer
+        // in order to minimize the timing variability of different systems
+        std::barrier produce(2);
+
         rpp::cfuture<> slow_producer = rpp::async_task([&]
         {
+            produce.arrive_and_wait(); // sync with consumer before producing item1
             spin_sleep_for_ms(25);
+            print_info("Producer is pushing: item1\n");
             queue.push("item1");
+
+            produce.arrive_and_wait(); // sync with consumer before producing item2
             spin_sleep_for_ms(25);
+            print_info("Producer is pushing: item2\n");
             queue.push("item2");
+
+            produce.arrive_and_wait(); // sync with consumer before producing item3
             spin_sleep_for_ms(25);
+            print_info("Producer is pushing: item3\n");
             queue.push("item3");
         });
         scope_guard([&]{ slow_producer.get(); });
@@ -485,38 +499,60 @@ TestImpl(test_concurrent_queue)
             return result;
         };
 
-        std::string item;
 
-        // wait for 50ms with 10ms intervals, but first item will arrive within ~25ms
-        std::atomic_int counter0 = 0;
-        AssertTrue(wait_pop_interval(item, Millis(50), Millis(10), [&] { return ++counter0 >= 10; }));
-        AssertThat(item, "item1");
-        AssertInRange(int(counter0), 2, 5);
+        produce.arrive_and_wait(); // produce ITEM1
+        {
+            // item1 will arrive in 25ms
+            // wait with large 10ms intervals, item should definitely arrive and we should check interval at least twice
+            std::atomic_int counter0 = 0;
+            std::string item1;
+            AssertTrue(wait_pop_interval(item1, Millis(40), Millis(10), [&] { return ++counter0 >= 10; }));
+            AssertThat(item1, "item1");
+            print_info("counter0: %d (expect item to arrive within 20-40ms, 2-4 intervals)\n", int(counter0));
+            AssertInRange(int(counter0), 2, 4); // cancellation tolerance is VERY loose here
 
-        // wait for 10ms with 5ms intervals, it should timeout
-        std::atomic_int counter1 = 0;
-        AssertFalse(wait_pop_interval(item, Millis(10), Millis(5), [&] { return ++counter1 >= 10; }));
-        AssertInRange(int(counter1), 1, 4); // tolerance is VERY loose here
+            // item2 will not arrive during this wait(10ms), time out in just 2 intervals
+            std::atomic_int counter1 = 0;
+            AssertFalse(wait_pop_interval(item1, Millis(10), Millis(5), [&] { return ++counter1 >= 100/*should never hit this*/; }));
+            AssertThat(item1, "item1");
+            print_info("counter1: %d (expect early return in 2-3 intervals due to timeout 10ms)\n", int(counter1));
+            AssertInRange(int(counter1), 2, 3); // this tests the total timeout(10ms) and not the interval
 
-        // wait another 15ms with 2ms intervals, and it should trigger the cancelcondition
-        std::atomic_int counter2 = 0;
-        AssertFalse(wait_pop_interval(item, Millis(15), Millis(2), [&] { return ++counter2 >= 5; }));
-        AssertThat(int(counter2), 5); // it should have cancelled exactly at 5 checks
+            // item2 will not arrive during this wait(15ms)
+            std::atomic_int counter2 = 0;
+            AssertFalse(wait_pop_interval(item1, Millis(15), Millis(2), [&] { return ++counter2 >= 2; }));
+            AssertThat(item1, "item1");
+            print_info("counter2: %d (expect return due to counter >= 2 before total timeout)\n", int(counter2));
+            AssertThat(int(counter2), 2); // this test should timeout due to counter >= 2 before the total timeout is reached
+        }
 
-        // wait until we pop the item finally
-        std::atomic_int counter3 = 0;
-        AssertTrue(wait_pop_interval(item, Millis(50), Millis(5), [&] { return ++counter3 >= 20; }));
-        AssertThat(item, "item2");
-        AssertLess(int(counter3), 20); // we should never have reached all the checks
+        produce.arrive_and_wait(); // produce ITEM2
+        {
+            // item2 will arrive in 25ms
+            // this ensures we run enough intervals and actually get the item
+            std::atomic_int counter3 = 0;
+            std::string item2;
+            AssertTrue(wait_pop_interval(item2, Millis(30), Millis(5), [&] { return ++counter3 >= 10; }));
+            AssertThat(item2, "item2");
+            print_info("counter3: %d (item should arrive in less than 7 intervals)\n", int(counter3));
+            AssertLess(int(counter3), 7); // we should never have reached all the checks
+        }
 
-        // now wait with extreme short intervals
-        std::atomic_int counter4 = 0;
-        AssertTrue(wait_pop_interval(item, Millis(35), Millis(1), [&] { return ++counter4 >= 35; }));
-        AssertThat(item, "item3");
-        // we should never have reached the limit of 35
-        // however there is NO guarantee that the sleep will be 1ms, that's just a minimum hint
-        // most likely it will sleep in 1-5ms range, so we lower the min range
-        AssertInRange(int(counter4), 5, 34);
+        produce.arrive_and_wait(); // produce ITEM3
+        {
+            // item3 will arrive in 25ms
+            // wait with extreme short intervals to test that we can rapidly check the cancellation condition
+            // this also protects us against bugs where interval 1ms is ignored and we end up waiting full 35ms
+            std::atomic_int counter4 = 0;
+            std::string item3;
+            AssertTrue(wait_pop_interval(item3, Millis(35), Millis(1), [&] { return ++counter4 >= 35; }));
+            AssertThat(item3, "item3");
+            print_info("counter4: %d (expected return before reaching 35)\n", int(counter4));
+            // we should never have reached the limit of 35
+            // however there is NO guarantee that the sleep will be 1ms, that's just a minimum hint
+            // most likely it will sleep in 1-5ms range, so we lower the min range
+            AssertInRange(int(counter4), 5, 34);
+        }
     }
 
     TestCase(wait_pop_cross_thread_perf)

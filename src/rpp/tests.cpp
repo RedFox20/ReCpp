@@ -940,10 +940,12 @@ namespace rpp
      * "-test:mytest" disables test with exact match
      * "mytest"     enables test with loose match
      * "-mytest"    disables test with loose match
-     * "mytest.mycasefilter"  enables specific test.case
-     * "-mytest.mycasefilter" disable specific test.case
-     * "mytest::mycasefilter"  enables specific test.case
-     * "-mytest::mycasefilter" disable specific test.case
+     * "mytest.mycasefilter"  enables specific test.case*
+     * "-mytest.mycasefilter" disable specific test.case*
+     * "mytest::mycasefilter"  enables specific test.case*
+     * "-mytest::mycasefilter" disable specific test.case*
+     * "test:mytest.mycasefilter"  enables specific test.case with exact test match
+     * "-test:mytest.mycasefilter" disable specific test.case with exact test match
      * "*" match all tests  
      * "mytest.*" match mytest and all cases
      * "math -math.numeric" enable all math tests except numeric 

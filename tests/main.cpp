@@ -7,7 +7,7 @@
 // See: https://github.com/llvm/llvm-project/issues/59432
 #if defined(__clang__) && defined(__has_feature)
     #if __has_feature(address_sanitizer)
-        extern "C" const char* __asan_default_options() {
+        extern "C" const char* __asan_default_options() { // NOLINT(bugprone-reserved-identifier)
             return "alloc_dealloc_mismatch=0";
         }
     #endif
