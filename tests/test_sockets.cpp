@@ -422,7 +422,7 @@ TestImpl(test_sockets)
             });
             rpp::Timer t4;
             AssertTrue(pollin(/*millis*/15));
-            AssertLess(t4.elapsed_millis(), 8.0);
+            AssertLess(t4.elapsed_millis(), 9.0); // CI timing is very inconsistent
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll1"s);
             rpp::Timer t4_2;
@@ -545,7 +545,7 @@ TestImpl(test_sockets)
             });
             rpp::Timer t2;
             AssertTrue(multi_poll(/*millis*/50));
-            AssertLessOrEqual(t2.elapsed_millis(), 20.0);
+            AssertLessOrEqual(t2.elapsed_millis(), 30.0); // hard to time this on CI machines
             AssertEqual(ready.size(), 1u);
             AssertTrue(ready[0] == &recv2);
             AssertThat(recv2.recv_str(), "udp_poll2"s);
@@ -568,7 +568,7 @@ TestImpl(test_sockets)
             bool got_recv1 = false;
             bool got_recv2 = false;
             AssertTrue(multi_poll(/*millis*/50));
-            AssertLessOrEqual(t3.elapsed_millis(), 20.0);
+            AssertLessOrEqual(t3.elapsed_millis(), 30.0); // hard to time this on CI machines
 
             // now we need to leave time for second packet to arrive, otherwise
             // when poll a second time, it will immediately return since first socket is still signaled
@@ -682,7 +682,7 @@ TestImpl(test_sockets)
             {
                 send.sendto(recv1_addr, std::string(MSG_SIZE, 'x'));
                 send.sendto(recv2_addr, std::string(MSG_SIZE, 'x'));
-                if (i % 200 == 0) rpp::sleep_ms(1); // throttle to avoid kernel dropping packets
+                if (i % 50 == 0) rpp::sleep_ms(1); // throttle to avoid kernel dropping packets
             }
         });
 

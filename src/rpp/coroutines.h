@@ -57,6 +57,9 @@ namespace rpp
         // similar to future<T>, either gets the result T, or throws the caught exception
         T await_resume()
         {
+            // dtor consistency test: clear some of the state stuff here
+            action = {};
+            poolTask = {nullptr};
             if (ex) std::rethrow_exception(ex);
             return std::move(result);
         }
@@ -92,6 +95,9 @@ namespace rpp
         // similar to future<void>, rethrows the caught exception or does nothing
         void await_resume()
         {
+            // dtor consistency test: clear some of the state stuff here
+            action = {};
+            poolTask = {nullptr};
             if (ex) std::rethrow_exception(ex);
         }
     };
@@ -129,6 +135,9 @@ namespace rpp
         // similar to future<T>, either gets the result T, or throws the caught exception
         auto await_resume()
         {
+            // dtor consistency test: clear some of the state stuff here
+            action = {};
+            poolTask = {nullptr};
             if (ex) std::rethrow_exception(ex);
             return f.get();
         }

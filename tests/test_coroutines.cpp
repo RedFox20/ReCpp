@@ -172,7 +172,7 @@ TestImpl(test_coroutines)
         {
             std::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 1u);
-            AssertThat(destructor_ids[0], 1);
+            if (destructor_ids.size() >= 1) AssertThat(destructor_ids[0], 1);
         }
 
         rpp::Timer t2;
@@ -187,7 +187,7 @@ TestImpl(test_coroutines)
         {
             std::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 2u);
-            AssertThat(destructor_ids[1], 2);
+            if (destructor_ids.size() >= 2) AssertThat(destructor_ids[1], 2);
         }
 
         rpp::Timer t3;
@@ -200,7 +200,7 @@ TestImpl(test_coroutines)
         {
             std::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 3u);
-            AssertThat(destructor_ids[2], 3);
+            if (destructor_ids.size() >= 3) AssertThat(destructor_ids[2], 3);
         }
 
         co_return destructor_ids;
@@ -210,9 +210,9 @@ TestImpl(test_coroutines)
         auto f = destructor_sequence_coro();
         std::vector<int> destructor_ids = f.get();
         AssertThat(destructor_ids.size(), 3u);
-        AssertThat(destructor_ids[0], 1);
-        AssertThat(destructor_ids[1], 2);
-        AssertThat(destructor_ids[2], 3);
+        if (destructor_ids.size() >= 1) AssertThat(destructor_ids[0], 1);
+        if (destructor_ids.size() >= 2) AssertThat(destructor_ids[1], 2);
+        if (destructor_ids.size() >= 3) AssertThat(destructor_ids[2], 3);
     }
 
 
