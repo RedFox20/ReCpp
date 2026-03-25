@@ -300,6 +300,8 @@ namespace rpp
             }
             T await_resume()
             {
+                // release resources before resuming the coroutine
+                action = {};
                 if (ex) std::rethrow_exception(ex);
                 return std::move(*result);
             }
@@ -334,6 +336,8 @@ namespace rpp
             // similar to future<T>, either gets the result T, or throws the caught exception
             auto await_resume()
             {
+                // release resources before resuming the coroutine
+                action = {};
                 if (ex) std::rethrow_exception(ex);
                 return f.get();
             }

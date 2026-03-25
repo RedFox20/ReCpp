@@ -8,6 +8,9 @@
 #include "future_types.h"
 #include "traits.h"
 #include "debugging.h" // __assertion_failure
+#if RPP_HAS_COROUTINES
+#  include <optional> // for cfuture<T>::promise_type (coroutine awaiter)
+#endif
 
 namespace rpp
 {
@@ -504,17 +507,32 @@ namespace rpp
             RPP_CORO_WRAPPER rpp::cfuture<T> get_return_object() noexcept { return this->get_future(); }
             RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
             RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
+
+            // Deferred return value and exception: stored here so the future is only
+            // signalled in ~promise_type(), AFTER the coroutine frame (and all its local
+            // variables) are fully destroyed.  This prevents a race where a thread waiting
+            // on the future observes shared state before local destructors have run.
+            std::optional<T>   deferred_value {};
+            std::exception_ptr deferred_ex    {};
+
             void return_value(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
             {
-                rpp::cpromise<T>::set_value(value);
+                deferred_value = value;
             }
             void return_value(T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
             {
-                rpp::cpromise<T>::set_value(std::move(value));
+                deferred_value = std::move(value);
             }
-            void unhandled_exception() noexcept
+            void unhandled_exception() noexcept { deferred_ex = std::current_exception(); }
+
+            // Signal the future here, after all coroutine locals have been destroyed.
+            // The C++ runtime destroys coroutine body locals before the promise object,
+            // so any side-effects in those destructors are guaranteed visible to the
+            // thread that wakes up on the future.
+            ~promise_type() noexcept
             {
-                rpp::cpromise<T>::set_exception(std::current_exception());
+                if (deferred_ex)    rpp::cpromise<T>::set_exception(deferred_ex);
+                else if (deferred_value) rpp::cpromise<T>::set_value(std::move(*deferred_value));
             }
         };
     #endif // RPP_HAS_COROUTINES
@@ -894,8 +912,19 @@ namespace rpp
             RPP_CORO_WRAPPER rpp::cfuture<void> get_return_object() noexcept { return this->get_future(); }
             RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
             RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
-            void return_void() noexcept { this->set_value(); }
-            void unhandled_exception() noexcept { this->set_exception(std::current_exception()); }
+
+            // Same deferred-signal approach as cfuture<T>::promise_type.
+            std::exception_ptr deferred_ex     {};
+            bool               deferred_return { false };
+
+            void return_void() noexcept { deferred_return = true; }
+            void unhandled_exception() noexcept { deferred_ex = std::current_exception(); }
+
+            ~promise_type() noexcept
+            {
+                if (deferred_ex)      rpp::cpromise<void>::set_exception(deferred_ex);
+                else if (deferred_return) rpp::cpromise<void>::set_value();
+            }
         };
     #endif // RPP_HAS_COROUTINES
     }; // cfuture<void>

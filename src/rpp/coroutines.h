@@ -37,12 +37,18 @@ namespace rpp
         explicit functor_awaiter(rpp::delegate<T()> action) noexcept
             : action{std::move(action)} {}
 
-        // is the task ready?
+        // Called first by the compiler immediately after `co_await action` is evaluated.
+        // If true, the coroutine skips suspension entirely and jumps straight to await_resume().
+        // Since poolTask hasn't been started yet (that happens in await_suspend), this always
+        // returns false, guaranteeing the coroutine suspends and the background task is launched.
         bool await_ready() const noexcept
         {
             return poolTask.was_started() && poolTask.is_finished();
         }
-        // suspension point that launches the background async task
+        // Called after await_ready() returns false, just as the coroutine is suspending.
+        // `cont` is a handle to the now-suspended coroutine; resuming it continues execution
+        // past the co_await expression and calls await_resume() on this background thread.
+        // The caller (the co_await site) returns here, giving control back up the call stack.
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
             if (poolTask.was_started()) std::terminate(); // avoid task explosion
@@ -54,7 +60,9 @@ namespace rpp
                 cont.resume(); // call await_resume() and continue on this background thread
             });
         }
-        // similar to future<T>, either gets the result T, or throws the caught exception
+        // Called by the compiler on the background thread immediately after cont.resume() returns
+        // control to the coroutine. At this point the background task has fully completed and
+        // result/ex are written. Returns the result to the co_await expression, or rethrows.
         T await_resume()
         {
             // dtor consistency test: clear some of the state stuff here

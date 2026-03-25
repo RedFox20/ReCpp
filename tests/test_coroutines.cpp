@@ -165,7 +165,7 @@ TestImpl(test_coroutines)
         rpp::Timer t1;
         co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
-            destructor_recorder dr {m, destructor_ids, 1};
+            destructor_recorder dr1 {m, destructor_ids, 1};
             co_await rpp::millis(10);
         };
         print_warning("dtor sequence #1 elapsed: %.2fms\n", t1.elapsed_millis());
@@ -178,7 +178,7 @@ TestImpl(test_coroutines)
         rpp::Timer t2;
         std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
-            destructor_recorder dr {m, destructor_ids, 2};
+            destructor_recorder dr2 {m, destructor_ids, 2};
             co_await rpp::millis(5);
             co_return "test";
         };
@@ -193,7 +193,7 @@ TestImpl(test_coroutines)
         rpp::Timer t3;
         co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
-            destructor_recorder dr {m, destructor_ids, 3};
+            destructor_recorder dr3 {m, destructor_ids, 3};
             co_return;
         };
         print_warning("dtor sequence #3 elapsed: %.2fms\n", t3.elapsed_millis());
