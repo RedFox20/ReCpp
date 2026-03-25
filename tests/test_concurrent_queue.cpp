@@ -336,32 +336,50 @@ TestImpl(test_concurrent_queue)
         AssertWaitPopTimed(Millis(15), false, /*item*/"", /*elapsed ms:*/ 14.0, 20.0);
     }
 
+    struct producer_queue : public rpp::concurrent_queue<std::string>
+    {
+        Timer t;
+        std::barrier<> barrier{2};
+        void barrier_push_after_delay_ms(const std::string& item, int delay_ms)
+        {
+            barrier.arrive_and_wait();
+            spin_sleep_for_ms(delay_ms);
+            print_info("[%5.2fms] <== Producer is pushing: %s\n", t.elapsed_millis(), item.c_str());
+            this->push(item);
+        }
+        void barrier_consumer_ready()
+        {
+            barrier.arrive_and_wait();
+        }
+    };
+
     // introduce a slow producer thread so we can test our timeouts
     TestCase(wait_pop_with_timeout_slow_producer)
     {
-        concurrent_queue<std::string> queue;
+        producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for_ms(25);
-            queue.push("item1");
-            spin_sleep_for_ms(25);
-            queue.push("item2");
-            spin_sleep_for_ms(25);
-            queue.push("item3");
-            spin_sleep_for_ms(50);
-            queue.push("item4");
+            queue.barrier_push_after_delay_ms("item1", 25);
+            queue.barrier_push_after_delay_ms("item2", 25);
+            queue.barrier_push_after_delay_ms("item3", 25);
+            queue.barrier_push_after_delay_ms("item4", 25);
         });
         scope_guard([&]{ slow_producer.get(); });
 
+        queue.barrier_consumer_ready(); // item1 is coming after 25ms
         PopResult r;
         AssertWaitPopTimed(Millis(5), false, /*item*/"", /*elapsed ms:*/ 4.0, 11.0);
         AssertWaitPopTimed(Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
-        AssertWaitPopTimed(Millis(15), false, /*item*/"", /*elapsed ms:*/ 14.0, 18.0);
-
+        AssertWaitPopTimed(Millis(10), false, /*item*/"", /*elapsed ms:*/ 8.0, 14.0);
         AssertWaitPopTimed(Millis(30), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 30.0); // this should not timeout
+
+        queue.barrier_consumer_ready(); // item2 is coming after 25ms
         AssertWaitPopTimed(Millis(35), true, /*item*/"item2", /*elapsed ms:*/ 10.0, 30.0);
+
+        queue.barrier_consumer_ready(); // item3 is coming after 25ms
         AssertWaitPopTimed(Millis(35), true, /*item*/"item3", /*elapsed ms:*/ 10.0, 30.0);
 
         // now we enter a long wait, but we should be notified by the producer
+        queue.barrier_consumer_ready(); // item4 is coming after 25ms
         AssertWaitPopTimed(Millis(1000), true, /*item*/"item4", /*elapsed ms:*/ 0.0, 60.0);
     }
 
@@ -406,14 +424,11 @@ TestImpl(test_concurrent_queue)
     // ensure that `wait_pop_until` gives up if timeout is reached
     TestCase(wait_pop_until_stops_on_timeout)
     {
-        concurrent_queue<std::string> queue;
+        producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for_ms(25);
-            queue.push("item1");
-            spin_sleep_for_ms(25);
-            queue.push("item2");
-            spin_sleep_for_ms(25);
-            queue.push("item3");
+            queue.barrier_push_after_delay_ms("item1", 25);
+            queue.barrier_push_after_delay_ms("item2", 25);
+            queue.barrier_push_after_delay_ms("item3", 25);
         });
         scope_guard([&]{ slow_producer.get(); }); // Clang doesn't have jthread yet o_O
 
@@ -421,8 +436,11 @@ TestImpl(test_concurrent_queue)
 
         // we should only have time to receive item1 and item2
         auto until = Now() + Millis(65);
+        queue.barrier_consumer_ready();
         AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 10.0, 35.0);
+        queue.barrier_consumer_ready();
         AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 10.0, 35.0);
+        queue.barrier_consumer_ready();
         AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 10.0, 35.0);
     }
 
@@ -430,15 +448,12 @@ TestImpl(test_concurrent_queue)
     // it requires some external mechanism to notify the queue
     TestCase(wait_pop_with_timeout_and_cancelcondition)
     {
-        concurrent_queue<std::string> queue;
         std::atomic_bool finished = false;
+        producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            spin_sleep_for_ms(25);
-            queue.push("item1");
-            spin_sleep_for_ms(25);
-            queue.push("item2");
-            spin_sleep_for_ms(25);
-            queue.push("item3");
+            queue.barrier_push_after_delay_ms("item1", 25);
+            queue.barrier_push_after_delay_ms("item2", 25);
+            queue.barrier_push_after_delay_ms("item3", 25);
             spin_sleep_for_ms(25);
             finished = true;
             queue.notify(); // notify any waiting threads
@@ -447,11 +462,15 @@ TestImpl(test_concurrent_queue)
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
+        queue.barrier_consumer_ready(); // item1 is coming after 25ms
         AssertFalse(queue.wait_pop(item, Millis(15), cancelCondition)); // this should timeout
         AssertTrue(queue.wait_pop(item, Millis(15), cancelCondition));
         AssertThat(item, "item1");
+        
+        queue.barrier_consumer_ready(); // item2 is coming after 25ms
         AssertTrue(queue.wait_pop(item, Millis(35), cancelCondition));
         AssertThat(item, "item2");
+        queue.barrier_consumer_ready(); // item3 is coming after 25ms
         AssertTrue(queue.wait_pop(item, Millis(35), cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
@@ -465,51 +484,30 @@ TestImpl(test_concurrent_queue)
     // with sufficient frequency
     TestCase(wait_pop_interval)
     {
-        concurrent_queue<std::string> queue;
-
-        // this barrier helps us to synchronize the producer and consumer
-        // in order to minimize the timing variability of different systems
-        std::barrier barrier1{2};
-        std::barrier barrier2{2};
-        std::barrier barrier3{2};
-
-        rpp::Timer t;
-
-        rpp::cfuture<> slow_producer = rpp::async_task([&]
-        {
-            barrier1.arrive_and_wait(); // sync with consumer before producing item1
-            spin_sleep_for_ms(25);
-            print_info("[%5.2fms] <== Producer is pushing: item1\n", t.elapsed_millis());
-            queue.push("item1");
-
-            barrier2.arrive_and_wait(); // sync with consumer before producing item2
-            spin_sleep_for_ms(25);
-            print_info("[%5.2fms] <== Producer is pushing: item2\n", t.elapsed_millis());
-            queue.push("item2");
-
-            barrier3.arrive_and_wait(); // sync with consumer before producing item3
-            spin_sleep_for_ms(25);
-            print_info("[%5.2fms] <== Producer is pushing: item3\n", t.elapsed_millis());
-            queue.push("item3");
+        producer_queue queue;
+        rpp::cfuture<> slow_producer = rpp::async_task([&] {
+            queue.barrier_push_after_delay_ms("item1", 25);
+            queue.barrier_push_after_delay_ms("item2", 25);
+            queue.barrier_push_after_delay_ms("item3", 25);
         });
         scope_guard([&]{ slow_producer.get(); });
 
         auto wait_pop_interval = [&](std::string& item, Duration timeout, Duration interval, auto cancel)
         {
             print_info("[%5.2fms]   * wait_pop_interval timeout=%lldms interval=%lldms\n",
-                       t.elapsed_millis(), timeout.millis(), interval.millis());
+                       queue.t.elapsed_millis(), timeout.millis(), interval.millis());
             rpp::Timer t2;
             bool result = queue.wait_pop_interval(item, timeout, interval, cancel);
             double elapsed_ms = t2.elapsed_millis();
             print_info("[%5.2fms]   --> wait_pop_interval elapsed: %.2f ms item: %s\n",
-                       t.elapsed_millis(), elapsed_ms, item.c_str());
+                       queue.t.elapsed_millis(), elapsed_ms, item.c_str());
             return result;
         };
 
 
-        barrier1.arrive_and_wait(); // produce ITEM1
+        queue.barrier_consumer_ready(); // produce ITEM1
         {
-            print_info("[%5.2fms] *** Consumer ready for item1\n", t.elapsed_millis());
+            print_info("[%5.2fms] *** Consumer ready for item1\n", queue.t.elapsed_millis());
             // item1 will arrive in 25ms
             // wait with large 10ms intervals, item should definitely arrive and we should check interval at least twice
             std::atomic_int counter0 = 0;
@@ -517,7 +515,7 @@ TestImpl(test_concurrent_queue)
             AssertTrue(wait_pop_interval(item1, Millis(40), Millis(10), [&] { return ++counter0 >= 10; }));
             AssertThat(item1, "item1");
             print_info("[%5.2fms]       counter0: %d (expect item to arrive within 20-40ms, 2-4 intervals)\n",
-                        t.elapsed_millis(), int(counter0));
+                        queue.t.elapsed_millis(), int(counter0));
             AssertInRange(int(counter0), 2, 4); // cancellation tolerance is VERY loose here
 
             // item2 will not arrive during this wait(10ms), time out in just 2 intervals
@@ -525,7 +523,7 @@ TestImpl(test_concurrent_queue)
             AssertFalse(wait_pop_interval(item1, Millis(10), Millis(5), [&] { return ++counter1 >= 100/*should never hit this*/; }));
             AssertThat(item1, "item1");
             print_info("[%5.2fms]       counter1: %d (expect early return in 2-3 intervals due to timeout 10ms)\n",
-                        t.elapsed_millis(), int(counter1));
+                        queue.t.elapsed_millis(), int(counter1));
             AssertInRange(int(counter1), 2, 3); // this tests the total timeout(10ms) and not the interval
 
             // item2 will not arrive during this wait(15ms)
@@ -533,13 +531,13 @@ TestImpl(test_concurrent_queue)
             AssertFalse(wait_pop_interval(item1, Millis(15), Millis(2), [&] { return ++counter2 >= 2; }));
             AssertThat(item1, "item1");
             print_info("[%5.2fms]       counter2: %d (expect return due to counter >= 2 before total timeout)\n",
-                        t.elapsed_millis(), int(counter2));
+                        queue.t.elapsed_millis(), int(counter2));
             AssertThat(int(counter2), 2); // this test should timeout due to counter >= 2 before the total timeout is reached
         }
 
-        barrier2.arrive_and_wait(); // produce ITEM2
+        queue.barrier_consumer_ready(); // produce ITEM2
         {
-            print_info("[%5.2fms] *** Consumer ready for item2\n", t.elapsed_millis());
+            print_info("[%5.2fms] *** Consumer ready for item2\n", queue.t.elapsed_millis());
             // item2 will arrive in 25ms
             // this ensures we run enough intervals and actually get the item
             std::atomic_int counter3 = 0;
@@ -547,13 +545,13 @@ TestImpl(test_concurrent_queue)
             AssertTrue(wait_pop_interval(item2, Millis(35), Millis(5), [&] { return ++counter3 >= 10; }));
             AssertThat(item2, "item2");
             print_info("[%5.2fms]       counter3: %d (item should arrive in less than 8 intervals)\n",
-                        t.elapsed_millis(), int(counter3));
+                        queue.t.elapsed_millis(), int(counter3));
             AssertLess(int(counter3), 8); // we should never have reached all the checks
         }
 
-        barrier3.arrive_and_wait(); // produce ITEM3
+        queue.barrier_consumer_ready(); // produce ITEM3
         {
-            print_info("[%5.2fms] *** Consumer ready for item3\n", t.elapsed_millis());
+            print_info("[%5.2fms] *** Consumer ready for item3\n", queue.t.elapsed_millis());
             // item3 will arrive in 25ms
             // wait with extreme short intervals to test that we can rapidly check the cancellation condition
             // this also protects us against bugs where interval 1ms is ignored and we end up waiting full 35ms
@@ -562,7 +560,7 @@ TestImpl(test_concurrent_queue)
             AssertTrue(wait_pop_interval(item3, Millis(35), Millis(1), [&] { return ++counter4 >= 35; }));
             AssertThat(item3, "item3");
             print_info("[%5.2fms]       counter4: %d (expected return before reaching 35)\n",
-                        t.elapsed_millis(), int(counter4));
+                        queue.t.elapsed_millis(), int(counter4));
             // we should never have reached the limit of 35
             // however there is NO guarantee that the sleep will be 1ms, that's just a minimum hint
             // most likely it will sleep in 1-5ms range, so we lower the min range
