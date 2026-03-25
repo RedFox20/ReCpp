@@ -211,7 +211,7 @@ workflows:
           name: android-cpp20-r28b-clang-tidy-clang19
           docker_image: "cimg/android:2025.12.1-ndk"
           toolchain: "ndk-r28b-clang++19"
-          ndk_version: "28.0.10865935"
+          ndk_version: "28.2.13676358"
       - android-build:
           name: android-cpp20-r29-clang-tidy-clang20
           docker_image: "cimg/android:2026.03.1-ndk"
