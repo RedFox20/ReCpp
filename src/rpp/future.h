@@ -58,14 +58,20 @@ namespace rpp
                     // notify the awaiters that the value is set
                     p.set_value(std::move(value));
                 }
+                // Release the promise reference to the shared state NOW, so that
+                // the pool_worker's generic.reset() only destroys a moved-from promise (no-op).
+                // This avoids a TSAN race between operator delete in ~promise()
+                // and pthread_cond_wait in future::get() on another thread.
+                cpromise<T> release = std::move(p);
+                (void)release;
             } catch (...) {
-                p.set_exception(std::current_exception());
+                // Release the promise reference to the shared state NOW, so that
+                // the pool_worker's generic.reset() only destroys a moved-from promise (no-op).
+                // This avoids a TSAN race between operator delete in ~promise()
+                // and pthread_cond_wait in future::get() on another thread.
+                cpromise<T> release = std::move(p);
+                release.set_exception(std::current_exception());
             }
-            // Release the promise reference to the shared state NOW, so that
-            // the pool_worker's generic.reset() only destroys a moved-from promise (no-op).
-            // This avoids a TSAN race between operator delete in ~promise()
-            // and pthread_cond_wait in future::get() on another thread.
-            { cpromise<T> release = std::move(p); }
         });
         return f;
     }
