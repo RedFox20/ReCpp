@@ -4,6 +4,7 @@ project(ReCpp)
 option(BUILD_TESTS "Build RppTests executable for unit testing?" OFF)
 option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
+option(BUILD_WITH_MODULES "Experimental: Build with C++20 module support" OFF)
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 
 # These are only for build systems that don't use `mamabuild` which supports these by default:
@@ -260,5 +261,33 @@ if (BUILD_TESTS)
 endif()
 
 ###################################################
+
+# Experimental C++20 Modules support
+if(BUILD_WITH_MODULES)
+    if(CMAKE_VERSION VERSION_LESS "3.28")
+        message(FATAL_ERROR "BUILD_WITH_MODULES requires CMake 3.28+, found ${CMAKE_VERSION}")
+    endif()
+    if(RPP_CXX_STANDARD LESS 20)
+        message(FATAL_ERROR "BUILD_WITH_MODULES requires C++20 or later")
+    endif()
+    message("RPP EXPERIMENTAL: C++20 Modules enabled")
+
+    set(RPP_MODULES_SRC
+        src/rpp/rpp-strview.cppm
+    )
+
+    # Add module interface to the library target
+    target_sources(ReCpp PUBLIC FILE_SET CXX_MODULES FILES ${RPP_MODULES_SRC})
+
+    if(BUILD_TESTS)
+        # Tests recompile sources, so they need their own module interface
+        target_sources(RppTests PUBLIC FILE_SET CXX_MODULES FILES ${RPP_MODULES_SRC})
+        target_compile_definitions(RppTests PRIVATE RPP_BUILD_WITH_MODULES=1)
+        # Enable module dependency scanning for ALL sources in RppTests,
+        # not just the .cppm files. Without this, .cpp files that use
+        # `import` won't get the -fmodule-file= flag from the build system.
+        set_target_properties(RppTests PROPERTIES CXX_SCAN_FOR_MODULES ON)
+    endif()
+endif()
 
 

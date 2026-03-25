@@ -40,6 +40,77 @@ mama clang clang-tidy asan build test="test_strview"
 mama gcc tsan build test test_until_failure
 ```
 
+
+## Experimental: C++20 Modules
+
+ReCpp has experimental support for C++20 named modules. This allows importing ReCpp headers as modules instead of using `#include`, providing faster compilation and better isolation.
+
+### Requirements
+
+| Requirement | Minimum |
+|-------------|---------|
+| C++ standard | C++20 |
+| CMake | 3.28+ |
+| MSVC | 19.34+ (VS 2022 17.4) |
+| Clang | 16+ (18+ recommended) |
+| GCC | 14+ |
+| Generator | Ninja (recommended) |
+
+### Building with modules
+
+Enable the `BUILD_WITH_MODULES` option alongside C++20:
+```bash
+# mama
+CXX20=1 BUILD_WITH_MODULES=1 mama clang tsan rebuild test="-vv test_strview_module"
+
+# CMake
+cmake -B build -G Ninja -DCXX20=ON -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON
+cmake --build build
+```
+
+### Using modules
+
+Module interface units are in `src/rpp/` with the naming convention `rpp-<module>.cppm`.
+Each module wraps an existing header using the global module fragment pattern, so the traditional `#include` approach continues to work alongside modules.
+
+```cpp
+// Traditional header include (still works as before)
+#include <rpp/strview.h>
+
+// C++20 module import
+import rpp.strview;
+```
+
+Macros (`RPPAPI`, `LogError`, `Assert`, `_sv` literal, etc.) cannot be exported from C++20 modules by design. If you need macros, combine the module import with a traditional include:
+```cpp
+import rpp.strview;
+#include <rpp/config.h>      // for RPPAPI, RPP_ENABLE_UNICODE, etc.
+#include <rpp/debugging.h>   // for LogError, Assert, etc.
+```
+
+### Available modules
+
+| Module | Header | Exported types |
+|--------|--------|----------------|
+| `rpp.strview` | [`strview.h`](src/rpp/strview.h) | `strview`, `ustrview`, `line_parser`, `keyval_parser`, `bracket_parser`, `concat`, `to_lower`, `to_upper`, `replace`, `_sv` literal, and more |
+
+### How it works
+
+The module interface units use the **global module fragment** to include existing headers, then re-export selected types via `using`-declarations. This is the same pattern used by `libstdc++` and `libc++` to implement `import std;`.
+
+```cpp
+// src/rpp/rpp-strview.cppm
+module;
+#include "strview.h"          // included in the global module fragment
+export module rpp.strview;
+
+export namespace rpp {
+    using rpp::strview;       // re-export as "visible" to importers
+    using rpp::line_parser;
+    // ...
+}
+```
+
 ---
 
 ## Table of Contents
@@ -259,8 +330,8 @@ while (text.next(line, '\n'))
 | [`strequalsi(s1, s2, len)`](src/rpp/strview.h#L86) | Case-insensitive string equality for given length |
 | [`to_int64(str, len, end)`](src/rpp/strview.h#L133) | Fast locale-agnostic string to 64-bit integer |
 | [`RPP_CONSTEXPR_STRLEN`](src/rpp/strview.h#L220) | Marks strlen as constexpr when compiler supports it |
-| [`RPP_UTF8LEN(c_str)`](src/rpp/strview.h#L231) | Returns int length of a UTF-8 C-string |
-| [`RPP_UTF16LEN(u_str)`](src/rpp/strview.h#L232) | Returns int length of a UTF-16 C-string |
+| [`utf8len(c_str)`](src/rpp/strview.h#L231) | Returns int length of a UTF-8 C-string |
+| [`utf16len(u_str)`](src/rpp/strview.h#L232) | Returns int length of a UTF-16 C-string |
 
 ### Utility Parsers
 

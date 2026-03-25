@@ -228,8 +228,18 @@ namespace rpp
     using string = std::string;
     using ustring = std::u16string;
 
-    #define RPP_UTF8LEN(c_str) (static_cast<int>(std::char_traits<char>::length((const char*)(c_str))))
-    #define RPP_UTF16LEN(u_str) (static_cast<int>(std::char_traits<char16_t>::length((const char16_t*)(u_str))))
+    inline RPP_CONSTEXPR_STRLEN int utf8len(const char* c_str) {
+        return static_cast<int>(std::char_traits<char>::length(c_str));
+    }
+    inline RPP_CONSTEXPR_STRLEN int utf8len(const char8_t* c_str) {
+        return static_cast<int>(std::char_traits<char8_t>::length(c_str));
+    }
+    inline RPP_CONSTEXPR_STRLEN int utf16len(const char16_t* u_str) {
+        return static_cast<int>(std::char_traits<char16_t>::length(u_str));
+    }
+    inline RPP_CONSTEXPR_STRLEN int utf16len(const wchar_t* u_str) {
+        return static_cast<int>(std::char_traits<wchar_t>::length(u_str));
+    }
 
     /**
      * String token for efficient parsing.
@@ -251,8 +261,8 @@ namespace rpp
         int len;         // length of string
 
         FINLINE constexpr strview()                            noexcept : str{""},  len{0} {}
-        FINLINE RPP_CONSTEXPR_STRLEN strview(char* str)        noexcept : str{str}, len{RPP_UTF8LEN(str)} {}
-        FINLINE RPP_CONSTEXPR_STRLEN strview(const char* str)  noexcept : str{str}, len{RPP_UTF8LEN(str)} {}
+        FINLINE RPP_CONSTEXPR_STRLEN strview(char* str)        noexcept : str{str}, len{utf8len(str)} {}
+        FINLINE RPP_CONSTEXPR_STRLEN strview(const char* str)  noexcept : str{str}, len{utf8len(str)} {}
         FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len} {}
         FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)} {}
         FINLINE constexpr strview(const char* str, const char* end) noexcept : str{str}, len{static_cast<int>(end - str)} {}
@@ -261,7 +271,7 @@ namespace rpp
         FINLINE strview(const string_view_t& s)              noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
 
     #ifdef __cpp_char8_t // fundamental type char8_t since C++20
-        FINLINE strview(const char8_t* str) noexcept : str{reinterpret_cast<const char*>(str)}, len{RPP_UTF8LEN(str)} {}
+        FINLINE strview(const char8_t* str) noexcept : str{reinterpret_cast<const char*>(str)}, len{utf8len(str)} {}
         strview(const char16_t* str) = delete; // char16_t is not supported by strview
     #endif
 
@@ -276,7 +286,7 @@ namespace rpp
 
         FINLINE RPP_CONSTEXPR_STRLEN strview& operator=(const char* s) noexcept {
             this->str = s ? s : "";
-            this->len = s ? RPP_UTF8LEN(str) : 0;
+            this->len = s ? utf8len(str) : 0;
             return *this;
         }
         template<int N>
@@ -977,8 +987,8 @@ namespace rpp
         int len;
 
         FINLINE constexpr ustrview()                                noexcept : str{u""}, len{0} {}
-        FINLINE RPP_CONSTEXPR_STRLEN ustrview(char16_t* str)        noexcept : str{str}, len{RPP_UTF16LEN(str) } {}
-        FINLINE RPP_CONSTEXPR_STRLEN ustrview(const char16_t* str)  noexcept : str{str}, len{RPP_UTF16LEN(str) } {}
+        FINLINE RPP_CONSTEXPR_STRLEN ustrview(char16_t* str)        noexcept : str{str}, len{utf16len(str) } {}
+        FINLINE RPP_CONSTEXPR_STRLEN ustrview(const char16_t* str)  noexcept : str{str}, len{utf16len(str) } {}
         FINLINE constexpr ustrview(const char16_t* str, int len)    noexcept : str{str}, len{len} {}
         FINLINE constexpr ustrview(const char16_t* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)} {}
         FINLINE constexpr ustrview(const char16_t* str, const char16_t* end) noexcept : str{str}, len{static_cast<int>(end - str)} {}
@@ -987,7 +997,7 @@ namespace rpp
         FINLINE ustrview(const string_view_t& s)              noexcept : str{s.data()},  len{static_cast<int>(s.length())} {}
 
     #if _MSC_VER
-        FINLINE ustrview(const wchar_t* wstr) noexcept : str{reinterpret_cast<const char16_t*>(wstr)}, len{RPP_UTF16LEN(wstr)} {}
+        FINLINE ustrview(const wchar_t* wstr) noexcept : str{reinterpret_cast<const char16_t*>(wstr)}, len{utf16len(wstr)} {}
     #endif
 
         string_t to_string() const noexcept { return string_t{str, str+len}; }
@@ -1281,6 +1291,7 @@ namespace rpp
 
     inline namespace literals
     {
+        // DEPRECATED: this will be removed in future versions of strview.h
         using namespace std::string_literals;
 
         inline constexpr strview operator ""_sv(const char* str, std::size_t len) noexcept
@@ -1359,8 +1370,8 @@ namespace rpp
     }
     inline string operator+(const string& a, const strview& b){ return strview{a} + b; }
     inline string operator+(const strview& a, const string& b){ return a + strview{b}; }
-    inline string operator+(const char* a, const strview& b)  { return strview{a, RPP_UTF8LEN(a)} + b; }
-    inline string operator+(const strview& a, const char* b)  { return a + strview{b, RPP_UTF8LEN(b)}; }
+    inline string operator+(const char* a, const strview& b)  { return strview{a, utf8len(a)} + b; }
+    inline string operator+(const strview& a, const char* b)  { return a + strview{b, utf8len(b)}; }
     inline string operator+(const strview& a, char b)         { return a + strview{&b, 1}; }
     inline string operator+(char a, const strview& b)         { return strview{&a, 1} + b; }
     inline string&& operator+(string&& a, const strview& b)   { return std::move(a.append(b.str, (size_t)b.len)); }
@@ -1380,8 +1391,8 @@ namespace rpp
     }
     inline ustring operator+(const ustring& a, const ustrview& b) { return ustrview{a} + b; }
     inline ustring operator+(const ustrview& a, const ustring& b) { return a + ustrview{b}; }
-    inline ustring operator+(const char16_t* a, const ustrview& b){ return ustrview{a, RPP_UTF16LEN(a)} + b; }
-    inline ustring operator+(const ustrview& a, const char16_t* b){ return a + ustrview{b, RPP_UTF16LEN(b)}; }
+    inline ustring operator+(const char16_t* a, const ustrview& b){ return ustrview{a, utf16len(a)} + b; }
+    inline ustring operator+(const ustrview& a, const char16_t* b){ return a + ustrview{b, utf16len(b)}; }
     inline ustring operator+(const ustrview& a, char16_t b)       { return a + ustrview{&b, 1}; }
     inline ustring operator+(char16_t a, const ustrview& b)       { return ustrview{&a, 1} + b; }
     inline ustring&& operator+(ustring&& a, const ustrview& b)    { return std::move(a.append(b.str, (size_t)b.len)); }
