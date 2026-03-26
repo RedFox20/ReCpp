@@ -185,9 +185,16 @@ namespace rpp
 
     struct test_results
     {
+        // uptop Test suites
         int tests_run = 0;
         int tests_failed = 0;
         int asserts_failed = 0;
+
+        // individual TestCase
+        int test_cases_run = 0;
+        int test_cases_passed = 0;
+        int test_cases_failed = 0;
+
         std::vector<test_failure*> failures;
         std::chrono::nanoseconds elapsed_time{};
         std::shared_ptr<rpp::mutex> mutex = std::make_shared<rpp::mutex>();
@@ -523,9 +530,13 @@ namespace rpp
         impl->elapsed_time = t2 - t1;
         impl->current_results = nullptr;
 
+        results.test_cases_run += r.num_test_cases_run;
+        results.test_cases_passed += r.num_test_cases_passed;
+        results.test_cases_failed += r.num_test_cases_failed;
+
         print_test_suite_summary(verb, r);
 
-        return r.num_tests_run > 0 && r.all_success();
+        return r.num_test_cases_run > 0 && r.all_success();
     }
 
     test::suite_results test::run_test_suite(strview methodFilter)
@@ -538,12 +549,12 @@ namespace rpp
             {
                 if (fn->name.find(methodFilter))
                 {
-                    if (run_test_func(*fn)) ++r.num_tests_passed;
-                    else                    ++r.num_tests_failed;
-                    ++r.num_tests_run;
+                    if (run_test_func(*fn)) ++r.num_test_cases_passed;
+                    else                    ++r.num_test_cases_failed;
+                    ++r.num_test_cases_run;
                 }
             }
-            if (r.num_tests_run == 0)
+            if (r.num_test_cases_run == 0)
             {
                 consolef(Yellow, "No tests matching '%.*s' in %s\n", methodFilter.len, methodFilter.str, name.str);
             }
@@ -554,12 +565,12 @@ namespace rpp
             {
                 if (fn->autorun)
                 {
-                    if (run_test_func(*fn)) ++r.num_tests_passed;
-                    else                    ++r.num_tests_failed;
-                    ++r.num_tests_run;
+                    if (run_test_func(*fn)) ++r.num_test_cases_passed;
+                    else                    ++r.num_test_cases_failed;
+                    ++r.num_test_cases_run;
                 }
             }
-            if (r.num_tests_run == 0)
+            if (r.num_test_cases_run == 0)
             {
                 consolef(Yellow, "No autorun tests discovered in %s\n", name.str);
             }
@@ -591,12 +602,12 @@ namespace rpp
         {
             if (r.all_success())
             {
-                char run[64]; snprintf(run, sizeof(run), "%d/%d", r.num_tests_passed, r.num_tests_run);
+                char run[64]; snprintf(run, sizeof(run), "%d/%d", r.num_test_cases_passed, r.num_test_cases_run);
                 consolef(Green, "TEST %-32s  %-5s  [OK] %s\n", name.str, run, get_time_str(impl->elapsed_time));
             }
             else
             {
-                char run[64]; snprintf(run, sizeof(run), "%d/%d", r.num_tests_failed, r.num_tests_run);
+                char run[64]; snprintf(run, sizeof(run), "%d/%d", r.num_test_cases_failed, r.num_test_cases_run);
                 consolef(Red,   "TEST %-32s  %-5s  [FAILED] %s\n", name.str, run, get_time_str(impl->elapsed_time));
             }
         }
@@ -1049,10 +1060,12 @@ namespace rpp
         if (failed > 0)
         {
             if (numTests == 1)
-                consolef(Red, "\nWARNING: Test failed with %d assertions! %s\n", failed, get_time_str(results.elapsed_time));
+                consolef(Red, "\nWARNING: Test failed with %d assertions in %d/%d test cases! %s\n",
+                              failed, results.test_cases_failed, results.test_cases_run, get_time_str(results.elapsed_time));
             else
-                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions! %s\n",
-                               results.tests_failed, numTests, failed, get_time_str(results.elapsed_time));
+                consolef(Red, "\nWARNING: %d/%d tests failed with %d assertions in %d/%d test cases! %s\n",
+                               results.tests_failed, numTests, failed,
+                               results.test_cases_failed, results.test_cases_run, get_time_str(results.elapsed_time));
             for (const test_failure* f : results.failures)
             {
                 if (f->line) consolef(Red, "    %s:%d  %s::%s:  %s\n", f->file.data(), f->line, f->testname.data(), f->testcase.data(), f->message.data());
@@ -1063,11 +1076,13 @@ namespace rpp
         }
         if (numTests <= 0)
         {
-            consolef(Yellow, "\nNOTE: No tests were run! (out of %d available)\n\n", (int)state().global_tests.size());
+            consolef(Yellow, "\nNOTE: No test suites were run! (out of %d available)\n\n", (int)state().global_tests.size());
             return 1;
         }
-        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed! %s\n\n", get_time_str(results.elapsed_time));
-        else               consolef(Green, "\nSUCCESS: All %d tests passed! %s\n\n", numTests, get_time_str(results.elapsed_time));
+        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed %d/%d test cases! %s\n\n",
+                                    results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
+        else               consolef(Green, "\nSUCCESS: All %d test suites with %d/%d test cases passed! %s\n\n",
+                                   numTests, results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
         return 0;
     }
 

@@ -2,6 +2,7 @@
 #include "condition_variable.h"
 #include "debugging.h"
 #include "mutex.h"
+#include <concepts>
 #include <atomic>
 
 namespace rpp
@@ -101,12 +102,14 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> FINLINE void notify(const Callback& callback) noexcept
+        template<std::invocable Callback>
+        FINLINE void notify(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify<Callback>(lock, callback);
         }
-        template<class Callback> FINLINE void notify(lock_t& lock, const Callback& callback) noexcept
+        template<std::invocable Callback>
+        FINLINE void notify(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify(lock);
@@ -136,12 +139,14 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> FINLINE void notify_all(const Callback& callback) noexcept
+        template<std::invocable Callback>
+        FINLINE void notify_all(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify_all<Callback>(lock, callback);
         }
-        template<class Callback> FINLINE void notify_all(lock_t& lock, const Callback& callback) noexcept
+        template<std::invocable Callback>
+        FINLINE void notify_all(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify_all(lock);
@@ -174,12 +179,14 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<class Callback> FINLINE void notify_once(const Callback& callback) noexcept
+        template<std::invocable Callback>
+        FINLINE void notify_once(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify_once<Callback>(lock, callback);
         }
-        template<class Callback> FINLINE void notify_once(lock_t& lock, const Callback& callback) noexcept
+        template<std::invocable Callback>
+        FINLINE void notify_once(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify_once(lock);

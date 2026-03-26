@@ -203,10 +203,10 @@ namespace rpp
     private:
         struct suite_results // intermediate results for a test suite run
         {
-            int num_tests_run = 0;
-            int num_tests_passed = 0;
-            int num_tests_failed = 0;
-            bool all_success() const noexcept { return num_tests_passed == num_tests_run; }
+            int num_test_cases_run = 0;
+            int num_test_cases_passed = 0;
+            int num_test_cases_failed = 0;
+            bool all_success() const noexcept { return num_test_cases_passed == num_test_cases_run; }
         };
         suite_results run_test_suite(strview methodFilter);
         void print_test_suite_title(TestVerbosity verb, strview methodFilter);
