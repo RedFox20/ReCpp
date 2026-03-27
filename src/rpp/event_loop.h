@@ -115,6 +115,8 @@ namespace rpp
      * - Suspended coroutines are paused while other pending tasks can resume
      * - All resumes are serialized onto a single thread (no data races)
      * - The user drives the loop via run_once(), run_until_idle() or run_loop()
+     * - fork() launches concurrent coroutine paths with event-driven join_forks()
+     * - run_async() supports semaphore waits and queue pops (resumes on loop thread)
      *
      * @code
      *     rpp::event_loop loop;
@@ -546,6 +548,53 @@ namespace rpp
                 if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::move(fut_or_cb) };
                 else                             return background_awaiter<R>{ *this, std::move(fut_or_cb) };
             }
+        }
+
+        // ─── Semaphore / Queue await ────────────────────────────────
+
+        /**
+         * @brief Waits for a semaphore signal on a background thread,
+         *        resumes on the event loop thread.
+         * @code
+         *     auto wr = co_await loop.await(sem, rpp::millis(100));
+         *     if (wr == rpp::semaphore::notified) { // signaled }
+         * @endcode
+         */
+        RPP_CORO_WRAPPER auto await(rpp::semaphore& sem, rpp::Duration timeout) noexcept
+        {
+            return run_async([&sem, timeout]() { return sem.wait(timeout); });
+        }
+
+        /**
+         * @brief Pops from a queue on a background thread,
+         *        resumes on the event loop thread.
+         * @code
+         *     std::string item;
+         *     bool got = co_await loop.await(queue, item, rpp::millis(100));
+         * @endcode
+         */
+        template<typename T>
+        RPP_CORO_WRAPPER auto await(rpp::concurrent_queue<T>& queue, T& out, rpp::Duration timeout) noexcept
+        {
+            return run_async([&queue, &out, timeout]() { return queue.wait_pop(out, timeout); });
+        }
+
+        /**
+         * @brief Pops from a queue on a background thread, returns std::optional<T>,
+         *        resumes on the event loop thread.
+         * @code
+         *     auto item = co_await loop.await_pop(queue, rpp::millis(100));
+         *     if (item) { use(*item); }
+         * @endcode
+         */
+        template<typename T>
+        RPP_CORO_WRAPPER auto await_pop(rpp::concurrent_queue<T>& queue, rpp::Duration timeout) noexcept
+        {
+            return run_async([&queue, timeout]() -> std::optional<T> {
+                T item;
+                if (queue.wait_pop(item, timeout)) return std::move(item);
+                return std::nullopt;
+            });
         }
 
         // ─── Sleep / delay awaiter ──────────────────────────────────

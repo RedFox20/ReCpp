@@ -3,6 +3,7 @@
 #include "stack_trace.h"
 #include "strview.h"
 
+#include <atomic>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -56,7 +57,7 @@ static bool DisableFunctionNames = false;
 static bool EnableTimestamps = false;
 static bool TimeOfDay = false;
 static int TimePrecision = 3;
-static rpp::int64 TimeOffset;
+static std::atomic<rpp::int64> TimeOffset {0};
 
 // new logging API
 namespace rpp
@@ -154,7 +155,7 @@ RPPCAPI void LogEnableTimestamps(bool enable, int precision, bool time_of_day) n
 }
 RPPCAPI void LogSetTimeOffset(rpp::int64 offset) noexcept
 {
-    TimeOffset = offset;
+    TimeOffset.store(offset, std::memory_order_release);
 }
 
 static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexcept
@@ -165,7 +166,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
 
     if (EnableTimestamps) {
         rpp::TimePoint now = rpp::TimePoint::now();
-        now.duration.nsec += TimeOffset;
+        now.duration.nsec += TimeOffset.load(std::memory_order_relaxed);
         if (TimeOfDay)
             len = now.time_of_day().to_string(pbuf, remaining-1, TimePrecision);
         else

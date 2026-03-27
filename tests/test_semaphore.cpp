@@ -1,4 +1,6 @@
 #include <rpp/semaphore.h>
+#include <rpp/coroutines.h>
+#include <rpp/future.h>
 #include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
@@ -214,4 +216,57 @@ TestImpl(test_semaphore)
         AssertEqual(consumer_data.size(), producer_data.size());
         AssertEqual(consumer_data, producer_data);
     }
+
+#if RPP_HAS_COROUTINES
+    // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+    // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
+    // resume on a background thread, which conflicts with the default test
+    // runner's synchronous pump loop.
+
+    // ─── co_await semaphore: signal received ────────────────────
+    TestCase(co_await_semaphore_notified)
+    {
+        rpp::semaphore sem;
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            auto result = co_await sem.await(millis(500));
+            AssertEqual(result, rpp::semaphore::notified);
+        };
+
+        std::thread producer([&]() { rpp::sleep_ms(20); sem.notify(); });
+        auto future = coro();
+        future.get();
+        producer.join();
+    }
+
+    // ─── co_await semaphore: timeout ────────────────────────────
+    TestCase(co_await_semaphore_timeout)
+    {
+        rpp::semaphore sem;
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            auto result = co_await sem.await(millis(20));
+            AssertEqual(result, rpp::semaphore::timeout);
+        };
+        coro().get();
+    }
+
+    // ─── co_await semaphore: already signaled (fast path) ───────
+    TestCase(co_await_semaphore_already_signaled)
+    {
+        rpp::semaphore sem;
+        sem.notify(); // pre-signal
+
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            auto result = co_await sem.await(millis(100));
+            AssertEqual(result, rpp::semaphore::notified);
+        };
+        coro().get();
+        // try_wait in await_ready should have consumed the signal
+        AssertEqual(sem.count(), 0);
+    }
+
+    // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+#endif // RPP_HAS_COROUTINES
 };

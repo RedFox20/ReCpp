@@ -5,8 +5,20 @@
 #include <atomic>
 #include <type_traits>
 
+#if RPP_HAS_CXX20
+#  include "future_types.h" // RPP_HAS_COROUTINES, rpp::coro_handle
+#  if RPP_HAS_COROUTINES
+#    include "delegate.h" // rpp::delegate (for coroutine awaiter)
+#  endif
+#endif
+
 namespace rpp
 {
+#if RPP_HAS_COROUTINES
+    // forward declaration: avoids circular include with thread_pool.h
+    void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
+#endif
+
 #if RPP_HAS_CXX20
     // Portable replacement for std::invocable which requires <concepts>
     // and is not available on all platforms (e.g. Android NDK r25b / Clang 14)
@@ -17,7 +29,11 @@ namespace rpp
     //////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Simple semaphore for notifying and waiting on events
+     * Simple semaphore for notifying and waiting on events.
+     *
+     * C++20 coroutine support: use `co_await sem.await(timeout)` to suspend a
+     * coroutine until the semaphore is signaled or the timeout expires.
+     * Requires `#include <rpp/coroutines.h>` and `using namespace rpp::coro_operators;`.
      */
     class semaphore
     {
@@ -338,6 +354,39 @@ namespace rpp
             // reset the flag to false
             hasFinished = false;
         }
+
+#if RPP_HAS_COROUTINES
+        /**
+         * @brief Awaitable handle for co_await on semaphore wait.
+         * Dispatches the blocking wait to a background thread and resumes the coroutine.
+         * @code
+         *     auto result = co_await sem.await(rpp::millis(100));
+         *     if (result == rpp::semaphore::notified) { // signaled }
+         * @endcode
+         */
+        struct RPP_CORO_RETURN_TYPE co_await_handle
+        {
+            semaphore& sem;
+            rpp::Duration timeout;
+            wait_result result = wait_result::timeout;
+
+            bool await_ready() noexcept
+            {
+                if (sem.try_wait()) { result = notified; return true; }
+                return false;
+            }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                rpp::parallel_task_detached(rpp::delegate<void()>{[this, cont]() mutable
+                {
+                    result = sem.wait(timeout);
+                    cont.resume();
+                }});
+            }
+            wait_result await_resume() noexcept { return result; }
+        };
+        co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
+#endif
     };
 
     /**
@@ -371,6 +420,10 @@ namespace rpp
         using semaphore::try_wait;
         using semaphore::wait;
         using semaphore::wait_no_unset;
+#if RPP_HAS_COROUTINES
+        using semaphore::co_await_handle;
+        using semaphore::await;
+#endif
     };
 
     /**
@@ -420,6 +473,10 @@ namespace rpp
         {
             return wait_no_unset(lock, timeout);
         }
+#if RPP_HAS_COROUTINES
+        using semaphore::co_await_handle;
+        using semaphore::await;
+#endif
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////

@@ -1,4 +1,5 @@
 #include <rpp/concurrent_queue.h>
+#include <rpp/coroutines.h>
 #include <rpp/future.h>
 #include <rpp/timer.h>
 #include <rpp/scope_guard.h>
@@ -660,4 +661,123 @@ TestImpl(test_concurrent_queue)
         double Mitems_per_sec = items_per_sec / 1'000'000.0;
         print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
     }
+
+#if RPP_HAS_COROUTINES
+    // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+    // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
+    // resume on a background thread, which conflicts with the default test
+    // runner's synchronous pump loop.
+
+    // ─── co_await queue pop: item arrives ───────────────────────
+    TestCase(co_await_queue_pop)
+    {
+        concurrent_queue<std::string> queue;
+        auto coro = [&]() -> cfuture<void>
+        {
+            std::string item;
+            bool got = co_await queue.await_pop(item, Duration::from_millis(500));
+            AssertThat(got, true);
+            AssertThat(item, "hello"s);
+        };
+
+        std::thread producer([&]() { rpp::sleep_ms(20); queue.push("hello"); });
+        auto future = coro();
+        future.get();
+        producer.join();
+    }
+
+    // ─── co_await queue pop: timeout ────────────────────────────
+    TestCase(co_await_queue_pop_timeout)
+    {
+        concurrent_queue<std::string> queue;
+        auto coro = [&]() -> cfuture<void>
+        {
+            std::string item;
+            bool got = co_await queue.await_pop(item, Duration::from_millis(20));
+            AssertThat(got, false);
+        };
+        coro().get();
+    }
+
+    // ─── co_await queue pop: already has item (fast path) ───────
+    TestCase(co_await_queue_pop_already_available)
+    {
+        concurrent_queue<std::string> queue;
+        queue.push("ready");
+
+        auto coro = [&]() -> cfuture<void>
+        {
+            std::string item;
+            bool got = co_await queue.await_pop(item, Duration::from_millis(100));
+            AssertThat(got, true);
+            AssertThat(item, "ready"s);
+        };
+        coro().get();
+        AssertThat(queue.empty(), true);
+    }
+
+    // ─── co_await queue available ───────────────────────────────
+    TestCase(co_await_queue_available_after_delay)
+    {
+        concurrent_queue<int> queue;
+        auto coro = [&]() -> cfuture<void>
+        {
+            bool available = co_await queue.await(Duration::from_millis(500));
+            AssertThat(available, true);
+        };
+
+        std::thread producer([&]() { rpp::sleep_ms(20); queue.push(42); });
+        auto future = coro();
+        future.get();
+        producer.join();
+        AssertThat(queue.empty(), false); // await() doesn't pop
+    }
+
+    // ─── co_await queue await_pop returning optional ────────────
+    TestCase(co_await_queue_pop_optional)
+    {
+        concurrent_queue<std::string> queue;
+        auto coro = [&]() -> cfuture<void>
+        {
+            auto item = co_await queue.await_pop(Duration::from_millis(500));
+            AssertThat(item.has_value(), true);
+            AssertThat(item.value_or("none"), "hello"s);
+        };
+
+        std::thread producer([&]() { rpp::sleep_ms(20); queue.push("hello"); });
+        auto future = coro();
+        future.get();
+        producer.join();
+    }
+
+    // ─── co_await queue await_pop optional: timeout ─────────────
+    TestCase(co_await_queue_pop_optional_timeout)
+    {
+        concurrent_queue<std::string> queue;
+        auto coro = [&]() -> cfuture<void>
+        {
+            auto item = co_await queue.await_pop(Duration::from_millis(20));
+            AssertThat(item.has_value(), false);
+        };
+        coro().get();
+    }
+
+    // ─── co_await queue await_pop optional: fast path ───────────
+    TestCase(co_await_queue_pop_optional_fast_path)
+    {
+        concurrent_queue<int> queue;
+        queue.push(99);
+
+        auto coro = [&]() -> cfuture<void>
+        {
+            auto item = co_await queue.await_pop(Duration::from_millis(100));
+            AssertThat(item.has_value(), true);
+            AssertThat(item.value_or(-1), 99);
+        };
+        coro().get();
+        AssertThat(queue.empty(), true);
+    }
+
+    // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+#endif // RPP_HAS_COROUTINES
 };

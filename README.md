@@ -1420,6 +1420,13 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`run_until_idle()`](src/rpp/event_loop.h#L221) | Run until no background tasks and no pending resume events remain |
 | [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L233) | Drive the loop until the given `event_task` completes, then rethrow on failure |
 | [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L407) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L266) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L598) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L279) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L287) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L563) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L576) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L588) | Pop from queue returning `optional<T>`, resume on loop thread |
 | [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L247) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
 | [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L239) | Post a raw coroutine handle resume to the loop thread |
 | [`delay(Duration duration)`](src/rpp/event_loop.h#L425) | Sleep on a background thread, resume on the loop thread |
@@ -1438,6 +1445,7 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 |--------|-------------|
 | [`done()`](src/rpp/event_loop.h#L72) | True if the coroutine has finished or was never started |
 | [`rethrow_if_exception()`](src/rpp/event_loop.h#L75) | Rethrow any unhandled exception captured by the coroutine |
+| `on_complete` | Optional completion callback in `promise_type`, called at `final_suspend` (used by `fork()`) |
 
 ### event_loop Example
 
@@ -1479,6 +1487,55 @@ rpp::event_task updateUI(rpp::event_loop* loop) {
 rpp::event_loop loop;
 auto task = updateUI(&loop);   // starts immediately, suspends at first co_await
 loop.run_until_done(task);     // drives the loop until task completes, rethrows on failure
+```
+
+### fork() Example
+
+`fork()` launches concurrent coroutine paths on the event loop. Forks are fire-and-forget — tracked internally, cleaned up automatically by `run_until_idle()`. Use `join_forks()` for event-driven join with timeout.
+
+```cpp
+rpp::event_loop loop;
+
+// fork two concurrent paths — no manual future tracking needed
+loop.fork([&]() -> rpp::event_task {
+    auto data = co_await loop.run_async([&]{ return fetchData(); });
+    state.data = data;  // safe: resumes on event loop thread
+});
+loop.fork([&]() -> rpp::event_task {
+    co_await loop.run_async([&]{ return processVideo(); });
+    state.videoReady = true;
+});
+
+loop.run_until_idle();  // drives both forks, cleans up on completion
+```
+
+Inside a coroutine, use `join_forks()` for structured concurrency with timeout:
+
+```cpp
+auto main_task = [&]() -> rpp::event_task {
+    loop.fork([&]() -> rpp::event_task { /* path 1 */ });
+    loop.fork([&]() -> rpp::event_task { /* path 2 */ });
+    int remaining = co_await loop.join_forks(rpp::seconds(5));
+    if (remaining > 0) { /* timeout: some forks still running */ }
+};
+```
+
+### Semaphore / Queue Await Example
+
+Event-loop-aware `co_await` for semaphores and queues — resumes on the loop thread:
+
+```cpp
+// wait for semaphore signal
+auto wr = co_await loop.await(sem, rpp::millis(100));
+if (wr == rpp::semaphore::notified) { /* signaled */ }
+
+// pop from queue (returns bool)
+std::string item;
+bool got = co_await loop.await(queue, item, rpp::millis(100));
+
+// pop from queue (returns optional<T>)
+auto opt = co_await loop.await_pop(queue, rpp::millis(100));
+if (opt) { use(*opt); }
 ```
 
 ---
@@ -1694,8 +1751,23 @@ Counting semaphore and lightweight notification flags.
 | [`try_wait()`](src/rpp/semaphore.h#L193) | Non-blocking wait attempt |
 | [`wait()`](src/rpp/semaphore.h#L209) | Blocking wait |
 | [`wait(Duration timeout)`](src/rpp/semaphore.h#L244) | Wait with timeout |
+| [`await(Duration timeout)`](src/rpp/semaphore.h#L362) | C++20 coroutine `co_await` — dispatches wait to background thread |
 | [`count()`](src/rpp/semaphore.h#L48) | Current count |
 | [`reset()`](src/rpp/semaphore.h#L63) | Reset to zero |
+
+### Example: Coroutine co_await
+
+```cpp
+#include <rpp/semaphore.h>
+#include <rpp/coroutines.h>
+
+rpp::semaphore sem;
+
+rpp::cfuture<void> waitForSignal() {
+    auto result = co_await sem.await(rpp::millis(100));
+    if (result == rpp::semaphore::notified) { /* handle signal */ }
+}
+```
 
 ### Example: Producer-Consumer with semaphore
 
@@ -3173,6 +3245,31 @@ Thread-safe FIFO queue with notification support.
 | [`size()`](src/rpp/concurrent_queue.h#L129) | Number of items |
 | [`reserve(int n)`](src/rpp/concurrent_queue.h#L210) | Reserve capacity |
 | [`notify()`](src/rpp/concurrent_queue.h#L138) / [`notify_one()`](src/rpp/concurrent_queue.h#L147) | Wake waiting consumers |
+| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L929) | C++20 coroutine `co_await` — wait for items available |
+| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L982) | C++20 coroutine `co_await` — pop item (returns bool) |
+| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1016) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
+
+### Example: Coroutine co_await
+
+```cpp
+#include <rpp/concurrent_queue.h>
+#include <rpp/coroutines.h>
+
+rpp::concurrent_queue<std::string> queue;
+
+rpp::cfuture<void> consumeMessages() {
+    // pop with bool result
+    std::string item;
+    bool got = co_await queue.await_pop(item, rpp::millis(100));
+
+    // pop with optional result
+    auto opt = co_await queue.await_pop(rpp::millis(100));
+    if (opt) { process(*opt); }
+
+    // check availability without popping
+    bool available = co_await queue.await(rpp::millis(100));
+}
+```
 
 ### Example: Producer-Consumer with wait_pop
 

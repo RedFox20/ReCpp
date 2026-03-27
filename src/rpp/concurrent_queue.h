@@ -5,8 +5,8 @@
  */
 #pragma once
 #include "config.h"
-#include "semaphore.h" // rpp::mutex, rpp::semaphore::lock_t
-#include "threads.h" // rpp::yield
+#include "condition_variable.h" // rpp::condition_variable
+#include "mutex.h" // rpp::mutex, rpp::spin_lock, rpp::yield
 #include <vector>
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional
@@ -14,14 +14,31 @@
 #include <cstring> // memmove
 #include <malloc.h> // malloc, free
 
+#if RPP_HAS_CXX20
+#  include "future_types.h" // RPP_HAS_COROUTINES, rpp::coro_handle
+#  if RPP_HAS_COROUTINES
+#    include "delegate.h" // rpp::delegate (for coroutine awaiter)
+#  endif
+#endif
+
 namespace rpp
 {
+    #if RPP_HAS_COROUTINES
+        // forward declaration: avoids circular include with thread_pool.h
+        void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
+    #endif
+
     /**
      * Provides a simple thread-safe queue with several synchronization helpers
      * as a simple way to write thread-safe code between multiple worker threads.
-     * 
+     *
      * @note This is not optimized for speed, but has acceptable performance
      *       and due to its simplicity it won't randomly deadlock on you.
+     *
+     * C++20 coroutine support (include `<rpp/future_types.h>` and `<rpp/thread_pool.h>`):
+     *   - `co_await queue.await(timeout)` — suspends until items are available
+     *   - `co_await queue.await_pop(item, timeout)` — suspends until an item is popped (returns bool)
+     *   - `co_await queue.await_pop(timeout)` — suspends until an item is popped (returns optional<T>)
      */
     template<class T>
     class concurrent_queue
@@ -39,7 +56,7 @@ namespace rpp
 
     private:
         using mutex_t = rpp::mutex;
-        using lock_t = rpp::semaphore::lock_t;
+        using lock_t = std::unique_lock<mutex_t>;
         mutable mutex_t Mutex;
         mutable rpp::condition_variable Waiter;
         // special state flag for all waiters to immediately exit the queue
@@ -911,5 +928,102 @@ namespace rpp
         {
             return (Tail - Head);
         }
+
+    public:
+#if RPP_HAS_COROUTINES
+        /**
+         * @brief Awaitable handle for co_await on queue availability.
+         * Dispatches a blocking wait to a background thread and resumes the coroutine.
+         * @code
+         *     bool available = co_await queue.await(rpp::millis(100));
+         * @endcode
+         */
+        struct RPP_CORO_RETURN_TYPE co_await_handle
+        {
+            concurrent_queue& queue;
+            rpp::Duration timeout;
+            bool available = false;
+
+            bool await_ready() noexcept
+            {
+                return (available = !queue.empty());
+            }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                rpp::parallel_task_detached(rpp::delegate<void()>{[this, cont]() mutable
+                {
+                    available = queue.wait_available(timeout);
+                    cont.resume();
+                }});
+            }
+            bool await_resume() noexcept { return available; }
+        };
+        co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
+
+        /**
+         * @brief Awaitable handle for co_await on queue pop.
+         * Dispatches a blocking wait_pop to a background thread and resumes the coroutine.
+         * @code
+         *     T item;
+         *     bool got = co_await queue.await_pop(item, rpp::millis(100));
+         * @endcode
+         */
+        struct RPP_CORO_RETURN_TYPE co_pop_handle
+        {
+            concurrent_queue& queue;
+            T& out;
+            rpp::Duration timeout;
+            bool success = false;
+
+            bool await_ready() noexcept
+            {
+                return (success = queue.try_pop(out));
+            }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                rpp::parallel_task_detached(rpp::delegate<void()>{[this, cont]() mutable
+                {
+                    success = queue.wait_pop(out, timeout);
+                    cont.resume();
+                }});
+            }
+            bool await_resume() noexcept { return success; }
+        };
+        co_pop_handle await_pop(T& out, rpp::Duration timeout) noexcept { return { *this, out, timeout }; }
+
+        /**
+         * @brief Awaitable handle for co_await on queue pop returning std::optional<T>.
+         * Dispatches a blocking wait_pop to a background thread and resumes the coroutine.
+         * @code
+         *     std::optional<T> item = co_await queue.await_pop(rpp::millis(100));
+         *     if (item) { use(*item); }
+         * @endcode
+         */
+        struct RPP_CORO_RETURN_TYPE co_pop_optional_handle
+        {
+            concurrent_queue& queue;
+            rpp::Duration timeout;
+            std::optional<T> result;
+
+            bool await_ready() noexcept
+            {
+                T item;
+                if (queue.try_pop(item)) { result.emplace(std::move(item)); return true; }
+                return false;
+            }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                rpp::parallel_task_detached(rpp::delegate<void()>{[this, cont]() mutable
+                {
+                    T item;
+                    if (queue.wait_pop(item, timeout))
+                        result.emplace(std::move(item));
+                    cont.resume();
+                }});
+            }
+            std::optional<T> await_resume() noexcept { return std::move(result); }
+        };
+        co_pop_optional_handle await_pop(rpp::Duration timeout) noexcept { return { *this, timeout, std::nullopt }; }
+#endif
     };
 }
