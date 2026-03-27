@@ -53,10 +53,10 @@ struct LogHandler
 static int NumLogHandlers;
 static std::array<LogHandler, MAX_LOG_HANDLERS> LogHandlers;
 static LogExceptCallback ExceptHandler;
-static bool DisableFunctionNames = false;
-static bool EnableTimestamps = false;
-static bool TimeOfDay = false;
-static int TimePrecision = 3;
+static std::atomic<bool> DisableFunctionNames {false};
+static std::atomic<bool> EnableTimestamps {false};
+static std::atomic<bool> TimeOfDay {false};
+static std::atomic<int> TimePrecision {3};
 static std::atomic<rpp::int64> TimeOffset {0};
 
 // new logging API
