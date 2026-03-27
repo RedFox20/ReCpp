@@ -249,8 +249,7 @@ namespace rpp
             }
         }
 
-        size_t pop = (end - next);
-        v.resize(v.size() - pop);
+        v.erase(v.begin() + (next - v.data()), v.end());
         return true; // items were erased
     }
 

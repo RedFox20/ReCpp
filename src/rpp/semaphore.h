@@ -2,11 +2,18 @@
 #include "condition_variable.h"
 #include "debugging.h"
 #include "mutex.h"
-#include <concepts>
 #include <atomic>
+#include <type_traits>
 
 namespace rpp
 {
+#if RPP_HAS_CXX20
+    // Portable replacement for std::invocable which requires <concepts>
+    // and is not available on all platforms (e.g. Android NDK r25b / Clang 14)
+    template<typename Callable>
+    concept IsCallable = std::is_invocable_v<Callable>;
+#endif
+
     //////////////////////////////////////////////////////////////////////////////////////////
 
     /**
@@ -102,13 +109,13 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<std::invocable Callback>
+        template<IsCallable Callback>
         FINLINE void notify(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify<Callback>(lock, callback);
         }
-        template<std::invocable Callback>
+        template<IsCallable Callback>
         FINLINE void notify(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
@@ -139,13 +146,13 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<std::invocable Callback>
+        template<IsCallable Callback>
         FINLINE void notify_all(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify_all<Callback>(lock, callback);
         }
-        template<std::invocable Callback>
+        template<IsCallable Callback>
         FINLINE void notify_all(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
@@ -179,13 +186,13 @@ namespace rpp
          *        thread safely just before notifying the waiting thread.
          * This is useful when you need to change some state and then notify a waiting thread.
          */
-        template<std::invocable Callback>
+        template<IsCallable Callback>
         FINLINE void notify_once(const Callback& callback) noexcept
         {
             auto lock = spin_lock();
             notify_once<Callback>(lock, callback);
         }
-        template<std::invocable Callback>
+        template<IsCallable Callback>
         FINLINE void notify_once(lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
