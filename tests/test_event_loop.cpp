@@ -858,36 +858,26 @@ TestImpl(test_event_loop)
         future.get();
     }
 
-    // ─── UI simulation: two serialized execution paths interleaving ─
+    // ─── UI simulation using fork(): fire-and-forget concurrency ──
     //
-    // Models a real UI application where the main (event-loop) thread makes
-    // decisions, dispatches slow background work, and resumes to commit results
-    // to shared state – with NO mutex on the shared state because every write
-    // happens on the loop thread.
+    // Same scenario as before — two serialized execution paths interleaving
+    // on the event loop — but using fork() for cleaner structured concurrency.
     //
-    // Two independent coroutines run concurrently as "serialized paths":
+    //   Path 1 – message_processor: 4 incoming UI commands, each parsed on
+    //            a background thread (8 ms), committed on the main thread.
+    //   Path 2 – video_pipeline: 5 pipeline stages with varying durations.
     //
-    //   Path 1 – message_processor
-    //     Simulates incoming UI commands (e.g., from a network socket).
-    //     Each command is parsed on a background thread (slow), then the
-    //     parsed result is committed on the main thread.  The next command
-    //     is NOT dispatched until the current one is committed → strictly
-    //     ordered within the path.
-    //
-    //   Path 2 – video_pipeline
-    //     Simulates async init / configure / run / teardown of a camera
-    //     pipeline.  Every stage is heavier than one message parse so the
-    //     two paths visibly interleave on the event loop.
+    // fork() starts each coroutine eagerly on the main thread and tracks it
+    // internally.  run_until_idle() drives all forks to completion and
+    // automatically cleans up completed forks (exceptions go through
+    // except_handler).
     //
     // Verified properties:
     //   1. Within each path the steps are ordered (sequential co_await chain).
-    //   2. The two paths run concurrently (the video pipeline does NOT block
-    //      the message processor and vice-versa).
-    //   3. All shared-state mutations happen on the loop thread (asserted at
-    //      every resume point – no locks required).
-    //   4. The interleaved timeline proves concurrent progress: at least one
-    //      message is committed before the first video stage resumes.
-    TestCase(ui_simulation_message_and_video_pipelines)
+    //   2. The two paths run concurrently (interleaved on the event loop).
+    //   3. All shared-state mutations happen on the loop thread (asserted).
+    //   4. At least one message is committed before the first video stage.
+    TestCase(ui_simulation_with_fork)
     {
         // ── Shared state – written ONLY on the event loop thread ─────────
         // No mutex needed: the event loop serialises all resumes onto a
@@ -902,11 +892,6 @@ TestImpl(test_event_loop)
         };
         SharedState state;
 
-        // ── Serialized path 1: message processor ────────────────────────
-        // Four incoming UI commands, each "parsed" on a background thread
-        // (simulated by an 8 ms sleep), then committed on the main thread.
-        // The for-loop + co_await means command N+1 is only dispatched after
-        // command N has been committed → strictly serialized within this path.
         const std::vector<std::string> raw_messages = {
             "connect_camera",
             "set_resolution_720p",
@@ -914,7 +899,8 @@ TestImpl(test_event_loop)
             "apply_filter_blur",
         };
 
-        auto message_processor = [&]() -> rpp::cfuture<void>
+        // ── Fork path 1: message processor ──────────────────────────────
+        loop->fork([&]() -> rpp::event_task
         {
             for (const std::string& msg : raw_messages)
             {
@@ -929,28 +915,20 @@ TestImpl(test_event_loop)
                 state.messages.push_back(result);
                 state.timeline.push_back("msg:" + msg);
             }
-        };
+        });
+        assert_on_main_thread();
 
-        // ── Serialized path 2: video pipeline ───────────────────────────
-        // Five distinct pipeline stages, each slow.  Within the coroutine they
-        // are strictly sequential (each co_await blocks the coroutine until
-        // that stage's background work completes and the loop resumes it).
-        // Concurrently, the message_processor makes progress on the loop.
-        //
+        // ── Fork path 2: video pipeline ─────────────────────────────────
         // Stage timings (background sleep):
         //   init       20 ms  → message_processor should commit ~2 messages first
         //   add_source 15 ms
         //   start      25 ms
         //   frames ×3  10 ms each
         //   teardown   15 ms
-        auto video_pipeline = [&]() -> rpp::cfuture<void>
+        loop->fork([&]() -> rpp::event_task
         {
             // Stage 1 – init (20 ms)
-            // While we wait here, the message_processor will commit at least
-            // one (likely two) messages on the main thread.
             co_await loop->run_async([] { rpp::sleep_ms(20); });
-
-            // DESIGN: resume always happens on main thread !
             assert_on_main_thread();
             state.pipeline_active = true;
             state.pipeline_log.emplace_back("init");
@@ -969,7 +947,6 @@ TestImpl(test_event_loop)
             state.timeline.emplace_back("vid:start");
 
             // Stage 4 – process 3 frame batches (10 ms each)
-            // Decisions (how many frames) are made on main thread between batches.
             for (int batch = 0; batch < 3; ++batch)
             {
                 int frames = co_await loop->run_async([batch]() -> int {
@@ -977,7 +954,7 @@ TestImpl(test_event_loop)
                     return (batch + 1) * 10; // 10, 20, 30
                 });
                 assert_on_main_thread();
-                state.total_frames += frames; // safe: main thread only
+                state.total_frames += frames;
                 state.pipeline_log.emplace_back("frames_" + std::to_string(batch));
                 state.timeline.emplace_back("vid:frames_" + std::to_string(batch));
             }
@@ -988,38 +965,13 @@ TestImpl(test_event_loop)
             state.pipeline_active = false;
             state.pipeline_log.emplace_back("teardown");
             state.timeline.emplace_back("vid:teardown");
-        };
-
-        // ── Main thread decision: launch both serialized paths ───────────
-        // This mirrors real UI code: the main thread decides to kick off
-        // background work, then yields control to the event loop.
+        });
         assert_on_main_thread();
 
-        print_info("Launch message and video coroutines\n");
-        auto msg_fut = message_processor(); // immediately suspends at first co_await
-        auto vid_fut = video_pipeline();    // immediately suspends at first co_await
-
-        // ── Drive the event loop until both paths finish ─────────────────
-        print_info("Pump events until both idle\n");
+        // ── Drive the event loop until all forks complete ────────────────
+        // run_until_idle() automatically cleans up completed forks
+        AssertThat(loop->num_forks(), 2);
         idle();
-
-        // wait up to 10 seconds for either paths to complete
-        print_info("Wait up to 10s for futures to complete\n");
-        bool msg_done = msg_fut.wait_for(rpp::seconds(10)) == std::future_status::ready;
-        bool vid_done = vid_fut.wait_for(rpp::seconds(10)) == std::future_status::ready;
-        AssertThat(msg_done, true);
-        AssertThat(vid_done, true);
-        if (!msg_done || !vid_done)
-        {
-            print_info("Timeline of events before deadlock:");
-            for (const std::string& e : state.timeline)
-                print_info("  %s\n", e.c_str());
-            std::terminate(); // fail hard to dump thread stacks for debugging
-        }
-
-        print_info("Both futures completed, check for exceptions\n");
-        msg_fut.get(); // must be ready; verifies no exception escaped
-        vid_fut.get();
 
         // ── Verify message path: order preserved ─────────────────────────
         AssertThat(state.messages.size(), 4u);
@@ -1041,7 +993,6 @@ TestImpl(test_event_loop)
         AssertThat(state.pipeline_active, false);
 
         // ── Verify interleaving: both paths progressed concurrently ───────
-        // The combined timeline must contain exactly 4 msg + 7 vid events.
         AssertThat(state.timeline.size(), 11u);
 
         int msg_events = 0;
@@ -1054,11 +1005,8 @@ TestImpl(test_event_loop)
         AssertThat(msg_events, 4);
         AssertThat(vid_events, 7);
 
-        // Locate the position of the first video event in the shared timeline.
-        // Because video_pipeline's init stage takes 20 ms and each message
-        // parse takes only 8 ms, at least one "msg:" entry must appear before
-        // "vid:init" – proving the message_processor made progress on the loop
-        // while the video_pipeline was suspended in its slow background task.
+        // At least one message committed before the first video resume.
+        // (2 × 8 ms < 20 ms, so ~2 in practice; we guard conservatively.)
         size_t first_vid_pos = state.timeline.size();
         for (size_t i = 0; i < state.timeline.size(); ++i)
             if (state.timeline[i].starts_with("vid:")) { first_vid_pos = i; break; }
@@ -1067,9 +1015,54 @@ TestImpl(test_event_loop)
         for (size_t i = 0; i < first_vid_pos; ++i)
             if (state.timeline[i].starts_with("msg:")) ++msgs_before_first_vid;
 
-        // At least one message committed before the first video resume.
-        // (In practice ~2, because 2 × 8 ms < 20 ms, but we guard conservatively.)
         AssertGreater(msgs_before_first_vid, 0);
+        AssertThat(loop->num_forks(), 0); // all forks completed
+    }
+
+    // ─── join_forks with timeout: soft deadlock prevention ──────
+    //
+    // Demonstrates the timeout pattern for handling slow forks.
+    // A fast fork completes within the timeout; a slow fork does not.
+    // join_forks() returns the number of forks still active, allowing
+    // the caller to continue with partial results instead of hanging.
+    TestCase(fork_join_with_timeout)
+    {
+        auto main_task = [&]() -> rpp::event_task
+        {
+            std::atomic<bool> slow_started{false};
+
+            // fast fork: completes quickly
+            loop->fork([&]() -> rpp::event_task
+            {
+                co_await loop->run_async([] { rpp::sleep_ms(10); });
+                assert_on_main_thread();
+            });
+            assert_on_main_thread();
+
+            // slow fork: takes much longer than our timeout
+            loop->fork([&]() -> rpp::event_task
+            {
+                slow_started.store(true);
+                co_await loop->run_async([] { rpp::sleep_ms(100); });
+                assert_on_main_thread();
+            });
+            assert_on_main_thread();
+
+            AssertThat(loop->num_forks(), 2);
+
+            // join with a short timeout — fast fork finishes, slow fork does not
+            int remaining = co_await loop->join_forks(rpp::millis(30));
+            assert_on_main_thread();
+            AssertGreater(remaining, 0);      // at least one fork still active
+            AssertThat(slow_started.load(), true); // slow fork did start
+        };
+
+        auto task = main_task();
+        loop->run_until_done(task);
+
+        // let the slow fork complete so we don't leak background work
+        // run_until_idle() automatically cleans up completed forks
+        idle();
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)

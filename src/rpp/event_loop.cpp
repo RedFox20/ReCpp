@@ -31,8 +31,21 @@ namespace rpp
         if (!wait_on_all(rpp::millis(1000)))
         {
             __assertion_failure("event_loop destroyed with pending tasks; this may cause resource leaks");
-            // do not terminate here, just try to exit gracefully
+            // do not terminate here (except via DEBUG __assertion_failure), just try to exit gracefully
         }
+
+        // clean up completed forks; exceptions go through except_handler
+        cleanup_forks();
+
+        if (num_forks() > 0)
+        {
+            __assertion_failure("event_loop destroyed with %d pending forks; cleaning up stale coroutine frames", num_forks());
+            // After wait_on_all(), all background threads have finished.
+            // The remaining forks are suspended coroutines — safe to destroy.
+        }
+
+        // destroy all fork coroutine frames (both completed and stale)
+        fork_tasks.clear();
     }
 
     void event_loop::stop() noexcept
@@ -80,7 +93,12 @@ namespace rpp
         }
 
         // expect to finish in reasonable time after stop() is called
-        return wait_on_all(rpp::millis(500));
+        bool all_done = wait_on_all(rpp::millis(500));
+
+        // automatically clean up completed forks; exceptions go through except_handler
+        cleanup_forks();
+
+        return all_done;
     }
 
     bool event_loop::run_once(rpp::Duration timeout) noexcept
@@ -129,6 +147,10 @@ namespace rpp
             if (!has_pending_work())
                 break; // truly idle: no pending tasks and no queued resumes
         }
+
+        // automatically clean up completed forks; exceptions go through except_handler
+        cleanup_forks();
+
         return processed_count;
     }
 
@@ -166,6 +188,47 @@ namespace rpp
     void event_loop::post(rpp::delegate<void()>&& callback) noexcept
     {
         resume_queue.push(resume_event{std::move(callback)});
+    }
+
+    void event_loop::notify_fork_joiner() noexcept
+    {
+        if (num_active_forks.load(std::memory_order_acquire) == 0 && fork_joiner)
+        {
+            post_resume(fork_joiner);
+            fork_joiner = {};
+        }
+    }
+
+    void event_loop::cleanup_forks() noexcept
+    {
+        for (auto& task : fork_tasks)
+        {
+            if (task.done())
+            {
+                try { task.rethrow_if_exception(); }
+                catch (const std::exception& ex)
+                {
+                    if (except_handler) except_handler(std::current_exception());
+                    else LogWarning("event_loop unhandled exception from fork: %s", ex.what());
+                }
+                catch (...)
+                {
+                    if (except_handler) except_handler(std::current_exception());
+                    else LogWarning("event_loop unhandled exception from fork");
+                }
+            }
+        }
+        rpp::erase_if(fork_tasks, [](const event_task& t) { return t.done(); });
+    }
+
+    void event_loop::drain_forks()
+    {
+        for (auto& task : fork_tasks)
+        {
+            if (task.done())
+                task.rethrow_if_exception();
+        }
+        rpp::erase_if(fork_tasks, [](const event_task& t) { return t.done(); });
     }
 
     void event_loop::process_event(resume_event& event) noexcept

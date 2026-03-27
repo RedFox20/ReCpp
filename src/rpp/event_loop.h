@@ -12,11 +12,12 @@
 #include "future_types.h"
 #include "thread_pool.h" // parallel_task, pool_task_handle
 #include "concurrent_queue.h"
+#include "collections.h" // rpp::erase_if
 #include "timer.h"
 #include "threads.h"
 #include "debugging.h"
 #include <atomic>
-#include <functional>
+#include <memory>
 #include <optional>
 #include <type_traits>
 
@@ -49,12 +50,24 @@ namespace rpp
         struct promise_type
         {
             std::exception_ptr exception;
+            rpp::delegate<void()> on_complete {}; // optional: called at final_suspend (e.g. by fork())
             event_task get_return_object() noexcept
             {
                 return event_task{rpp::coro_handle<promise_type>::from_promise(*this)};
             }
             rpp::suspend_never initial_suspend() noexcept { return {}; }
-            rpp::suspend_always final_suspend() noexcept { return {}; }
+            // custom final_awaiter: calls on_complete before suspending (keeps frame alive)
+            struct final_awaiter
+            {
+                bool await_ready() noexcept { return false; }
+                void await_suspend(rpp::coro_handle<promise_type> h) noexcept
+                {
+                    if (auto& promise_completed = h.promise().on_complete)
+                        promise_completed();
+                }
+                void await_resume() noexcept {}
+            };
+            final_awaiter final_suspend() noexcept { return {}; }
             void return_void() noexcept {}
             void unhandled_exception() noexcept { exception = std::current_exception(); }
         };
@@ -64,9 +77,13 @@ namespace rpp
         explicit event_task(rpp::coro_handle<promise_type> h) noexcept : handle{h} {}
         event_task(event_task&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
         ~event_task() { if (handle) handle.destroy(); }
+        event_task& operator=(event_task&& o) noexcept
+        {
+            if (this != &o) { if (handle) handle.destroy(); handle = o.handle; o.handle = nullptr; }
+            return *this;
+        }
         event_task(const event_task&) = delete;
         event_task& operator=(const event_task&) = delete;
-        event_task& operator=(event_task&&) = delete;
 
         /** @returns true if the coroutine has finished (or was never started) */
         bool done() const noexcept { return !handle || handle.done(); }
@@ -75,7 +92,10 @@ namespace rpp
         void rethrow_if_exception() const
         {
             if (handle && handle.promise().exception)
-                std::rethrow_exception(handle.promise().exception);
+            {
+                std::exception_ptr ex = std::move(handle.promise().exception); // only throw once
+                std::rethrow_exception(ex);
+            }
         }
     };
 
@@ -147,6 +167,11 @@ namespace rpp
         // user-provided exception handler for any unhandled exceptions from background tasks
         rpp::delegate<void(std::exception_ptr)> except_handler {};
 
+        // fork tracking: stores event_tasks for forked coroutines
+        std::vector<event_task> fork_tasks;
+        std::atomic<int> num_active_forks {0};
+        rpp::coro_handle<> fork_joiner {}; // coroutine waiting in join_forks()
+
     public:
         /**
          * @brief Initializes a new event loop.
@@ -201,6 +226,7 @@ namespace rpp
          *
          * Processes all queued coroutine resumes and waits for new ones.
          * Returns when stop() is called and attempts to drain any remaining pending tasks before exiting.
+         * Automatically cleans up completed forks; fork exceptions go through except_handler.
          * @returns true if all pending tasks were completed, false if some tasks still pending
          */
         bool run_loop() noexcept;
@@ -215,7 +241,9 @@ namespace rpp
         bool run_once(rpp::Duration timeout) noexcept;
 
         /**
-         * @brief Runs the event loop until there are no more background tasks and nore more resume events
+         * @brief Runs the event loop until there are no more background tasks and no more resume events.
+         *
+         * Automatically cleans up completed forks; fork exceptions go through except_handler.
          * @returns Number of resume events processed before the loop became idle
          */
         int run_until_idle() noexcept;
@@ -231,6 +259,87 @@ namespace rpp
          * @endcode
          */
         void run_until_done(event_task& task);
+
+    private:
+        // forward declarations for fork API (used by fork() template)
+        void cleanup_forks() noexcept;
+        void notify_fork_joiner() noexcept;
+
+    public:
+        // ─── Fork API ────────────────────────────────────────────
+
+        /**
+         * @brief Forks a new coroutine execution path on the event loop.
+         *
+         * The callback is invoked immediately on the event loop thread (eager start).
+         * It must return `rpp::event_task`. The resulting coroutine is tracked
+         * internally — no handle management needed.
+         *
+         * Must be called on the event loop thread.
+         *
+         * @code
+         *     loop.fork([&]() -> rpp::event_task {
+         *         auto result = co_await loop.run_async([&]{ return heavyWork(); });
+         *         updateState(result);
+         *     });
+         *     loop.fork([&]() -> rpp::event_task { ... });
+         *     loop.run_until_idle();  // drives all forks, cleans up on completion
+         * @endcode
+         */
+        template<typename F>
+        void fork(F&& coro_factory)
+        {
+            // must be called on the event loop thread (fork_tasks is not thread-safe)
+            if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+            {
+                LogError("event_loop::fork() must be called on the event loop thread");
+                return;
+            }
+
+            // clean up completed forks to avoid unbounded growth
+            cleanup_forks();
+
+            num_active_forks.fetch_add(1, std::memory_order_acq_rel);
+
+            // Heap-allocate the lambda to keep it alive for the coroutine's lifetime.
+            // Lambda coroutines store a `this` pointer to the lambda object — if the
+            // lambda is a temporary and is destroyed before the coroutine completes,
+            // all by-reference captures dangle.
+            auto stored = std::make_shared<std::decay_t<F>>(std::forward<F>(coro_factory));
+            auto task = (*stored)(); // starts eagerly on event loop thread
+
+            if (task.done())
+            {
+                // completed synchronously (no co_await in callback)
+                num_active_forks.fetch_sub(1, std::memory_order_acq_rel);
+                notify_fork_joiner();
+            }
+            else
+            {
+                // Capture shared_ptr in on_complete to extend lambda lifetime.
+                // The delegate lives in the promise (coroutine frame), which stays
+                // alive until the event_task destructor calls handle.destroy().
+                task.handle.promise().on_complete = [this, stored]()
+                {
+                    num_active_forks.fetch_sub(1, std::memory_order_acq_rel);
+                    notify_fork_joiner();
+                };
+            }
+            fork_tasks.push_back(std::move(task));
+        }
+
+        /**
+         * @brief Returns the number of forked coroutines that have not yet completed.
+         */
+        int num_forks() const noexcept { return num_active_forks.load(std::memory_order_acquire); }
+
+        /**
+         * @brief Checks completed forks for exceptions and clears them.
+         *
+         * Rethrows the first exception found among completed forks.
+         * Must be called on the event loop thread.
+         */
+        void drain_forks();
 
         /**
          * @brief Posts a coroutine handle to be resumed on the event loop thread.
@@ -479,6 +588,83 @@ namespace rpp
             return delay_awaiter{ *this, until };
         }
 
+        /**
+         * @brief Awaiter that suspends the caller until all forks complete or timeout expires.
+         *
+         * Event-driven: fork completions resume the joiner directly via post_resume().
+         * For timeout: a background timer resumes the joiner if forks haven't finished.
+         */
+        struct RPP_CORO_RETURN_TYPE join_forks_awaiter
+        {
+            event_loop& loop;
+            rpp::Duration timeout;
+
+            bool await_ready() const noexcept
+            {
+                return loop.num_active_forks.load(std::memory_order_acquire) == 0;
+            }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                loop.fork_joiner = cont;
+                // double-check: all forks may have completed between await_ready and here
+                // (single-threaded event loop — cannot actually race, but defensive)
+                if (loop.num_active_forks.load(std::memory_order_acquire) == 0)
+                {
+                    loop.fork_joiner = {};
+                    loop.post_resume(cont);
+                    return;
+                }
+                // start timeout timer if finite
+                if (timeout < rpp::seconds(86400))
+                {
+                    rpp::TimePoint deadline = rpp::TimePoint::now() + timeout;
+                    loop.start_in_background([&loop = loop, cont, deadline]()
+                    {
+                        rpp::sleep_until(deadline);
+                        // post callback to event loop thread for thread-safe joiner check
+                        loop.resume_queue.push(resume_event{rpp::delegate<void()>{
+                            [&loop, cont]()
+                            {
+                                if (loop.fork_joiner == cont)
+                                {
+                                    loop.fork_joiner = {};
+                                    cont.resume();
+                                }
+                            }
+                        }});
+                        // balance the start_in_background counter increment
+                        loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
+                    });
+                }
+            }
+            int await_resume()
+            {
+                loop.drain_forks();
+                return loop.num_active_forks.load(std::memory_order_acquire);
+            }
+        };
+
+        /**
+         * @brief Awaitable join for all active forks, with optional timeout.
+         *
+         * Suspends the caller until all forks complete or the timeout expires.
+         * Returns the number of forks still active (0 = all done).
+         * Event-driven: zero polling overhead; fork completions resume the joiner directly.
+         *
+         * @code
+         *     // wait indefinitely for all forks
+         *     co_await loop.join_forks();
+         *
+         *     // wait with timeout — handle soft deadlock
+         *     int remaining = co_await loop.join_forks(rpp::seconds(5));
+         *     if (remaining > 0) { // some forks still running }
+         * @endcode
+         */
+        join_forks_awaiter join_forks(rpp::Duration timeout = rpp::seconds(86400)) noexcept
+        {
+            return join_forks_awaiter{ *this, timeout };
+        }
+
     private:
 
         void start_in_background(task_delegate<void()>&& generic_task) noexcept
@@ -492,6 +678,8 @@ namespace rpp
 
         // processes a single resume event
         void process_event(resume_event& event) noexcept;
+
+
     };
 
 } // namespace rpp
