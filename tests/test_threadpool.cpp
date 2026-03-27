@@ -474,6 +474,58 @@ TestImpl(test_threadpool)
         // Test passes if no assertion, crash, or ASAN error occurs
     }
 
+    // Rapid submit-wait cycles from 4 threads simultaneously.
+    // Stresses the signal_finish_and_cleanup → set_current_task_and_unlock → is_running
+    // path that caused the RadioMicrohard deadlock (pool worker stuck on finished.m mutex).
+    // Timeout detection: if any worker gets stuck, the wait() calls will hang.
+    TestCase(rapid_task_cycle_stress)
+    {
+        constexpr int TASKS_PER_THREAD = 500;
+        std::atomic_int completed{0};
+        std::latch go{4};
+
+        auto submitter = [&] {
+            go.arrive_and_wait();
+            for (int i = 0; i < TASKS_PER_THREAD; ++i)
+                rpp::parallel_task([&] { completed += 1; }).wait();
+        };
+        std::thread t1{submitter}, t2{submitter}, t3{submitter}, t4{submitter};
+        t1.join(); t2.join(); t3.join(); t4.join();
+
+        AssertThat((int)completed, 4 * TASKS_PER_THREAD);
+    }
+
+    // Nested async_task().get() — the exact pattern from the RadioMicrohard deadlock.
+    // Outer pool worker blocks on inner future, requiring the pool to spawn/reuse
+    // a different worker. Tests 2-deep and 3-deep nesting.
+    TestCase(nested_async_task_get_no_deadlock)
+    {
+        rpp::Timer t;
+
+        // 2-deep: outer task blocks waiting for inner task
+        for (int i = 0; i < 100; ++i)
+        {
+            int r = rpp::async_task([]() -> int {
+                return rpp::async_task([]() -> int { return 42; }).get();
+            }).get();
+            AssertThat(r, 42);
+        }
+
+        // 3-deep: requires 3 concurrent workers minimum
+        for (int i = 0; i < 50; ++i)
+        {
+            int r = rpp::async_task([]() -> int {
+                return rpp::async_task([]() -> int {
+                    return rpp::async_task([]() -> int { return 99; }).get();
+                }).get();
+            }).get();
+            AssertThat(r, 99);
+        }
+
+        if (t.elapsed_ms() >= 10'000)
+            AssertFailed("nested async_task deadlock — took %lldms\n", t.elapsed_ms());
+    }
+
     TestCase(pool_task_handle_fire_and_forget_race)
     {
         // Tests the async_task fire-and-forget pattern where

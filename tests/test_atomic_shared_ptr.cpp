@@ -1,4 +1,7 @@
+// override to OUR internal implementation
+#define RPP_USE_STD_ATOMIC_SHARED_PTR 0
 #include <rpp/atomic_shared_ptr.h>
+#include <rpp/semaphore.h>
 #include <rpp/tests.h>
 #include <thread>
 #include <vector>
@@ -183,5 +186,53 @@ TestImpl(test_atomic_shared_ptr)
         // every exchange received a non-null old value (initial was non-null)
         AssertEqual(total_non_null.load(), NUM_THREADS * EXCHANGES_PER_THREAD);
         AssertTrue(asp.load(std::memory_order_acquire) != nullptr);
+    }
+
+    // Reproduces the pool_task_handle lifecycle that caused the RadioMicrohard deadlock:
+    //   Writer: store(new state) → yield → exchange(null) + lock finished + notify (signal_finish_and_cleanup)
+    //   Readers: load() → finished.is_set()  (is_running check)
+    // The deadlock was: a reader got stuck on finished.m of a freshly allocated state.
+    // If allocator reuses memory from the just-freed state, and the mutex isn't properly
+    // initialized, finished.m can appear locked (futex=2) to the reader.
+    TestCase(pool_task_lifecycle_stress)
+    {
+        struct task_state
+        {
+            rpp::semaphore_once_flag finished;
+        };
+
+        constexpr int N = 5'000;
+        rpp::atomic_shared_ptr<task_state> asp;
+        std::atomic_bool stop{false};
+        std::atomic_int checks{0};
+
+        // 4 reader threads hammering load() + finished.is_set() — same as pool_worker::is_running()
+        auto reader = [&] {
+            while (!stop.load(std::memory_order_relaxed))
+            {
+                if (auto s = asp.load())
+                {
+                    (void)s->finished.is_set(); // locks finished.m briefly
+                    checks.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        };
+        std::thread r1{reader}, r2{reader}, r3{reader}, r4{reader};
+
+        for (int i = 0; i < N; ++i)
+        {
+            asp.store(std::make_shared<task_state>()); // new state (may reuse freed memory)
+            std::this_thread::yield();
+            // signal_finish_and_cleanup pattern: take → lock finished → notify → destroy
+            if (auto taken = asp.exchange(nullptr))
+            {
+                auto lock = taken->finished.spin_lock();
+                taken->finished.notify_all(lock);
+            }
+        }
+
+        stop.store(true, std::memory_order_release);
+        r1.join(); r2.join(); r3.join(); r4.join();
+        AssertGreater(checks.load(), 0);
     }
 };

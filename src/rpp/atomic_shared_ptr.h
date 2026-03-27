@@ -18,7 +18,15 @@ namespace rpp
 {
     //////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__cpp_lib_atomic_shared_ptr)
+#ifndef RPP_USE_STD_ATOMIC_SHARED_PTR
+#  ifdef __cpp_lib_atomic_shared_ptr
+#    define RPP_USE_STD_ATOMIC_SHARED_PTR 1
+#  else
+#    define RPP_USE_STD_ATOMIC_SHARED_PTR 0
+#  endif
+#endif
+
+#if RPP_USE_STD_ATOMIC_SHARED_PTR
 
     /**
      * Native std::atomic<shared_ptr<T>> available (GCC 12+, MSVC 19.28+)
