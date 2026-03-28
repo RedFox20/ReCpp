@@ -319,11 +319,11 @@ while (text.next(line, '\n'))
 | [`to_int(str, len, end)`](src/rpp/strview.h#L123) | Fast locale-agnostic atoi |
 | [`to_inthx(str, len, end)`](src/rpp/strview.h#L144) | Fast locale-agnostic atoi for HEX strings |
 | [`_tostring(buffer, value)`](src/rpp/strview.h#L165) | Fast locale-agnostic itoa/ftoa for int, float, double |
-| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1522) | Replaces characters in a string buffer |
-| [`concat(a, b, ...)`](src/rpp/strview.h#L1392) | Concatenates multiple strviews into std::string |
-| [`to_lower(str, len)`](src/rpp/strview.h#L1502) | Converts string to lowercase |
-| [`to_upper(str, len)`](src/rpp/strview.h#L1507) | Converts string to uppercase |
-| [`operator""_sv`](src/rpp/strview.h#L1286) | String literal for creating `strview` |
+| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1533) | Replaces characters in a string buffer |
+| [`concat(a, b, ...)`](src/rpp/strview.h#L1403) | Concatenates multiple strviews into std::string |
+| [`to_lower(str, len)`](src/rpp/strview.h#L1513) | Converts string to lowercase |
+| [`to_upper(str, len)`](src/rpp/strview.h#L1518) | Converts string to uppercase |
+| [`operator""_sv`](src/rpp/strview.h#L1297) | String literal for creating `strview` |
 | [`strcontains(str, len, ch)`](src/rpp/strview.h#L78) | Checks if character is found within a string |
 | [`strcontainsi(str, len, ch)`](src/rpp/strview.h#L79) | Case-insensitive character search |
 | [`strequals(s1, s2, len)`](src/rpp/strview.h#L85) | Case-sensitive string equality for given length |
@@ -331,76 +331,76 @@ while (text.next(line, '\n'))
 | [`to_int64(str, len, end)`](src/rpp/strview.h#L133) | Fast locale-agnostic string to 64-bit integer |
 | [`RPP_CONSTEXPR_STRLEN`](src/rpp/strview.h#L220) | Marks strlen as constexpr when compiler supports it |
 | [`utf8len(c_str)`](src/rpp/strview.h#L231) | Returns int length of a UTF-8 C-string |
-| [`utf16len(u_str)`](src/rpp/strview.h#L232) | Returns int length of a UTF-16 C-string |
+| [`utf16len(u_str)`](src/rpp/strview.h#L237) | Returns int length of a UTF-16 C-string |
 
 ### Utility Parsers
 
 | Class | Description |
 |-------|-------------|
-| [`line_parser`](src/rpp/strview.h#L1539) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
-| [`keyval_parser`](src/rpp/strview.h#L1577) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
-| [`bracket_parser`](src/rpp/strview.h#L1626) | Parses a buffer for balanced-parentheses structures |
+| [`line_parser`](src/rpp/strview.h#L1550) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
+| [`keyval_parser`](src/rpp/strview.h#L1588) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
+| [`bracket_parser`](src/rpp/strview.h#L1637) | Parses a buffer for balanced-parentheses structures |
 
 ### strview Class
 
-[`struct strview`](src/rpp/strview.h#L244) — Non-owning string token for efficient parsing. Represents a weak reference string with start pointer and length.
+[`struct strview`](src/rpp/strview.h#L254) — Non-owning string token for efficient parsing. Represents a weak reference string with start pointer and length.
 
 | Method | Description |
 |--------|-------------|
-| [`to_int()`](src/rpp/strview.h#L330) | Parses this strview as an integer |
-| [`to_int_hex()`](src/rpp/strview.h#L332) | Parses this strview as a HEX integer (`0xff` or `0ff` or `ff`) |
-| [`to_long()`](src/rpp/strview.h#L336) | Parse as long |
-| [`to_float()`](src/rpp/strview.h#L338) | Parses as a float |
-| [`to_double()`](src/rpp/strview.h#L340) | Parses as a double |
-| [`to_bool()`](src/rpp/strview.h#L347) | Relaxed parsing as boolean: `"true"`, `"yes"`, `"on"`, `"1"` |
-| [`clear()`](src/rpp/strview.h#L297) | Clears the strview |
-| [`size()`](src/rpp/strview.h#L300) | Returns the length |
-| [`empty()`](src/rpp/strview.h#L302) | True if empty |
-| [`is_whitespace()`](src/rpp/strview.h#L350) | True if all whitespace |
-| [`is_nullterm()`](src/rpp/strview.h#L352) | True if the referenced string is null-terminated |
-| [`trim_start()`](src/rpp/strview.h#L358) | Trims whitespace (or given char/chars) from the start |
-| [`trim_end()`](src/rpp/strview.h#L376) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](src/rpp/strview.h#L390) | Trims both start and end |
-| [`chomp_first()`](src/rpp/strview.h#L401) | Consumes the first character if possible |
-| [`chomp_last()`](src/rpp/strview.h#L403) | Consumes the last character if possible |
-| [`pop_front()`](src/rpp/strview.h#L406) | Pops and returns the first character |
-| [`pop_back()`](src/rpp/strview.h#L408) | Pops and returns the last character |
-| [`contains(char c)`](src/rpp/strview.h#L435) | True if contains a char or substring |
-| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L445) | True if contains any of the given chars |
-| [`find(char c)`](src/rpp/strview.h#L453) | Pointer to start of substring if found, NULL otherwise |
-| [`rfind(char c)`](src/rpp/strview.h#L483) | Reverse search for a character |
-| [`findany(const char* chars, int n)`](src/rpp/strview.h#L489) | Forward search for any of the specified chars |
-| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L498) | Reverse search for any of the specified chars |
-| [`count(char ch)`](src/rpp/strview.h#L507) | Count occurrences of a character |
-| [`indexof(char ch)`](src/rpp/strview.h#L510) | Index of character, or -1 |
-| [`rindexof(char ch)`](src/rpp/strview.h#L515) | Reverse iterating index of character |
-| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L518) | First index of any matching char |
-| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L524) | True if starts with the string |
-| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L535) | Case-insensitive starts_with |
-| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L546) | True if ends with the string |
-| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L557) | Case-insensitive ends_with |
-| [`equals(const char* s, int len)`](src/rpp/strview.h#L568) | Exact equality |
-| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L574) | Case-insensitive equality |
-| [`compare(const char* s, int n)`](src/rpp/strview.h#L595) | Compare to another string |
-| [`split_first(char delim)`](src/rpp/strview.h#L617) | Split into two, return the first part |
-| [`split_second(char delim)`](src/rpp/strview.h#L633) | Split into two, return the second part |
-| [`next(strview& out, char delim)`](src/rpp/strview.h#L641) | Gets next token; advances ptr to next delimiter |
-| [`next(char delim)`](src/rpp/strview.h#L664) | Returns next token directly |
-| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L708) | Gets next token without trimming; stops on delimiter |
-| [`substr(int index, int length)`](src/rpp/strview.h#L839) | Creates a substring from index with given length |
-| [`substr(int index)`](src/rpp/strview.h#L845) | Creates a substring from index to end |
-| [`next_double()`](src/rpp/strview.h#L852) | Parses next double from current position |
-| [`next_float()`](src/rpp/strview.h#L853) | Parses next float from current position |
-| [`next_int()`](src/rpp/strview.h#L859) | Parses next int from current position |
-| [`skip(int nchars)`](src/rpp/strview.h#L870) | Safely skips N characters |
-| [`skip_until(char ch)`](src/rpp/strview.h#L876) | Skips until the specified char is found |
-| [`skip_after(char ch)`](src/rpp/strview.h#L900) | Skips past the specified char |
-| [`to_lower()`](src/rpp/strview.h#L924) | Modifies the referenced string to lowercase |
-| [`as_lower()`](src/rpp/strview.h#L929) | Returns a lowercase copy as std::string |
-| [`to_upper()`](src/rpp/strview.h#L940) | Modifies the referenced string to uppercase |
-| [`as_upper()`](src/rpp/strview.h#L945) | Returns an uppercase copy as std::string |
-| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L959) | Replaces all occurrences of chOld with chNew |
-| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L821) | Decomposes strview into multiple typed outputs |
+| [`to_int()`](src/rpp/strview.h#L340) | Parses this strview as an integer |
+| [`to_int_hex()`](src/rpp/strview.h#L342) | Parses this strview as a HEX integer (`0xff` or `0ff` or `ff`) |
+| [`to_long()`](src/rpp/strview.h#L346) | Parse as long |
+| [`to_float()`](src/rpp/strview.h#L348) | Parses as a float |
+| [`to_double()`](src/rpp/strview.h#L348) | Parses as a double |
+| [`to_bool()`](src/rpp/strview.h#L357) | Relaxed parsing as boolean: `"true"`, `"yes"`, `"on"`, `"1"` |
+| [`clear()`](src/rpp/strview.h#L307) | Clears the strview |
+| [`size()`](src/rpp/strview.h#L310) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L312) | True if empty |
+| [`is_whitespace()`](src/rpp/strview.h#L360) | True if all whitespace |
+| [`is_nullterm()`](src/rpp/strview.h#L362) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L368) | Trims whitespace (or given char/chars) from the start |
+| [`trim_end()`](src/rpp/strview.h#L384) | Trims whitespace (or given char/chars) from the end |
+| [`trim()`](src/rpp/strview.h#L400) | Trims both start and end |
+| [`chomp_first()`](src/rpp/strview.h#L411) | Consumes the first character if possible |
+| [`chomp_last()`](src/rpp/strview.h#L413) | Consumes the last character if possible |
+| [`pop_front()`](src/rpp/strview.h#L416) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L418) | Pops and returns the last character |
+| [`contains(char c)`](src/rpp/strview.h#L445) | True if contains a char or substring |
+| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L455) | True if contains any of the given chars |
+| [`find(char c)`](src/rpp/strview.h#L463) | Pointer to start of substring if found, NULL otherwise |
+| [`rfind(char c)`](src/rpp/strview.h#L493) | Reverse search for a character |
+| [`findany(const char* chars, int n)`](src/rpp/strview.h#L499) | Forward search for any of the specified chars |
+| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L508) | Reverse search for any of the specified chars |
+| [`count(char ch)`](src/rpp/strview.h#L517) | Count occurrences of a character |
+| [`indexof(char ch)`](src/rpp/strview.h#L520) | Index of character, or -1 |
+| [`rindexof(char ch)`](src/rpp/strview.h#L525) | Reverse iterating index of character |
+| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L528) | First index of any matching char |
+| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L534) | True if starts with the string |
+| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L545) | Case-insensitive starts_with |
+| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L556) | True if ends with the string |
+| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L567) | Case-insensitive ends_with |
+| [`equals(const char* s, int len)`](src/rpp/strview.h#L578) | Exact equality |
+| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L584) | Case-insensitive equality |
+| [`compare(const char* s, int n)`](src/rpp/strview.h#L605) | Compare to another string |
+| [`split_first(char delim)`](src/rpp/strview.h#L627) | Split into two, return the first part |
+| [`split_second(char delim)`](src/rpp/strview.h#L643) | Split into two, return the second part |
+| [`next(strview& out, char delim)`](src/rpp/strview.h#L651) | Gets next token; advances ptr to next delimiter |
+| [`next(char delim)`](src/rpp/strview.h#L674) | Returns next token directly |
+| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L718) | Gets next token without trimming; stops on delimiter |
+| [`substr(int index, int length)`](src/rpp/strview.h#L849) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L849) | Creates a substring from index to end |
+| [`next_double()`](src/rpp/strview.h#L862) | Parses next double from current position |
+| [`next_float()`](src/rpp/strview.h#L863) | Parses next float from current position |
+| [`next_int()`](src/rpp/strview.h#L869) | Parses next int from current position |
+| [`skip(int nchars)`](src/rpp/strview.h#L880) | Safely skips N characters |
+| [`skip_until(char ch)`](src/rpp/strview.h#L886) | Skips until the specified char is found |
+| [`skip_after(char ch)`](src/rpp/strview.h#L910) | Skips past the specified char |
+| [`to_lower()`](src/rpp/strview.h#L934) | Modifies the referenced string to lowercase |
+| [`as_lower()`](src/rpp/strview.h#L939) | Returns a lowercase copy as std::string |
+| [`to_upper()`](src/rpp/strview.h#L950) | Modifies the referenced string to uppercase |
+| [`as_upper()`](src/rpp/strview.h#L955) | Returns an uppercase copy as std::string |
+| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L969) | Replaces all occurrences of chOld with chNew |
+| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L831) | Decomposes strview into multiple typed outputs |
 
 ### Example: Splitting Paths and URLs
 
@@ -553,36 +553,36 @@ if (a < b) // true — lexicographic ordering via compare()
 
 ### ustrview Class
 
-[`struct ustrview`](src/rpp/strview.h#L970) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
+[`struct ustrview`](src/rpp/strview.h#L980) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
 
 | Method | Description |
 |--------|-------------|
-| [`size()`](src/rpp/strview.h#L1003) | Returns the length |
-| [`empty()`](src/rpp/strview.h#L1005) | True if empty |
-| [`clear()`](src/rpp/strview.h#L1000) | Clears the ustrview |
-| [`is_nullterm()`](src/rpp/strview.h#L1023) | True if the referenced string is null-terminated |
-| [`trim_start()`](src/rpp/strview.h#L1027) | Trims whitespace (or given char/chars) from the start |
-| [`trim_end()`](src/rpp/strview.h#L1034) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](src/rpp/strview.h#L1041) | Trims both start and end |
-| [`chomp_first()`](src/rpp/strview.h#L1048) | Consumes the first character |
-| [`chomp_last()`](src/rpp/strview.h#L1050) | Consumes the last character |
-| [`pop_front()`](src/rpp/strview.h#L1053) | Pops and returns the first character |
-| [`pop_back()`](src/rpp/strview.h#L1055) | Pops and returns the last character |
-| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1080) | True if starts with the string |
-| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1091) | Case-insensitive starts_with |
-| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1102) | True if ends with the string |
-| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1113) | Case-insensitive ends_with |
-| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1123) | Exact equality |
-| [`compare(const char16_t* s, int n)`](src/rpp/strview.h#L1141) | Compare to another string |
-| [`rfind(char16_t c)`](src/rpp/strview.h#L1159) | Reverse search for a character |
-| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1165) | Forward search for any of the specified chars |
-| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1174) | Reverse search for any of the specified chars |
-| [`substr(int index, int length)`](src/rpp/strview.h#L1183) | Creates a substring from index with given length |
-| [`substr(int index)`](src/rpp/strview.h#L1189) | Creates a substring from index to end |
-| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1197) | Gets next token; advances ptr to next delimiter |
-| [`next(char16_t delim)`](src/rpp/strview.h#L1223) | Returns next token directly |
-| [`to_string()`](src/rpp/strview.h#L993) | Convert to `std::u16string` |
-| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1074) | Copy to null-terminated C-string buffer |
+| [`size()`](src/rpp/strview.h#L1013) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L1015) | True if empty |
+| [`clear()`](src/rpp/strview.h#L1010) | Clears the ustrview |
+| [`is_nullterm()`](src/rpp/strview.h#L1033) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L1037) | Trims whitespace (or given char/chars) from the start |
+| [`trim_end()`](src/rpp/strview.h#L1044) | Trims whitespace (or given char/chars) from the end |
+| [`trim()`](src/rpp/strview.h#L1051) | Trims both start and end |
+| [`chomp_first()`](src/rpp/strview.h#L1058) | Consumes the first character |
+| [`chomp_last()`](src/rpp/strview.h#L1060) | Consumes the last character |
+| [`pop_front()`](src/rpp/strview.h#L1063) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L1065) | Pops and returns the last character |
+| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1090) | True if starts with the string |
+| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1101) | Case-insensitive starts_with |
+| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1112) | True if ends with the string |
+| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1123) | Case-insensitive ends_with |
+| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1133) | Exact equality |
+| [`compare(const char16_t* s, int n)`](src/rpp/strview.h#L1150) | Compare to another string |
+| [`rfind(char16_t c)`](src/rpp/strview.h#L1169) | Reverse search for a character |
+| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1175) | Forward search for any of the specified chars |
+| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1184) | Reverse search for any of the specified chars |
+| [`substr(int index, int length)`](src/rpp/strview.h#L1193) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L1193) | Creates a substring from index to end |
+| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1207) | Gets next token; advances ptr to next delimiter |
+| [`next(char16_t delim)`](src/rpp/strview.h#L1230) | Returns next token directly |
+| [`to_string()`](src/rpp/strview.h#L1003) | Convert to `std::u16string` |
+| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1084) | Copy to null-terminated C-string buffer |
 
 ```cpp
 #define RPP_ENABLE_UNICODE 1
@@ -620,37 +620,37 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Item | Description |
 |------|-------------|
-| [`string_buffer`](src/rpp/sprint.h#L73) | Fast, always-null-terminated string builder |
-| [`format_opt`](src/rpp/sprint.h#L62) | Format options enum: `none`, `lowercase`, `uppercase` |
+| [`string_buffer`](src/rpp/sprint.h#L77) | Fast, always-null-terminated string builder |
+| [`format_opt`](src/rpp/sprint.h#L66) | Format options enum: `none`, `lowercase`, `uppercase` |
 
 ### string_buffer Methods
 
 | Method | Description |
 |--------|-------------|
 | [`write(const T& v)`](src/rpp/sprint.h#L124) | Write a value (auto-converts most types) |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L335) | Write values followed by newline |
-| [`writef(const char* format, ...)`](src/rpp/sprint.h#L118) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L281) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L260) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L343) | Pretty-print a value |
-| [`clear()`](src/rpp/sprint.h#L109) | Clear the buffer |
-| [`reserve(int capacity)`](src/rpp/sprint.h#L110) | Reserve capacity |
-| [`resize(int size)`](src/rpp/sprint.h#L111) | Resize buffer |
-| [`append(const char* data, int len)`](src/rpp/sprint.h#L114) | Append raw data |
-| [`emplace_buffer(int n)`](src/rpp/sprint.h#L117) | Get writable buffer of N bytes |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L339) | Write values followed by newline |
+| [`writef(const char* format, ...)`](src/rpp/sprint.h#L122) | Printf-style formatted write |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L285) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L264) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L347) | Pretty-print a value |
+| [`clear()`](src/rpp/sprint.h#L113) | Clear the buffer |
+| [`reserve(int capacity)`](src/rpp/sprint.h#L114) | Reserve capacity |
+| [`resize(int size)`](src/rpp/sprint.h#L115) | Resize buffer |
+| [`append(const char* data, int len)`](src/rpp/sprint.h#L118) | Append raw data |
+| [`emplace_buffer(int n)`](src/rpp/sprint.h#L121) | Get writable buffer of N bytes |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`to_string(char)`](src/rpp/sprint.h#L33) | Locale-agnostic char to string |
-| [`to_string(int)`](src/rpp/sprint.h#L41) | Locale-agnostic int to string |
-| [`to_string(float)`](src/rpp/sprint.h#L47) | Locale-agnostic float to string |
-| [`to_string(double)`](src/rpp/sprint.h#L48) | Locale-agnostic double to string |
-| [`to_string(bool)`](src/rpp/sprint.h#L51) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L456) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L475) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L403) | Converts string bytes to hexadecimal representation |
+| [`to_string(char)`](src/rpp/sprint.h#L37) | Locale-agnostic char to string |
+| [`to_string(int)`](src/rpp/sprint.h#L45) | Locale-agnostic int to string |
+| [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
+| [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
+| [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
+| [`print(args...)`](src/rpp/sprint.h#L461) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L481) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L407) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -1229,33 +1229,33 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 
 | Item | Description |
 |------|-------------|
-| [`cfuture<T>`](src/rpp/future.h#L117) | Extended `std::future` with composition and coroutine support |
-| [`async_task(task)`](src/rpp/future.h#L29) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L916) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L933) | Create an already-errored future |
-| [`wait_all(futures)`](src/rpp/future.h#L1001) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L955) | Block and gather results from all futures |
+| [`cfuture<T>`](src/rpp/future.h#L126) | Extended `std::future` with composition and coroutine support |
+| [`async_task(task)`](src/rpp/future.h#L32) | Launch a task on the thread pool, returns `cfuture<T>` |
+| [`make_ready_future(value)`](src/rpp/future.h#L951) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L968) | Create an already-errored future |
+| [`wait_all(futures)`](src/rpp/future.h#L1036) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L990) | Block and gather results from all futures |
 
 ### cfuture Methods
 
 | Method | Description |
 |--------|-------------|
-| [`~cfuture()`](src/rpp/future.h#L131) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
-| [`then()`](src/rpp/future.h#L159) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
-| [`then(Task task)`](src/rpp/future.h#L176) | Chain a continuation that receives the result (runs via `async_task`) |
-| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L203) | Chain with 1–4 typed exception recovery handlers |
-| [`then(cfuture<U>&& next)`](src/rpp/future.h#L255) | Chain by waiting for this future, then returning the result of `next` |
-| [`continue_with(Task task)`](src/rpp/future.h#L271) | Fire-and-forget continuation (moves `*this` into background) |
-| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L279) | Fire-and-forget continuation with 1–4 typed exception handlers |
-| [`detach()`](src/rpp/future.h#L334) | Abandon future, wait in background (swallows exceptions) |
-| [`chain_async(Task task)`](src/rpp/future.h#L366) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
-| [`chain_async(cfuture&& next)`](src/rpp/future.h#L379) | Sequential chaining with another future |
-| [`await_ready()`](src/rpp/future.h#L393) | Non-blocking check if the future is already finished |
-| [`collect_ready(T* result)`](src/rpp/future.h#L424) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
-| [`collect_wait(T* result)`](src/rpp/future.h#L442) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
-| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L454) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L466) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L493) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`~cfuture()`](src/rpp/future.h#L140) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
+| [`then()`](src/rpp/future.h#L168) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
+| [`then(Task task)`](src/rpp/future.h#L185) | Chain a continuation that receives the result (runs via `async_task`) |
+| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L212) | Chain with 1–4 typed exception recovery handlers |
+| [`then(cfuture<U>&& next)`](src/rpp/future.h#L264) | Chain by waiting for this future, then returning the result of `next` |
+| [`continue_with(Task task)`](src/rpp/future.h#L280) | Fire-and-forget continuation (moves `*this` into background) |
+| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L288) | Fire-and-forget continuation with 1–4 typed exception handlers |
+| [`detach()`](src/rpp/future.h#L343) | Abandon future, wait in background (swallows exceptions) |
+| [`chain_async(Task task)`](src/rpp/future.h#L375) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
+| [`chain_async(cfuture&& next)`](src/rpp/future.h#L388) | Sequential chaining with another future |
+| [`await_ready()`](src/rpp/future.h#L402) | Non-blocking check if the future is already finished |
+| [`collect_ready(T* result)`](src/rpp/future.h#L433) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L451) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L463) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L475) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L502) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`RPP_HAS_COROUTINES`](src/rpp/future_types.h#L12) | Detects whether C++20 coroutine headers are available |
 | [`RPP_CORO_STD`](src/rpp/future_types.h#L13) | Namespace alias for coroutine types (std or std::experimental) |
 
@@ -1376,18 +1376,18 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 
 | Class | Description |
 |-------|-------------|
-| [`functor_awaiter<T>`](src/rpp/coroutines.h#L42) | Awaiter for lambdas/delegates via `parallel_task()` |
-| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L112) | Awaiter for lambdas returning futures |
-| [`time_awaiter`](src/rpp/coroutines.h#L190) | Awaiter for `rpp::Duration` durations (async sleep) |
+| [`functor_awaiter<T>`](src/rpp/coroutines.h#L30) | Awaiter for lambdas/delegates via `parallel_task()` |
+| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L114) | Awaiter for lambdas returning futures |
+| [`time_awaiter`](src/rpp/coroutines.h#L195) | Awaiter for `rpp::Duration` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
 | Operator | Description |
 |----------|-------------|
-| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L243) | Run delegate async on thread pool |
-| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L274) | Run lambda async on thread pool |
-| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L286) | Await a composable future |
-| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L310) | Async sleep for a duration |
+| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L248) | Run delegate async on thread pool |
+| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L279) | Run lambda async on thread pool |
+| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L285) | Await a composable future |
+| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L315) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;
@@ -1408,43 +1408,43 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Class | Description |
 |-------|-------------|
-| [`event_loop`](src/rpp/event_loop.h#L116) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
-| [`event_task`](src/rpp/event_loop.h#L47) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
+| [`event_loop`](src/rpp/event_loop.h#L138) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
+| [`event_task`](src/rpp/event_loop.h#L48) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
 
 ### event_loop Methods
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L206) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L215) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
-| [`run_until_idle()`](src/rpp/event_loop.h#L221) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L233) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L407) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L266) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L598) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L279) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L287) | Check completed forks for exceptions and clear them |
+| [`run_loop()`](src/rpp/event_loop.h#L234) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L243) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
+| [`run_until_idle()`](src/rpp/event_loop.h#L251) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L263) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L532) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L292) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L712) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L336) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L344) | Check completed forks for exceptions and clear them |
 | [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L563) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L576) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L588) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L247) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L239) | Post a raw coroutine handle resume to the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L425) | Sleep on a background thread, resume on the loop thread |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L429) | Sleep until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L183) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L190) | Block until all pending work drains, with timeout |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L196) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L175) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L166) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L172) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L178) | Thread ID of the loop's owner thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L577) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L591) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L358) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L350) | Post a raw coroutine handle resume to the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L631) | Sleep on a background thread, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L635) | Sleep until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L210) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L217) | Block until all pending work drains, with timeout |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L223) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L202) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L193) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L199) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L205) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
 | Method | Description |
 |--------|-------------|
-| [`done()`](src/rpp/event_loop.h#L72) | True if the coroutine has finished or was never started |
-| [`rethrow_if_exception()`](src/rpp/event_loop.h#L75) | Rethrow any unhandled exception captured by the coroutine |
+| [`done()`](src/rpp/event_loop.h#L89) | True if the coroutine has finished or was never started |
+| [`rethrow_if_exception()`](src/rpp/event_loop.h#L92) | Rethrow any unhandled exception captured by the coroutine |
 | `on_complete` | Optional completion callback in `promise_type`, called at `final_suspend` (used by `fork()`) |
 
 ### event_loop Example
@@ -1737,23 +1737,23 @@ Counting semaphore and lightweight notification flags.
 
 | Class | Description |
 |-------|-------------|
-| [`semaphore`](src/rpp/semaphore.h#L14) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](src/rpp/semaphore.h#L336) | Lighter semaphore using a single atomic flag |
-| [`semaphore_once_flag`](src/rpp/semaphore.h#L370) | One-shot semaphore that can only be set once |
+| [`semaphore`](src/rpp/semaphore.h#L38) | Counting semaphore with spin-lock optimization |
+| [`semaphore_flag`](src/rpp/semaphore.h#L399) | Lighter semaphore using a single atomic flag |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L437) | One-shot semaphore that can only be set once |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](src/rpp/semaphore.h#L87) | Increment and wake one waiter |
-| [`notify_all()`](src/rpp/semaphore.h#L122) | Wake all waiters |
-| [`notify_once()`](src/rpp/semaphore.h#L155) | Notify only if not already signaled |
-| [`try_wait()`](src/rpp/semaphore.h#L193) | Non-blocking wait attempt |
-| [`wait()`](src/rpp/semaphore.h#L209) | Blocking wait |
-| [`wait(Duration timeout)`](src/rpp/semaphore.h#L244) | Wait with timeout |
-| [`await(Duration timeout)`](src/rpp/semaphore.h#L362) | C++20 coroutine `co_await` — dispatches wait to background thread |
-| [`count()`](src/rpp/semaphore.h#L48) | Current count |
-| [`reset()`](src/rpp/semaphore.h#L63) | Reset to zero |
+| [`notify()`](src/rpp/semaphore.h#L111) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L148) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L183) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L223) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L239) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L274) | Wait with timeout |
+| [`await(Duration timeout)`](src/rpp/semaphore.h#L388) | C++20 coroutine `co_await` — dispatches wait to background thread |
+| [`count()`](src/rpp/semaphore.h#L72) | Current count |
+| [`reset()`](src/rpp/semaphore.h#L68) | Reset to zero |
 
 ### Example: Coroutine co_await
 
@@ -2295,59 +2295,68 @@ struct Config : rpp::serializable<Config>
 
 ---
 
-## rpp/timer.h
+## rpp/timepoint.h
 
-High-precision timers, duration types, and performance profiling utilities.
+Nanosecond-precision `Duration` and `TimePoint` types, time constants, sleep utilities, and convenience duration literals. This header is the foundation for all time-related functionality in ReCpp.
 
 ### Types
 
 | Type | Description |
 |------|-------------|
-| [`Duration`](src/rpp/timer.h#L50) | Unified nanosecond-precision duration |
-| [`TimePoint`](src/rpp/timer.h#L239) | System's most accurate time point measurement |
-| [`Timer`](src/rpp/timer.h#L354) | High-accuracy timer for profiling or deltaTime |
-| [`StopWatch`](src/rpp/timer.h#L427) | Start/stop/resume event timer |
-| [`ScopedPerfTimer`](src/rpp/timer.h#L493) | Auto-logs elapsed time from ctor to dtor |
+| [`Duration`](src/rpp/timepoint.h#L50) | Unified nanosecond-precision duration (int64 nsec) |
+| [`TimePoint`](src/rpp/timepoint.h#L239) | System's most accurate time point measurement |
 
 ### Duration Factory & Accessors
 
 | Method | Description |
 |--------|-------------|
-| [`Duration::from_seconds(double s)`](src/rpp/timer.h#L86) | Create from fractional seconds |
-| [`Duration::from_millis(double ms)`](src/rpp/timer.h#L342) | Create from milliseconds |
-| [`Duration::from_micros(double us)`](src/rpp/timer.h#L344) | Create from microseconds |
-| [`Duration::from_nanos(int64 ns)`](src/rpp/timer.h#L101) | Create from nanoseconds |
-| [`Duration::from_hours(double h)`](src/rpp/timer.h#L112) | Create from hours |
-| [`Duration::from_minutes(double m)`](src/rpp/timer.h#L108) | Create from minutes |
-| [`sec()`](src/rpp/timer.h#L119) / [`msec()`](src/rpp/timer.h#L123) | Convert to fractional seconds / milliseconds |
-| [`seconds()`](src/rpp/timer.h#L127) / [`millis()`](src/rpp/timer.h#L131) / [`micros()`](src/rpp/timer.h#L135) / [`nanos()`](src/rpp/timer.h#L140) | Convert to integer time units |
-| [`to_string()`](src/rpp/timer.h#L204) | Human-readable duration string |
-| [`to_stopwatch_string()`](src/rpp/timer.h#L221) | Stopwatch-style format |
+| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L86) | Create from fractional seconds |
+| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L342) | Create from milliseconds |
+| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L344) | Create from microseconds |
+| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L101) | Create from nanoseconds |
+| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L112) | Create from hours |
+| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L108) | Create from minutes |
+| [`sec()`](src/rpp/timepoint.h#L119) / [`msec()`](src/rpp/timepoint.h#L123) | Convert to fractional seconds / milliseconds |
+| [`seconds()`](src/rpp/timepoint.h#L127) / [`millis()`](src/rpp/timepoint.h#L131) / [`micros()`](src/rpp/timepoint.h#L135) / [`nanos()`](src/rpp/timepoint.h#L140) | Convert to integer time units |
+| [`to_string()`](src/rpp/timepoint.h#L207) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timepoint.h#L224) | Stopwatch-style format |
 
-### Timer Methods
+### TimePoint Methods
 
 | Method | Description |
 |--------|-------------|
-| [`start()`](src/rpp/timer.h#L374) | Start / restart the timer |
-| [`elapsed()`](src/rpp/timer.h#L380) | Fractional seconds since start |
-| [`elapsed_millis()`](src/rpp/timer.h#L382) | Fractional milliseconds since start |
-| [`next()`](src/rpp/timer.h#L387) | Get elapsed time and restart |
-| [`measure(Func&& func)`](src/rpp/timer.h#L406) | Measure a block's execution time (seconds) |
-| [`measure_millis(Func&& func)`](src/rpp/timer.h#L414) | Measure a block's execution time (ms) |
+| [`TimePoint::now()`](src/rpp/timepoint.h#L274) | Current OS high-accuracy time point |
+| [`TimePoint::local()`](src/rpp/timepoint.h#L277) | Current time with timezone offset |
+| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L289) | Duration between two time points |
+| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L292) | Fractional seconds between two points |
+| [`time_of_day()`](src/rpp/timepoint.h#L286) | Extract HH:MM:SS.nanos part |
+| [`to_epoch_us()`](src/rpp/timepoint.h#L265) | Convert to UNIX epoch microseconds |
+| [`utc_to_local()`](src/rpp/timepoint.h#L280) | Add timezone offset to this timepoint |
 
 ### Global Time Utilities
 
 | Function | Description |
 |----------|-------------|
-| [`sleep_ms(millis)`](src/rpp/timer.h#L19) | Sleep for milliseconds |
-| [`sleep_us(micros)`](src/rpp/timer.h#L22) | Sleep for microseconds |
-| [`sleep_ns(nanos)`](src/rpp/timer.h#L25) | Sleep for nanoseconds |
-| [`time_now_seconds()`](src/rpp/timer.h#L531) | Returns current time in fractional seconds |
+| [`sleep_ms(millis)`](src/rpp/timepoint.h#L19) | Sleep for milliseconds |
+| [`sleep_us(micros)`](src/rpp/timepoint.h#L22) | Sleep for microseconds |
+| [`sleep_ns(nanos)`](src/rpp/timepoint.h#L25) | Sleep for nanoseconds |
+| [`sleep_for(const Duration& d)`](src/rpp/timepoint.h#L31) | Sleep for a Duration |
+| [`sleep_until(const TimePoint& tp)`](src/rpp/timepoint.h#L33) | Sleep until a TimePoint |
+| [`time_now_seconds()`](src/rpp/timepoint.h#L364) | Returns current time in fractional seconds (C linkage) |
+
+### Duration Literals
+
+| Literal | Description |
+|---------|-------------|
+| `100_ms` | 100 milliseconds |
+| `2_s` | 2 seconds |
+| `500_us` | 500 microseconds |
+| `1000_ns` | 1000 nanoseconds |
 
 ### Example: Sleep Utilities
 
 ```cpp
-#include <rpp/timer.h>
+#include <rpp/timepoint.h>
 
 // sleep for various durations, high precision
 rpp::sleep_ms(100);   // sleep 100 milliseconds
@@ -2358,7 +2367,7 @@ rpp::sleep_ns(50000); // sleep 50,000 nanoseconds
 ### Example: Duration — Creation, Arithmetic & Formatting
 
 ```cpp
-#include <rpp/timer.h>
+#include <rpp/timepoint.h>
 
 // factory methods for creating durations
 rpp::Duration d1 = rpp::Duration::from_seconds(2.5);
@@ -2395,12 +2404,17 @@ rpp::Duration clamped = d1.clamped(rpp::Duration::from_seconds(0),
 // human-readable formatting
 std::string clock = composite.to_string();           // "01:30:45.000"
 std::string watch = composite.to_stopwatch_string();  // "[1h 30m 45s 0ms]"
+
+// duration literals
+using namespace rpp::duration_literals;
+rpp::Duration timeout = 100_ms;
+rpp::Duration interval = 2_s;
 ```
 
 ### Example: TimePoint — Measurement & Elapsed
 
 ```cpp
-#include <rpp/timer.h>
+#include <rpp/timepoint.h>
 
 // capture the current high-accuracy time point
 rpp::TimePoint start = rpp::TimePoint::now();
@@ -2428,6 +2442,107 @@ rpp::TimePoint local = rpp::TimePoint::local();
 rpp::Duration tod = local.time_of_day();
 LogInfo("time of day: %s", tod.to_string());
 ```
+
+---
+
+## rpp/atomic_timepoint.h
+
+Lock-free atomic wrappers for `Duration` and `TimePoint`. Both types are 8 bytes (a single `int64`) and inherit from `std::atomic<Duration>` / `std::atomic<TimePoint>`, which are always lock-free on 64-bit platforms. Provides atomic `+=` / `-=` operators via CAS loops that reuse the underlying Duration/TimePoint arithmetic.
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| [`AtomicDuration`](src/rpp/atomic_timepoint.h#L23) | Lock-free atomic Duration with atomic arithmetic |
+| [`AtomicTimePoint`](src/rpp/atomic_timepoint.h#L81) | Lock-free atomic TimePoint with atomic arithmetic |
+
+### AtomicDuration Methods
+
+Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_exchange_strong()` from `std::atomic<Duration>`.
+
+| Method | Description |
+|--------|-------------|
+| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L33) | Atomically add a Duration, returns new value |
+| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L44) | Atomically subtract a Duration, returns new value |
+| [`fetch_add(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L55) | Atomically add, returns old value |
+| [`fetch_sub(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L64) | Atomically subtract, returns old value |
+
+### AtomicTimePoint Methods
+
+Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_exchange_strong()` from `std::atomic<TimePoint>`.
+
+| Method | Description |
+|--------|-------------|
+| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L91) | Atomically add a Duration, returns new TimePoint |
+| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L102) | Atomically subtract a Duration, returns new TimePoint |
+
+### Example: Atomic Duration Accumulation
+
+```cpp
+#include <rpp/atomic_timepoint.h>
+#include <thread>
+#include <vector>
+
+// thread-safe duration accumulator
+rpp::AtomicDuration totalElapsed;
+
+void worker()
+{
+    rpp::TimePoint start = rpp::TimePoint::now();
+    doWork();
+    rpp::Duration elapsed = start.elapsed(rpp::TimePoint::now());
+    totalElapsed += elapsed; // atomic CAS loop
+}
+
+std::vector<std::thread> threads;
+for (int i = 0; i < 8; ++i)
+    threads.emplace_back(worker);
+for (auto& t : threads)
+    t.join();
+
+LogInfo("total work: %.3f ms", totalElapsed.load().msec());
+```
+
+### Example: Atomic TimePoint Deadline
+
+```cpp
+#include <rpp/atomic_timepoint.h>
+
+// shared deadline that can be updated from any thread
+rpp::AtomicTimePoint deadline = rpp::TimePoint::now() + rpp::Duration::from_seconds(5);
+
+// extend the deadline atomically
+deadline += rpp::Duration::from_seconds(2);
+
+// check expiry from another thread
+if (rpp::TimePoint::now() > deadline.load())
+    LogInfo("deadline expired!");
+```
+
+---
+
+## rpp/timer.h
+
+High-precision timers and performance profiling utilities. Includes `rpp/timepoint.h` for backwards compatibility, so existing code using `#include <rpp/timer.h>` for `Duration` and `TimePoint` continues to work unchanged.
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| [`Timer`](src/rpp/timer.h#L17) | High-accuracy timer for profiling or deltaTime |
+| [`StopWatch`](src/rpp/timer.h#L90) | Start/stop/resume event timer |
+| [`ScopedPerfTimer`](src/rpp/timer.h#L156) | Auto-logs elapsed time from ctor to dtor |
+
+### Timer Methods
+
+| Method | Description |
+|--------|-------------|
+| [`start()`](src/rpp/timer.h#L37) | Start / restart the timer |
+| [`elapsed()`](src/rpp/timer.h#L43) | Fractional seconds since start |
+| [`elapsed_millis()`](src/rpp/timer.h#L45) | Fractional milliseconds since start |
+| [`next()`](src/rpp/timer.h#L50) | Get elapsed time and restart |
+| [`measure(Func&& func)`](src/rpp/timer.h#L69) | Measure a block's execution time (seconds) |
+| [`measure_millis(Func&& func)`](src/rpp/timer.h#L77) | Measure a block's execution time (ms) |
 
 ### Example: Timer — Profiling & Delta Time
 
@@ -3072,16 +3187,16 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 | [`pop_back(vector)`](src/rpp/collections.h#L182) | Pop last element with return value |
 | [`push_unique(vector, item)`](src/rpp/collections.h#L199) | Push only if not already present |
 | [`erase_item(vector, item)`](src/rpp/collections.h#L207) | Erase first matching item |
-| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L259) | O(1) erase by swapping with last element |
-| [`contains(container, item)`](src/rpp/collections.h#L331) | Check membership |
-| [`find(vector, item)`](src/rpp/collections.h#L346) | Find element (returns iterator) |
-| [`find_smallest(range, selector)`](src/rpp/collections.h#L427) | Find minimum by selector |
-| [`find_largest(range, selector)`](src/rpp/collections.h#L449) | Find maximum by selector |
-| [`any_of(vector, predicate)`](src/rpp/collections.h#L467) | True if any element matches predicate |
-| [`all_of(vector, predicate)`](src/rpp/collections.h#L476) | True if all elements match predicate |
-| [`none_of(vector, predicate)`](src/rpp/collections.h#L485) | True if no elements match predicate |
-| [`sum_all(vector)`](src/rpp/collections.h#L495) | Sum all elements |
-| [`append(vector, other)`](src/rpp/collections.h#L336) | Append one vector to another |
+| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L258) | O(1) erase by swapping with last element |
+| [`contains(container, item)`](src/rpp/collections.h#L330) | Check membership |
+| [`find(vector, item)`](src/rpp/collections.h#L345) | Find element (returns iterator) |
+| [`find_smallest(range, selector)`](src/rpp/collections.h#L426) | Find minimum by selector |
+| [`find_largest(range, selector)`](src/rpp/collections.h#L448) | Find maximum by selector |
+| [`any_of(vector, predicate)`](src/rpp/collections.h#L466) | True if any element matches predicate |
+| [`all_of(vector, predicate)`](src/rpp/collections.h#L475) | True if all elements match predicate |
+| [`none_of(vector, predicate)`](src/rpp/collections.h#L484) | True if no elements match predicate |
+| [`sum_all(vector)`](src/rpp/collections.h#L494) | Sum all elements |
+| [`append(vector, other)`](src/rpp/collections.h#L335) | Append one vector to another |
 
 ### Example: element_range & index_range
 
@@ -3228,26 +3343,26 @@ Thread-safe FIFO queue with notification support.
 
 | Class | Description |
 |-------|-------------|
-| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L27) | Thread-safe queue with push/pop/wait |
+| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L44) | Thread-safe queue with push/pop/wait |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`push(T&& item)`](src/rpp/concurrent_queue.h#L306) | Push an item |
-| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L306) | Push multiple items |
-| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L353) | Non-blocking pop attempt |
-| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L280) | Pop all items at once |
-| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L517) | Blocking pop with timeout |
-| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L517) | Blocking pop with predicate and timeout |
-| [`clear()`](src/rpp/concurrent_queue.h#L178) | Clear the queue |
-| [`empty()`](src/rpp/concurrent_queue.h#L110) | True if empty |
-| [`size()`](src/rpp/concurrent_queue.h#L129) | Number of items |
-| [`reserve(int n)`](src/rpp/concurrent_queue.h#L210) | Reserve capacity |
-| [`notify()`](src/rpp/concurrent_queue.h#L138) / [`notify_one()`](src/rpp/concurrent_queue.h#L147) | Wake waiting consumers |
-| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L929) | C++20 coroutine `co_await` — wait for items available |
-| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L982) | C++20 coroutine `co_await` — pop item (returns bool) |
-| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1016) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
+| [`push(T&& item)`](src/rpp/concurrent_queue.h#L313) | Push an item |
+| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L313) | Push multiple items |
+| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L980) | Non-blocking pop attempt |
+| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L297) | Pop all items at once |
+| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L534) | Blocking pop with timeout |
+| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L534) | Blocking pop with predicate and timeout |
+| [`clear()`](src/rpp/concurrent_queue.h#L195) | Clear the queue |
+| [`empty()`](src/rpp/concurrent_queue.h#L127) | True if empty |
+| [`size()`](src/rpp/concurrent_queue.h#L146) | Number of items |
+| [`reserve(int n)`](src/rpp/concurrent_queue.h#L227) | Reserve capacity |
+| [`notify()`](src/rpp/concurrent_queue.h#L155) / [`notify_one()`](src/rpp/concurrent_queue.h#L164) | Wake waiting consumers |
+| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L961) | C++20 coroutine `co_await` — wait for items available |
+| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L992) | C++20 coroutine `co_await` — pop item (returns bool) |
+| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1026) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
 
 ### Example: Coroutine co_await
 

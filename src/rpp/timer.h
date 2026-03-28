@@ -3,349 +3,12 @@
  * Simple performance Timers and high performance Duration/TimePoint, Copyright (c) 2016-2025, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include "config.h"
-
-#if !RPP_BARE_METAL
-#  include <string>
-#endif
+#include "timepoint.h" // Duration, TimePoint, sleep functions, time constants, duration literals
 
 #if __cplusplus
 
 namespace rpp
 {
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    /** Let this thread sleep for provided MILLISECONDS */
-    RPPAPI void sleep_ms(unsigned int millis) noexcept;
-
-    /** Let this thread sleep for provided MICROSECONDS */
-    RPPAPI void sleep_us(unsigned int micros) noexcept;
-
-    /** Let this thread sleep for provided NANOSECONDS */
-    RPPAPI void sleep_ns(int64 nanos) noexcept;
-
-    struct Duration; // forward declaration
-    struct TimePoint; // forward declaration
-
-    /** Let this thread sleep for the provided Duration */
-    RPPAPI void sleep_for(const Duration& d) noexcept;
-    /** Let this thread sleep until the provided system TimePoint */
-    RPPAPI void sleep_until(const TimePoint& tp) noexcept;
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    static constexpr int64 MILLIS_PER_SEC = 1'000LL;
-    static constexpr int64 MICROS_PER_SEC = 1'000'000LL;
-    static constexpr int64 NANOS_PER_SEC  = 1'000'000'000LL;
-    static constexpr int64 NANOS_PER_MILLI = 1'000'000LL;
-    static constexpr int64 NANOS_PER_MICRO = 1'000LL;
-    static constexpr int64 NANOS_PER_YEAR   = 31'557'600'000'000'000LL;
-    static constexpr int64 NANOS_PER_DAY    = 86'400'000'000'000LL;
-    static constexpr int64 NANOS_PER_HOUR   = 3'600'000'000'000LL;
-    static constexpr int64 NANOS_PER_MINUTE = 60'000'000'000LL;
-
-    /**
-     * @brief New Duration API for TimePoint arithmetics
-     */
-    struct Duration
-    {
-        // this has a maximum resolution of 9223372036 seconds (292.27 years)
-        int64 nsec = 0;
-
-        constexpr Duration() noexcept = default;
-        explicit constexpr Duration(int64 ns) noexcept : nsec{ns} {}
-
-        /**
-         * @brief Constructs a new Duration from hours, minutes, seconds, nanos
-         */
-        constexpr Duration(int64 hours, int64 minutes, int64 seconds, int64 nanos) noexcept
-            : nsec{ (hours   * NANOS_PER_HOUR)
-                  + (minutes * NANOS_PER_MINUTE)
-                  + (seconds * NANOS_PER_SEC)
-                  + nanos }
-        {
-        }
-
-        /** @brief The ZERO Duration */
-        static constexpr Duration zero() noexcept { return {}; }
-        static constexpr Duration max() noexcept { return Duration{ int64(RPP_INT64_MAX) }; }
-        static constexpr Duration min() noexcept { return Duration{ int64(RPP_INT64_MIN) }; }
-        explicit operator bool() const noexcept { return nsec != 0; }
-
-        /** @returns true if this Duration has been initialized */
-        constexpr bool is_valid() const noexcept { return nsec != 0; }
-        constexpr bool operator==(const Duration& d) const noexcept { return nsec == d.nsec; }
-        constexpr bool operator!=(const Duration& d) const noexcept { return nsec != d.nsec; }
-        constexpr bool operator>(const Duration& d) const noexcept { return nsec > d.nsec; }
-        constexpr bool operator<(const Duration& d) const noexcept { return nsec < d.nsec; }
-        constexpr bool operator>=(const Duration& d) const noexcept { return nsec >= d.nsec; }
-        constexpr bool operator<=(const Duration& d) const noexcept { return nsec <= d.nsec; }
-
-
-        /** @returns New Duration from fractional seconds (positive or negative) */
-        static constexpr Duration from_seconds(double seconds) noexcept { return Duration{ int64(seconds * NANOS_PER_SEC) }; }
-        static constexpr Duration from_seconds(int32 seconds) noexcept { return Duration{ int64(seconds) * NANOS_PER_SEC }; }
-        static constexpr Duration from_seconds(int64 seconds) noexcept { return Duration{ seconds * NANOS_PER_SEC }; }
-
-        /** @returns New Duration from integer milliseconds (positive or negative) */
-        static constexpr Duration from_millis(double millis) noexcept { return Duration{ int64(millis * NANOS_PER_MILLI) }; }
-        static constexpr Duration from_millis(int32 millis) noexcept { return Duration{ int64(millis) * NANOS_PER_MILLI }; }
-        static constexpr Duration from_millis(int64 millis) noexcept { return Duration{ millis * NANOS_PER_MILLI }; }
-
-        /** @returns New Duration from integer microseconds (positive or negative) */
-        static constexpr Duration from_micros(double micros) noexcept { return Duration{ int64(micros * NANOS_PER_MICRO) }; }
-        static constexpr Duration from_micros(int32 micros) noexcept { return Duration{ int64(micros) * NANOS_PER_MICRO }; }
-        static constexpr Duration from_micros(int64 micros) noexcept { return Duration{ micros * NANOS_PER_MICRO }; }
-
-        /** @returns New Duration from integer nanoseconds (positive or negative) */
-        static constexpr Duration from_nanos(int64 nanos) noexcept { return Duration{ nanos }; }
-
-        /** @returns New Duration from integer days (positive or negative) */
-        static constexpr Duration from_days(int32 days) noexcept { return Duration{ int64(days) * NANOS_PER_DAY }; }
-        static constexpr Duration from_days(int64 days) noexcept { return Duration{ days * NANOS_PER_DAY }; }
-
-        /** @returns New Duration from integer minutes (positive or negative) */
-        static constexpr Duration from_minutes(int32 minutes) noexcept { return Duration{ int64(minutes) * NANOS_PER_MINUTE }; }
-        static constexpr Duration from_minutes(int64 minutes) noexcept { return Duration{ minutes * NANOS_PER_MINUTE }; }
-
-        /** @returns New Duration from integer hours (positive or negative) */
-        static constexpr Duration from_hours(double hours) noexcept { return Duration{ int64(hours * NANOS_PER_HOUR) }; }
-        static constexpr Duration from_hours(int32 hours) noexcept { return Duration{ int64(hours) * NANOS_PER_HOUR }; }
-        static constexpr Duration from_hours(int64 hours) noexcept { return Duration{ hours * NANOS_PER_HOUR }; }
-
-        /** 
-         * @returns TOTAL fractional seconds (positive or negative) of this Duration
-         */
-        constexpr double sec() const noexcept { return double(nsec) / double(NANOS_PER_SEC); }
-        /**
-         * @returns TOTAL fractional milliseconds (positive or negative) of this Duration
-         */
-        constexpr double msec() const noexcept { return double(nsec) / double(NANOS_PER_MILLI); }
-        /**
-         * @returns TOTAL int64 seconds (positive or negative) of this Duration
-         */
-        constexpr int64 seconds() const noexcept { return nsec / NANOS_PER_SEC; }
-        /**
-         * @returns TOTAL int64 milliseconds (positive or negative) of this Duration
-         */
-        constexpr int64 millis() const noexcept { return nsec / NANOS_PER_MILLI; }
-        /**
-         * @returns TOTAL int64 microseconds (positive or negative) of this Duration
-         */
-        constexpr int64 micros() const noexcept { return nsec / NANOS_PER_MICRO; }
-        /**
-         * @returns TOTAL int64 nanoseconds (positive or negative) of this Duration
-         * @warning This overflows at 9,223,372,036,854,775,807 nanoseconds (9,223,372,036 seconds, which is ~292 years)
-         */
-        constexpr int64 nanos() const noexcept { return nsec; }
-        
-        static constexpr int SECONDS_PER_YEAR = 31'557'600;
-
-        /**
-         * @returns TOTAL int64 days of this Duration
-         */
-        constexpr int64 days() const noexcept { return nsec / NANOS_PER_DAY; }
-        /**
-         * @returns TOTAL int64 hours of this Duration
-         */
-        constexpr int64 hours() const noexcept { return nsec / NANOS_PER_HOUR; }
-        /**
-         * @returns TOTAL int64 minutes of this Duration
-         */
-        constexpr int64 minutes() const noexcept { return nsec / NANOS_PER_MINUTE; }
-
-        /**
-         * @returns This time duration as an absolute duration
-         */
-        constexpr Duration abs() const noexcept { return Duration{ nsec < 0 ? -nsec : nsec }; }
-
-        /**
-         * @returns This duration clamped between [min, max] range.
-         */
-        constexpr Duration clamped(const Duration& min, const Duration& max) const noexcept
-        {
-            int64 nsec_clamped = nsec;
-            if      (nsec_clamped < min.nsec) nsec_clamped = min.nsec;
-            else if (nsec_clamped > max.nsec) nsec_clamped = max.nsec;
-            return Duration{ nsec_clamped };
-        }
-
-        constexpr Duration operator+(const Duration& d) const noexcept { return Duration{ nsec + d.nsec }; }
-        constexpr Duration operator-(const Duration& d) const noexcept { return Duration{ nsec - d.nsec }; }
-        constexpr Duration& operator+=(const Duration& d) noexcept { nsec += d.nsec; return *this; }
-        constexpr Duration& operator-=(const Duration& d) noexcept { nsec -= d.nsec; return *this; }
-        constexpr Duration operator-() const noexcept { return Duration{ -nsec }; }
-
-        /** @brief Divides this duration by an integer */
-        constexpr Duration operator/(int32 d) const noexcept { return Duration{ nsec / d }; }
-        /**
-         * @brief Multiplies this duration by an integer
-         * @warning This can overflow!!!
-         */
-        constexpr Duration operator*(int32 d) const noexcept { return Duration{ nsec * d }; }
-
-        /**
-         * @brief Multiplies this duration by a fraction - must be double precision due to internal int64 representation
-         * @warning This can overflow if the double is too large!!!
-         */
-        constexpr Duration operator*(double d) const noexcept { return Duration{ int64(double(nsec) * d) }; }
-
-        /** 
-         * @brief Converts this Duration into a string with fractional seconds
-         * @example "12:44:00" -- 0 fractional digits
-         * @example "12:44:00.938" -- 3 fractional digits (milliseconds)
-         * @example "12:44:00.937521" -- 6 fractional digits (microseconds)
-         * @example "12:44:00.937521423" -- 9 fractional digits (nanoseconds)
-         * @param buf            - Output buffer [must be at least 25 bytes]
-         * @param bufsize        - Size of the output buffer
-         * @param fraction_digits - Number of fractional digits to include (default is 3 which is milliseconds) (6 is microseconds)
-         * @returns Number of characters written into the buffer
-         */
-        int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
-
-    #if !RPP_BARE_METAL
-        std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
-    #endif
-
-        /**
-         * @brief Converts this Duration into a Stopwatch string which is easier for humans to read.
-         *        The fraction_digits parameter decides where microseconds or nanoseconds are also displayed.
-         * @example "[100m 12s 44ms]" -- 3 fractional digits
-         * @example "[100m 12s 44ms 938us]" -- 6 fractional digits
-         * @example "[100m 12s 44ms 937us 521ns]" -- 9 fractional digits
-         * @param buf            - Output buffer [must be at least 36 bytes]
-         * @param bufsize        - Size of the output buffer
-         * @param fraction_digits - Number of fractional digits to include (default is 3 which is milliseconds)
-         * @returns Number of characters written into the buffer
-         */
-        int to_stopwatch_string(char* buf, int bufsize, int fraction_digits = 3) const noexcept;
-
-    #if !RPP_BARE_METAL
-        std::string to_stopwatch_string(int fraction_digits = 3) const noexcept;
-    #endif
-    };
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * @brief New TimePoint API for OS specific high accuracy timepoints
-     *        which avoids floating point calculations.
-     *
-     * @note This TimePoint is synchronized to UNIX epoch since 1970,
-     *       however it is not designed for datetime calculations.
-     *       The main purpose of this TimePoint is to provide high accuracy time measurements.
-     *       For datetime calculations use the DateTime class.
-     */
-    struct TimePoint
-    {
-        // public duration object, feel free to set it to whatever you want
-        Duration duration;
-
-        constexpr TimePoint() = default;
-        constexpr explicit TimePoint(const Duration& d) noexcept : duration{d} {}
-        constexpr explicit TimePoint(int64 ns) noexcept : duration{ns} {}
-
-        /**
-         * @brief Constructs a new TimePoint from year, month, day, hour, minute, second, nanos
-         */
-        NOINLINE TimePoint(int year, int month, int day, int hour, int minute, int second, int64 nanos) noexcept;
-
-        /** @brief The ZERO TimePoint */
-        static constexpr TimePoint zero() noexcept { return {}; }
-        static constexpr TimePoint max() noexcept { return TimePoint{ int64(RPP_INT64_MAX) }; }
-        static constexpr TimePoint min() noexcept { return TimePoint{ int64(RPP_INT64_MIN) }; }
-
-        /** @returns TimePoint from a UNIX EPOCH microseconds timestamp */
-        static constexpr TimePoint from_epoch_us(uint64 unix_epoch_us) noexcept { return TimePoint{ int64(unix_epoch_us) * NANOS_PER_MICRO }; }
-
-        /** 
-         * @returns UNIX EPOCH microseconds timestamp from this TimePoint, which can be used to construct an std::chrono::time_point.
-         * @example auto std_tp = std::chrono::steady_clock::time_point(std::chrono::microseconds(rpp_tp.to_epoch_us()));
-         */
-        uint64 to_epoch_us() const noexcept { return uint64(duration.nsec / NANOS_PER_MICRO); }
-
-        /**
-         * @returns UNIX EPOCH nanoseconds timestamp from this TimePoint, which can be used to construct an std::chrono::time_point.
-         * @example auto std_tp = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(rpp_tp.to_epoch_ns()));
-         */
-        uint64 to_epoch_ns() const noexcept { return uint64(duration.nsec); }
-
-        /** @returns Current OS specific high accuracy timepoint */
-        static TimePoint now() noexcept;
-
-        /** @returns Current OS time with timezone offset */
-        static TimePoint local() noexcept;
-
-        /** @returns This timepoint with TimeZone offset added. Does not validate that this is a valid UTC time. */
-        TimePoint utc_to_local() const noexcept;
-
-        /** @returns TimeZone offset in seconds for the current system, e.g. 10800 for UTC+3 timezone */
-        static int64 timezone_offset_seconds() noexcept;
-
-        /** @returns only the HH:MM:SS.NANOS part of the Duration */
-        constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }
-
-        /** @returns Duration from this point until end */
-        constexpr Duration elapsed(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}; }
-
-        /** @returns fractional seconds elapsed from this time point until end */
-        constexpr double elapsed_sec(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.sec(); }
-        /** @returns integer seconds elapsed from this time point until end */
-        constexpr int64 elapsed_s(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.seconds(); }
-        /** @returns integer milliseconds elapsed from this time point until end */
-        constexpr int64 elapsed_ms(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.millis(); }
-        /** @returns integer microseconds elapsed from this time point until end */
-        constexpr int64 elapsed_us(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.micros(); }
-        /** @returns integer nanoseconds elapsed from this time point until end */
-        constexpr int64 elapsed_ns(const TimePoint& end) const noexcept { return Duration{end.duration.nsec-duration.nsec}.nanos(); }
-
-        /** @returns true if this timepoint has been initialized */
-        constexpr bool is_valid() const noexcept { return duration.is_valid(); }
-        constexpr explicit operator bool() const noexcept { return duration.is_valid(); }
-
-        constexpr bool operator==(const TimePoint& t) const noexcept { return duration.nsec == t.duration.nsec; }
-        constexpr bool operator!=(const TimePoint& t) const noexcept { return duration.nsec != t.duration.nsec; }
-        constexpr bool operator>(const TimePoint& t) const noexcept { return duration.nsec > t.duration.nsec; }
-        constexpr bool operator<(const TimePoint& t) const noexcept { return duration.nsec < t.duration.nsec; }
-        constexpr bool operator>=(const TimePoint& t) const noexcept { return duration.nsec >= t.duration.nsec; }
-        constexpr bool operator<=(const TimePoint& t) const noexcept { return duration.nsec <= t.duration.nsec; }
-        constexpr TimePoint operator+(const Duration& d) const noexcept { return TimePoint{duration.nsec + d.nsec}; }
-        constexpr TimePoint operator-(const Duration& d) const noexcept { return TimePoint{duration.nsec - d.nsec}; }
-        constexpr TimePoint& operator+=(const Duration& d) noexcept { duration.nsec += d.nsec; return *this; }
-        constexpr TimePoint& operator-=(const Duration& d) noexcept { duration.nsec -= d.nsec; return *this;}
-        constexpr Duration operator-(const TimePoint& t) const noexcept { return Duration{duration.nsec - t.duration.nsec}; }
-
-        /** @brief Converts this Duration into a string */
-        int to_string(char* buf, int bufsize, int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
-
-    #if !RPP_BARE_METAL
-        std::string to_string(int fraction_digits = 3/*3 digits -- milliseconds*/) const noexcept;
-    #endif
-    };
-
-    // Convenience functions for constructing Durations, similar to std::chrono::seconds() etc.
-    inline constexpr Duration seconds_f(double seconds) noexcept { return Duration::from_seconds(seconds); }
-    inline constexpr Duration seconds(int64 seconds) noexcept { return Duration::from_seconds(seconds); }
-    inline constexpr Duration millis_f(double millis) noexcept { return Duration::from_millis(millis); }
-    inline constexpr Duration millis(int64 millis) noexcept { return Duration::from_millis(millis); }
-    inline constexpr Duration micros_f(double micros) noexcept { return Duration::from_micros(micros); }
-    inline constexpr Duration micros(int64 micros) noexcept { return Duration::from_micros(micros); }
-    inline constexpr Duration nanos(int64 nanos) noexcept { return Duration::from_nanos(nanos); }
-
-    inline namespace duration_literals
-    {
-        // convenience literals for durations
-        //   using namespace rpp::duration_literals;
-        //   rpp::Duration timeout = 100_ms; // 100 milliseconds
-        inline constexpr Duration operator ""_s (long double s)         noexcept { return Duration::from_seconds(static_cast<double>(s)); }
-        inline constexpr Duration operator ""_s (unsigned long long s)  noexcept { return Duration::from_seconds(static_cast<int64>(s)); }
-        inline constexpr Duration operator ""_ms(long double ms)        noexcept { return Duration::from_millis(static_cast<double>(ms)); }
-        inline constexpr Duration operator ""_ms(unsigned long long ms) noexcept { return Duration::from_millis(static_cast<int64>(ms));  }
-        inline constexpr Duration operator ""_us(long double us)        noexcept { return Duration::from_micros(static_cast<double>(us)); }
-        inline constexpr Duration operator ""_us(unsigned long long us) noexcept { return Duration::from_micros(static_cast<int64>(us)); }
-        inline constexpr Duration operator ""_ns(unsigned long long ns) noexcept { return Duration::from_nanos(static_cast<int64>(ns)); }
-    }
-
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
@@ -435,7 +98,7 @@ namespace rpp
         /** @brief Creates a new StopWatch and starts it immediately */
         static StopWatch start_new() noexcept { StopWatch sw; sw.start(); return sw; }
 
-        /** 
+        /**
          * Sets the initial starting point of the stopwatch and resets the stop point
          * only if the stopwatch hasn't started already
          * @note No effect if started()
@@ -464,8 +127,8 @@ namespace rpp
         /** Has the stopwatch been stopped with a valid time? */
         bool stopped() const noexcept { return end.is_valid(); }
 
-        /** 
-         * Reports the currently elapsed time. 
+        /**
+         * Reports the currently elapsed time.
          * If stopwatch is stopped, it will report the stored time
          * If stopwatch is still running, it will report the currently elapsed time
          * Otherwise reports 0.0
@@ -480,8 +143,8 @@ namespace rpp
 
     /**
      * Automatically logs performance from constructor to destructor and writes it to log
-     * 
-     * @code 
+     *
+     * @code
      * void slow_function()
      * {
      *     ScopedPerfTimer timer{"[perf]", __FUNCTION__, 500};
@@ -524,12 +187,4 @@ namespace rpp
 }
 #endif
 
-#if __cplusplus
-extern "C" {
-#endif
-    /** @return Current time in fractional seconds */
-    RPPAPI double time_now_seconds();
-#if __cplusplus
-}
-#endif
 

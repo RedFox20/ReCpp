@@ -35,7 +35,9 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `sockets.h` | TCP/UDP sockets, IP addresses, network interfaces |
 | `binary_stream.h` | Buffered binary read/write streams |
 | `binary_serializer.h` | Reflection-based binary and string serialization |
-| `timer.h` | High-precision timers, Duration, TimePoint, StopWatch |
+| `timepoint.h` | Duration, TimePoint, time constants, sleep utilities, duration literals |
+| `atomic_timepoint.h` | Lock-free AtomicDuration, AtomicTimePoint (inherits std::atomic) |
+| `timer.h` | Timer, StopWatch, ScopedPerfTimer (includes timepoint.h) |
 | `vec.h` | 2D/3D/4D vector math, matrices, rectangles |
 | `math.h` | Clamp, lerp, deg/rad, epsilon compare |
 | `minmax.h` | SSE-optimized min, max, abs, sqrt |
@@ -55,6 +57,14 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `type_traits.h` | Detection idiom and type trait helpers |
 | `traits.h` | Function type traits for callables |
 | `jni_cpp.h` | Android JNI C++ utilities |
+
+## After Modifying Headers
+
+When any header in `src/rpp/` is modified:
+
+1. **Update README line references**: Run `python3 update_doc_linerefs.py` from the repo root to fix line numbers in README.md. Use `--dry-run` to preview changes first.
+2. **Document new public API**: Add entries to README.md for any new public functions/types/constants using the format `| [\`name(params)\`](src/rpp/header.h#L123) | Description |`. The display text must match the declaration closely enough for `update_doc_linerefs.py` to track it.
+3. **Check for undocumented API**: Run `python3 update_doc_linerefs.py --check-undocumented` to find public declarations missing from README.md.
 
 ## Installing mama build tool
 
