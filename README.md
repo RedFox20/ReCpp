@@ -134,6 +134,8 @@ export namespace rpp {
 | [Sockets](#rppsocketsh) | [`sockets.h`](src/rpp/sockets.h) | Cross-platform TCP/UDP sockets, IP addresses, and network interfaces |
 | [Binary Stream](#rppbinary_streamh) | [`binary_stream.h`](src/rpp/binary_stream.h) | Buffered binary read/write streams |
 | [Binary Serializer](#rppbinary_serializerh) | [`binary_serializer.h`](src/rpp/binary_serializer.h) | Reflection-based binary and string serialization |
+| [Atomic Timepoint](#rppatomic_timepointh) | [`atomic_timepoint.h`](src/rpp/atomic_timepoint.h) | Lock-free atomic Duration and TimePoint |
+| [Atomic Shared Ptr](#rppatomic_shared_ptrh) | [`atomic_shared_ptr.h`](src/rpp/atomic_shared_ptr.h) | Portable atomic shared_ptr and weak_ptr |
 | [Timer](#rpptimer) | [`timer.h`](src/rpp/timer.h) | High-precision timers, Duration, TimePoint, and StopWatch |
 | [Vectors & Math](#rppvech) | [`vec.h`](src/rpp/vec.h) | 2D/3D/4D vector math, matrices, rectangles, and geometry |
 | [Math](#rppmath) | [`math.h`](src/rpp/math.h) | Basic math utilities: clamp, lerp, deg/rad, epsilon compare |
@@ -2517,6 +2519,53 @@ deadline += rpp::Duration::from_seconds(2);
 // check expiry from another thread
 if (rpp::TimePoint::now() > deadline.load())
     LogInfo("deadline expired!");
+```
+
+---
+
+## rpp/atomic_shared_ptr.h
+
+Portable atomic `shared_ptr` and `weak_ptr` wrappers. Uses native `std::atomic<shared_ptr<T>>` / `std::atomic<weak_ptr<T>>` when available (GCC 12+, MSVC 19.28+), otherwise falls back to a mutex-based implementation for platforms without `__cpp_lib_atomic_shared_ptr` (notably libc++/Clang).
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| [`atomic_shared_ptr<T>`](src/rpp/atomic_shared_ptr.h#L50) | Thread-safe atomic shared_ptr with load/store/exchange |
+| [`atomic_weak_ptr<T>`](src/rpp/atomic_shared_ptr.h#L110) | Thread-safe atomic weak_ptr with load/store/exchange |
+
+### atomic_shared_ptr Methods
+
+| Method | Description |
+|--------|-------------|
+| [`load(memory_order)`](src/rpp/atomic_shared_ptr.h#L78) | Atomically load a copy of the shared_ptr |
+| [`store(shared_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L86) | Atomically replace the stored shared_ptr |
+| [`exchange(shared_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L94) | Atomically replace and return the old shared_ptr |
+
+### atomic_weak_ptr Methods
+
+| Method | Description |
+|--------|-------------|
+| [`load(memory_order)`](src/rpp/atomic_shared_ptr.h#L138) | Atomically load a copy of the weak_ptr |
+| [`store(weak_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L146) | Atomically replace the stored weak_ptr |
+| [`exchange(weak_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L154) | Atomically replace and return the old weak_ptr |
+
+### Example
+
+```cpp
+#include <rpp/atomic_shared_ptr.h>
+
+// atomic_shared_ptr: thread-safe shared ownership
+rpp::atomic_shared_ptr<Config> config{std::make_shared<Config>()};
+auto current = config.load();          // atomic copy
+config.store(std::make_shared<Config>()); // atomic replace
+
+// atomic_weak_ptr: thread-safe weak observation
+rpp::atomic_weak_ptr<Session> session;
+session.store(activeSession);          // store weak_ptr
+if (auto locked = session.load().lock()) {
+    locked->process();                 // use if still alive
+}
 ```
 
 ---

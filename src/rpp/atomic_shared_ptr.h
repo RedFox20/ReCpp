@@ -34,6 +34,9 @@ namespace rpp
     template<class T>
     using atomic_shared_ptr = std::atomic<std::shared_ptr<T>>;
 
+    template<class T>
+    using atomic_weak_ptr = std::atomic<std::weak_ptr<T>>;
+
 #else
 
     /**
@@ -93,6 +96,66 @@ namespace rpp
         {
             mtx.lock();
             std::shared_ptr<T> old = std::move(this->ptr);
+            this->ptr = std::move(desired);
+            mtx.unlock();
+            return old;
+        }
+    };
+
+    /**
+     * Fallback: lock based atomic weak_ptr for platforms without
+     * native std::atomic<weak_ptr<T>> (notably libc++/Clang).
+     */
+    template<class T>
+    class atomic_weak_ptr
+    {
+        std::weak_ptr<T> ptr;
+        // lesson: mutex is faster than std::spin_lock in this case
+        mutable rpp::mutex mtx {};
+
+    public:
+        atomic_weak_ptr() noexcept = default;
+
+        atomic_weak_ptr(std::weak_ptr<T> desired) noexcept
+            : ptr{std::move(desired)} {}
+
+        ~atomic_weak_ptr() noexcept = default;
+
+        // Non-copyable, non-movable (matches std::atomic semantics)
+        atomic_weak_ptr(const atomic_weak_ptr&) = delete;
+        atomic_weak_ptr& operator=(const atomic_weak_ptr&) = delete;
+
+        bool is_lock_free() const noexcept { return false; }
+
+        atomic_weak_ptr& operator=(std::nullptr_t) noexcept
+        {
+            mtx.lock();
+            this->ptr.reset();
+            mtx.unlock();
+            return *this;
+        }
+
+        std::weak_ptr<T> load(std::memory_order /*order*/ = std::memory_order_seq_cst) const noexcept
+        {
+            mtx.lock();
+            std::weak_ptr<T> result = this->ptr;
+            mtx.unlock();
+            return result;
+        }
+
+        void store(std::weak_ptr<T> desired,
+                   std::memory_order /*order*/ = std::memory_order_seq_cst) noexcept
+        {
+            mtx.lock();
+            this->ptr = std::move(desired);
+            mtx.unlock();
+        }
+
+        std::weak_ptr<T> exchange(std::weak_ptr<T> desired,
+                                  std::memory_order /*order*/ = std::memory_order_seq_cst) noexcept
+        {
+            mtx.lock();
+            std::weak_ptr<T> old = std::move(this->ptr);
             this->ptr = std::move(desired);
             mtx.unlock();
             return old;
