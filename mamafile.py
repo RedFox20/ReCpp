@@ -28,8 +28,8 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
-        self.copy(self.source_dir('src/rpp/'),
-                  self.build_dir('include/rpp/'), filter=['.h','.natvis'])
+        self.export_include('src/rpp', build_dir=False,
+                            includes_filter=['.h','.natvis'], as_includes_root=True)
         if self.windows:
             self.export_lib(f'{self.cmake_build_type}/ReCpp.lib')
         else:
