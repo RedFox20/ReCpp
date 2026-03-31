@@ -709,7 +709,7 @@ namespace rpp
          *     if (remaining > 0) { // some forks still running }
          * @endcode
          */
-        join_forks_awaiter join_forks(rpp::Duration timeout = rpp::seconds(86400)) noexcept
+        RPP_CORO_WRAPPER join_forks_awaiter join_forks(rpp::Duration timeout = rpp::seconds(86400)) noexcept
         {
             return join_forks_awaiter{ *this, timeout };
         }
