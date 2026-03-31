@@ -297,6 +297,21 @@ namespace rpp
          *        because we match SyncType::set() method if it exists.
          */
         template<class ValueType>
+        const value_type& set(ValueType&& value) noexcept
+        {
+            if constexpr (has_set_memb<SyncType, ValueType>)
+                instance->set(std::forward<ValueType>(value));
+            else
+                instance->get_ref() = std::forward<ValueType>(value);
+            return instance->get_ref();
+        }
+
+        /**
+         * @brief It's important that all write operations go through this operator,
+         *        because we match SyncType::set() method if it exists.
+         * This is equivalent to synchronize_guard::set()
+         */
+        template<class ValueType>
         void operator=(ValueType&& value) noexcept
         {
             // if class has a set() method, use it for assignments instead
