@@ -1664,7 +1664,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L13) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L34) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L171) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L395) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L410) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -2457,6 +2457,7 @@ Lock-free atomic wrappers for `Duration` and `TimePoint`. Both types are 8 bytes
 |------|-------------|
 | [`AtomicDuration`](src/rpp/atomic_timepoint.h#L23) | Lock-free atomic Duration with atomic arithmetic |
 | [`AtomicTimePoint`](src/rpp/atomic_timepoint.h#L81) | Lock-free atomic TimePoint with atomic arithmetic |
+| [`AtomicTimeSource`](src/rpp/atomic_timepoint.h#L120) | Lock-free time source with sync and warp offsets |
 
 ### AtomicDuration Methods
 
@@ -2477,6 +2478,42 @@ Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_
 |--------|-------------|
 | [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L91) | Atomically add a Duration, returns new TimePoint |
 | [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L102) | Atomically subtract a Duration, returns new TimePoint |
+
+### AtomicTimeSource
+
+Lock-free time source for simulation time warping and time synchronization with external sources. Maintains a `combined_offset` (sync + warp) applied to system time. All mutations are atomic via `fetch_add`/`exchange`; reads use `memory_order_relaxed` for minimal overhead on the hot path (`time_now()`).
+
+| Method | Description |
+|--------|-------------|
+| [`time_now()`](src/rpp/atomic_timepoint.h#L137) | Returns system time plus combined offset (sync + warp) |
+| [`total_offset()`](src/rpp/atomic_timepoint.h#L148) | Returns the combined sync + warp offset |
+| [`warp_offset()`](src/rpp/atomic_timepoint.h#L158) | Returns the current warp offset (diagnostic) |
+| [`sync_offset()`](src/rpp/atomic_timepoint.h#L168) | Returns the current sync offset (diagnostic) |
+| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L176) | Atomically advances time by delta |
+| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L185) | Atomically rewinds time by delta |
+| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L194) | Sets sync offset, adjusting combined offset by the difference |
+
+### Example: AtomicTimeSource for Simulation Time
+
+```cpp
+#include <rpp/atomic_timepoint.h>
+
+rpp::AtomicTimeSource timeSource;
+
+// sync with an external NTP-like source
+timeSource.set_sync_offset(rpp::Duration::from_millis(42));
+
+// warp forward for simulation fast-forward
+timeSource.warp_forward(rpp::Duration::from_seconds(60));
+
+// get virtual time (system time + sync + warp offsets)
+rpp::TimePoint virtualNow = timeSource.time_now();
+
+// inspect offsets
+rpp::Duration total = timeSource.total_offset();   // 60.042s
+rpp::Duration sync  = timeSource.sync_offset();    // 42ms
+rpp::Duration warp  = timeSource.warp_offset();    // 60s
+```
 
 ### Example: Atomic Duration Accumulation
 

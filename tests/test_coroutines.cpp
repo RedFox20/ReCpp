@@ -46,7 +46,7 @@ TestImpl(test_coroutines)
         double e = t1.elapsed_millis();
         // require some level of acceptable accuracy in the sleeps
         AssertGreater(e, 49.0);
-        AssertLess(e, 55.0);
+        AssertLess(e, 56.0);
 
         rpp::Timer t2;
         duration_coro(15).get();

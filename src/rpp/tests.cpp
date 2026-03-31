@@ -1,5 +1,7 @@
 ﻿#include "tests.h"
 #include "mutex.h"
+#include "proc_utils.h"
+#include "thread_pool.h"
 #include <memory>
 #include <unordered_set>
 #include <chrono> // high_resolution_clock
@@ -1079,10 +1081,34 @@ namespace rpp
             consolef(Yellow, "\nNOTE: No test suites were run! (out of %d available)\n\n", (int)state().global_tests.size());
             return 1;
         }
-        if (numTests == 1) consolef(Green, "\nSUCCESS: Test passed %d/%d test cases! %s\n\n",
-                                    results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
-        else               consolef(Green, "\nSUCCESS: All %d test suites with %d/%d test cases passed! %s\n\n",
-                                   numTests, results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
+        if (numTests == 1)
+        {
+            consolef(Green, "\nSUCCESS: Test passed %d/%d test cases! %s\n\n",
+                     results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
+        }
+        else
+        {
+            consolef(Green, "\nSUCCESS: All %d test suites with %d/%d test cases passed! %s\n\n",
+                     numTests, results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
+        }
+
+        // do final cleanup to sanity check memory usage
+        rpp::thread_pool::global().clear_idle_tasks();
+        rpp::string_buffer san;
+        #if RPP_SANITIZERS
+            #if RPP_ASAN
+                san.write("+ASAN");
+            #endif
+            #if RPP_TSAN
+                san.write("+TSAN");
+            #endif
+            #if RPP_UBSAN
+                san.write("+UBSAN");
+            #endif
+        #endif
+        rpp::proc_mem_info info = proc_current_mem_used();
+        consolef(Default, "Memory used PHYS:%.2fMB VIRT:%.2fMB %s\n",
+                 info.physical_mem_mb(), info.virtual_size_mb(), san.c_str());
         return 0;
     }
 

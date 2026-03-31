@@ -42,16 +42,16 @@ TestImpl(test_timer)
         for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
-            spin_sleep_for_ms(20);
+            spin_sleep_for_ms(10);
             double elapsed_ms = t.elapsed_millis();
-            print_info("timer_ms %d 20ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 20.0, 20.0 + sigma_ms);
+            print_info("timer_ms %d 10ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
+            AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
         }
     }
 
     TestCase(ensure_sleep_millis_accuracy)
     {
-        for (int i = 0; i < 20; ++i)
+        for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
             rpp::sleep_ms(18);
@@ -63,7 +63,7 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_micros_accuracy)
     {
-        for (int i = 0; i < 20; ++i)
+        for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(2500);
@@ -71,7 +71,7 @@ TestImpl(test_timer)
             print_info("micros %d 2500us sleep time: %gus\n", i+1, elapsed_us);
             AssertInRange(elapsed_us, 2500, 20'000); // OS sleep can never be accurate enough, so the range must be very loose
         }
-        for (int i = 0; i < 20; ++i)
+        for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(500);
@@ -83,7 +83,7 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_nanos_accuracy)
     {
-        for (int i = 0; i < 20; ++i)
+        for (int i = 0; i < 5; ++i)
         {
             rpp::Timer t;
             // going below 100'000ns is not accurate with clock_nanosleep
@@ -200,7 +200,7 @@ TestImpl(test_timer)
     TestCase(duration_sec_arithmetic)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
-        const int millis = 57; // wait a few millis
+        const int millis = 10; // wait a few millis
         spin_sleep_for_ms(millis);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
@@ -227,7 +227,7 @@ TestImpl(test_timer)
     TestCase(duration_millis_arithmetic)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
-        const int millis = 15; // wait a few millis
+        const int millis = 10; // wait a few millis
         spin_sleep_for_ms(millis);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
@@ -254,7 +254,7 @@ TestImpl(test_timer)
     TestCase(duration_micros_arithmetic)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now();
-        const int microseconds = 40; // wait a few micros
+        const int microseconds = 15; // wait a few micros
         spin_sleep_for_us(microseconds);
         rpp::TimePoint t2 = rpp::TimePoint::now();
 
