@@ -958,7 +958,7 @@ namespace rpp
             }
             bool await_resume() noexcept { return available; }
         };
-        co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
+        RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
 
         /**
          * @brief Awaitable handle for co_await on queue pop.
@@ -989,7 +989,7 @@ namespace rpp
             }
             bool await_resume() noexcept { return success; }
         };
-        co_pop_handle await_pop(T& out, rpp::Duration timeout) noexcept { return { *this, out, timeout }; }
+        RPP_CORO_WRAPPER co_pop_handle await_pop(T& out, rpp::Duration timeout) noexcept { return { *this, out, timeout }; }
 
         /**
          * @brief Awaitable handle for co_await on queue pop returning std::optional<T>.
@@ -1023,7 +1023,7 @@ namespace rpp
             }
             std::optional<T> await_resume() noexcept { return std::move(result); }
         };
-        co_pop_optional_handle await_pop(rpp::Duration timeout) noexcept { return { *this, timeout, std::nullopt }; }
+        RPP_CORO_WRAPPER co_pop_optional_handle await_pop(rpp::Duration timeout) noexcept { return { *this, timeout, std::nullopt }; }
 #endif
     };
 }

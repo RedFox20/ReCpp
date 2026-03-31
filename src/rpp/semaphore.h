@@ -385,7 +385,7 @@ namespace rpp
             }
             wait_result await_resume() noexcept { return result; }
         };
-        co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
+        RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
 #endif
     };
 
