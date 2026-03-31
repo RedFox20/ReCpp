@@ -667,12 +667,12 @@ namespace rpp
                 if (timeout < rpp::seconds(86400))
                 {
                     rpp::TimePoint deadline = rpp::TimePoint::now() + timeout;
-                    loop.start_in_background([&loop = loop, cont, deadline]()
+                    loop.start_in_background([&loop=loop, cont, deadline]() mutable // mutable because of `cont.resume()`
                     {
                         rpp::sleep_until(deadline);
                         // post callback to event loop thread for thread-safe joiner check
                         loop.resume_queue.push(resume_event{rpp::delegate<void()>{
-                            [&loop, cont]()
+                            [&loop=loop, cont]() mutable // mutable because of `cont.resume()`
                             {
                                 if (loop.fork_joiner == cont)
                                 {
