@@ -37,46 +37,52 @@ namespace rpp
     /**
      * @brief Clock types for TimePoint::now(ClockType).
      *
-     * Linux clock_gettime mapping and cross-platform alternatives:
+     * Linux: uses clock_gettime() natively for all types
+     *   Realtime        CLOCK_REALTIME              ~1ns precision
+     *   RealtimeCoarse  CLOCK_REALTIME_COARSE       ~1-4ms precision (vDSO, no syscall)
+     *   TAI             CLOCK_TAI                   ~1ns precision (no leap seconds)
+     *   Monotonic       CLOCK_MONOTONIC             ~1ns precision, NTP rate-adjusted
+     *   MonotonicRaw    CLOCK_MONOTONIC_RAW         ~1ns precision, no NTP adjustment
+     *   MonotonicCoarse CLOCK_MONOTONIC_COARSE      ~1-4ms precision (vDSO, no syscall)
+     *   Boottime        CLOCK_BOOTTIME              ~1ns precision, includes suspend time
+     *   ProcessCPU      CLOCK_PROCESS_CPUTIME_ID    ~1ns precision (scheduler dependent, ~1-10ms on VMs)
+     *   ThreadCPU       CLOCK_THREAD_CPUTIME_ID     ~1ns precision (scheduler dependent, ~1-10ms on VMs)
      *
-     * Wall clocks (epoch-based):
-     *   Realtime       - CLOCK_REALTIME           - wall clock, NTP adjusted
-     *   RealtimeCoarse - CLOCK_REALTIME_COARSE    - fast but ~1-4ms resolution
-     *   TAI            - CLOCK_TAI                - International Atomic Time (no leap seconds)
+     * Windows:
+     *   Realtime        GetSystemTimePreciseAsFileTime  ~100ns precision
+     *   RealtimeCoarse  GetSystemTimeAsFileTime         ~15.6ms precision
+     *   TAI             (falls back to Realtime)        ~100ns precision
+     *   Monotonic       QueryPerformanceCounter         ~100ns-1us precision
+     *   MonotonicRaw    QueryPerformanceCounter         ~100ns-1us precision
+     *   MonotonicCoarse GetTickCount64                  ~15.6ms precision
+     *   Boottime        GetTickCount64                  ~15.6ms precision
+     *   ProcessCPU      GetProcessTimes                 ~15.6ms precision
+     *   ThreadCPU       GetThreadTimes                  ~15.6ms precision
      *
-     * Monotonic clocks (arbitrary epoch, never goes backwards):
-     *   Monotonic       - CLOCK_MONOTONIC          - monotonic, NTP rate-adjusted
-     *   MonotonicRaw    - CLOCK_MONOTONIC_RAW      - monotonic, no NTP adjustment at all
-     *   MonotonicCoarse - CLOCK_MONOTONIC_COARSE   - fast but ~1-4ms resolution
-     *   Boottime        - CLOCK_BOOTTIME           - like Monotonic but includes suspend time
+     * macOS: uses clock_gettime(), no Coarse/Boottime/TAI variants
+     *   RealtimeCoarse  (falls back to Realtime)        ~1us precision
+     *   TAI             (falls back to Realtime)        ~1us precision
+     *   MonotonicCoarse (falls back to Monotonic)       ~1us precision
+     *   Boottime        (falls back to Monotonic)       ~1us precision
      *
-     * CPU time clocks:
-     *   ProcessCPU - CLOCK_PROCESS_CPUTIME_ID - CPU time consumed by this process
-     *   ThreadCPU  - CLOCK_THREAD_CPUTIME_ID  - CPU time consumed by this thread
-     *
-     * Platform fallbacks:
-     *   macOS:   No Coarse variants (uses regular), no Boottime (uses Monotonic), no TAI (uses Realtime)
-     *   Windows: Realtime=GetSystemTimePreciseAsFileTime, RealtimeCoarse=GetSystemTimeAsFileTime,
-     *            Monotonic/MonotonicRaw=QueryPerformanceCounter, Boottime/MonotonicCoarse=GetTickCount64,
-     *            ProcessCPU=GetProcessTimes, ThreadCPU=GetThreadTimes, no TAI (uses Realtime)
-     *   Other:   All types fall back to default now()
+     * Other platforms: all types fall back to default now()
      */
     enum class ClockType
     {
         // wall clocks (epoch-based)
-        Realtime = 0,        // system real-time clock (default)
-        RealtimeCoarse = 1,  // fast, lower resolution real-time clock
-        TAI = 2,             // international atomic time (Linux only, fallback to Realtime elsewhere)
+        Realtime = 0,        // system real-time clock (default)           worst-case precision: ~100ns (Windows), ~1ns (Linux vDSO)
+        RealtimeCoarse = 1,  // fast, lower resolution real-time clock     worst-case precision: ~15.6ms (Windows), ~1-4ms (Linux vDSO)
+        TAI = 2,             // international atomic time (Linux only)     worst-case precision: ~100ns (Linux), fallback to Realtime on other platforms
 
         // monotonic clocks (arbitrary epoch, suitable for elapsed time measurements)
-        Monotonic = 3,       // monotonic clock, NTP rate-adjusted
-        MonotonicRaw = 4,    // monotonic clock, no NTP adjustments
-        MonotonicCoarse = 5, // fast, lower resolution monotonic clock
-        Boottime = 6,        // monotonic clock that includes system suspend time
+        Monotonic = 3,       // monotonic clock, NTP rate-adjusted         worst-case precision: ~1us
+        MonotonicRaw = 4,    // monotonic clock, no NTP adjustments        worst-case precision: ~1us
+        MonotonicCoarse = 5, // fast, lower resolution monotonic clock     worst-case precision: ~15.6ms (Windows), ~1-4ms (Linux vDSO)
+        Boottime = 6,        // monotonic, includes system suspend time    worst-case precision: ~15.6ms (Windows), ~1us (Linux)
 
         // CPU time clocks
-        ProcessCPU = 7,      // CPU time consumed by this process (all threads)
-        ThreadCPU = 8,       // CPU time consumed by the calling thread
+        ProcessCPU = 7,      // CPU time consumed by this process          worst-case precision: ~15.6ms (Windows), ~1us (Linux, scheduler dependent)
+        ThreadCPU = 8,       // CPU time consumed by the calling thread    worst-case precision: ~15.6ms (Windows), ~1us (Linux, scheduler dependent)
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

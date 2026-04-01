@@ -1410,17 +1410,17 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 | Class | Description |
 |-------|-------------|
 | [`functor_awaiter<T>`](src/rpp/coroutines.h#L30) | Awaiter for lambdas/delegates via `parallel_task()` |
-| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L114) | Awaiter for lambdas returning futures |
-| [`time_awaiter`](src/rpp/coroutines.h#L195) | Awaiter for `rpp::Duration` durations (async sleep) |
+| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L112) | Awaiter for lambdas returning futures |
+| [`time_awaiter`](src/rpp/coroutines.h#L192) | Awaiter for `rpp::Duration` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
 | Operator | Description |
 |----------|-------------|
-| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L248) | Run delegate async on thread pool |
-| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L279) | Run lambda async on thread pool |
-| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L285) | Await a composable future |
-| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L315) | Async sleep for a duration |
+| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L245) | Run delegate async on thread pool |
+| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L276) | Run lambda async on thread pool |
+| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L282) | Await a composable future |
+| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L312) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;
@@ -2337,36 +2337,52 @@ Nanosecond-precision `Duration` and `TimePoint` types, time constants, sleep uti
 | Type | Description |
 |------|-------------|
 | [`Duration`](src/rpp/timepoint.h#L27) | Unified nanosecond-precision duration (int64 nsec) |
-| [`TimePoint`](src/rpp/timepoint.h#L286) | System's most accurate time point measurement |
-| [`ClockType`](src/rpp/timepoint.h#L64) | Clock source selector for `TimePoint::now(ClockType)` |
+| [`TimePoint`](src/rpp/timepoint.h#L292) | System's most accurate time point measurement |
+| [`ClockType`](src/rpp/timepoint.h#L70) | Clock source selector for `TimePoint::now(ClockType)` |
+
+### ClockType Values
+
+| Value | Linux API | Linux precision | Windows API | Windows precision |
+|-------|-----------|-----------------|-------------|-------------------|
+| `Realtime` | `CLOCK_REALTIME` | ~1ns | `GetSystemTimePreciseAsFileTime` | ~100ns |
+| `RealtimeCoarse` | `CLOCK_REALTIME_COARSE` | ~1-4ms | `GetSystemTimeAsFileTime` | ~15.6ms |
+| `TAI` | `CLOCK_TAI` | ~1ns | falls back to Realtime | ~100ns |
+| `Monotonic` | `CLOCK_MONOTONIC` | ~1ns | `QueryPerformanceCounter` | ~100ns-1us |
+| `MonotonicRaw` | `CLOCK_MONOTONIC_RAW` | ~1ns | `QueryPerformanceCounter` | ~100ns-1us |
+| `MonotonicCoarse` | `CLOCK_MONOTONIC_COARSE` | ~1-4ms | `GetTickCount64` | ~15.6ms |
+| `Boottime` | `CLOCK_BOOTTIME` | ~1ns | `GetTickCount64` | ~15.6ms |
+| `ProcessCPU` | `CLOCK_PROCESS_CPUTIME_ID` | ~1ns | `GetProcessTimes` | ~15.6ms |
+| `ThreadCPU` | `CLOCK_THREAD_CPUTIME_ID` | ~1ns | `GetThreadTimes` | ~15.6ms |
+
+macOS uses `clock_gettime()` but lacks Coarse, Boottime, and TAI variants — these fall back to their regular equivalents. Other platforms fall back to default `now()`.
 
 ### Duration Factory & Accessors
 
 | Method | Description |
 |--------|-------------|
-| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L133) | Create from fractional seconds |
-| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L396) | Create from milliseconds |
-| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L398) | Create from microseconds |
-| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L148) | Create from nanoseconds |
-| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L159) | Create from hours |
-| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L155) | Create from minutes |
-| [`sec()`](src/rpp/timepoint.h#L166) / [`msec()`](src/rpp/timepoint.h#L170) | Convert to fractional seconds / milliseconds |
-| [`seconds()`](src/rpp/timepoint.h#L174) / [`millis()`](src/rpp/timepoint.h#L178) / [`micros()`](src/rpp/timepoint.h#L182) / [`nanos()`](src/rpp/timepoint.h#L187) | Convert to integer time units |
-| [`to_string()`](src/rpp/timepoint.h#L251) | Human-readable duration string |
-| [`to_stopwatch_string()`](src/rpp/timepoint.h#L268) | Stopwatch-style format |
+| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L139) | Create from fractional seconds |
+| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L402) | Create from milliseconds |
+| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L404) | Create from microseconds |
+| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L154) | Create from nanoseconds |
+| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L165) | Create from hours |
+| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L161) | Create from minutes |
+| [`sec()`](src/rpp/timepoint.h#L172) / [`msec()`](src/rpp/timepoint.h#L176) | Convert to fractional seconds / milliseconds |
+| [`seconds()`](src/rpp/timepoint.h#L180) / [`millis()`](src/rpp/timepoint.h#L184) / [`micros()`](src/rpp/timepoint.h#L188) / [`nanos()`](src/rpp/timepoint.h#L193) | Convert to integer time units |
+| [`to_string()`](src/rpp/timepoint.h#L257) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timepoint.h#L274) | Stopwatch-style format |
 
 ### TimePoint Methods
 
 | Method | Description |
 |--------|-------------|
-| [`TimePoint::now()`](src/rpp/timepoint.h#L321) | Current OS high-accuracy time point |
-| [`TimePoint::now(ClockType clock)`](src/rpp/timepoint.h#L328) | Time point from a specific clock source |
-| [`TimePoint::local()`](src/rpp/timepoint.h#L331) | Current time with timezone offset |
-| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L343) | Duration between two time points |
-| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L346) | Fractional seconds between two points |
-| [`time_of_day()`](src/rpp/timepoint.h#L340) | Extract HH:MM:SS.nanos part |
-| [`to_epoch_us()`](src/rpp/timepoint.h#L312) | Convert to UNIX epoch microseconds |
-| [`utc_to_local()`](src/rpp/timepoint.h#L334) | Add timezone offset to this timepoint |
+| [`TimePoint::now()`](src/rpp/timepoint.h#L327) | Current OS high-accuracy time point |
+| [`TimePoint::now(ClockType clock)`](src/rpp/timepoint.h#L334) | Time point from a specific clock source |
+| [`TimePoint::local()`](src/rpp/timepoint.h#L337) | Current time with timezone offset |
+| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L349) | Duration between two time points |
+| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L352) | Fractional seconds between two points |
+| [`time_of_day()`](src/rpp/timepoint.h#L346) | Extract HH:MM:SS.nanos part |
+| [`to_epoch_us()`](src/rpp/timepoint.h#L318) | Convert to UNIX epoch microseconds |
+| [`utc_to_local()`](src/rpp/timepoint.h#L340) | Add timezone offset to this timepoint |
 
 ### Global Time Utilities
 
@@ -2377,7 +2393,7 @@ Nanosecond-precision `Duration` and `TimePoint` types, time constants, sleep uti
 | [`sleep_ns(nanos)`](src/rpp/timepoint.h#L25) | Sleep for nanoseconds |
 | [`sleep_for(const Duration& d)`](src/rpp/timepoint.h#L31) | Sleep for a Duration |
 | [`sleep_until(const TimePoint& tp)`](src/rpp/timepoint.h#L33) | Sleep until a TimePoint |
-| [`time_now_seconds()`](src/rpp/timepoint.h#L418) | Returns current time in fractional seconds (C linkage) |
+| [`time_now_seconds()`](src/rpp/timepoint.h#L424) | Returns current time in fractional seconds (C linkage) |
 
 ### Duration Literals
 
@@ -2489,8 +2505,8 @@ Lock-free atomic wrappers for `Duration` and `TimePoint`. Both types are 8 bytes
 | Type | Description |
 |------|-------------|
 | [`AtomicDuration`](src/rpp/atomic_timepoint.h#L23) | Lock-free atomic Duration with atomic arithmetic |
-| [`AtomicTimePoint`](src/rpp/atomic_timepoint.h#L81) | Lock-free atomic TimePoint with atomic arithmetic |
-| [`AtomicTimeSource`](src/rpp/atomic_timepoint.h#L120) | Lock-free time source with sync and warp offsets |
+| [`AtomicTimePoint`](src/rpp/atomic_timepoint.h#L88) | Lock-free atomic TimePoint with atomic arithmetic |
+| [`AtomicTimeSource`](src/rpp/atomic_timepoint.h#L134) | Lock-free time source with sync and warp offsets |
 
 ### AtomicDuration Methods
 
@@ -2498,10 +2514,10 @@ Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_
 
 | Method | Description |
 |--------|-------------|
-| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L33) | Atomically add a Duration, returns new value |
-| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L44) | Atomically subtract a Duration, returns new value |
-| [`fetch_add(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L55) | Atomically add, returns old value |
-| [`fetch_sub(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L64) | Atomically subtract, returns old value |
+| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L40) | Atomically add a Duration, returns new value |
+| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L51) | Atomically subtract a Duration, returns new value |
+| [`fetch_add(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L62) | Atomically add, returns old value |
+| [`fetch_sub(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L71) | Atomically subtract, returns old value |
 
 ### AtomicTimePoint Methods
 
@@ -2509,8 +2525,8 @@ Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_
 
 | Method | Description |
 |--------|-------------|
-| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L91) | Atomically add a Duration, returns new TimePoint |
-| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L102) | Atomically subtract a Duration, returns new TimePoint |
+| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L105) | Atomically add a Duration, returns new TimePoint |
+| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L116) | Atomically subtract a Duration, returns new TimePoint |
 
 ### AtomicTimeSource
 
@@ -2518,13 +2534,13 @@ Lock-free time source for simulation time warping and time synchronization with 
 
 | Method | Description |
 |--------|-------------|
-| [`time_now()`](src/rpp/atomic_timepoint.h#L137) | Returns system time plus combined offset (sync + warp) |
-| [`total_offset()`](src/rpp/atomic_timepoint.h#L159) | Returns the combined sync + warp offset |
-| [`warp_offset()`](src/rpp/atomic_timepoint.h#L169) | Returns the current warp offset (diagnostic) |
-| [`sync_offset()`](src/rpp/atomic_timepoint.h#L179) | Returns the current sync offset (diagnostic) |
-| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L187) | Atomically advances time by delta |
-| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L196) | Atomically rewinds time by delta |
-| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L205) | Sets sync offset, adjusting combined offset by the difference |
+| [`time_now()`](src/rpp/atomic_timepoint.h#L151) | Returns system time plus combined offset (sync + warp) |
+| [`total_offset()`](src/rpp/atomic_timepoint.h#L173) | Returns the combined sync + warp offset |
+| [`warp_offset()`](src/rpp/atomic_timepoint.h#L183) | Returns the current warp offset (diagnostic) |
+| [`sync_offset()`](src/rpp/atomic_timepoint.h#L193) | Returns the current sync offset (diagnostic) |
+| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L201) | Atomically advances time by delta |
+| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L210) | Atomically rewinds time by delta |
+| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L219) | Sets sync offset, adjusting combined offset by the difference |
 
 ### Example: AtomicTimeSource for Simulation Time
 

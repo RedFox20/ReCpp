@@ -532,25 +532,26 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
         AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(10'000, /*full_spin*/true);
+        // Windows: GetTickCount64 has ~15.6ms resolution, need longer spin than 10ms
+        spin_sleep_for_us(20'000, /*full_spin*/true);
         rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("MonotonicCoarse 10ms elapsed: %lldus\n", elapsed_us);
-        // coarse clocks have low resolution, so use wider tolerance
-        AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 30'000);
+        rpp::int64 elapsed_ms = (t2 - t1).millis();
+        print_info("MonotonicCoarse 20ms elapsed: %lldms\n", elapsed_ms);
+        AssertGreaterOrEqual(elapsed_ms, 10);
+        AssertLessOrEqual(elapsed_ms, 50);
     }
 
     TestCase(clock_type_boottime)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Boottime);
         AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(10'000, /*full_spin*/true);
+        // Windows: GetTickCount64 has ~15.6ms resolution, need longer spin than 10ms
+        spin_sleep_for_us(20'000, /*full_spin*/true);
         rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Boottime);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("Boottime 10ms elapsed: %lldus\n", elapsed_us);
-        AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 18'000);
+        rpp::int64 elapsed_ms = (t2 - t1).millis();
+        print_info("Boottime 20ms elapsed: %lldms\n", elapsed_ms);
+        AssertGreaterOrEqual(elapsed_ms, 10);
+        AssertLessOrEqual(elapsed_ms, 50);
     }
 
     TestCase(clock_type_process_cpu)
