@@ -293,7 +293,13 @@ namespace rpp
             case Yellow:  priority = ANDROID_LOG_WARN;  break;
             case Red:     priority = ANDROID_LOG_ERROR; break;
         }
-        __android_log_write(priority, "rpp", str);
+
+        // android log_write appends a newline, but our testing API requires an explicit newline
+        // so we need to strip the newline if it's present
+        char* buf = (char*)alloca(len);
+        memcpy(buf, str, len-1); // copy without newline
+        buf[len-1] = '\0'; // null-terminate
+        __android_log_write(priority, "rpp", buf);
     #else
         FILE* cout = color == Red ? stderr : stdout;
         static constexpr rpp::strview colors[] = {

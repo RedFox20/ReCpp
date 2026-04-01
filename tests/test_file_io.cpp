@@ -78,6 +78,7 @@ TestImpl(test_file_io)
                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
                            "0123456789!@#$%^&*()_+-=[]{};':\",.<>/?`~";
         out.write(TestFileContents);
+        out.flush(); // flush before size() so fstat sees the written data
         TestFileSize = out.size();
         out.close();
     }
@@ -189,6 +190,7 @@ TestImpl(test_file_io)
             expectedSize += randCount;
         }
 
+        f.flush(); // flush before size() so fstat sees the written data
         int fileSize = f.size();
         AssertThat(fileSize, expectedSize);
         f.close();

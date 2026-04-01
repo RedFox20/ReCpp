@@ -1,4 +1,11 @@
-# ReCpp [![CircleCI](https://circleci.com/gh/RedFox20/ReCpp.svg?style=svg)](https://circleci.com/gh/RedFox20/ReCpp) (GCC, Clang, MSVC)
+# ReCpp
+
+[![CircleCI](https://circleci.com/gh/RedFox20/ReCpp.svg?style=shield)](https://circleci.com/gh/RedFox20/ReCpp)
+[![Linux GCC](https://img.shields.io/badge/Linux-GCC_13--14-blue?logo=linux)](https://circleci.com/gh/RedFox20/ReCpp)
+[![Linux Clang](https://img.shields.io/badge/Linux-Clang_18-blue?logo=llvm)](https://circleci.com/gh/RedFox20/ReCpp)
+[![Windows MSVC](https://img.shields.io/badge/Windows-MSVC_2022-blue?logo=windows)](https://circleci.com/gh/RedFox20/ReCpp)
+[![Android Clang](https://img.shields.io/badge/Android-NDK_r29b_Clang_18-blue?logo=android)](https://circleci.com/gh/RedFox20/ReCpp)
+[![MIPS GCC](https://img.shields.io/badge/MIPS-GCC_12-blue)](https://circleci.com/gh/RedFox20/ReCpp)
 ## Reusable Standalone C++ Libraries and Modules
 
 The goal of this project is to provide C++20 and C++23 developers with convenient and minimal cross-platform C++ utility libraries.
@@ -10,7 +17,7 @@ All of the modules are heavily performance oriented and provide the least amount
 |----------|-----------|-------|
 | **Windows** | MSVC++ 2019, 2022, 2026 | x64 |
 | **Ubuntu Linux** | clang++ 14–20, g++ 11–15 | x86_64, ASan/TSan/clang-tidy CI |
-| **Android** | NDK r25b–r29 (clang++ 14–20) | arm64-v8a, armeabi-v7a |
+| **Android** | NDK r25b–r29 (clang++ 14–20) | arm64-v8a, armeabi-v7a, QEMU aarch64 CI tests |
 | **iOS / macOS** | Apple Clang | arm64, x86_64 |
 | **AArch64 Embedded** | g++ 11–15 | i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25 |
 | **MIPSEL** | g++ 11 | Cross-compiled, no tests |
@@ -39,6 +46,30 @@ mama clang clang-tidy asan build test="test_strview"
 # Run tests until failure with GCC and ThreadSanitizer
 mama gcc tsan build test test_until_failure
 ```
+
+### Clang-Tidy Analysis
+
+Run clang-tidy locally without building with `clang-tidy` enabled:
+```bash
+./run_clang_tidy              # quiet mode, uses all cores
+./run_clang_tidy -j 4         # limit to 4 jobs
+./run_clang_tidy -v           # verbose (show per-file commands)
+./run_clang_tidy --android    # analyze Android NDK build
+```
+
+### Android Testing (QEMU)
+
+Run Android aarch64 unit tests locally using QEMU user-mode emulation.
+Requires `ANDROID_NDK_HOME` to be set. Installs `qemu-user` automatically on first run.
+
+```bash
+./run_android_tests --build -vv                   # build and run all tests
+./run_android_tests -vv test_delegate             # run specific test suite
+./run_android_tests -vv test_delegate::virtuals   # run specific test case
+```
+
+Uses a pre-built bionic sysroot from Android API 29 ([`.circleci/android-qemu-sysroot-api29/`](.circleci/android-qemu-sysroot-api29/))
+with a custom `liblog.so` that redirects `__android_log_*` to stdout/stderr with colored priority labels.
 
 
 ## Experimental: C++20 Modules
@@ -178,107 +209,107 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_CXX17`](src/rpp/config.h#L57) | `1` if C++17 or later is available |
-| [`RPP_HAS_CXX20`](src/rpp/config.h#L65) | `1` if C++20 or later is available |
-| [`RPP_HAS_CXX23`](src/rpp/config.h#L73) | `1` if C++23 or later is available |
-| [`RPP_HAS_CXX26`](src/rpp/config.h#L81) | `1` if C++26 or later is available |
-| [`RPP_INLINE_STATIC`](src/rpp/config.h#L89) | `inline static` on C++17+, `static` otherwise |
-| [`RPP_CXX17_IF_CONSTEXPR`](src/rpp/config.h#L97) | `if constexpr` when available, falls back to `if` |
+| [`RPP_HAS_CXX17`](src/rpp/config.h#L75) | `1` if C++17 or later is available |
+| [`RPP_HAS_CXX20`](src/rpp/config.h#L83) | `1` if C++20 or later is available |
+| [`RPP_HAS_CXX23`](src/rpp/config.h#L91) | `1` if C++23 or later is available |
+| [`RPP_HAS_CXX26`](src/rpp/config.h#L99) | `1` if C++26 or later is available |
+| [`RPP_INLINE_STATIC`](src/rpp/config.h#L107) | `inline static` on C++17+, `static` otherwise |
+| [`RPP_CXX17_IF_CONSTEXPR`](src/rpp/config.h#L115) | `if constexpr` when available, falls back to `if` |
 
 ### API Export / Linkage
 
 | Macro | Description |
 |-------|-------------|
-| [`RPPAPI`](src/rpp/config.h#L37) | DLL visibility attribute: `__declspec(dllexport)` on MSVC, `__attribute__((visibility("default")))` on GCC/Clang |
-| [`RPP_EXTERNC`](src/rpp/config.h#L45) | `extern "C"` when compiling as C++, empty otherwise |
-| [`RPPCAPI`](src/rpp/config.h#L52) | Combined `RPP_EXTERNC RPPAPI` for C-compatible exported functions |
+| [`RPPAPI`](src/rpp/config.h#L55) | DLL visibility attribute: `__declspec(dllexport)` on MSVC, `__attribute__((visibility("default")))` on GCC/Clang |
+| [`RPP_EXTERNC`](src/rpp/config.h#L63) | `extern "C"` when compiling as C++, empty otherwise |
+| [`RPPCAPI`](src/rpp/config.h#L70) | Combined `RPP_EXTERNC RPPAPI` for C-compatible exported functions |
 
 ### Sanitizer Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_ASAN`](src/rpp/config.h#L105) | `1` if AddressSanitizer is enabled |
-| [`RPP_TSAN`](src/rpp/config.h#L113) | `1` if ThreadSanitizer is enabled |
-| [`RPP_UBSAN`](src/rpp/config.h#L122) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
-| [`RPP_SANITIZERS`](src/rpp/config.h#L130) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
+| [`RPP_ASAN`](src/rpp/config.h#L123) | `1` if AddressSanitizer is enabled |
+| [`RPP_TSAN`](src/rpp/config.h#L131) | `1` if ThreadSanitizer is enabled |
+| [`RPP_UBSAN`](src/rpp/config.h#L140) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
+| [`RPP_SANITIZERS`](src/rpp/config.h#L148) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
 
 ### Platform & Architecture
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_BARE_METAL`](src/rpp/config.h#L170) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
-| [`RPP_FREERTOS`](src/rpp/config.h#L158) | `1` if targeting FreeRTOS |
-| [`RPP_STM32_HAL`](src/rpp/config.h#L162) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
-| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L177) | `1` if targeting ARM Cortex-M architecture |
-| [`RPP_ARM_ARCH`](src/rpp/config.h#L193) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
-| [`RPP_64BIT`](src/rpp/config.h#L218) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L368) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L376) | `1` if target is big-endian |
+| [`RPP_BARE_METAL`](src/rpp/config.h#L188) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
+| [`RPP_FREERTOS`](src/rpp/config.h#L176) | `1` if targeting FreeRTOS |
+| [`RPP_STM32_HAL`](src/rpp/config.h#L180) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
+| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L195) | `1` if targeting ARM Cortex-M architecture |
+| [`RPP_ARM_ARCH`](src/rpp/config.h#L211) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
+| [`RPP_64BIT`](src/rpp/config.h#L236) | `1` if compiling for a 64-bit target |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L386) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L394) | `1` if target is big-endian |
 
 ### Feature Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_QT`](src/rpp/config.h#L139) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
-| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L149) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
+| [`RPP_HAS_QT`](src/rpp/config.h#L157) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
+| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L167) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
 
 ### Function Attributes
 
 | Macro | Description |
 |-------|-------------|
-| [`FINLINE`](src/rpp/config.h#L211) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
-| [`NOINLINE`](src/rpp/config.h#L202) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](src/rpp/config.h#L242) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L301) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L233) | Delete copy and move constructors and assignment operators |
+| [`FINLINE`](src/rpp/config.h#L229) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
+| [`NOINLINE`](src/rpp/config.h#L220) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
+| [`NODISCARD`](src/rpp/config.h#L260) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L319) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L251) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L265) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L276) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L283) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L294) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L316) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L332) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L333) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L334) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L334) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L350) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L351) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L352) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](src/rpp/config.h#L345) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](src/rpp/config.h#L346) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](src/rpp/config.h#L347) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L348) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L357) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L356) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L359) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L358) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L361) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L360) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L363) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L362) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L363) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L364) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L365) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L366) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L375) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L374) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L377) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L376) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L379) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L378) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L381) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L380) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.h#L388) | `unsigned char` |
-| [`ushort`](src/rpp/config.h#L389) | `unsigned short` |
-| [`uint`](src/rpp/config.h#L390) | `unsigned int` |
-| [`ulong`](src/rpp/config.h#L391) | `unsigned long` |
-| [`int16`](src/rpp/config.h#L393) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.h#L394) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.h#L397) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.h#L398) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.h#L404) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.h#L405) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L406) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L407) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L408) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L409) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L411) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L412) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L415) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L416) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L422) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L423) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -1191,26 +1222,26 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 | Class | Description |
 |-------|-------------|
 | [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L170) | Single-target function delegate |
-| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L718) | Multi-target event delegate (`event<>` alias) |
+| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L746) | Multi-target event delegate (`event<>` alias) |
 
 ### delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`operator()(Args... args)`](src/rpp/delegate.h#L659) | Invoke the delegate |
-| [`operator bool()`](src/rpp/delegate.h#L620) | True if delegate is bound |
-| [`reset()`](src/rpp/delegate.h#L604) | Unbind the delegate |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L687) | Invoke the delegate |
+| [`operator bool()`](src/rpp/delegate.h#L648) | True if delegate is bound |
+| [`reset()`](src/rpp/delegate.h#L593) | Unbind the delegate |
 
 ### multicast_delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L803) / [`operator+=`](src/rpp/delegate.h#L864) | Register a callback |
-| [`operator-=`](src/rpp/delegate.h#L874) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L884) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L752) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L771) | Number of registered callbacks |
-| [`multicast_fwd<T>`](src/rpp/delegate.h#L888) | Trait to deduce forwarding reference type for multicast args |
+| [`add(delegate)`](src/rpp/delegate.h#L831) / [`operator+=`](src/rpp/delegate.h#L892) | Register a callback |
+| [`operator-=`](src/rpp/delegate.h#L902) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L912) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L751) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L799) | Number of registered callbacks |
+| [`multicast_fwd<T>`](src/rpp/delegate.h#L916) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
 
@@ -3443,7 +3474,7 @@ Thread-safe FIFO queue with notification support.
 |--------|-------------|
 | [`push(T&& item)`](src/rpp/concurrent_queue.h#L314) | Push an item |
 | [`push(T&&... items)`](src/rpp/concurrent_queue.h#L314) | Push multiple items |
-| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L1053) | Non-blocking pop attempt |
+| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L1027) | Non-blocking pop attempt |
 | [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L298) | Pop all items at once |
 | [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L538) | Blocking pop with timeout |
 | [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L631) | Blocking pop with predicate and timeout |
@@ -3452,9 +3483,9 @@ Thread-safe FIFO queue with notification support.
 | [`size()`](src/rpp/concurrent_queue.h#L147) | Number of items |
 | [`reserve(int n)`](src/rpp/concurrent_queue.h#L228) | Reserve capacity |
 | [`notify()`](src/rpp/concurrent_queue.h#L156) / [`notify_one()`](src/rpp/concurrent_queue.h#L165) | Wake waiting consumers |
-| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L1034) | C++20 coroutine `co_await` — wait for items available |
-| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L1065) | C++20 coroutine `co_await` — pop item (returns bool) |
-| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1065) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
+| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L1008) | C++20 coroutine `co_await` — wait for items available |
+| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L1039) | C++20 coroutine `co_await` — pop item (returns bool) |
+| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1073) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
 
 ### Example: Coroutine co_await
 

@@ -242,11 +242,9 @@ RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, cons
         if      (severity == LogSeverityInfo) priority = ANDROID_LOG_INFO;
         else if (severity == LogSeverityWarn) priority = ANDROID_LOG_WARN;
         __android_log_write(priority, tag, str);
-
     #elif RPP_BARE_METAL
         printf_("%.*s\n", len, str);
     #else
-
         #if _MSC_VER
             // windows: configure code page as UTF-8, so any UTF-8 characters are printed correctly
             static bool have_configured_mode;

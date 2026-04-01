@@ -2,12 +2,13 @@
  * Replacement liblog.so for QEMU user-mode testing.
  * Redirects __android_log_* to stdout/stderr with ANSI-colored priority labels.
  * ERROR/FATAL go to stderr, everything else to stdout.
- * Does not append extra newlines — callers already include them.
+ * Each log call is a separate line (matching real Android logcat behavior).
  *
  * Build: .circleci/build_liblog.sh
  */
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 enum {
     ANDROID_LOG_VERBOSE = 2,
@@ -51,46 +52,52 @@ static FILE* log_stream(int prio)
     return (prio >= ANDROID_LOG_ERROR) ? stderr : stdout;
 }
 
-static void print_prefix(FILE* out, int prio, const char* tag)
+// prefix: start color and print priority/tag label
+static void log_prefix(FILE* out, int prio, const char* tag)
 {
-    fprintf(out, "%s%s/%s: \x1b[0m", prio_color(prio), prio_label(prio), tag);
+    fprintf(out, "%s%s/%s: ", prio_color(prio), prio_label(prio), tag);
+}
+
+// suffix: reset color and always append a trailing newline
+static void log_suffix(FILE* out)
+{
+    fprintf(out, "\x1b[0m\n");
+    fflush(out);
 }
 
 int __android_log_write(int prio, const char* tag, const char* text)
 {
     FILE* out = log_stream(prio);
-    print_prefix(out, prio, tag);
+    log_prefix(out, prio, tag);
     int ret = fprintf(out, "%s", text);
-    fflush(out);
+    log_suffix(out);
     return ret;
 }
 
 int __android_log_print(int prio, const char* tag, const char* fmt, ...)
 {
     FILE* out = log_stream(prio);
-    print_prefix(out, prio, tag);
+    log_prefix(out, prio, tag);
     va_list ap;
     va_start(ap, fmt);
     int ret = vfprintf(out, fmt, ap);
     va_end(ap);
-    fputc('\n', out);
-    fflush(out);
+    log_suffix(out);
     return ret;
 }
 
 int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap)
 {
     FILE* out = log_stream(prio);
-    print_prefix(out, prio, tag);
+    log_prefix(out, prio, tag);
     int ret = vfprintf(out, fmt, ap);
-    fputc('\n', out);
-    fflush(out);
+    log_suffix(out);
     return ret;
 }
 
 void __android_log_assert(const char* cond, const char* tag, const char* fmt, ...)
 {
-    print_prefix(stderr, ANDROID_LOG_FATAL, tag);
+    log_prefix(stderr, ANDROID_LOG_FATAL, tag);
     fprintf(stderr, "ASSERT FAILED");
     if (cond) fprintf(stderr, " [%s]", cond);
     if (fmt)
@@ -101,8 +108,7 @@ void __android_log_assert(const char* cond, const char* tag, const char* fmt, ..
         vfprintf(stderr, fmt, ap);
         va_end(ap);
     }
-    fputc('\n', stderr);
-    fflush(stderr);
+    log_suffix(stderr);
     __builtin_abort();
 }
 

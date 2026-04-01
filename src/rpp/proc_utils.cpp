@@ -31,7 +31,12 @@ namespace rpp
             result.virtual_size = static_cast<uint64>(info.virtual_size);
             result.physical_mem = static_cast<uint64>(info.resident_size);
         }
-    #else
+    #elif RPP_ANDROID
+        struct rusage usg {};
+        getrusage(RUSAGE_SELF, &usg);
+        result.physical_mem = static_cast<uint64>(usg.ru_maxrss) * 1024; // convert from KB to bytes
+        result.virtual_size = result.physical_mem; // fallback to physical mem if stat read fails
+    #else // Linux or Android
         // // https://man7.org/linux/man-pages/man5/proc.5.html
         // // size       (1) total program size (same as VmSize in /proc/pid/status)
         // // resident   (2) resident set size (inaccurate; same as VmRSS in /proc/pid/status)
@@ -71,6 +76,13 @@ namespace rpp
                 }
             }
         }
+        else
+        {
+            struct rusage usg {};
+            getrusage(RUSAGE_SELF, &usg);
+            result.physical_mem = static_cast<uint64>(usg.ru_maxrss) * 1024; // convert from KB to bytes
+            result.virtual_size = result.physical_mem; // fallback to physical mem if stat read fails
+        }
     #endif
         return result;
     }
@@ -98,7 +110,7 @@ namespace rpp
             r.cpu_time_us    = r.kernel_time_us + r.user_time_us;
         }
     #else // linux
-        struct rusage usg;
+        struct rusage usg {};
         getrusage(RUSAGE_SELF, &usg);
         // convert timeval to microseconds
         r.kernel_time_us = usg.ru_stime.tv_sec * 1'000'000ll + (int64)usg.ru_stime.tv_usec;
