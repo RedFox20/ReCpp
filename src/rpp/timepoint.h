@@ -34,6 +34,53 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @brief Clock types for TimePoint::now(ClockType).
+     *
+     * Linux clock_gettime mapping and cross-platform alternatives:
+     *
+     * Wall clocks (epoch-based):
+     *   Realtime       - CLOCK_REALTIME           - wall clock, NTP adjusted
+     *   RealtimeCoarse - CLOCK_REALTIME_COARSE    - fast but ~1-4ms resolution
+     *   TAI            - CLOCK_TAI                - International Atomic Time (no leap seconds)
+     *
+     * Monotonic clocks (arbitrary epoch, never goes backwards):
+     *   Monotonic       - CLOCK_MONOTONIC          - monotonic, NTP rate-adjusted
+     *   MonotonicRaw    - CLOCK_MONOTONIC_RAW      - monotonic, no NTP adjustment at all
+     *   MonotonicCoarse - CLOCK_MONOTONIC_COARSE   - fast but ~1-4ms resolution
+     *   Boottime        - CLOCK_BOOTTIME           - like Monotonic but includes suspend time
+     *
+     * CPU time clocks:
+     *   ProcessCPU - CLOCK_PROCESS_CPUTIME_ID - CPU time consumed by this process
+     *   ThreadCPU  - CLOCK_THREAD_CPUTIME_ID  - CPU time consumed by this thread
+     *
+     * Platform fallbacks:
+     *   macOS:   No Coarse variants (uses regular), no Boottime (uses Monotonic), no TAI (uses Realtime)
+     *   Windows: Realtime=GetSystemTimePreciseAsFileTime, RealtimeCoarse=GetSystemTimeAsFileTime,
+     *            Monotonic/MonotonicRaw=QueryPerformanceCounter, Boottime/MonotonicCoarse=GetTickCount64,
+     *            ProcessCPU=GetProcessTimes, ThreadCPU=GetThreadTimes, no TAI (uses Realtime)
+     *   Other:   All types fall back to default now()
+     */
+    enum class ClockType
+    {
+        // wall clocks (epoch-based)
+        Realtime = 0,        // system real-time clock (default)
+        RealtimeCoarse = 1,  // fast, lower resolution real-time clock
+        TAI = 2,             // international atomic time (Linux only, fallback to Realtime elsewhere)
+
+        // monotonic clocks (arbitrary epoch, suitable for elapsed time measurements)
+        Monotonic = 3,       // monotonic clock, NTP rate-adjusted
+        MonotonicRaw = 4,    // monotonic clock, no NTP adjustments
+        MonotonicCoarse = 5, // fast, lower resolution monotonic clock
+        Boottime = 6,        // monotonic clock that includes system suspend time
+
+        // CPU time clocks
+        ProcessCPU = 7,      // CPU time consumed by this process (all threads)
+        ThreadCPU = 8,       // CPU time consumed by the calling thread
+    };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     static constexpr int64 MILLIS_PER_SEC = 1'000LL;
     static constexpr int64 MICROS_PER_SEC = 1'000'000LL;
     static constexpr int64 NANOS_PER_SEC  = 1'000'000'000LL;
@@ -272,6 +319,13 @@ namespace rpp
 
         /** @returns Current OS specific high accuracy timepoint */
         static TimePoint now() noexcept;
+
+        /**
+         * @returns TimePoint from the specified clock source.
+         * @note Monotonic clocks use an arbitrary epoch (not UNIX epoch).
+         *       On unsupported platforms, falls back to default now().
+         */
+        static TimePoint now(ClockType clock) noexcept;
 
         /** @returns Current OS time with timezone offset */
         static TimePoint local() noexcept;

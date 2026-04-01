@@ -67,10 +67,7 @@ jobs:
           steps:
             - run:
                 name: Clang Tidy Analysis # run clang-tidy separately for Clang++ because it's super slow during build
-                command: |
-                  # only keep the first entry for each source file, since we're skipping tests which recompile with RPP_DEBUG=1
-                  ./.circleci/dedup_compile_commands.py packages/ReCpp/linux/compile_commands.json
-                  run-clang-tidy -j 3 -p packages/ReCpp/linux/ src/rpp/
+                command: ./run_clang_tidy -j 5
   win64-cpp20-msvc2022:
     description: Windows MSVC C++20 VS2022 x64 Build
     executor:
@@ -148,15 +145,7 @@ jobs:
               CXX20=1 mama android verbose build with_tests jobs=3
       - run:
           name: Clang Tidy Analysis # run clang-tidy separately because it's super slow during build
-          command: |
-            echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-            NDK_CLANG_TIDY="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang-tidy"
-            echo "Using clang-tidy: $NDK_CLANG_TIDY"
-            # only keep the first entry for each source file, since we're skipping tests which recompile with RPP_DEBUG=1
-            ./.circleci/dedup_compile_commands.py packages/ReCpp/android/compile_commands.json
-            ls /home/circleci/android-sdk/ndk/
-            ls -la "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/"
-            run-clang-tidy -clang-tidy-binary "$NDK_CLANG_TIDY" -j 3 -p packages/ReCpp/android/ src/rpp/
+          command: ./run_clang_tidy --android -j 5
 
 workflows:
   build_all:

@@ -1,0 +1,69 @@
+#!/bin/bash
+# Runs clang-tidy analysis on the ReCpp source files using the mama build compile_commands.json.
+# Requires a prior mama build so that compile_commands.json exists.
+#
+# Usage:
+#   ./run_clang_tidy              # linux, all cores
+#   ./run_clang_tidy -j 3         # linux, 3 jobs
+#   ./run_clang_tidy --android    # android NDK clang-tidy
+#   ./run_clang_tidy -v           # verbose (show per-file commands)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# parse args
+JOBS=""
+PLATFORM="linux"
+VERBOSE=false
+PASSTHROUGH=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --android) PLATFORM="android"; shift ;;
+        -v|--verbose) VERBOSE=true; shift ;;
+        -j) JOBS="$2"; shift 2 ;;
+        -j*) JOBS="${1#-j}"; shift ;;
+        *) PASSTHROUGH+=("$1"); shift ;;
+    esac
+done
+JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
+
+COMPILE_DB="$SCRIPT_DIR/packages/ReCpp/$PLATFORM/compile_commands.json"
+if [ ! -f "$COMPILE_DB" ]; then
+    echo "ERROR: $COMPILE_DB not found. Run 'mama build' first." >&2
+    exit 1
+fi
+
+# deduplicate compile_commands.json (tests recompile sources with RPP_DEBUG=1)
+"$SCRIPT_DIR/.circleci/dedup_compile_commands.py" "$COMPILE_DB" > /dev/null
+
+# use NDK clang-tidy for android builds
+CLANG_TIDY_ARGS=()
+if [[ "$PLATFORM" == "android" ]]; then
+    NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+    if [[ -z "$NDK_HOME" ]]; then
+        echo "ERROR: ANDROID_NDK_HOME or ANDROID_NDK_ROOT must be set for --android" >&2
+        ls /home/circleci/android-sdk/ndk/
+        exit 1
+    fi
+    NDK_CLANG_TIDY="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang-tidy"
+    if [ ! -f "$NDK_CLANG_TIDY" ]; then
+        echo "ERROR: NDK clang-tidy not found at $NDK_CLANG_TIDY" >&2
+        ls -la "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/"
+        exit 1
+    fi
+    CLANG_TIDY_ARGS+=(-clang-tidy-binary "$NDK_CLANG_TIDY")
+fi
+
+CMD=(run-clang-tidy -j "$JOBS"
+    -p "$(dirname "$COMPILE_DB")"
+    -use-color true
+    "${CLANG_TIDY_ARGS[@]+"${CLANG_TIDY_ARGS[@]}"}"
+    "${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"}"
+    "$SCRIPT_DIR/src/rpp/")
+
+if [[ "$VERBOSE" == true ]]; then
+    "${CMD[@]}"
+else
+    # quiet mode: only show actual warnings/errors, not per-file progress or check lists
+    "${CMD[@]}" 2>&1 | grep -vE '^(clang-tidy|Use -header-filter|Suppressed [0-9]+ warning|Enabled checks:|[0-9]+ warnings generated\.|    [-a-z]|\s*$)' || true
+fi

@@ -18,6 +18,7 @@
 #endif
 
 #include "timer.h" // rpp::Duration, rpp::TimePoint
+#include "predicates.h" // rpp::IsPredicate
 #include <condition_variable> // std::cv_status
 
 namespace rpp
@@ -98,7 +99,7 @@ namespace rpp
          * @returns false if the predicate pred still evaluates to false
          *          after the abs_time timeout expired, otherwise true.
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time,
                         const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
@@ -123,7 +124,7 @@ namespace rpp
          * @returns false if the predicate stop_waiting still evaluates
          *          to false after the rel_time timeout expired, otherwise true.
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const rpp::Duration& rel_time,
                       const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
@@ -244,7 +245,7 @@ namespace rpp
          * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
          * @param stop_waiting predicate which returns ​false if the waiting should be continued
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         void wait(std::unique_lock<Mutex>& lock, const Predicate& stop_waiting) noexcept
         {
             while (!stop_waiting())
@@ -286,7 +287,7 @@ namespace rpp
          * @returns false if the predicate pred still evaluates to false
          *          after the abs_time timeout expired, otherwise true.
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const time_point& abs_time,
                         const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
@@ -309,7 +310,7 @@ namespace rpp
          * @returns false if the predicate stop_waiting still evaluates
          *          to false after the rel_time timeout expired, otherwise true.
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const duration& rel_time,
                       const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
@@ -390,7 +391,7 @@ namespace rpp
          * @returns false if the predicate pred still evaluates to false
          *          after the abs_time timeout expired, otherwise true.
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time,
                         const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
@@ -413,7 +414,7 @@ namespace rpp
          * @returns false if the predicate stop_waiting still evaluates
          *          to false after the rel_time timeout expired, otherwise true.
          */
-        template<class Mutex, class Predicate>
+        template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const rpp::Duration& rel_time,
                       const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())

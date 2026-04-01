@@ -22,14 +22,25 @@ namespace rpp
     {
     }
 
+    Timer::Timer(ClockType clock) noexcept
+        : started{TimePoint::now(clock)}, clock{clock}
+    {
+    }
+
     Timer::Timer(StartMode mode) noexcept
         : started{mode == StartMode::AutoStart ? TimePoint::now() : TimePoint{}}
     {
     }
 
+    Timer::Timer(ClockType clock, StartMode mode) noexcept
+        : started{mode == StartMode::AutoStart ? TimePoint::now(clock) : TimePoint{}}
+        , clock{clock}
+    {
+    }
+
     double Timer::elapsed() const noexcept
     {
-        TimePoint end = TimePoint::now();
+        TimePoint end = time_now();
         return started.elapsed_sec(end);
     }
 
@@ -45,7 +56,7 @@ namespace rpp
 
     double Timer::next() noexcept
     {
-        TimePoint now = TimePoint::now();
+        TimePoint now = time_now();
         double t = started.elapsed_sec(now);
         started = now;
         return t;

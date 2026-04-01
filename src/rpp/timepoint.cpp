@@ -17,6 +17,10 @@
         #if __ANDROID__
             #include <android/log.h>
         #endif
+        // CLOCK_TAI may not be defined on older glibc/kernel headers
+        #ifndef CLOCK_TAI
+            #define CLOCK_TAI 11
+        #endif
     #endif
     #include <thread>
 #elif RPP_BARE_METAL
@@ -260,6 +264,16 @@ namespace rpp
             return 1000 / tick_period_in_ms;
         }
     #endif
+#endif
+
+#if __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
+    // converts a clock_gettime result to a TimePoint
+    static FINLINE int64 linux_clock_gettime_ns(clockid_t clk) noexcept
+    {
+        struct timespec t;
+        clock_gettime(clk, &t);
+        return int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec);
+    }
 #endif
 
     void sleep_ms(unsigned int millis) noexcept
@@ -678,9 +692,89 @@ namespace rpp
         #elif RPP_STM32_HAL
             return TimePoint{ cortex_m_get_time_ns() };
         #else
-            struct timespec t;
-            clock_gettime(CLOCK_REALTIME, &t);
-            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) };
+            return TimePoint{ linux_clock_gettime_ns(CLOCK_REALTIME) };
+        #endif
+    }
+
+    TimePoint TimePoint::now(ClockType clock) noexcept
+    {
+        #if _WIN32
+            switch (clock)
+            {
+                default:
+                case ClockType::Realtime:
+                case ClockType::TAI: // no TAI on Windows, fall back to Realtime
+                    return now(); // GetSystemTimePreciseAsFileTime
+                case ClockType::RealtimeCoarse: {
+                    // GetSystemTimeAsFileTime is faster but less precise (~15.6ms)
+                    FILETIME filetime;
+                    GetSystemTimeAsFileTime(&filetime);
+                    return TimePoint{ ticks_to_ns(get_ticks_since_epoch(filetime)) };
+                }
+                case ClockType::Monotonic:
+                case ClockType::MonotonicRaw: {
+                    // QueryPerformanceCounter - high resolution monotonic timer
+                    LARGE_INTEGER freq, counter;
+                    QueryPerformanceFrequency(&freq);
+                    QueryPerformanceCounter(&counter);
+                    // convert to nanoseconds: counter * 1e9 / freq
+                    // split to avoid overflow: whole seconds + remainder
+                    int64 sec  = counter.QuadPart / freq.QuadPart;
+                    int64 rem  = counter.QuadPart % freq.QuadPart;
+                    return TimePoint{ sec * NANOS_PER_SEC + (rem * NANOS_PER_SEC) / freq.QuadPart };
+                }
+                case ClockType::MonotonicCoarse:
+                case ClockType::Boottime:
+                    // GetTickCount64 - milliseconds since boot, includes suspend time
+                    return TimePoint{ int64(GetTickCount64()) * NANOS_PER_MILLI };
+                case ClockType::ProcessCPU: {
+                    FILETIME creation, exit, kernel, user;
+                    GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user);
+                    return TimePoint{ ticks_to_ns(to_uint64(kernel) + to_uint64(user)) };
+                }
+                case ClockType::ThreadCPU: {
+                    FILETIME creation, exit, kernel, user;
+                    GetThreadTimes(GetCurrentThread(), &creation, &exit, &kernel, &user);
+                    return TimePoint{ ticks_to_ns(to_uint64(kernel) + to_uint64(user)) };
+                }
+            }
+        #elif RPP_BARE_METAL
+            (void)clock;
+            return now(); // bare metal: all clock types fall back to default
+        #elif __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
+            // ClockType to clockid_t mapping table
+            // macOS: no coarse variants, no boottime, no TAI — mapped to nearest equivalent
+            constexpr clockid_t clock_table[] = {
+                // wall clocks
+                /*Realtime*/       CLOCK_REALTIME,
+                #if __linux__ || __ANDROID__
+                /*RealtimeCoarse*/ CLOCK_REALTIME_COARSE,
+                /*TAI*/            CLOCK_TAI,
+                #else // macOS/Emscripten: no coarse or TAI variants
+                /*RealtimeCoarse*/ CLOCK_REALTIME,
+                /*TAI*/            CLOCK_REALTIME,
+                #endif
+                // monotonic clocks
+                CLOCK_MONOTONIC,
+                CLOCK_MONOTONIC_RAW,
+                #if __linux__ || __ANDROID__
+                /*MonotonicCoarse*/ CLOCK_MONOTONIC_COARSE,
+                /*Boottime*/        CLOCK_BOOTTIME,
+                #else // macOS/Emscripten: no coarse, boottime includes suspend already
+                /*MonotonicCoarse*/ CLOCK_MONOTONIC,
+                /*Boottime*/        CLOCK_MONOTONIC,
+                #endif
+                // CPU time clocks
+                CLOCK_PROCESS_CPUTIME_ID,
+                CLOCK_THREAD_CPUTIME_ID,
+            };
+            int index = static_cast<int>(clock);
+            constexpr int max_index = static_cast<int>(sizeof(clock_table) / sizeof(clock_table[0]));
+            clockid_t clk = (index >= 0 && index < max_index) ? clock_table[index] : CLOCK_REALTIME;
+            return TimePoint{ linux_clock_gettime_ns(clk) };
+        #else
+            (void)clock;
+            return now(); // unknown platform: all clock types fall back to default
         #endif
     }
 
@@ -694,9 +788,7 @@ namespace rpp
         #elif RPP_STM32_HAL
             return TimePoint{cortex_m_get_time_ns() + timezone_offset_seconds() * NANOS_PER_SEC};
         #else
-            struct timespec t;
-            clock_gettime(CLOCK_REALTIME, &t);
-            return TimePoint{ int64(t.tv_sec * NANOS_PER_SEC + t.tv_nsec) + timezone_offset_seconds() * NANOS_PER_SEC };
+            return TimePoint{ linux_clock_gettime_ns(CLOCK_REALTIME) + timezone_offset_seconds() * NANOS_PER_SEC };
         #endif
     }
 

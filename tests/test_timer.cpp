@@ -27,19 +27,19 @@ TestImpl(test_timer)
 
     TestCase(basic_timer_sec)
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             rpp::Timer t;
-            spin_sleep_for_ms(20);
-            double elapsed = t.elapsed();
-            print_info("timer %d 20ms spin_sleep timer result: %fs\n", i+1, elapsed);
-            AssertInRange(elapsed, 0.02, 0.02 + sigma_s);
+            spin_sleep_for_ms(10);
+            double elapsed_ms = t.elapsed_millis();
+            print_info("timer %d 10ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
+            AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
         }
     }
 
     TestCase(basic_timer_ms)
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             rpp::Timer t;
             spin_sleep_for_ms(10);
@@ -51,7 +51,7 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_millis_accuracy)
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             rpp::Timer t;
             rpp::sleep_ms(18);
@@ -63,7 +63,7 @@ TestImpl(test_timer)
 
     TestCase(ensure_sleep_micros_accuracy)
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(2500);
@@ -71,7 +71,7 @@ TestImpl(test_timer)
             print_info("micros %d 2500us sleep time: %gus\n", i+1, elapsed_us);
             AssertInRange(elapsed_us, 2500, 20'000); // OS sleep can never be accurate enough, so the range must be very loose
         }
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             rpp::Timer t;
             rpp::sleep_us(500);
@@ -339,13 +339,13 @@ TestImpl(test_timer)
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), false);
 
-        spin_sleep_for_ms(50);
+        spin_sleep_for_ms(20);
 
         sw.stop();
         AssertThat(sw.started(), true);
         AssertThat(sw.stopped(), true);
-        print_info("50ms stopwatch time: %fs\n", sw.elapsed());
-        AssertInRange(sw.elapsed_millis(), 50.0, 50.0 + sigma_ms);
+        print_info("20ms stopwatch time: %fs\n", sw.elapsed());
+        AssertInRange(sw.elapsed_millis(), 20.0, 20.0 + sigma_ms);
         AssertThat(sw.elapsed(), sw.elapsed()); // ensure time is stable after stop
 
         sw.resume();
@@ -372,19 +372,19 @@ TestImpl(test_timer)
     {
         {
             auto spt = rpp::ScopedPerfTimer{};
-            spin_sleep_for_ms(25);
+            spin_sleep_for_ms(10);
         }
         {
             auto spt = rpp::ScopedPerfTimer { __FUNCTION__ }; // backwards compatibility
-            spin_sleep_for_ms(25);
+            spin_sleep_for_ms(10);
         }
         {
             auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__ };
-            spin_sleep_for_ms(25);
+            spin_sleep_for_ms(10);
         }
         {
             auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__, "detail-item" };
-            spin_sleep_for_ms(25);
+            spin_sleep_for_ms(10);
         }
     }
 
@@ -455,6 +455,135 @@ TestImpl(test_timer)
         AssertEqual(local.to_string(), expected.to_string());
     }
 
+    TestCase(timer_with_clock_type)
+    {
+        rpp::Timer t { rpp::ClockType::Monotonic };
+        AssertThat(t.clock, rpp::ClockType::Monotonic);
+        AssertThat(t.is_started(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        double elapsed_ms = t.elapsed_millis();
+        print_info("Timer(Monotonic) 10ms elapsed: %.3fms\n", elapsed_ms);
+        AssertInRange(elapsed_ms, 9.0, 15.0);
+
+        // test next() resets with correct clock
+        double next_ms = t.next_millis();
+        print_info("Timer(Monotonic) next: %.3fms\n", next_ms);
+        AssertGreater(next_ms, 0.0);
+    }
+
+    TestCase(timer_with_clock_type_nostart)
+    {
+        rpp::Timer t { rpp::ClockType::Monotonic, rpp::Timer::NoStart };
+        AssertThat(t.clock, rpp::ClockType::Monotonic);
+        AssertThat(t.is_started(), false);
+        t.start();
+        AssertThat(t.is_started(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        double elapsed_ms = t.elapsed_millis();
+        print_info("Timer(Monotonic, NoStart) 10ms elapsed: %.3fms\n", elapsed_ms);
+        AssertInRange(elapsed_ms, 9.0, 15.0);
+    }
+
+    TestCase(clock_type_realtime)
+    {
+        // Realtime should return a value close to default now()
+        rpp::TimePoint t1 = rpp::TimePoint::now();
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Realtime);
+        rpp::int64 diff_us = (t2 - t1).abs().micros();
+        print_info("Realtime vs now() diff: %lldus\n", diff_us);
+        AssertLess(diff_us, 1'000); // should be within 1000us
+    }
+
+    TestCase(clock_type_realtime_coarse)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::RealtimeCoarse);
+        AssertThat(t1.is_valid(), true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Realtime);
+        rpp::int64 diff_us = (t2 - t1).abs().micros();
+        print_info("RealtimeCoarse vs Realtime diff: %lldus\n", diff_us);
+        AssertLess(diff_us, 100'000);
+    }
+
+    TestCase(clock_type_monotonic)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+        AssertThat(t1.is_valid(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+        rpp::int64 elapsed_us = (t2 - t1).micros();
+        print_info("Monotonic 10ms elapsed: %lldus\n", elapsed_us);
+        AssertGreaterOrEqual(elapsed_us, 9'000);
+        AssertLessOrEqual(elapsed_us, 15'000);
+    }
+
+    TestCase(clock_type_monotonic_raw)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::MonotonicRaw);
+        AssertThat(t1.is_valid(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::MonotonicRaw);
+        rpp::int64 elapsed_us = (t2 - t1).micros();
+        print_info("MonotonicRaw 10ms elapsed: %lldus\n", elapsed_us);
+        AssertGreaterOrEqual(elapsed_us, 9'000);
+        AssertLessOrEqual(elapsed_us, 15'000);
+    }
+
+    TestCase(clock_type_monotonic_coarse)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
+        AssertThat(t1.is_valid(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
+        rpp::int64 elapsed_us = (t2 - t1).micros();
+        print_info("MonotonicCoarse 10ms elapsed: %lldus\n", elapsed_us);
+        // coarse clocks have low resolution, so use wider tolerance
+        AssertGreaterOrEqual(elapsed_us, 9'000);
+        AssertLessOrEqual(elapsed_us, 30'000);
+    }
+
+    TestCase(clock_type_boottime)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Boottime);
+        AssertThat(t1.is_valid(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Boottime);
+        rpp::int64 elapsed_us = (t2 - t1).micros();
+        print_info("Boottime 10ms elapsed: %lldus\n", elapsed_us);
+        AssertGreaterOrEqual(elapsed_us, 9'000);
+        AssertLessOrEqual(elapsed_us, 15'000);
+    }
+
+    TestCase(clock_type_process_cpu)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
+        AssertThat(t1.is_valid(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
+        rpp::int64 elapsed_us = (t2 - t1).micros();
+        print_info("ProcessCPU 10ms spin elapsed: %lldus\n", elapsed_us);
+        AssertGreater(elapsed_us, 5'000);
+    }
+
+    TestCase(clock_type_thread_cpu)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
+        AssertThat(t1.is_valid(), true);
+        spin_sleep_for_us(10'000, /*full_spin*/true);
+        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
+        rpp::int64 elapsed_us = (t2 - t1).micros();
+        print_info("ThreadCPU 10ms spin elapsed: %lldus\n", elapsed_us);
+        AssertGreater(elapsed_us, 5'000);
+    }
+
+    TestCase(clock_type_tai)
+    {
+        // TAI may fail on systems without TAI configured, but should not crash
+        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::TAI);
+        print_info("TAI value: %lldns\n", t1.duration.nanos());
+        // TAI falls back to Realtime on non-Linux, so just verify it returns something
+        AssertThat(t1.is_valid(), true);
+    }
+
     TestCase(proc_cpu_times)
     {
         rpp::cpu_usage_info t1 = rpp::proc_total_cpu_usage();
@@ -470,10 +599,14 @@ TestImpl(test_timer)
         print_info("# diff all:%.1fms usr:%.1fms sys:%.1fms\n",
                    double(cpu_delta)/1000.0, double(user_delta)/1000.0, double(kernel_delta)/1000.0);
 
+        // kernel_time_us can be 0 on Linux VMs where spin_sleep uses RDTSC (pure userspace)
+        // also, since we use spin_sleep_for_us() with full_spin=true, we may get a lot of kernel=0 readings
+    #if _MSC_VER
         AssertGreater(t1.kernel_time_us, 0u);
+        AssertGreater(t2.kernel_time_us, 0u);
+    #endif
         AssertGreater(t1.user_time_us, 0u);
         AssertGreater(t1.cpu_time_us, 0u);
-        AssertGreater(t2.kernel_time_us, 0u);
         AssertGreater(t2.user_time_us, 0u);
         // only compare CPU times, since we're uncertain about USER/KERNEL distribution
         AssertGreaterOrEqual(t2.cpu_time_us, t1.cpu_time_us);

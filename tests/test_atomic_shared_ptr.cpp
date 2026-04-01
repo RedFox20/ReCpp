@@ -217,7 +217,7 @@ TestImpl(test_atomic_shared_ptr)
                 }
             }
         };
-        std::thread r1{reader}, r2{reader}, r3{reader}, r4{reader};
+        std::thread r1{reader}, r2{reader}, r3{reader}, r4{reader}; // NOLINT(readability-isolate-declaration)
 
         for (int i = 0; i < N; ++i)
         {

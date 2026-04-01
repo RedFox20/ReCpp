@@ -142,6 +142,17 @@ namespace rpp
         }
 
         /**
+         * @returns The virtual time with ONLY warp offset applied, ignoring sync offset.
+         *          The sync offset is typically used for time syncing.
+         */
+        rpp::TimePoint time_unsynced() const noexcept
+        {
+            rpp::TimePoint base_local = rpp::TimePoint::now();
+            rpp::int64 warp_ns = warp_offset_ns.load(std::memory_order_relaxed);
+            return rpp::TimePoint{ base_local.duration.nsec + warp_ns };
+        }
+
+        /**
          * @returns The total offset (sync + warp) currently applied to the time source, 
          *          which can be added to a TimePoint to get the current time.
          */

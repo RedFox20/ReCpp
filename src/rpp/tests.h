@@ -47,7 +47,7 @@ namespace rpp
         strview name;
         test_factory factory;
 
-        strview case_filter;      // internal: only execute test cases that pass this filter
+        std::vector<strview> case_filters; // internal: only execute test cases that pass this filter
         bool test_enabled = true; // internal: this is automatically set by the test system
         bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
     };
@@ -199,7 +199,7 @@ namespace rpp
          * @param results ALL test results
          * @return TRUE if ALL tests passed, FALSE if any failure
          */
-        bool run_test(test_results& results, strview methodFilter = {});
+        bool run_test(test_results& results, const std::vector<strview>& case_filters);
     private:
         struct suite_results // intermediate results for a test suite run
         {

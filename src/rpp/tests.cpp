@@ -2,6 +2,7 @@
 #include "mutex.h"
 #include "proc_utils.h"
 #include "thread_pool.h"
+#include "timepoint.h"
 #include <memory>
 #include <unordered_set>
 #include <chrono> // high_resolution_clock
@@ -198,7 +199,7 @@ namespace rpp
         int test_cases_failed = 0;
 
         std::vector<test_failure*> failures;
-        std::chrono::nanoseconds elapsed_time{};
+        rpp::Duration elapsed_time;
         std::shared_ptr<rpp::mutex> mutex = std::make_shared<rpp::mutex>();
 
         ~test_results()
@@ -221,7 +222,7 @@ namespace rpp
         test_func_type func { nullptr };
         coro_func_type coro_func { nullptr };
         size_t expectedExType = 0;
-        std::chrono::nanoseconds elapsed_time{};
+        rpp::Duration elapsed_time;
         bool is_coro = false;
         bool autorun = true;
         bool did_run = false;
@@ -254,7 +255,7 @@ namespace rpp
         std::vector<test_func*> test_functions;
         test_results* current_results = nullptr;
         test_func* current_func = nullptr;
-        std::chrono::nanoseconds elapsed_time{};
+        rpp::Duration elapsed_time;
         int title_length = 80;
 
         ~test_impl()
@@ -486,10 +487,10 @@ namespace rpp
         tl_current_test = nullptr;
     }
 
-    static const char* get_time_str(const std::chrono::nanoseconds& time) noexcept
+    static const char* get_time_str(const rpp::Duration& time) noexcept
     {
         static thread_local char buffer[128];
-        rpp::int64 time_ns = time.count();
+        rpp::int64 time_ns = time.nsec;
         if (time_ns < 1000ll) // less than 1us, display as 999ns
         {
             snprintf(buffer, sizeof(buffer), "%dns", (int)time_ns);
@@ -519,26 +520,45 @@ namespace rpp
         return buffer;
     }
 
-    bool test::run_test(test_results& results, strview methodFilter)
+    bool test::run_test(test_results& results, const std::vector<strview>& case_filters)
     {
-        impl->current_results = &results;
         TestVerbosity verb = state().verbosity;
+        impl->current_results = &results;
 
-        print_test_suite_title(verb, methodFilter);
+        suite_results suite_total {};
+        auto run_suite = [this,&suite_total](strview methodFilter)
+        {
+            auto t1 = rpp::TimePoint::now();
+            suite_results r = run_test_suite(methodFilter);
+            auto t2 = rpp::TimePoint::now();
+            impl->elapsed_time += (t2 - t1);
 
-        auto t1 = std::chrono::high_resolution_clock::now();
-        suite_results r = run_test_suite(methodFilter);
-        auto t2 = std::chrono::high_resolution_clock::now();
-        impl->elapsed_time = t2 - t1;
+            suite_total.num_test_cases_run    += r.num_test_cases_run;
+            suite_total.num_test_cases_passed += r.num_test_cases_passed;
+            suite_total.num_test_cases_failed += r.num_test_cases_failed;
+        };
+
+        if (!case_filters.empty())
+        {
+            std::string method_filter = case_filters.size() == 1
+                                      ? std::string(case_filters.front())
+                                      : rpp::format("(%zu)filters", case_filters.size());
+            print_test_suite_title(verb, method_filter);
+            for (const strview& filter : case_filters)
+                run_suite(filter);
+        }
+        else
+        {
+            print_test_suite_title(verb, {});
+            run_suite({});
+        }
+
         impl->current_results = nullptr;
-
-        results.test_cases_run += r.num_test_cases_run;
-        results.test_cases_passed += r.num_test_cases_passed;
-        results.test_cases_failed += r.num_test_cases_failed;
-
-        print_test_suite_summary(verb, r);
-
-        return r.num_test_cases_run > 0 && r.all_success();
+        results.test_cases_run    += suite_total.num_test_cases_run;
+        results.test_cases_passed += suite_total.num_test_cases_passed;
+        results.test_cases_failed += suite_total.num_test_cases_failed;
+        print_test_suite_summary(verb, suite_total);
+        return suite_total.num_test_cases_run > 0 && suite_total.all_success();
     }
 
     test::suite_results test::run_test_suite(strview methodFilter)
@@ -660,7 +680,7 @@ namespace rpp
         test.did_run = true;
         tl_current_test_func = impl->current_func = &test;
         int before = impl->current_results->asserts_failed;
-        auto t1 = std::chrono::high_resolution_clock::now();
+        auto t1 = rpp::TimePoint::now();
         decltype(t1) t2;
         try
         {
@@ -683,7 +703,7 @@ namespace rpp
                 #endif
             }
             test_case_cleanup();
-            t2 = std::chrono::high_resolution_clock::now();
+            t2 = rpp::TimePoint::now();
             if (test.expectedExType) // we expected an exception, but none happened?!
             {
                 assert_failed_custom("FAILED with expected EXCEPTION NOT THROWN in %s::%s\n",
@@ -693,7 +713,7 @@ namespace rpp
         catch (const std::exception& e)
         {
             test_case_cleanup();
-            t2 = std::chrono::high_resolution_clock::now();
+            t2 = rpp::TimePoint::now();
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
                 if (verb >= TestVerbosity::AllMessages)
@@ -782,20 +802,19 @@ namespace rpp
         //       However, we want to avoid using rpp/timer.h here, since that would
         //       introduce a circular dependency in the testing framework and not test
         //       the timer.h implementation.
-        namespace time = std::chrono;
-        auto start = time::high_resolution_clock::now();
-        auto end = start + time::nanoseconds(microseconds * 1000ull);
+        auto start = std::chrono::high_resolution_clock::now();
+        auto end = start + std::chrono::nanoseconds(microseconds * 1000ull);
         while (true)
         {
-            auto remaining = (end - time::high_resolution_clock::now());
-            if (remaining <= time::nanoseconds::zero())
+            auto remaining = (end - std::chrono::high_resolution_clock::now());
+            if (remaining <= std::chrono::nanoseconds::zero())
                 break;
 
             // if we have more than win32 timeslice + suspend remaining, it's safe to sleep the thread
             constexpr int suspend_ms = 5;
-            if (!full_spin && remaining > time::milliseconds(16+suspend_ms))
+            if (!full_spin && remaining > std::chrono::milliseconds(16+suspend_ms))
             {
-                std::this_thread::sleep_for(time::milliseconds(suspend_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(suspend_ms));
             }
         }
 #endif
@@ -992,10 +1011,12 @@ namespace rpp
             }
 
             const bool exactMatch = testName.starts_with("test:");
+            const bool specificTest = specific.len > 0;
             testName = exactMatch ? testName.skip_after(':') : testName;
             LogTestLabel(
-                if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", testName.len, testName.str);
-                else            consolef(Yellow, "Filtering substr tests '%.*s'\n", testName.len, testName.str);
+                if    (specificTest) consolef(Yellow, "Filtering specific tests '%.*s::*%.*s*'\n", testName.len, testName.str, specific.len, specific.str);
+                else if (exactMatch) consolef(Yellow, "Filtering exact  tests '%.*s'\n", testName.len, testName.str);
+                else                 consolef(Yellow, "Filtering substr tests '%.*s'\n", testName.len, testName.str);
             );
 
             bool match = false;
@@ -1004,11 +1025,10 @@ namespace rpp
                 if ((exactMatch && t.name.equalsi(testName)) ||
                     (!exactMatch && t.name.containsi(testName)))
                 {
-                    t.case_filter = specific;
+                    t.case_filters.push_back(specific);
                     if (disableTest) disabled.insert(t.name);
                     else              enabled.insert(t.name);
                     match = true;
-                    if (exactMatch) break; // no need to continue searching if exact match
                 }
             }
             if (!match) {
@@ -1037,13 +1057,13 @@ namespace rpp
 
     void run_all_marked_tests(test_results& results)
     {
-        auto t1 = std::chrono::high_resolution_clock::now();
+        auto t1 = rpp::TimePoint::now();
         for (test_info& t : state().global_tests)
         {
             if (t.test_enabled)
             {
                 auto test = t.factory(t.name);
-                if (!test->run_test(results, t.case_filter))
+                if (!test->run_test(results, t.case_filters))
                 {
                     results.tests_failed++;
                 }
@@ -1051,7 +1071,7 @@ namespace rpp
             }
         }
 
-        auto t2 = std::chrono::high_resolution_clock::now();
+        auto t2 = rpp::TimePoint::now();
         results.elapsed_time = t2 - t1;
     }
 

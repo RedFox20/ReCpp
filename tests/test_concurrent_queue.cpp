@@ -445,6 +445,101 @@ TestImpl(test_concurrent_queue)
         AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 10.0, 35.0);
     }
 
+    // test that fast-forwarding a time source causes wait_pop to return early
+    TestCase(wait_pop_timesource_fast_forward)
+    {
+        concurrent_queue<std::string> queue;
+        AtomicTimeSource ts;
+
+        // wait_pop with a large virtual timeout, then fast-forward time from another thread
+        std::string item;
+        rpp::Timer real_timer;
+        rpp::cfuture<> warper = rpp::async_task([&] {
+            spin_sleep_for_ms(10); // let the consumer start waiting
+            ts.warp_forward(rpp::seconds(10)); // fast-forward past the timeout
+        });
+        scope_guard([&]{ warper.get(); });
+
+        bool got = queue.wait_pop(item, rpp::seconds(10), &ts);
+        double elapsed_ms = real_timer.elapsed_millis();
+
+        print_info("wait_pop fast-forward elapsed: %.2f ms (expected <40ms real)\n", elapsed_ms);
+        AssertThat(got, false); // no item was pushed
+        // should complete in well under 1s of real time, not 10s
+        AssertLess(elapsed_ms, 40.0);
+    }
+
+    // test that fast-forwarding a time source causes wait_pop_until to return early
+    TestCase(wait_pop_until_timesource_fast_forward)
+    {
+        concurrent_queue<std::string> queue;
+        AtomicTimeSource ts;
+
+        // use virtual time for the deadline
+        auto until = ts.time_now() + rpp::seconds(1);
+        std::string item;
+        rpp::Timer real_timer;
+        rpp::cfuture<> warper = rpp::async_task([&] {
+            spin_sleep_for_ms(10); // let the consumer start waiting
+            ts.warp_forward(rpp::seconds(1)); // fast-forward past the deadline
+        });
+        scope_guard([&]{ warper.get(); });
+
+        AssertFalse(queue.wait_pop_until(item, until, &ts));
+        double elapsed_ms = real_timer.elapsed_millis();
+
+        print_info("wait_pop_until fast-forward elapsed: %.2f ms (expected <40ms real)\n", elapsed_ms);
+        AssertThat(item, ""); // no item was pushed
+        // should complete in well under 1s of real time, not 10s
+        AssertLess(elapsed_ms, 40.0);
+    }
+
+    // test that wait_pop with time_source still receives items normally
+    TestCase(wait_pop_timesource_receives_item)
+    {
+        concurrent_queue<std::string> queue;
+        AtomicTimeSource ts;
+
+        // push an item after a short delay
+        rpp::cfuture<> producer = rpp::async_task([&] {
+            spin_sleep_for_ms(10);
+            queue.push("hello");
+        });
+        scope_guard([&]{ producer.get(); });
+
+        std::string item;
+        rpp::Timer real_timer;
+        AssertTrue(queue.wait_pop(item, rpp::seconds(1), &ts));
+        double elapsed_ms = real_timer.elapsed_millis();
+
+        print_info("wait_pop timesource item elapsed: %.2f ms (expected <40ms real)\n", elapsed_ms);
+        AssertThat(item, "hello");
+        AssertLess(elapsed_ms, 40.0); // should get the item promptly
+    }
+
+    // test that wait_pop_until with time_source still receives items normally
+    TestCase(wait_pop_until_timesource_receives_item)
+    {
+        concurrent_queue<std::string> queue;
+        AtomicTimeSource ts;
+
+        auto until = ts.time_now() + rpp::seconds(1);
+        rpp::cfuture<> producer = rpp::async_task([&] {
+            spin_sleep_for_ms(10);
+            queue.push("world");
+        });
+        scope_guard([&]{ producer.get(); });
+
+        std::string item;
+        rpp::Timer real_timer;
+        AssertTrue(queue.wait_pop_until(item, until, &ts));
+        double elapsed_ms = real_timer.elapsed_millis();
+
+        print_info("wait_pop_until timesource item elapsed: %.2f ms (expected <40ms real)\n", elapsed_ms);
+        AssertThat(item, "world");
+        AssertLess(elapsed_ms, 40.0); // should get the item promptly
+    }
+
     // in general the pop_with_timeout is not very useful because
     // it requires some external mechanism to notify the queue
     TestCase(wait_pop_with_timeout_and_cancelcondition)

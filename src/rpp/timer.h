@@ -18,6 +18,8 @@ namespace rpp
     {
         // public started timepoint, feel free to set it to whatever you want
         TimePoint started;
+        // clock type used by this timer for all now() calls
+        ClockType clock = ClockType::Realtime;
 
         enum StartMode {
             NoStart,
@@ -27,14 +29,23 @@ namespace rpp
         /** Initializes a new timer by calling start */
         Timer() noexcept;
 
+        /** @brief Initializes timer with a specific clock type */
+        explicit Timer(ClockType clock) noexcept;
+
         /** @brief Initializes timer with either NoStart or AutoStart modes */
         explicit Timer(StartMode mode) noexcept;
+
+        /** @brief Initializes timer with a specific clock type and start mode */
+        Timer(ClockType clock, StartMode mode) noexcept;
 
         /** @returns true if this timer has been started */
         bool is_started() const noexcept { return started.is_valid(); }
 
+        /** @returns The current time using this timer's clock type */
+        TimePoint time_now() const noexcept { return TimePoint::now(clock); }
+
         /** Starts the timer */
-        void start() noexcept { started = TimePoint::now(); }
+        void start() noexcept { started = time_now(); }
 
         /** @brief Resets the timer to a custom time point */
         void reset(const TimePoint& time = TimePoint::zero()) noexcept { started = time; }
@@ -59,11 +70,11 @@ namespace rpp
         int64 elapsed_ns(const TimePoint& end) const noexcept { return started.elapsed_ns(end); }
 
         /** @returns integer milliseconds elapsed from start() until now() */
-        int64 elapsed_ms() const noexcept { return started.elapsed_ms(TimePoint::now()); }
+        int64 elapsed_ms() const noexcept { return started.elapsed_ms(time_now()); }
         /** @returns integer microseconds elapsed from start() until now() */
-        int64 elapsed_us() const noexcept { return started.elapsed_us(TimePoint::now()); }
+        int64 elapsed_us() const noexcept { return started.elapsed_us(time_now()); }
         /** @returns integer microseconds elapsed from start() until now() */
-        int64 elapsed_ns() const noexcept { return started.elapsed_ns(TimePoint::now()); }
+        int64 elapsed_ns() const noexcept { return started.elapsed_ns(time_now()); }
 
         /** Measure block execution time in fractional seconds */
         template<class Func> static double measure(const Func& f)

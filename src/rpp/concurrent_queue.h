@@ -7,6 +7,7 @@
 #include "config.h"
 #include "condition_variable.h" // rpp::condition_variable
 #include "mutex.h" // rpp::mutex, rpp::spin_lock, rpp::yield
+#include "atomic_timepoint.h" // rpp::AtomicTimeSource
 #include <vector>
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional
@@ -469,12 +470,14 @@ namespace rpp
          * @brief Attempts to wait until an item is available.
          * @note A timed wait cannot be notified to cancel, unless queue is destroyed.
          * @param timeout Maximum time to wait before returning FALSE
+         * @param time_source [Optional] Time source for virtual or simulation accelerated time. If not provided, uses real time.
          * @returns TRUE if an item is available to peek or pop. FALSE if notified and no items.
          */
-        [[nodiscard]] bool wait_available(rpp::Duration timeout) const noexcept
+        [[nodiscard]] bool wait_available(rpp::Duration timeout,
+                                          const rpp::AtomicTimeSource* time_source = nullptr) const noexcept
         {
             lock_t lock_guard = spin_lock();
-            return wait_notify_for(lock_guard, timeout);
+            return wait_notify_for(lock_guard, timeout, time_source);
         }
 
         /**
@@ -518,7 +521,8 @@ namespace rpp
          *       before giving up. This may return false before the timeout due to spurious wakeups.
          *       Useful for synchronization tasks that have a time limit.
          * 
-         * @param outItem [out] The popped item. Only valid if return value is TRUE
+         * @param out_item [out] The popped item. Only valid if return value is TRUE
+         * @param time_source [Optional] Time source for virtual or simulation accelerated time. If not provided, uses real time.
          * @param timeout [required] Time to wait before returning FALSE
          * @return TRUE if an item was popped, FALSE if timed out.
          * @code
@@ -531,12 +535,13 @@ namespace rpp
          * @endcode
          */
         [[nodiscard]]
-        bool wait_pop(T& outItem, rpp::Duration timeout) noexcept
+        bool wait_pop(T& out_item, rpp::Duration timeout,
+                      const rpp::AtomicTimeSource* time_source = nullptr) noexcept
         {
             lock_t lock_guard = spin_lock();
-            if (!wait_notify_for(lock_guard, timeout))
+            if (!wait_notify_for(lock_guard, timeout, time_source))
                 return false;
-            pop_unlocked(outItem);
+            pop_unlocked(out_item);
             return true;
         }
 
@@ -545,15 +550,18 @@ namespace rpp
          * without popping it.
          * 
          * @note A timed wait cannot be notified to cancel, unless queue is destroyed.
+         * @param out_item [out] The popped item. Only valid if return value is TRUE
+         * @param time_source [Optional] Time source for virtual or simulation accelerated time. If not provided, uses real time.
          * @return TRUE if an item was peeked successfully
          */
         [[nodiscard]]
-        bool wait_peek(T& outItem, rpp::Duration timeout) const noexcept
+        bool wait_peek(T& out_item, rpp::Duration timeout,
+                       const rpp::AtomicTimeSource* time_source = nullptr) const noexcept
         {
             lock_t lock_guard = spin_lock();
-            if (!wait_notify_for(lock_guard, timeout))
+            if (!wait_notify_for(lock_guard, timeout, time_source))
                 return false;
-            outItem = *Head; // copy (may throw)
+            out_item = *Head; // copy (may throw)
             return true;
         }
 
@@ -562,9 +570,10 @@ namespace rpp
          * loops that have an absolute time limit for processing messages.
          * 
          * @note A timed wait cannot be notified to cancel, unless queue is destroyed.
-         * 
-         * @param outItem [out] The popped item. Only valid if return value is TRUE
+         * @note This is best used for cases where you want to wait up to a certain time
+         * @param out_item [out] The popped item. Only valid if return value is TRUE
          * @param until [required] Timepoint to wait until before returning FALSE
+         * @param time_source [Optional] Time source for virtual or simulation accelerated time. If not provided, uses real time.
          * @return TRUE if an item was popped, FALSE if timed out.
          * @code
          *   auto until = rpp::TimePoint::now() + time_limit;
@@ -577,9 +586,10 @@ namespace rpp
          * @endcode
          */
         [[nodiscard]]
-        bool wait_pop_until(T& outItem, rpp::TimePoint until) noexcept
+        bool wait_pop_until(T& out_item, rpp::TimePoint until,
+                            const rpp::AtomicTimeSource* time_source = nullptr) noexcept
         {
-            auto now = rpp::TimePoint::now();
+            auto now = time_now(time_source);
 
             // if we're already past the time limit, then don't check anything
             // this ensures while() loops don't get stuck processing items endlessly
@@ -587,48 +597,51 @@ namespace rpp
                 return false;
 
             lock_t lock_guard = spin_lock();
-            if (!wait_notify_until(lock_guard, until))
+            if (!wait_notify_until(lock_guard, until, time_source))
                 return false;
-            pop_unlocked(outItem);
+            pop_unlocked(out_item);
             return true;
         }
 
         /**
          * Waits up to @param timeout duration until an item is ready to be popped.
-         * The cancelCondition is used to terminate the wait.
+         * The cancel_cond is used to terminate the wait.
          * 
-         * @note A timed wait cannot be notified to cancel, unless queue is destroyed. cancelCondition() is checked instead.
+         * @note A timed wait cannot be notified to cancel, unless queue is destroyed. cancel_cond() is checked instead.
          * @note This is a wrapper around wait_pop_interval, with the cancellation check
          *       interval set to 1/10th of the timeout.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
          * @param timeout [required] Maximum time to wait before returning FALSE
-         * @param cancelCondition Cancellation condition, CANCEL if cancelCondition()==true
+         * @param cancel_cond Cancellation condition, CANCEL if cancel_cond()==true
+         * @param time_source [Optional] Time source for virtual or simulation accelerated time. If not provided, uses real time.
          * @return TRUE if an item was popped,
          *         FALSE if no item popped due to: timeout or cancellation.
          * @code
          *   string item;
          *   auto timeout = rpp::Duration::from_millis(100);
-         *   if (queue.wait_pop(item, timeout, [this]{ return this->cancelled || this->finished; })
+         *   if (queue.wait_pop(item, timeout, [this]{ return this->cancelled || this->finished; }))
          *   {
          *       // item is valid
          *   }
          * @endcode
          */
-        template<class WaitUntil>
+        template<IsPredicate WaitUntil>
         [[nodiscard]]
-        bool wait_pop(T& outItem, rpp::Duration timeout, const WaitUntil& cancelCondition)  noexcept(noexcept(cancelCondition()))
+        bool wait_pop(T& outItem, rpp::Duration timeout, const WaitUntil& cancel_cond,
+                      const rpp::AtomicTimeSource* time_source = nullptr)
+            noexcept(noexcept(cancel_cond()))
         {
             rpp::Duration interval = timeout / 10;
-            return wait_pop_interval<WaitUntil>(outItem, timeout, interval, cancelCondition);
+            return wait_pop_interval<WaitUntil>(outItem, timeout, interval, cancel_cond, time_source);
         }
 
         /**
          * Waits until an item is ready to be popped.
-         * The @param cancelCondition is used to terminate the wait.
-         * And @param interval defines how often the cancelCondition is checked.
+         * The @param cancel_cond is used to terminate the wait.
+         * And @param interval defines how often the cancel_cond is checked.
          * 
-         * @note This is a superior alternative to wait_pop(), because the cancelCondition
+         * @note This is a superior alternative to wait_pop(), because the cancel_cond
          *       is checked multiple times, instead of only between waits if someone notifies.
          * 
          * @param outItem [out] The popped item. Only valid if return value is TRUE
@@ -637,7 +650,8 @@ namespace rpp
          * @param interval Interval for checking the cancellation condition
          *  NOTE: this is just a hint and there is no guarantee to make this accurate without
          *        affecting system performance. A 1ms interval could be anywhere from 1ms to 15ms.
-         * @param cancelCondition Cancellation condition, CANCEL if cancelCondition()==true
+         * @param cancel_cond Cancellation condition, CANCEL if cancel_cond()==true
+         * @param time_source [Optional] Time source for virtual or simulation accelerated time. If not provided, uses real time.
          * @return TRUE if an item was popped,
          *         FALSE if no item popped due to: timeout or cancellation
          * @code
@@ -649,31 +663,36 @@ namespace rpp
          *   }
          * @endcode
          */
-        template<class WaitUntil>
+        template<IsPredicate WaitUntil>
         [[nodiscard]]
         bool wait_pop_interval(T& outItem, rpp::Duration timeout, rpp::Duration interval,
-                               const WaitUntil& cancelCondition) noexcept(noexcept(cancelCondition()))
+                               const WaitUntil& cancel_cond,
+                               const rpp::AtomicTimeSource* time_source = nullptr)
+            noexcept(noexcept(cancel_cond()))
         {
             lock_t lock_guard = spin_lock();
             if (is_destroying()) return false; // give up immediately
             if (Head == Tail)
             {
                 rpp::Duration remaining = timeout;
-                rpp::TimePoint prevTime = rpp::TimePoint::now();
+                rpp::TimePoint prevTime = time_now(time_source);
                 constexpr rpp::Duration zero = rpp::Duration{0};
                 do
                 {
-                    if (cancelCondition())
+                    if (cancel_cond())
                         return false;
                 #if _MSC_VER // on Win32 wait_for is faster
                     (void)Waiter.wait_for(lock_guard, interval); // noexcept
                 #else // on GCC wait_until is faster
-                    (void)Waiter.wait_until(lock_guard, prevTime + interval); // may throw
+                    // use real system time for CV deadline when using a virtual time source
+                    auto cv_deadline = time_source ? rpp::TimePoint::now() + interval
+                                                   : prevTime + interval;
+                    (void)Waiter.wait_until(lock_guard, cv_deadline); // may throw
                 #endif
                     if (is_destroying()) return false; // give up immediately
                     if (Head != Tail) break; // got data
 
-                    rpp::TimePoint now = rpp::TimePoint::now();
+                    rpp::TimePoint now = time_now(time_source);
                     remaining -= (now - prevTime);
                     if (remaining <= zero)
                         break; // timed out
@@ -692,6 +711,14 @@ namespace rpp
         }
 
     private:
+        rpp::TimePoint time_now(const rpp::AtomicTimeSource* time_source) const noexcept
+        {
+            if (time_source)
+                return time_source->time_now();
+            else
+                return rpp::TimePoint::now();
+        }
+
         [[nodiscard]] FINLINE bool is_destroying() const noexcept { return Destroying.load(std::memory_order_acquire); }
 
         // waits until this thread is notified and returns true if there's an item
@@ -715,7 +742,8 @@ namespace rpp
             return Head != Tail;
         }
         // wait_notify with a timeout, returns true if there is an item
-        bool wait_notify_for(lock_t& lock_guard, const rpp::Duration& timeout) const noexcept
+        bool wait_notify_for(lock_t& lock_guard, const rpp::Duration& timeout,
+                             const rpp::AtomicTimeSource* time_source) const noexcept
         {
             if (is_destroying()) {
                 rpp::yield(); // need to yield here to avoid burning a hole into the CPU
@@ -727,44 +755,89 @@ namespace rpp
                 //rpp::yield(); // need to yield here to avoid burning a hole into the CPU
                 return false; // zero timeout, don't enter wait loop
             }
-            auto now = rpp::TimePoint::now();
+            auto now = time_now(time_source);
             auto end = now + timeout;
-            do {
-                #if _MSC_VER // on Win32 wait_for is faster
+            if (time_source)
+            {
+                // When using a virtual time source, we must use real system time for
+                // the CV wait, and poll in short intervals so that time warping
+                // (fast-forward) causes the wait to exit promptly.
+                constexpr auto warp_poll = rpp::Duration::from_millis(10);
+                do {
                     rpp::Duration remaining = end - now;
-                    (void)Waiter.wait_for(lock_guard, remaining); // noexcept
-                #else // on GCC wait_until is faster
-                    (void)Waiter.wait_until(lock_guard, end); // may throw
-                #endif
-                if (is_destroying()) return false; // give up immediately
-                if (Head != Tail) return true; // got an item
-                now = rpp::TimePoint::now();
-            } while (now < end); // handle spurious wakeups
+                    rpp::Duration real_wait = remaining < warp_poll ? remaining : warp_poll;
+                    #if _MSC_VER
+                        (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
+                    #else
+                        (void)Waiter.wait_until(lock_guard, rpp::TimePoint::now() + real_wait); // may throw
+                    #endif
+                    if (is_destroying()) return false;
+                    if (Head != Tail) return true;
+                    now = time_now(time_source);
+                } while (now < end);
+            }
+            else
+            {
+                do {
+                    #if _MSC_VER // on Win32 wait_for is faster
+                        rpp::Duration remaining = end - now;
+                        (void)Waiter.wait_for(lock_guard, remaining); // noexcept
+                    #else // on GCC wait_until is faster
+                        (void)Waiter.wait_until(lock_guard, end); // may throw
+                    #endif
+                    if (is_destroying()) return false; // give up immediately
+                    if (Head != Tail) return true; // got an item
+                    now = time_now(time_source);
+                } while (now < end); // handle spurious wakeups
+            }
             return false;
         }
         // PRECONDITION: until.is_valid()
-        bool wait_notify_until(lock_t& lock_guard, const rpp::TimePoint& until) const noexcept
+        bool wait_notify_until(lock_t& lock_guard, const rpp::TimePoint& until,
+                               const rpp::AtomicTimeSource* time_source) const noexcept
         {
             if (is_destroying()) {
                 rpp::yield(); // need to yield here to avoid burning a hole into the CPU
                 return false; // give up immediately
             }
             if (Head != Tail) return true; // wait is not needed
-            rpp::TimePoint now;
-            #if _MSC_VER
-                now = rpp::TimePoint::now();
-            #endif
-            do {
-                #if _MSC_VER // on Win32 wait_for is faster
+            if (time_source)
+            {
+                // When using a virtual time source, poll in short real-time intervals
+                // so that time warping (fast-forward) causes the wait to exit promptly.
+                constexpr auto warp_poll = rpp::Duration::from_millis(10);
+                rpp::TimePoint now = time_source->time_now();
+                do {
                     rpp::Duration remaining = until - now;
-                    (void)Waiter.wait_for(lock_guard, remaining); // noexcept
-                #else // on GCC wait_until is faster
-                    (void)Waiter.wait_until(lock_guard, until); // may throw
+                    rpp::Duration real_wait = remaining < warp_poll ? remaining : warp_poll;
+                    #if _MSC_VER
+                        (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
+                    #else
+                        (void)Waiter.wait_until(lock_guard, rpp::TimePoint::now() + real_wait); // may throw
+                    #endif
+                    if (is_destroying()) return false;
+                    if (Head != Tail) return true;
+                    now = time_source->time_now();
+                } while (now < until);
+            }
+            else
+            {
+                rpp::TimePoint now;
+                #if _MSC_VER
+                    now = rpp::TimePoint::now();
                 #endif
-                if (is_destroying()) return false; // give up immediately
-                if (Head != Tail) return true; // got an item
-                now = rpp::TimePoint::now();
-            } while (now < until); // handle spurious wakeups
+                do {
+                    #if _MSC_VER // on Win32 wait_for is faster
+                        rpp::Duration remaining = until - now;
+                        (void)Waiter.wait_for(lock_guard, remaining); // noexcept
+                    #else // on GCC wait_until is faster
+                        (void)Waiter.wait_until(lock_guard, until); // may throw
+                    #endif
+                    if (is_destroying()) return false; // give up immediately
+                    if (Head != Tail) return true; // got an item
+                    now = rpp::TimePoint::now();
+                } while (now < until); // handle spurious wakeups
+            }
             return false;
         }
         void notify_one_unlocked() noexcept

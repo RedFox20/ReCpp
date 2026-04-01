@@ -36,7 +36,7 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `binary_stream.h` | Buffered binary read/write streams |
 | `binary_serializer.h` | Reflection-based binary and string serialization |
 | `timepoint.h` | Duration, TimePoint, time constants, sleep utilities, duration literals |
-| `atomic_timepoint.h` | Lock-free AtomicDuration, AtomicTimePoint (inherits std::atomic) |
+| `atomic_timepoint.h` | Lock-free AtomicDuration, AtomicTimePoint (inherits std::atomic), AtomicTimeSource (time sync + fastforward) |
 | `timer.h` | Timer, StopWatch, ScopedPerfTimer (includes timepoint.h) |
 | `vec.h` | 2D/3D/4D vector math, matrices, rectangles |
 | `math.h` | Clamp, lerp, deg/rad, epsilon compare |
@@ -88,27 +88,27 @@ Always include `tsan` in build commands to keep a consistent build configuration
 # basic build and test (C++20 with TSAN)
 CXX20=1 mama gcc tsan build test="nogdb -vv"
 
-# full reconfigure + rebuild
+# full reconfigure + rebuild + test
 CXX20=1 mama gcc tsan rebuild test="nogdb -vv"
 
-# build with clang instead of gcc
+# build project with clang instead of gcc
 CXX20=1 mama clang tsan build test="nogdb -vv"
 
-# run a specific test suite
+# build project and run a specific test suite
 CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue"
 
-# run a specific test
+# build project and run a specific test
 CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop"
 
-# run a specific test until failure (up to N iterations)
+# build project and run a specific test until failure (up to N iterations)
 CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
 ```
 
 ### Address Sanitizer (mama)
-ASAN and TSAN cannot be combined. Use ASAN only when specifically debugging memory issues — this requires a full rebuild.
+ASAN and TSAN cannot be combined. Use ASAN only when specifically debugging memory issues — this requires a reconfiguration.
 In this case, omit `nogdb`, since by default mama will start tests with GDB attached, which will provide rich stack traces on fatal crashes.
 ```bash
-CXX20=1 mama gcc asan rebuild test="-vv"
+CXX20=1 mama gcc asan configure build test="-vv"
 ```
 
 ### clang-tidy (mama)

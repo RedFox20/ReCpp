@@ -3,7 +3,6 @@
 #include "debugging.h"
 #include "mutex.h"
 #include <atomic>
-#include <type_traits>
 
 #if RPP_HAS_CXX20
 #  include "future_types.h" // RPP_HAS_COROUTINES, rpp::coro_handle
@@ -17,13 +16,6 @@ namespace rpp
 #if RPP_HAS_COROUTINES
     // forward declaration: avoids circular include with thread_pool.h
     void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
-#endif
-
-#if RPP_HAS_CXX20
-    // Portable replacement for std::invocable which requires <concepts>
-    // and is not available on all platforms (e.g. Android NDK r25b / Clang 14)
-    template<typename Callable>
-    concept IsCallable = std::is_invocable_v<Callable>;
 #endif
 
     //////////////////////////////////////////////////////////////////////////////////////////

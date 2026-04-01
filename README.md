@@ -1739,23 +1739,23 @@ Counting semaphore and lightweight notification flags.
 
 | Class | Description |
 |-------|-------------|
-| [`semaphore`](src/rpp/semaphore.h#L38) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](src/rpp/semaphore.h#L399) | Lighter semaphore using a single atomic flag |
-| [`semaphore_once_flag`](src/rpp/semaphore.h#L437) | One-shot semaphore that can only be set once |
+| [`semaphore`](src/rpp/semaphore.h#L30) | Counting semaphore with spin-lock optimization |
+| [`semaphore_flag`](src/rpp/semaphore.h#L391) | Lighter semaphore using a single atomic flag |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L429) | One-shot semaphore that can only be set once |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](src/rpp/semaphore.h#L111) | Increment and wake one waiter |
-| [`notify_all()`](src/rpp/semaphore.h#L148) | Wake all waiters |
-| [`notify_once()`](src/rpp/semaphore.h#L183) | Notify only if not already signaled |
-| [`try_wait()`](src/rpp/semaphore.h#L223) | Non-blocking wait attempt |
-| [`wait()`](src/rpp/semaphore.h#L239) | Blocking wait |
-| [`wait(Duration timeout)`](src/rpp/semaphore.h#L274) | Wait with timeout |
-| [`await(Duration timeout)`](src/rpp/semaphore.h#L388) | C++20 coroutine `co_await` — dispatches wait to background thread |
-| [`count()`](src/rpp/semaphore.h#L72) | Current count |
-| [`reset()`](src/rpp/semaphore.h#L68) | Reset to zero |
+| [`notify()`](src/rpp/semaphore.h#L110) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L147) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L182) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L215) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L236) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L271) | Wait with timeout |
+| [`await(Duration timeout)`](src/rpp/semaphore.h#L380) | C++20 coroutine `co_await` — dispatches wait to background thread |
+| [`count()`](src/rpp/semaphore.h#L69) | Current count |
+| [`reset()`](src/rpp/semaphore.h#L60) | Reset to zero |
 
 ### Example: Coroutine co_await
 
@@ -1837,7 +1837,7 @@ Extended condition variable with `rpp::Duration` and `rpp::TimePoint` overloads.
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](src/rpp/condition_variable.h#L30) | Condition variable with high-resolution timeout support |
+| [`condition_variable`](src/rpp/condition_variable.h#L31) | Condition variable with high-resolution timeout support |
 
 ### Example
 
@@ -2305,35 +2305,37 @@ Nanosecond-precision `Duration` and `TimePoint` types, time constants, sleep uti
 
 | Type | Description |
 |------|-------------|
-| [`Duration`](src/rpp/timepoint.h#L50) | Unified nanosecond-precision duration (int64 nsec) |
-| [`TimePoint`](src/rpp/timepoint.h#L239) | System's most accurate time point measurement |
+| [`Duration`](src/rpp/timepoint.h#L27) | Unified nanosecond-precision duration (int64 nsec) |
+| [`TimePoint`](src/rpp/timepoint.h#L286) | System's most accurate time point measurement |
+| [`ClockType`](src/rpp/timepoint.h#L64) | Clock source selector for `TimePoint::now(ClockType)` |
 
 ### Duration Factory & Accessors
 
 | Method | Description |
 |--------|-------------|
-| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L86) | Create from fractional seconds |
-| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L342) | Create from milliseconds |
-| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L344) | Create from microseconds |
-| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L101) | Create from nanoseconds |
-| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L112) | Create from hours |
-| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L108) | Create from minutes |
-| [`sec()`](src/rpp/timepoint.h#L119) / [`msec()`](src/rpp/timepoint.h#L123) | Convert to fractional seconds / milliseconds |
-| [`seconds()`](src/rpp/timepoint.h#L127) / [`millis()`](src/rpp/timepoint.h#L131) / [`micros()`](src/rpp/timepoint.h#L135) / [`nanos()`](src/rpp/timepoint.h#L140) | Convert to integer time units |
-| [`to_string()`](src/rpp/timepoint.h#L207) | Human-readable duration string |
-| [`to_stopwatch_string()`](src/rpp/timepoint.h#L224) | Stopwatch-style format |
+| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L133) | Create from fractional seconds |
+| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L396) | Create from milliseconds |
+| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L398) | Create from microseconds |
+| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L148) | Create from nanoseconds |
+| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L159) | Create from hours |
+| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L155) | Create from minutes |
+| [`sec()`](src/rpp/timepoint.h#L166) / [`msec()`](src/rpp/timepoint.h#L170) | Convert to fractional seconds / milliseconds |
+| [`seconds()`](src/rpp/timepoint.h#L174) / [`millis()`](src/rpp/timepoint.h#L178) / [`micros()`](src/rpp/timepoint.h#L182) / [`nanos()`](src/rpp/timepoint.h#L187) | Convert to integer time units |
+| [`to_string()`](src/rpp/timepoint.h#L251) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timepoint.h#L268) | Stopwatch-style format |
 
 ### TimePoint Methods
 
 | Method | Description |
 |--------|-------------|
-| [`TimePoint::now()`](src/rpp/timepoint.h#L274) | Current OS high-accuracy time point |
-| [`TimePoint::local()`](src/rpp/timepoint.h#L277) | Current time with timezone offset |
-| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L289) | Duration between two time points |
-| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L292) | Fractional seconds between two points |
-| [`time_of_day()`](src/rpp/timepoint.h#L286) | Extract HH:MM:SS.nanos part |
-| [`to_epoch_us()`](src/rpp/timepoint.h#L265) | Convert to UNIX epoch microseconds |
-| [`utc_to_local()`](src/rpp/timepoint.h#L280) | Add timezone offset to this timepoint |
+| [`TimePoint::now()`](src/rpp/timepoint.h#L321) | Current OS high-accuracy time point |
+| [`TimePoint::now(ClockType clock)`](src/rpp/timepoint.h#L328) | Time point from a specific clock source |
+| [`TimePoint::local()`](src/rpp/timepoint.h#L331) | Current time with timezone offset |
+| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L343) | Duration between two time points |
+| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L346) | Fractional seconds between two points |
+| [`time_of_day()`](src/rpp/timepoint.h#L340) | Extract HH:MM:SS.nanos part |
+| [`to_epoch_us()`](src/rpp/timepoint.h#L312) | Convert to UNIX epoch microseconds |
+| [`utc_to_local()`](src/rpp/timepoint.h#L334) | Add timezone offset to this timepoint |
 
 ### Global Time Utilities
 
@@ -2344,7 +2346,7 @@ Nanosecond-precision `Duration` and `TimePoint` types, time constants, sleep uti
 | [`sleep_ns(nanos)`](src/rpp/timepoint.h#L25) | Sleep for nanoseconds |
 | [`sleep_for(const Duration& d)`](src/rpp/timepoint.h#L31) | Sleep for a Duration |
 | [`sleep_until(const TimePoint& tp)`](src/rpp/timepoint.h#L33) | Sleep until a TimePoint |
-| [`time_now_seconds()`](src/rpp/timepoint.h#L364) | Returns current time in fractional seconds (C linkage) |
+| [`time_now_seconds()`](src/rpp/timepoint.h#L418) | Returns current time in fractional seconds (C linkage) |
 
 ### Duration Literals
 
@@ -2486,12 +2488,12 @@ Lock-free time source for simulation time warping and time synchronization with 
 | Method | Description |
 |--------|-------------|
 | [`time_now()`](src/rpp/atomic_timepoint.h#L137) | Returns system time plus combined offset (sync + warp) |
-| [`total_offset()`](src/rpp/atomic_timepoint.h#L148) | Returns the combined sync + warp offset |
-| [`warp_offset()`](src/rpp/atomic_timepoint.h#L158) | Returns the current warp offset (diagnostic) |
-| [`sync_offset()`](src/rpp/atomic_timepoint.h#L168) | Returns the current sync offset (diagnostic) |
-| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L176) | Atomically advances time by delta |
-| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L185) | Atomically rewinds time by delta |
-| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L194) | Sets sync offset, adjusting combined offset by the difference |
+| [`total_offset()`](src/rpp/atomic_timepoint.h#L159) | Returns the combined sync + warp offset |
+| [`warp_offset()`](src/rpp/atomic_timepoint.h#L169) | Returns the current warp offset (diagnostic) |
+| [`sync_offset()`](src/rpp/atomic_timepoint.h#L179) | Returns the current sync offset (diagnostic) |
+| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L187) | Atomically advances time by delta |
+| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L196) | Atomically rewinds time by delta |
+| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L205) | Sets sync offset, adjusting combined offset by the difference |
 
 ### Example: AtomicTimeSource for Simulation Time
 
@@ -2616,19 +2618,23 @@ High-precision timers and performance profiling utilities. Includes `rpp/timepoi
 | Type | Description |
 |------|-------------|
 | [`Timer`](src/rpp/timer.h#L17) | High-accuracy timer for profiling or deltaTime |
-| [`StopWatch`](src/rpp/timer.h#L90) | Start/stop/resume event timer |
-| [`ScopedPerfTimer`](src/rpp/timer.h#L156) | Auto-logs elapsed time from ctor to dtor |
+| [`StopWatch`](src/rpp/timer.h#L101) | Start/stop/resume event timer |
+| [`ScopedPerfTimer`](src/rpp/timer.h#L167) | Auto-logs elapsed time from ctor to dtor |
 
 ### Timer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`start()`](src/rpp/timer.h#L37) | Start / restart the timer |
-| [`elapsed()`](src/rpp/timer.h#L43) | Fractional seconds since start |
-| [`elapsed_millis()`](src/rpp/timer.h#L45) | Fractional milliseconds since start |
-| [`next()`](src/rpp/timer.h#L50) | Get elapsed time and restart |
-| [`measure(Func&& func)`](src/rpp/timer.h#L69) | Measure a block's execution time (seconds) |
-| [`measure_millis(Func&& func)`](src/rpp/timer.h#L77) | Measure a block's execution time (ms) |
+| [`Timer()`](src/rpp/timer.h#L30) | Construct and auto-start with default (Realtime) clock |
+| [`Timer(ClockType clock)`](src/rpp/timer.h#L33) | Construct and auto-start with a specific clock type |
+| [`Timer(ClockType clock, StartMode mode)`](src/rpp/timer.h#L39) | Construct with specific clock and start mode |
+| [`start()`](src/rpp/timer.h#L48) | Start / restart the timer |
+| [`time_now()`](src/rpp/timer.h#L45) | Get current time using this timer's clock type |
+| [`elapsed()`](src/rpp/timer.h#L54) | Fractional seconds since start |
+| [`elapsed_millis()`](src/rpp/timer.h#L56) | Fractional milliseconds since start |
+| [`next()`](src/rpp/timer.h#L61) | Get elapsed time and restart |
+| [`measure(Func&& func)`](src/rpp/timer.h#L80) | Measure a block's execution time (seconds) |
+| [`measure_millis(Func&& func)`](src/rpp/timer.h#L88) | Measure a block's execution time (ms) |
 
 ### Example: Timer — Profiling & Delta Time
 
@@ -3429,26 +3435,26 @@ Thread-safe FIFO queue with notification support.
 
 | Class | Description |
 |-------|-------------|
-| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L44) | Thread-safe queue with push/pop/wait |
+| [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L45) | Thread-safe queue with push/pop/wait |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`push(T&& item)`](src/rpp/concurrent_queue.h#L313) | Push an item |
-| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L313) | Push multiple items |
-| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L980) | Non-blocking pop attempt |
-| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L297) | Pop all items at once |
-| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L534) | Blocking pop with timeout |
-| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L534) | Blocking pop with predicate and timeout |
-| [`clear()`](src/rpp/concurrent_queue.h#L195) | Clear the queue |
-| [`empty()`](src/rpp/concurrent_queue.h#L127) | True if empty |
-| [`size()`](src/rpp/concurrent_queue.h#L146) | Number of items |
-| [`reserve(int n)`](src/rpp/concurrent_queue.h#L227) | Reserve capacity |
-| [`notify()`](src/rpp/concurrent_queue.h#L155) / [`notify_one()`](src/rpp/concurrent_queue.h#L164) | Wake waiting consumers |
-| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L961) | C++20 coroutine `co_await` — wait for items available |
-| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L992) | C++20 coroutine `co_await` — pop item (returns bool) |
-| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1026) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
+| [`push(T&& item)`](src/rpp/concurrent_queue.h#L314) | Push an item |
+| [`push(T&&... items)`](src/rpp/concurrent_queue.h#L314) | Push multiple items |
+| [`try_pop(T& out)`](src/rpp/concurrent_queue.h#L1053) | Non-blocking pop attempt |
+| [`try_pop_all(std::vector<T>& out)`](src/rpp/concurrent_queue.h#L298) | Pop all items at once |
+| [`wait_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L538) | Blocking pop with timeout |
+| [`wait_pop(T& outItem, Duration timeout)`](src/rpp/concurrent_queue.h#L631) | Blocking pop with predicate and timeout |
+| [`clear()`](src/rpp/concurrent_queue.h#L196) | Clear the queue |
+| [`empty()`](src/rpp/concurrent_queue.h#L128) | True if empty |
+| [`size()`](src/rpp/concurrent_queue.h#L147) | Number of items |
+| [`reserve(int n)`](src/rpp/concurrent_queue.h#L228) | Reserve capacity |
+| [`notify()`](src/rpp/concurrent_queue.h#L156) / [`notify_one()`](src/rpp/concurrent_queue.h#L165) | Wake waiting consumers |
+| [`await(Duration timeout)`](src/rpp/concurrent_queue.h#L1034) | C++20 coroutine `co_await` — wait for items available |
+| [`await_pop(T& out, Duration timeout)`](src/rpp/concurrent_queue.h#L1065) | C++20 coroutine `co_await` — pop item (returns bool) |
+| [`await_pop(Duration timeout)`](src/rpp/concurrent_queue.h#L1065) | C++20 coroutine `co_await` — pop item (returns `optional<T>`) |
 
 ### Example: Coroutine co_await
 

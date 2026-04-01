@@ -172,7 +172,7 @@ TestImpl(test_coroutines)
         {
             std::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 1u);
-            if (destructor_ids.size() >= 1) AssertThat(destructor_ids[0], 1);
+            if (!destructor_ids.empty()) AssertThat(destructor_ids[0], 1);
         }
 
         rpp::Timer t2;
