@@ -149,7 +149,7 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_performance)
     {
-    #if YOCTO_LINUX || MIPS || __ANDROID__
+    #if YOCTO_LINUX || MIPS || RPP_ANDROID
         constexpr int COUNT = 81'234'567 / 10;
         constexpr int64 EXPECTED_SUM = 32995264630240LL;
     #else

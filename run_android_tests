@@ -1,0 +1,66 @@
+#!/bin/bash
+# Runs ReCpp unit tests on an emulated Android (aarch64) environment using QEMU user-mode.
+# Uses a pre-built sysroot with bionic linker64/libc from API 29 and a custom liblog.so
+# that redirects __android_log_write to stderr.
+#
+# Usage:
+#   ./run_android_tests                        # run tests (requires prior mama android build)
+#   ./run_android_tests --build                # build first, then run tests
+#   ./run_android_tests --build -vv            # build + verbose test output
+#   ./run_android_tests test_concurrent_queue  # run specific test suite
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD_DIR="$SCRIPT_DIR/packages/ReCpp/android"
+TEST_BIN="$BUILD_DIR/RppTests"
+
+# pre-built sysroot with bionic API 29 (jemalloc, compatible with QEMU user-mode)
+QEMU_SYSROOT="$SCRIPT_DIR/.circleci/android-qemu-sysroot-api29"
+
+# parse args
+DO_BUILD=false
+TEST_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --build) DO_BUILD=true; shift ;;
+        *) TEST_ARGS+=("$1"); shift ;;
+    esac
+done
+
+# ensure qemu-user is installed
+if ! command -v qemu-aarch64 &>/dev/null; then
+    echo "Installing qemu-user for aarch64 emulation..."
+    sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user
+fi
+
+# verify sysroot exists
+if [ ! -f "$QEMU_SYSROOT/system/bin/linker64" ]; then
+    echo "ERROR: QEMU sysroot not found at $QEMU_SYSROOT" >&2
+    echo "       This should be checked into the repository." >&2
+    exit 1
+fi
+
+# optionally build
+if [[ "$DO_BUILD" == true ]]; then
+    echo "Building ReCpp tests for Android..."
+    CXX20=1 mama android build with_tests
+fi
+
+if [ ! -f "$TEST_BIN" ]; then
+    echo "ERROR: $TEST_BIN not found. Run with --build or 'CXX20=1 mama android build with_tests' first." >&2
+    exit 1
+fi
+
+# copy libc++_shared.so from NDK into the sysroot if not already present
+NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+if [[ -n "$NDK_HOME" ]]; then
+    NDK_LIBCXX="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+    if [ -f "$NDK_LIBCXX" ]; then
+        cp "$NDK_LIBCXX" "$QEMU_SYSROOT/system/lib64/libc++_shared.so"
+    fi
+fi
+
+echo "Running RppTests on Android (QEMU aarch64 user-mode)..."
+# filter out linker warnings (harmless DT entry warnings from NDK stub libs)
+qemu-aarch64 -L "$QEMU_SYSROOT" "$TEST_BIN" "${TEST_ARGS[@]+"${TEST_ARGS[@]}"}" 2>&1 \
+    | grep -v "^linker: Warning:\|^WARNING: linker:"

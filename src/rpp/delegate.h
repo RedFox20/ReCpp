@@ -381,30 +381,58 @@ namespace rpp
                 }
             }
         #elif __clang__ // disable on VC++ clang, enable on all other clang builds
-            struct VCallThunk {
-                union {
-                    void* method;
-                    size_t vtable_index; // = vindex*2+1 (always odd)
-                };
-                size_t this_adjustment;
-            };
             struct VTable {
                 void* entries[16]; // size is pseudo, mainly for gdb
+            };
+        #if defined(__arm__) || defined(__aarch64__)
+            // ARM C++ ABI variant: virtual flag is in adj field (adj & 1),
+            // ptr is the raw vtable byte offset (NOT +1 like Itanium)
+            struct VCallThunk {
+                void* ptr;         // function address, or vtable byte offset if virtual
+                size_t adj;        // (this_adjustment * 2) | is_virtual
             };
             template<class FClass, class MethodType>
             static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
             {
                 auto& t = *(struct VCallThunk*)&method;
-                if (size_t(t.method) & 1u) { // is_thunk?
-                    auto* vtable = (struct VTable*) *(void**)inst; // NOLINT: clang-tidy does not like this hack
-                    size_t voffset = (t.vtable_index-1)/8;
+                if (t.adj & 1u) { // is_virtual? (ARM ABI: virtual flag in adj, not ptr)
+                    auto* vtable = (struct VTable*) *(void**)inst; // NOLINT
+                    size_t voffset = size_t(t.ptr) / sizeof(void*);
+                    if (out_inst) {
+                        *out_inst = (void*)((const uint8_t*)inst + (t.adj >> 1));
+                    }
+                    return { .pfunc = vtable->entries[voffset] }; // resolve from vtable NOLINT
+                }
+                if (out_inst) {
+                    *out_inst = (void*)((const uint8_t*)inst + (t.adj >> 1));
+                }
+                return func{ .pfunc = t.ptr }; // not a virtual method
+            }
+        #else
+            // Standard Itanium ABI: virtual flag is in ptr field (ptr & 1),
+            // ptr is vtable byte offset + 1
+            struct VCallThunk {
+                union {
+                    void* method;
+                    size_t vtable_index; // vtable byte offset + 1 (always odd for virtual)
+                };
+                size_t this_adjustment;
+            };
+            template<class FClass, class MethodType>
+            static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
+            {
+                auto& t = *(struct VCallThunk*)&method;
+                if (size_t(t.method) & 1u) { // is_virtual? (Itanium: virtual flag in ptr)
+                    auto* vtable = (struct VTable*) *(void**)inst; // NOLINT
+                    size_t voffset = (t.vtable_index - 1) / sizeof(void*);
                     if (out_inst) {
                         *out_inst = (void*)((const uint8_t*)inst + t.this_adjustment);
                     }
-                    return { .pfunc = vtable->entries[voffset] }; // resolve thunk NOLINT: null pointer dereference
+                    return { .pfunc = vtable->entries[voffset] }; // resolve from vtable NOLINT
                 }
-                return func{ .pfunc = t.method }; // not a virtual method thunk
+                return func{ .pfunc = t.method }; // not a virtual method
             }
+        #endif
         #elif __GNUG__ // G++
             template<class IClass, class FClass, class MethodType>
             static func devirtualize(IClass* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept

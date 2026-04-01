@@ -14,7 +14,7 @@
 #  define WIN32_LEAN_AND_MEAN 1
 #  include <Windows.h>
 #  include <conio.h> // _kbhit
-#elif __ANDROID__
+#elif RPP_ANDROID
 #  include <unistd.h> // usleep
 #  include <android/log.h>
 // #  include <linux/memfd.h>
@@ -90,7 +90,7 @@ namespace rpp
                     }
                 }
                 shared_mem = (shared*)MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(shared));
-            #elif __ANDROID__
+            #elif RPP_ANDROID
                 // @todo Properly implement Process-Wide shared variables
                 shared_mem = new shared();
                 shared_mem->initialized = 1;
@@ -101,7 +101,7 @@ namespace rpp
                 shared_mem = &local_shared;
             #else
                 std::string name = "/rpp_tests_state_"s + rpp::to_string(getpid());
-                #if __ANDROID__
+                #if RPP_ANDROID
                     // shm_fd = open(name.c_str(), O_RDWR);
                     // if (shm_fd == -1) {
                     //     shm_fd = memfd_create(name.c_str(), MFD_ALLOW_SEALING | MFD_CLOEXEC);
@@ -146,7 +146,7 @@ namespace rpp
                 UnmapViewOfFile(shared_mem);
                 CloseHandle(handle);
                 handle = INVALID_HANDLE_VALUE;
-            #elif __ANDROID__
+            #elif RPP_ANDROID
                 delete shared_mem;
             #elif RPP_BARE_METAL
                 // nothing to unmap on bare-metal
@@ -284,7 +284,7 @@ namespace rpp
 
     static void console(ConsoleColor color, const char* str, int len)
     {
-    #if __ANDROID__
+    #if RPP_ANDROID
         (void)len;
         int priority = 0;
         switch (color) {
@@ -750,7 +750,7 @@ namespace rpp
     {
 #if _WIN32
         Sleep(millis);
-#elif __ANDROID__
+#elif RPP_ANDROID
         usleep(useconds_t(millis) * 1000);
 #elif RPP_FREERTOS
         vTaskDelay(millis / portTICK_PERIOD_MS);

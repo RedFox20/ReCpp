@@ -3,7 +3,7 @@
 #if _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
-#elif __ANDROID__
+#elif RPP_ANDROID
     #include <android/log.h>
 #elif RPP_BARE_METAL
     #include <printf/printf.h>
@@ -93,16 +93,20 @@ namespace rpp
         detail = detail ? detail : "";
         prefix = prefix ? prefix : "";
 
-        #if !__ANDROID__ && HAS_DEBUGGING_H
+        #if !RPP_ANDROID && HAS_DEBUGGING_H
             LogInfo("%s %s%s%s elapsed: %.3fms", prefix, location, padDetail, detail, elapsed_ms);
         #else
-            constexpr const char format[] = "$ %s %s%s%s elapsed: %.3fms\n";
+            constexpr const char format[] = "$ %s %s%s%s elapsed: %.3fms"
+                #if !RPP_ANDROID // no newlines on android
+                "\n"
+                #endif
+                ;
             #if _WIN32
                 static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
                 SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN); // dark yellow
                 fprintf(stderr, format, prefix, location, padDetail, detail, elapsed_ms);
                 SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // default color
-            #elif __ANDROID__
+            #elif RPP_ANDROID
                 __android_log_print(ANDROID_LOG_WARN, "rpp", format, prefix, location, padDetail, detail, elapsed_ms);
             #elif RPP_BARE_METAL
                 printf_(format, prefix, location, padDetail, detail, elapsed_ms);

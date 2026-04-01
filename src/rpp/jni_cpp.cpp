@@ -701,4 +701,4 @@ namespace rpp::jni
 
 } // namespace rpp::jni
 
-#endif // !__ANDROID__
+#endif // __ANDROID__

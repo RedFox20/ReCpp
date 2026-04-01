@@ -231,7 +231,7 @@ namespace rpp
 
 
 #if defined __APPLE__ || defined __clang__ // iOS or just clang
-#  if __ANDROID__
+#  if RPP_ANDROID
 #    define __assertion_failure(fmt,...) \
     __assert2(rpp::shorten_filename(__FILE__), __LINE__, _LogFuncname(__FUNCTION__), _rpp_assert_format(fmt, ##__VA_ARGS__))
 #  elif __APPLE__
@@ -310,7 +310,7 @@ RPP_EXTERNC void __assert_rtn(const char *, const char *, int, const char *) __d
 #endif
 
 #ifdef __cplusplus
-#if !__ANDROID__ && !RPP_BARE_METAL
+#if !RPP_ANDROID && !RPP_BARE_METAL
 #  include <stdexcept>
 #endif
 

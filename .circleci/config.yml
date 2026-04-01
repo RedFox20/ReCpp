@@ -133,7 +133,7 @@ jobs:
                   NDK_PATH="/home/circleci/android-sdk/ndk/<< parameters.ndk_version >>"
                   echo "export ANDROID_NDK_HOME=$NDK_PATH" >> "$BASH_ENV"
                   echo "export ANDROID_NDK_ROOT=$NDK_PATH" >> "$BASH_ENV"
-      - run: sudo apt-get update -q && sudo apt-get install -y clang-tidy # install run-clang-tidy wrapper
+      - run: sudo apt-get update -q && sudo apt-get install -y clang-tidy qemu-user
       - run: make configure-cmake
       - run: sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED || true
       - run: make configure-pip3
@@ -143,6 +143,9 @@ jobs:
           command: |
               echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
               CXX20=1 mama android verbose build with_tests jobs=3
+      - run:
+          name: Run Tests Android NDK << parameters.toolchain >> (QEMU aarch64)
+          command: ./run_android_tests -vv
       - run:
           name: Clang Tidy Analysis # run clang-tidy separately because it's super slow during build
           command: ./run_clang_tidy --android -j 5

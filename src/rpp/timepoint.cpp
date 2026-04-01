@@ -9,12 +9,12 @@
     #include <timeapi.h>
     #include <sysinfoapi.h> // GetSystemTimePreciseAsFileTime
     #pragma comment(lib, "Winmm.lib") // MM time library
-#elif __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
+#elif __APPLE__ || __linux__ || RPP_ANDROID || __EMSCRIPTEN__
     #include <cstdio>  // fprintf
     #include <unistd.h> // usleep()
-    #if __linux__ || __ANDROID__
+    #if __linux__ || RPP_ANDROID
         #include <sys/time.h>
-        #if __ANDROID__
+        #if RPP_ANDROID
             #include <android/log.h>
         #endif
         // CLOCK_TAI may not be defined on older glibc/kernel headers
@@ -266,7 +266,7 @@ namespace rpp
     #endif
 #endif
 
-#if __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
+#if __APPLE__ || __linux__ || RPP_ANDROID || __EMSCRIPTEN__
     // converts a clock_gettime result to a TimePoint
     static FINLINE int64 linux_clock_gettime_ns(clockid_t clk) noexcept
     {
@@ -741,13 +741,13 @@ namespace rpp
         #elif RPP_BARE_METAL
             (void)clock;
             return now(); // bare metal: all clock types fall back to default
-        #elif __APPLE__ || __linux__ || __ANDROID__ || __EMSCRIPTEN__
+        #elif __APPLE__ || __linux__ || RPP_ANDROID || __EMSCRIPTEN__
             // ClockType to clockid_t mapping table
             // macOS: no coarse variants, no boottime, no TAI — mapped to nearest equivalent
             constexpr clockid_t clock_table[] = {
                 // wall clocks
                 /*Realtime*/       CLOCK_REALTIME,
-                #if __linux__ || __ANDROID__
+                #if __linux__ || RPP_ANDROID
                 /*RealtimeCoarse*/ CLOCK_REALTIME_COARSE,
                 /*TAI*/            CLOCK_TAI,
                 #else // macOS/Emscripten: no coarse or TAI variants
@@ -757,7 +757,7 @@ namespace rpp
                 // monotonic clocks
                 CLOCK_MONOTONIC,
                 CLOCK_MONOTONIC_RAW,
-                #if __linux__ || __ANDROID__
+                #if __linux__ || RPP_ANDROID
                 /*MonotonicCoarse*/ CLOCK_MONOTONIC_COARSE,
                 /*Boottime*/        CLOCK_BOOTTIME,
                 #else // macOS/Emscripten: no coarse, boottime includes suspend already

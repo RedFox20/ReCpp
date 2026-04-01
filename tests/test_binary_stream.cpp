@@ -164,6 +164,11 @@ TestImpl(test_binary_stream)
         std::string file = rpp::temp_dir() + "/test.rpp.binary_stream.tmp";
         {
             rpp::file_writer out { file };
+            if (!out.good())
+            {
+                AssertFailed("failed to open file for writing: %s", file.c_str());
+                return;
+            }
             for (int i = 0; i < count; ++i)
             {
                 out.write_uint16(10);
@@ -179,8 +184,9 @@ TestImpl(test_binary_stream)
                 const auto& __expr   = expr;           \
                 const auto& __expect = expected;       \
                 if (!(__expr == __expect)) {           \
-                    print_error("file_reader failed at index=%d  %s\n", i, #expr); \
+                    print_error("file_reader failed at index=%d  %s -- exiting file_read_write loop\n", i, #expr); \
                     assumption_failed(RPP_SOURCE_LOC_CURRENT, #expr, __expr, "but expected", __expect); \
+                    i = count; /* break outer loop */ \
                 } \
             } while (false)
 

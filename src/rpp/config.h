@@ -32,6 +32,24 @@
 #  endif
 #endif
 
+// Android, any compiler
+#ifndef RPP_ANDROID
+#  if defined(__ANDROID__)
+#    define RPP_ANDROID 1
+#  else
+#    define RPP_ANDROID 0
+#  endif
+#endif
+
+// Android using Clang
+#ifndef RPP_ANDROID_CLANG
+#  if defined(__ANDROID__) && defined(__clang__)
+#    define RPP_ANDROID_CLANG 1
+#  else
+#    define RPP_ANDROID_CLANG 0
+#  endif
+#endif
+
 #ifndef RPPAPI
 #  if _MSC_VER
 #    define RPPAPI //__declspec(dllexport)

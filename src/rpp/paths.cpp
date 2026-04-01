@@ -1426,9 +1426,11 @@ namespace rpp /* ReCpp */
         #elif __APPLE__
             extern string apple_temp_dir() noexcept;
             return apple_temp_dir();
-        #elif __ANDROID__
-            // return getContext().getExternalFilesDir(null).getPath();
-            return "/data/local/tmp";
+        #elif RPP_ANDROID
+            if (char* path = getenv("TMPDIR")) return path;
+            if (char* path = getenv("TMP")) return path;
+            if (folder_exists("/tmp")) return "/tmp/"; // qemu-aarch64 user-mode emulation on host filesystem
+            return "/data/local/tmp/"; // real device via adb shell
         #else
             if (char* path = getenv("TMP"))     return path;
             if (char* path = getenv("TEMP"))    return path;

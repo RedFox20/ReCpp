@@ -126,7 +126,7 @@ TestImpl(test_file_io)
     TestCase(current_source_file_and_folder_exists)
     {
         // can only run this test on host machines
-    #if _MSC_VER || (__linux__ && !__ANDROID__ && !OCLEA && !__EMSCRIPTEN__)
+    #if _MSC_VER || (__linux__ && !RPP_ANDROID && !OCLEA && !__EMSCRIPTEN__)
         Assert(file_exists(__FILE__));
     #endif
         Assert(!file_exists("/complete/rubbish/path.txt"));
@@ -141,7 +141,7 @@ TestImpl(test_file_io)
     TestCase(current_source_file_and_folder_exists_utf16)
     {
         // can only run this test on host machines
-    #if _MSC_VER || (__linux__ && !__ANDROID__ && !OCLEA && !__EMSCRIPTEN__)
+    #if _MSC_VER || (__linux__ && !RPP_ANDROID && !OCLEA && !__EMSCRIPTEN__)
         Assert(file_exists(rpp::to_ustring(__FILE__)));
     #endif
         Assert(!file_exists(u"/complete/rubbish/path.txt"_sv));

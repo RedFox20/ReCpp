@@ -677,16 +677,22 @@ namespace rpp
                 rpp::Duration remaining = timeout;
                 rpp::TimePoint prevTime = time_now(time_source);
                 constexpr rpp::Duration zero = rpp::Duration{0};
+                // When using a virtual time source, poll in short real-time intervals
+                // so that time warping (fast-forward) causes the wait to exit promptly.
+                constexpr rpp::Duration warp_poll = rpp::millis(1);
                 do
                 {
                     if (cancel_cond())
                         return false;
+                    const rpp::Duration& limit = (time_source ? warp_poll : interval);
+                    // make sure we don't suspend past the final waiting point
+                    rpp::Duration real_wait = (remaining < limit ? remaining : limit);
                 #if _MSC_VER // on Win32 wait_for is faster
-                    (void)Waiter.wait_for(lock_guard, interval); // noexcept
+                    (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
                 #else // on GCC wait_until is faster
                     // use real system time for CV deadline when using a virtual time source
-                    auto cv_deadline = time_source ? rpp::TimePoint::now() + interval
-                                                   : prevTime + interval;
+                    auto cv_deadline = time_source ? rpp::TimePoint::now() + real_wait
+                                                   : prevTime + real_wait;
                     (void)Waiter.wait_until(lock_guard, cv_deadline); // may throw
                 #endif
                     if (is_destroying()) return false; // give up immediately
@@ -696,11 +702,7 @@ namespace rpp
                     remaining -= (now - prevTime);
                     if (remaining <= zero)
                         break; // timed out
-
                     prevTime = now;
-                    // make sure we don't suspend past the final waiting point
-                    if (interval > remaining)
-                        interval = remaining;
                 } while (Head == Tail);
 
                 if (Head == Tail)
@@ -757,39 +759,25 @@ namespace rpp
             }
             auto now = time_now(time_source);
             auto end = now + timeout;
-            if (time_source)
-            {
-                // When using a virtual time source, we must use real system time for
-                // the CV wait, and poll in short intervals so that time warping
-                // (fast-forward) causes the wait to exit promptly.
-                constexpr auto warp_poll = rpp::Duration::from_millis(10);
-                do {
-                    rpp::Duration remaining = end - now;
-                    rpp::Duration real_wait = remaining < warp_poll ? remaining : warp_poll;
-                    #if _MSC_VER
-                        (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
-                    #else
-                        (void)Waiter.wait_until(lock_guard, rpp::TimePoint::now() + real_wait); // may throw
-                    #endif
-                    if (is_destroying()) return false;
-                    if (Head != Tail) return true;
-                    now = time_now(time_source);
-                } while (now < end);
-            }
-            else
-            {
-                do {
-                    #if _MSC_VER // on Win32 wait_for is faster
-                        rpp::Duration remaining = end - now;
-                        (void)Waiter.wait_for(lock_guard, remaining); // noexcept
-                    #else // on GCC wait_until is faster
-                        (void)Waiter.wait_until(lock_guard, end); // may throw
-                    #endif
-                    if (is_destroying()) return false; // give up immediately
-                    if (Head != Tail) return true; // got an item
-                    now = time_now(time_source);
-                } while (now < end); // handle spurious wakeups
-            }
+            // When using a virtual time source, we must use real system time for
+            // the CV wait, and poll in short intervals so that time warping
+            // (fast-forward) causes the wait to exit promptly.
+            constexpr rpp::Duration warp_poll = rpp::millis(1);
+            do {
+                rpp::Duration remaining = end - now;
+                rpp::Duration real_wait;
+                if (time_source) real_wait = (remaining < warp_poll ? remaining : warp_poll);
+                else             real_wait = remaining;
+                #if _MSC_VER // on Win32 wait_for is faster
+                    (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
+                #else // on GCC wait_until is faster
+                    rpp::TimePoint cv_end = time_source ? rpp::TimePoint::now() + real_wait : end;
+                    (void)Waiter.wait_until(lock_guard, cv_end); // may throw
+                #endif
+                if (is_destroying()) return false; // give up immediately
+                if (Head != Tail) return true; // got an item
+                now = time_now(time_source);
+            } while (now < end); // handle spurious wakeups
             return false;
         }
         // PRECONDITION: until.is_valid()
@@ -801,43 +789,29 @@ namespace rpp
                 return false; // give up immediately
             }
             if (Head != Tail) return true; // wait is not needed
-            if (time_source)
-            {
-                // When using a virtual time source, poll in short real-time intervals
-                // so that time warping (fast-forward) causes the wait to exit promptly.
-                constexpr auto warp_poll = rpp::Duration::from_millis(10);
-                rpp::TimePoint now = time_source->time_now();
-                do {
-                    rpp::Duration remaining = until - now;
-                    rpp::Duration real_wait = remaining < warp_poll ? remaining : warp_poll;
-                    #if _MSC_VER
-                        (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
-                    #else
-                        (void)Waiter.wait_until(lock_guard, rpp::TimePoint::now() + real_wait); // may throw
-                    #endif
-                    if (is_destroying()) return false;
-                    if (Head != Tail) return true;
-                    now = time_source->time_now();
-                } while (now < until);
-            }
-            else
-            {
-                rpp::TimePoint now;
-                #if _MSC_VER
-                    now = rpp::TimePoint::now();
+
+            // When using a virtual time source, poll in short real-time intervals
+            // so that time warping (fast-forward) causes the wait to exit promptly.
+            constexpr rpp::Duration warp_poll = rpp::millis(1);
+            rpp::TimePoint now;
+            #if _MSC_VER
+                now = time_now(time_source);
+            #endif
+            do {
+                rpp::Duration remaining = until - now;
+                rpp::Duration real_wait;
+                if (time_source) real_wait = (remaining < warp_poll ? remaining : warp_poll);
+                else             real_wait = remaining;
+                #if _MSC_VER // on Win32 wait_for is faster
+                    (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
+                #else // on GCC wait_until is faster
+                    rpp::TimePoint cv_end = time_source ? rpp::TimePoint::now() + real_wait : until;
+                    (void)Waiter.wait_until(lock_guard, cv_end); // may throw
                 #endif
-                do {
-                    #if _MSC_VER // on Win32 wait_for is faster
-                        rpp::Duration remaining = until - now;
-                        (void)Waiter.wait_for(lock_guard, remaining); // noexcept
-                    #else // on GCC wait_until is faster
-                        (void)Waiter.wait_until(lock_guard, until); // may throw
-                    #endif
-                    if (is_destroying()) return false; // give up immediately
-                    if (Head != Tail) return true; // got an item
-                    now = rpp::TimePoint::now();
-                } while (now < until); // handle spurious wakeups
-            }
+                if (is_destroying()) return false; // give up immediately
+                if (Head != Tail) return true; // got an item
+                now = time_now(time_source);
+            } while (now < until); // handle spurious wakeups
             return false;
         }
         void notify_one_unlocked() noexcept

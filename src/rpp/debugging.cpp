@@ -10,7 +10,7 @@
 #include <cstdlib> // alloca
 #include <exception> // std::terminate
 
-#if __ANDROID__
+#if RPP_ANDROID
 # include <android/log.h>
 #endif
 
@@ -236,7 +236,7 @@ RPPCAPI RPP_NORETURN void RppAssertFail(const char* message, const char* file,
 
 RPPCAPI void LogWriteToDefaultOutput(const char* tag, LogSeverity severity, const char* str, int len)
 {
-    #if __ANDROID__
+    #if RPP_ANDROID
         (void)len;
         auto priority = ANDROID_LOG_ERROR;
         if      (severity == LogSeverityInfo) priority = ANDROID_LOG_INFO;

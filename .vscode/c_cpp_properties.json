@@ -35,7 +35,7 @@
             "compileCommands": "${workspaceFolder}/packages/ReCpp/linux/compile_commands.json"
         },
         {
-            "name": "Android",
+            "name": "Android Clang arm64",
             "includePath": [
                 "${workspaceFolder}/**"
             ],

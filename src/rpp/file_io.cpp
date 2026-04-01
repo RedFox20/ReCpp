@@ -10,7 +10,7 @@
 #if __APPLE__
     #include <TargetConditionals.h> // TARGET_OS_IPHONE
 #endif
-#if __ANDROID__
+#if RPP_ANDROID
     #include <jni.h>
 #endif
 
@@ -199,7 +199,7 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if _MSC_VER
         return GetFileSize(reinterpret_cast<HANDLE>(Handle), nullptr);
-    #elif __ANDROID__ || TARGET_OS_IPHONE
+    #elif RPP_ANDROID || TARGET_OS_IPHONE
         struct stat s;
         if (fstat(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
@@ -223,7 +223,7 @@ namespace rpp /* ReCpp */
             return 0ull;
         }
         return static_cast<int64>(size.QuadPart);
-    #elif __ANDROID__ || __APPLE__
+    #elif RPP_ANDROID || __APPLE__
         struct stat64 s;
         if (_fstat64(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));

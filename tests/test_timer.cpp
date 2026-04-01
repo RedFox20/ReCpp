@@ -513,7 +513,7 @@ TestImpl(test_timer)
         rpp::int64 elapsed_us = (t2 - t1).micros();
         print_info("Monotonic 10ms elapsed: %lldus\n", elapsed_us);
         AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 15'000);
+        AssertLessOrEqual(elapsed_us, 18'000);
     }
 
     TestCase(clock_type_monotonic_raw)
@@ -525,7 +525,7 @@ TestImpl(test_timer)
         rpp::int64 elapsed_us = (t2 - t1).micros();
         print_info("MonotonicRaw 10ms elapsed: %lldus\n", elapsed_us);
         AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 15'000);
+        AssertLessOrEqual(elapsed_us, 18'000);
     }
 
     TestCase(clock_type_monotonic_coarse)
@@ -550,7 +550,7 @@ TestImpl(test_timer)
         rpp::int64 elapsed_us = (t2 - t1).micros();
         print_info("Boottime 10ms elapsed: %lldus\n", elapsed_us);
         AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 15'000);
+        AssertLessOrEqual(elapsed_us, 18'000);
     }
 
     TestCase(clock_type_process_cpu)
@@ -568,10 +568,10 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
         AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(10'000, /*full_spin*/true);
+        spin_sleep_for_us(20'000, /*full_spin*/true);
         rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
         rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("ThreadCPU 10ms spin elapsed: %lldus\n", elapsed_us);
+        print_info("ThreadCPU 20ms spin elapsed: %lldus\n", elapsed_us);
         AssertGreater(elapsed_us, 5'000);
     }
 

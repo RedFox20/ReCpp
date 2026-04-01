@@ -55,13 +55,13 @@
     #include <poll.h> // poll()
     #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
-    // on __ANDROID__ this requires API level 24
-    #if __ANDROID__ && __ANDROID_API__ < 24
+    // on Android this requires API level 24
+    #if RPP_ANDROID && __ANDROID_API__ < 24
         #error "<ifaddrs.h> requires ANDROID_API level 24"
     #else
         #include <ifaddrs.h>
     #endif
-    #if __ANDROID__
+    #if RPP_ANDROID
         #include "jni_cpp.h"
         #include <android/log.h>
         #include <android/multinetwork.h> // android_setsocknetwork
@@ -2129,7 +2129,7 @@ namespace rpp
         if (!good())
             return false;
 
-    #if __ANDROID__ && __ANDROID_API__ >= 23
+    #if RPP_ANDROID && __ANDROID_API__ >= 23
         if (android_setsocknetwork((net_handle_t)network_handle, os_handle_unsafe()) != 0)
         {
             set_errno_unlocked(os_getsockerr());
@@ -2160,7 +2160,7 @@ namespace rpp
 
     void socket::unbind_interface() noexcept
     {
-    #if __ANDROID__ && __ANDROID_API__ >= 23
+    #if RPP_ANDROID && __ANDROID_API__ >= 23
         bind_to_interface(0); // 0=NETWORK_UNSPECIFIED
     #else
         // TODO: implement for other platforms
@@ -2214,7 +2214,7 @@ namespace rpp
 
     std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept
     {
-    #if __ANDROID__ && __ANDROID_API__ >= 21
+    #if RPP_ANDROID && __ANDROID_API__ >= 21
         using namespace rpp::jni;
 
         try
