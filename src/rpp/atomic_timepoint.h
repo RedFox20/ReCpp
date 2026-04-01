@@ -31,6 +31,11 @@ namespace rpp
             "std::atomic<Duration> must be lock-free (requires 64-bit platform)");
     #endif // !MIPS
 
+        // default initialize to zero, because it's not the default for atomics
+        AtomicDuration() noexcept : base{Duration::zero()}
+        {
+        }
+
         /** @brief Atomically adds a Duration. @returns The new value after addition. */
         Duration operator+=(Duration d) noexcept
         {
@@ -90,6 +95,11 @@ namespace rpp
         static_assert(base::is_always_lock_free,
             "std::atomic<TimePoint> must be lock-free (requires 64-bit platform)");
     #endif // !MIPS
+
+        // default initialize to zero, because it's not the default for atomics
+        AtomicTimePoint() noexcept : base{TimePoint::zero()}
+        {
+        }
 
         /** @brief Atomically adds a Duration. @returns The new TimePoint after addition. */
         TimePoint operator+=(Duration d) noexcept

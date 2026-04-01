@@ -163,12 +163,22 @@ namespace rpp
     {
         static int num_cores = []
         {
-            // TODO: figure out which types of CPU-s have SMT/HT
-            #if MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID
-                constexpr int hyperthreading_factor = 1;
+        // TODO: figure out which types of CPU-s have SMT/HT
+        #if MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID
+            #if RPP_TESTS
+                int hyperthreading_factor = 1;
+                if (std::getenv("CIRCLECI") != nullptr)
+                {
+                    // CIRCLECI machines usually report actual hardware threads -- e.g. 36 threads
+                    // even though scheduler only has access to 3/4/6/8 cores
+                    hyperthreading_factor = 4;
+                }
             #else
-                constexpr int hyperthreading_factor = 2;
+                constexpr int hyperthreading_factor = 1;
             #endif
+        #else
+            constexpr int hyperthreading_factor = 2;
+        #endif
             int n = (int)std::thread::hardware_concurrency() / hyperthreading_factor;
             return n > 0 ? n : 1;
         }();

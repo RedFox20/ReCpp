@@ -538,9 +538,12 @@ namespace rpp
             min_tasks = range < max_tasks ? range/*cannot be neg/zero*/ : max_tasks/*can be zero*/;
             if (min_tasks < 1) min_tasks = 1; // avoid zero div
             // spread the range over all available cores, with last task getting the remainder
-            // ex 11 / 4 --> round(2.75) --> 3
-            // ex 128 / 18 --> round(7.11) --> 7
-            max_length = (int)roundf((float)range / float(min_tasks));
+            // floor ensures we don't overshoot chunk size and end up with fewer tasks than min_tasks
+            // ex 11 / 4 --> 11/4 --> 2  (gives 6 tasks, last task gets remainder)
+            // ex 128 / 18 --> 128/18 --> 7  (gives 19 tasks, clamped to 18 by max_tasks)
+            // ex 128 / 36 --> 128/36 --> 3  (gives 43 tasks, clamped to 36 by max_tasks)
+            max_length = range / min_tasks;
+            if (max_length < 1) max_length = 1;
         }
         else
         {

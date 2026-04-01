@@ -32,27 +32,28 @@ namespace rpp
         rpp::delegate<T()> action;
         T result {};
         std::exception_ptr ex {};
-        rpp::pool_task_handle poolTask {nullptr};
+        bool suspended = false;
 
         explicit functor_awaiter(rpp::delegate<T()> action) noexcept
             : action{std::move(action)} {}
 
         // Called first by the compiler immediately after `co_await action` is evaluated.
         // If true, the coroutine skips suspension entirely and jumps straight to await_resume().
-        // Since poolTask hasn't been started yet (that happens in await_suspend), this always
+        // Since action hasn't been started yet (that happens in await_suspend), this always
         // returns false, guaranteeing the coroutine suspends and the background task is launched.
-        bool await_ready() const noexcept
-        {
-            return poolTask.was_started() && poolTask.is_finished();
-        }
+        bool await_ready() const noexcept { return false; }
         // Called after await_ready() returns false, just as the coroutine is suspending.
         // `cont` is a handle to the now-suspended coroutine; resuming it continues execution
         // past the co_await expression and calls await_resume() on this background thread.
         // The caller (the co_await site) returns here, giving control back up the call stack.
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (poolTask.was_started()) std::terminate(); // avoid task explosion
-            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
+            if (suspended) std::terminate(); // avoid task explosion
+            suspended = true;
+            // Use detached task: storing the pool_task_handle into a member is a race,
+            // because cont.resume() may destroy the coroutine frame (and `this`)
+            // before the handle assignment completes on the calling thread.
+            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable
             {
                 try { result = std::move(action()); }
                 catch (...) { ex = std::current_exception(); }
@@ -67,7 +68,6 @@ namespace rpp
         {
             // dtor consistency test: clear some of the state stuff here
             action = {};
-            poolTask = {nullptr};
             if (ex) std::rethrow_exception(ex);
             return std::move(result);
         }
@@ -77,23 +77,22 @@ namespace rpp
     struct RPP_CORO_RETURN_TYPE functor_awaiter<void>
     {
         rpp::delegate<void()> action;
-
         std::exception_ptr ex {};
-        rpp::pool_task_handle poolTask {nullptr};
+        bool suspended = false;
 
         explicit functor_awaiter(rpp::delegate<void()> action) noexcept
             : action{std::move(action)} {}
 
-        // is the task ready?
-        bool await_ready() const noexcept
-        {
-            return poolTask.was_started() && poolTask.is_finished();
-        }
+        bool await_ready() const noexcept { return false; }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (poolTask.was_started()) std::terminate(); // avoid task explosion
-            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable {
+            if (suspended) std::terminate(); // avoid task explosion
+            suspended = true;
+            // Use detached task: storing the pool_task_handle into a member is a race,
+            // because cont.resume() may destroy the coroutine frame (and `this`)
+            // before the handle assignment completes on the calling thread.
+            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable {
                 try { action(); }
                 catch (...) { ex = std::current_exception(); }
                 // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
@@ -105,7 +104,6 @@ namespace rpp
         {
             // dtor consistency test: clear some of the state stuff here
             action = {};
-            poolTask = {nullptr};
             if (ex) std::rethrow_exception(ex);
         }
     };
@@ -116,21 +114,21 @@ namespace rpp
         rpp::delegate<Future()> action;
         Future f {};
         std::exception_ptr ex {};
-        rpp::pool_task_handle poolTask {nullptr};
+        bool suspended = false;
 
         explicit functor_awaiter_fut(rpp::delegate<Future()> action) noexcept
             : action{std::move(action)} {}
 
-        // is the task ready?
-        bool await_ready() const noexcept
-        {
-            return poolTask.was_started() && poolTask.is_finished();
-        }
+        bool await_ready() const noexcept { return false; }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (poolTask.was_started()) std::terminate(); // avoid task explosion
-            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
+            if (suspended) std::terminate(); // avoid task explosion
+            suspended = true;
+            // Use detached task: storing the pool_task_handle into a member is a race,
+            // because cont.resume() may destroy the coroutine frame (and `this`)
+            // before the handle assignment completes on the calling thread.
+            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable
             {
                 try {
                     f = action(); // get the future from the lambda
@@ -145,7 +143,6 @@ namespace rpp
         {
             // dtor consistency test: clear some of the state stuff here
             action = {};
-            poolTask = {nullptr};
             if (ex) std::rethrow_exception(ex);
             return f.get();
         }
@@ -158,23 +155,23 @@ namespace rpp
     {
         std::future<T> f;
         std::exception_ptr ex {};
-        rpp::pool_task_handle poolTask {nullptr};
+        bool suspended = false;
 
         // NOTE: there is no safe way to grab the reference normally
         //       so we always MOVE the future into this awaiter
         explicit std_future_awaiter(std::future<T>&& f) noexcept
             : f{std::move(f)} {}
 
-        // is the task ready?
-        bool await_ready() const noexcept
-        {
-            return poolTask.was_started() && poolTask.is_finished();
-        }
+        bool await_ready() const noexcept { return false; }
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (poolTask.was_started()) std::terminate(); // avoid task explosion
-            poolTask = rpp::parallel_task([this, cont]() /*clang-12 compat*/mutable
+            if (suspended) std::terminate(); // avoid task explosion
+            suspended = true;
+            // Use detached task: storing the pool_task_handle into a member is a race,
+            // because cont.resume() may destroy the coroutine frame (and `this`)
+            // before the handle assignment completes on the calling thread.
+            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable
             {
                 try { f.wait(); /* wait for the nested coroutine to finish (can throw) */ }
                 catch (...) { ex = std::current_exception(); }

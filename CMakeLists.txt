@@ -250,7 +250,7 @@ if (BUILD_TESTS)
     # we build Rpp from source again so that RPP_DEBUG=1 has an effect in unit tests
     add_executable(RppTests ${RPP_TESTS} ${RPP_SRC})
     set_target_properties(RppTests PROPERTIES XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
-    target_compile_definitions(RppTests PRIVATE -DRPP_DEBUG=1)
+    target_compile_definitions(RppTests PRIVATE -DRPP_DEBUG=1 -DRPP_TESTS=1) # -- #define RPP_TESTS 1 -- for unit tests
     target_include_directories(RppTests PUBLIC "src")
     target_link_libraries(RppTests
         ${RPP_RUNTIME}
