@@ -98,6 +98,49 @@ namespace rpp
         return get_ticks_since_epoch(filetime);
     }
 
+    // returns nanoseconds for the given ClockType using Win32 APIs
+    static int64 win32_clock_ns(ClockType clock) noexcept
+    {
+        switch (clock)
+        {
+            default:
+            case ClockType::Realtime:
+            case ClockType::TAI: // no TAI on Windows, fall back to Realtime
+                return ticks_to_ns(ticks_since_epoch());
+            case ClockType::RealtimeCoarse: {
+                // GetSystemTimeAsFileTime is faster but less precise (~15.6ms)
+                FILETIME filetime;
+                GetSystemTimeAsFileTime(&filetime);
+                return ticks_to_ns(get_ticks_since_epoch(filetime));
+            }
+            case ClockType::Monotonic:
+            case ClockType::MonotonicRaw: {
+                // QueryPerformanceCounter - high resolution monotonic timer
+                LARGE_INTEGER freq, counter;
+                QueryPerformanceFrequency(&freq);
+                QueryPerformanceCounter(&counter);
+                // split to avoid overflow: whole seconds + remainder
+                int64 sec = counter.QuadPart / freq.QuadPart;
+                int64 rem = counter.QuadPart % freq.QuadPart;
+                return sec * NANOS_PER_SEC + (rem * NANOS_PER_SEC) / freq.QuadPart;
+            }
+            case ClockType::MonotonicCoarse:
+            case ClockType::Boottime:
+                // GetTickCount64 - milliseconds since boot, includes suspend time
+                return int64(GetTickCount64()) * NANOS_PER_MILLI;
+            case ClockType::ProcessCPU: {
+                FILETIME creation, exit, kernel, user;
+                GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user);
+                return ticks_to_ns(to_uint64(kernel) + to_uint64(user));
+            }
+            case ClockType::ThreadCPU: {
+                FILETIME creation, exit, kernel, user;
+                GetThreadTimes(GetCurrentThread(), &creation, &exit, &kernel, &user);
+                return ticks_to_ns(to_uint64(kernel) + to_uint64(user));
+            }
+        }
+    }
+
     // uses multimedia timer API-s to sleep more accurately
     static void win32_sleep_ns(int64 nanos)
     {
@@ -699,45 +742,7 @@ namespace rpp
     TimePoint TimePoint::now(ClockType clock) noexcept
     {
         #if _WIN32
-            switch (clock)
-            {
-                default:
-                case ClockType::Realtime:
-                case ClockType::TAI: // no TAI on Windows, fall back to Realtime
-                    return now(); // GetSystemTimePreciseAsFileTime
-                case ClockType::RealtimeCoarse: {
-                    // GetSystemTimeAsFileTime is faster but less precise (~15.6ms)
-                    FILETIME filetime;
-                    GetSystemTimeAsFileTime(&filetime);
-                    return TimePoint{ ticks_to_ns(get_ticks_since_epoch(filetime)) };
-                }
-                case ClockType::Monotonic:
-                case ClockType::MonotonicRaw: {
-                    // QueryPerformanceCounter - high resolution monotonic timer
-                    LARGE_INTEGER freq, counter;
-                    QueryPerformanceFrequency(&freq);
-                    QueryPerformanceCounter(&counter);
-                    // convert to nanoseconds: counter * 1e9 / freq
-                    // split to avoid overflow: whole seconds + remainder
-                    int64 sec  = counter.QuadPart / freq.QuadPart;
-                    int64 rem  = counter.QuadPart % freq.QuadPart;
-                    return TimePoint{ sec * NANOS_PER_SEC + (rem * NANOS_PER_SEC) / freq.QuadPart };
-                }
-                case ClockType::MonotonicCoarse:
-                case ClockType::Boottime:
-                    // GetTickCount64 - milliseconds since boot, includes suspend time
-                    return TimePoint{ int64(GetTickCount64()) * NANOS_PER_MILLI };
-                case ClockType::ProcessCPU: {
-                    FILETIME creation, exit, kernel, user;
-                    GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user);
-                    return TimePoint{ ticks_to_ns(to_uint64(kernel) + to_uint64(user)) };
-                }
-                case ClockType::ThreadCPU: {
-                    FILETIME creation, exit, kernel, user;
-                    GetThreadTimes(GetCurrentThread(), &creation, &exit, &kernel, &user);
-                    return TimePoint{ ticks_to_ns(to_uint64(kernel) + to_uint64(user)) };
-                }
-            }
+            return TimePoint{ win32_clock_ns(clock) };
         #elif RPP_BARE_METAL
             (void)clock;
             return now(); // bare metal: all clock types fall back to default
@@ -745,32 +750,29 @@ namespace rpp
             // ClockType to clockid_t mapping table
             // macOS: no coarse variants, no boottime, no TAI — mapped to nearest equivalent
             constexpr clockid_t clock_table[] = {
-                // wall clocks
-                /*Realtime*/       CLOCK_REALTIME,
+                    /*Realtime*/       CLOCK_REALTIME,
                 #if __linux__ || RPP_ANDROID
-                /*RealtimeCoarse*/ CLOCK_REALTIME_COARSE,
-                /*TAI*/            CLOCK_TAI,
+                    /*RealtimeCoarse*/ CLOCK_REALTIME_COARSE,
+                    /*TAI*/            CLOCK_TAI,
                 #else // macOS/Emscripten: no coarse or TAI variants
-                /*RealtimeCoarse*/ CLOCK_REALTIME,
-                /*TAI*/            CLOCK_REALTIME,
+                    /*RealtimeCoarse*/ CLOCK_REALTIME,
+                    /*TAI*/            CLOCK_REALTIME,
                 #endif
-                // monotonic clocks
-                CLOCK_MONOTONIC,
-                CLOCK_MONOTONIC_RAW,
+                    CLOCK_MONOTONIC,
+                    CLOCK_MONOTONIC_RAW,
                 #if __linux__ || RPP_ANDROID
-                /*MonotonicCoarse*/ CLOCK_MONOTONIC_COARSE,
-                /*Boottime*/        CLOCK_BOOTTIME,
+                    /*MonotonicCoarse*/ CLOCK_MONOTONIC_COARSE,
+                    /*Boottime*/        CLOCK_BOOTTIME,
                 #else // macOS/Emscripten: no coarse, boottime includes suspend already
-                /*MonotonicCoarse*/ CLOCK_MONOTONIC,
-                /*Boottime*/        CLOCK_MONOTONIC,
+                    /*MonotonicCoarse*/ CLOCK_MONOTONIC,
+                    /*Boottime*/        CLOCK_MONOTONIC,
                 #endif
-                // CPU time clocks
-                CLOCK_PROCESS_CPUTIME_ID,
-                CLOCK_THREAD_CPUTIME_ID,
+                    CLOCK_PROCESS_CPUTIME_ID,
+                    CLOCK_THREAD_CPUTIME_ID,
             };
             int index = static_cast<int>(clock);
             constexpr int max_index = static_cast<int>(sizeof(clock_table) / sizeof(clock_table[0]));
-            clockid_t clk = (index >= 0 && index < max_index) ? clock_table[index] : CLOCK_REALTIME;
+            clockid_t clk = (0 <= index && index < max_index) ? clock_table[index] : CLOCK_REALTIME;
             return TimePoint{ linux_clock_gettime_ns(clk) };
         #else
             (void)clock;

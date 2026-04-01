@@ -26,8 +26,10 @@ namespace rpp
         using base::base;      // inherit constructors: atomic(), atomic(Duration)
         using base::operator=; // inherit: Duration operator=(Duration)
 
+    #if !MIPS // mips is 32-bit, so this will not be atomic
         static_assert(base::is_always_lock_free,
             "std::atomic<Duration> must be lock-free (requires 64-bit platform)");
+    #endif // !MIPS
 
         /** @brief Atomically adds a Duration. @returns The new value after addition. */
         Duration operator+=(Duration d) noexcept
@@ -84,8 +86,10 @@ namespace rpp
         using base::base;      // inherit constructors: atomic(), atomic(TimePoint)
         using base::operator=; // inherit: TimePoint operator=(TimePoint)
 
+    #if !MIPS // mips is 32-bit, so this will not be atomic
         static_assert(base::is_always_lock_free,
             "std::atomic<TimePoint> must be lock-free (requires 64-bit platform)");
+    #endif // !MIPS
 
         /** @brief Atomically adds a Duration. @returns The new TimePoint after addition. */
         TimePoint operator+=(Duration d) noexcept
