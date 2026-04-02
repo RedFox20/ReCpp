@@ -27,7 +27,7 @@ namespace rpp
 
     bool load_balancer::can_send() const noexcept
     {
-        return can_send(TimePoint::now());
+        return can_send(TimePoint::monotonic_now());
     }
 
     // DON'T FORGET TO CALL notify_sent() !
@@ -42,7 +42,7 @@ namespace rpp
 
     void load_balancer::wait_to_send(uint32 bytesToSend) noexcept
     {
-        TimePoint start = TimePoint::now();
+        TimePoint start = TimePoint::monotonic_now();
         const rpp::TimePoint timeoutStart = lastSendTime;
         if (!timeoutStart)
         {
@@ -73,7 +73,7 @@ namespace rpp
                     rpp::sleep_ns(remainingNs / 2);
                 }
 
-                end = TimePoint::now();
+                end = TimePoint::monotonic_now();
                 remainingNs = timeoutNs - timeoutStart.elapsed_ns(end);
             }
         }

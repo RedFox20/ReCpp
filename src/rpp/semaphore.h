@@ -298,7 +298,7 @@ namespace rpp
                 // if timeout is 0, then do not enter this infinite loop, just return instantly
                 if (timeout.nsec <= 0)
                     return semaphore::timeout;
-                auto until = rpp::TimePoint::now() + timeout;
+                auto until = rpp::TimePoint::monotonic_now() + timeout;
                 while (value <= 0)
                     if (cv.wait_until(lock, until) == std::cv_status::timeout)
                         return semaphore::timeout;

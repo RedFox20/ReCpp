@@ -739,17 +739,20 @@ namespace rpp
         #endif
     }
 
-    TimePoint TimePoint::now(ClockType clock) noexcept
+    static constexpr int NUM_CLOCKS = int(ClockType::__Count);
+
+    // returns raw nanoseconds for any ClockType, without epoch synchronization
+    static int64 raw_clock_ns(ClockType clock) noexcept
     {
         #if _WIN32
-            return TimePoint{ win32_clock_ns(clock) };
+            return win32_clock_ns(clock);
         #elif RPP_BARE_METAL
             (void)clock;
-            return now(); // bare metal: all clock types fall back to default
+            return TimePoint::now().duration.nsec;
         #elif __APPLE__ || __linux__ || RPP_ANDROID || __EMSCRIPTEN__
             // ClockType to clockid_t mapping table
             // macOS: no coarse variants, no boottime, no TAI — mapped to nearest equivalent
-            constexpr clockid_t clock_table[] = {
+            constexpr clockid_t clock_table[NUM_CLOCKS] = {
                     /*Realtime*/       CLOCK_REALTIME,
                 #if __linux__ || RPP_ANDROID
                     /*RealtimeCoarse*/ CLOCK_REALTIME_COARSE,
@@ -771,13 +774,55 @@ namespace rpp
                     CLOCK_THREAD_CPUTIME_ID,
             };
             int index = static_cast<int>(clock);
-            constexpr int max_index = static_cast<int>(sizeof(clock_table) / sizeof(clock_table[0]));
-            clockid_t clk = (0 <= index && index < max_index) ? clock_table[index] : CLOCK_REALTIME;
-            return TimePoint{ linux_clock_gettime_ns(clk) };
+            clockid_t clk = (0 <= index && index < NUM_CLOCKS) ? clock_table[index] : CLOCK_REALTIME;
+            return linux_clock_gettime_ns(clk);
         #else
             (void)clock;
-            return now(); // unknown platform: all clock types fall back to default
+            return TimePoint::now().duration.nsec;
         #endif
+    }
+
+    // returns the realtime epoch offset for a monotonic clock type,
+    // lazily captured once per clock type on first use
+    static int64 monotonic_epoch_offset(ClockType clock) noexcept
+    {
+        constexpr int64 UNINITIALIZED = RPP_INT64_MAX;
+        static int64 offsets[NUM_CLOCKS] = {
+            UNINITIALIZED, UNINITIALIZED, UNINITIALIZED,
+            UNINITIALIZED, UNINITIALIZED, UNINITIALIZED,
+            UNINITIALIZED, UNINITIALIZED, UNINITIALIZED,
+        };
+
+        int index = static_cast<int>(clock);
+        if (index < 0 || index >= NUM_CLOCKS)
+            return 0;
+
+        int64 offset = offsets[index];
+        if (offset == UNINITIALIZED)
+        {
+            // sample both clocks as close together as possible
+            offset = raw_clock_ns(ClockType::Realtime) - raw_clock_ns(clock);
+            offsets[index] = offset;
+        }
+        return offset;
+    }
+
+    TimePoint TimePoint::now(ClockType clock) noexcept
+    {
+        int64 ns = raw_clock_ns(clock);
+        // synchronize monotonic clocks to realtime epoch so they are printable
+        switch (clock)
+        {
+            case ClockType::Monotonic:
+            case ClockType::MonotonicRaw:
+            case ClockType::MonotonicCoarse:
+            case ClockType::Boottime:
+                ns += monotonic_epoch_offset(clock);
+                break;
+            default:
+                break;
+        }
+        return TimePoint{ ns };
     }
 
     TimePoint TimePoint::local() noexcept
@@ -822,5 +867,5 @@ namespace rpp
 
 extern "C" double time_now_seconds()
 {
-    return rpp::TimePoint::now().duration.sec();
+    return rpp::TimePoint::system_now().duration.sec();
 }

@@ -150,7 +150,7 @@ namespace rpp
          */
         rpp::TimePoint time_now() const noexcept
         {
-            rpp::TimePoint base_now = rpp::TimePoint::now();
+            rpp::TimePoint base_now = rpp::TimePoint::system_now();
             rpp::int64 offset_ns = combined_offset_ns.load(std::memory_order_relaxed);
             return rpp::TimePoint{ base_now.duration.nsec + offset_ns };
         }
@@ -161,7 +161,7 @@ namespace rpp
          */
         rpp::TimePoint time_unsynced() const noexcept
         {
-            rpp::TimePoint base_local = rpp::TimePoint::now();
+            rpp::TimePoint base_local = rpp::TimePoint::system_now();
             rpp::int64 warp_ns = warp_offset_ns.load(std::memory_order_relaxed);
             return rpp::TimePoint{ base_local.duration.nsec + warp_ns };
         }

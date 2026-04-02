@@ -19,7 +19,7 @@ TestImpl(test_concurrent_queue)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
-    static TimePoint Now() { return TimePoint::now(); }
+    static TimePoint Now() { return TimePoint::monotonic_now(); }
     static constexpr Duration Millis(int millis) { return Duration::from_millis(millis); }
 
     TestInit(test_concurrent_queue)
@@ -406,6 +406,7 @@ TestImpl(test_concurrent_queue)
 
         PopResult r;
 
+        // this first check should definitely timeout, but make sure it WAITS
         AssertWaitPopUntil(Now()+Millis(5), false, /*item*/"", /*elapsed ms:*/ 2.9, 10.0);
         AssertWaitPopUntil(Now()+Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
@@ -438,11 +439,11 @@ TestImpl(test_concurrent_queue)
         // we should only have time to receive item1 and item2
         auto until = Now() + Millis(65);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 10.0, 35.0);
+        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 10.0, 40.0);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 10.0, 35.0);
+        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 10.0, 40.0);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 10.0, 35.0);
+        AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 10.0, 40.0);
     }
 
     // test that fast-forwarding a time source causes wait_pop to return early

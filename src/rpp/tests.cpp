@@ -534,9 +534,9 @@ namespace rpp
         suite_results suite_total {};
         auto run_suite = [this,&suite_total](strview methodFilter)
         {
-            auto t1 = rpp::TimePoint::now();
+            auto t1 = rpp::TimePoint::monotonic_now();
             suite_results r = run_test_suite(methodFilter);
-            auto t2 = rpp::TimePoint::now();
+            auto t2 = rpp::TimePoint::monotonic_now();
             impl->elapsed_time += (t2 - t1);
 
             suite_total.num_test_cases_run    += r.num_test_cases_run;
@@ -686,7 +686,7 @@ namespace rpp
         test.did_run = true;
         tl_current_test_func = impl->current_func = &test;
         int before = impl->current_results->asserts_failed;
-        auto t1 = rpp::TimePoint::now();
+        auto t1 = rpp::TimePoint::monotonic_now();
         decltype(t1) t2;
         try
         {
@@ -709,7 +709,7 @@ namespace rpp
                 #endif
             }
             test_case_cleanup();
-            t2 = rpp::TimePoint::now();
+            t2 = rpp::TimePoint::monotonic_now();
             if (test.expectedExType) // we expected an exception, but none happened?!
             {
                 assert_failed_custom("FAILED with expected EXCEPTION NOT THROWN in %s::%s\n",
@@ -719,7 +719,7 @@ namespace rpp
         catch (const std::exception& e)
         {
             test_case_cleanup();
-            t2 = rpp::TimePoint::now();
+            t2 = rpp::TimePoint::monotonic_now();
             if (test.expectedExType && test.expectedExType == typeid(e).hash_code())
             {
                 if (verb >= TestVerbosity::AllMessages)
@@ -1063,7 +1063,7 @@ namespace rpp
 
     void run_all_marked_tests(test_results& results)
     {
-        auto t1 = rpp::TimePoint::now();
+        auto t1 = rpp::TimePoint::monotonic_now();
         for (test_info& t : state().global_tests)
         {
             if (t.test_enabled)
@@ -1077,7 +1077,7 @@ namespace rpp
             }
         }
 
-        auto t2 = rpp::TimePoint::now();
+        auto t2 = rpp::TimePoint::monotonic_now();
         results.elapsed_time = t2 - t1;
     }
 

@@ -13,13 +13,17 @@ namespace rpp
 
     /**
      * High accuracy timer for performance profiling or deltaTime measurement
+     * Uses monotonic time by default.
      */
     struct RPPAPI Timer
     {
         // public started timepoint, feel free to set it to whatever you want
         TimePoint started;
+
+        static constexpr ClockType DefaultClock = ClockType::Monotonic; // default clock type for timers
+
         // clock type used by this timer for all now() calls
-        ClockType clock = ClockType::Realtime;
+        ClockType clock = DefaultClock;
 
         enum StartMode {
             NoStart,

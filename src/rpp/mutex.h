@@ -235,12 +235,12 @@ namespace rpp
             if (timeout <= rpp::Duration::zero())
                 return std::unique_lock<Mutex>{m, std::defer_lock}; // no timeout, just return deferred lock
 
-            rpp::TimePoint start = rpp::TimePoint::now();
+            rpp::TimePoint start = rpp::TimePoint::monotonic_now();
             do {
                 rpp::sleep_us(50); // yielding here will improve perf massively
                 if (m.try_lock()) return std::unique_lock<Mutex>{m, std::adopt_lock};
             }
-            while ((rpp::TimePoint::now() - start) < timeout);
+            while ((rpp::TimePoint::monotonic_now() - start) < timeout);
 
             return std::unique_lock<Mutex>{m, std::defer_lock}; // no timeout, just return deferred lock
         }

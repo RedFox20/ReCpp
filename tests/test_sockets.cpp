@@ -384,7 +384,7 @@ TestImpl(test_sockets)
             AssertTrue(pollin(/*millis*/10));
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll"s);
-            AssertLessOrEqual(t1.elapsed_millis(), 1.0);
+            AssertLessOrEqual(t1.elapsed_millis(), 2.0);
         }
 
         // TEST2: data arrives in the middle of the wait

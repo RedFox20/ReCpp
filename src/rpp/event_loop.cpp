@@ -57,7 +57,7 @@ namespace rpp
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
     {
         // drain any remaining events to avoid leaking coroutine frames
-        rpp::TimePoint end = rpp::TimePoint::now() + timeout;
+        rpp::TimePoint end = rpp::TimePoint::monotonic_now() + timeout;
         resume_event event;
         while (resume_queue.try_pop(event))
         {

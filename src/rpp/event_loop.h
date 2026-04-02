@@ -608,8 +608,8 @@ namespace rpp
             event_loop& loop;
             rpp::TimePoint end;
             delay_awaiter(event_loop& loop, rpp::TimePoint tp) noexcept : loop{loop}, end{tp} {}
-            delay_awaiter(event_loop& loop, rpp::Duration d) noexcept : loop{loop}, end{rpp::TimePoint::now() + d} {}
-            bool await_ready() const noexcept { return rpp::TimePoint::now() >= end; }
+            delay_awaiter(event_loop& loop, rpp::Duration d) noexcept : loop{loop}, end{rpp::TimePoint::monotonic_now() + d} {}
+            bool await_ready() const noexcept { return rpp::TimePoint::monotonic_now() >= end; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 loop.start_in_background([this, cont]() mutable
@@ -666,7 +666,7 @@ namespace rpp
                 // start timeout timer if finite
                 if (timeout < rpp::seconds(86400))
                 {
-                    rpp::TimePoint deadline = rpp::TimePoint::now() + timeout;
+                    rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + timeout;
                     loop.start_in_background([&loop=loop, cont, deadline]() mutable // mutable because of `cont.resume()`
                     {
                         rpp::sleep_until(deadline);

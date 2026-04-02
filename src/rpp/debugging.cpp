@@ -165,7 +165,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
     int len = 0;
 
     if (EnableTimestamps) {
-        rpp::TimePoint now = rpp::TimePoint::now();
+        rpp::TimePoint now = rpp::TimePoint::system_now();
         now.duration.nsec += TimeOffset.load(std::memory_order_relaxed);
         if (TimeOfDay)
             len = now.time_of_day().to_string(pbuf, remaining-1, TimePrecision);

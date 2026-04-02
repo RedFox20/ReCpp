@@ -88,7 +88,7 @@ TestImpl(test_timer)
             rpp::Timer t;
             // going below 100'000ns is not accurate with clock_nanosleep
             rpp::sleep_ns(100'000);
-            rpp::int64 elapsed_ns = t.elapsed_ns(rpp::TimePoint::now());
+            rpp::int64 elapsed_ns = t.elapsed_ns(rpp::TimePoint::monotonic_now());
             print_info("nanos %d 100000ns sleep time: %lldns\n", i+1, elapsed_ns);
             AssertInRange(elapsed_ns, 99'999, 7'100'200); // OS sleep can never be accurate enough, so the range must be very loose
         }
@@ -199,10 +199,10 @@ TestImpl(test_timer)
     // this tests that all of the Duration::sec() / TimePoint::elapsed_sec() math is correct
     TestCase(duration_sec_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
         const int millis = 10; // wait a few millis
         spin_sleep_for_ms(millis);
-        rpp::TimePoint t2 = rpp::TimePoint::now();
+        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
 
         double elapsed_sec = t1.elapsed_sec(t2);
         print_info("elapsed_sec: %fs\n", elapsed_sec);
@@ -226,10 +226,10 @@ TestImpl(test_timer)
     // this tests that all of the Duration::millis() / TimePoint::elapsed_ms() math is correct
     TestCase(duration_millis_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
         const int millis = 10; // wait a few millis
         spin_sleep_for_ms(millis);
-        rpp::TimePoint t2 = rpp::TimePoint::now();
+        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
 
         rpp::Duration elapsed1 = t1.elapsed(t2);
         print_info("elapsed: %lldns\n", elapsed1.nanos());
@@ -253,10 +253,10 @@ TestImpl(test_timer)
     // this tests that all of the Duration::micros() / TimePoint::elapsed_us() math is correct
     TestCase(duration_micros_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
         const int microseconds = 15; // wait a few micros
         spin_sleep_for_us(microseconds);
-        rpp::TimePoint t2 = rpp::TimePoint::now();
+        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
 
         rpp::Duration elapsed1 = t1.elapsed(t2);
         print_info("elapsed: %lldns\n", elapsed1.nanos());
@@ -281,10 +281,10 @@ TestImpl(test_timer)
     // this tests that all of the Duration::nanos() / TimePoint::elapsed_ns() math is correct
     TestCase(duration_nanos_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
         const int microseconds = 15; // wait a few micros
         spin_sleep_for_us(microseconds);
-        rpp::TimePoint t2 = rpp::TimePoint::now();
+        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
 
         rpp::int64 elapsed_ns = t1.elapsed_ns(t2);
         print_info("elapsed_ns: %lldns\n", elapsed_ns);
@@ -585,6 +585,26 @@ TestImpl(test_timer)
         print_info("TAI value: %lldns\n", t1.duration.nanos());
         // TAI falls back to Realtime on non-Linux, so just verify it returns something
         AssertThat(t1.is_valid(), true);
+    }
+
+    TestCase(monotonic_epoch_synchronized)
+    {
+        // monotonic clocks should be automatically synchronized to realtime epoch
+        rpp::TimePoint real = rpp::TimePoint::now();
+        rpp::TimePoint mono = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+
+        rpp::int64 diff_ms = (mono - real).abs().millis();
+        print_info("Monotonic vs Realtime diff: %lldms\n", diff_ms);
+        print_info("  monotonic: %s\n", mono.to_string(3).c_str());
+        print_info("  realtime:  %s\n", real.to_string(3).c_str());
+        AssertLess(diff_ms, 100); // should be within 100ms
+
+        // boottime should also be synchronized
+        rpp::TimePoint boot = rpp::TimePoint::now(rpp::ClockType::Boottime);
+        rpp::int64 boot_diff_ms = (boot - real).abs().millis();
+        print_info("Boottime vs Realtime diff: %lldms\n", boot_diff_ms);
+        print_info("  boottime:  %s\n", boot.to_string(3).c_str());
+        AssertLess(boot_diff_ms, 100);
     }
 
     TestCase(proc_cpu_times)

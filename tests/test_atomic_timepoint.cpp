@@ -137,6 +137,8 @@ TestImpl(test_atomic_timepoint)
         TimePoint now = TimePoint::now();
         AtomicTimePoint tp = now;
         AssertThat(tp.load(), now);
+        AtomicTimePoint tp2 { now };
+        AssertThat(tp2.load(), now);
     }
 
     TestCase(timepoint_store_and_load)
@@ -229,9 +231,9 @@ TestImpl(test_atomic_timepoint)
         AssertThat(ts.warp_offset(), Duration::zero());
 
         // time_now() should be approximately system time
-        TimePoint before = TimePoint::now();
+        TimePoint before = TimePoint::system_now();
         TimePoint ts_now = ts.time_now();
-        TimePoint after = TimePoint::now();
+        TimePoint after = TimePoint::system_now();
         AssertGreaterOrEqual(ts_now, before);
         AssertLessOrEqual(ts_now, after);
     }
@@ -246,7 +248,7 @@ TestImpl(test_atomic_timepoint)
         AssertThat(ts.total_offset(), Duration::from_seconds(1));
 
         // time_now() should be ~1s ahead of system time
-        TimePoint sys_now = TimePoint::now();
+        TimePoint sys_now = TimePoint::system_now();
         TimePoint ts_now = ts.time_now();
         Duration diff = ts_now - sys_now;
         AssertGreater(diff.nsec, Duration::from_millis(900).nsec);
@@ -327,7 +329,7 @@ TestImpl(test_atomic_timepoint)
 
         // time_now() should be ~1s in the past relative to system time
         TimePoint ts_now = ts.time_now();
-        TimePoint sys_now = TimePoint::now();
+        TimePoint sys_now = TimePoint::system_now();
         Duration diff = sys_now - ts_now;
         AssertGreater(diff.nsec, Duration::from_millis(900).nsec);
         AssertLess(diff.nsec, Duration::from_millis(1100).nsec);

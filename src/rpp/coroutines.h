@@ -187,17 +187,17 @@ namespace rpp
     };
 
     /**
-     * @brief Awaiter object for std::chrono durations
+     * @brief Awaiter object for rpp::Duration and rpp::TimePoint, allowing to co_await on them directly.
      */
     struct RPP_CORO_RETURN_TYPE time_awaiter
     {
         rpp::TimePoint end;
 
         explicit time_awaiter(const rpp::TimePoint& end) noexcept : end{end} {}
-        explicit time_awaiter(const rpp::Duration& d) noexcept : end{rpp::TimePoint::now() + d} {}
+        explicit time_awaiter(const rpp::Duration& d) noexcept : end{rpp::TimePoint::monotonic_now() + d} {}
         bool await_ready() const noexcept
         {
-            return rpp::TimePoint::now() >= end;
+            return rpp::TimePoint::monotonic_now() >= end;
         }
         void await_suspend(rpp::coro_handle<> cont) const
         {

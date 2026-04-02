@@ -18,7 +18,7 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    Timer::Timer() noexcept : started{TimePoint::now()}
+    Timer::Timer() noexcept : started{TimePoint::now(DefaultClock)}
     {
     }
 
@@ -28,7 +28,7 @@ namespace rpp
     }
 
     Timer::Timer(StartMode mode) noexcept
-        : started{mode == StartMode::AutoStart ? TimePoint::now() : TimePoint{}}
+        : started{mode == StartMode::AutoStart ? TimePoint::now(DefaultClock) : TimePoint{}}
     {
     }
 
@@ -74,7 +74,7 @@ namespace rpp
         : prefix{prefix}
         , location{location}
         , detail{detail}
-        , start{TimePoint::now()}
+        , start{TimePoint::monotonic_now()}
         , threshold_us{threshold_us}
     {
     }
@@ -82,7 +82,7 @@ namespace rpp
     ScopedPerfTimer::~ScopedPerfTimer() noexcept
     {
         // measure elapsed time as the first operation in the destructor
-        TimePoint now = TimePoint::now();
+        TimePoint now = TimePoint::monotonic_now();
         Duration elapsed = start.elapsed(now);
         if (threshold_us != 0 && elapsed.micros() <= rpp::int64(threshold_us))
             return; // within threshold, don't report anything
@@ -121,7 +121,7 @@ namespace rpp
     void StopWatch::start() noexcept
     {
         if (!begin) {
-            begin = TimePoint::now();
+            begin = TimePoint::monotonic_now();
             end = {};
         }
     }
@@ -129,7 +129,7 @@ namespace rpp
     void StopWatch::stop() noexcept
     {
         if (begin && !end)
-            end = TimePoint::now();
+            end = TimePoint::monotonic_now();
     }
 
     void StopWatch::resume() noexcept
@@ -145,7 +145,7 @@ namespace rpp
 
     void StopWatch::restart() noexcept
     {
-        begin = TimePoint::now();
+        begin = TimePoint::monotonic_now();
         end = {};
     }
 
@@ -155,7 +155,7 @@ namespace rpp
             if (end) {
                 return begin.elapsed_sec(end);
             } else {
-                return begin.elapsed_sec(TimePoint::now());
+                return begin.elapsed_sec(TimePoint::monotonic_now());
             }
         }
         return 0.0;

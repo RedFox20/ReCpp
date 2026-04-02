@@ -36,6 +36,9 @@ namespace rpp
 
     /**
      * @brief Clock types for TimePoint::now(ClockType).
+     *        Monotonic clocks are automatically synchronized to the 
+     *        Realtime epoch on first use, so they can be directly printed 
+     *        with to_string() while retaining monotonic guarantees (never going backwards).
      *
      * Linux: uses clock_gettime() natively for all types
      *   Realtime        CLOCK_REALTIME              ~1ns precision
@@ -83,6 +86,7 @@ namespace rpp
         // CPU time clocks
         ProcessCPU = 7,      // CPU time consumed by this process          worst-case precision: ~15.6ms (Windows), ~1us (Linux, scheduler dependent)
         ThreadCPU = 8,       // CPU time consumed by the calling thread    worst-case precision: ~15.6ms (Windows), ~1us (Linux, scheduler dependent)
+        __Count,            // internal use only, do not use
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,15 +327,24 @@ namespace rpp
          */
         uint64 to_epoch_ns() const noexcept { return uint64(duration.nsec); }
 
-        /** @returns Current OS specific high accuracy timepoint */
+        /** @returns Current OS specific epoch based datetime with ~100ns accuracy: ClockType::Realtime */
         static TimePoint now() noexcept;
 
         /**
          * @returns TimePoint from the specified clock source.
-         * @note Monotonic clocks use an arbitrary epoch (not UNIX epoch).
+         * @note Monotonic clocks (Monotonic, MonotonicRaw, MonotonicCoarse, Boottime) are
+         *       automatically synchronized to the Realtime epoch on first use, making them
+         *       printable via to_string(). The offset is captured once and reused.
+         *       CPU time clocks (ProcessCPU, ThreadCPU) are NOT synchronized.
          *       On unsupported platforms, falls back to default now().
          */
         static TimePoint now(ClockType clock) noexcept;
+
+        /** @returns Shorthand for TimePoint::now(ClockType::Realtime) */
+        FINLINE static TimePoint system_now() noexcept { return now(ClockType::Realtime); }
+
+        /** @returns Shorthand for TimePoint::now(ClockType::Monotonic) */
+        FINLINE static TimePoint monotonic_now() noexcept { return now(ClockType::Monotonic); }
 
         /** @returns Current OS time with timezone offset */
         static TimePoint local() noexcept;

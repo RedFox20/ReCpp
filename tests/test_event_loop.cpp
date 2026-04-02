@@ -674,7 +674,7 @@ TestImpl(test_event_loop)
     TestCaseCoro(delay_until_resumes_on_loop_thread)
     {
         rpp::Timer t;
-        rpp::TimePoint target = rpp::TimePoint::now() + rpp::millis(20);
+        rpp::TimePoint target = rpp::TimePoint::monotonic_now() + rpp::millis(20);
         co_await loop->delay_until(target);
         assert_on_main_thread();
         AssertGreater(t.elapsed_millis(), 18.0);

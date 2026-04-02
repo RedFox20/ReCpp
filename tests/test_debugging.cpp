@@ -92,9 +92,9 @@ TestImpl(test_debugging)
         log_output.clear();
 
         ::LogEnableTimestamps(true);
-        rpp::TimePoint timeBefore = rpp::TimePoint::now();
+        rpp::TimePoint timeBefore = rpp::TimePoint::system_now(); // debugging.cpp uses TimePoint::system_now() -- system clock
         LogInfo("TimestampTest");
-        rpp::TimePoint timeAfter = rpp::TimePoint::now();
+        rpp::TimePoint timeAfter = rpp::TimePoint::system_now();
         ::LogEnableTimestamps(false);
 
         std::string timestamp = rpp::strview{log_output}.split_first('$').trim();
