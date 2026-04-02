@@ -116,13 +116,25 @@ namespace rpp
             case ClockType::Monotonic:
             case ClockType::MonotonicRaw: {
                 // QueryPerformanceCounter - high resolution monotonic timer
-                LARGE_INTEGER freq, counter;
-                QueryPerformanceFrequency(&freq);
+                static LARGE_INTEGER freq = []{ // doesn't change after system boot
+                    LARGE_INTEGER f;
+                    QueryPerformanceFrequency(&f);
+                    return f;
+                }();
+                LARGE_INTEGER counter;
                 QueryPerformanceCounter(&counter);
-                // split to avoid overflow: whole seconds + remainder
-                int64 sec = counter.QuadPart / freq.QuadPart;
-                int64 rem = counter.QuadPart % freq.QuadPart;
-                return sec * NANOS_PER_SEC + (rem * NANOS_PER_SEC) / freq.QuadPart;
+                // 10MHz frequency is common and allows direct conversion to nanos without division
+                constexpr int64 TEN_MHZ = 10'000'000LL;
+                if (int64(freq.QuadPart) == TEN_MHZ) {
+                    // convert directly to nanoseconds without division
+                    return int64(counter.QuadPart) * (NANOS_PER_SEC / TEN_MHZ);
+                }
+                else {
+                    // split to avoid overflow: whole seconds + remainder
+                    int64 sec = int64(counter.QuadPart / freq.QuadPart);
+                    int64 rem = int64(counter.QuadPart % freq.QuadPart);
+                    return (sec * NANOS_PER_SEC) + (rem * NANOS_PER_SEC) / int64(freq.QuadPart);
+                }
             }
             case ClockType::MonotonicCoarse:
             case ClockType::Boottime:
