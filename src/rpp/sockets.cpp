@@ -1701,11 +1701,11 @@ namespace rpp
         if (set_opt(SOL_SOCKET, SO_REUSEADDR, reuse)) {
             return handle_errno(get_errno_unlocked()) == 0;
         }
-    #if !_WIN32
-        if (set_opt(SOL_SOCKET, SO_REUSEPORT, reuse)) {
-            return handle_errno(get_errno_unlocked()) == 0;
-        }
-    #endif
+        // NOTE: SO_REUSEPORT is intentionally NOT set here.
+        // SO_REUSEADDR allows binding to a recently closed port (TIME_WAIT).
+        // SO_REUSEPORT allows multiple sockets to bind to the same port and
+        // enables kernel load-balancing of incoming packets, which causes
+        // UDP packets to be delivered to the wrong socket in localhost scenarios.
         return true; // SO_REUSEADDR is set
     }
 
