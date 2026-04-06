@@ -107,7 +107,8 @@ elseif(MSVC)
     # /Zi - Debug Database
     # /Oi - Intrinsics Enabled
     # /MP - MultiProcess build
-    add_compile_options(/arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP)
+    # /Zc:preprocessor - Conforming preprocessor (required for __VA_OPT__)
+    add_compile_options(/arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP /Zc:preprocessor)
     # /MD - MultiThreaded Dynamic CRT
     # /MT - MultiThreaded Static CRT
     if (MSVC_DYNAMIC)

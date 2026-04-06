@@ -199,7 +199,10 @@ namespace rpp
 // C++20 __VA_OPT__ is preferred because the fallback (_spaces_on_empty_token trick)
 // breaks when __VA_ARGS__ starts with a C-style cast like (long long)(expr) --
 // the function-like _spaces_on_empty_token macro greedily consumes (long long) as its argument.
-#if __cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)
+// MSVC requires /Zc:preprocessor for __VA_OPT__; _MSVC_TRADITIONAL==0 confirms it is active.
+// Library consumers without /Zc:preprocessor will use the fallback automatically.
+#if (!defined(_MSC_VER) && __cplusplus >= 202002L) \
+ || (defined(_MSVC_TRADITIONAL) && _MSVC_TRADITIONAL == 0)
 #define _va_comma(...) __VA_OPT__(,)
 #else
 #define _rpp_z
