@@ -66,9 +66,8 @@ namespace rpp
             auto lock = spin_lock();
             return value;
         }
-        int count(lock_t& lock) const noexcept
+        int count([[maybe_unused]] const lock_t& lock) const noexcept
         {
-            (void)lock;
             return value;
         }
 
@@ -79,6 +78,10 @@ namespace rpp
         void reset(int newCount = 0) noexcept
         {
             auto lock = spin_lock();
+            reset(lock, newCount);
+        }
+        void reset([[maybe_unused]] const lock_t& lock, int newCount = 0) noexcept
+        {
             if (0 <= newCount && newCount <= max_value)
                 value = newCount;
             if (newCount > 0)
@@ -105,7 +108,7 @@ namespace rpp
             auto lock = spin_lock();
             notify(lock);
         }
-        NOINLINE void notify(lock_t& lock) noexcept
+        NOINLINE void notify(const lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("notify(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -124,7 +127,7 @@ namespace rpp
             notify<Callback>(lock, callback);
         }
         template<IsCallable Callback>
-        FINLINE void notify(lock_t& lock, const Callback& callback) noexcept
+        FINLINE void notify(const lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify(lock);
@@ -142,7 +145,7 @@ namespace rpp
             auto lock = spin_lock();
             notify_all(lock);
         }
-        NOINLINE void notify_all(lock_t& lock) noexcept
+        NOINLINE void notify_all(const lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("notify_all(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -161,7 +164,7 @@ namespace rpp
             notify_all<Callback>(lock, callback);
         }
         template<IsCallable Callback>
-        FINLINE void notify_all(lock_t& lock, const Callback& callback) noexcept
+        FINLINE void notify_all(const lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify_all(lock);
@@ -177,7 +180,7 @@ namespace rpp
             auto lock = spin_lock();
             return notify_once(lock);
         }
-        NOINLINE bool notify_once(lock_t& lock) noexcept
+        NOINLINE bool notify_once(const lock_t& lock) noexcept
         {
             if (!lock.owns_lock()) LogError("notify_once(lock) must be called with an owned lock!");
             if (value < 0) LogError("count=%d must not be negative", value.load());
@@ -201,7 +204,7 @@ namespace rpp
             notify_once<Callback>(lock, callback);
         }
         template<IsCallable Callback>
-        FINLINE void notify_once(lock_t& lock, const Callback& callback) noexcept
+        FINLINE void notify_once(const lock_t& lock, const Callback& callback) noexcept
         {
             callback(); // <-- perform any state changes here
             notify_once(lock);
@@ -215,6 +218,10 @@ namespace rpp
         bool try_wait() noexcept
         {
             auto lock = spin_lock();
+            return try_wait(lock);
+        }
+        bool try_wait([[maybe_unused]] const lock_t& lock) noexcept
+        {
             if (value > 0)
             {
                 --value;
