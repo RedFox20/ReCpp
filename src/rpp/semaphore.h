@@ -300,8 +300,14 @@ namespace rpp
                     return semaphore::timeout;
                 auto until = rpp::TimePoint::monotonic_now() + timeout;
                 while (value <= 0)
+                {
                     if (cv.wait_until(lock, until) == std::cv_status::timeout)
-                        return semaphore::timeout;
+                    {
+                        // recheck value after timeout: a concurrent notify() may have
+                        // incremented value between the CV timeout and lock reacquisition
+                        return (value > 0) ? semaphore::notified : semaphore::timeout;
+                    }
+                }
             }
             return semaphore::notified;
         }

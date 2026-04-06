@@ -217,6 +217,151 @@ TestImpl(test_semaphore)
         AssertEqual(consumer_data, producer_data);
     }
 
+    // Regression: wait with timeout must correctly time out
+    TestCase(wait_timeout_returns_after_expected_duration)
+    {
+        rpp::semaphore sem;
+
+        rpp::Timer timer;
+        auto result = sem.wait(millis(50));
+        double elapsed = timer.elapsed_ms();
+
+        AssertEqual(result, rpp::semaphore::timeout);
+        AssertGreater(elapsed, 30.0);
+        AssertLess(elapsed, 200.0);
+    }
+
+    // Regression: notify just before timeout should still return notified
+    TestCase(notify_near_timeout_returns_notified)
+    {
+        rpp::semaphore sem;
+
+        // Notify very close to the timeout boundary
+        std::thread notifier([&] {
+            rpp::sleep_ms(40);
+            sem.notify();
+        });
+
+        rpp::Timer timer;
+        auto result = sem.wait(millis(100));
+        double elapsed = timer.elapsed_ms();
+
+        notifier.join();
+        AssertEqual(result, rpp::semaphore::notified);
+        AssertLess(elapsed, 80.0);
+    }
+
+    // Regression: notify_once then wait should consume the stale value,
+    // then a second wait should block until notified
+    TestCase(stale_notify_once_consumed_then_blocks)
+    {
+        rpp::semaphore sem;
+
+        // Pre-signal (simulates stale value after clear)
+        sem.notify_once();
+        AssertEqual(1, sem.count());
+
+        // First wait consumes the stale value immediately
+        rpp::Timer timer;
+        auto result1 = sem.wait(millis(100));
+        AssertEqual(result1, rpp::semaphore::notified);
+        AssertLess(timer.elapsed_ms(), 20.0);
+        AssertEqual(0, sem.count());
+
+        // Second wait should block and timeout (no new notification)
+        timer.start();
+        auto result2 = sem.wait(millis(50));
+        AssertEqual(result2, rpp::semaphore::timeout);
+        AssertGreater(timer.elapsed_ms(), 30.0);
+    }
+
+    // Regression: concurrent notify during semaphore wait must not be lost
+    TestCase(concurrent_notify_during_wait_not_lost)
+    {
+        constexpr int ITERATIONS = 100;
+        int failures = 0;
+
+        for (int i = 0; i < ITERATIONS; ++i)
+        {
+            rpp::semaphore sem;
+
+            std::thread notifier([&] {
+                // Tight timing: notify after a very short delay
+                rpp::sleep_us(500);
+                sem.notify();
+            });
+
+            auto result = sem.wait(millis(200));
+            notifier.join();
+
+            if (result != rpp::semaphore::notified)
+                ++failures;
+        }
+
+        AssertEqual(failures, 0);
+    }
+
+    // Regression: multiple rapid notify_once + wait cycles
+    TestCase(rapid_notify_once_wait_cycles)
+    {
+        rpp::semaphore sem;
+        std::atomic_bool running{true};
+        std::atomic_int received{0};
+
+        std::thread producer([&] {
+            while (running)
+            {
+                sem.notify_once();
+                rpp::sleep_us(100);
+            }
+        });
+
+        // Consumer: wait and consume in a loop
+        for (int i = 0; i < 50; ++i)
+        {
+            auto result = sem.wait(millis(100));
+            if (result == rpp::semaphore::notified)
+                ++received;
+        }
+
+        running = false;
+        producer.join();
+        AssertEqual(received.load(), 50);
+    }
+
+    // Regression: semaphore_flag wait with monotonic timeout
+    TestCase(semaphore_flag_wait_timeout)
+    {
+        rpp::semaphore_flag flag;
+
+        rpp::Timer timer;
+        auto result = flag.wait(millis(50));
+        double elapsed = timer.elapsed_ms();
+
+        AssertEqual(result, rpp::semaphore::timeout);
+        AssertGreater(elapsed, 30.0);
+        AssertLess(elapsed, 200.0);
+    }
+
+    // Regression: semaphore_flag wait notified
+    TestCase(semaphore_flag_wait_notified)
+    {
+        rpp::semaphore_flag flag;
+
+        std::thread notifier([&] {
+            rpp::sleep_ms(20);
+            flag.notify();
+        });
+
+        rpp::Timer timer;
+        auto result = flag.wait(millis(500));
+        double elapsed = timer.elapsed_ms();
+
+        notifier.join();
+        AssertEqual(result, rpp::semaphore::notified);
+        AssertLess(elapsed, 200.0);
+    }
+
 #if RPP_HAS_COROUTINES
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
     // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
