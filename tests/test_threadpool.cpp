@@ -489,7 +489,7 @@ TestImpl(test_threadpool)
             for (int i = 0; i < TASKS_PER_THREAD; ++i)
                 rpp::parallel_task([&] { completed += 1; }).wait();
         };
-        std::thread t1{submitter}, t2{submitter}, t3{submitter}, t4{submitter};
+        std::thread t1{submitter}, t2{submitter}, t3{submitter}, t4{submitter}; // NOLINT(readability-isolate-declaration)
         t1.join(); t2.join(); t3.join(); t4.join();
 
         AssertThat((int)completed, 4 * TASKS_PER_THREAD);

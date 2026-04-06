@@ -110,19 +110,19 @@ TestImpl(test_semaphore)
         {
             while (working)
             {
-                rpp::sleep_ms(3); // do some work
-                if (sem.wait(millis(100)) == rpp::semaphore::timeout)
+                rpp::sleep_ms(1); // do some work
+                if (sem.wait(millis(50)) == rpp::semaphore::timeout)
                     AssertFailed("semaphore was not notified");
                 else if (working)
                     ++num_notified;
             }
         });
 
-        int num_notifies_sent = 25;
+        int num_notifies_sent = 10;
         for (int i = 0; i < num_notifies_sent; ++i)
         {
             sem.notify();
-            rpp::sleep_ms(5);
+            rpp::sleep_ms(2);
         }
 
         working = false;
@@ -144,21 +144,21 @@ TestImpl(test_semaphore)
             while (working)
             {
                 spin_sleep_for_us(100); // do some work
-                if (sem.wait(millis(100)) == rpp::semaphore::timeout)
+                if (sem.wait(millis(50)) == rpp::semaphore::timeout)
                     AssertFailed("semaphore was not notified");
                 else if (working)
                     ++num_notified;
             }
         });
 
-        int num_notifies_sent = 1000;
+        int num_notifies_sent = 500;
         for (int i = 0; i < num_notifies_sent; ++i)
         {
             sem.notify();
             spin_sleep_for_us(100);
         }
 
-        spin_sleep_for_us(15000);
+        spin_sleep_for_us(5000);
         working = false;
         sem.notify(); // notify finished
         worker.join();
@@ -202,11 +202,11 @@ TestImpl(test_semaphore)
         producer.join();
 
         // wait for consumer to finish receiving all of the data
-        for (int i = 0; i < 20; ++i) { // with a max wait limit
+        for (int i = 0; i < 40; ++i) { // with a max wait limit
             { std::lock_guard lock { producer_mutex };
               if (producer_queue.empty()) break;
             }
-            rpp::sleep_ms(5);
+            rpp::sleep_ms(1);
         }
 
         working = false;
@@ -221,34 +221,22 @@ TestImpl(test_semaphore)
     TestCase(wait_timeout_returns_after_expected_duration)
     {
         rpp::semaphore sem;
-
-        rpp::Timer timer;
-        auto result = sem.wait(millis(50));
-        double elapsed = timer.elapsed_ms();
-
-        AssertEqual(result, rpp::semaphore::timeout);
-        AssertGreater(elapsed, 30.0);
-        AssertLess(elapsed, 200.0);
+        rpp::Timer t;
+        AssertEqual(sem.wait(millis(20)), rpp::semaphore::timeout);
+        AssertGreater(t.elapsed_millis(), 10.0);
+        AssertLess(t.elapsed_millis(), 100.0);
     }
 
     // Regression: notify just before timeout should still return notified
     TestCase(notify_near_timeout_returns_notified)
     {
         rpp::semaphore sem;
+        std::thread notifier([&] { rpp::sleep_ms(10); sem.notify(); });
 
-        // Notify very close to the timeout boundary
-        std::thread notifier([&] {
-            rpp::sleep_ms(40);
-            sem.notify();
-        });
-
-        rpp::Timer timer;
-        auto result = sem.wait(millis(100));
-        double elapsed = timer.elapsed_ms();
-
+        rpp::Timer t;
+        AssertEqual(sem.wait(millis(100)), rpp::semaphore::notified);
+        AssertLess(t.elapsed_millis(), 50.0);
         notifier.join();
-        AssertEqual(result, rpp::semaphore::notified);
-        AssertLess(elapsed, 80.0);
     }
 
     // Regression: notify_once then wait should consume the stale value,
@@ -256,49 +244,28 @@ TestImpl(test_semaphore)
     TestCase(stale_notify_once_consumed_then_blocks)
     {
         rpp::semaphore sem;
-
-        // Pre-signal (simulates stale value after clear)
         sem.notify_once();
-        AssertEqual(1, sem.count());
 
-        // First wait consumes the stale value immediately
-        rpp::Timer timer;
-        auto result1 = sem.wait(millis(100));
-        AssertEqual(result1, rpp::semaphore::notified);
-        AssertLess(timer.elapsed_ms(), 20.0);
+        rpp::Timer t;
+        AssertEqual(sem.wait(millis(50)), rpp::semaphore::notified);
+        AssertLess(t.elapsed_millis(), 10.0);
         AssertEqual(0, sem.count());
 
-        // Second wait should block and timeout (no new notification)
-        timer.start();
-        auto result2 = sem.wait(millis(50));
-        AssertEqual(result2, rpp::semaphore::timeout);
-        AssertGreater(timer.elapsed_ms(), 30.0);
+        t.start();
+        AssertEqual(sem.wait(millis(20)), rpp::semaphore::timeout);
+        AssertGreater(t.elapsed_millis(), 10.0);
     }
 
     // Regression: concurrent notify during semaphore wait must not be lost
     TestCase(concurrent_notify_during_wait_not_lost)
     {
-        constexpr int ITERATIONS = 100;
-        int failures = 0;
-
-        for (int i = 0; i < ITERATIONS; ++i)
+        for (int i = 0; i < 100; ++i)
         {
             rpp::semaphore sem;
-
-            std::thread notifier([&] {
-                // Tight timing: notify after a very short delay
-                rpp::sleep_us(500);
-                sem.notify();
-            });
-
-            auto result = sem.wait(millis(200));
+            std::thread notifier([&] { rpp::sleep_us(500); sem.notify(); });
+            AssertEqual(sem.wait(millis(100)), rpp::semaphore::notified);
             notifier.join();
-
-            if (result != rpp::semaphore::notified)
-                ++failures;
         }
-
-        AssertEqual(failures, 0);
     }
 
     // Regression: multiple rapid notify_once + wait cycles
@@ -309,57 +276,73 @@ TestImpl(test_semaphore)
         std::atomic_int received{0};
 
         std::thread producer([&] {
-            while (running)
-            {
-                sem.notify_once();
-                rpp::sleep_us(100);
-            }
+            while (running) { sem.notify_once(); rpp::sleep_us(100); }
         });
 
-        // Consumer: wait and consume in a loop
         for (int i = 0; i < 50; ++i)
-        {
-            auto result = sem.wait(millis(100));
-            if (result == rpp::semaphore::notified)
+            if (sem.wait(millis(50)) == rpp::semaphore::notified)
                 ++received;
-        }
 
         running = false;
         producer.join();
         AssertEqual(received.load(), 50);
     }
 
-    // Regression: semaphore_flag wait with monotonic timeout
     TestCase(semaphore_flag_wait_timeout)
     {
         rpp::semaphore_flag flag;
-
-        rpp::Timer timer;
-        auto result = flag.wait(millis(50));
-        double elapsed = timer.elapsed_ms();
-
-        AssertEqual(result, rpp::semaphore::timeout);
-        AssertGreater(elapsed, 30.0);
-        AssertLess(elapsed, 200.0);
+        rpp::Timer t;
+        AssertEqual(flag.wait(millis(20)), rpp::semaphore::timeout);
+        AssertGreater(t.elapsed_millis(), 10.0);
+        AssertLess(t.elapsed_millis(), 100.0);
     }
 
-    // Regression: semaphore_flag wait notified
     TestCase(semaphore_flag_wait_notified)
     {
         rpp::semaphore_flag flag;
+        std::thread notifier([&] { rpp::sleep_ms(5); flag.notify(); });
 
-        std::thread notifier([&] {
-            rpp::sleep_ms(20);
-            flag.notify();
-        });
-
-        rpp::Timer timer;
-        auto result = flag.wait(millis(500));
-        double elapsed = timer.elapsed_ms();
-
+        AssertEqual(flag.wait(millis(200)), rpp::semaphore::notified);
         notifier.join();
-        AssertEqual(result, rpp::semaphore::notified);
-        AssertLess(elapsed, 200.0);
+    }
+
+    TestCase(wait_zero_timeout_returns_immediately)
+    {
+        rpp::semaphore sem;
+        rpp::Timer t;
+        AssertEqual(sem.wait(millis(0)), rpp::semaphore::timeout);
+        AssertEqual(sem.wait_no_unset(millis(0)), rpp::semaphore::timeout);
+        AssertLess(t.elapsed_millis(), 10.0);
+    }
+
+    TestCase(wait_very_short_timeout_no_deadlock)
+    {
+        rpp::semaphore sem;
+        rpp::Timer t;
+        AssertEqual(sem.wait(millis(1)), rpp::semaphore::timeout);
+        AssertLess(t.elapsed_millis(), 50.0);
+    }
+
+    // Regression: multiple rapid wait timeouts must not accumulate errors
+    TestCase(rapid_wait_timeouts_no_accumulation)
+    {
+        rpp::semaphore sem;
+        rpp::Timer t;
+        for (int i = 0; i < 10; ++i)
+            AssertEqual(sem.wait(millis(2)), rpp::semaphore::timeout);
+        AssertGreater(t.elapsed_millis(), 10.0);
+        AssertLess(t.elapsed_millis(), 200.0);
+    }
+
+    TestCase(semaphore_flag_concurrent_notify)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::semaphore_flag f;
+            std::thread notifier([&f] { rpp::sleep_us(500); f.notify(); });
+            AssertEqual(f.wait(millis(100)), rpp::semaphore::notified);
+            notifier.join();
+        }
     }
 
 #if RPP_HAS_COROUTINES

@@ -577,6 +577,51 @@ TestImpl(test_concurrent_queue)
         AssertLess(t.elapsed_millis(), 35);
     }
 
+    // Regression: wait_pop_until with past deadline must not deadlock
+    TestCase(wait_pop_until_past_deadline_returns_immediately)
+    {
+        concurrent_queue<std::string> queue;
+        std::string item;
+        auto past = Now() - Millis(100);
+        rpp::Timer timer;
+        bool got = queue.wait_pop_until(item, past);
+        double elapsed = timer.elapsed_millis();
+        AssertFalse(got);
+        AssertLess(elapsed, 20.0); // should return almost immediately
+    }
+
+    // Regression: wait_pop with very short timeout must not deadlock
+    TestCase(wait_pop_very_short_timeout_no_deadlock)
+    {
+        concurrent_queue<std::string> queue;
+        std::string item;
+        rpp::Timer timer;
+        bool got = queue.wait_pop(item, Millis(1));
+        double elapsed = timer.elapsed_millis();
+        AssertFalse(got);
+        AssertLess(elapsed, 20.0); // should not hang
+    }
+
+    // Regression: wait_pop must return promptly when item arrives during wait
+    TestCase(wait_pop_notified_during_wait)
+    {
+        concurrent_queue<std::string> queue;
+        std::thread producer([&] {
+            rpp::sleep_ms(15);
+            queue.push("hello");
+        });
+
+        std::string item;
+        rpp::Timer timer;
+        bool got = queue.wait_pop(item, Millis(500));
+        double elapsed = timer.elapsed_millis();
+
+        producer.join();
+        AssertTrue(got);
+        AssertThat(item, "hello");
+        AssertLess(elapsed, 30.0);
+    }
+
     // ensure that wait_pop_interval actually checks the cancelCondition
     // with sufficient frequency
     TestCase(wait_pop_interval)

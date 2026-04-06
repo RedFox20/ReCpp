@@ -195,6 +195,13 @@ namespace rpp
 #define _rpp_get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
 #define _rpp_wrap(x) x
 
+// _va_comma(__VA_ARGS__): expands to `,` if __VA_ARGS__ is non-empty, nothing if empty.
+// C++20 __VA_OPT__ is preferred because the fallback (_spaces_on_empty_token trick)
+// breaks when __VA_ARGS__ starts with a C-style cast like (long long)(expr) --
+// the function-like _spaces_on_empty_token macro greedily consumes (long long) as its argument.
+#if __cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)
+#define _va_comma(...) __VA_OPT__(,)
+#else
 #define _rpp_z
 #define _rpp_c ,
 #define _spaces_on_empty_token(...) ,,,, ,,,, ,,,,
@@ -202,6 +209,7 @@ namespace rpp
 #define _va_comma2(...) _rpp_wrap(_get_nth_comma(__VA_ARGS__,  _rpp_c,_rpp_c,_rpp_c,_rpp_c, \
                                   _rpp_c,_rpp_c,_rpp_c,_rpp_c, _rpp_c,_rpp_c,_rpp_c,_rpp_c, _rpp_z) )
 #define _va_comma(...) _va_comma2(_spaces_on_empty_token __VA_ARGS__ (/*empty*/))
+#endif
 
 #define _wa0(...)
 #define _wa1(z, x)       , rpp::__wrap<rpp::__clean_type<decltype(x)>>::w(x)

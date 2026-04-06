@@ -19,10 +19,35 @@
 
 #include "timer.h" // rpp::Duration, rpp::TimePoint
 #include "predicates.h" // rpp::IsPredicate
+#include "debugging.h" // LogError
 #include <condition_variable> // std::cv_status
 
 namespace rpp
 {
+    /**
+     * @brief Computes remaining duration from an absolute rpp::TimePoint deadline
+     *        using the monotonic clock. Asserts if the remaining time is suspiciously
+     *        large (>15s), which usually indicates a clock domain mismatch
+     *        (e.g. passing TimePoint::now() instead of TimePoint::monotonic_now()).
+     * @returns Remaining duration, clamped to 15ms on bogus values, or 0 if already past.
+     */
+    inline rpp::Duration _cv_remaining_duration(const rpp::TimePoint& abs_time) noexcept
+    {
+        rpp::Duration remaining = abs_time - rpp::TimePoint::monotonic_now();
+        if (remaining.nsec <= 0)
+            return rpp::Duration::zero();
+        // if remaining time is suspiciously large, it's likely a clock domain mismatch
+        // (e.g. TimePoint::now() instead of TimePoint::monotonic_now())
+        constexpr rpp::int64 MAX_REASONABLE_NS = 15LL * NANOS_PER_SEC; // 15 seconds
+        if (remaining.nsec > MAX_REASONABLE_NS)
+        {
+            LogError("condition_variable::wait_until abs_time is %lld sec in the future,"
+                     " possible clock domain mismatch (use TimePoint::monotonic_now())",
+                     (long long int)(remaining.nsec / NANOS_PER_SEC));
+            return rpp::Duration::from_millis(15); // ~one Win32 tick
+        }
+        return remaining;
+    }
 
 #if !_MSC_VER
 
@@ -75,7 +100,8 @@ namespace rpp
          *
          * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
          * @param abs_time an object of type rpp::TimePoint representing the time when to stop waiting.
-         *                 Strongly recommend using TimePoint::monotonic_now() + rel_time to avoid NTP time jump issues.
+         *                 MUST be created from TimePoint::monotonic_now(), NOT TimePoint::now().
+         *                 Using realtime clock will cause incorrect waits when NTP adjusts the clock.
          * @returns std::cv_status::timeout if the absolute timeout specified
          *          by abs_time was reached, std::cv_status::no_timeout otherwise.
          */
@@ -83,19 +109,18 @@ namespace rpp
         [[nodiscard]]
         std::cv_status wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time) noexcept
         {
-            // convert absolute deadline to remaining duration, then wait using steady_clock
-            rpp::int64 remaining_ns = abs_time.duration.nsec - rpp::TimePoint::monotonic_now().duration.nsec;
-            if (remaining_ns <= 0)
+            rpp::Duration remaining = _cv_remaining_duration(abs_time);
+            if (remaining.nsec <= 0)
                 return std::cv_status::timeout;
-            auto steady_deadline = clock::now() + std::chrono::nanoseconds(remaining_ns);
-            return std::condition_variable::wait_until(lock, steady_deadline);
+            return this->wait_for(lock, remaining); // rpp::Duration overload
         }
 
         /**
          * @brief This overload may be used to ignore spurious awakenings.
          *
          * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
-         * @param abs_time an object of type rpp::TimePoint representing the time when to stop waiting
+         * @param abs_time an object of type rpp::TimePoint representing the time when to stop waiting.
+         *                 MUST be created from TimePoint::monotonic_now().
          * @param stop_waiting predicate which returns ​false if the waiting should be continued.
          *
          * @returns false if the predicate pred still evaluates to false
@@ -104,11 +129,14 @@ namespace rpp
         template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time,
-                        const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+                        const Predicate& stop_waiting) noexcept(noexcept(stop_waiting()))
         {
             while (!stop_waiting())
             {
-                if (wait_until(lock, abs_time) == std::cv_status::timeout)
+                rpp::Duration remaining = _cv_remaining_duration(abs_time);
+                if (remaining.nsec <= 0)
+                    return stop_waiting();
+                if (this->wait_for(lock, remaining) == std::cv_status::timeout)
                     return stop_waiting();
             }
             return true;
@@ -127,7 +155,7 @@ namespace rpp
         template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const rpp::Duration& rel_time,
-                      const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+                      const Predicate& stop_waiting) noexcept(noexcept(stop_waiting()))
         {
             auto steady_deadline = clock::now() + std::chrono::nanoseconds(rel_time.nsec);
             while (!stop_waiting())
@@ -289,7 +317,7 @@ namespace rpp
         template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const time_point& abs_time,
-                        const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+                        const Predicate& stop_waiting) noexcept(noexcept(stop_waiting()))
         {
             while (!stop_waiting())
                 if (wait_until(lock, abs_time) == std::cv_status::timeout)
@@ -312,7 +340,7 @@ namespace rpp
         template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const duration& rel_time,
-                      const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+                      const Predicate& stop_waiting) noexcept(noexcept(stop_waiting()))
         {
             auto steady_deadline = clock::now() + rel_time;
             while (!stop_waiting())
@@ -376,16 +404,18 @@ namespace rpp
         [[nodiscard]]
         std::cv_status wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time) noexcept
         {
-            rpp::Duration rel_time = (abs_time - rpp::TimePoint::monotonic_now());
-            return wait_for(lock, rel_time);
+            rpp::Duration remaining = _cv_remaining_duration(abs_time);
+            if (remaining.nsec <= 0)
+                return std::cv_status::timeout;
+            return wait_for(lock, remaining);
         }
 
         /**
          * @brief This overload may be used to ignore spurious awakenings.
          *
          * @param lock an object of type std::unique_lock<Mutex>, which must be locked by the current thread
-         * @param abs_time an object of type std::chrono::time_point representing the time when to stop waiting
-         *                 Strongly recommend using TimePoint::monotonic_now() + rel_time to avoid NTP time jump issues.
+         * @param abs_time an object of type rpp::TimePoint representing the time when to stop waiting.
+         *                 Must use TimePoint::monotonic_now() to avoid NTP time jump issues.
          * @param stop_waiting predicate which returns ​false if the waiting should be continued.
          *
          * @returns false if the predicate pred still evaluates to false
@@ -394,11 +424,13 @@ namespace rpp
         template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_until(std::unique_lock<Mutex>& lock, const rpp::TimePoint& abs_time,
-                        const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+                        const Predicate& stop_waiting) noexcept(noexcept(stop_waiting()))
         {
             while (!stop_waiting())
+            {
                 if (wait_until(lock, abs_time) == std::cv_status::timeout)
                     return stop_waiting();
+            }
             return true;
         }
 
@@ -417,13 +449,17 @@ namespace rpp
         template<class Mutex, IsPredicate Predicate>
         [[nodiscard]]
         bool wait_for(std::unique_lock<Mutex>& lock, const rpp::Duration& rel_time,
-                      const Predicate& stop_waiting) noexcept(std::declval<Predicate>()())
+                      const Predicate& stop_waiting) noexcept(noexcept(stop_waiting()))
         {
-            // convert to absolute time, since on GCC that one is faster
-            auto steady_deadline = rpp::TimePoint::monotonic_now() + rel_time;
+            auto deadline = rpp::TimePoint::monotonic_now() + rel_time;
             while (!stop_waiting())
-                if (wait_until(lock, steady_deadline) == std::cv_status::timeout)
+            {
+                rpp::Duration remaining = deadline - rpp::TimePoint::monotonic_now();
+                if (remaining.nsec <= 0)
                     return stop_waiting();
+                if (wait_for(lock, remaining) == std::cv_status::timeout)
+                    return stop_waiting();
+            }
             return true;
         }
 
