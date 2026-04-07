@@ -32,6 +32,7 @@ class ReCpp(mama.BuildTarget):
                             includes_filter=['.h','.natvis'], as_includes_root=True)
         if self.windows:
             self.export_lib(f'{self.cmake_build_type}/ReCpp.lib')
+            self.export_asset(f'{self.cmake_build_type}/ReCpp.pdb', build_dir=True)
         else:
             self.export_lib('libReCpp.a')
 
