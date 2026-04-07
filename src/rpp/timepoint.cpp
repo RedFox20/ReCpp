@@ -179,10 +179,10 @@ namespace rpp
         }
 
         // calculate remaining time to sleep
-        uint64 elapsed_ns = ticks_to_ns(ticks_since_epoch() - start_ticks);
+        int64 elapsed_ns = ticks_to_ns(ticks_since_epoch() - start_ticks);
         if (elapsed_ns < nanos)
         {
-            uint64 remaining_ns = nanos - elapsed_ns;
+            int64 remaining_ns = nanos - elapsed_ns;
             int ms = static_cast<int>(remaining_ns / 1'000'000);
             if (ms <= 0) ms = 1;
             SleepEx(ms, /*alertable*/TRUE);

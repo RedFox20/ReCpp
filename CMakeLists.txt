@@ -104,11 +104,13 @@ elseif(MSVC)
     # /wd4251 - Disable dll-interface warning
     # /wd4275 - Disable dll-interface base class warning
     # /W3 - warning level 3
-    # /Zi - Debug Database
+    # /Z7 - Embedded CodeView debug info (travels inside .obj/.lib so consumers
+    #       of the static lib don't hit LNK4099 looking for an external .pdb;
+    #       canonical MS recommendation for static libs distributed as binaries)
     # /Oi - Intrinsics Enabled
     # /MP - MultiProcess build
     # /Zc:preprocessor - Conforming preprocessor (required for __VA_OPT__)
-    add_compile_options(/arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Zi /MP /Zc:preprocessor)
+    add_compile_options(/arch:AVX2 /Oi /wd4996 /wd4819 /wd4251 /wd4275 /W3 /Z7 /MP /Zc:preprocessor)
     # /MD - MultiThreaded Dynamic CRT
     # /MT - MultiThreaded Static CRT
     if (MSVC_DYNAMIC)
