@@ -77,7 +77,7 @@ namespace rpp /* ReCpp */
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
-    
+
     // minimal version of stat64 struct, with low level dev and inode info removed
     struct sys_min_fstats
     {
@@ -194,27 +194,27 @@ namespace rpp /* ReCpp */
 
     int file_size(strview filename) noexcept
     {
-        int64 s; 
+        int64 s;
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
     }
     int64 file_sizel(strview filename) noexcept
     {
-        int64 s; 
+        int64 s;
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
     time_t file_created(strview filename) noexcept
     {
-        time_t t; 
+        time_t t;
         return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
     }
     time_t file_accessed(strview filename) noexcept
     {
-        time_t t; 
+        time_t t;
         return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
     }
     time_t file_modified(strview filename) noexcept
     {
-        time_t t; 
+        time_t t;
         return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
     }
 
@@ -331,6 +331,65 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
+    static bool sys_rename_file(T oldPath, T newPath) noexcept
+    {
+    #if _MSC_VER
+        if (wchar_dual_conv conv{ oldPath, newPath })
+        {
+            if (MoveFileExW(conv.wstr1, conv.wstr2, MOVEFILE_REPLACE_EXISTING) != 0)
+            {
+                return true;
+            }
+            if (GetLastError() != ERROR_NOT_SAME_DEVICE)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    #else
+        if (multibyte_dual_conv conv{ oldPath, newPath })
+        {
+            if (::rename(conv.cstr1, conv.cstr2) == 0)
+            {
+                return true;
+            }
+            if (errno != EXDEV)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    #endif
+        // cross-filesystem fallback: copy + delete
+        if (sys_copy_file(oldPath, newPath))
+        {
+            if (sys_delete<T>(oldPath))
+                return true;
+            // copy succeeded but delete failed; remove the copy to avoid duplicates
+            sys_delete<T>(newPath);
+        }
+        return false;
+    }
+    bool rename_file(strview oldPath, strview newPath) noexcept
+    {
+        return sys_rename_file<strview>(oldPath, newPath);
+    }
+#if RPP_ENABLE_UNICODE
+    bool rename_file(ustrview oldPath, ustrview newPath) noexcept
+    {
+        return sys_rename_file<ustrview>(oldPath, newPath);
+    }
+#endif
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    template<StringViewType T>
     static bool copy_file_mode(T sourceFile, T destinationFile) noexcept
     {
     #if _WIN32
@@ -341,7 +400,7 @@ namespace rpp /* ReCpp */
         return sys_stat64(sourceFile, &s) && set_st_mode(destinationFile, s.st_mode);
     #endif
     }
-    
+
     bool copy_file_mode(strview sourceFile, strview destinationFile) noexcept
     {
         return copy_file_mode<strview>(sourceFile, destinationFile);
@@ -428,7 +487,7 @@ namespace rpp /* ReCpp */
     };
 
     ////////////////////////////////////////////////////////////////////////////////
-        
+
     // on failure, check errno for details, if folder (or file) exists, we consider it a success
     // @note Might not be desired behaviour for all cases, so use file_exists or folder_exists.
     template<StringViewType T>
@@ -649,7 +708,7 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     static constexpr int EXT_LEN_MAX = 8; // max length of file extension, including dot
-    
+
     template<StringViewType T>
     static auto file_name(T path) noexcept -> T
     {
@@ -738,7 +797,7 @@ namespace rpp /* ReCpp */
         return file_replace_ext<ustrview>(path, ext);
     }
 #endif
-    
+
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
@@ -761,7 +820,7 @@ namespace rpp /* ReCpp */
         return file_name_append<ustrview>(path, add);
     }
 #endif
-    
+
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
@@ -786,7 +845,7 @@ namespace rpp /* ReCpp */
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
-    
+
     string file_nameext_replace(strview path, strview newFileNameAndExt) noexcept
     {
         return concat(folder_path(path), newFileNameAndExt);
@@ -906,7 +965,7 @@ namespace rpp /* ReCpp */
                 res += n;
             }
         }
-        
+
         typename T::string_t result; result.reserve(res);
         result.append(args[0].data(), args[0].size());
 
@@ -1439,7 +1498,7 @@ namespace rpp /* ReCpp */
             return "/tmp/";
         #endif
     }
-    
+
     string home_dir() noexcept // NOLINT(bugprone-exception-escape)
     {
         #if _MSC_VER
@@ -1479,6 +1538,6 @@ namespace rpp /* ReCpp */
         #endif
     }
 #endif // RPP_ENABLE_UNICODE
-    
+
     ////////////////////////////////////////////////////////////////////////////////
 } // namespace rpp

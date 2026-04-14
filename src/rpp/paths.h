@@ -144,6 +144,21 @@ namespace rpp /* ReCpp */
 #endif
 
     /**
+     * @brief Renames oldPath to newPath, overwriting newPath if it exists.
+     * @note Falls back to copy + delete when moving across filesystem boundaries.
+     * @return TRUE if the file was renamed successfully
+     */
+    RPPAPI bool rename_file(strview oldPath, strview newPath) noexcept;
+#if RPP_ENABLE_UNICODE
+    RPPAPI bool rename_file(ustrview oldPath, ustrview newPath) noexcept;
+#endif
+
+    inline bool move_file(strview oldPath, strview newPath) noexcept { return rename_file(oldPath, newPath); }
+#if RPP_ENABLE_UNICODE
+    inline bool move_file(ustrview oldPath, ustrview newPath) noexcept { return rename_file(oldPath, newPath); }
+#endif
+
+    /**
      * @brief Copies sourceFile to destinationFile, overwriting the previous file!
      * @note File access rights are also copied
      * @return TRUE if sourceFile was opened && destinationFile was created && copied successfully
@@ -210,7 +225,7 @@ namespace rpp /* ReCpp */
 
     /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
-     * @result "path" ==> "C:\Projects\Test\path" 
+     * @result "path" ==> "C:\Projects\Test\path"
      */
     RPPAPI string full_path(strview path) noexcept;
 #if RPP_ENABLE_UNICODE
@@ -228,10 +243,10 @@ namespace rpp /* ReCpp */
 
     /**
      * @brief Extract the filename (no extension) from a file path
-     * 
+     *
      * @result /root/dir/file.ext ==> file
      * @result /root/dir/file     ==> file
-     * @result /root/dir/         ==> 
+     * @result /root/dir/         ==>
      * @result file.ext           ==> file
      * @result /.git/f.reallylong ==> f.reallylong
      * @result /.git/filewnoext   ==> filewnoext
@@ -245,7 +260,7 @@ namespace rpp /* ReCpp */
      * @brief Extract the file part (with ext) from a file path
      * @result /root/dir/file.ext ==> file.ext
      * @result /root/dir/file     ==> file
-     * @result /root/dir/         ==> 
+     * @result /root/dir/         ==>
      * @result file.ext           ==> file.ext
      */
     RPPAPI strview file_nameext(strview path) noexcept;
@@ -256,11 +271,11 @@ namespace rpp /* ReCpp */
     /**
      * @brief Extract the extension from a file path
      * @result /root/dir/file.ext ==> ext
-     * @result /root/dir/file     ==> 
-     * @result /root/dir/         ==> 
+     * @result /root/dir/file     ==>
+     * @result /root/dir/         ==>
      * @result file.ext           ==> ext
-     * @result /.git/f.reallylong ==> 
-     * @result /.git/filewnoext   ==> 
+     * @result /.git/f.reallylong ==>
+     * @result /.git/filewnoext   ==>
      */
     RPPAPI strview file_ext(strview path) noexcept;
 #if RPP_ENABLE_UNICODE
@@ -279,7 +294,7 @@ namespace rpp /* ReCpp */
 #if RPP_ENABLE_UNICODE
     RPPAPI ustring file_replace_ext(ustrview path, ustrview ext) noexcept;
 #endif
-    
+
     /**
      * @brief Changes only the file name by appending a string, leaving directory and extension untouched
      * @result /dir/file.txt ==> /dir/fileadd.txt
@@ -291,7 +306,7 @@ namespace rpp /* ReCpp */
 #if RPP_ENABLE_UNICODE
     RPPAPI ustring file_name_append(ustrview path, ustrview add) noexcept;
 #endif
-    
+
     /**
      * @brief Replaces only the file name of the path, leaving directory and extension untouched
      * @result /dir/file.txt ==> /dir/replaced.txt
@@ -303,7 +318,7 @@ namespace rpp /* ReCpp */
 #if RPP_ENABLE_UNICODE
     RPPAPI ustring file_name_replace(ustrview path, ustrview newFileName) noexcept;
 #endif
-    
+
     /**
      * @brief Replaces the file name and extension, leaving directory untouched
      * @result /dir/file.txt ==> /dir/replaced.bin
@@ -322,7 +337,7 @@ namespace rpp /* ReCpp */
      * @result /root/dir/file     ==> dir
      * @result /root/dir/         ==> dir
      * @result dir/               ==> dir
-     * @result file.ext           ==> 
+     * @result file.ext           ==>
      */
     RPPAPI strview folder_name(strview path) noexcept;
 #if RPP_ENABLE_UNICODE
@@ -336,7 +351,7 @@ namespace rpp /* ReCpp */
      * @result /root/dir/file     ==> /root/dir/
      * @result /root/dir/         ==> /root/dir/
      * @result dir/               ==> dir/
-     * @result file.ext           ==> 
+     * @result file.ext           ==>
      */
     RPPAPI strview folder_path(strview path) noexcept;
 #if RPP_ENABLE_UNICODE
@@ -365,7 +380,7 @@ namespace rpp /* ReCpp */
 #if RPP_ENABLE_UNICODE
     RPPAPI ustring normalized(ustrview path, char16_t sep = u'/') noexcept;
 #endif
-    
+
     /**
      * @brief Efficiently combines path strings, removing any repeated / or \
      * @result path_combine("tmp", "file.txt")   ==> "tmp/file.txt"
@@ -592,7 +607,7 @@ namespace rpp /* ReCpp */
      *        dir_fullpath        - returned paths will be fullpaths instead of relative
      *        dir_relpath_combine - combines input_dir with relpaths
      * @return Number of folders found
-     * 
+     *
      * @code
      * @example [dir_recursive=false] [dir_fullpath=false] vector<string> {
      *     "bin",
@@ -746,19 +761,19 @@ namespace rpp /* ReCpp */
      *                            object must be passed for identification to work.
      *                            This is only if the dynamic module is not in the same binary
      *                            as RPP, such as external dynamic libaries.
-     * 
+     *
      * An extra slash is always appended.
      * Path is always normalized to forward slashes /
-     * 
+     *
      * @code
      * string modulePath = rpp::module_dir(); //   "/path/to/project/bin/"
      * @endcode
-     * 
+     *
      * Specifying external dynamic modules:
      * @code
      * // macOS/iOS
      * string modulePath = rpp::module_dir(MyLibraryObject.class);
-     * 
+     *
      * // Win32
      * string modulePath = rpp::module_dir(GetModuleHandle("fbxsdk"));
      * @endcode

@@ -657,6 +657,61 @@ TestImpl(test_file_io)
     }
 #endif 
 
+    TestCase(rename_file_basic)
+    {
+        AssertTrue(file::write_new(TestFile, "rename_me"));
+        std::string dest = path_combine(temp_dir(), "_rpp_test_renamed.txt");
+        AssertTrue(rename_file(TestFile, dest));
+        AssertFalse(file_exists(TestFile)); // original removed
+        AssertTrue(file_exists(dest));
+        AssertThat(file::read_all_text(dest), "rename_me");
+        delete_file(dest);
+    }
+
+    TestCase(rename_file_overwrites_existing)
+    {
+        AssertTrue(file::write_new(TestFile, "original"));
+        std::string dest = path_combine(temp_dir(), "_rpp_test_renamed.txt");
+        AssertTrue(file::write_new(dest, "old_content"));
+        AssertTrue(rename_file(TestFile, dest));
+        AssertFalse(file_exists(TestFile));
+        AssertThat(file::read_all_text(dest), "original");
+        delete_file(dest);
+    }
+
+    TestCase(rename_file_nonexistent)
+    {
+        std::string src = path_combine(temp_dir(), "_rpp_no_such_file.txt");
+        std::string dest = path_combine(temp_dir(), "_rpp_test_renamed.txt");
+        AssertFalse(rename_file(src, dest));
+        AssertFalse(file_exists(dest));
+    }
+
+    TestCase(move_file_is_rename)
+    {
+        AssertTrue(file::write_new(TestFile, "move_me"));
+        std::string dest = path_combine(temp_dir(), "_rpp_test_moved.txt");
+        AssertTrue(move_file(TestFile, dest));
+        AssertFalse(file_exists(TestFile));
+        AssertTrue(file_exists(dest));
+        AssertThat(file::read_all_text(dest), "move_me");
+        delete_file(dest);
+    }
+
+#if RPP_ENABLE_UNICODE
+    TestCase(rename_file_unicode)
+    {
+        prepare_unicode_file_paths();
+        AssertTrue(file::write_new(TestUnicodeFile, "unicode_rename"));
+        rpp::ustring dest = path_combine(temp_diru(), u"_rpp_test_renamed_😀.txt");
+        AssertTrue(rename_file(TestUnicodeFile, dest));
+        AssertFalse(file_exists(TestUnicodeFile));
+        AssertTrue(file_exists(dest));
+        AssertThat(file::read_all_text(dest), "unicode_rename");
+        delete_file(dest);
+    }
+#endif
+
     TestCase(truncate_front)
     {
         const int FILE_SIZE = 4096;
