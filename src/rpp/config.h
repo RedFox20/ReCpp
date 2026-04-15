@@ -190,6 +190,10 @@
 #  define RPP_BARE_METAL 0
 #endif
 
+#ifndef RPP_USE_EYALROZ_PRINTF
+#  define RPP_USE_EYALROZ_PRINTF 0
+#endif
+
 #ifndef RPP_CORTEX_M_ARCH
 #  if RPP_STM32_HAL // STM32 is always Cortex-M
 #    define RPP_CORTEX_M_ARCH 1

@@ -6,7 +6,14 @@
 #elif RPP_ANDROID
     #include <android/log.h>
 #elif RPP_BARE_METAL
+    #if RPP_USE_EYALROZ_PRINTF
     #include <printf/printf.h>
+    #else
+    #include <cstdio>
+    #ifndef printf_
+    #define printf_ printf
+    #endif
+    #endif
 #endif
 
 #if defined(__has_include) && __has_include("debugging.h")
