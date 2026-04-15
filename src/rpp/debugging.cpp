@@ -32,7 +32,13 @@
 #endif
 
 #if RPP_BARE_METAL
-# include <printf/printf.h>
+# if RPP_USE_EYALROZ_PRINTF
+#  include <printf/printf.h>
+# else
+#  ifndef printf_
+#   define printf_ printf
+#  endif
+# endif
 # if RPP_STM32_HAL
 #  include RPP_STM32_HAL_H
 # endif

@@ -25,7 +25,14 @@
     #include <thread>
 #elif RPP_BARE_METAL
     #define timegm mktime
-    #include <printf/printf.h>
+    #if RPP_USE_EYALROZ_PRINTF
+        #include <printf/printf.h>
+    #else
+        #include <cstdio>
+        #ifndef snprintf_
+            #define snprintf_ snprintf
+        #endif
+    #endif
     #include <cstdarg>
 
     #if RPP_FREERTOS

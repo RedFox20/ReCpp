@@ -240,11 +240,12 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | [`RPP_BARE_METAL`](src/rpp/config.h#L188) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
 | [`RPP_FREERTOS`](src/rpp/config.h#L176) | `1` if targeting FreeRTOS |
 | [`RPP_STM32_HAL`](src/rpp/config.h#L180) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
-| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L195) | `1` if targeting ARM Cortex-M architecture |
-| [`RPP_ARM_ARCH`](src/rpp/config.h#L211) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
-| [`RPP_64BIT`](src/rpp/config.h#L236) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L386) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L394) | `1` if target is big-endian |
+| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L194) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
+| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L199) | `1` if targeting ARM Cortex-M architecture |
+| [`RPP_ARM_ARCH`](src/rpp/config.h#L215) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
+| [`RPP_64BIT`](src/rpp/config.h#L240) | `1` if compiling for a 64-bit target |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L390) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L398) | `1` if target is big-endian |
 
 ### Feature Detection
 
@@ -257,59 +258,59 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Macro | Description |
 |-------|-------------|
-| [`FINLINE`](src/rpp/config.h#L229) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
-| [`NOINLINE`](src/rpp/config.h#L220) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](src/rpp/config.h#L260) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L319) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L251) | Delete copy and move constructors and assignment operators |
+| [`FINLINE`](src/rpp/config.h#L233) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
+| [`NOINLINE`](src/rpp/config.h#L224) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
+| [`NODISCARD`](src/rpp/config.h#L264) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L323) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L255) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L283) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L294) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L287) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L298) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L334) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L350) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L351) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L352) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L338) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L354) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L355) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L356) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](src/rpp/config.h#L363) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](src/rpp/config.h#L364) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](src/rpp/config.h#L365) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L366) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L375) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L374) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L377) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L376) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L379) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L378) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L381) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L380) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L367) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L368) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L369) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L370) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L379) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L378) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L381) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L380) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L383) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L382) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L385) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L384) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.h#L406) | `unsigned char` |
-| [`ushort`](src/rpp/config.h#L407) | `unsigned short` |
-| [`uint`](src/rpp/config.h#L408) | `unsigned int` |
-| [`ulong`](src/rpp/config.h#L409) | `unsigned long` |
-| [`int16`](src/rpp/config.h#L411) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.h#L412) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.h#L415) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.h#L416) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.h#L422) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.h#L423) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L410) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L411) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L412) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L413) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L415) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L416) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L419) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L420) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L426) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L427) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -1771,20 +1772,20 @@ Counting semaphore and lightweight notification flags.
 | Class | Description |
 |-------|-------------|
 | [`semaphore`](src/rpp/semaphore.h#L30) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](src/rpp/semaphore.h#L391) | Lighter semaphore using a single atomic flag |
-| [`semaphore_once_flag`](src/rpp/semaphore.h#L429) | One-shot semaphore that can only be set once |
+| [`semaphore_flag`](src/rpp/semaphore.h#L404) | Lighter semaphore using a single atomic flag |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L442) | One-shot semaphore that can only be set once |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](src/rpp/semaphore.h#L110) | Increment and wake one waiter |
-| [`notify_all()`](src/rpp/semaphore.h#L147) | Wake all waiters |
-| [`notify_once()`](src/rpp/semaphore.h#L182) | Notify only if not already signaled |
-| [`try_wait()`](src/rpp/semaphore.h#L215) | Non-blocking wait attempt |
-| [`wait()`](src/rpp/semaphore.h#L236) | Blocking wait |
-| [`wait(Duration timeout)`](src/rpp/semaphore.h#L271) | Wait with timeout |
-| [`await(Duration timeout)`](src/rpp/semaphore.h#L380) | C++20 coroutine `co_await` — dispatches wait to background thread |
+| [`notify()`](src/rpp/semaphore.h#L109) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L146) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L181) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L218) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L238) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L273) | Wait with timeout |
+| [`await(Duration timeout)`](src/rpp/semaphore.h#L393) | C++20 coroutine `co_await` — dispatches wait to background thread |
 | [`count()`](src/rpp/semaphore.h#L69) | Current count |
 | [`reset()`](src/rpp/semaphore.h#L60) | Reset to zero |
 
@@ -1868,7 +1869,7 @@ Extended condition variable with `rpp::Duration` and `rpp::TimePoint` overloads.
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](src/rpp/condition_variable.h#L35) | Condition variable with high-resolution timeout support |
+| [`condition_variable`](src/rpp/condition_variable.h#L60) | Condition variable with high-resolution timeout support |
 
 ### Example
 
@@ -3679,10 +3680,10 @@ Cross-platform logging with severity filtering, log handlers, timestamps, and as
 
 | Macro | Description |
 |-------|-------------|
-| [`LogInfo(format, ...)`](src/rpp/debugging.h#L272) | Log informational message |
-| [`LogWarning(format, ...)`](src/rpp/debugging.h#L278) | Log warning |
-| [`LogError(format, ...)`](src/rpp/debugging.h#L284) | Log error (debug assert) |
-| [`Assert(expression, format, ...)`](src/rpp/debugging.h#L298) | Conditional error log |
+| [`LogInfo(format, ...)`](src/rpp/debugging.h#L283) | Log informational message |
+| [`LogWarning(format, ...)`](src/rpp/debugging.h#L289) | Log warning |
+| [`LogError(format, ...)`](src/rpp/debugging.h#L295) | Log error (debug assert) |
+| [`Assert(expression, format, ...)`](src/rpp/debugging.h#L309) | Conditional error log |
 
 ### Configuration Functions
 
