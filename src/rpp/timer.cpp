@@ -7,12 +7,12 @@
     #include <android/log.h>
 #elif RPP_BARE_METAL
     #if RPP_USE_EYALROZ_PRINTF
-    #include <printf/printf.h>
+        #include <printf/printf.h>
     #else
-    #include <cstdio>
-    #ifndef printf_
-    #define printf_ printf
-    #endif
+        #include <cstdio>
+        #ifndef printf_
+            #define printf_ printf
+        #endif
     #endif
 #endif
 

@@ -26,12 +26,12 @@
 #elif RPP_BARE_METAL
     #define timegm mktime
     #if RPP_USE_EYALROZ_PRINTF
-    #include <printf/printf.h>
+        #include <printf/printf.h>
     #else
-    #include <cstdio>
-    #ifndef snprintf_
-    #define snprintf_ snprintf
-    #endif
+        #include <cstdio>
+        #ifndef snprintf_
+            #define snprintf_ snprintf
+        #endif
     #endif
     #include <cstdarg>
 
