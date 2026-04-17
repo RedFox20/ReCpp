@@ -587,7 +587,9 @@ namespace rpp
     string strview::as_lower() const noexcept
     {
         string ret;
-        try { ret.reserve(size_t(len)); } catch (...) { return ret; }
+        size_t current_len = size_t(len);
+        if (current_len > ret.max_size()) return ret;
+        ret.reserve(current_len);
         char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::tolower(*s++)));
@@ -596,7 +598,9 @@ namespace rpp
     string strview::as_upper() const noexcept
     {
         string ret;
-        try { ret.reserve(size_t(len)); } catch (...) { return ret; }
+        size_t current_len = size_t(len);
+        if (current_len > ret.max_size()) return ret;
+        ret.reserve(current_len);
         char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::toupper(*s++)));

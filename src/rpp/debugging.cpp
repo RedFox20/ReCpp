@@ -2,6 +2,9 @@
 #include "timer.h" // rpp::TimePoint
 #include "stack_trace.h"
 #include "strview.h"
+#if RPP_CORTEX_M_ARCH
+# include "mutex.h" // rpp::critical_section
+#endif
 
 #include <atomic>
 #include <array>
@@ -63,7 +66,12 @@ static std::atomic<bool> DisableFunctionNames {false};
 static std::atomic<bool> EnableTimestamps {false};
 static std::atomic<bool> TimeOfDay {false};
 static std::atomic<int> TimePrecision {3};
-static std::atomic<rpp::int64> TimeOffset {0};
+#if RPP_CORTEX_M_ARCH
+    // no 64-bit atomics on Cortex systems
+    static rpp::int64 TimeOffset {0};
+#else
+    static std::atomic<rpp::int64> TimeOffset {0};
+#endif
 
 // new logging API
 namespace rpp
@@ -161,7 +169,13 @@ RPPCAPI void LogEnableTimestamps(bool enable, int precision, bool time_of_day) n
 }
 RPPCAPI void LogSetTimeOffset(rpp::int64 offset) noexcept
 {
+#if RPP_CORTEX_M_ARCH
+    rpp::critical_section mut{};
+    std::lock_guard<rpp::critical_section> guard{mut};
+    TimeOffset = offset;
+#else
     TimeOffset.store(offset, std::memory_order_release);
+#endif
 }
 
 static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexcept
@@ -172,7 +186,15 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
 
     if (EnableTimestamps) {
         rpp::TimePoint now = rpp::TimePoint::system_now();
+    #if RPP_CORTEX_M_ARCH
+        {
+            rpp::critical_section mut{};
+            std::lock_guard<rpp::critical_section> guard{mut};
+            now.duration.nsec += TimeOffset;
+        }
+    #else
         now.duration.nsec += TimeOffset.load(std::memory_order_relaxed);
+    #endif
         if (TimeOfDay)
             len = now.time_of_day().to_string(pbuf, remaining-1, TimePrecision);
         else
