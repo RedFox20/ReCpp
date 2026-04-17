@@ -588,8 +588,12 @@ namespace rpp
     {
         string ret;
         size_t current_len = size_t(len);
-        if (current_len > ret.max_size()) return ret;
-        ret.reserve(current_len);
+        #if RPP_HAS_EXCEPTIONS == 1
+            try { ret.reserve(current_len); } catch (...) { return ret; }
+        #else
+            if (current_len > ret.max_size()) return ret; // Handle negative len
+            ret.reserve(current_len);
+        #endif
         char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::tolower(*s++)));
@@ -599,8 +603,12 @@ namespace rpp
     {
         string ret;
         size_t current_len = size_t(len);
-        if (current_len > ret.max_size()) return ret;
-        ret.reserve(current_len);
+        #if RPP_HAS_EXCEPTIONS == 1
+            try { ret.reserve(current_len); } catch (...) { return ret; }
+        #else
+            if (current_len > ret.max_size()) return ret; // Handle negative len
+            ret.reserve(current_len);
+        #endif
         char* s = const_cast<char*>(str);
         for (int n = len; n > 0; --n)
             ret.push_back(static_cast<char>(::toupper(*s++)));
