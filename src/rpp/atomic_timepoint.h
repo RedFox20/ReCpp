@@ -225,6 +225,19 @@ namespace rpp
             rpp::int64 offset_diff = new_offset.nsec - old_offset;
             combined_offset_ns.fetch_add(offset_diff, std::memory_order_seq_cst);
         }
+
+        /**
+         * @brief Sets the warp offset to the given value
+         */
+        void set_warp_offset(rpp::Duration new_offset) noexcept
+        {
+            rpp::int64 old_offset = warp_offset_ns.exchange(new_offset.nsec, std::memory_order_seq_cst);
+
+            // update combined offset by the difference between new and old warp offsets
+            // to avoid another fetch of sync_offset_ns
+            rpp::int64 offset_diff = new_offset.nsec - old_offset;
+            combined_offset_ns.fetch_add(offset_diff, std::memory_order_seq_cst);
+        }
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////
