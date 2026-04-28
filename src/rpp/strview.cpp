@@ -587,31 +587,39 @@ namespace rpp
     string strview::as_lower() const noexcept
     {
         string ret;
-        size_t current_len = size_t(len);
+        const size_t current_len = size_t(len);
+        if (current_len > ret.max_size()) return ret; // Negative len becomes huge size_t, handle that case
+
         #if RPP_HAS_EXCEPTIONS == 1
-            try { ret.reserve(current_len); } catch (...) { return ret; }
-        #else
-            if (current_len > ret.max_size()) return ret; // Handle negative len
-            ret.reserve(current_len);
+            try {
         #endif
-        char* s = const_cast<char*>(str);
-        for (int n = len; n > 0; --n)
-            ret.push_back(static_cast<char>(::tolower(*s++)));
+                ret.reserve(current_len);
+                for (size_t i = 0; i < current_len; ++i)
+                    ret.push_back(static_cast<char>(::tolower(str[i])));
+        #if RPP_HAS_EXCEPTIONS == 1
+            } catch (...) {
+                return string{};
+            }
+        #endif
         return ret;
     }
     string strview::as_upper() const noexcept
     {
         string ret;
         size_t current_len = size_t(len);
+        if (current_len > ret.max_size()) return ret; // Negative len becomes huge size_t, handle that case
+
         #if RPP_HAS_EXCEPTIONS == 1
-            try { ret.reserve(current_len); } catch (...) { return ret; }
-        #else
-            if (current_len > ret.max_size()) return ret; // Handle negative len
-            ret.reserve(current_len);
+            try {
         #endif
-        char* s = const_cast<char*>(str);
-        for (int n = len; n > 0; --n)
-            ret.push_back(static_cast<char>(::toupper(*s++)));
+                ret.reserve(current_len);
+                for (size_t i = 0; i < current_len; ++i)
+                    ret.push_back(static_cast<char>(::toupper(str[i])));
+        #if RPP_HAS_EXCEPTIONS == 1
+            } catch (...) {
+                return string{};
+            }
+        #endif
         return ret;
     }
 

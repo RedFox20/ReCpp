@@ -69,6 +69,7 @@ static std::atomic<int> TimePrecision {3};
 #if RPP_CORTEX_M_ARCH
     // no 64-bit atomics on Cortex systems
     static rpp::int64 TimeOffset {0};
+    static rpp::critical_section LogMutex;
 #else
     static std::atomic<rpp::int64> TimeOffset {0};
 #endif
@@ -170,8 +171,7 @@ RPPCAPI void LogEnableTimestamps(bool enable, int precision, bool time_of_day) n
 RPPCAPI void LogSetTimeOffset(rpp::int64 offset) noexcept
 {
 #if RPP_CORTEX_M_ARCH
-    rpp::critical_section mut{};
-    std::lock_guard<rpp::critical_section> guard{mut};
+    std::lock_guard<rpp::critical_section> guard{LogMutex};
     TimeOffset = offset;
 #else
     TimeOffset.store(offset, std::memory_order_release);
@@ -188,8 +188,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
         rpp::TimePoint now = rpp::TimePoint::system_now();
     #if RPP_CORTEX_M_ARCH
         {
-            rpp::critical_section mut{};
-            std::lock_guard<rpp::critical_section> guard{mut};
+            std::lock_guard<rpp::critical_section> guard{LogMutex};
             now.duration.nsec += TimeOffset;
         }
     #else
