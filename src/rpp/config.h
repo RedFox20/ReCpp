@@ -402,6 +402,24 @@
 #  endif
 #endif
 
+#ifndef RPP_HAS_EXCEPTIONS
+#  if defined(_MSC_VER)
+#    if defined(_CPPUNWIND)
+#      define RPP_HAS_EXCEPTIONS 1
+#    else
+#      define RPP_HAS_EXCEPTIONS 0
+#    endif
+#  elif defined(__GNUC__) || defined(__clang__)
+#    if defined(__EXCEPTIONS) || defined(__cpp_exceptions)
+#      define RPP_HAS_EXCEPTIONS 1
+#    else
+#      define RPP_HAS_EXCEPTIONS 0
+#    endif
+#  else
+#    define RPP_HAS_EXCEPTIONS 1 // By default, assume exceptions are supported
+#  endif
+#endif
+
 #ifdef __cplusplus
 namespace rpp
 {
