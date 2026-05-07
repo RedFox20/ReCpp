@@ -40,12 +40,6 @@ namespace rpp
         return value < min ? min : (value < max ? value : max);
     }
 
-    /** @brief Clamps the value to zero if it is very close to zero */
-    template<class T> static constexpr T clampZero(const T value, const T epsilon = (T)0.001)
-    {
-        return nearlyZero(value, epsilon) ? 0 : value;
-    }
-
     /**
      * @brief Math utility, Linear Interpolation
      *        ex: lerp(0.5, 30.0, 60.0); ==> 45.0, because 0.5 is halfway between [30, 60]
@@ -87,6 +81,12 @@ namespace rpp
     template<class T> static constexpr bool almostEqual(const T& a, const T& b, const T epsilon = (T)0.001)
     {
         return abs(a - b) <= epsilon;
+    }
+
+    /** @brief Clamps the value to zero if it is very close to zero */
+    template<class T> static constexpr T clampZero(const T value, const T epsilon = (T)0.001)
+    {
+        return nearlyZero(value, epsilon) ? 0 : value;
     }
 
     ///////////////////////////////////////////////////////////////////////////////
