@@ -3983,23 +3983,23 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 
 | Function | Description |
 |----------|-------------|
-| [`writeBEU16(out, value)`](src/rpp/endian.h#L46) | Write 16-bit big-endian |
-| [`writeBEU32(out, value)`](src/rpp/endian.h#L51) | Write 32-bit big-endian |
-| [`writeBEU64(out, value)`](src/rpp/endian.h#L56) | Write 64-bit big-endian |
-| [`readBEU16(in)`](src/rpp/endian.h#L61) | Read 16-bit big-endian |
-| [`readBEU32(in)`](src/rpp/endian.h#L66) | Read 32-bit big-endian |
-| [`readBEU64(in)`](src/rpp/endian.h#L71) | Read 64-bit big-endian |
+| [`writeBEU16(out, value)`](src/rpp/endian.h#L54) | Write 16-bit big-endian |
+| [`writeBEU32(out, value)`](src/rpp/endian.h#L61) | Write 32-bit big-endian |
+| [`writeBEU64(out, value)`](src/rpp/endian.h#L70) | Write 64-bit big-endian |
+| [`readBEU16(in)`](src/rpp/endian.h#L83) | Read 16-bit big-endian |
+| [`readBEU32(in)`](src/rpp/endian.h#L89) | Read 32-bit big-endian |
+| [`readBEU64(in)`](src/rpp/endian.h#L95) | Read 64-bit big-endian |
 
 ### Little-Endian
 
 | Function | Description |
 |----------|-------------|
-| [`writeLEU16(out, value)`](src/rpp/endian.h#L80) | Write 16-bit little-endian |
-| [`writeLEU32(out, value)`](src/rpp/endian.h#L85) | Write 32-bit little-endian |
-| [`writeLEU64(out, value)`](src/rpp/endian.h#L90) | Write 64-bit little-endian |
-| [`readLEU16(in)`](src/rpp/endian.h#L95) | Read 16-bit little-endian |
-| [`readLEU32(in)`](src/rpp/endian.h#L100) | Read 32-bit little-endian |
-| [`readLEU64(in)`](src/rpp/endian.h#L105) | Read 64-bit little-endian |
+| [`writeLEU16(out, value)`](src/rpp/endian.h#L106) | Write 16-bit little-endian |
+| [`writeLEU32(out, value)`](src/rpp/endian.h#L113) | Write 32-bit little-endian |
+| [`writeLEU64(out, value)`](src/rpp/endian.h#L122) | Write 64-bit little-endian |
+| [`readLEU16(in)`](src/rpp/endian.h#L135) | Read 16-bit little-endian |
+| [`readLEU32(in)`](src/rpp/endian.h#L141) | Read 32-bit little-endian |
+| [`readLEU64(in)`](src/rpp/endian.h#L147) | Read 64-bit little-endian |
 | [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L17) | Platform-specific 16-bit byte swap |
 | [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L18) | Platform-specific 32-bit byte swap |
 | [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L19) | Platform-specific 64-bit byte swap |
