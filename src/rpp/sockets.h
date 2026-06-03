@@ -496,9 +496,12 @@ namespace rpp
         // automatically sets nodelay (nagle disabled) on TCP sockets
         static constexpr bool DEFAULT_NODELAY = true;
 
+        using mutex_t = typename rpp::recursive_mutex;
+        using lock_t = std::unique_lock<mutex_t>;
+
     protected:
 
-        mutable rpp::recursive_mutex Mtx; // recursive mutex for thread safe read/write operations
+        mutable mutex_t Mtx; // recursive mutex for thread safe read/write operations
         int Sock;            // Socket handle
         ipaddress Addr;      // remote addr
         mutable int LastErr; // last error code
@@ -544,7 +547,10 @@ namespace rpp
          * @returns The internal recursive mutex.
          * Use this mutex if you need to lock the socket for multiple operations.
          */
-        rpp::recursive_mutex& mutex() noexcept { return Mtx; }
+        mutex_t& mutex() noexcept { return Mtx; }
+
+        /** @brief Acquires a unique lock on the socket's internal mutex */
+        lock_t spin_lock() noexcept { return rpp::spin_lock(Mtx); }
 
         /** Closes the connection (if any) and returns this socket to a default state */
         void close() noexcept;
@@ -574,7 +580,7 @@ namespace rpp
         int os_handle() const noexcept
         {
             // FIX: potential race condition during AutoClose error handling
-            std::unique_lock lock = rpp::spin_lock(Mtx);
+            lock_t lock = rpp::spin_lock(Mtx);
             return Sock;
         }
         int oshandle() const noexcept { return os_handle(); }
@@ -813,6 +819,8 @@ namespace rpp
          * If there is no data available, this function returns 0
          */
         NOINLINE int recvfrom(ipaddress& from, void* buffer, int maxBytes) noexcept;
+
+        NOINLINE int recvfrom(lock_t& lock, ipaddress& from, void* buffer, int maxBytes) noexcept;
 
         /**
          * @brief Waits up to timeout until data is available and then calls recvfrom() or returns 0

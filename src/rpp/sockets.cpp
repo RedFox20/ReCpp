@@ -1017,19 +1017,31 @@ namespace rpp
 
     NOINLINE int socket::recvfrom(ipaddress& from, void* buffer, int maxBytes) noexcept
     {
+        lock_t lock = rpp::spin_lock(Mtx);
+        return recvfrom(lock, from, buffer, maxBytes);
+    }
+
+    NOINLINE int socket::recvfrom(lock_t& lock, ipaddress& from, void* buffer, int maxBytes) noexcept
+    {
         Assert(type() == ST_Datagram, "recvfrom only works on UDP sockets");
+        Assert(lock.owns_lock(), "recvfrom requires a locked mutex");
+        Assert(lock.mutex() == &Mtx, "recvfrom requires a lock on the actual socket mutex");
 
         if (maxBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
 
         saddr a;
         socklen_t len = sizeof(a);
-        std::unique_lock lock { Mtx };
         int sock = os_handle_unsafe();
         // we can't keep the mutex locked if we're entering a blocking operation
+        bool unlocked = false;
         if (Blocking)
+        {
             lock.unlock();
+            unlocked = true;
+        }
         int res = handle_txres(::recvfrom(sock, (char*)buffer, maxBytes, 0, &a.sa, &len));
+        if (unlocked) lock.lock(); // re-lock the mutex if we unlocked it before
         if (res > 0) from = to_ipaddress(a);
         return res;
     }
