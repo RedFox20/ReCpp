@@ -3,10 +3,13 @@
 #include "strview.h" // _tostring
 #include "sort.h"
 #include "./math.h" // rpp::min
+#include "endian.h" // rpp::readLEU16, rpp::writeLEU16 (Windows AF_Unix framing)
 #include <cstdlib>    // malloc
 #include <cstdio>     // printf
 #include <cstring>    // memcpy,memset,strlen
+#include <cstddef>    // offsetof
 #include <cassert>
+#include <memory> // std::unique_ptr
 #include <thread> // std::this_thread::yield()
 
 #if DEBUG || _DEBUG || RPP_DEBUG
@@ -23,6 +26,7 @@
     #include <Windows.h>
     #include <WinSock2.h>
     #include <ws2tcpip.h>           // winsock2 and TCP/IP functions
+    #include <afunix.h>             // sockaddr_un (AF_UNIX, Win10 1803+)
     #include <mstcpip.h>            // WSAIoctl Options
     #include <process.h>            // _beginthreadex
     #include <Iphlpapi.h>
@@ -45,6 +49,7 @@
     #include <netdb.h>              // addrinfo, freeaddrinfo...
     #include <netinet/in.h>         // sockaddr_in
     #include <netinet/tcp.h>        // TCP_NODELAY
+    #include <sys/un.h>             // sockaddr_un (AF_UNIX)
     #include <cerrno>               // last error number
     #include <sys/ioctl.h>          // ioctl()
     #if __has_include(<fcntl.h>)
@@ -78,6 +83,30 @@
 #  define logflush(...)
 #else
 #  define logflush(file) fflush(file)
+#endif
+
+// AF_Unix message sockets: Windows (framed SOCK_STREAM) and Linux
+// (SOCK_SEQPACKET in the abstract namespace). Everything else fails cleanly --
+// the SOCK_SEQPACKET + abstract-namespace + SCM_RIGHTS combination is
+// Linux-specific, so we refuse to pretend support we can't deliver.
+#ifndef RPP_UNIX_SOCKET_SUPPORTED
+#  if _WIN32 || defined(__linux__)
+#    define RPP_UNIX_SOCKET_SUPPORTED 1
+#  else
+#    define RPP_UNIX_SOCKET_SUPPORTED 0
+#  endif
+#endif
+
+#ifndef MSG_NOSIGNAL
+#  define MSG_NOSIGNAL 0
+#endif
+
+// Maps a bare errno macro to its platform-specific socket error constant
+// (WSA-prefixed on Windows). Used throughout for cross-platform error handling.
+#if _WIN32
+#  define ESOCK(errmacro) WSA ## errmacro
+#else
+#  define ESOCK(errmacro) errmacro
 #endif
 
 #if RPP_SOCKETS_DBG
@@ -134,6 +163,7 @@ namespace rpp
         case AF_INET:     return AF_IPv4;
         case AF_INET6:    return AF_IPv6;
         case 32/*AF_BTH*/:return AF_Bth;
+        case AF_UNIX:     return AF_Unix;
         }
     }
     socket_type to_socktype(int sock) noexcept
@@ -169,7 +199,7 @@ namespace rpp
     }
     int addrfamily_int(address_family addressFamily) noexcept
     {
-        static int families[] = { AF_UNSPEC, AF_INET, AF_INET6, 32/*AF_BTH*/ };
+        static int families[] = { AF_UNSPEC, AF_INET, AF_INET6, 32/*AF_BTH*/, AF_UNIX };
         return families[addressFamily];
     }
     int socktype_int(socket_type sockType) noexcept
@@ -187,12 +217,26 @@ namespace rpp
     ////////        IP Address
     ///////////////////////////////////////////////////////////////////////////
 
-    union saddr {
-        sockaddr     sa;
-        sockaddr_in  sa4;
-        sockaddr_in6 sa6;
+    // Wraps the various sockaddr families plus an explicit address length.
+    // The length is REQUIRED for AF_UNIX in the Linux abstract namespace, whose
+    // sockaddr length is offsetof(sun_path)+1+namelen and CANNOT be derived from
+    // sa_family. to_saddr() sets Len for every family; raw OS sockaddrs that are
+    // reinterpret_cast to saddr (e.g. from getifaddrs) never read Len/size().
+    #if _MSC_VER
+    #  pragma warning(push)
+    #  pragma warning(disable:4201) // nonstandard anonymous struct/union
+    #endif
+    struct saddr {
+        union {
+            sockaddr     sa;
+            sockaddr_in  sa4;
+            sockaddr_in6 sa6;
+            sockaddr_un  sun;
+        };
+        int Len = 0; // explicit address length; 0 => derive from sa_family
         operator const sockaddr*() const noexcept { return &sa; }
         int size() const noexcept {
+            if (Len > 0) return Len;
             switch (sa.sa_family) {
                 default:       return sizeof(sa);
                 case AF_INET:  return sizeof(sa4);
@@ -200,19 +244,35 @@ namespace rpp
             }
         }
     };
+    #if _MSC_VER
+    #  pragma warning(pop)
+    #endif
 
     // --------------------------------------------------------------------------------
 
     raw_address::raw_address() noexcept
         : Family{AF_DontCare}, FlowInfo{0}, ScopeId{0}
     {
-        memset(Addr6, 0, sizeof(Addr6));
+        memset(UnixName, 0, sizeof(UnixName)); // zero the entire address union
     }
 
     raw_address::raw_address(address_family af) noexcept
         : Family{af}, FlowInfo{0}, ScopeId{0}
     {
-        memset(Addr6, 0, sizeof(Addr6));
+        memset(UnixName, 0, sizeof(UnixName)); // zero the entire address union
+    }
+
+    raw_address raw_address::from_unix_name(strview name) noexcept
+    {
+        raw_address a; // AF_DontCare, zeroed union
+        // Reject names that don't fit (incl NUL terminator); never truncate,
+        // a truncated name could collide with another service.
+        if (name.empty() || static_cast<size_t>(name.size()) >= sizeof(a.UnixName))
+            return a; // leaves AF_DontCare => invalid
+        a.Family = AF_Unix;
+        memcpy(a.UnixName, name.data(), static_cast<size_t>(name.size()));
+        a.UnixName[name.size()] = '\0';
+        return a;
     }
 
     raw_address::raw_address(address_family af, uint32_t ipv4) noexcept : raw_address{af}
@@ -236,7 +296,7 @@ namespace rpp
     void raw_address::reset() noexcept
     {
         Family = AF_DontCare;
-        memset(Addr6, 0, sizeof(Addr6));
+        memset(UnixName, 0, sizeof(UnixName)); // zero the entire address union
         FlowInfo = 0;
         ScopeId = 0;
     }
@@ -330,6 +390,8 @@ namespace rpp
         {
             if (Family == AF_IPv4)
                 return Addr4 == addr.Addr4;
+            if (Family == AF_Unix)
+                return strncmp(UnixName, addr.UnixName, sizeof(UnixName)) == 0;
             return FlowInfo == addr.FlowInfo && ScopeId == addr.ScopeId
                 && memcmp(Addr6, addr.Addr6, sizeof(Addr6)) == 0;
         }
@@ -344,6 +406,8 @@ namespace rpp
         // families are equal, compare by addr
         if (Family == AF_IPv4)
             return memcmp(&Addr4, &addr.Addr4, sizeof(Addr4));
+        else if (Family == AF_Unix)
+            return strncmp(UnixName, addr.UnixName, sizeof(UnixName));
         else
             return memcmp(&Addr6, &addr.Addr6, sizeof(Addr6));
     }
@@ -352,6 +416,8 @@ namespace rpp
     {
         if (Family == AF_IPv4)
             return Addr4 != INADDR_ANY;
+        if (Family == AF_Unix)
+            return UnixName[0] != '\0';
         for (unsigned char i : Addr6) // NOLINT(readability-use-anyofallof)
             if (i != 0) return true;
         return false;
@@ -375,6 +441,10 @@ namespace rpp
         if (Family == AF_DontCare) {
             if (max > 0) buf[0] = '\0';
             return 0;
+        }
+        if (Family == AF_Unix) {
+            int n = snprintf(buf, max, "%s", UnixName);
+            return n < 0 ? 0 : n;
         }
         inwin32(InitWinSock());
         if (inet_ntop(addrfamily_int(Family), (void*)&Addr4, buf, max))
@@ -446,7 +516,14 @@ namespace rpp
             return; // quiet fail on error/invalid socket
         }
 
-        Address.Family = to_addrfamily(a.sa4.sin_family);
+        Address.Family = to_addrfamily(a.sa.sa_family);
+        if (Address.Family == AF_Unix) {
+            // AF_UNIX has no port. Recovering the name is best-effort: abstract
+            // (Linux) names start with a NUL, so leave UnixName empty.
+            Port = 0;
+            Address.FlowInfo = 0, Address.ScopeId = 0;
+            return;
+        }
         Port = ntohs(a.sa4.sin_port);
         if (Address.Family == AF_IPv4) {
             Address.Addr4 = a.sa4.sin_addr.s_addr;
@@ -523,18 +600,56 @@ namespace rpp
         return 0;
     }
 
+    // Fills the AF_UNIX sockaddr_un from a unix name. Sets a.Len, or leaves it 0
+    // (=> invalid/zero-length address) if the name doesn't fit, so callers fail
+    // cleanly. Ports the platform name mapping from the old unix_socket.cpp.
+    static void fill_unix_addr(saddr& a, const char* name) noexcept
+    {
+        memset(&a.sun, 0, sizeof(a.sun));
+        a.sun.sun_family = AF_UNIX;
+        a.Len = 0; // assume failure
+        if (!name || *name == '\0')
+            return;
+#if _WIN32
+        // Windows: "%TEMP%\<name>.sock" (per-user temp dir, so no uid keying).
+        char tmp[MAX_PATH];
+        const DWORD n = GetTempPathA(sizeof(tmp), tmp); // ends with '\'
+        if (n == 0 || n >= sizeof(tmp))
+            return;
+        const int len = snprintf(a.sun.sun_path, sizeof(a.sun.sun_path), "%s%s.sock", tmp, name);
+        if (len < 0 || len >= static_cast<int>(sizeof(a.sun.sun_path)))
+            return;
+        a.Len = static_cast<int>(sizeof(a.sun));
+#elif RPP_UNIX_SOCKET_SUPPORTED
+        // Linux abstract namespace: leading NUL, no trailing terminator counted.
+        const size_t nlen = strlen(name);
+        if (nlen > sizeof(a.sun.sun_path) - 1) // leading NUL occupies sun_path[0]
+            return; // name too long; never truncate
+        memcpy(a.sun.sun_path + 1, name, nlen);
+        a.Len = static_cast<int>(offsetof(sockaddr_un, sun_path) + 1 + nlen);
+#else
+        (void)name; // unsupported platform: leave Len == 0
+#endif
+    }
+
     static saddr to_saddr(const ipaddress& ipa) noexcept
     {
         saddr a;
+        if (ipa.Address.Family == AF_Unix) {
+            fill_unix_addr(a, ipa.Address.UnixName);
+            return a;
+        }
         a.sa4.sin_family = (uint16_t)addrfamily_int(ipa.Address.Family);
         a.sa4.sin_port = htons(ipa.Port);
         if (ipa.Address.Family == AF_IPv4) {
             a.sa4.sin_addr.s_addr = ipa.Address.Addr4;
             memset(a.sa4.sin_zero, 0, sizeof(a.sa4.sin_zero));
+            a.Len = sizeof(a.sa4);
         } else { // AF_IPv6
             memcpy(&a.sa6.sin6_addr, ipa.Address.Addr6, sizeof(ipa.Address.Addr6));
             a.sa6.sin6_flowinfo = ipa.Address.FlowInfo;
             a.sa6.sin6_scope_id = ipa.Address.ScopeId;
+            a.Len = sizeof(a.sa6);
         }
         return a;
     }
@@ -715,6 +830,24 @@ namespace rpp
     }
 
     ///////////////////////////////////////////////////////////////////////////
+    /////////        AF_Unix framing (Windows only)
+    ///////////////////////////////////////////////////////////////////////////
+
+    // Windows AF_UNIX is stream-only (no SOCK_SEQPACKET), so messages are framed
+    // in software: a 2-byte little-endian length prefix + payload. This state
+    // reassembles received frames and stashes a partial send tail. On POSIX the
+    // struct is an empty placeholder (never allocated).
+    struct unix_framing
+    {
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        std::vector<uint8_t> rx; // stream-to-message reassembly
+        size_t rx_off = 0;       // read cursor into rx; consumed prefix compacted lazily
+        std::vector<uint8_t> tx; // partial-frame tail awaiting flush
+        size_t tx_off = 0;       // unsent offset into tx
+    #endif
+    };
+
+    ///////////////////////////////////////////////////////////////////////////
     /////////        socket
     ///////////////////////////////////////////////////////////////////////////
 
@@ -763,6 +896,7 @@ namespace rpp
         std::swap(Category, s.Category);
         std::swap(Type, s.Type);
         std::swap(Connected, s.Connected);
+        std::swap(Framing, s.Framing);
         return *this;
     }
     socket::~socket() noexcept
@@ -783,6 +917,7 @@ namespace rpp
             Type = ST_Unspecified;
             Category = SC_Unknown;
             Connected = false;
+            Framing.reset(); // drop any AF_Unix framing state (Windows)
             bool shared = Shared;
 
             // Release the lock here, to unblock any other threads that might
@@ -810,6 +945,22 @@ namespace rpp
     {
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
+
+        if (is_af_unix())
+        {
+            // AF_Unix is message-oriented: reject oversize messages on every
+            // platform (the Windows length prefix is 16-bit, so an oversize
+            // frame would wrap and desync the peer).
+            if (numBytes > max_unix_message_size)
+            {
+                set_errno(ESOCK(EMSGSIZE));
+                return -1;
+            }
+        #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+            return send_unix_framed(buffer, numBytes); // software framing
+        #endif
+        }
+
         int flags = 0;
         #if __linux__
             // Linux triggers SIGPIPE on write to a closed socket, which terminates the application
@@ -848,7 +999,7 @@ namespace rpp
 
     void socket::flush_send_buf() noexcept
     {
-        if (type() == ST_Stream)
+        if (type() == ST_Stream && !is_af_unix()) // TCP only, never AF_Unix
         {
             std::unique_lock lock = rpp::spin_lock(Mtx);
             // flush write buffer (hack only available for TCP sockets)
@@ -983,6 +1134,10 @@ namespace rpp
     {
         if (maxBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        if (is_af_unix())
+            return recv_unix_framed(buffer, maxBytes); // software de-framing
+    #endif
         std::unique_lock lock { Mtx };
         int sock = os_handle_unsafe();
         // we can't keep the mutex locked if we're entering a blocking operation
@@ -1113,7 +1268,7 @@ namespace rpp
         if (ret == 0) // socket closed gracefully
         {
             set_errno(os_getsockerr());
-            if (Type == ST_Stream) // only for TCP streams, connection was closed gracefully
+            if (Type == ST_Stream || Type == ST_SeqPacket)
             {
                 logdebug("socket closed gracefully");
                 close();
@@ -1127,12 +1282,6 @@ namespace rpp
         set_errno(0); // clear any errors
         return (int)ret; // return as bytesAvailable
     }
-
-    #if _WIN32
-        #define ESOCK(errmacro) WSA ## errmacro
-    #else
-        #define ESOCK(errmacro) errmacro
-    #endif
 
     int socket::handle_errno(int err) noexcept
     {
@@ -1473,8 +1622,8 @@ namespace rpp
 
     bool socket::set_nagle(bool enableNagle) noexcept
     {
-        if (type() != ST_Stream)
-            return false; // cannot set nagle
+        if (type() != ST_Stream || is_af_unix())
+            return false; // cannot set nagle (TCP only, never AF_Unix)
 
         // TCP_NODELAY: 1 nodelay, 0 nagle enabled
         if (set_opt(IPPROTO_TCP, TCP_NODELAY, enableNagle?0:1) == 0)
@@ -1484,8 +1633,8 @@ namespace rpp
     }
     bool socket::is_nodelay() const noexcept
     {
-        if (type() != ST_Stream)
-            return true; // non-TCP datagrams are assumed to have nagle off
+        if (type() != ST_Stream || is_af_unix())
+            return true; // non-TCP (incl AF_Unix) are assumed to have nagle off
 
         int result = get_opt(IPPROTO_TCP, TCP_NODELAY);
         if (result < 0)
@@ -1673,11 +1822,35 @@ namespace rpp
         inwin32(InitWinSock());
         close();
 
-        // create a generic socket
         int family = addrfamily_int(af);
-        auto stype = to_socktype(ipp);
-        int type   = socktype_int(stype);
-        int proto  = ipproto_int(ipp);
+        int type = 0;
+        int proto = 0;
+        socket_type stype = ST_Unspecified;
+
+        if (af == AF_Unix)
+        {
+        #if RPP_UNIX_SOCKET_SUPPORTED
+            // Linux: SOCK_SEQPACKET (message boundaries). Windows: SOCK_STREAM
+            // (no SEQPACKET; messages are framed in software). proto 0.
+        #if _WIN32
+            type = SOCK_STREAM;  stype = ST_Stream;
+        #else
+            type = SOCK_SEQPACKET; stype = ST_SeqPacket;
+        #endif
+            proto = 0;
+        #else
+            // Unsupported platform: refuse to pretend support we can't deliver.
+            handle_errno(ESOCK(EAFNOSUPPORT));
+            return false;
+        #endif
+        }
+        else
+        {
+            stype = to_socktype(ipp);
+            type  = socktype_int(stype);
+            proto = ipproto_int(ipp);
+        }
+
         set_os_handle_unsafe((int)::socket(family, type, proto)); // NOLINT(readability-redundant-casting)
         if (os_handle_unsafe() == INVALID)
         {
@@ -1686,7 +1859,16 @@ namespace rpp
         }
 
         Type = stype;
-        if (stype == ST_Stream)
+        // remember the family so family()/is_af_unix() work before bind/connect
+        Addr.Address.Family = af;
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        if (af == AF_Unix)
+            Framing = std::make_unique<unix_framing>(); // software message framing
+    #endif
+
+        // TCP_NODELAY only applies to genuine TCP streams, never to AF_Unix
+        // (on Windows a unix socket is ST_Stream but has no IPPROTO_TCP options).
+        if (stype == ST_Stream && af != AF_Unix)
         {
             if (opt & SO_Nagle) set_nagle(true);
             else                set_nodelay(DEFAULT_NODELAY);
@@ -1731,6 +1913,13 @@ namespace rpp
             if (!enable_reuse_address(true))
                 return false; // failed to enable SO_REUSEADDR, dont bind
         }
+
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        // Windows AF_Unix is a real filesystem object; remove a stale socket
+        // file left over from a past run before binding.
+        if (addr.Address.Family == AF_Unix && sa.size() > 0)
+            ::DeleteFileA(sa.sun.sun_path);
+    #endif
 
         if (::bind(os_handle_unsafe(), sa, sa.size()) == 0)
         {
@@ -1963,7 +2152,9 @@ namespace rpp
             LogError("Cannot use socket::accept() on closed sockets");
             return socket::from_err_code(ESOCK(EBADF));
         }
-        if (type() != socket_type::ST_Stream)
+        // accept() works on connection-oriented sockets: TCP streams and
+        // AF_Unix SEQPACKET (Linux) / framed SOCK_STREAM (Windows).
+        if (type() != socket_type::ST_Stream && type() != socket_type::ST_SeqPacket)
         {
             LogError("Cannot use socket::accept() on non-TCP sockets, use recvfrom instead");
             return socket::from_err_code(ESOCK(EPROTOTYPE));
@@ -1989,10 +2180,17 @@ namespace rpp
             return socket::from_err_code(get_errno_unlocked());
         }
 
+        const bool unix_client = client.is_af_unix();
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        if (unix_client)
+            client.Framing = std::make_unique<unix_framing>(); // software framing
+    #endif
+
         // set the accepted socket with same options as the listener
-        if (is_nodelay()) client.set_nagle(false);
+        if (is_nodelay()) client.set_nagle(false); // no-op / skipped for AF_Unix
         client.set_blocking(is_blocking());
-        client.set_autoclosing(DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
+        // AF_Unix sockets self-close on fatal I/O errors (old unix_socket contract)
+        client.set_autoclosing(unix_client ? true : DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
         client.Connected = true;
         client.Category = SC_Accept;
         return client;
@@ -2107,11 +2305,17 @@ namespace rpp
     void socket::configure_connected_client(socket_option opt) noexcept
     {
         Category = SC_Client;
-        set_autoclosing(DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
+        // AF_Unix sockets self-close on fatal I/O errors (old unix_socket contract)
+        set_autoclosing(is_af_unix() ? true : DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
         Connected = true;
 
-        if (opt & SO_Nagle) set_nagle(true);
-        else                set_nodelay(DEFAULT_NODELAY);
+        // TCP_NODELAY is meaningless for AF_Unix (and on Windows would issue a
+        // bogus IPPROTO_TCP setsockopt on an ST_Stream unix socket).
+        if (!is_af_unix())
+        {
+            if (opt & SO_Nagle) set_nagle(true);
+            else                set_nodelay(DEFAULT_NODELAY);
+        }
 
         // configure blocking flags
         if      (opt & SO_NonBlock) set_blocking(false);
@@ -2133,6 +2337,337 @@ namespace rpp
         if (s.connect(remoteAddr, millis, opt))
             return s;
         return socket::from_err_code(s.get_errno_unlocked(), remoteAddr);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ///////        AF_Unix (local) sockets
+    ////////////////////////////////////////////////////////////////////////////////
+
+#if RPP_UNIX_SOCKET_SUPPORTED && !_WIN32
+    // Closes every SCM_RIGHTS fd attached to a received message, except `keep`.
+    static void close_received_fds(msghdr& msg, int keep) noexcept
+    {
+        for (cmsghdr* c = CMSG_FIRSTHDR(&msg); c != nullptr; c = CMSG_NXTHDR(&msg, c))
+        {
+            if (c->cmsg_level != SOL_SOCKET || c->cmsg_type != SCM_RIGHTS)
+                continue;
+            const size_t count = (c->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+            for (size_t i = 0; i < count; ++i)
+            {
+                int fd = -1;
+                memcpy(&fd, CMSG_DATA(c) + i * sizeof(int), sizeof(fd));
+                if (fd >= 0 && fd != keep)
+                    ::close(fd);
+            }
+        }
+    }
+#endif
+
+#if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+    // Drains any unsent frame tail; the stream must stay in sync. Returns true
+    // once the tx buffer is empty, false if it would block (tail still pending)
+    // -- the socket self-closes on a fatal error. Called from send()/recv().
+    bool socket::try_flush_unix() noexcept
+    {
+        std::unique_lock lock = rpp::spin_lock(Mtx);
+        unix_framing* f = Framing.get();
+        if (!f) return true;
+        while (f->tx_off < f->tx.size())
+        {
+            const int r = ::send(static_cast<SOCKET>(os_handle_unsafe()),
+                                 reinterpret_cast<const char*>(f->tx.data()) + f->tx_off,
+                                 static_cast<int>(f->tx.size() - f->tx_off), 0);
+            if (r > 0)
+            {
+                f->tx_off += static_cast<size_t>(r);
+                continue;
+            }
+            if (r < 0 && WSAGetLastError() == WSAEWOULDBLOCK)
+                return false; // tail still stuck
+            lock.unlock();
+            close(); // peer gone
+            return false;
+        }
+        f->tx.clear();
+        f->tx_off = 0;
+        return true;
+    }
+
+    int socket::send_unix_framed(const void* data, int len) noexcept
+    {
+        std::unique_lock lock = rpp::spin_lock(Mtx);
+        unix_framing* f = Framing.get();
+        if (!f || os_handle_unsafe() == INVALID)
+            return -1;
+
+        // Finish any partially-sent frame first; the stream must stay in sync.
+        lock.unlock();
+        if (!try_flush_unix())
+        {
+            // tail still stuck (would block) or peer gone (socket self-closed)
+            if (os_handle_unsafe() == INVALID)
+                return -1;
+            set_errno(WSAEWOULDBLOCK);
+            return 0; // would-block: not sent, socket stays valid
+        }
+        lock.lock();
+        f = Framing.get();
+        if (!f || os_handle_unsafe() == INVALID)
+            return -1;
+
+        // Frame: 2-byte LE length prefix + payload.
+        std::vector<uint8_t> frame;
+        frame.reserve(static_cast<size_t>(2 + len));
+        frame.resize(2);
+        writeLEU16(frame.data(), static_cast<uint16_t>(len));
+        const uint8_t* src = static_cast<const uint8_t*>(data);
+        frame.insert(frame.end(), src, src + len);
+        const int total = static_cast<int>(frame.size());
+
+        const int r = ::send(static_cast<SOCKET>(os_handle_unsafe()),
+                             reinterpret_cast<const char*>(frame.data()), total, 0);
+        if (r == total)
+            return len; // whole frame committed
+        if (r >= 0)
+        {
+            // Partial: the frame is committed, stash the tail to keep the stream
+            // in sync. Delivered by a later send()/recv() via try_flush_unix().
+            f->tx.assign(frame.begin() + r, frame.end());
+            f->tx_off = 0;
+            return len;
+        }
+        if (WSAGetLastError() == WSAEWOULDBLOCK)
+        {
+            set_errno(WSAEWOULDBLOCK);
+            return 0; // send buffer full
+        }
+        lock.unlock();
+        close(); // peer gone
+        return -1;
+    }
+
+    int socket::recv_unix_framed(void* buf, int cap) noexcept
+    {
+        // Opportunistically push out any frame tail left by a prior partial
+        // send(); a recv()-only peer otherwise leaves the wire half-framed.
+        try_flush_unix();
+        if (os_handle_unsafe() == INVALID)
+            return -1;
+
+        std::unique_lock lock { Mtx };
+        unix_framing* f = Framing.get();
+        if (!f) return -1;
+
+        // Threshold past which we compact rx instead of leaving consumed bytes
+        // before rx_off. Bounds the memmove cost to O(backlog) amortized.
+        constexpr size_t compact_threshold = 64 * 1024;
+        for (;;)
+        {
+            const size_t avail = f->rx.size() - f->rx_off;
+            if (avail >= 2) // a complete frame already buffered?
+            {
+                const uint8_t* p = f->rx.data() + f->rx_off;
+                const int len = readLEU16(p);
+                if (avail >= static_cast<size_t>(2 + len))
+                {
+                    const int n = len < cap ? len : cap; // truncate like SEQPACKET
+                    memcpy(buf, p + 2, static_cast<size_t>(n));
+                    f->rx_off += static_cast<size_t>(2 + len);
+                    if (f->rx_off == f->rx.size())
+                    {
+                        f->rx.clear();
+                        f->rx_off = 0;
+                    }
+                    else if (f->rx_off >= compact_threshold)
+                    {
+                        f->rx.erase(f->rx.begin(), f->rx.begin() + static_cast<std::ptrdiff_t>(f->rx_off));
+                        f->rx_off = 0;
+                    }
+                    return n;
+                }
+            }
+            char tmp[4096];
+            int sock = os_handle_unsafe();
+            const int r = ::recv(static_cast<SOCKET>(sock), tmp, sizeof(tmp), 0);
+            if (r > 0)
+            {
+                f->rx.insert(f->rx.end(), tmp, tmp + r);
+                continue;
+            }
+            if (r < 0 && WSAGetLastError() == WSAEWOULDBLOCK)
+                return 0; // nothing ready (non-blocking)
+            lock.unlock();
+            close(); // EOF or fatal
+            return -1;
+        }
+    }
+#endif // _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+
+    socket socket::listen_unix(strview name, int backlog, socket_option opt) noexcept
+    {
+        socket s;
+        ipaddress addr = ipaddress::unix_addr(name);
+        if (!addr.is_valid()) // name too long / empty
+            return socket::from_err_code(ESOCK(EINVAL), addr);
+
+        // SO_ReuseAddr is handled by bind(), remove it from the creation options
+        socket_option creationOpts = socket_option(opt & ~SO_ReuseAddr);
+        if (!s.create(AF_Unix, IPP_DontCare, creationOpts))
+            return socket::from_err_code(s.get_errno_unlocked(), addr);
+        if (!s.bind(addr, opt))
+            return socket::from_err_code(s.get_errno_unlocked(), addr);
+        if (::listen(s.os_handle(), backlog) != 0)
+        {
+            s.handle_errno();
+            return socket::from_err_code(s.get_errno_unlocked(), addr);
+        }
+        s.Category = SC_Listen;
+        return s;
+    }
+
+    socket socket::connect_unix(strview name, socket_option opt) noexcept
+    {
+        ipaddress addr = ipaddress::unix_addr(name);
+        if (!addr.is_valid()) // name too long / empty
+            return socket::from_err_code(ESOCK(EINVAL), addr);
+
+        socket s;
+        // create the AF_Unix socket up front (connect() would default to IPP_TCP)
+        if (!s.create(AF_Unix, IPP_DontCare, socket_option(opt | SO_Blocking)))
+            return socket::from_err_code(s.get_errno_unlocked(), addr);
+        if (s.connect(addr, opt))
+            return s;
+        return socket::from_err_code(s.get_errno_unlocked(), addr);
+    }
+
+    bool socket::pair(socket& a, socket& b) noexcept
+    {
+#if RPP_UNIX_SOCKET_SUPPORTED && !_WIN32 // Linux only (SCM_RIGHTS pair semantics)
+        int sv[2];
+        if (::socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv) != 0)
+            return false;
+        a = socket::from_os_handle(sv[0], ipaddress::unix_addr("pair"));
+        b = socket::from_os_handle(sv[1], ipaddress::unix_addr("pair"));
+        a.Type = b.Type = ST_SeqPacket;
+        a.Connected = b.Connected = true;
+        a.Category = b.Category = SC_Client;
+        // self-close on fatal I/O errors, matching connect/accept unix sockets
+        a.set_autoclosing(true);
+        b.set_autoclosing(true);
+        return true;
+#else
+        (void)a, (void)b;
+        return false;
+#endif
+    }
+
+    bool socket::send_fd(uint32_t tag, int fd) noexcept
+    {
+#if RPP_UNIX_SOCKET_SUPPORTED && !_WIN32 // SCM_RIGHTS is Linux only
+        std::unique_lock lock = rpp::spin_lock(Mtx);
+        if (os_handle_unsafe() == INVALID || fd < 0)
+            return false;
+
+        iovec iov{&tag, sizeof(tag)};
+        union {
+            char buf[CMSG_SPACE(sizeof(int))];
+            cmsghdr align;
+        } control;
+        memset(&control, 0, sizeof(control));
+
+        msghdr msg{};
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = control.buf;
+        msg.msg_controllen = sizeof(control.buf);
+
+        cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
+
+        int sock = os_handle_unsafe();
+        ssize_t n;
+        do {
+            n = ::sendmsg(sock, &msg, MSG_DONTWAIT | MSG_NOSIGNAL);
+        } while (n < 0 && errno == EINTR);
+
+        if (n == static_cast<ssize_t>(sizeof(tag)))
+            return true; // all-or-nothing like send()
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+            return false; // send buffer full, socket stays valid
+        lock.unlock();
+        close(); // peer gone (or partial/short -- unrecoverable)
+        return false;
+#else
+        (void)tag, (void)fd;
+        return false; // no SCM_RIGHTS here
+#endif
+    }
+
+    int socket::recv_fd(uint32_t& out_tag, int& out_fd) noexcept
+    {
+#if RPP_UNIX_SOCKET_SUPPORTED && !_WIN32 // SCM_RIGHTS is Linux only
+        std::unique_lock lock { Mtx };
+        if (os_handle_unsafe() == INVALID)
+            return -1;
+
+        uint32_t tag = 0;
+        iovec iov{&tag, sizeof(tag)};
+        union {
+            char buf[CMSG_SPACE(sizeof(int))];
+            cmsghdr align;
+        } control;
+
+        msghdr msg{};
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = control.buf;
+        msg.msg_controllen = sizeof(control.buf);
+
+        int sock = os_handle_unsafe();
+        ssize_t n;
+        do {
+#ifdef MSG_CMSG_CLOEXEC
+            n = ::recvmsg(sock, &msg, MSG_CMSG_CLOEXEC);
+#else
+            n = ::recvmsg(sock, &msg, 0);
+#endif
+        } while (n < 0 && errno == EINTR);
+
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+            return 0; // nothing ready (non-blocking mode), socket stays valid
+        if (n <= 0)
+        {
+            lock.unlock();
+            close();
+            return -1; // EOF or fatal
+        }
+        if (n != static_cast<ssize_t>(sizeof(tag)))
+        {
+            close_received_fds(msg, -1);
+            return 0; // malformed -- skip
+        }
+
+        cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+        if (cmsg == nullptr || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS ||
+            cmsg->cmsg_len != CMSG_LEN(sizeof(int)))
+        {
+            close_received_fds(msg, -1);
+            return 0; // no (single) fd attached -- skip
+        }
+
+        int fd = -1;
+        memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+        close_received_fds(msg, fd); // defensive: drop any extra piggybacked fds
+        out_tag = tag;
+        out_fd = fd;
+        return 1;
+#else
+        (void)out_tag, (void)out_fd;
+        return -1; // no SCM_RIGHTS here
+#endif
     }
 
     bool socket::bind_to_interface([[maybe_unused]] uint64_t network_handle) noexcept
@@ -2278,6 +2813,29 @@ namespace rpp
         // TODO: implement for other platforms
         (void)network_interface;
         return std::nullopt;
+    #endif
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    void wait_readable(std::initializer_list<int> fds, int timeout_ms) noexcept
+    {
+    #if _WIN32
+        WSAPOLLFD pfds[8];
+        ULONG n = 0;
+        for (int fd : fds)
+            if (fd >= 0 && n < 8) // POLLRDNORM: WSAPoll rejects combos with POLLPRI
+                pfds[n++] = WSAPOLLFD{static_cast<SOCKET>(fd), POLLRDNORM, 0};
+        if (n > 0)
+            ::WSAPoll(pfds, n, timeout_ms);
+    #else
+        pollfd pfds[8];
+        nfds_t n = 0;
+        for (int fd : fds)
+            if (fd >= 0 && n < 8)
+                pfds[n++] = pollfd{fd, POLLIN, 0};
+        if (n > 0)
+            ::poll(pfds, n, timeout_ms);
     #endif
     }
 

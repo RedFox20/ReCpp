@@ -32,7 +32,7 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `condition_variable.h` | Condition variable with high-res timeout |
 | `concurrent_queue.h` | Thread-safe FIFO queue |
 | `close_sync.h` | Read-write sync for safe async destruction |
-| `sockets.h` | TCP/UDP sockets, IP addresses, network interfaces |
+| `sockets.h` | TCP/UDP/AF_UNIX sockets, IP addresses, network interfaces, message-oriented AF_UNIX transport with fd passing (SCM_RIGHTS) |
 | `binary_stream.h` | Buffered binary read/write streams |
 | `binary_serializer.h` | Reflection-based binary and string serialization |
 | `timepoint.h` | Duration, TimePoint, time constants, sleep utilities, duration literals |

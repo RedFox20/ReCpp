@@ -247,6 +247,9 @@ target_link_libraries(ReCpp
     PUBLIC ${TRACE_LIBRARY}
     PUBLIC Threads::Threads
 )
+if(WIN32) # winsock (sockets.cpp, incl AF_Unix support); MSVC also pulls it via #pragma comment(lib), MinGW does not
+    target_link_libraries(ReCpp PUBLIC ws2_32)
+endif()
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################
@@ -265,6 +268,9 @@ if (BUILD_TESTS)
         ${TRACE_LIBRARY}
         Threads::Threads
     )
+    if(WIN32)
+        target_link_libraries(RppTests ws2_32)
+    endif()
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()
 

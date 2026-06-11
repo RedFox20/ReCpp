@@ -11,6 +11,8 @@
 #include "load_balancer.h" // rpp::load_balancer
 #include <vector>   // std::vector
 #include <optional> // std::optional
+#include <memory>   // std::unique_ptr
+#include <initializer_list> // std::initializer_list
 #include "mutex.h"
 #if RPP_HAS_CXX20
 #  include <span>
@@ -24,6 +26,7 @@ namespace rpp
         AF_IPv4,        // The Internet Protocol version 4 (IPv4) address family
         AF_IPv6,        // The Internet Protocol version 6 (IPv6) address family
         AF_Bth,         // Bluetooth address family, supported since WinXP SP2
+        AF_Unix,        // Local AF_UNIX address family (message-oriented unix domain sockets)
     };
 
     enum RPPAPI socket_type : uint8_t
@@ -38,7 +41,7 @@ namespace rpp
 
     enum RPPAPI socket_category : uint8_t
     {
-        SC_Unknown, // UDP or other unknown socket 
+        SC_Unknown, // UDP or other unknown socket
         SC_Listen,  // this socket is a LISTEN server socket via socket::listen()
         SC_Accept,  // this socket was accepted via socket::accept() as a server side client
         SC_Client,  // this is a Client side connection socket via socket::connect()
@@ -117,6 +120,7 @@ namespace rpp
                 unsigned long FlowInfo;
                 unsigned long ScopeId; // The network prefix for IPv6
             };
+            char UnixName[64];
         };
 
         raw_address() noexcept; // memset 0 raw_address
@@ -142,8 +146,18 @@ namespace rpp
         /** @returns true if this raw_address is IPv6 */
         bool is_ipv6() const noexcept { return Family == AF_IPv6; }
 
+        /** @returns true if this raw_address is an AF_Unix local socket name */
+        bool is_unix() const noexcept { return Family == AF_Unix; }
+
         /** @returns IPv4 address as a 32-bit integer */
         uint32_t ipv4_address() const noexcept { return Addr4; }
+
+        /**
+         * @brief Constructs an AF_Unix raw_address carrying the given local socket name.
+         * Names with length >= 64 (including NUL) are rejected and yield an empty
+         * (AF_DontCare) address rather than being truncated.
+         */
+        static raw_address from_unix_name(strview name) noexcept;
 
         /** Resets this raw_address to a default state */
         void reset() noexcept;
@@ -188,7 +202,7 @@ namespace rpp
         */
         bool has_address() const noexcept;
 
-        /** 
+        /**
          * @returns the IP address as a string. Example result: "192.168.1.110"
          */
         std::string str() const noexcept;
@@ -199,7 +213,7 @@ namespace rpp
          */
         char* c_str() const noexcept;
 
-        /** 
+        /**
          * @brief Formats the IP into `buf` and returns the length of the string
          * Example result: "192.168.1.110"
          */
@@ -281,10 +295,24 @@ namespace rpp
             : ipaddress{get_address_family(hostname), hostname.c_str(), port} {}
 
         /**
-         * Initializes directly from a socket handle, 
+         * Initializes directly from a socket handle,
          * figures out adddress family from the socket
          */
         explicit ipaddress(int socket) noexcept;
+
+        /**
+         * @brief Creates an AF_Unix ipaddress carrying a local socket name.
+         * Unix addresses have no port. Names too long to fit (>= 64 chars incl NUL)
+         * produce an empty (invalid) address.
+         * @param name Local socket name, e.g. "my-service"
+         */
+        static ipaddress unix_addr(strview name) noexcept
+        {
+            ipaddress ip;
+            ip.Address = raw_address::from_unix_name(name);
+            ip.Port = 0;
+            return ip;
+        }
 
         /**
          * @returns AF_IPv4 or AF_IPv6 depending on the syntax of this ip_and_port string.
@@ -337,9 +365,14 @@ namespace rpp
 
         /**
          * @returns true if this address has at least a listener port
+         *          (or, for AF_Unix, a non-empty local socket name)
          **/
-        bool is_valid() const noexcept { return Address.Family && Port != 0; }
-        explicit operator bool() const noexcept { return Address.Family && Port != 0; }
+        bool is_valid() const noexcept
+        {
+            if (Address.Family == AF_Unix) return Address.UnixName[0] != '\0';
+            return Address.Family && Port != 0;
+        }
+        explicit operator bool() const noexcept { return is_valid(); }
 
         /** @returns Address string with port, eg "192.168.1.1:14550" "*/
         std::string str() const noexcept;
@@ -463,24 +496,35 @@ namespace rpp
     /**
      * A lightweight C++ Socket object with basic error handling and resource safety.
      * This is an extremely thin wrapper around low-level OS sockets.
-     * 
+     *
      * @note Since 2024 version, this is now automatically thread-safe, since
      *       all cases where performance is critical, multi-threading contexts are utilized.
-     * 
+     *
      * UNIX sockets are not thread-safe when writing to the same socket from multiple threads.
      *   - Calling select()/poll() from two or more threads is unsafe
      *   - UDP not safe for send() and recv()
      *   - TCP send() mostly safe, but ordering of data is not guaranteed,
      *         recv() is not safe, since it can read data from multiple threads
-     * 
+     *
      * On Windows, two threads calling send() at the same time is unsafe
      *    - Calling select()/poll() from two threads is unsafe
      */
+    // Windows-only AF_UNIX stream-to-message framing state (pimpl).
+    // Defined in sockets.cpp; only allocated for AF_Unix sockets on _WIN32.
+    struct unix_framing;
+
     class RPPAPI socket
     {
     public:
 
         static constexpr int INVALID = -1;
+
+        /**
+         * Largest message that an AF_Unix socket send()/recv() can carry.
+         * The Windows framing layer uses a 16-bit length prefix, so messages
+         * larger than this are rejected on all platforms for uniformity.
+         */
+        static constexpr int max_unix_message_size = 65535;
 
         // if true, Socket is shared and dtor won't call closesocket()
         static constexpr bool DEFAULT_SHARED = false;
@@ -492,7 +536,7 @@ namespace rpp
         // This is TRUE for sockets created via accept() and connect()/connect_to().
         static constexpr bool DEFAULT_AUTOCLOSE = false;
         static constexpr bool DEFAULT_AUTOCLOSE_CLIENT_SOCKETS = false;
-    
+
         // automatically sets nodelay (nagle disabled) on TCP sockets
         static constexpr bool DEFAULT_NODELAY = true;
 
@@ -511,12 +555,15 @@ namespace rpp
         bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
+        // AF_Unix stream-to-message framing state, lazily allocated only for
+        // AF_Unix sockets on Windows (null on POSIX and for all IP sockets).
+        std::unique_ptr<unix_framing> Framing;
 
     public:
 
         /**
          * Create a socket with an initialized handle
-         * WARNING: socket will take ownership of the handle, 
+         * WARNING: socket will take ownership of the handle,
          *          unless you set shared=true, which is equivalent of
          *          set_shared(true) OR calling release_noclose()
          * @note You must validate the socket on your own after initialization from OS handle
@@ -588,6 +635,14 @@ namespace rpp
         // non-locked versions of os_handle()
         FINLINE int os_handle_unsafe() const noexcept { return Sock; }
         FINLINE void set_os_handle_unsafe(int sock) noexcept { Sock = sock; }
+        // true if this socket is an AF_Unix local socket
+        FINLINE bool is_af_unix() const noexcept { return Addr.Address.Family == AF_Unix; }
+    #if _WIN32
+        // Windows AF_Unix software message framing (no-op on POSIX).
+        int  send_unix_framed(const void* data, int len) noexcept;
+        int  recv_unix_framed(void* buf, int cap) noexcept;
+        bool try_flush_unix() noexcept; // drain a partial frame tail
+    #endif
     public:
 
         /** @returns Current ipaddress */
@@ -628,7 +683,7 @@ namespace rpp
             SE_SHUTDOWN = 20, // The socket has been shut down
         };
 
-        /** @return The last OS specific error code. 
+        /** @return The last OS specific error code.
          *          The user is responsible for manually parsing this depending on platform. */
         int last_errno() const noexcept;
 
@@ -681,8 +736,8 @@ namespace rpp
         }
     #endif
         // Send a C++ string
-        template<class T> int send(const std::basic_string<T>& str) noexcept { 
-            return this->send(str.data(), static_cast<int>(sizeof(T) * str.size())); 
+        template<class T> int send(const std::basic_string<T>& str) noexcept {
+            return this->send(str.data(), static_cast<int>(sizeof(T) * str.size()));
         }
         // Send a string view
         int send(rpp::strview str) noexcept {
@@ -803,10 +858,10 @@ namespace rpp
          * Peek bytes from remote socket, return number of bytes peeked.
          * Automatically closes TCP socket during critical failure and returns -1
          * If there is no data to peek, this function returns 0
-         * 
+         *
          * If this socket::is_blocking(), then poll(0ms, PF_Read) will be used to
          * avoid blocking.
-         * 
+         *
          * @warning peek() is inherently not thread safe, so make sure you acquire lock
          *          during peek()+recv() operation, otherwise another thread could read
          *          the peeked datagram before you call recv().
@@ -836,7 +891,7 @@ namespace rpp
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
          */
         NOINLINE bool recv(std::vector<uint8_t>& outBuffer);
-        
+
         /**
          * UDP only. Peeks available() bytes, resizes outBuffer and reads a single packet into it
          * returns TRUE if outBuffer was written to, FALSE if no data or socket error
@@ -1006,7 +1061,7 @@ namespace rpp
         bool is_blocking() const noexcept;
 
         /**
-         * Configure socket settings: Nagle off (TCP_NODELAY) 
+         * Configure socket settings: Nagle off (TCP_NODELAY)
          * or on (Nagle bandwidth opt.)
          * @note This only applies for TCP sockets
          * @param enableNagle (FALSE = TCP_NODELAY, TRUE = Nagle enabled)
@@ -1018,7 +1073,7 @@ namespace rpp
         bool set_nodelay(bool nodelay) noexcept { return set_nagle(!nodelay); }
 
         /**
-         * @returns true if socket is set to nodelay: set_nagle(false);, 
+         * @returns true if socket is set to nodelay: set_nagle(false);,
          *          check socket::last_err() for error message
          */
         bool is_nodelay() const noexcept;
@@ -1154,9 +1209,9 @@ namespace rpp
 
         /**
          * @warning select() from two threads is inherently thread-unsafe - you have been warned!
-         * 
+         *
          * @warning SF_Write will not trigger on Windows sockets if send()/sendto() did not return SE_AGAIN (EWOULDBLOCK)
-         * 
+         *
          * @brief Tries to select this socket for conditions
          * Select suspends the thread until this Socket file descriptor is signaled
          * @param timeoutMillis The maximum time to wait for the socket to be signaled
@@ -1176,15 +1231,15 @@ namespace rpp
 
         /**
          * @warning poll() from two threads is inherently thread-unsafe - you have been warned!
-         * 
+         *
          * @brief Calls poll() or WSAPoll() on this socket
          * This is faster than select()
          * @warning After calling poll(), you MUST read all available data from the socket
          *          before calling poll again.
          *          poll() will only react if there is NEW data available
-         * 
+         *
          * @warning PF_Write will not trigger on Windows sockets if send()/sendto() did not return SE_AGAIN (EWOULDBLOCK)
-         * 
+         *
          * @param timeoutMillis Timeout in milliseconds to suspend until the socket is signaled
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
@@ -1208,8 +1263,8 @@ namespace rpp
         static int poll(const std::vector<socket*>& in, std::vector<int>& ready,
                         int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
     #endif
-        
-        /** 
+
+        /**
          * @brief Enables polling multiple sockets for READ/WRITE readiness
          * @param in Array of socket pointers to poll
          * @param inCount Number of sockets in the 'in' array
@@ -1302,11 +1357,11 @@ namespace rpp
         /**
          * Try accepting a new connection from THIS listening socket.
          * If a fatal error happens, and AutoClosing is enabled, this can close the socket.
-         * 
+         *
          * @param timeoutMillis if > 0, polls the socket until timeoutMillis is reached
          *                      if == 0, tests for a pending connection and returns immediately
          *                      if < 0, waits forever until a connection is established
-         * 
+         *
          * @return Invalid socket if there are no pending connections, otherwise a valid socket handle
          */
         socket accept(int timeoutMillis = 0) noexcept;
@@ -1371,6 +1426,66 @@ namespace rpp
          * Clears any previous bind_to_interface
          */
         void unbind_interface() noexcept;
+
+        ////////////////////////////////////////////////////////////////////////////
+        // AF_Unix (local) socket support
+        //
+        // AF_Unix sockets are message-oriented. Supported on Linux
+        // (SOCK_SEQPACKET in the abstract namespace -- no filesystem object,
+        // released by the kernel on close) and Windows (Win10 1803+, framed
+        // SOCK_STREAM: messages carry a 2-byte little-endian length prefix
+        // internally and names map to "%TEMP%\<name>.sock"). Other platforms are
+        // unsupported -- create(AF_Unix,...) fails with SE_SOCKFAMILY.
+        //
+        // The maximum message size is max_unix_message_size (65535 bytes); send()
+        // rejects larger messages on all platforms for uniformity. fd passing
+        // (send_fd / recv_fd) and pair() are Linux-only.
+        ////////////////////////////////////////////////////////////////////////////
+
+        /**
+         * @brief Creates a connected AF_Unix socket pair (e.g. for handing one
+         *        end to a forked child process). Linux only; returns false elsewhere.
+         *        Both sockets are configured autoclosing + non-blocking-capable.
+         * @return true on success, false otherwise (a, b left invalid).
+         */
+        static bool pair(socket& a, socket& b) noexcept;
+
+        /**
+         * @brief Creates an AF_Unix listening socket bound to a local name.
+         *        Mirrors the IP listen_to() static. Blocking by default.
+         * @param name Local socket name, e.g. "my-service"
+         * @param backlog Listen backlog (default 1)
+         * @param opt Socket options (SO_NonBlock / SO_Blocking etc.)
+         * @returns A valid listening socket, or an invalid socket on failure.
+         */
+        static socket listen_unix(strview name, int backlog = 1, socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Connects to an AF_Unix listener by name. Blocking connect.
+         *        Mirrors the IP connect_to() static.
+         * @param name Local socket name to connect to
+         * @param opt Socket options (SO_NonBlock / SO_Blocking etc.)
+         * @returns A valid connected socket, or an invalid socket on failure.
+         */
+        static socket connect_unix(strview name, socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Passes a file descriptor + a small tag via SCM_RIGHTS (Linux only).
+         *        Does not close `fd`. Only valid on AF_Unix sockets.
+         * @return true = delivered, false = would block (socket stays valid) or
+         *         peer gone (the socket self-closes if AutoClose); always false
+         *         on non-Linux platforms.
+         */
+        bool send_fd(uint32_t tag, int fd) noexcept;
+
+        /**
+         * @brief Counterpart to send_fd() (Linux only). Only valid on AF_Unix sockets.
+         * @return 1 = fd delivered (caller owns out_fd), 0 = nothing ready
+         *         (non-blocking mode) or a frame without an fd -- call again later,
+         *         -1 = EOF/error (the socket self-closes if AutoClose); always -1
+         *         on non-Linux platforms.
+         */
+        int recv_fd(uint32_t& out_tag, int& out_fd) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1412,6 +1527,18 @@ namespace rpp
      * @returns Network handle for the specified interface or std::nullopt if not found
      */
     std::optional<uint64_t> get_network_handle(const std::string& network_interface) noexcept;
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Blocks until one of the socket fds becomes readable, or timeout_ms elapses.
+     * Invalid (< 0) entries are skipped; returns immediately when none are valid.
+     * Takes any socket fd (not just unix sockets); at most 8 are waited on.
+     * Useful for fds received via socket::recv_fd().
+     * @param fds socket file descriptors to poll for readability
+     * @param timeout_ms max wait in milliseconds, negative blocks indefinitely
+     */
+    RPPAPI void wait_readable(std::initializer_list<int> fds, int timeout_ms) noexcept;
 
     ////////////////////////////////////////////////////////////////////////////////
 
