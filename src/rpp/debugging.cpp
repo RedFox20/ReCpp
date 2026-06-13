@@ -59,13 +59,13 @@ struct LogHandler
     void* context;
     rpp::LogMsgHandler handler;
 };
-static int NumLogHandlers;
+static std::atomic_int NumLogHandlers {0};
 static std::array<LogHandler, MAX_LOG_HANDLERS> LogHandlers;
 static LogExceptCallback ExceptHandler;
-static std::atomic<bool> DisableFunctionNames {false};
-static std::atomic<bool> EnableTimestamps {false};
-static std::atomic<bool> TimeOfDay {false};
-static std::atomic<int> TimePrecision {3};
+static std::atomic_bool DisableFunctionNames {false};
+static std::atomic_bool EnableTimestamps {false};
+static std::atomic_bool TimeOfDay {false};
+static std::atomic_int TimePrecision {3};
 #if RPP_CORTEX_M_ARCH
     // no 64-bit atomics on Cortex systems
     static rpp::int64 TimeOffset {0};
@@ -79,7 +79,8 @@ namespace rpp
 {
     static int index_of(const LogHandler& handler) noexcept
     {
-        for (int i = 0; i < NumLogHandlers; ++i)
+        int numHandlers = NumLogHandlers.load(std::memory_order_acquire);
+        for (int i = 0; i < numHandlers; ++i)
         {
             const LogHandler& h = LogHandlers[i];
             if (h.context == handler.context && h.handler == handler.handler)
@@ -90,7 +91,8 @@ namespace rpp
 
     static int index_of(LogMsgHandler handler_func) noexcept
     {
-        for (int i = 0; i < NumLogHandlers; ++i)
+        int numHandlers = NumLogHandlers.load(std::memory_order_acquire);
+        for (int i = 0; i < numHandlers; ++i)
             if (LogHandlers[i].handler == handler_func)
                 return i;
         return -1;
@@ -98,11 +100,13 @@ namespace rpp
 
     void add_log_handler(void* context, LogMsgHandler handler) noexcept
     {
-        if (NumLogHandlers < MAX_LOG_HANDLERS)
+        int numHandlers = NumLogHandlers.load(std::memory_order_acquire);
+        if (numHandlers < MAX_LOG_HANDLERS)
         {
             if (index_of({ context, handler }) == -1)
             {
-                LogHandlers[NumLogHandlers++] = { context, handler };
+                LogHandlers[numHandlers] = { context, handler };
+                ++NumLogHandlers; // publish the new handler count after storing the handler
             }
         }
     }
@@ -340,12 +344,13 @@ RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
         ShortFilePathMessage(ptr, len);
     #endif
 
-    if (int num_handlers = NumLogHandlers)
+    if (int num_handlers = NumLogHandlers.load(std::memory_order_acquire))
     {
         for (int i = 0; i < num_handlers; ++i)
         {
             auto& h = LogHandlers[i];
-            h.handler(h.context, severity, ptr, len);
+            if (h.handler)
+                h.handler(h.context, severity, ptr, len);
         }
     }
     else
@@ -359,12 +364,13 @@ RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len)
 {
     if (severity < Filter)
         return;
-    if (int num_handlers = NumLogHandlers)
+    if (int num_handlers = NumLogHandlers.load(std::memory_order_acquire))
     {
         for (int i = 0; i < num_handlers; ++i)
         {
             auto& h = LogHandlers[i];
-            h.handler(h.context, severity, message, len);
+            if (h.handler)
+                h.handler(h.context, severity, message, len);
         }
     }
     else
