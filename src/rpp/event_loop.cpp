@@ -116,6 +116,10 @@ namespace rpp
         }
 
         process_event(event);
+
+        // automatically clean up completed forks; exceptions go through except_handler
+        cleanup_forks();
+
         return true;
     }
 
@@ -201,6 +205,8 @@ namespace rpp
 
     void event_loop::cleanup_forks() noexcept
     {
+        if (fork_tasks.empty())
+            return;
         for (auto& task : fork_tasks)
         {
             if (task.done())
@@ -223,6 +229,8 @@ namespace rpp
 
     void event_loop::drain_forks()
     {
+        if (fork_tasks.empty())
+            return;
         for (auto& task : fork_tasks)
         {
             if (task.done())

@@ -344,6 +344,41 @@ namespace rpp
         void drain_forks();
 
         /**
+         * @brief Launches a fire-and-forget coroutine onto the loop from ANY thread.
+         *
+         * Like fork(), but callable off the owner thread: when invoked from another thread the
+         * launch is marshalled onto the owner thread (via post()) before the coroutine starts,
+         * so callers never have to be on the loop thread — and never have to hand-roll a
+         * post()+fork() pair. The coroutine is tracked exactly like fork(): drained by
+         * run_until_idle()/wait_on_all()/the destructor, with exceptions routed to except_handler.
+         *
+         * @param coro_factory invocable returning rpp::event_task; co_await loop.run_async(...)
+         *        inside it to do background work and resume on the owner thread.
+         * @code
+         *     loop.run_async_void([&]() -> rpp::event_task {   // may be called from a worker thread
+         *         bool ok = co_await loop.run_async([&]{ return blockingWork(); });
+         *         commit(ok);   // runs on the owner (loop) thread
+         *     });
+         * @endcode
+         */
+        template<typename CoroFactory>
+        void run_async_void(CoroFactory coro_factory) noexcept
+        {
+            if (rpp::get_thread_id() == owner_thread_id.load(std::memory_order_acquire))
+            {
+                fork(std::move(coro_factory)); // already on the owner thread: start immediately
+            }
+            else
+            {
+                // marshal onto the owner thread, then start the tracked coroutine there
+                post([this, coro_factory = std::move(coro_factory)]() mutable
+                {
+                    fork(std::move(coro_factory));
+                });
+            }
+        }
+
+        /**
          * @brief Posts a coroutine handle to be resumed on the event loop thread.
          * Thread-safe: can be called from any thread.
          */

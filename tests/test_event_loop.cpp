@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <thread>
 using namespace rpp;
 using namespace std::chrono_literals;
 
@@ -1063,6 +1064,52 @@ TestImpl(test_event_loop)
         // let the slow fork complete so we don't leak background work
         // run_until_idle() automatically cleans up completed forks
         idle();
+    }
+
+    // ─── run_async_void: launch a one-shot coroutine from ANY thread ──────────
+    // Off the owner thread the launch is marshalled (post) before the coroutine starts, so
+    // the caller need not be on the loop thread; the coroutine still resumes on the loop thread.
+    TestCase(run_async_void_from_background_thread)
+    {
+        std::atomic_bool done { false };
+        std::atomic<uint64> launch_tid { 0 };
+        std::atomic<uint64> resume_tid { 0 };
+
+        std::thread launcher([&]
+        {
+            launch_tid = rpp::get_thread_id();
+            loop->run_async_void([&]() -> rpp::event_task
+            {
+                co_await loop->run_async([] { rpp::sleep_ms(1); });
+                resume_tid = rpp::get_thread_id();
+                done = true;
+            });
+        });
+        launcher.join();
+
+        AssertNotEqual(launch_tid.load(), main_tid); // launched off the owner thread
+
+        // drive the loop on the owner thread; run_until_idle waits for the background work
+        idle();
+
+        AssertThat(done.load(), true);
+        AssertThat(resume_tid.load(), main_tid); // coroutine resumed on the owner thread
+    }
+
+    // run_async_void called on the owner thread forks immediately (no marshalling).
+    TestCase(run_async_void_on_owner_thread)
+    {
+        std::atomic_bool done { false };
+        std::atomic<uint64> resume_tid { 0 };
+        loop->run_async_void([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([] { rpp::sleep_ms(1); });
+            resume_tid = rpp::get_thread_id();
+            done = true;
+        });
+        idle();
+        AssertThat(done.load(), true);
+        AssertThat(resume_tid.load(), main_tid);
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
