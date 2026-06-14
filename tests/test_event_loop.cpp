@@ -1112,6 +1112,30 @@ TestImpl(test_event_loop)
         AssertThat(resume_tid.load(), main_tid);
     }
 
+    // ─── warpable clock: delay() tracks an AtomicTimeSource so warp_forward releases it ──
+    // A 10-virtual-second delay can only complete within a 2s wall budget if warp_forward()
+    // advanced the loop's clock past the deadline.
+    TestCase(delay_is_released_by_time_warp)
+    {
+        rpp::AtomicTimeSource clock;
+        rpp::event_loop warp_loop(main_tid, nullptr, &clock);
+
+        std::atomic_bool done { false };
+        warp_loop.fork([&]() -> rpp::event_task
+        {
+            co_await warp_loop.delay(rpp::seconds(10)); // 10 *virtual* seconds
+            done = true;
+        });
+
+        clock.warp_forward(rpp::seconds(10)); // advance virtual time past the deadline
+
+        rpp::Timer wall;
+        while (!done.load() && wall.elapsed_ms() < 2000)
+            warp_loop.run_once(rpp::millis(5));
+
+        AssertThat(done.load(), true);
+    }
+
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
 #endif // RPP_HAS_COROUTINES

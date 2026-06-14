@@ -10,9 +10,11 @@
 namespace rpp
 {
     event_loop::event_loop(rpp::uint64 main_thr_id,
-                           rpp::thread_pool* background_task_pool) noexcept
+                           rpp::thread_pool* background_task_pool,
+                           rpp::AtomicTimeSource* warpable_clock) noexcept
         : owner_thread_id{main_thr_id ? main_thr_id : rpp::get_thread_id()}
         , background_pool{background_task_pool ? *background_task_pool : rpp::thread_pool::global()}
+        , time_source{warpable_clock}
     {
     }
 

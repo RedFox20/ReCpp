@@ -14,6 +14,7 @@
 #include "concurrent_queue.h"
 #include "collections.h" // rpp::erase_if
 #include "timer.h"
+#include "atomic_timepoint.h" // rpp::AtomicTimeSource (optional warpable clock)
 #include "threads.h"
 #include "debugging.h"
 #include <atomic>
@@ -163,6 +164,10 @@ namespace rpp
 
         rpp::thread_pool& background_pool;
 
+        // optional warpable clock: when set, delay()/delay_until() track this source's
+        // virtual time so warp_forward() can advance a pending wait. Null = wall clock.
+        rpp::AtomicTimeSource* time_source = nullptr;
+
         // thread-safe FIFO queue of resume events
         rpp::concurrent_queue<resume_event> resume_queue;
 
@@ -182,9 +187,24 @@ namespace rpp
          *                             If null, then global thread pool is used.
          */
         event_loop(rpp::uint64 main_thr_id = 0/*0=rpp::get_thread_id()*/,
-                   rpp::thread_pool* background_task_pool = nullptr) noexcept;
+                   rpp::thread_pool* background_task_pool = nullptr,
+                   rpp::AtomicTimeSource* warpable_clock = nullptr) noexcept;
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
+
+        /**
+         * @brief Attaches a warpable clock used by delay()/delay_until(). When set, a pending
+         *        delay tracks this source's virtual time, so warp_forward() advances the wait.
+         *        Pass null to revert to wall-clock timing.
+         */
+        void set_time_source(rpp::AtomicTimeSource* clock) noexcept { time_source = clock; }
+
+        /** @returns the loop's current time: the warpable clock's virtual time if attached,
+         *           otherwise the monotonic wall clock. */
+        rpp::TimePoint current_time() const noexcept
+        {
+            return time_source ? time_source->time_now() : rpp::TimePoint::monotonic_now();
+        }
 
         /** @returns true if there are background tasks currently in progress */
         bool has_background_tasks() const noexcept { return num_background_suspended.load(std::memory_order_acquire) > 0; }
@@ -641,15 +661,24 @@ namespace rpp
         struct delay_awaiter
         {
             event_loop& loop;
-            rpp::TimePoint end;
+            rpp::TimePoint end; // deadline on the loop's clock (virtual if a time source is attached)
             delay_awaiter(event_loop& loop, rpp::TimePoint tp) noexcept : loop{loop}, end{tp} {}
-            delay_awaiter(event_loop& loop, rpp::Duration d) noexcept : loop{loop}, end{rpp::TimePoint::monotonic_now() + d} {}
-            bool await_ready() const noexcept { return rpp::TimePoint::monotonic_now() >= end; }
+            delay_awaiter(event_loop& loop, rpp::Duration d) noexcept : loop{loop}, end{loop.current_time() + d} {}
+            bool await_ready() const noexcept { return loop.current_time() >= end; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 loop.start_in_background([this, cont]() mutable
                 {
-                    rpp::sleep_until(end);
+                    if (loop.time_source)
+                    {
+                        // warpable clock: poll so warp_forward() can release the wait early
+                        while (loop.current_time() < end)
+                            rpp::sleep_ms(1); // wall-clock poll step
+                    }
+                    else
+                    {
+                        rpp::sleep_until(end); // wall clock: one efficient sleep
+                    }
                     loop.post_resume_from_suspension(cont);
                 });
             }
