@@ -312,16 +312,17 @@ namespace rpp
          * @returns true if `fut` became ready within `timeout`; false on timeout (never blocks past it).
          */
         template<typename T>
-        bool pump_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15)) noexcept
+        bool pump_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15))
         {
             rpp::TimePoint end = current_time() + timeout;
-            while (fut.valid() && !fut.await_ready())
+            while (fut.valid() && fut.wait_for(rpp::Duration::zero()) == std::future_status::timeout)
             {
                 if (current_time() >= end)
                     return false;
                 run_once(rpp::millis(5)); // block-wait briefly for the next continuation, then run it
             }
-            return fut.valid() && fut.await_ready();
+            // if the future is deferred, .get() needs to be called to trigger the continuation
+            return fut.valid() && fut.wait_for(rpp::Duration::zero()) != std::future_status::timeout;
         }
 
         /**
