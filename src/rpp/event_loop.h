@@ -173,6 +173,7 @@ namespace rpp
 
         // user-provided exception handler for any unhandled exceptions from background tasks
         rpp::delegate<void(std::exception_ptr)> except_handler {};
+        rpp::delegate<void(std::exception)> std_except_handler {};
 
         // fork tracking: stores event_tasks for forked coroutines
         std::vector<event_task> fork_tasks;
@@ -242,6 +243,12 @@ namespace rpp
          */
         void set_except_handler(rpp::delegate<void(std::exception_ptr)> handler) noexcept
         { except_handler = std::move(handler); }
+        /**
+         * @brief Directly collects only std::exception derived exceptions, 
+         *        to simplify error handling for common cases.
+         */
+        void set_std_except_handler(rpp::delegate<void(std::exception)> handler) noexcept
+        { std_except_handler = std::move(handler); }
 
         /**
          * @brief Runs the event loop until stop() is called and all pending tasks are completed.
@@ -261,6 +268,14 @@ namespace rpp
          * @returns true if a resume was processed, false if timed out
          */
         bool run_once(rpp::Duration timeout) noexcept;
+
+        /**
+         * @brief Processes all pending resume events that are ready to run.
+         *        Equivalent to while (loop.run_once(Duration::zero())) {} but more efficient.
+         *        Does not block wait for new events.
+         * @returns true if at least one resume was processed, false if no ready resumes were found
+         */
+        bool run_all_ready() noexcept;
 
         /**
          * @brief Runs the event loop until there are no more background tasks and no more resume events.
@@ -527,11 +542,12 @@ namespace rpp
 
             bool await_ready() const noexcept
             {
-                return fut.valid() && fut.wait_for(std::chrono::microseconds{0}) != std::future_status::timeout;
+                return false; // always suspend; a ready future would otherwise resume inline off-loop
             }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                if (!fut.valid())
+                // already resolved (ready or invalid): hop to the loop thread, no worker needed
+                if (!fut.valid() || fut.wait_for(std::chrono::microseconds{0}) != std::future_status::timeout)
                 {
                     // nothing to wait on; resume immediately on loop thread
                     loop.post_resume(cont);
@@ -777,6 +793,18 @@ namespace rpp
         {
             return join_forks_awaiter{ *this, timeout };
         }
+
+        /** @brief A minimal resume-on-main-thread awaiter for coroutines */
+        struct RPP_CORO_RETURN_TYPE resume_awaiter
+        {
+            event_loop& loop;
+            bool await_ready() const noexcept { return false; } // never inline
+            void await_suspend(rpp::coro_handle<> cont) noexcept { loop.post_resume(cont); }
+            void await_resume() const noexcept {}
+        };
+
+        /** @brief co_await this to unconditionally reschedule the coroutine onto the loop thread. */
+        RPP_CORO_WRAPPER resume_awaiter resume_on_loop() noexcept { return resume_awaiter{ *this }; }
 
     private:
 

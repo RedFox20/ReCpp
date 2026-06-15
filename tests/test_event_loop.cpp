@@ -1136,6 +1136,74 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // ─── Helper: launch a coroutine OFF the loop thread ─────────
+    // Runs `make_coro` (a factory returning rpp::cfuture<void>) on a fresh
+    // background thread, so the coroutine's synchronous prefix (up to its first
+    // co_await) executes OFF the loop thread. Then drives the loop on this
+    // (owner) thread until the coroutine completes, bounded by a 2s wall budget
+    // so a regression fails instead of hanging. Returns the launcher thread id.
+    template <class MakeCoro>
+    uint64 start_coro_on_background_thread(MakeCoro make_coro)
+    {
+        std::atomic<uint64> launcher_tid{0};
+        rpp::cfuture<void> fut = rpp::async_task(
+            [&]() -> rpp::cfuture<void>
+            {
+                launcher_tid = rpp::get_thread_id();
+                return make_coro(); // start the coroutine here, off the loop thread
+            }
+        ).get();
+
+        rpp::Timer wall;
+        while (!fut.await_ready() && wall.elapsed_ms() < 2000)
+            loop->run_once(rpp::millis(5));
+
+        fut.get(); // ready in the success path; rethrows any coroutine exception
+        return launcher_tid.load();
+    }
+
+    // awaiting an ALREADY-READY future must still
+    // hop onto the loop thread, never resume inline on the caller.
+    TestCase(ready_future_await_resumes_on_loop_not_caller)
+    {
+        std::atomic<uint64> resume_tid{0};
+        uint64 launcher = start_coro_on_background_thread(
+            [&]() -> rpp::cfuture<void>
+            {
+                // make_ready_future is resolved before the await even begins
+                co_await loop->run_async(rpp::make_ready_future(42));
+                resume_tid = rpp::get_thread_id();
+            });
+        AssertNotEqual(launcher, main_tid); // sanity: coroutine really started off the loop
+        AssertThat(resume_tid.load(), main_tid); // resumed on the loop thread, not the caller
+    }
+
+    // resume_on_loop() unconditionally reschedules onto the loop thread,
+    // even when the coroutine is currently running off the loop.
+    TestCase(resume_on_loop_hops_to_loop_thread)
+    {
+        std::atomic<uint64> resume_tid{0};
+        uint64 launcher = start_coro_on_background_thread(
+            [&]() -> rpp::cfuture<void>
+            {
+                co_await loop->resume_on_loop();
+                resume_tid = rpp::get_thread_id();
+            });
+        AssertNotEqual(launcher, main_tid);
+        AssertThat(resume_tid.load(), main_tid);
+    }
+
+    // resume_on_loop() while ALREADY on the loop thread: still valid, no
+    // deadlock, and stays on the loop thread across repeated hops.
+    TestCaseCoro(resume_on_loop_when_already_on_loop)
+    {
+        assert_on_main_thread();
+        co_await loop->resume_on_loop();
+        assert_on_main_thread();
+        co_await loop->resume_on_loop();
+        assert_on_main_thread();
+    }
+
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
 #endif // RPP_HAS_COROUTINES

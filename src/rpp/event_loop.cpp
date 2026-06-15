@@ -36,7 +36,6 @@ namespace rpp
             // do not terminate here (except via DEBUG __assertion_failure), just try to exit gracefully
         }
 
-        // clean up completed forks; exceptions go through except_handler
         cleanup_forks();
 
         if (num_forks() > 0)
@@ -96,10 +95,7 @@ namespace rpp
 
         // expect to finish in reasonable time after stop() is called
         bool all_done = wait_on_all(rpp::millis(500));
-
-        // automatically clean up completed forks; exceptions go through except_handler
         cleanup_forks();
-
         return all_done;
     }
 
@@ -118,11 +114,22 @@ namespace rpp
         }
 
         process_event(event);
-
-        // automatically clean up completed forks; exceptions go through except_handler
         cleanup_forks();
-
         return true;
+    }
+
+    bool event_loop::run_all_ready() noexcept
+    {
+        bool processed = false;
+        resume_event event;
+        while (resume_queue.try_pop(event))
+        {
+            process_event(event);
+            processed = true;
+        }
+
+        cleanup_forks();
+        return processed;
     }
 
     int event_loop::run_until_idle() noexcept
@@ -153,10 +160,7 @@ namespace rpp
             if (!has_pending_work())
                 break; // truly idle: no pending tasks and no queued resumes
         }
-
-        // automatically clean up completed forks; exceptions go through except_handler
         cleanup_forks();
-
         return processed_count;
     }
 
@@ -205,6 +209,7 @@ namespace rpp
         }
     }
 
+    // automatically clean up completed forks; exceptions go through except_handler
     void event_loop::cleanup_forks() noexcept
     {
         if (fork_tasks.empty())
@@ -251,7 +256,8 @@ namespace rpp
             }
             catch (const std::exception& ex)
             {
-                if (except_handler) except_handler(std::current_exception());
+                if (std_except_handler) std_except_handler(ex);
+                else if (except_handler) except_handler(std::current_exception());
                 else LogWarning("event_loop unhandled exception from coroutine: %s", ex.what());
             }
             catch (...)
@@ -268,7 +274,8 @@ namespace rpp
             }
             catch (const std::exception& ex)
             {
-                if (except_handler) except_handler(std::current_exception());
+                if (std_except_handler) std_except_handler(ex);
+                else if (except_handler) except_handler(std::current_exception());
                 else LogWarning("event_loop unhandled exception from delegate: %s", ex.what());
             }
             catch (...)

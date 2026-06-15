@@ -1443,43 +1443,44 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Class | Description |
 |-------|-------------|
-| [`event_loop`](src/rpp/event_loop.h#L138) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
-| [`event_task`](src/rpp/event_loop.h#L48) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
+| [`event_loop`](src/rpp/event_loop.h#L139) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
+| [`event_task`](src/rpp/event_loop.h#L49) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
 
 ### event_loop Methods
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L234) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L243) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
-| [`run_until_idle()`](src/rpp/event_loop.h#L251) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L263) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L532) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L292) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L712) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L336) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L344) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L563) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L577) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L591) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L358) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L350) | Post a raw coroutine handle resume to the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L631) | Sleep on a background thread, resume on the loop thread |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L635) | Sleep until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L210) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L217) | Block until all pending work drains, with timeout |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L223) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L202) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L193) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L199) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L205) | Thread ID of the loop's owner thread |
+| [`run_loop()`](src/rpp/event_loop.h#L261) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L270) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
+| [`run_until_idle()`](src/rpp/event_loop.h#L286) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L298) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L603) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L327) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L792) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L371) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L379) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L634) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L648) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L662) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L428) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L420) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L807) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L711) | Sleep on a background thread, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L715) | Sleep until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L231) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L238) | Block until all pending work drains, with timeout |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L244) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L223) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L214) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L220) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L226) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
 | Method | Description |
 |--------|-------------|
-| [`done()`](src/rpp/event_loop.h#L89) | True if the coroutine has finished or was never started |
-| [`rethrow_if_exception()`](src/rpp/event_loop.h#L92) | Rethrow any unhandled exception captured by the coroutine |
+| [`done()`](src/rpp/event_loop.h#L90) | True if the coroutine has finished or was never started |
+| [`rethrow_if_exception()`](src/rpp/event_loop.h#L93) | Rethrow any unhandled exception captured by the coroutine |
 | `on_complete` | Optional completion callback in `promise_type`, called at `final_suspend` (used by `fork()`) |
 
 ### event_loop Example
@@ -1934,31 +1935,31 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 
 | Method | Description |
 |--------|-------------|
-| [`close()`](src/rpp/sockets.h#L550) | Close the socket |
-| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L661) | Send data |
-| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L785) | Receive data |
-| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L697) | UDP send to address |
-| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L815) | UDP receive with source address |
-| [`flush()`](src/rpp/sockets.h#L735) | Flush pending data |
-| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L808) | Peek at incoming data without consuming |
-| [`skip(int bytes)`](src/rpp/sockets.h#L758) | Skip incoming bytes |
-| [`available()`](src/rpp/sockets.h#L769) | Bytes available to read |
-| [`select(int millis)`](src/rpp/sockets.h#L1158) | Wait for socket readability |
-| [`good()`](src/rpp/sockets.h#L569) / [`bad()`](src/rpp/sockets.h#L571) | Socket state |
-| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1007) | Enable/disable Nagle's algorithm |
+| [`close()`](src/rpp/sockets.h#L556) | Close the socket |
+| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L667) | Send data |
+| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L791) | Receive data |
+| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L703) | UDP send to address |
+| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L821) | UDP receive with source address |
+| [`flush()`](src/rpp/sockets.h#L741) | Flush pending data |
+| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L814) | Peek at incoming data without consuming |
+| [`skip(int bytes)`](src/rpp/sockets.h#L764) | Skip incoming bytes |
+| [`available()`](src/rpp/sockets.h#L775) | Bytes available to read |
+| [`select(int millis)`](src/rpp/sockets.h#L1166) | Wait for socket readability |
+| [`good()`](src/rpp/sockets.h#L575) / [`bad()`](src/rpp/sockets.h#L577) | Socket state |
+| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1015) | Enable/disable Nagle's algorithm |
 
 ### socket Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1251) | Create a listening server socket |
-| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1260) | Create a listening server socket |
-| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1304) | Accept an incoming connection |
-| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1312) | Connect to an address |
-| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1335) | Connect by hostname and port |
+| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1259) | Create a listening server socket |
+| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1268) | Create a listening server socket |
+| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1312) | Accept an incoming connection |
+| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1320) | Connect to an address |
+| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1343) | Connect by hostname and port |
 | [`protocol_info`](src/rpp/sockets.h#L86) | Describes socket protocol version, address family, type and protocol |
-| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1374) | Creates an INADDR_ANY UDP socket bound to a random port |
-| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1380) | Creates an INADDR_ANY TCP listener bound to a random port |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1382) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1388) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 
@@ -3983,32 +3984,32 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 
 | Function | Description |
 |----------|-------------|
-| [`writeBEU16(out, value)`](src/rpp/endian.h#L54) | Write 16-bit big-endian |
-| [`writeBEU32(out, value)`](src/rpp/endian.h#L61) | Write 32-bit big-endian |
+| [`writeBEU16(out, value)`](src/rpp/endian.h#L58) | Write 16-bit big-endian |
+| [`writeBEU32(out, value)`](src/rpp/endian.h#L64) | Write 32-bit big-endian |
 | [`writeBEU64(out, value)`](src/rpp/endian.h#L70) | Write 64-bit big-endian |
-| [`readBEU16(in)`](src/rpp/endian.h#L83) | Read 16-bit big-endian |
-| [`readBEU32(in)`](src/rpp/endian.h#L89) | Read 32-bit big-endian |
-| [`readBEU64(in)`](src/rpp/endian.h#L95) | Read 64-bit big-endian |
+| [`readBEU16(in)`](src/rpp/endian.h#L76) | Read 16-bit big-endian |
+| [`readBEU32(in)`](src/rpp/endian.h#L83) | Read 32-bit big-endian |
+| [`readBEU64(in)`](src/rpp/endian.h#L90) | Read 64-bit big-endian |
 
 ### Little-Endian
 
 | Function | Description |
 |----------|-------------|
-| [`writeLEU16(out, value)`](src/rpp/endian.h#L106) | Write 16-bit little-endian |
-| [`writeLEU32(out, value)`](src/rpp/endian.h#L113) | Write 32-bit little-endian |
-| [`writeLEU64(out, value)`](src/rpp/endian.h#L122) | Write 64-bit little-endian |
-| [`readLEU16(in)`](src/rpp/endian.h#L135) | Read 16-bit little-endian |
-| [`readLEU32(in)`](src/rpp/endian.h#L141) | Read 32-bit little-endian |
-| [`readLEU64(in)`](src/rpp/endian.h#L147) | Read 64-bit little-endian |
-| [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L17) | Platform-specific 16-bit byte swap |
-| [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L18) | Platform-specific 32-bit byte swap |
-| [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L19) | Platform-specific 64-bit byte swap |
-| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L27) | Convert 16-bit value to big-endian byte order |
-| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L28) | Convert 32-bit value to big-endian byte order |
-| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L29) | Convert 64-bit value to big-endian byte order |
-| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L30) | Convert 16-bit value to little-endian byte order |
-| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L31) | Convert 32-bit value to little-endian byte order |
-| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L32) | Convert 64-bit value to little-endian byte order |
+| [`writeLEU16(out, value)`](src/rpp/endian.h#L101) | Write 16-bit little-endian |
+| [`writeLEU32(out, value)`](src/rpp/endian.h#L107) | Write 32-bit little-endian |
+| [`writeLEU64(out, value)`](src/rpp/endian.h#L113) | Write 64-bit little-endian |
+| [`readLEU16(in)`](src/rpp/endian.h#L119) | Read 16-bit little-endian |
+| [`readLEU32(in)`](src/rpp/endian.h#L126) | Read 32-bit little-endian |
+| [`readLEU64(in)`](src/rpp/endian.h#L133) | Read 64-bit little-endian |
+| [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L18) | Platform-specific 16-bit byte swap |
+| [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L19) | Platform-specific 32-bit byte swap |
+| [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L20) | Platform-specific 64-bit byte swap |
+| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L30) | Convert 16-bit value to big-endian byte order |
+| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L31) | Convert 32-bit value to big-endian byte order |
+| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L32) | Convert 64-bit value to big-endian byte order |
+| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L33) | Convert 16-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L34) | Convert 32-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L35) | Convert 64-bit value to little-endian byte order |
 
 ### Example: Big-Endian & Little-Endian Read/Write
 
