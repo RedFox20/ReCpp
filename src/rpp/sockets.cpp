@@ -1604,6 +1604,9 @@ namespace rpp
         // recv on the socket.
         std::unique_lock lock1 = rpp::spin_lock(Mtx);
         int sock = os_handle_unsafe();
+        rpp::socket_type stype = Type;
+        rpp::socket_category cat = Category;
+        bool was_connected = Connected;
         if (lock1.owns_lock())
             lock1.unlock(); // suppress warning
         if (sock == INVALID)
@@ -1617,26 +1620,26 @@ namespace rpp
             {
                 // After some of the errors socket might still be considered valid,
                 // but the connection is lost
-                return Connected;
+                return was_connected;
             }
             return false; // it was a fatal error
         }
 
-        if (Type == ST_Datagram)
+        if (stype == ST_Datagram)
             return true; // UDP is always connected (no connection state to check)
 
-        if (Category == SC_Listen)
+        if (cat == SC_Listen)
             return true; // Listening sockets are always connected
 
         // Checking for connection status only makes sense for connection oriented sockets.
         // This only applies for Accepted or Client sockets.
         // To check if a TCP socket is still connected we use a nonblocking read.
         // In the case of Blocking sockets, an additional poll() is done.
-        if (Category == SC_Accept || Category == SC_Client) // Accept & Client implies TCP
+        if (cat == SC_Accept || cat == SC_Client) // Accept & Client implies TCP
         {
             // if it was already marked as disconnected, it cannot recover again
             // without a new connection being made
-            if (!Connected)
+            if (!was_connected)
                 return false;
 
             // if the socket is blocking, then MSG_PEEK can cause a blocking operation.
@@ -1658,7 +1661,7 @@ namespace rpp
                 handle_txres(::recv(sock, &c, 1, MSG_PEEK));
             }
             // if poll doesn't trigger, we rely on the Connected flag
-            return Connected;
+            return was_connected;
         }
 
         // an unknown socket category, assume it's NOT connection oriented
