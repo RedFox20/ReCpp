@@ -1204,6 +1204,45 @@ TestImpl(test_event_loop)
         assert_on_main_thread();
     }
 
+    // ─── run_until_ready: drive a future to completion FROM the owner thread ─────
+    // without a blocking get() — the continuation resumes on this thread, so we pump.
+    TestCase(run_until_ready_pumps_future_on_owner_thread)
+    {
+        rpp::cfuture<int> fut = [&]() -> rpp::cfuture<int>
+        {
+            int v = co_await loop->run_async([] { rpp::sleep_ms(5); return 7; });
+            co_return v * 6;
+        }();
+        int result = loop->run_until_ready(fut);
+        AssertThat(result, 42);
+    }
+
+    // pump_until_ready returns false on timeout instead of blocking on get().
+    TestCase(pump_until_ready_times_out_without_blocking)
+    {
+        rpp::cfuture<int> fut = [&]() -> rpp::cfuture<int>
+        {
+            co_await loop->run_async([] { rpp::sleep_ms(200); return 1; });
+            co_return 1;
+        }();
+        rpp::Timer wall;
+        bool ready = loop->pump_until_ready(fut, rpp::millis(20));
+        AssertThat(ready, false);              // 200ms work can't finish in a 20ms budget
+        AssertLess(wall.elapsed_ms(), 2000.0); // returned promptly — did NOT block on get()
+        loop->run_until_ready(fut);            // drain so the coroutine frame completes cleanly
+    }
+
+    // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).
+    TestCase(ensure_on_owner_thread_detects_off_thread)
+    {
+        AssertThat(loop->ensure_on_owner_thread(), true); // we are the owner thread
+
+        bool off_thread = true;
+        std::thread t{[&] { off_thread = loop->ensure_on_owner_thread(); }};
+        t.join();
+        AssertThat(off_thread, false); // ran on a different thread (one expected error log above)
+    }
+
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
 #endif // RPP_HAS_COROUTINES

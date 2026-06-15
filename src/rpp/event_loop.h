@@ -21,6 +21,8 @@
 #include <memory>
 #include <optional>
 #include <type_traits>
+#include <source_location>
+#include <stdexcept>
 
 #if RPP_HAS_COROUTINES
 
@@ -296,6 +298,51 @@ namespace rpp
          * @endcode
          */
         void run_until_done(event_task& task);
+
+        /**
+         * @brief Pumps THIS loop on its owner thread until `fut` is ready or `timeout` elapses.
+         *
+         * Use this to obtain an async result on the loop's OWN thread without deadlocking: the
+         * awaited continuation resumes on this very thread, so a blocking `fut.get()` here would
+         * wait for work only this thread can run. Pumping drives just enough of the loop to settle
+         * `fut` (and whatever it depends on) — it does NOT drain the whole loop, so unrelated work
+         * and other components' tasks are left running.
+         *
+         * @warning Must be called on the loop's owner thread.
+         * @returns true if `fut` became ready within `timeout`; false on timeout (never blocks past it).
+         */
+        template<typename T>
+        bool pump_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15)) noexcept
+        {
+            rpp::TimePoint end = current_time() + timeout;
+            while (fut.valid() && !fut.await_ready())
+            {
+                if (current_time() >= end)
+                    return false;
+                run_once(rpp::millis(5)); // block-wait briefly for the next continuation, then run it
+            }
+            return fut.valid() && fut.await_ready();
+        }
+
+        /**
+         * @brief Pumps the loop until `fut` is ready (see pump_until_ready), then returns its value.
+         * @throws std::runtime_error if `fut` does not become ready within `timeout` (never blocks).
+         */
+        template<typename T>
+        T run_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15))
+        {
+            if (!pump_until_ready(fut, timeout))
+                throw std::runtime_error("event_loop::run_until_ready timed out");
+            return fut.get();
+        }
+
+        /**
+         * @brief Verifies the caller is running on this loop's owner thread; logs an error at the
+         *        caller's source location if not. A debugging aid for confirming a coroutine
+         *        continuation resumed on the expected loop thread (the common async edge-case bug).
+         * @returns true if on the owner thread, false otherwise.
+         */
+        bool ensure_on_owner_thread(std::source_location loc = std::source_location::current()) const noexcept;
 
     private:
         // forward declarations for fork API (used by fork() template)
@@ -746,10 +793,20 @@ namespace rpp
                 // start timeout timer if finite
                 if (timeout < rpp::seconds(86400))
                 {
-                    rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + timeout;
+                    rpp::TimePoint deadline = loop.current_time() + timeout;
                     loop.start_in_background([&loop=loop, cont, deadline]() mutable // mutable because of `cont.resume()`
                     {
-                        rpp::sleep_until(deadline);
+                        if (loop.time_source)
+                        {
+                            // warpable clock: poll so warp_forward() can release the wait early
+                            while (loop.current_time() < deadline)
+                                rpp::sleep_ms(1); // wall-clock poll step
+                        }
+                        else
+                        {
+                            rpp::sleep_until(deadline); // wall clock: one efficient sleep
+                        }
+
                         // post callback to event loop thread for thread-safe joiner check
                         loop.resume_queue.push(resume_event{rpp::delegate<void()>{
                             [&loop=loop, cont]() mutable // mutable because of `cont.resume()`
