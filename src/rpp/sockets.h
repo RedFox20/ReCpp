@@ -18,6 +18,25 @@
 #  include <span>
 #endif
 
+// AF_Unix message sockets: Windows (framed SOCK_STREAM) and Linux
+// (SOCK_SEQPACKET in the abstract namespace). Everything else fails cleanly.
+#ifndef RPP_UNIX_SOCKET_SUPPORTED
+#  if _WIN32 || defined(__linux__)
+#    define RPP_UNIX_SOCKET_SUPPORTED 1
+#  else
+#    define RPP_UNIX_SOCKET_SUPPORTED 0
+#  endif
+#endif
+
+// Windows AF_Unix is stream-only, so messages need software framing dispatched
+// through the full send()/recv() overload set. We gate a small virtual layer on
+// Windows only; POSIX sockets stay non-virtual with zero per-instance overhead.
+#if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+#  define RPP_AFUNIX_VIRTUAL virtual
+#else
+#  define RPP_AFUNIX_VIRTUAL
+#endif
+
 namespace rpp
 {
     enum RPPAPI address_family : uint8_t
@@ -120,7 +139,6 @@ namespace rpp
                 unsigned long FlowInfo;
                 unsigned long ScopeId; // The network prefix for IPv6
             };
-            char UnixName[64];
         };
 
         raw_address() noexcept; // memset 0 raw_address
@@ -146,18 +164,11 @@ namespace rpp
         /** @returns true if this raw_address is IPv6 */
         bool is_ipv6() const noexcept { return Family == AF_IPv6; }
 
-        /** @returns true if this raw_address is an AF_Unix local socket name */
+        /** @returns true if this raw_address is an AF_Unix */
         bool is_unix() const noexcept { return Family == AF_Unix; }
 
         /** @returns IPv4 address as a 32-bit integer */
         uint32_t ipv4_address() const noexcept { return Addr4; }
-
-        /**
-         * @brief Constructs an AF_Unix raw_address carrying the given local socket name.
-         * Names with length >= 64 (including NUL) are rejected and yield an empty
-         * (AF_DontCare) address rather than being truncated.
-         */
-        static raw_address from_unix_name(strview name) noexcept;
 
         /** Resets this raw_address to a default state */
         void reset() noexcept;
@@ -300,18 +311,9 @@ namespace rpp
          */
         explicit ipaddress(int socket) noexcept;
 
-        /**
-         * @brief Creates an AF_Unix ipaddress carrying a local socket name.
-         * Unix addresses have no port. Names too long to fit (>= 64 chars incl NUL)
-         * produce an empty (invalid) address.
-         * @param name Local socket name, e.g. "my-service"
-         */
-        static ipaddress unix_addr(strview name) noexcept
+        static ipaddress unix_addr() noexcept
         {
-            ipaddress ip;
-            ip.Address = raw_address::from_unix_name(name);
-            ip.Port = 0;
-            return ip;
+            return ipaddress{AF_Unix, 0};
         }
 
         /**
@@ -361,15 +363,15 @@ namespace rpp
         /**
          * @returns true if this address is not even a listener port, but just an uninitialized struct
          */
-        bool is_empty() const noexcept { return Port == 0; }
+        bool is_empty() const noexcept { return Address.Family != AF_Unix && Port == 0; }
 
         /**
          * @returns true if this address has at least a listener port
-         *          (or, for AF_Unix, a non-empty local socket name)
+         *          (or, for AF_Unix, the family marker is set)
          **/
         bool is_valid() const noexcept
         {
-            if (Address.Family == AF_Unix) return Address.UnixName[0] != '\0';
+            if (Address.Family == AF_Unix) return true;
             return Address.Family && Port != 0;
         }
         explicit operator bool() const noexcept { return is_valid(); }
@@ -509,10 +511,6 @@ namespace rpp
      * On Windows, two threads calling send() at the same time is unsafe
      *    - Calling select()/poll() from two threads is unsafe
      */
-    // Windows-only AF_UNIX stream-to-message framing state (pimpl).
-    // Defined in sockets.cpp; only allocated for AF_Unix sockets on _WIN32.
-    struct unix_framing;
-
     class RPPAPI socket
     {
     public:
@@ -524,7 +522,7 @@ namespace rpp
          * The Windows framing layer uses a 16-bit length prefix, so messages
          * larger than this are rejected on all platforms for uniformity.
          */
-        static constexpr int max_unix_message_size = 65535;
+        static constexpr int MAX_UNIX_MESSAGE_SIZE = 65535;
 
         // if true, Socket is shared and dtor won't call closesocket()
         static constexpr bool DEFAULT_SHARED = false;
@@ -555,9 +553,6 @@ namespace rpp
         bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
-        // AF_Unix stream-to-message framing state, lazily allocated only for
-        // AF_Unix sockets on Windows (null on POSIX and for all IP sockets).
-        std::unique_ptr<unix_framing> Framing;
 
     public:
 
@@ -583,7 +578,7 @@ namespace rpp
 
         /* Creates a default socket object */
         socket() noexcept;
-        ~socket() noexcept;
+        RPP_AFUNIX_VIRTUAL ~socket() noexcept;
         socket(socket&& s) noexcept;             // move construct allowed
         socket& operator=(socket&& s) noexcept;  // move assign allowed
 
@@ -600,7 +595,7 @@ namespace rpp
         lock_t spin_lock() noexcept { return rpp::spin_lock(Mtx); }
 
         /** Closes the connection (if any) and returns this socket to a default state */
-        void close() noexcept;
+        RPP_AFUNIX_VIRTUAL void close() noexcept;
 
         // Releases the socket handle from this socket:: but does not call closesocket() !
         // The socket handle itself is returned
@@ -631,18 +626,12 @@ namespace rpp
             return Sock;
         }
         int oshandle() const noexcept { return os_handle(); }
-    private:
+    protected:
         // non-locked versions of os_handle()
         FINLINE int os_handle_unsafe() const noexcept { return Sock; }
         FINLINE void set_os_handle_unsafe(int sock) noexcept { Sock = sock; }
         // true if this socket is an AF_Unix local socket
         FINLINE bool is_af_unix() const noexcept { return Addr.Address.Family == AF_Unix; }
-    #if _WIN32
-        // Windows AF_Unix software message framing (no-op on POSIX).
-        int  send_unix_framed(const void* data, int len) noexcept;
-        int  recv_unix_framed(void* buf, int cap) noexcept;
-        bool try_flush_unix() noexcept; // drain a partial frame tail
-    #endif
     public:
 
         /** @returns Current ipaddress */
@@ -687,7 +676,7 @@ namespace rpp
          *          The user is responsible for manually parsing this depending on platform. */
         int last_errno() const noexcept;
 
-    private:
+    protected:
         void set_errno(int err) const noexcept;
         int get_errno() const noexcept;
         FINLINE int set_errno_unlocked(int err) const noexcept { LastErr = err; return err; }
@@ -719,7 +708,7 @@ namespace rpp
          * if AutoClosing == true, then automatically closes socket during critical failure
          * @returns Number of bytes sent, or -1 on failure (check last_err())
          */
-        NOINLINE int send(const void* buffer, int numBytes) noexcept;
+        NOINLINE RPP_AFUNIX_VIRTUAL int send(const void* buffer, int numBytes) noexcept;
 
         // Send a null delimited C string
         int send(const char* str) noexcept;
@@ -843,7 +832,7 @@ namespace rpp
          * Automatically closes socket during critical failure and returns -1
          * If there is no data to receive, this function returns 0
          */
-        NOINLINE int recv(void* buffer, int maxBytes) noexcept;
+        NOINLINE RPP_AFUNIX_VIRTUAL int recv(void* buffer, int maxBytes) noexcept;
 
         /**
          * @brief Waits up to timeout until data is available and then calls recv() or returns 0
@@ -1384,7 +1373,7 @@ namespace rpp
         bool connect(const ipaddress& remoteAddr, int millis,
                      socket_option opt = SO_None) noexcept;
 
-    private:
+    protected:
         void configure_connected_client(socket_option opt) noexcept;
 
     public:
@@ -1426,21 +1415,62 @@ namespace rpp
          * Clears any previous bind_to_interface
          */
         void unbind_interface() noexcept;
+    };
 
-        ////////////////////////////////////////////////////////////////////////////
-        // AF_Unix (local) socket support
-        //
-        // AF_Unix sockets are message-oriented. Supported on Linux
-        // (SOCK_SEQPACKET in the abstract namespace -- no filesystem object,
-        // released by the kernel on close) and Windows (Win10 1803+, framed
-        // SOCK_STREAM: messages carry a 2-byte little-endian length prefix
-        // internally and names map to "%TEMP%\<name>.sock"). Other platforms are
-        // unsupported -- create(AF_Unix,...) fails with SE_SOCKFAMILY.
-        //
-        // The maximum message size is max_unix_message_size (65535 bytes); send()
-        // rejects larger messages on all platforms for uniformity. fd passing
-        // (send_fd / recv_fd) and pair() are Linux-only.
-        ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    // AF_Unix (local) sockets
+    //
+    // AF_Unix sockets are message-oriented. Supported on Linux (SOCK_SEQPACKET
+    // in the abstract namespace -- no filesystem object, released by the kernel
+    // on close) and Windows (Win10 1803+, framed SOCK_STREAM: messages carry a
+    // 2-byte little-endian length prefix internally and names map to
+    // "%TEMP%\<name>.sock"). Other platforms are unsupported -- the factories
+    // fail cleanly.
+    //
+    // The maximum message size is socket::MAX_UNIX_MESSAGE_SIZE (65535 bytes);
+    // send() rejects larger messages on all platforms for uniformity. fd passing
+    // (send_fd / recv_fd) and pair() are Linux-only.
+    ////////////////////////////////////////////////////////////////////////////////
+
+    // Windows AF_Unix is stream-only (no SOCK_SEQPACKET), so messages are framed
+    // in software: a 2-byte little-endian length prefix + payload. This state
+    // reassembles received frames and stashes a partial send tail. On POSIX the
+    // struct is empty and unix_socket carries no framing member at all.
+    struct unix_framing
+    {
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        std::vector<uint8_t> rx; // stream-to-message reassembly
+        size_t rx_off = 0;       // read cursor into rx; consumed prefix compacted lazily
+        std::vector<uint8_t> tx; // partial-frame tail awaiting flush
+        size_t tx_off = 0;       // unsent offset into tx
+    #endif
+    };
+
+    /**
+     * @brief Message-oriented AF_Unix (local) socket.
+     *
+     * Extends rpp::socket with the unix-only state (a socket name and, on
+     * Windows, the software framing buffers) so that plain IP sockets pay none
+     * of that per-instance cost. Reuses all of rpp::socket's I/O utilities;
+     * create the socket through one of the static factories below.
+     *
+     * On Windows the inherited send()/recv() are overridden to apply software
+     * message framing; on POSIX the SOCK_SEQPACKET sockets need no framing and
+     * the base implementations are used directly (no virtual dispatch).
+     */
+    class RPPAPI unix_socket : public socket
+    {
+        std::string SockName; // local socket name (best-effort for accepted/pair ends)
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        unix_framing Framing; // software message framing state (Windows only)
+    #endif
+    public:
+        unix_socket() noexcept = default;
+        unix_socket(unix_socket&& s) noexcept;
+        unix_socket& operator=(unix_socket&& s) noexcept;
+
+        /** @returns the local socket name this unix_socket was created with (may be empty) */
+        const std::string& unix_name() const noexcept { return SockName; }
 
         /**
          * @brief Creates a connected AF_Unix socket pair (e.g. for handing one
@@ -1448,7 +1478,7 @@ namespace rpp
          *        Both sockets are configured autoclosing + non-blocking-capable.
          * @return true on success, false otherwise (a, b left invalid).
          */
-        static bool pair(socket& a, socket& b) noexcept;
+        static bool pair(unix_socket& a, unix_socket& b) noexcept;
 
         /**
          * @brief Creates an AF_Unix listening socket bound to a local name.
@@ -1458,7 +1488,7 @@ namespace rpp
          * @param opt Socket options (SO_NonBlock / SO_Blocking etc.)
          * @returns A valid listening socket, or an invalid socket on failure.
          */
-        static socket listen_unix(strview name, int backlog = 1, socket_option opt = SO_None) noexcept;
+        static unix_socket listen_unix(strview name, int backlog = 1, socket_option opt = SO_None) noexcept;
 
         /**
          * @brief Connects to an AF_Unix listener by name. Blocking connect.
@@ -1467,11 +1497,18 @@ namespace rpp
          * @param opt Socket options (SO_NonBlock / SO_Blocking etc.)
          * @returns A valid connected socket, or an invalid socket on failure.
          */
-        static socket connect_unix(strview name, socket_option opt = SO_None) noexcept;
+        static unix_socket connect_unix(strview name, socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Accepts a new client connection from this listening unix_socket.
+         *        Mirrors socket::accept() but yields a unix_socket (so framing
+         *        dispatches correctly on Windows).
+         */
+        unix_socket accept(int timeoutMillis = 0) noexcept;
 
         /**
          * @brief Passes a file descriptor + a small tag via SCM_RIGHTS (Linux only).
-         *        Does not close `fd`. Only valid on AF_Unix sockets.
+         *        Does not close `fd`.
          * @return true = delivered, false = would block (socket stays valid) or
          *         peer gone (the socket self-closes if AutoClose); always false
          *         on non-Linux platforms.
@@ -1479,13 +1516,40 @@ namespace rpp
         bool send_fd(uint32_t tag, int fd) noexcept;
 
         /**
-         * @brief Counterpart to send_fd() (Linux only). Only valid on AF_Unix sockets.
+         * @brief Counterpart to send_fd() (Linux only).
          * @return 1 = fd delivered (caller owns out_fd), 0 = nothing ready
          *         (non-blocking mode) or a frame without an fd -- call again later,
          *         -1 = EOF/error (the socket self-closes if AutoClose); always -1
          *         on non-Linux platforms.
          */
         int recv_fd(uint32_t& out_tag, int& out_fd) noexcept;
+
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        // Windows software message framing overrides; re-expose the inherited
+        // convenience overloads that funnel through these two.
+        int send(const void* buffer, int numBytes) noexcept override;
+        int recv(void* buffer, int maxBytes) noexcept override;
+        void close() noexcept override;
+        using socket::send;
+        using socket::recv;
+    #endif
+
+    protected:
+        // Wraps a fully-configured base socket (e.g. from accept()/pair()) as a
+        // unix_socket; on Windows the framing buffers start fresh.
+        explicit unix_socket(socket&& base) noexcept : socket{ std::move(base) } {}
+
+    private:
+        static unix_socket from_err(int err) noexcept;
+        // bind()/connect() an AF_Unix socket using SockName to build the
+        // sockaddr_un (the name is not carried in the socket address).
+        bool bind_unix(socket_option opt) noexcept;
+        bool connect_unix_to(socket_option opt) noexcept;
+    #if _WIN32 && RPP_UNIX_SOCKET_SUPPORTED
+        int  send_unix_framed(const void* data, int len) noexcept;
+        int  recv_unix_framed(void* buf, int cap) noexcept;
+        bool try_flush_unix() noexcept; // drain a partial frame tail
+    #endif
     };
 
     ////////////////////////////////////////////////////////////////////////////////

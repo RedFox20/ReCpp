@@ -882,7 +882,7 @@ void fileio_read_sample(rpp::strview filename = "README.md"_sv)
     if (rpp::file f = { filename, rpp::file::READONLY }) // open the file explicitly, or use static file::read_all() util
     {
         // reads all data in the most efficient way
-        rpp::load_buffer data = f.read_all(); 
+        rpp::load_buffer data = f.read_all();
 
         // use the data as a binary blob
         for (char& ch : data) { }
@@ -891,11 +891,11 @@ void fileio_read_sample(rpp::strview filename = "README.md"_sv)
 void fileio_writeall_sample(rpp::strview filename = "test.txt"_sv)
 {
     std::string someText = "/**\n * A simple self-expanding buffer\n */\nstruct";
-    
+
     // write a new file with the contents of someText
     rpp::file::write_new(filename, someText.data(), someText.size());
 
-    // or just write it as a string 
+    // or just write it as a string
     rpp::file::write_new(filename, someText);
 }
 void fileio_modify_sample(rpp::strview filename = "test.txt"_sv)
@@ -1913,52 +1913,53 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 
 | Enum | Description |
 |------|-------------|
-| [`address_family`](src/rpp/sockets.h#L23) | `AF_DontCare`, `AF_IPv4`, `AF_IPv6`, `AF_Bth` |
-| [`socket_type`](src/rpp/sockets.h#L32) | `ST_Stream`, `ST_Datagram`, `ST_Raw`, `ST_RDM`, `ST_SeqPacket` |
-| [`socket_category`](src/rpp/sockets.h#L42) | `SC_Unknown`, `SC_Listen`, `SC_Accept`, `SC_Client` |
-| [`ip_protocol`](src/rpp/sockets.h#L50) | `IPP_TCP`, `IPP_UDP`, `IPP_ICMP`, `IPP_BTH`, etc. |
-| [`socket_option`](src/rpp/sockets.h#L62) | `SO_None`, `SO_ReuseAddr`, `SO_Blocking`, `SO_NonBlock`, `SO_Nagle` |
+| [`address_family`](src/rpp/sockets.h#L42) | `AF_DontCare`, `AF_IPv4`, `AF_IPv6`, `AF_Bth` |
+| [`socket_type`](src/rpp/sockets.h#L51) | `ST_Stream`, `ST_Datagram`, `ST_Raw`, `ST_RDM`, `ST_SeqPacket` |
+| [`socket_category`](src/rpp/sockets.h#L61) | `SC_Unknown`, `SC_Listen`, `SC_Accept`, `SC_Client` |
+| [`ip_protocol`](src/rpp/sockets.h#L69) | `IPP_TCP`, `IPP_UDP`, `IPP_ICMP`, `IPP_BTH`, etc. |
+| [`socket_option`](src/rpp/sockets.h#L81) | `SO_None`, `SO_ReuseAddr`, `SO_Blocking`, `SO_NonBlock`, `SO_Nagle` |
 
 ### Classes
 
 | Class | Description |
 |-------|-------------|
-| [`raw_address`](src/rpp/sockets.h#L104) | IP address without port (IPv4/IPv6) |
-| [`ipaddress`](src/rpp/sockets.h#L227) | IP address + port, constructible from `"ip:port"` strings |
-| [`ipaddress4`](src/rpp/sockets.h#L400) | IPv4 convenience wrapper |
-| [`ipaddress6`](src/rpp/sockets.h#L435) | IPv6 convenience wrapper |
-| [`ipinterface`](src/rpp/sockets.h#L467) | Network interface info (name, addr, netmask, broadcast, gateway) |
-| [`socket`](src/rpp/sockets.h#L516) | Full TCP/UDP socket with send, recv, select, etc. |
+| [`raw_address`](src/rpp/sockets.h#L123) | IP address without port (IPv4/IPv6) |
+| [`ipaddress`](src/rpp/sockets.h#L238) | IP address + port, constructible from `"ip:port"` strings |
+| [`ipaddress4`](src/rpp/sockets.h#L402) | IPv4 convenience wrapper |
+| [`ipaddress6`](src/rpp/sockets.h#L437) | IPv6 convenience wrapper |
+| [`ipinterface`](src/rpp/sockets.h#L469) | Network interface info (name, addr, netmask, broadcast, gateway) |
+| [`socket`](src/rpp/sockets.h#L514) | Full TCP/UDP socket with send, recv, select, etc. |
+| [`unix_socket`](src/rpp/sockets.h#L1461) | Message-oriented AF_Unix socket (derived from `socket`) |
 
 ### socket Methods
 
 | Method | Description |
 |--------|-------------|
-| [`close()`](src/rpp/sockets.h#L603) | Close the socket |
-| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L722) | Send data |
-| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L846) | Receive data |
-| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L758) | UDP send to address |
-| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L876) | UDP receive with source address |
-| [`flush()`](src/rpp/sockets.h#L796) | Flush pending data |
-| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L869) | Peek at incoming data without consuming |
-| [`skip(int bytes)`](src/rpp/sockets.h#L819) | Skip incoming bytes |
-| [`available()`](src/rpp/sockets.h#L830) | Bytes available to read |
-| [`select(int millis)`](src/rpp/sockets.h#L1221) | Wait for socket readability |
-| [`good()`](src/rpp/sockets.h#L622) / [`bad()`](src/rpp/sockets.h#L624) | Socket state |
-| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1070) | Enable/disable Nagle's algorithm |
+| [`close()`](src/rpp/sockets.h#L598) | Close the socket |
+| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L711) | Send data |
+| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L835) | Receive data |
+| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L747) | UDP send to address |
+| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L867) | UDP receive with source address |
+| [`flush()`](src/rpp/sockets.h#L785) | Flush pending data |
+| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L858) | Peek at incoming data without consuming |
+| [`skip(int bytes)`](src/rpp/sockets.h#L808) | Skip incoming bytes |
+| [`available()`](src/rpp/sockets.h#L819) | Bytes available to read |
+| [`select(int millis)`](src/rpp/sockets.h#L1210) | Wait for socket readability |
+| [`good()`](src/rpp/sockets.h#L617) / [`bad()`](src/rpp/sockets.h#L619) | Socket state |
+| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1062) | Enable/disable Nagle's algorithm |
 
 ### socket Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1314) | Create a listening server socket |
-| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1323) | Create a listening server socket |
-| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1367) | Accept an incoming connection |
-| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1375) | Connect to an address |
-| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1398) | Connect by hostname and port |
-| [`protocol_info`](src/rpp/sockets.h#L89) | Describes socket protocol version, address family, type and protocol |
-| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1497) | Creates an INADDR_ANY UDP socket bound to a random port |
-| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1503) | Creates an INADDR_ANY TCP listener bound to a random port |
+| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1303) | Create a listening server socket |
+| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1312) | Create a listening server socket |
+| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1356) | Accept an incoming connection |
+| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1373) | Connect to an address |
+| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1397) | Connect by hostname and port |
+| [`protocol_info`](src/rpp/sockets.h#L108) | Describes socket protocol version, address family, type and protocol |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1561) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1567) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 
@@ -2103,35 +2104,40 @@ udp.bind_to_interface("eth0");
 
 ### AF_Unix (local) sockets
 
-`rpp::socket` natively supports message-oriented AF_UNIX sockets. Supported on
-Linux (`SOCK_SEQPACKET` in the abstract namespace -- no filesystem object,
-released by the kernel on close) and Windows (Win10 1803+, framed `SOCK_STREAM`:
-messages carry a 2-byte little-endian length prefix internally and names map to
-`%TEMP%\<name>.sock`). Other platforms are unsupported -- `create(AF_Unix, ...)`
-fails with `SE_SOCKFAMILY`. The maximum message size is `max_unix_message_size`
-(65535 bytes); `send()` rejects larger messages on all platforms for uniformity.
-fd passing (`send_fd` / `recv_fd`) and `pair()` are Linux-only. AF_Unix sockets
-follow the socket's normal blocking mode (use `set_blocking(false)` for
-non-blocking I/O).
+`rpp::unix_socket` (derived from `rpp::socket`) provides message-oriented
+AF_UNIX sockets. Keeping the unix-only state (the socket name and, on Windows,
+the software framing buffers) on the derived class means plain `rpp::socket`
+instances pay no per-instance cost for it -- the name is not stored in the
+socket address, so `raw_address`/`ipaddress` stay lean for IPv4/IPv6.
+Supported on Linux (`SOCK_SEQPACKET`
+in the abstract namespace -- no filesystem object, released by the kernel on
+close) and Windows (Win10 1803+, framed `SOCK_STREAM`: messages carry a 2-byte
+little-endian length prefix internally and names map to `%TEMP%\<name>.sock`).
+Other platforms are unsupported -- the factories fail cleanly. The maximum
+message size is `socket::MAX_UNIX_MESSAGE_SIZE` (65535 bytes); `send()` rejects
+larger messages on all platforms for uniformity. fd passing (`send_fd` /
+`recv_fd`) and `pair()` are Linux-only. AF_Unix sockets follow the socket's
+normal blocking mode (use `set_blocking(false)` for non-blocking I/O).
 
 | Method | Description |
 |--------|-------------|
-| [`max_unix_message_size`](src/rpp/sockets.h#L527) | Largest AF_Unix message send()/recv() can carry (65535 bytes) |
-| [`ipaddress::unix_addr(strview name)`](src/rpp/sockets.h#L309) | Build an AF_Unix ipaddress from a local socket name |
-| [`raw_address::from_unix_name(strview name)`](src/rpp/sockets.h#L160) | Build an AF_Unix raw_address (rejects over-long names) |
-| [`raw_address::is_unix()`](src/rpp/sockets.h#L150) | True if this raw_address is an AF_Unix local socket name |
-| [`socket::create(AF_Unix)`](src/rpp/sockets.h#L1171) | Create an AF_Unix socket (SEQPACKET on Linux, framed stream on Windows) |
-| [`socket::listen_unix(strview name, int backlog = 1, socket_option opt = SO_None)`](src/rpp/sockets.h#L1461) | Create a listening AF_Unix socket bound to a name |
-| [`socket::connect_unix(strview name, socket_option opt = SO_None)`](src/rpp/sockets.h#L1470) | Connect to an AF_Unix listener by name |
-| [`socket::pair(socket& a, socket& b)`](src/rpp/sockets.h#L1451) | Create a connected AF_Unix socket pair (Linux only) |
-| [`socket::send_fd(uint32_t tag, int fd)`](src/rpp/sockets.h#L1479) | Pass an fd + tag via SCM_RIGHTS (Linux only) |
-| [`socket::recv_fd(uint32_t& out_tag, int& out_fd)`](src/rpp/sockets.h#L1488) | Receive a passed fd (1 = fd, 0 = nothing/skip, -1 = EOF; Linux only) |
-| [`wait_readable(std::initializer_list<int> fds, int timeout_ms)`](src/rpp/sockets.h#L1541) | Block until one of up to 8 socket fds is readable, or timeout |
+| [`socket::MAX_UNIX_MESSAGE_SIZE`](src/rpp/sockets.h#L525) | Largest AF_Unix message send()/recv() can carry (65535 bytes) |
+| [`ipaddress::unix_addr()`](src/rpp/sockets.h#L314) | Build a port-less AF_Unix family marker (carries no name) |
+| [`raw_address::is_unix()`](src/rpp/sockets.h#L168) | True if this raw_address is an AF_Unix local socket |
+| [`socket::create(AF_Unix)`](src/rpp/sockets.h#L1160) | Create an AF_Unix socket (SEQPACKET on Linux, framed stream on Windows) |
+| [`unix_socket::listen_unix(strview name, int backlog = 1, socket_option opt = SO_None)`](src/rpp/sockets.h#L1491) | Create a listening AF_Unix socket bound to a name |
+| [`unix_socket::connect_unix(strview name, socket_option opt = SO_None)`](src/rpp/sockets.h#L1500) | Connect to an AF_Unix listener by name |
+| [`unix_socket::accept(int timeoutMillis = 0)`](src/rpp/sockets.h#L1507) | Accept a client connection, yielding a unix_socket |
+| [`unix_socket::pair(unix_socket& a, unix_socket& b)`](src/rpp/sockets.h#L1481) | Create a connected AF_Unix socket pair (Linux only) |
+| [`unix_socket::send_fd(uint32_t tag, int fd)`](src/rpp/sockets.h#L1516) | Pass an fd + tag via SCM_RIGHTS (Linux only) |
+| [`unix_socket::recv_fd(uint32_t& out_tag, int& out_fd)`](src/rpp/sockets.h#L1525) | Receive a passed fd (1 = fd, 0 = nothing/skip, -1 = EOF; Linux only) |
+| [`unix_socket::unix_name()`](src/rpp/sockets.h#L1473) | The local socket name this unix_socket was created with |
+| [`wait_readable(std::initializer_list<int> fds, int timeout_ms)`](src/rpp/sockets.h#L1605) | Block until one of up to 8 socket fds is readable, or timeout |
 
 ```cpp
-rpp::socket listener = rpp::socket::listen_unix("my-service");
-rpp::socket client = rpp::socket::connect_unix("my-service");
-rpp::socket server = listener.accept(2000);
+rpp::unix_socket listener = rpp::unix_socket::listen_unix("my-service");
+rpp::unix_socket client = rpp::unix_socket::connect_unix("my-service");
+rpp::unix_socket server = listener.accept(2000);
 
 client.send("hello", 5);
 char buf[64];
@@ -4753,7 +4759,7 @@ JArray bytes = getData.arrayF(JniType::Byte, instance);
 ---
 
 ## Development > CircleCI Local
-Running CircleCI locally on WSL/Ubuntu. 
+Running CircleCI locally on WSL/Ubuntu.
 If running on WSL, you need Docker Desktop with WSL2 integration enabled.
 
 You will need to configure a personal API token to use the CircleCI CLI.
