@@ -318,11 +318,19 @@ namespace rpp
         template <typename T>
         T run_until_done(rpp::task<T>& task)
         {
-            while (!task.done())
-                run_once(rpp::millis(5));
+            return drive_to_done(task); // eager: already in flight, just pump
+        }
 
-            run_all_ready(); // drain callbacks posted during the final resume (e.g. a trailing post())
-            return task.await_resume(); // task is done: returns the value or rethrows (non-blocking)
+        /**
+         * @brief Drives the loop until the given (lazy) `rpp::deferred<T>` completes, then returns
+         *        its value (or rethrows). Unlike `task`, a deferred has not started yet — this
+         *        starts it, then pumps the loop to completion. @warning Owner-thread only.
+         */
+        template <typename T>
+        T run_until_done(rpp::deferred<T>& task)
+        {
+            task.start(); // lazy: launch the body before pumping
+            return drive_to_done(task);
         }
 
         /**
@@ -891,6 +899,17 @@ namespace rpp
         RPP_CORO_WRAPPER resume_awaiter resume_on_loop() noexcept { return resume_awaiter{ *this }; }
 
     private:
+
+        // Shared pump used by both run_until_done(task)/(deferred): drive the loop until the
+        // already-started task completes, drain the trailing resumes, then return its result.
+        template <class Awaitable>
+        auto drive_to_done(Awaitable& task) -> decltype(task.await_resume())
+        {
+            while (!task.done())
+                run_once(rpp::millis(5));
+            run_all_ready(); // drain callbacks posted during the final resume (e.g. a trailing post())
+            return task.await_resume(); // done: returns the value or rethrows (non-blocking)
+        }
 
         void start_in_background(task_delegate<void()>&& generic_task) noexcept
         {

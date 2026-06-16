@@ -1408,15 +1408,21 @@ rpp::cfuture<std::string> retryDownloadAsync(std::string url, int maxRetries)
 
 ## rpp/task.h
 
-Eager, single-threaded coroutine task. Like `rpp::cfuture<T>` it starts running immediately at the call site, so the work is launched right away (not deferred). Unlike cfuture — whose awaiter spawns a detached thread-pool task on every `co_await` and resumes the continuation on a background worker — `rpp::task<T>` never spawns a thread of its own and resumes its awaiter on whatever thread the task body completes on. Chained over event-loop leaves (`event_loop::delay` / `run_async`), a task chain stays on the loop thread end-to-end. It is intentionally not a future: there is no `get()`/`wait()`/`.then()` — drive it by `co_await` from another coroutine; use `rpp::cfuture<T>` when you need a thread-blocking future or `.then()`.
+Single-threaded coroutine tasks. Unlike `rpp::cfuture<T>` — whose awaiter spawns a detached thread-pool task on every `co_await` and resumes the continuation on a background worker — these never spawn a thread of their own and resume the awaiter on whatever thread the body completes on. Chained over event-loop leaves (`event_loop::delay` / `run_async`), a chain stays on the loop thread end-to-end. Two flavours share one implementation via a compile-time policy (zero runtime cost, identical API):
+
+- **`rpp::task<T>` (eager)** — starts running at the call site (like `cfuture`); launches the work *now*, regardless of when you `co_await`.
+- **`rpp::deferred<T>` (lazy)** — the body runs only when first awaited (or `start()`ed); the call/await delay is a few cycles, not a scheduler round-trip.
+
+Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_await` from a coroutine, or a top-level task via `event_loop::run_until_done()`. Use `rpp::cfuture<T>` when you need a thread-blocking future or `.then()`.
 
 | Type | Description |
 |------|-------------|
-| [`task<T>`](src/rpp/task.h#L57) | Eager coroutine returning `T`; `co_await` resumes the caller where the body finishes (its loop) |
-| [`task<void>`](src/rpp/task.h#L57) | void specialization — same eager, resume-on-loop lifecycle, no value |
-| [`task<T>::done()`](src/rpp/task.h#L118) | True once the task has resolved; lets a driver poll completion without awaiting (no `wait()`) |
+| [`task<T>`](src/rpp/task.h#L62) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
+| [`deferred<T>`](src/rpp/task.h#L63) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
+| [`done()`](src/rpp/task.h#L154) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
+| [`deferred<T>::start()`](src/rpp/task.h#L197) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
-Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L319).
+Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L319) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L330).
 
 Example: [tests/test_task.cpp](tests/test_task.cpp)
 
@@ -1472,22 +1478,22 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`run_until_idle()`](src/rpp/event_loop.h#L289) | Run until no background tasks and no pending resume events remain |
 | [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L301) | Drive the loop until the given `event_task` completes, then rethrow on failure |
 | [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L319) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
-| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L345) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
-| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L363) | Pump until that future is ready, then return its value; throws on timeout |
-| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L376) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L681) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L405) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L880) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L449) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L457) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L712) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L726) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L740) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L506) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L498) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L895) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L789) | Sleep on a background thread, resume on the loop thread |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L793) | Sleep until a time point, resume on the loop thread |
+| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L349) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
+| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L367) | Pump until that future is ready, then return its value; throws on timeout |
+| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L380) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L685) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L409) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L884) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L453) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L461) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L716) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L730) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L744) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L510) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L502) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L899) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L793) | Sleep on a background thread, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L797) | Sleep until a time point, resume on the loop thread |
 | [`stop()`](src/rpp/event_loop.h#L234) | Signal the loop to stop and finalize pending tasks |
 | [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L241) | Block until all pending work drains, with timeout |
 | [`set_except_handler(handler)`](src/rpp/event_loop.h#L247) | Set custom exception handler for unhandled background errors |

@@ -1,8 +1,10 @@
 #pragma once
 /**
- * Eager, single-threaded coroutine task - a structured-concurrency alternative to cfuture<T>
- * that resumes its awaiter on the SAME (event-loop) thread the task completes on, without
- * spawning a thread for the continuation.
+ * Single-threaded coroutine tasks - structured-concurrency alternatives to cfuture<T> that resume
+ * their awaiter on the SAME (event-loop) thread the task completes on, without spawning a thread
+ * for the continuation. Two flavours share one implementation via a compile-time policy:
+ *   - rpp::task<T>      EAGER  - body runs at construction (like cfuture); launches work now.
+ *   - rpp::deferred<T>  LAZY   - body runs only when first awaited (or explicitly started).
  *
  * Copyright (c) 2026, Jorma Rebane
  * Distributed under MIT Software License
@@ -12,53 +14,59 @@
 #if RPP_HAS_COROUTINES
 #include <coroutine>
 #include <exception> // std::exception_ptr
+#include <type_traits> // std::conditional_t, std::is_void_v
 #include <utility> // std::exchange, std::move
 #include <variant>
 
 namespace rpp
 {
     /**
-     * @brief Eager, single-threaded coroutine result. Like `rpp::cfuture<T>` it starts running
-     *        immediately at the call site; UNLIKE cfuture, awaiting it never spawns a thread —
-     *        the awaiter resumes on whatever thread the task body completes on (its event loop).
+     * @brief Single-threaded coroutine result. Unlike `rpp::cfuture<T>`, awaiting one never spawns
+     *        a thread — the awaiter resumes on whatever thread the task body completes on (its loop).
      *
-     * EAGER (start now): the body runs at CONSTRUCTION (`initial_suspend = suspend_never`),
-     *   synchronously up to its first background leaf (e.g. `event_loop::run_async` /
-     *   `MicrohardTelnet::async_exec`), which dispatches the real work to a worker thread and
-     *   suspends. So `radio.do_something()` launches the work *now*, regardless of when (or
-     *   whether) you co_await the result — matching the immediacy callers expect from cfuture.
-     *   This is "eager", not "deferred": the work is never queued to start "when the loop has time".
+     * Two flavours, identical API, selected at the type level:
+     *   - `rpp::task<T>` (EAGER): the body runs at CONSTRUCTION up to its first background leaf
+     *     (e.g. `event_loop::run_async`), which dispatches the real work and suspends. The work is
+     *     launched immediately at the call site, regardless of when you co_await — matching the
+     *     immediacy callers expect from `cfuture`. This is "eager", never "deferred-until-the-loop".
+     *   - `rpp::deferred<T>` (LAZY): the body does NOT run until the result is first awaited (or
+     *     started via `deferred::start()`). Awaiting starts it via symmetric transfer, so the delay
+     *     between `co_await` and launch is a few cycles, not a scheduler round-trip.
      *
-     * RESUMES ON THE LOOP (no thread spawn): awaiting registers a continuation; when the task
-     *   completes it resumes that continuation directly (symmetric transfer) on the thread the body
-     *   finished on. Because the leaves post their resume back to the event loop, a task (and any
-     *   task it awaits) completes on the loop thread — so `co_await` lands you back on the loop with
-     *   no off-loop hop. This is the whole point versus cfuture, whose awaiter does
-     *   `fut.wait(); cont.resume()` on a detached pool thread (off-loop — a silent data race).
+     * Both RESUME ON THE LOOP (no thread spawn): awaiting registers a continuation; on completion
+     * the task resumes it via symmetric transfer on the thread the body finished on. Because the
+     * leaves post their resume back to the event loop, a chain completes on the loop thread — so
+     * `co_await` lands you back on the loop with no off-loop hop (the whole point versus cfuture,
+     * whose awaiter does `fut.wait(); cont.resume()` on a detached pool thread — off-loop).
      *
-     * NOT a future: there is intentionally no `get()` / `wait()`. `task<T>` is for coroutine code
-     *   (`co_await`). Use `rpp::cfuture<T>` when you need a thread-blocking future or `.then()`.
+     * NOT a future: there is intentionally no `get()` / `wait()`. These are for coroutine code
+     * (`co_await`); a top-level task is driven by `event_loop::run_until_done()`. Use
+     * `rpp::cfuture<T>` when you need a thread-blocking future or `.then()`.
      *
-     * LIFETIME (eager hazard): because the body runs from construction, a task is in flight before
-     *   you await it. It MUST be co_awaited (or otherwise kept alive until it completes) — destroying
-     *   a task whose body is still suspended on a background leaf is undefined behaviour, because the
-     *   leaf will later resume an already-destroyed frame. The `co_await foo()` pattern is always
-     *   safe (the temporary outlives the await). Do not store-and-drop an un-awaited task.
+     * LIFETIME: a running task must outlive its completion — destroying one whose body is still
+     * suspended on a background leaf is undefined (the leaf would resume a destroyed frame). The
+     * `co_await foo()` pattern is always safe (the temporary outlives the await). An eager `task`
+     * is in flight from construction, so never store-and-drop one un-awaited; a `deferred` that was
+     * never awaited/started never ran and is safe to drop.
      *
      * @code
-     *   rpp::task<bool> set_freq(int f) {
-     *       auto r = co_await loop.run_async([&]{ return radio.write(f); }); // dispatched eagerly
+     *   rpp::task<bool> set_freq(int f) {                    // EAGER: launches the write now
+     *       auto r = co_await loop.run_async([&]{ return radio.write(f); });
      *       co_return r.ok;
      *   }
-     *   bool ok = co_await set_freq(1630); // write already in flight; resumes HERE on the loop
+     *   bool ok = co_await set_freq(1630);                   // write already in flight; resumes on loop
+     *
+     *   rpp::deferred<int> lazily() { co_return compute(); } // LAZY: runs only when awaited
      * @endcode
      */
     template <typename T>
     class task;
+    template <typename T>
+    class deferred;
 
     namespace detail
     {
-        // Final-suspend awaiter shared by every task promise: hands control to the awaiting
+        // Final-suspend awaiter shared by every task/deferred promise: hands control to the awaiting
         // coroutine via symmetric transfer (no thread hop, no spawn). Works on any promise that
         // exposes a `.continuation` handle.
         struct task_final_awaiter
@@ -73,9 +81,57 @@ namespace rpp
             void await_resume() const noexcept {}
         };
 
-        // Task handle lifecycle + awaiter registration, shared by the value and void specializations.
-        // `Promise` must expose a `.continuation` handle (set when this task is awaited).
-        template <class Promise>
+        // Extract a completed task's result: rethrows a captured exception, else moves out the value.
+        template <typename T, class Handle>
+        T take_result(Handle handle)
+        {
+            if constexpr (std::is_void_v<T>)
+            {
+                if (handle.promise().error)
+                    std::rethrow_exception(handle.promise().error);
+            }
+            else
+            {
+                auto& r = handle.promise().result;
+                if (std::exception_ptr* ex = std::get_if<2>(&r))
+                    std::rethrow_exception(*ex);
+                return std::move(std::get<1>(r)); // moved out before the frame is destroyed
+            }
+        }
+
+        // Promise shared by task (Lazy=false) and deferred (Lazy=true); only initial_suspend differs.
+        // `Owner` is the concrete task<T> / deferred<T> that get_return_object must produce.
+        template <typename T, bool Lazy, class Owner>
+        struct task_promise
+        {
+            using value_type = T;
+            std::coroutine_handle<> continuation{}; // awaiter to resume when we finish
+            std::variant<std::monostate, T, std::exception_ptr> result{};
+
+            Owner get_return_object() noexcept { return Owner{std::coroutine_handle<task_promise>::from_promise(*this)}; }
+            std::conditional_t<Lazy, std::suspend_always, std::suspend_never> initial_suspend() noexcept { return {}; }
+            task_final_awaiter final_suspend() noexcept { return {}; }
+            void return_value(T value) noexcept { result.template emplace<1>(std::move(value)); }
+            void unhandled_exception() noexcept { result.template emplace<2>(std::current_exception()); }
+        };
+
+        template <bool Lazy, class Owner>
+        struct task_promise<void, Lazy, Owner>
+        {
+            using value_type = void;
+            std::coroutine_handle<> continuation{};
+            std::exception_ptr error{};
+
+            Owner get_return_object() noexcept { return Owner{std::coroutine_handle<task_promise>::from_promise(*this)}; }
+            std::conditional_t<Lazy, std::suspend_always, std::suspend_never> initial_suspend() noexcept { return {}; }
+            task_final_awaiter final_suspend() noexcept { return {}; }
+            void return_void() noexcept {}
+            void unhandled_exception() noexcept { error = std::current_exception(); }
+        };
+
+        // Handle lifecycle + awaiter, shared by both flavours. `Lazy` selects eager vs deferred start
+        // at compile time (zero runtime cost). `Promise::value_type` gives the awaited result type.
+        template <class Promise, bool Lazy>
         class task_base
         {
         public:
@@ -83,6 +139,7 @@ namespace rpp
 
         protected:
             handle_type handle{};
+            bool started = false; // deferred-only: guards the one-time initial launch (unused when eager)
 
         public:
             task_base() noexcept = default;
@@ -92,6 +149,7 @@ namespace rpp
             }
             task_base(task_base&& o) noexcept
                 : handle{std::exchange(o.handle, {})}
+                , started{std::exchange(o.started, false)}
             {
             }
             task_base& operator=(task_base&& o) noexcept
@@ -101,6 +159,7 @@ namespace rpp
                     if (handle)
                         handle.destroy();
                     handle = std::exchange(o.handle, {});
+                    started = std::exchange(o.started, false);
                 }
                 return *this;
             }
@@ -112,92 +171,70 @@ namespace rpp
                     handle.destroy();
             }
 
-            /// @returns true if the task has finished running (resolved its value or exception).
-            ///          Lets non-coroutine drivers (e.g. event_loop::run_until_done) poll for
-            ///          completion without awaiting. Not a wait() — it never blocks.
+            /// @returns true once the task has resolved (value or exception). Non-blocking poll;
+            ///          lets drivers like event_loop::run_until_done check completion without awaiting.
             bool done() const noexcept { return !handle || handle.done(); }
 
             bool await_ready() const noexcept { return !handle || handle.done(); }
-            // EAGER: the body already started at construction (suspend_never), so here we only
-            // register the awaiter to be resumed when the task completes. Returns void => the
-            // awaiter suspends; the task's final_suspend resumes it (on the loop). If the task
-            // already finished, await_ready() short-circuits and this is never called.
-            void await_suspend(std::coroutine_handle<> awaiting) noexcept { handle.promise().continuation = awaiting; }
-        };
 
-        template <typename T>
-        struct task_promise
-        {
-            std::coroutine_handle<> continuation{}; // awaiter to resume when we finish
-            std::variant<std::monostate, T, std::exception_ptr> result{};
+            // Register the awaiter, then hand off control:
+            //  - Eager: the body already started at construction -> just suspend (noop_coroutine).
+            //  - Deferred, not yet started: launch it via symmetric transfer (return its handle).
+            //  - Deferred, already started (e.g. start() then co_await): just suspend; resuming the
+            //    handle again would double-resume a coroutine already in flight. await_ready()
+            //    short-circuits when it is already done, so this only handles the in-flight case.
+            std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaiting) noexcept
+            {
+                handle.promise().continuation = awaiting;
+                if constexpr (Lazy)
+                {
+                    if (!started)
+                    {
+                        started = true;
+                        return handle;
+                    }
+                }
+                return std::noop_coroutine();
+            }
 
-            task<T> get_return_object() noexcept;
-            std::suspend_never initial_suspend() noexcept { return {}; } // EAGER: start running at construction
-            task_final_awaiter final_suspend() noexcept { return {}; }
-            void return_value(T value) noexcept { result.template emplace<1>(std::move(value)); }
-            void unhandled_exception() noexcept { result.template emplace<2>(std::current_exception()); }
-        };
-
-        template <>
-        struct task_promise<void>
-        {
-            std::coroutine_handle<> continuation{};
-            std::exception_ptr error{};
-
-            task<void> get_return_object() noexcept;
-            std::suspend_never initial_suspend() noexcept { return {}; } // EAGER: start running at construction
-            task_final_awaiter final_suspend() noexcept { return {}; }
-            void return_void() noexcept {}
-            void unhandled_exception() noexcept { error = std::current_exception(); }
+            typename Promise::value_type await_resume() { return detail::take_result<typename Promise::value_type>(handle); }
         };
     } // namespace detail
 
+    /** @brief Eager coroutine task: starts at construction. `co_await` resumes the caller on the loop. */
     template <typename T>
-    class [[nodiscard]] task : public detail::task_base<detail::task_promise<T>>
+    class [[nodiscard]] task : public detail::task_base<detail::task_promise<T, false, task<T>>, false>
     {
-        using base = detail::task_base<detail::task_promise<T>>;
+        using base = detail::task_base<detail::task_promise<T, false, task<T>>, false>;
 
     public:
-        using promise_type = detail::task_promise<T>;
-        using base::base; // inherit the handle constructor
-
-        T await_resume()
-        {
-            auto& r = this->handle.promise().result;
-            if (std::exception_ptr* ex = std::get_if<2>(&r))
-                std::rethrow_exception(*ex);
-            return std::move(std::get<1>(r)); // moved out before the frame is destroyed
-        }
+        using promise_type = detail::task_promise<T, false, task<T>>;
+        using base::base;
     };
 
-    /** @brief void specialization, same eager, resume-on-loop lifecycle, no value. */
-    template <>
-    class [[nodiscard]] task<void> : public detail::task_base<detail::task_promise<void>>
+    /** @brief Lazy coroutine task: starts only when first awaited (or via start()). Same API as task. */
+    template <typename T>
+    class [[nodiscard]] deferred : public detail::task_base<detail::task_promise<T, true, deferred<T>>, true>
     {
-        using base = detail::task_base<detail::task_promise<void>>;
+        using base = detail::task_base<detail::task_promise<T, true, deferred<T>>, true>;
 
     public:
-        using promise_type = detail::task_promise<void>;
+        using promise_type = detail::task_promise<T, true, deferred<T>>;
         using base::base;
 
-        void await_resume()
+        /// @brief Starts a not-yet-started deferred task (resumes it from its initial suspend), so a
+        ///        non-coroutine driver can launch it before pumping. `event_loop::run_until_done`
+        ///        calls this for you. Idempotent: a second start() — or a co_await after start() —
+        ///        does NOT run the body again (a task runs to completion exactly once; re-running
+        ///        would make it a generator, a different pattern).
+        void start() noexcept
         {
-            if (this->handle.promise().error)
-                std::rethrow_exception(this->handle.promise().error);
+            if (this->handle && !this->started)
+            {
+                this->started = true;
+                this->handle.resume();
+            }
         }
     };
-
-    namespace detail
-    {
-        template <typename T>
-        inline task<T> task_promise<T>::get_return_object() noexcept
-        {
-            return task<T>{std::coroutine_handle<task_promise>::from_promise(*this)};
-        }
-        inline task<void> task_promise<void>::get_return_object() noexcept
-        {
-            return task<void>{std::coroutine_handle<task_promise>::from_promise(*this)};
-        }
-    } // namespace detail
 } // namespace rpp
 #endif // RPP_HAS_COROUTINES
