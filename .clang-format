@@ -4,12 +4,26 @@ BasedOnStyle: LLVM
 AccessModifierOffset: -4
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
-AlignOperands: false
+AlignOperands: AlignAfterOperator
 AlignTrailingComments: false
+BreakBeforeBinaryOperators: NonAssignment
 AlwaysBreakTemplateDeclarations: Yes
 AlignAfterOpenBracket: Align
+AlignArrayOfStructures: Left
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortCompoundRequirementOnASingleLine: true
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: All
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
 BinPackArguments: true
 BinPackParameters: true
+BreakBeforeBraces: Custom
 BraceWrapping:
   AfterCaseLabel: true
   AfterClass: true
@@ -27,17 +41,21 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
-BreakBeforeBraces: Custom
 BreakConstructorInitializers: BeforeComma
-ColumnLimit: 120
+ColumnLimit: 130
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
+LambdaBodyIndentation: Signature
 IncludeCategories:
-  - Regex: '^<.*'
+  - Regex: '^".*"$'
     Priority: 1
-  - Regex: '^".*'
-    Priority: 2
-  - Regex: '.*'
+  - Regex: '^<(gtest|test)/.*>$'
     Priority: 3
+  - Regex: '^<(krattutil|rpp|rtp|mavlink|mavlink2)/.*>$'
+    Priority: 4
+  - Regex: '^<.*/.*'
+    Priority: 2
+  - Regex: '^<.*>$'
+    Priority: 5
 IncludeIsMainRegex: '([-_](test|unittest))?$'
 IndentCaseBlocks: true
 IndentCaseLabels: true

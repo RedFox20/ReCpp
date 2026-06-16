@@ -1408,12 +1408,15 @@ rpp::cfuture<std::string> retryDownloadAsync(std::string url, int maxRetries)
 
 ## rpp/task.h
 
-Lazy, symmetric-transfer coroutine task. Unlike `rpp::cfuture<T>` — whose awaiter is *eager* and spawns a detached thread-pool task on every `co_await` (resuming the continuation on a background worker) — `rpp::task<T>` never spawns a thread and resumes its awaiter on whatever thread the task body completes on. Chained over event-loop leaves (`event_loop::delay` / `run_async`), a task chain stays on the loop thread end-to-end. It is intentionally not a future: there is no `get()`/`wait()` — drive it by `co_await` from another coroutine, or as a top-level task via `rpp::event_task` + `event_loop::run_async_void()`.
+Eager, single-threaded coroutine task. Like `rpp::cfuture<T>` it starts running immediately at the call site, so the work is launched right away (not deferred). Unlike cfuture — whose awaiter spawns a detached thread-pool task on every `co_await` and resumes the continuation on a background worker — `rpp::task<T>` never spawns a thread of its own and resumes its awaiter on whatever thread the task body completes on. Chained over event-loop leaves (`event_loop::delay` / `run_async`), a task chain stays on the loop thread end-to-end. It is intentionally not a future: there is no `get()`/`wait()`/`.then()` — drive it by `co_await` from another coroutine; use `rpp::cfuture<T>` when you need a thread-blocking future or `.then()`.
 
 | Type | Description |
 |------|-------------|
-| [`task<T>`](src/rpp/task.h#L49) | Lazy coroutine returning `T`; `co_await` resumes the caller where the body finishes |
-| [`task<void>`](src/rpp/task.h#L49) | void specialization — same lazy/symmetric-transfer lifecycle, no value |
+| [`task<T>`](src/rpp/task.h#L57) | Eager coroutine returning `T`; `co_await` resumes the caller where the body finishes (its loop) |
+| [`task<void>`](src/rpp/task.h#L57) | void specialization — same eager, resume-on-loop lifecycle, no value |
+| [`task<T>::done()`](src/rpp/task.h#L118) | True once the task has resolved; lets a driver poll completion without awaiting (no `wait()`) |
+
+Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L319).
 
 Example: [tests/test_task.cpp](tests/test_task.cpp)
 
@@ -1457,47 +1460,48 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Class | Description |
 |-------|-------------|
-| [`event_loop`](src/rpp/event_loop.h#L141) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
-| [`event_task`](src/rpp/event_loop.h#L51) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
+| [`event_loop`](src/rpp/event_loop.h#L142) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
+| [`event_task`](src/rpp/event_loop.h#L52) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
 
 ### event_loop Methods
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L263) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L272) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
-| [`run_until_idle()`](src/rpp/event_loop.h#L288) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L300) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L315) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
-| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L333) | Pump until that future is ready, then return its value; throws on timeout |
-| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L346) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L651) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L375) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L850) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L419) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L427) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L682) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L696) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L710) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L476) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L468) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L865) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L759) | Sleep on a background thread, resume on the loop thread |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L763) | Sleep until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L233) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L240) | Block until all pending work drains, with timeout |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L246) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L225) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L216) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L222) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L228) | Thread ID of the loop's owner thread |
+| [`run_loop()`](src/rpp/event_loop.h#L264) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L273) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
+| [`run_until_idle()`](src/rpp/event_loop.h#L289) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L301) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L319) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
+| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L345) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
+| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L363) | Pump until that future is ready, then return its value; throws on timeout |
+| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L376) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L681) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L405) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L880) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L449) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L457) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L712) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L726) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L740) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L506) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L498) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L895) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L789) | Sleep on a background thread, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L793) | Sleep until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L234) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L241) | Block until all pending work drains, with timeout |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L247) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L226) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L217) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L223) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L229) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
 | Method | Description |
 |--------|-------------|
-| [`done()`](src/rpp/event_loop.h#L92) | True if the coroutine has finished or was never started |
-| [`rethrow_if_exception()`](src/rpp/event_loop.h#L95) | Rethrow any unhandled exception captured by the coroutine |
+| [`done()`](src/rpp/event_loop.h#L93) | True if the coroutine has finished or was never started |
+| [`rethrow_if_exception()`](src/rpp/event_loop.h#L96) | Rethrow any unhandled exception captured by the coroutine |
 | `on_complete` | Optional completion callback in `promise_type`, called at `final_suspend` (used by `fork()`) |
 
 ### event_loop Example

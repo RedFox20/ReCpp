@@ -8,21 +8,22 @@
  * Copyright (c) 2026, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include "config.h"
-#include "future_types.h"
-#include "thread_pool.h" // parallel_task, pool_task_handle
-#include "concurrent_queue.h"
-#include "collections.h" // rpp::erase_if
-#include "timer.h"
 #include "atomic_timepoint.h" // rpp::AtomicTimeSource (optional warpable clock)
-#include "threads.h"
+#include "collections.h" // rpp::erase_if
+#include "concurrent_queue.h"
+#include "config.h"
 #include "debugging.h"
+#include "future_types.h"
+#include "task.h" // rpp::task<T> (driven to completion by run_until_done)
+#include "thread_pool.h" // parallel_task, pool_task_handle
+#include "threads.h"
+#include "timer.h"
 #include <atomic>
 #include <memory>
 #include <optional>
-#include <type_traits>
 #include <source_location>
 #include <stdexcept>
+#include <type_traits>
 
 #if RPP_HAS_COROUTINES
 
@@ -298,6 +299,31 @@ namespace rpp
          * @endcode
          */
         void run_until_done(event_task& task);
+
+        /**
+         * @brief Drives the loop until the given (eager) `rpp::task<T>` completes, then returns its
+         *        value (or rethrows its exception).
+         *
+         * The task is already running (eager); this pumps the loop so the task's background-leaf
+         * continuations resume on this thread until it finishes. It does NOT block a thread — it
+         * actively pumps the loop. This is the canonical way to drive a top-level task to
+         * completion from non-coroutine code (e.g. tests, app startup).
+         *
+         * @warning Must be called on the loop's owner thread.
+         * @code
+         *     rpp::task<int> t = compute(loop); // eager: already in flight
+         *     int result = loop.run_until_done(t);
+         * @endcode
+         */
+        template <typename T>
+        T run_until_done(rpp::task<T>& task)
+        {
+            while (!task.done())
+                run_once(rpp::millis(5));
+
+            run_all_ready(); // drain callbacks posted during the final resume (e.g. a trailing post())
+            return task.await_resume(); // task is done: returns the value or rethrows (non-blocking)
+        }
 
         /**
          * @brief Pumps THIS loop on its owner thread until `fut` is ready or `timeout` elapses.
