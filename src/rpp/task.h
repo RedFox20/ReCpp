@@ -12,7 +12,7 @@
 #include "future_types.h" // RPP_HAS_COROUTINES
 
 #if RPP_HAS_COROUTINES
-#include <coroutine>
+// NOTE: future_types.h already includes <coroutine> and exposes rpp::coro_handle / rpp::suspend_* / RPP_CORO_STD
 #include <exception> // std::exception_ptr
 #include <type_traits> // std::conditional_t, std::is_void_v
 #include <utility> // std::exchange, std::move
@@ -73,10 +73,10 @@ namespace rpp
         {
             bool await_ready() const noexcept { return false; }
             template <class Promise>
-            std::coroutine_handle<> await_suspend(std::coroutine_handle<Promise> h) const noexcept
+            rpp::coro_handle<> await_suspend(rpp::coro_handle<Promise> h) const noexcept
             {
-                std::coroutine_handle<> cont = h.promise().continuation;
-                return cont ? cont : std::noop_coroutine();
+                rpp::coro_handle<> cont = h.promise().continuation;
+                return cont ? cont : RPP_CORO_STD::noop_coroutine();
             }
             void await_resume() const noexcept {}
         };
@@ -105,11 +105,11 @@ namespace rpp
         struct task_promise
         {
             using value_type = T;
-            std::coroutine_handle<> continuation{}; // awaiter to resume when we finish
+            rpp::coro_handle<> continuation{}; // awaiter to resume when we finish
             std::variant<std::monostate, T, std::exception_ptr> result{};
 
-            Owner get_return_object() noexcept { return Owner{std::coroutine_handle<task_promise>::from_promise(*this)}; }
-            std::conditional_t<Lazy, std::suspend_always, std::suspend_never> initial_suspend() noexcept { return {}; }
+            Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
+            std::conditional_t<Lazy, rpp::suspend_always, rpp::suspend_never> initial_suspend() noexcept { return {}; }
             task_final_awaiter final_suspend() noexcept { return {}; }
             void return_value(T value) noexcept { result.template emplace<1>(std::move(value)); }
             void unhandled_exception() noexcept { result.template emplace<2>(std::current_exception()); }
@@ -119,11 +119,11 @@ namespace rpp
         struct task_promise<void, Lazy, Owner>
         {
             using value_type = void;
-            std::coroutine_handle<> continuation{};
+            rpp::coro_handle<> continuation{};
             std::exception_ptr error{};
 
-            Owner get_return_object() noexcept { return Owner{std::coroutine_handle<task_promise>::from_promise(*this)}; }
-            std::conditional_t<Lazy, std::suspend_always, std::suspend_never> initial_suspend() noexcept { return {}; }
+            Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
+            std::conditional_t<Lazy, rpp::suspend_always, rpp::suspend_never> initial_suspend() noexcept { return {}; }
             task_final_awaiter final_suspend() noexcept { return {}; }
             void return_void() noexcept {}
             void unhandled_exception() noexcept { error = std::current_exception(); }
@@ -135,7 +135,7 @@ namespace rpp
         class task_base
         {
         public:
-            using handle_type = std::coroutine_handle<Promise>;
+            using handle_type = rpp::coro_handle<Promise>;
 
         protected:
             handle_type handle{};
@@ -183,7 +183,7 @@ namespace rpp
             //  - Deferred, already started (e.g. start() then co_await): just suspend; resuming the
             //    handle again would double-resume a coroutine already in flight. await_ready()
             //    short-circuits when it is already done, so this only handles the in-flight case.
-            std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaiting) noexcept
+            rpp::coro_handle<> await_suspend(rpp::coro_handle<> awaiting) noexcept
             {
                 handle.promise().continuation = awaiting;
                 if constexpr (Lazy)
@@ -194,7 +194,7 @@ namespace rpp
                         return handle;
                     }
                 }
-                return std::noop_coroutine();
+                return RPP_CORO_STD::noop_coroutine();
             }
 
             typename Promise::value_type await_resume() { return detail::take_result<typename Promise::value_type>(handle); }

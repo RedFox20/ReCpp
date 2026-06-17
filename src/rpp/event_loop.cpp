@@ -195,11 +195,11 @@ namespace rpp
         num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
     }
 
-    bool event_loop::ensure_on_owner_thread(std::source_location loc) const noexcept
+    bool event_loop::ensure_on_owner_thread(rpp::source_loc loc) const noexcept
     {
         if (owner_thread_id.load(std::memory_order_acquire) == rpp::get_thread_id())
             return true;
-        LogErrorFL(loc.file_name(), (int)loc.line(), loc.function_name(),
+        LogErrorFL(loc.file_name(), loc.line(), loc.function_name(),
                    "coroutine not on event_loop owner thread");
         return false;
     }

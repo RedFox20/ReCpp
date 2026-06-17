@@ -1235,10 +1235,10 @@ TestImpl(test_event_loop)
     // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).
     TestCase(ensure_on_owner_thread_detects_off_thread)
     {
-        AssertThat(loop->ensure_on_owner_thread(), true); // we are the owner thread
+        AssertThat(loop->ensure_on_owner_thread(RPP_SOURCE_LOC_CURRENT), true); // we are the owner thread
 
         bool off_thread = true;
-        std::thread t{[&] { off_thread = loop->ensure_on_owner_thread(); }};
+        std::thread t{[&] { off_thread = loop->ensure_on_owner_thread(RPP_SOURCE_LOC_CURRENT); }};
         t.join();
         AssertThat(off_thread, false); // ran on a different thread (one expected error log above)
     }

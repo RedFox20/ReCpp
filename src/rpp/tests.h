@@ -8,6 +8,7 @@
 #include "debugging.h" // for adapting debugging API-s with tests API
 #include "./math.h" // rpp::min, rpp::max
 #include "future_types.h" // RPP_HAS_COROUTINES and to support TestCaseCoro()
+#include "source_loc.h" // rpp::source_loc
 
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
@@ -17,17 +18,6 @@
 #include <vector>  // access to std::vector and std::string
 #include <atomic>  // std::atomic<T> type support
 #include <typeinfo> // std::type_info for exception type checking
-
-#if RPP_HAS_CXX20 && __has_include(<source_location>)
-#include <source_location> // std::source_location for better assert messages
-#define RPP_HAS_SOURCE_LOCATION 1
-#define RPP_SOURCE_LOC rpp::source_loc loc = { std::source_location::current() }
-#define RPP_SOURCE_LOC_CURRENT { std::source_location::current() }
-#else
-#define RPP_HAS_SOURCE_LOCATION 0
-#define RPP_SOURCE_LOC rpp::source_loc loc = { __FILE__, __LINE__ }
-#define RPP_SOURCE_LOC_CURRENT { __FILE__, __LINE__ }
-#endif
 
 namespace rpp
 {
@@ -50,16 +40,6 @@ namespace rpp
         std::vector<strview> case_filters; // internal: only execute test cases that pass this filter
         bool test_enabled = true; // internal: this is automatically set by the test system
         bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
-    };
-
-    struct RPPAPI source_loc
-    {
-        const char* file;
-        int line;
-        source_loc(const char* file, int line) noexcept : file{file}, line{line} {}
-    #if RPP_HAS_SOURCE_LOCATION
-        source_loc(std::source_location loc) noexcept : file{loc.file_name()}, line{(int)loc.line()} {}
-    #endif
     };
 
     RPPAPI void register_test(strview name, test_factory factory, bool autorun);

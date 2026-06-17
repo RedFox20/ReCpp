@@ -18,10 +18,10 @@
 #include "thread_pool.h" // parallel_task, pool_task_handle
 #include "threads.h"
 #include "timer.h"
+#include "source_loc.h" // rpp::source_loc
 #include <atomic>
 #include <memory>
 #include <optional>
-#include <source_location>
 #include <stdexcept>
 #include <type_traits>
 
@@ -377,7 +377,7 @@ namespace rpp
          *        continuation resumed on the expected loop thread (the common async edge-case bug).
          * @returns true if on the owner thread, false otherwise.
          */
-        bool ensure_on_owner_thread(std::source_location loc = std::source_location::current()) const noexcept;
+        bool ensure_on_owner_thread(rpp::source_loc loc) const noexcept;
 
     private:
         // forward declarations for fork API (used by fork() template)
