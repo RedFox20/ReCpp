@@ -589,22 +589,30 @@ TestImpl(test_timer)
 
     TestCase(monotonic_epoch_synchronized)
     {
-        // monotonic clocks should be automatically synchronized to realtime epoch
+        // Monotonic clocks are synced to the realtime epoch ON FIRST USE (so they print as wall-clock
+        // time). The offset is captured once and intentionally NOT refreshed - that immunity to wall-clock
+        // steps is the whole point of measuring time monotonically. So the synced value can drift from
+        // realtime by however much the OS stepped the wall clock since first use (NTP / suspend / VM-host
+        // sync); on CI/qemu that is seconds. We therefore assert (1) the epoch was applied at all and
+        // (2) tight RATE synchronization over a short window - not an absolute sub-second offset.
         rpp::TimePoint real = rpp::TimePoint::now();
         rpp::TimePoint mono = rpp::TimePoint::now(rpp::ClockType::Monotonic);
-
-        rpp::int64 diff_ms = (mono - real).abs().millis();
-        print_info("Monotonic vs Realtime diff: %lldms\n", diff_ms);
-        print_info("  monotonic: %s\n", mono.to_string(3).c_str());
-        print_info("  realtime:  %s\n", real.to_string(3).c_str());
-        AssertLess(diff_ms, 100); // should be within 100ms
-
-        // boottime should also be synchronized
         rpp::TimePoint boot = rpp::TimePoint::now(rpp::ClockType::Boottime);
-        rpp::int64 boot_diff_ms = (boot - real).abs().millis();
-        print_info("Boottime vs Realtime diff: %lldms\n", boot_diff_ms);
-        print_info("  boottime:  %s\n", boot.to_string(3).c_str());
-        AssertLess(boot_diff_ms, 100);
+        print_info("Monotonic vs Realtime diff: %lldms\n", (mono - real).abs().millis());
+        print_info("Boottime  vs Realtime diff: %lldms\n", (boot - real).abs().millis());
+        // epoch applied: a non-synced clock reads raw time-since-boot, off from the wall clock by the
+        // host uptime (minutes to days); a synced clock is within the wall-clock step budget (seconds).
+        AssertLess((mono - real).abs().seconds(), 60);
+        AssertLess((boot - real).abs().seconds(), 60);
+
+        // rate sync: synced-monotonic and realtime must advance together over a short window (wall-clock
+        // steps are negligible across a few ms), which is the precise synchronization timestamps rely on.
+        rpp::TimePoint r1 = rpp::TimePoint::now(), m1 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+        spin_sleep_for_us(20'000, /*full_spin*/true);
+        rpp::TimePoint r2 = rpp::TimePoint::now(), m2 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+        rpp::int64 skew_us = ((m2 - m1) - (r2 - r1)).abs().micros();
+        print_info("Monotonic vs Realtime rate skew over 20ms: %lldus\n", skew_us);
+        AssertLess(skew_us, 2'000);
     }
 
     TestCase(proc_cpu_times)

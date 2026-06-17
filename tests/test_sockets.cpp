@@ -599,7 +599,7 @@ TestImpl(test_sockets)
     }
 
     // helper function to pop a single UDP packet and return number of bytes received, discarding data
-    static int pop_udp_packet(socket& recv, int expected_size = -1, RPP_SOURCE_LOC)
+    static int pop_udp_packet(socket& recv, int expected_size, rpp::source_loc loc)
     {
         char buffer[4096];
         int r = recv.recv(buffer, sizeof(buffer));
@@ -648,7 +648,7 @@ TestImpl(test_sockets)
             {
                 while (true)
                 {
-                    if (pop_udp_packet(recv, MSG_SIZE) > 0)
+                    if (pop_udp_packet(recv, MSG_SIZE, RPP_SOURCE_LOC_CURRENT) > 0)
                         ++num_received;
                     else
                         break;
@@ -699,7 +699,7 @@ TestImpl(test_sockets)
                 {
                     while (true)
                     {
-                        if (pop_udp_packet(*sockets[i], MSG_SIZE) > 0)
+                        if (pop_udp_packet(*sockets[i], MSG_SIZE, RPP_SOURCE_LOC_CURRENT) > 0)
                             ++num_received[i];
                         else
                             break;
@@ -746,7 +746,7 @@ TestImpl(test_sockets)
             int num_received = 0;
             while (num_received < NUM_MESSAGES && t.elapsed_ms() < 4000)
             {
-                if (pop_udp_packet(recv, MSG_SIZE) > 0)
+                if (pop_udp_packet(recv, MSG_SIZE, RPP_SOURCE_LOC_CURRENT) > 0)
                     ++num_received;
             }
             return num_received;
