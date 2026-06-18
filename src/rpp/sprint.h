@@ -101,6 +101,7 @@ namespace rpp
         string_buffer& operator=(string_buffer&& sb) noexcept;
 
         FINLINE int size() const noexcept { return len; }
+        FINLINE bool empty() const noexcept { return len == 0; }
         FINLINE const char* c_str() const noexcept { return ptr; }
         FINLINE const char* data()  const noexcept { return ptr; }
         FINLINE rpp::strview view() const noexcept { return { ptr, len }; }
@@ -309,7 +310,7 @@ namespace rpp
 
         template<class T> FINLINE void write_with_separator(const T& arg) noexcept
         {
-            write_separator();
+            if (!empty()) write_separator();
             write(arg);
         }
 
