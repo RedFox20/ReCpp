@@ -28,12 +28,13 @@ TestImpl(test_event_loop)
 
 #if RPP_HAS_COROUTINES
 
+    rpp::AtomicTimeSource clock;
     std::unique_ptr<rpp::event_loop> loop;
     const uint64 main_tid = rpp::get_thread_id();
 
     TestCaseSetup()
     {
-        loop = std::make_unique<rpp::event_loop>();
+        loop = std::make_unique<rpp::event_loop>(0, nullptr, &clock);
     }
     // this sets up a custom loop runner for TestCaseCoro()
     // so we can test how a loop system would actually work
@@ -1112,28 +1113,99 @@ TestImpl(test_event_loop)
         AssertThat(resume_tid.load(), main_tid);
     }
 
+    // loops untile predicate returns true or wall timeout expires,
+    // returns elapsed wall time
+    template<typename Predicate>
+    rpp::Duration loop_until(rpp::Duration timeout, const Predicate& pred)
+    {
+        rpp::TimePoint start = rpp::TimePoint::monotonic_now();
+        while (!pred() && (rpp::TimePoint::monotonic_now() - start) < timeout)
+            loop->run_once(rpp::millis(5));
+        return rpp::TimePoint::monotonic_now() - start;
+    }
+
     // ─── warpable clock: delay() tracks an AtomicTimeSource so warp_forward releases it ──
     // A 10-virtual-second delay can only complete within a 2s wall budget if warp_forward()
     // advanced the loop's clock past the deadline.
     TestCase(delay_is_released_by_time_warp)
     {
-        rpp::AtomicTimeSource clock;
-        rpp::event_loop warp_loop(main_tid, nullptr, &clock);
-
         std::atomic_bool done { false };
-        warp_loop.fork([&]() -> rpp::event_task
+        loop->fork([&]() -> rpp::event_task
         {
-            co_await warp_loop.delay(rpp::seconds(10)); // 10 *virtual* seconds
+            co_await loop->delay(rpp::seconds(10)); // 10 *virtual* seconds
             done = true;
         });
 
         clock.warp_forward(rpp::seconds(10)); // advance virtual time past the deadline
 
-        rpp::Timer wall;
-        while (!done.load() && wall.elapsed_ms() < 2000)
-            warp_loop.run_once(rpp::millis(5));
-
+        loop_until(rpp::millis(2000), [&]{ return done.load(); });
         AssertThat(done.load(), true);
+    }
+
+    // ─── loop hook: fires on every run_once() ───────────────────
+    // run_once() always invokes the hook, whether or not an event was processed.
+    TestCase(loop_hook_invoked_by_run_once)
+    {
+        int hook_calls = 0;
+        loop->set_loop_hook_handler([&]{ ++hook_calls; });
+        loop->run_once(rpp::Duration::zero()); // empty queue, non-blocking
+        loop->run_once(rpp::Duration::zero());
+        loop->run_once(rpp::Duration::zero());
+        AssertThat(hook_calls, 3);
+    }
+
+    // ─── loop hook: NOT fired by run_all_ready() ────────────────
+    // run_all_ready() drains ready events without ever calling the hook (documented).
+    TestCase(loop_hook_not_invoked_by_run_all_ready)
+    {
+        int hook_calls = 0;
+        loop->set_loop_hook_handler([&]{ ++hook_calls; });
+        loop->post([]{}); // something to drain
+        loop->post([]{});
+        loop->run_all_ready();
+        AssertThat(hook_calls, 0);
+    }
+
+    // ─── loop hook drives time warp: long delay ends quickly ────
+    // The hook fires on every run_once(); a test uses it to warp virtual time forward
+    // so a 10-virtual-second delay() resolves in a tiny wall budget instead of blocking
+    // for the full duration. Without the warp this loop would run ~10 wall seconds.
+    TestCase(loop_hook_warps_time_so_delay_ends_quickly)
+    {
+        loop->set_loop_hook_handler([&]{ clock.warp_forward(rpp::millis(500)); });
+
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::seconds(10)); // 10 *virtual* seconds
+            done = true;
+        });
+
+        // NOTE: hook warps +500ms each call
+        rpp::Duration spent = loop_until(rpp::millis(2000), [&]{ return done.load(); });
+        AssertThat(done.load(), true);
+        AssertLess(spent, rpp::millis(2000)); // ~10s wall without the warp hook
+    }
+
+    // ─── loop hook drives time warp under run_until_idle() ──────
+    // run_until_idle() invokes the hook on its idle iterations (between resume events).
+    // A single large warp on the first idle tick pushes virtual time past the deadline,
+    // so the delay resolves immediately and the loop drains.
+    TestCase(loop_hook_warps_time_in_run_until_idle)
+    {
+        loop->set_loop_hook_handler([&]{ clock.warp_forward(rpp::seconds(3600)); });
+
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::seconds(10)); // 10 *virtual* seconds
+            done = true;
+        });
+
+        rpp::Timer wall;
+        loop->run_until_idle(); // idle-tick hook warps time so the delay resolves fast
+        AssertThat(done.load(), true);
+        AssertLess(wall.elapsed_ms(), 2000);
     }
 
     // ─── Helper: launch a coroutine OFF the loop thread ─────────
@@ -1154,9 +1226,7 @@ TestImpl(test_event_loop)
             }
         ).get();
 
-        rpp::Timer wall;
-        while (!fut.await_ready() && wall.elapsed_ms() < 2000)
-            loop->run_once(rpp::millis(5));
+        loop_until(rpp::millis(2000), [&]{ return fut.await_ready(); });
 
         fut.get(); // ready in the success path; rethrows any coroutine exception
         return launcher_tid.load();

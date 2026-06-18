@@ -65,31 +65,27 @@ namespace rpp
             process_event(event);
         }
         // only wait with timeout if there are still background tasks that could post events
-        while (has_background_tasks() && resume_queue.wait_pop_until(event, end))
+        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, time_source))
         {
             process_event(event);
+            invoke_loop_hook();
         }
         return resume_queue.empty() && !has_background_tasks();
     }
 
-    bool event_loop::run_loop() noexcept
+    bool event_loop::run_loop(rpp::Duration suspend_interval) noexcept
     {
         // keep processing until stop() is called and pending tasks are completed
         loop_running = true;
         while (loop_running)
         {
             resume_event event;
-            if (resume_queue.try_pop(event))
-            {
-                process_event(event);
-                continue;
-            }
-
             // background tasks still running: wait for the next resume with a timeout
             // to avoid missing a race where pending_count drops after we checked
-            if (resume_queue.wait_pop(event, rpp::Duration::from_millis(15)))
+            if (resume_queue.wait_pop(event, suspend_interval, time_source))
             {
                 process_event(event);
+                invoke_loop_hook();
             }
         }
 
@@ -102,20 +98,15 @@ namespace rpp
     bool event_loop::run_once(rpp::Duration timeout) noexcept
     {
         resume_event event;
-        if (timeout == rpp::Duration::zero())
-        {
-            if (!resume_queue.try_pop(event))
-                return false;
-        }
-        else
-        {
-            if (!resume_queue.wait_pop(event, timeout))
-                return false;
-        }
+        const bool got_event = timeout == rpp::Duration::zero()
+                             ? resume_queue.try_pop(event)
+                             : resume_queue.wait_pop(event, timeout, time_source);
+        if (got_event)
+            process_event(event);
 
-        process_event(event);
+        invoke_loop_hook();
         cleanup_forks();
-        return true;
+        return got_event;
     }
 
     bool event_loop::run_all_ready() noexcept
@@ -132,27 +123,23 @@ namespace rpp
         return processed;
     }
 
-    int event_loop::run_until_idle() noexcept
+    int event_loop::run_until_idle(rpp::Duration suspend_interval) noexcept
     {
         int processed_count = 0;
         while (true)
         {
             resume_event event;
-            if (resume_queue.try_pop(event))
-            {
-                process_event(event);
-                ++processed_count;
-                continue;
-            }
-
             // background tasks still running: wait for the next resume with a timeout
             // to avoid missing a race where pending_count drops after we checked
-            if (resume_queue.wait_pop(event, rpp::Duration::from_millis(15)))
+            if (resume_queue.wait_pop(event, suspend_interval, time_source))
             {
                 process_event(event);
                 ++processed_count;
                 continue; // loop around one more time just in case
             }
+
+            // invoked between resume events
+            invoke_loop_hook();
 
             // Break only when BOTH: no background tasks AND no queued resume events.
             // If count==0 but queue is non-empty, a task pushed its event just before
@@ -170,7 +157,7 @@ namespace rpp
         // so we can exit the loop
         while (!task.done())
         {
-            run_once(rpp::Duration::from_millis(15));
+            run_once(rpp::millis(15));
         }
 
         // drain any callbacks that were posted during the final resume
@@ -285,12 +272,34 @@ namespace rpp
             {
                 if (std_except_handler) std_except_handler(ex);
                 else if (except_handler) except_handler(std::current_exception());
-                else LogWarning("event_loop unhandled exception from delegate: %s", ex.what());
+                else LogError("event_loop unhandled exception from delegate: %s", ex.what());
             }
             catch (...)
             {
                 if (except_handler) except_handler(std::current_exception());
-                else LogWarning("event_loop unhandled exception from delegate");
+                else LogError("event_loop unhandled exception from delegate");
+            }
+        }
+    }
+
+    void event_loop::invoke_loop_hook() noexcept
+    {
+        if (loop_hook_handler)
+        {
+            try
+            {
+                loop_hook_handler();
+            }
+            catch (const std::exception& ex)
+            {
+                if (std_except_handler) std_except_handler(ex);
+                else if (except_handler) except_handler(std::current_exception());
+                else LogError("event_loop hook threw: %s", ex.what());
+            }
+            catch (...)
+            {
+                if (except_handler) except_handler(std::current_exception());
+                else LogError("event_loop hook threw unknown exception");
             }
         }
     }

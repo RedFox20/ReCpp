@@ -178,6 +178,11 @@ namespace rpp
         rpp::delegate<void(std::exception_ptr)> except_handler {};
         rpp::delegate<void(std::exception)> std_except_handler {};
 
+        // loop hook handler which is called every time we process run_once() 
+        // or do a single iteration of run_until_idle()
+        // Designed for additional test hooks, e.g. time warping fast forwarding, etc.
+        rpp::delegate<void()> loop_hook_handler {};
+
         // fork tracking: stores event_tasks for forked coroutines
         std::vector<event_task> fork_tasks;
         std::atomic<int> num_active_forks {0};
@@ -254,14 +259,32 @@ namespace rpp
         { std_except_handler = std::move(handler); }
 
         /**
+         * @brief Sets a loop hook handler that is called every time we process run_once()
+         *        or do a single iteration of run_until_idle().
+         *        Designed for additional test hooks, e.g. time warping fast forwarding, etc.
+         *        The handler is called on the event loop thread, so it can safely access
+         *        any data that is only valid on the loop thread.
+         *        The handler should not block or perform long-running work, as it will
+         *        delay the processing of other pending tasks.
+         *        
+         *        The handler should not throw exceptions, as they will be caught and logged.
+         *        The handler should not call run_loop() or run_once(), as this will cause
+         *        a deadlock. The handler should not call stop(), as this will cause
+         *        the loop to exit prematurely.
+         */
+        void set_loop_hook_handler(rpp::delegate<void()> handler) noexcept
+        { loop_hook_handler = std::move(handler); }
+
+        /**
          * @brief Runs the event loop until stop() is called and all pending tasks are completed.
+         * @param suspend_interval Maximum time to wait suspended between loop hook invocations.
          *
          * Processes all queued coroutine resumes and waits for new ones.
          * Returns when stop() is called and attempts to drain any remaining pending tasks before exiting.
          * Automatically cleans up completed forks; fork exceptions go through except_handler.
          * @returns true if all pending tasks were completed, false if some tasks still pending
          */
-        bool run_loop() noexcept;
+        bool run_loop(rpp::Duration suspend_interval = rpp::millis(15)) noexcept;
 
         /**
          * @brief Processes at most one pending resume event.
@@ -276,17 +299,18 @@ namespace rpp
          * @brief Processes all pending resume events that are ready to run.
          *        Equivalent to while (loop.run_once(Duration::zero())) {} but more efficient.
          *        Does not block wait for new events.
+         *        Does not call the loop hook handler.
          * @returns true if at least one resume was processed, false if no ready resumes were found
          */
         bool run_all_ready() noexcept;
 
         /**
          * @brief Runs the event loop until there are no more background tasks and no more resume events.
-         *
+         * @param suspend_interval Maximum time to wait suspended between loop hook invocations.
          * Automatically cleans up completed forks; fork exceptions go through except_handler.
          * @returns Number of resume events processed before the loop became idle
          */
-        int run_until_idle() noexcept;
+        int run_until_idle(rpp::Duration suspend_interval = rpp::millis(15)) noexcept;
 
         /**
          * @brief Drives the event loop until the given event_task completes,
@@ -923,7 +947,8 @@ namespace rpp
         // processes a single resume event
         void process_event(resume_event& event) noexcept;
 
-
+        // invoke the loop hook handler safely, catching any exceptions
+        void invoke_loop_hook() noexcept;
     };
 
 } // namespace rpp
