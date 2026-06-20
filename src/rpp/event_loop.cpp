@@ -9,6 +9,11 @@
 
 namespace rpp
 {
+    static void loop_post_resume(void* ctx, rpp::coro_handle<> h) noexcept
+    {
+        static_cast<event_loop*>(ctx)->post_resume(h);
+    }
+
     event_loop::event_loop(rpp::uint64 main_thr_id,
                            rpp::thread_pool* background_task_pool,
                            rpp::AtomicTimeSource* warpable_clock) noexcept
@@ -16,6 +21,7 @@ namespace rpp
         , background_pool{background_task_pool ? *background_task_pool : rpp::thread_pool::global()}
         , time_source{warpable_clock}
     {
+        detail::tl_loop = { &loop_post_resume, this };
     }
 
     event_loop::~event_loop() noexcept
@@ -244,6 +250,9 @@ namespace rpp
 
     void event_loop::process_event(resume_event& event) noexcept
     {
+        auto prev = detail::tl_loop;
+        detail::tl_loop = { &loop_post_resume, this };
+
         if (event.handle)
         {
             try
@@ -265,7 +274,7 @@ namespace rpp
         else if (event.callback)
         {
             try
-            { 
+            {
                 event.callback();
             }
             catch (const std::exception& ex)
@@ -280,6 +289,8 @@ namespace rpp
                 else LogError("event_loop unhandled exception from delegate");
             }
         }
+
+        detail::tl_loop = prev;
     }
 
     void event_loop::invoke_loop_hook() noexcept

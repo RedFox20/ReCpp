@@ -13,6 +13,7 @@
 
 #if RPP_HAS_COROUTINES
 // NOTE: future_types.h already includes <coroutine> and exposes rpp::coro_handle / rpp::suspend_* / RPP_CORO_STD
+#include <atomic>
 #include <exception> // std::exception_ptr
 #include <type_traits> // std::conditional_t, std::is_void_v
 #include <utility> // std::exchange, std::move
@@ -66,17 +67,37 @@ namespace rpp
 
     namespace detail
     {
-        // Final-suspend awaiter shared by every task/deferred promise: hands control to the awaiting
-        // coroutine via symmetric transfer (no thread hop, no spawn). Works on any promise that
-        // exposes a `.continuation` handle.
+        // Set by event_loop on the owner thread; captured by task_base::await_suspend so
+        // task_final_awaiter posts the continuation back instead of doing an inline transfer.
+        using loop_post_fn = void (*)(void* ctx, rpp::coro_handle<>) noexcept;
+        struct loop_ctx { loop_post_fn fn = nullptr; void* ctx = nullptr; };
+        inline thread_local loop_ctx tl_loop;
+
+        // Sentinel stored by task_final_awaiter to signal "task completed before await_suspend ran".
+        inline void* task_done_sentinel() noexcept { return reinterpret_cast<void*>(uintptr_t{1}); }
+
         struct task_final_awaiter
         {
             bool await_ready() const noexcept { return false; }
             template <class Promise>
             rpp::coro_handle<> await_suspend(rpp::coro_handle<Promise> h) const noexcept
             {
-                rpp::coro_handle<> cont = h.promise().continuation;
-                return cont ? cont : RPP_CORO_STD::noop_coroutine();
+                auto& p = h.promise();
+                // release: result is visible to whoever acquires. acquire on failure: we see the
+                // captured loop context published before await_suspend's release store/CAS.
+                void* expected = nullptr;
+                if (!p.continuation.compare_exchange_strong(expected, task_done_sentinel(),
+                        std::memory_order_release, std::memory_order_acquire))
+                {
+                    rpp::coro_handle<> cont = rpp::coro_handle<>::from_address(expected);
+                    if (auto fn = p.resume_loop.fn)
+                    {
+                        fn(p.resume_loop.ctx, cont);
+                        return RPP_CORO_STD::noop_coroutine();
+                    }
+                    return cont;
+                }
+                return RPP_CORO_STD::noop_coroutine();
             }
             void await_resume() const noexcept {}
         };
@@ -105,7 +126,8 @@ namespace rpp
         struct task_promise
         {
             using value_type = T;
-            rpp::coro_handle<> continuation{}; // awaiter to resume when we finish
+            std::atomic<void*> continuation{nullptr};
+            loop_ctx resume_loop{}; // plain payload, published via the continuation release/acquire handshake
             std::variant<std::monostate, T, std::exception_ptr> result{};
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
@@ -119,7 +141,8 @@ namespace rpp
         struct task_promise<void, Lazy, Owner>
         {
             using value_type = void;
-            rpp::coro_handle<> continuation{};
+            std::atomic<void*> continuation{nullptr};
+            loop_ctx resume_loop{}; // plain payload, published via the continuation release/acquire handshake
             std::exception_ptr error{};
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
@@ -175,26 +198,38 @@ namespace rpp
             ///          lets drivers like event_loop::run_until_done check completion without awaiting.
             bool done() const noexcept { return !handle || handle.done(); }
 
-            bool await_ready() const noexcept { return !handle || handle.done(); }
+            // Always false: the CAS in await_suspend must run to coordinate with task_final_awaiter.
+            bool await_ready() const noexcept { return false; }
 
-            // Register the awaiter, then hand off control:
-            //  - Eager: the body already started at construction -> just suspend (noop_coroutine).
-            //  - Deferred, not yet started: launch it via symmetric transfer (return its handle).
-            //  - Deferred, already started (e.g. start() then co_await): just suspend; resuming the
-            //    handle again would double-resume a coroutine already in flight. await_ready()
-            //    short-circuits when it is already done, so this only handles the in-flight case.
             rpp::coro_handle<> await_suspend(rpp::coro_handle<> awaiting) noexcept
             {
-                handle.promise().continuation = awaiting;
+                auto& p = handle.promise();
+                // Capture loop context; the release store/CAS below publishes it, pairing with
+                // task_final_awaiter's acquire-on-failure.
+                p.resume_loop = detail::tl_loop; // plain store, sequenced-before the release store/CAS below
+
                 if constexpr (Lazy)
                 {
                     if (!started)
                     {
                         started = true;
-                        return handle;
+                        p.continuation.store(awaiting.address(), std::memory_order_release);
+                        return handle; // symmetric transfer launches the body
                     }
                 }
-                return RPP_CORO_STD::noop_coroutine();
+
+                void* expected = nullptr;
+                if (p.continuation.compare_exchange_strong(expected, awaiting.address(),
+                        std::memory_order_release, std::memory_order_acquire))
+                    return RPP_CORO_STD::noop_coroutine();
+
+                // Task already done — resume using captured loop context.
+                if (detail::tl_loop.fn)
+                {
+                    detail::tl_loop.fn(detail::tl_loop.ctx, awaiting);
+                    return RPP_CORO_STD::noop_coroutine();
+                }
+                return awaiting;
             }
 
             typename Promise::value_type await_resume() { return detail::take_result<typename Promise::value_type>(handle); }
