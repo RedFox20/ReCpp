@@ -9,7 +9,10 @@
 
 namespace rpp
 {
-    static void loop_post_resume(void* ctx, rpp::coro_handle<> h) noexcept;
+    static void loop_post_resume(void* ctx, rpp::coro_handle<> h) noexcept
+    {
+        static_cast<event_loop*>(ctx)->post_resume(h);
+    }
 
     event_loop::event_loop(rpp::uint64 main_thr_id,
                            rpp::thread_pool* background_task_pool,
@@ -243,11 +246,6 @@ namespace rpp
                 task.rethrow_if_exception();
         }
         rpp::erase_if(fork_tasks, [](const event_task& t) { return t.done(); });
-    }
-
-    static void loop_post_resume(void* ctx, rpp::coro_handle<> h) noexcept
-    {
-        static_cast<event_loop*>(ctx)->post_resume(h);
     }
 
     void event_loop::process_event(resume_event& event) noexcept

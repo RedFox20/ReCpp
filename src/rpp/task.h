@@ -84,15 +84,15 @@ namespace rpp
             {
                 auto& p = h.promise();
                 // release: result is visible to whoever acquires. acquire on failure: we see the
-                // resume_via/ctx stores done before await_suspend's release CAS.
+                // captured loop context published before await_suspend's release store/CAS.
                 void* expected = nullptr;
                 if (!p.continuation.compare_exchange_strong(expected, task_done_sentinel(),
                         std::memory_order_release, std::memory_order_acquire))
                 {
                     rpp::coro_handle<> cont = rpp::coro_handle<>::from_address(expected);
-                    if (auto fn = p.resume_via.load(std::memory_order_relaxed))
+                    if (auto fn = p.resume_loop.fn)
                     {
-                        fn(p.resume_ctx.load(std::memory_order_relaxed), cont);
+                        fn(p.resume_loop.ctx, cont);
                         return RPP_CORO_STD::noop_coroutine();
                     }
                     return cont;
@@ -127,8 +127,7 @@ namespace rpp
         {
             using value_type = T;
             std::atomic<void*> continuation{nullptr};
-            std::atomic<loop_post_fn> resume_via{nullptr};
-            std::atomic<void*> resume_ctx{nullptr};
+            loop_ctx resume_loop{}; // plain payload, published via the continuation release/acquire handshake
             std::variant<std::monostate, T, std::exception_ptr> result{};
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
@@ -143,8 +142,7 @@ namespace rpp
         {
             using value_type = void;
             std::atomic<void*> continuation{nullptr};
-            std::atomic<loop_post_fn> resume_via{nullptr};
-            std::atomic<void*> resume_ctx{nullptr};
+            loop_ctx resume_loop{}; // plain payload, published via the continuation release/acquire handshake
             std::exception_ptr error{};
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
@@ -206,9 +204,9 @@ namespace rpp
             rpp::coro_handle<> await_suspend(rpp::coro_handle<> awaiting) noexcept
             {
                 auto& p = handle.promise();
-                // Capture loop context; release CAS below pairs with task_final_awaiter's acquire.
-                p.resume_via.store(detail::tl_loop.fn, std::memory_order_relaxed);
-                p.resume_ctx.store(detail::tl_loop.ctx, std::memory_order_relaxed);
+                // Capture loop context; the release store/CAS below publishes it, pairing with
+                // task_final_awaiter's acquire-on-failure.
+                p.resume_loop = detail::tl_loop; // plain store, sequenced-before the release store/CAS below
 
                 if constexpr (Lazy)
                 {

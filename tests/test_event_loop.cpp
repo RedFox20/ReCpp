@@ -1335,7 +1335,7 @@ TestImpl(test_event_loop)
         auto pool_completing_task = [&]() -> rpp::task<int>
         {
             // Sleep 1 ms so the future isn't ready before task_base::await_suspend
-            // writes continuation/resume_via, keeping the test race-free under TSAN.
+            // writes continuation/resume_loop, keeping the test race-free under TSAN.
             rpp::cfuture<int> fut = rpp::async_task([] { rpp::sleep_ms(1); return 42; });
             int r = co_await fut; // cfuture resumes this task body on pool thread
             co_return r;          // co_return fires on pool thread -> task_final_awaiter on pool thread
