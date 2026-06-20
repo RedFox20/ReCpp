@@ -18,12 +18,7 @@ namespace rpp
         , background_pool{background_task_pool ? *background_task_pool : rpp::thread_pool::global()}
         , time_source{warpable_clock}
     {
-        // Register this loop on the owner thread so that any rpp::task<T> constructed
-        // on the owner thread (including eagerly-started ones before the first
-        // process_event call) captures the correct post-back function.
-        // process_event saves/restores these, so nested calls stay correct.
-        detail::tl_loop_post_fn = &loop_post_resume;
-        detail::tl_loop_ctx     = this;
+        detail::tl_loop = { &loop_post_resume, this };
     }
 
     event_loop::~event_loop() noexcept
@@ -257,12 +252,8 @@ namespace rpp
 
     void event_loop::process_event(resume_event& event) noexcept
     {
-        // Set thread-locals so any rpp::task co_awaited from within this
-        // coroutine posts its continuation back to this loop (Option A fix).
-        auto prev_fn  = detail::tl_loop_post_fn;
-        auto prev_ctx = detail::tl_loop_ctx;
-        detail::tl_loop_post_fn = &loop_post_resume;
-        detail::tl_loop_ctx     = this;
+        auto prev = detail::tl_loop;
+        detail::tl_loop = { &loop_post_resume, this };
 
         if (event.handle)
         {
@@ -301,8 +292,7 @@ namespace rpp
             }
         }
 
-        detail::tl_loop_post_fn = prev_fn;
-        detail::tl_loop_ctx     = prev_ctx;
+        detail::tl_loop = prev;
     }
 
     void event_loop::invoke_loop_hook() noexcept
