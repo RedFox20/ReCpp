@@ -13,6 +13,7 @@
 
 #if RPP_HAS_COROUTINES
 // NOTE: future_types.h already includes <coroutine> and exposes rpp::coro_handle / rpp::suspend_* / RPP_CORO_STD
+#include <atomic>
 #include <exception> // std::exception_ptr
 #include <type_traits> // std::conditional_t, std::is_void_v
 #include <utility> // std::exchange, std::move
@@ -66,17 +67,49 @@ namespace rpp
 
     namespace detail
     {
+        // Set by event_loop::process_event before each coroutine resume.
+        // task_base::await_suspend captures these so task_final_awaiter can
+        // post the continuation back to the loop instead of doing an inline
+        // symmetric transfer (which would cause the event_task to drift to
+        // whichever thread the inner task completed on).
+        using loop_post_fn = void (*)(void* ctx, rpp::coro_handle<>) noexcept;
+        inline thread_local loop_post_fn tl_loop_post_fn = nullptr;
+        inline thread_local void* tl_loop_ctx = nullptr;
+
+        // Sentinel: task_final_awaiter stores this when it runs before task_base::await_suspend,
+        // so that await_suspend can detect "already done" and handle the continuation itself.
+        inline void* task_done_sentinel() noexcept { return reinterpret_cast<void*>(uintptr_t{1}); }
+
         // Final-suspend awaiter shared by every task/deferred promise: hands control to the awaiting
         // coroutine via symmetric transfer (no thread hop, no spawn). Works on any promise that
-        // exposes a `.continuation` handle.
+        // exposes `.continuation`, `.resume_via`, `.resume_ctx` atomics.
         struct task_final_awaiter
         {
             bool await_ready() const noexcept { return false; }
             template <class Promise>
             rpp::coro_handle<> await_suspend(rpp::coro_handle<Promise> h) const noexcept
             {
-                rpp::coro_handle<> cont = h.promise().continuation;
-                return cont ? cont : RPP_CORO_STD::noop_coroutine();
+                auto& p = h.promise();
+                // Try to claim the continuation slot. If null → swap in sentinel (task finished first).
+                // release: pairs with the acquire in task_base::await_suspend's CAS/load.
+                void* expected = nullptr;
+                if (!p.continuation.compare_exchange_strong(expected, task_done_sentinel(),
+                        std::memory_order_release, std::memory_order_relaxed))
+                {
+                    // task_base::await_suspend already stored the continuation — resume it
+                    // acquire: sees the resume_via/resume_ctx stored by await_suspend
+                    void* cont_addr = expected; // CAS failure: expected = current value
+                    rpp::coro_handle<> cont = rpp::coro_handle<>::from_address(cont_addr);
+                    if (auto fn = p.resume_via.load(std::memory_order_acquire))
+                    {
+                        void* ctx = p.resume_ctx.load(std::memory_order_relaxed);
+                        fn(ctx, cont); // post continuation to owner loop
+                        return RPP_CORO_STD::noop_coroutine();
+                    }
+                    return cont; // symmetric transfer (no loop context — standalone use)
+                }
+                // Sentinel stored — task_base::await_suspend will handle the continuation
+                return RPP_CORO_STD::noop_coroutine();
             }
             void await_resume() const noexcept {}
         };
@@ -105,7 +138,11 @@ namespace rpp
         struct task_promise
         {
             using value_type = T;
-            rpp::coro_handle<> continuation{}; // awaiter to resume when we finish
+            // Atomics: task_base::await_suspend writes these on the owner thread; task_final_awaiter
+            // reads them on the completing thread (which may be a pool thread for cfuture leaves).
+            std::atomic<void*> continuation{nullptr}; // coro_handle<>::address() of the awaiting coroutine
+            std::atomic<loop_post_fn> resume_via{nullptr}; // if set, post back via this instead of symmetric transfer
+            std::atomic<void*> resume_ctx{nullptr};         // context for resume_via
             std::variant<std::monostate, T, std::exception_ptr> result{};
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
@@ -119,7 +156,9 @@ namespace rpp
         struct task_promise<void, Lazy, Owner>
         {
             using value_type = void;
-            rpp::coro_handle<> continuation{};
+            std::atomic<void*> continuation{nullptr};
+            std::atomic<loop_post_fn> resume_via{nullptr};
+            std::atomic<void*> resume_ctx{nullptr};
             std::exception_ptr error{};
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
@@ -175,26 +214,54 @@ namespace rpp
             ///          lets drivers like event_loop::run_until_done check completion without awaiting.
             bool done() const noexcept { return !handle || handle.done(); }
 
-            bool await_ready() const noexcept { return !handle || handle.done(); }
+            // Returns true only if the task has already completed AND the continuation slot
+            // was claimed by this side (not by task_final_awaiter). In all other cases we
+            // go through await_suspend so the CAS handshake can coordinate safely.
+            bool await_ready() const noexcept { return false; }
 
-            // Register the awaiter, then hand off control:
-            //  - Eager: the body already started at construction -> just suspend (noop_coroutine).
-            //  - Deferred, not yet started: launch it via symmetric transfer (return its handle).
-            //  - Deferred, already started (e.g. start() then co_await): just suspend; resuming the
-            //    handle again would double-resume a coroutine already in flight. await_ready()
-            //    short-circuits when it is already done, so this only handles the in-flight case.
+            // Register the awaiter and hand off control.
+            // Uses a CAS on the continuation slot to coordinate with task_final_awaiter:
+            //   - CAS null→awaiting: task still in flight — it will post when done.
+            //   - CAS finds sentinel: task already finished — resume inline (or post to loop).
+            // Also handles deferred (Lazy) launch via symmetric transfer.
             rpp::coro_handle<> await_suspend(rpp::coro_handle<> awaiting) noexcept
             {
-                handle.promise().continuation = awaiting;
+                auto& p = handle.promise();
                 if constexpr (Lazy)
                 {
                     if (!started)
                     {
                         started = true;
-                        return handle;
+                        // For lazy tasks the body hasn't run yet: store continuation before launching
+                        p.resume_ctx.store(detail::tl_loop_ctx, std::memory_order_relaxed);
+                        p.resume_via.store(detail::tl_loop_post_fn, std::memory_order_relaxed);
+                        p.continuation.store(awaiting.address(), std::memory_order_release);
+                        return handle; // symmetric transfer launches the body
                     }
                 }
-                return RPP_CORO_STD::noop_coroutine();
+
+                // Store resume_via / resume_ctx first (relaxed), then CAS continuation (release).
+                // The release pairs with task_final_awaiter's CAS failure acquire.
+                p.resume_ctx.store(detail::tl_loop_ctx, std::memory_order_relaxed);
+                p.resume_via.store(detail::tl_loop_post_fn, std::memory_order_relaxed);
+
+                void* expected = nullptr;
+                if (p.continuation.compare_exchange_strong(expected, awaiting.address(),
+                        std::memory_order_release, std::memory_order_acquire))
+                {
+                    // CAS succeeded: continuation stored, task will call resume_via when done
+                    return RPP_CORO_STD::noop_coroutine();
+                }
+
+                // CAS failed: task_final_awaiter already ran and stored the sentinel —
+                // the task is done. Resume the awaiting coroutine inline or via the loop.
+                if (auto fn = p.resume_via.load(std::memory_order_relaxed))
+                {
+                    void* ctx = p.resume_ctx.load(std::memory_order_relaxed);
+                    fn(ctx, awaiting);
+                    return RPP_CORO_STD::noop_coroutine();
+                }
+                return awaiting; // symmetric transfer: no loop context, resume inline
             }
 
             typename Promise::value_type await_resume() { return detail::take_result<typename Promise::value_type>(handle); }

@@ -1313,6 +1313,48 @@ TestImpl(test_event_loop)
         AssertThat(off_thread, false); // ran on a different thread (one expected error log above)
     }
 
+    // Regression / TSAN repro: rpp::task<T> that completes on a pool thread
+    // (via a direct co_await cfuture, not via loop->run_async) must NOT cause
+    // the awaiting event_task to drift to the pool thread.
+    //
+    // Before the fix: task_final_awaiter did symmetric transfer to the event_task
+    // continuation on the completing pool thread; the event_task body then ran off
+    // the loop thread, racing the loop thread's event_task.done() check in
+    // run_until_done() — a genuine TSAN data race on the coroutine frame.
+    //
+    // After the fix: task_final_awaiter posts the continuation to the owner loop,
+    // so the event_task body always resumes on the loop thread.
+    TestCase(tsan_task_await_resumes_on_loop_thread)
+    {
+        std::atomic<rpp::uint64> continuation_tid{0};
+        const rpp::uint64 loop_tid = rpp::get_thread_id();
+
+        // A task whose body is resumed (and co_returns) on a pool thread:
+        // cfuture::await_suspend spawns a pool thread that calls cont.resume() inline,
+        // so the task body after co_await executes on that pool thread.
+        auto pool_completing_task = [&]() -> rpp::task<int>
+        {
+            // Sleep 1 ms so the future isn't ready before task_base::await_suspend
+            // writes continuation/resume_via, keeping the test race-free under TSAN.
+            rpp::cfuture<int> fut = rpp::async_task([] { rpp::sleep_ms(1); return 42; });
+            int r = co_await fut; // cfuture resumes this task body on pool thread
+            co_return r;          // co_return fires on pool thread -> task_final_awaiter on pool thread
+        };
+
+        rpp::event_task et = [&]() -> rpp::event_task
+        {
+            int r = co_await pool_completing_task();
+            // Before fix: event_task body runs on pool thread -> races loop thread's done() check.
+            // After fix: always resumes on the loop thread.
+            continuation_tid = rpp::get_thread_id();
+            AssertThat(r, 42);
+        }();
+
+        loop->run_until_done(et);
+
+        AssertThat(continuation_tid.load(), loop_tid);
+    }
+
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
 #endif // RPP_HAS_COROUTINES

@@ -9,6 +9,8 @@
 
 namespace rpp
 {
+    static void loop_post_resume(void* ctx, rpp::coro_handle<> h) noexcept;
+
     event_loop::event_loop(rpp::uint64 main_thr_id,
                            rpp::thread_pool* background_task_pool,
                            rpp::AtomicTimeSource* warpable_clock) noexcept
@@ -16,6 +18,12 @@ namespace rpp
         , background_pool{background_task_pool ? *background_task_pool : rpp::thread_pool::global()}
         , time_source{warpable_clock}
     {
+        // Register this loop on the owner thread so that any rpp::task<T> constructed
+        // on the owner thread (including eagerly-started ones before the first
+        // process_event call) captures the correct post-back function.
+        // process_event saves/restores these, so nested calls stay correct.
+        detail::tl_loop_post_fn = &loop_post_resume;
+        detail::tl_loop_ctx     = this;
     }
 
     event_loop::~event_loop() noexcept
@@ -242,8 +250,20 @@ namespace rpp
         rpp::erase_if(fork_tasks, [](const event_task& t) { return t.done(); });
     }
 
+    static void loop_post_resume(void* ctx, rpp::coro_handle<> h) noexcept
+    {
+        static_cast<event_loop*>(ctx)->post_resume(h);
+    }
+
     void event_loop::process_event(resume_event& event) noexcept
     {
+        // Set thread-locals so any rpp::task co_awaited from within this
+        // coroutine posts its continuation back to this loop (Option A fix).
+        auto prev_fn  = detail::tl_loop_post_fn;
+        auto prev_ctx = detail::tl_loop_ctx;
+        detail::tl_loop_post_fn = &loop_post_resume;
+        detail::tl_loop_ctx     = this;
+
         if (event.handle)
         {
             try
@@ -265,7 +285,7 @@ namespace rpp
         else if (event.callback)
         {
             try
-            { 
+            {
                 event.callback();
             }
             catch (const std::exception& ex)
@@ -280,6 +300,9 @@ namespace rpp
                 else LogError("event_loop unhandled exception from delegate");
             }
         }
+
+        detail::tl_loop_post_fn = prev_fn;
+        detail::tl_loop_ctx     = prev_ctx;
     }
 
     void event_loop::invoke_loop_hook() noexcept
