@@ -663,17 +663,17 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Method | Description |
 |--------|-------------|
-| [`write(const T& v)`](src/rpp/sprint.h#L124) | Write a value (auto-converts most types) |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L339) | Write values followed by newline |
-| [`writef(const char* format, ...)`](src/rpp/sprint.h#L122) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L285) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L264) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L347) | Pretty-print a value |
-| [`clear()`](src/rpp/sprint.h#L113) | Clear the buffer |
-| [`reserve(int capacity)`](src/rpp/sprint.h#L114) | Reserve capacity |
-| [`resize(int size)`](src/rpp/sprint.h#L115) | Resize buffer |
-| [`append(const char* data, int len)`](src/rpp/sprint.h#L118) | Append raw data |
-| [`emplace_buffer(int n)`](src/rpp/sprint.h#L121) | Get writable buffer of N bytes |
+| [`write(const T& v)`](src/rpp/sprint.h#L125) | Write a value (auto-converts most types) |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L340) | Write values followed by newline |
+| [`writef(const char* format, ...)`](src/rpp/sprint.h#L123) | Printf-style formatted write |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L286) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L265) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L348) | Pretty-print a value |
+| [`clear()`](src/rpp/sprint.h#L114) | Clear the buffer |
+| [`reserve(int capacity)`](src/rpp/sprint.h#L115) | Reserve capacity |
+| [`resize(int size)`](src/rpp/sprint.h#L116) | Resize buffer |
+| [`append(const char* data, int len)`](src/rpp/sprint.h#L119) | Append raw data |
+| [`emplace_buffer(int n)`](src/rpp/sprint.h#L122) | Get writable buffer of N bytes |
 
 ### Free Functions
 
@@ -684,9 +684,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L461) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L481) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L407) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L462) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L482) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L408) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -1417,12 +1417,12 @@ Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_awa
 
 | Type | Description |
 |------|-------------|
-| [`task<T>`](src/rpp/task.h#L62) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
-| [`deferred<T>`](src/rpp/task.h#L63) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
-| [`done()`](src/rpp/task.h#L154) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
-| [`deferred<T>::start()`](src/rpp/task.h#L197) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
+| [`task<T>`](src/rpp/task.h#L64) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
+| [`deferred<T>`](src/rpp/task.h#L66) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
+| [`done()`](src/rpp/task.h#L199) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
+| [`deferred<T>::start()`](src/rpp/task.h#L265) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
-Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L319) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L330).
+Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L325) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L354).
 
 Example: [tests/test_task.cpp](tests/test_task.cpp)
 
@@ -1473,34 +1473,34 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L264) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L273) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
-| [`run_until_idle()`](src/rpp/event_loop.h#L289) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L301) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L319) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
-| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L349) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
-| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L367) | Pump until that future is ready, then return its value; throws on timeout |
-| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L380) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L685) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L409) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L884) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L453) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L461) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L716) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L730) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L744) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L510) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L502) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L899) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L793) | Sleep on a background thread, resume on the loop thread |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L797) | Sleep until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L234) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L241) | Block until all pending work drains, with timeout |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L247) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L226) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L217) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L223) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L229) | Thread ID of the loop's owner thread |
+| [`run_loop()`](src/rpp/event_loop.h#L287) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L296) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
+| [`run_until_idle()`](src/rpp/event_loop.h#L313) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L325) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L343) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
+| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L373) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
+| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L391) | Pump until that future is ready, then return its value; throws on timeout |
+| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L404) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L709) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L433) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L908) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L477) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L485) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L740) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L754) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L768) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L534) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L526) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L923) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L817) | Sleep on a background thread, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L821) | Sleep until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L239) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L246) | Block until all pending work drains, with timeout |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L252) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L231) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L222) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L228) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L234) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
@@ -4343,32 +4343,32 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Item | Description |
 |------|-------------|
-| [`test`](src/rpp/tests.h#L39) | Base test class with lifecycle hooks |
-| [`test_info`](src/rpp/tests.h#L40) | Test registration metadata |
-| [`TestVerbosity`](src/rpp/tests.h#L67) | `None`, `Summary`, `TestLabels`, `AllMessages` |
+| [`test`](src/rpp/tests.h#L29) | Base test class with lifecycle hooks |
+| [`test_info`](src/rpp/tests.h#L35) | Test registration metadata |
+| [`TestVerbosity`](src/rpp/tests.h#L47) | `None`, `Summary`, `TestLabels`, `AllMessages` |
 
 ### Key Macros
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L713) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L728) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L745) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L585) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L601) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L637) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L706) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L576) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L610) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.h#L693) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.h#L708) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.h#L725) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.h#L565) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.h#L581) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L617) | Assert inequality |
+| [`AssertTrue(expr)`](src/rpp/tests.h#L686) | Assert expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.h#L556) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.h#L590) | Assert expression throws |
 
 ### Running Tests
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(patterns)`](src/rpp/tests.h#L283) | Run tests matching patterns |
-| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L294) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L283) | Run all registered tests |
-| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L65) | Registers a unit test with given name, factory and autorun flag |
+| [`test::run_tests(patterns)`](src/rpp/tests.h#L279) | Run tests matching patterns |
+| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L274) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L279) | Run all registered tests |
+| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L45) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase
 
