@@ -1355,6 +1355,75 @@ TestImpl(test_event_loop)
         AssertThat(continuation_tid.load(), loop_tid);
     }
 
+    // Follow-up: run_until_done(task<T>&)/(deferred<T>&) must also drive a TOP-LEVEL task to
+    // completion on the loop thread when the task body completes on a pool thread (it co_awaited a
+    // cfuture directly). Before the fix the driver polled handle.done() cross-thread (TSAN frame
+    // race); now it routes completion through an internal event_task so the result is read on loop.
+    TestCase(tsan_run_until_done_task_resumes_on_loop_thread)
+    {
+        const rpp::uint64 loop_tid = rpp::get_thread_id();
+        std::atomic<rpp::uint64> body_tid{0};
+
+        auto pool_completing_task = [&]() -> rpp::task<int>
+        {
+            rpp::cfuture<int> fut = rpp::async_task([] { rpp::sleep_ms(1); return 42; });
+            int r = co_await fut;            // resumes this task body on a pool thread
+            body_tid = rpp::get_thread_id();
+            co_return r;                     // task_final_awaiter runs on the pool thread
+        };
+
+        rpp::task<int> t = pool_completing_task(); // eager: already in flight
+        int got = loop->run_until_done(t);         // drives + reads the result on the loop thread
+
+        AssertThat(got, 42);
+        AssertNotEqual(body_tid.load(), loop_tid); // sanity: the body really completed off-loop
+    }
+
+    // deferred<T> variant: the wrapper's co_await drives the lazy launch (no explicit start()).
+    TestCase(tsan_run_until_done_deferred_resumes_on_loop_thread)
+    {
+        auto make = [&]() -> rpp::deferred<int>
+        {
+            rpp::cfuture<int> fut = rpp::async_task([] { rpp::sleep_ms(1); return 7; });
+            int r = co_await fut;
+            co_return r;
+        };
+
+        rpp::deferred<int> d = make(); // lazy: not started until awaited
+        int got = loop->run_until_done(d);
+        AssertThat(got, 7);
+    }
+
+    // void-result variant: exercises the if-constexpr void branch of the wrapper driver.
+    TestCase(tsan_run_until_done_task_void)
+    {
+        std::atomic<bool> ran{false};
+        auto make = [&]() -> rpp::task<void>
+        {
+            co_await rpp::async_task([] { rpp::sleep_ms(1); });
+            ran = true; // completes on a pool thread
+            co_return;
+        };
+
+        rpp::task<void> t = make();
+        loop->run_until_done(t);
+        AssertThat(ran.load(), true);
+    }
+
+    // An exception thrown after an off-loop completion must propagate out of run_until_done
+    // (covers the wrapper's exception_ptr round-trip).
+    TestCase(run_until_done_task_propagates_exception)
+    {
+        auto make = [&]() -> rpp::task<int>
+        {
+            co_await rpp::async_task([] { rpp::sleep_ms(1); });
+            throw std::runtime_error("boom"); // thrown on a pool thread
+        };
+
+        rpp::task<int> t = make();
+        AssertThrows(loop->run_until_done(t), std::runtime_error);
+    }
+
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
 #endif // RPP_HAS_COROUTINES

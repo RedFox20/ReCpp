@@ -342,19 +342,18 @@ namespace rpp
         template <typename T>
         T run_until_done(rpp::task<T>& task)
         {
-            return drive_to_done(task); // eager: already in flight, just pump
+            return drive_top_level<T>(task); // route through an event_task so completion lands on the loop
         }
 
         /**
          * @brief Drives the loop until the given (lazy) `rpp::deferred<T>` completes, then returns
-         *        its value (or rethrows). Unlike `task`, a deferred has not started yet — this
-         *        starts it, then pumps the loop to completion. @warning Owner-thread only.
+         *        its value (or rethrows). Unlike `task`, a deferred has not started yet — awaiting
+         *        it launches the body, then the loop is pumped to completion. @warning Owner-thread only.
          */
         template <typename T>
         T run_until_done(rpp::deferred<T>& task)
         {
-            task.start(); // lazy: launch the body before pumping
-            return drive_to_done(task);
+            return drive_top_level<T>(task); // co_await drives the lazy launch; completion lands on the loop
         }
 
         /**
@@ -924,15 +923,45 @@ namespace rpp
 
     private:
 
-        // Shared pump used by both run_until_done(task)/(deferred): drive the loop until the
-        // already-started task completes, drain the trailing resumes, then return its result.
-        template <class Awaitable>
-        auto drive_to_done(Awaitable& task) -> decltype(task.await_resume())
+        // Internal event_task wrappers that co_await a top-level task<T>/deferred<T> so its
+        // task_final_awaiter posts the continuation back to this loop (task.h): the result is then
+        // produced — and the user task's frame destroyed — on the loop thread, even when the task
+        // body completed on a pool thread (e.g. it co_awaited a cfuture directly). Captures are
+        // reference PARAMETERS, never a capturing lambda, so the coroutine frame can't dangle.
+        template <class Awaitable, class T>
+        static event_task await_into(Awaitable& task, std::optional<T>& out, std::exception_ptr& err)
         {
-            while (!task.done())
-                run_once(rpp::millis(5));
-            run_all_ready(); // drain callbacks posted during the final resume (e.g. a trailing post())
-            return task.await_resume(); // done: returns the value or rethrows (non-blocking)
+            try { out.emplace(co_await task); }
+            catch (...) { err = std::current_exception(); }
+        }
+        template <class Awaitable>
+        static event_task await_into_void(Awaitable& task, std::exception_ptr& err)
+        {
+            try { co_await task; }
+            catch (...) { err = std::current_exception(); }
+        }
+
+        // Drive a top-level task<T>/deferred<T> to completion through the (already loop-affine)
+        // run_until_done(event_task&) driver, then hand back its value or rethrow. Replaces the old
+        // cross-thread done() poll, which raced a pool thread completing the task frame off-loop.
+        template <typename T, class Awaitable>
+        T drive_top_level(Awaitable& task)
+        {
+            std::exception_ptr err;
+            if constexpr (std::is_void_v<T>)
+            {
+                event_task w = await_into_void(task, err);
+                run_until_done(w);
+                if (err) std::rethrow_exception(err);
+            }
+            else
+            {
+                std::optional<T> out;
+                event_task w = await_into(task, out, err);
+                run_until_done(w);
+                if (err) std::rethrow_exception(err);
+                return std::move(*out);
+            }
         }
 
         void start_in_background(task_delegate<void()>&& generic_task) noexcept
