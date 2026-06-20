@@ -91,16 +91,19 @@ namespace rpp
             {
                 auto& p = h.promise();
                 // Try to claim the continuation slot. If null → swap in sentinel (task finished first).
-                // release: pairs with the acquire in task_base::await_suspend's CAS/load.
+                // release: ensures result writes are visible to the acquiring await_suspend.
+                // acquire on failure: synchronizes with await_suspend's release CAS so we see
+                // resume_via/resume_ctx written before that release.
                 void* expected = nullptr;
                 if (!p.continuation.compare_exchange_strong(expected, task_done_sentinel(),
-                        std::memory_order_release, std::memory_order_relaxed))
+                        std::memory_order_release, std::memory_order_acquire))
                 {
-                    // task_base::await_suspend already stored the continuation — resume it
-                    // acquire: sees the resume_via/resume_ctx stored by await_suspend
-                    void* cont_addr = expected; // CAS failure: expected = current value
+                    // await_suspend already stored the continuation — resume it.
+                    // The CAS failure acquire syncs with await_suspend's release CAS, so
+                    // resume_via/resume_ctx are visible here without a further acquire load.
+                    void* cont_addr = expected; // CAS failure: expected holds the current value
                     rpp::coro_handle<> cont = rpp::coro_handle<>::from_address(cont_addr);
-                    if (auto fn = p.resume_via.load(std::memory_order_acquire))
+                    if (auto fn = p.resume_via.load(std::memory_order_relaxed))
                     {
                         void* ctx = p.resume_ctx.load(std::memory_order_relaxed);
                         fn(ctx, cont); // post continuation to owner loop
