@@ -46,6 +46,22 @@ namespace rpp
     using coro_handle = RPP_CORO_STD::coroutine_handle<T>;
     using suspend_never = RPP_CORO_STD::suspend_never;
     using suspend_always = RPP_CORO_STD::suspend_always;
+
+    namespace detail
+    {
+        // Set by event_loop on its owner thread; captured by the awaiter of a task/cfuture so the
+        // continuation is posted back to the owner loop instead of resuming on whatever pool thread
+        // completed the awaited work. Keeps event-loop-bound coroutines loop-affine across co_await.
+        using loop_post_fn = void (*)(void* ctx, rpp::coro_handle<>) noexcept;
+        struct loop_ctx
+        {
+            loop_post_fn fn = nullptr;
+            void* ctx = nullptr;
+            // Resume the continuation on the owner loop if there is one, else inline on this thread.
+            void resume(rpp::coro_handle<> cont) const noexcept { fn ? fn(ctx, cont) : cont.resume(); }
+        };
+        inline thread_local loop_ctx tl_loop;
+    }
 #endif // RPP_HAS_COROUTINES
 
 

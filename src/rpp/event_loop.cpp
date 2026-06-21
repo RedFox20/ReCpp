@@ -53,6 +53,12 @@ namespace rpp
 
         // destroy all fork coroutine frames (both completed and stale)
         fork_tasks.clear();
+
+        // Stop advertising this loop on the owner thread's TLS. The constructor registered it so
+        // task/cfuture awaiters can post their continuation back here; once we are gone a later
+        // await on this thread must not capture a pointer to this destroyed loop (use-after-free).
+        if (detail::tl_loop.ctx == this)
+            detail::tl_loop = {};
     }
 
     void event_loop::stop() noexcept

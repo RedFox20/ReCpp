@@ -1355,28 +1355,53 @@ TestImpl(test_event_loop)
         AssertThat(continuation_tid.load(), loop_tid);
     }
 
-    // Follow-up: run_until_done(task<T>&)/(deferred<T>&) must also drive a TOP-LEVEL task to
-    // completion on the loop thread when the task body completes on a pool thread (it co_awaited a
-    // cfuture directly). Before the fix the driver polled handle.done() cross-thread (TSAN frame
-    // race); now it routes completion through an internal event_task so the result is read on loop.
+    // A direct `co_await someCfuture` must also resume the awaiting coroutine on the owner loop
+    // thread, not on the pool worker that waited on the future. cfuture::await_suspend spawns a
+    // pool worker to wait; before the loop-affine fix it called cont.resume() on that worker, so an
+    // event-loop-bound coroutine drifted onto a pool thread after the await (TSAN frame race vs the
+    // loop thread, plus a silent thread-affinity violation). Unlike the task case above this never
+    // went through task_final_awaiter, so #54's task fix did not cover it.
+    TestCase(tsan_cfuture_await_resumes_on_loop_thread)
+    {
+        std::atomic<rpp::uint64> continuation_tid{0};
+        const rpp::uint64 loop_tid = rpp::get_thread_id();
+
+        rpp::event_task et = [&]() -> rpp::event_task
+        {
+            // Sleep 1 ms so the future isn't ready before await_suspend captures the loop context.
+            rpp::cfuture<int> fut = rpp::async_task([] { rpp::sleep_ms(1); return 42; });
+            int r = co_await fut; // direct cfuture await: must post the continuation back to the loop
+            continuation_tid = rpp::get_thread_id();
+            AssertThat(r, 42);
+        }();
+
+        loop->run_until_done(et);
+
+        AssertThat(continuation_tid.load(), loop_tid);
+    }
+
+    // Follow-up: run_until_done(task<T>&)/(deferred<T>&) drives a TOP-LEVEL eager task to completion
+    // and returns its result on the loop thread. The task co_awaits a cfuture directly; with the
+    // loop-affine cfuture await the body resumes back on the loop (no pool-thread drift), and
+    // run_until_done routes completion through an internal event_task so the result is read on loop.
     TestCase(tsan_run_until_done_task_resumes_on_loop_thread)
     {
         const rpp::uint64 loop_tid = rpp::get_thread_id();
         std::atomic<rpp::uint64> body_tid{0};
 
-        auto pool_completing_task = [&]() -> rpp::task<int>
+        auto loop_affine_task = [&]() -> rpp::task<int>
         {
             rpp::cfuture<int> fut = rpp::async_task([] { rpp::sleep_ms(1); return 42; });
-            int r = co_await fut;            // resumes this task body on a pool thread
+            int r = co_await fut;            // loop-affine: the body resumes back on the loop thread
             body_tid = rpp::get_thread_id();
-            co_return r;                     // task_final_awaiter runs on the pool thread
+            co_return r;                     // task_final_awaiter runs on the loop thread
         };
 
-        rpp::task<int> t = pool_completing_task(); // eager: already in flight
-        int got = loop->run_until_done(t);         // drives + reads the result on the loop thread
+        rpp::task<int> t = loop_affine_task(); // eager: already in flight
+        int got = loop->run_until_done(t);     // drives + reads the result on the loop thread
 
         AssertThat(got, 42);
-        AssertNotEqual(body_tid.load(), loop_tid); // sanity: the body really completed off-loop
+        AssertThat(body_tid.load(), loop_tid); // body stayed on the loop (cfuture await is loop-affine)
     }
 
     // deferred<T> variant: the wrapper's co_await drives the lazy launch (no explicit start()).

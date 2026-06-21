@@ -468,11 +468,15 @@ namespace rpp
                 cont.resume();
                 return;
             }
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat:*/mutable
+            // Capture the owner loop (if the awaiting coroutine runs on one) so the continuation
+            // resumes on the loop thread instead of the pool thread that waited on the future.
+            // Without this, an event-loop-bound coroutine drifts onto a pool thread after co_await.
+            const rpp::detail::loop_ctx loop = rpp::detail::tl_loop;
+            rpp::parallel_task_detached([this, cont, loop]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
                     this->wait();
-                cont.resume(); // call await_resume() and continue on this background thread
+                loop.resume(cont); // resume on the owner loop if any, else inline on this worker
             });
         }
 
@@ -878,11 +882,15 @@ namespace rpp
                 cont.resume();
                 return;
             }
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat:*/mutable
+            // Capture the owner loop (if the awaiting coroutine runs on one) so the continuation
+            // resumes on the loop thread instead of the pool thread that waited on the future.
+            // Without this, an event-loop-bound coroutine drifts onto a pool thread after co_await.
+            const rpp::detail::loop_ctx loop = rpp::detail::tl_loop;
+            rpp::parallel_task_detached([this, cont, loop]() /*clang-12 compat:*/mutable
             {
                 if (this->valid())
                     this->wait();
-                cont.resume(); // call await_resume() and continue on this background thread
+                loop.resume(cont); // resume on the owner loop if any, else inline on this worker
             });
         }
 
