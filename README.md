@@ -1267,10 +1267,10 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 |------|-------------|
 | [`cfuture<T>`](src/rpp/future.h#L126) | Extended `std::future` with composition and coroutine support |
 | [`async_task(task)`](src/rpp/future.h#L32) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L951) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L968) | Create an already-errored future |
-| [`wait_all(futures)`](src/rpp/future.h#L1036) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L990) | Block and gather results from all futures |
+| [`make_ready_future(value)`](src/rpp/future.h#L959) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L976) | Create an already-errored future |
+| [`wait_all(futures)`](src/rpp/future.h#L1044) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L998) | Block and gather results from all futures |
 
 ### cfuture Methods
 
@@ -1290,8 +1290,8 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 | [`collect_ready(T* result)`](src/rpp/future.h#L433) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
 | [`collect_wait(T* result)`](src/rpp/future.h#L451) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
 | [`await_suspend(coro_handle<>)`](src/rpp/future.h#L463) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L475) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L502) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`await_resume()`](src/rpp/future.h#L486) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L506) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`RPP_HAS_COROUTINES`](src/rpp/future_types.h#L12) | Detects whether C++20 coroutine headers are available |
 | [`RPP_CORO_STD`](src/rpp/future_types.h#L13) | Namespace alias for coroutine types (std or std::experimental) |
 
@@ -1419,8 +1419,8 @@ Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_awa
 |------|-------------|
 | [`task<T>`](src/rpp/task.h#L64) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
 | [`deferred<T>`](src/rpp/task.h#L66) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
-| [`done()`](src/rpp/task.h#L199) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
-| [`deferred<T>::start()`](src/rpp/task.h#L265) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
+| [`done()`](src/rpp/task.h#L196) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
+| [`deferred<T>::start()`](src/rpp/task.h#L262) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
 Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L325) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L354).
 

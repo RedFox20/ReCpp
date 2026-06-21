@@ -67,11 +67,8 @@ namespace rpp
 
     namespace detail
     {
-        // Set by event_loop on the owner thread; captured by task_base::await_suspend so
-        // task_final_awaiter posts the continuation back instead of doing an inline transfer.
-        using loop_post_fn = void (*)(void* ctx, rpp::coro_handle<>) noexcept;
-        struct loop_ctx { loop_post_fn fn = nullptr; void* ctx = nullptr; };
-        inline thread_local loop_ctx tl_loop;
+        // loop_post_fn / loop_ctx / tl_loop live in future_types.h so both the task and the cfuture
+        // awaiters can capture the owner loop and keep event-loop-bound coroutines loop-affine.
 
         // Sentinel stored by task_final_awaiter to signal "task completed before await_suspend ran".
         inline void* task_done_sentinel() noexcept { return reinterpret_cast<void*>(uintptr_t{1}); }
