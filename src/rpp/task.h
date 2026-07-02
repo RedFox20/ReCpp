@@ -171,6 +171,9 @@ namespace rpp
                     handle.destroy();
             }
 
+            /// @returns true if this task owns a coroutine frame (not default-constructed / moved-from).
+            bool valid() const noexcept { return (bool)handle; }
+
             /// @returns true once the task has resolved (value or exception). Non-blocking poll;
             ///          lets drivers like event_loop::run_until_done check completion without awaiting.
             bool done() const noexcept { return !handle || handle.done(); }
