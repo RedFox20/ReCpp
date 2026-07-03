@@ -641,14 +641,14 @@ namespace rpp
         if (!getifaddrs(&if_addrs))
         {
             int count = 0;
-            for (auto* ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next) {
-                if (!family || ifa->ifa_addr->sa_family == family) ++count;
+            for (auto* ifa = if_addrs; ifa; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr && (!family || ifa->ifa_addr->sa_family == family)) ++count;
             }
             out.reserve(count);
 
-            for (auto* ifa = if_addrs; (ifa && ifa->ifa_addr); ifa = ifa->ifa_next)
+            for (auto* ifa = if_addrs; ifa; ifa = ifa->ifa_next)
             {
-                if (!family || ifa->ifa_addr->sa_family == family)
+                if (ifa->ifa_addr && (!family || ifa->ifa_addr->sa_family == family))
                 {
                     ipinterface& in = out.emplace_back();
                     in.name = std::string{ifa->ifa_name};
@@ -2287,4 +2287,3 @@ namespace rpp
     ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace rpp
-
