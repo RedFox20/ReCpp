@@ -17,6 +17,10 @@ class ReCpp(mama.BuildTarget):
 
 
     def configure(self):
+        # follow mama's clang stdlib choice; getattr keeps this working on older mamabuild
+        if getattr(self.config, 'clang_stdlib', 'libc++') != 'libc++':
+            self.add_cmake_options('RPP_USE_LIBCXX=OFF')
+
         # enable CMAKE opts if env vars are enabled
         self.enable_from_env('BUILD_TESTS', force=self.config.test != '')
         self.enable_from_env('BUILD_WITH_MEM_SAFETY')

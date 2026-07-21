@@ -32,7 +32,7 @@
             "cStandard": "c17",
             "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-clang-x64",
-            "compileCommands": "${workspaceFolder}/packages/ReCpp/linux/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/packages/ReCpp/linux-clang/compile_commands.json"
         },
         {
             "name": "Android Clang arm64",
