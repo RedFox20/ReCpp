@@ -240,10 +240,12 @@
 #  define RPP_64BIT 1
 #endif
 
-#ifdef _LIBCPP_STD_VER
-#  define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
-#elif !defined(_HAS_STD_BYTE)
-#  define _HAS_STD_BYTE 0
+#if !defined(_HAS_STD_BYTE)
+#  ifdef _LIBCPP_STD_VER
+#    define _HAS_STD_BYTE (_LIBCPP_STD_VER > 16)
+#  else
+#    define _HAS_STD_BYTE 0
+#  endif
 #endif
 
 // libc++ headers do transitive includes, which causes some issues with clang-tidy, so we disable them here
