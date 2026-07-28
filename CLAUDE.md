@@ -1,13 +1,41 @@
 # ReCpp Instructions for Claude
 
-Additional instructions can be read from `.github/copilot-instructions.md`.
+Read the additional instructions in `.github/copilot-instructions.md`.
+
+## MANDATORY: writing style and response shape (always on)
+
+Two style skills are project defaults. This file imports them, so they load every
+session. Do not wait to be asked. Do not invoke them manually.
+
+@.claude/skills/ste-writing/SKILL.md
+@.claude/skills/output-style/SKILL.md
+
+- **`ste-writing`** governs *prose*: README.md, docs, commit messages, PR text,
+  doxygen blocks, code comments, and `ThrowErr()` and `Log*` strings. It does not
+  govern code, identifiers, or command syntax.
+- **`output-style`** governs *responses to the user*: lead with the next action,
+  number multi-step work, restate progress, suppress tangents, and drop all
+  preamble and closing pleasantries.
+
+If a style rule collides with the rest of this file, **CLAUDE.md wins. The style
+shapes what fits inside it.** These gates are not negotiable for brevity:
+
+- the mandatory unit test
+- the TSAN build
+- the clang-tidy pass
+- the full test suite run
+- the README.md line-reference update
 
 ## Development Requirements
 
-1. **Unit tests are mandatory** — every new feature or bug fix must include corresponding unit tests in `tests/`.
-2. **Always build with TSAN** — always include `tsan` in build commands to avoid rebuild churn when switching between regular and TSAN builds.
-3. **Validate with clang-tidy** — run `CXX20=1 mama gcc tsan build clang-tidy test="nogdb -vv"` and fix all warnings before considering the task complete.
-4. **Run the full test suite** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"` and confirm all tests pass with no data races. A task is not complete until all tests pass.
+1. **Unit tests are mandatory** — add a test in `tests/` for every new feature and
+   every bug fix.
+2. **Always build with TSAN** — put `tsan` in every build command. A switch between
+   a regular build and a TSAN build forces a full rebuild.
+3. **Validate with clang-tidy** — run `CXX20=1 mama gcc tsan build clang-tidy test="nogdb -vv"`.
+   Fix every warning before you call the task complete.
+4. **Run the full test suite** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"`.
+   All tests must pass with no data race. A task is not complete until they do.
 
 ## ReCpp Modules
 
@@ -18,8 +46,8 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `config.h` | Platform detection, compiler macros, base types |
 | `strview.h` | Non-owning string view with tokenization and search |
 | `sprint.h` | String builder, type-safe formatting, to_string |
-| `file_io.h` | Cross-platform file read/write, RAII file handles |
-| `paths.h` | Path manipulation, directory listing, filesystem utils |
+| `file_io.h` | Cross-platform file read and write, RAII file handles |
+| `paths.h` | Path manipulation, directory listing, filesystem helpers |
 | `delegate.h` | Fast function delegates and multicast events |
 | `future.h` | Composable futures with continuations and coroutines |
 | `future_types.h` | Supporting types for futures |
@@ -33,10 +61,10 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `concurrent_queue.h` | Thread-safe FIFO queue |
 | `close_sync.h` | Read-write sync for safe async destruction |
 | `sockets.h` | TCP/UDP sockets, IP addresses, network interfaces |
-| `binary_stream.h` | Buffered binary read/write streams |
+| `binary_stream.h` | Buffered binary read and write streams |
 | `binary_serializer.h` | Reflection-based binary and string serialization |
 | `timepoint.h` | Duration, TimePoint, time constants, sleep utilities, duration literals |
-| `atomic_timepoint.h` | Lock-free AtomicDuration, AtomicTimePoint (inherits std::atomic), AtomicTimeSource (time sync + fastforward) |
+| `atomic_timepoint.h` | Lock-free AtomicDuration, AtomicTimePoint (inherits std::atomic), AtomicTimeSource (time sync and fastforward) |
 | `timer.h` | Timer, StopWatch, ScopedPerfTimer (includes timepoint.h) |
 | `vec.h` | 2D/3D/4D vector math, matrices, rectangles |
 | `math.h` | Clamp, lerp, deg/rad, epsilon compare |
@@ -45,7 +73,7 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 | `debugging.h` | Logging, assertions, log handlers |
 | `stack_trace.h` | Stack tracing and traced exceptions |
 | `bitutils.h` | Fixed-length bit array |
-| `endian.h` | Endian byte-swap read/write |
+| `endian.h` | Endian byte-swap read and write |
 | `memory_pool.h` | Linear bump-allocator memory pools |
 | `sort.h` | Minimal insertion sort |
 | `scope_guard.h` | RAII scope cleanup guard |
@@ -60,11 +88,17 @@ All headers are in `src/rpp/`. Test files are in `tests/`.
 
 ## After Modifying Headers
 
-When any header in `src/rpp/` is modified:
+After you change a header in `src/rpp/`:
 
-1. **Update README line references**: Run `python3 update_doc_linerefs.py` from the repo root to fix line numbers in README.md. Use `--dry-run` to preview changes first.
-2. **Document new public API**: Add entries to README.md for any new public functions/types/constants using the format `| [\`name(params)\`](src/rpp/header.h#L123) | Description |`. The display text must match the declaration closely enough for `update_doc_linerefs.py` to track it.
-3. **Check for undocumented API**: Run `python3 update_doc_linerefs.py --check-undocumented` to find public declarations missing from README.md.
+1. **Update README line references**: Run `python3 update_doc_linerefs.py` from the
+   repo root. It fixes the line numbers in README.md. Add `--dry-run` to preview the
+   changes first.
+2. **Document new public API**: Add a README.md entry for each new public function,
+   type, or constant. Use the format `| [\`name(params)\`](src/rpp/header.h#L123) | Description |`.
+   The display text must match the declaration closely enough for
+   `update_doc_linerefs.py` to track it.
+3. **Check for undocumented API**: Run `python3 update_doc_linerefs.py --check-undocumented`
+   to find the public declarations that README.md does not cover.
 
 ## Installing mama build tool
 
@@ -73,7 +107,8 @@ mama is a Python-based C++ build tool. Install it with pip:
 pip install mama
 ```
 
-Dependencies installed automatically: `colorama`, `distro`, `keyring`, `keyrings.cryptfile`, `psutil`, `python-dateutil`, `termcolor`.
+pip also installs these dependencies: `colorama`, `distro`, `keyring`,
+`keyrings.cryptfile`, `psutil`, `python-dateutil`, `termcolor`.
 
 On Linux, you also need `libdw-dev` for stack tracing support:
 ```bash
@@ -82,7 +117,9 @@ sudo apt-get install libdw-dev
 
 ## Building with mama
 
-Always include `tsan` in build commands to keep a consistent build configuration. The `nogdb` argument is used to reduce noise in output, but can be omitted if you want mama to attach GDB when starting tests.
+Put `tsan` in every build command. This keeps the build configuration consistent.
+The `nogdb` argument reduces the output noise. Omit it if you want mama to attach
+GDB when it starts the tests.
 
 ```bash
 # basic build and test (C++20 with TSAN)
@@ -105,8 +142,9 @@ CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop"
 ```
 
 ### Address Sanitizer (mama)
-ASAN and TSAN cannot be combined. Use ASAN only when specifically debugging memory issues — this requires a reconfiguration.
-In this case, omit `nogdb`, since by default mama will start tests with GDB attached, which will provide rich stack traces on fatal crashes.
+You cannot combine ASAN and TSAN. Use ASAN only when you debug a memory error. ASAN
+needs a reconfigure. Omit `nogdb` here. mama then attaches GDB to the tests, and GDB
+gives a full stack trace on a fatal crash.
 ```bash
 CXX20=1 mama gcc asan configure build test="-vv"
 ```
@@ -135,11 +173,13 @@ cmake --build build
 ```
 
 ### Thread Sanitizer (CMake)
-TSAN is only available via mama (`mama gcc tsan`). The CMake `BUILD_WITH_MEM_SAFETY` option enables AddressSanitizer, not ThreadSanitizer.
+mama is the only way to get TSAN (`mama gcc tsan`). The CMake `BUILD_WITH_MEM_SAFETY`
+option enables AddressSanitizer, not ThreadSanitizer.
 
 ### clang-tidy (CMake)
 ```bash
 cmake -B build -DBUILD_TESTS=ON -DCXX20=ON -DCMAKE_CXX_CLANG_TIDY=clang-tidy
 cmake --build build
 ```
-The project has a `.clang-tidy` config file in the repo root, and `CMAKE_EXPORT_COMPILE_COMMANDS` is enabled automatically.
+The repo root holds a `.clang-tidy` config file. CMake enables
+`CMAKE_EXPORT_COMPILE_COMMANDS` automatically.
