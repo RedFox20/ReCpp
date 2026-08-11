@@ -126,7 +126,8 @@ is measured on at least one tier 1 compiler.
 | 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
 | 14 | gcc-14 builds every module cleanly. | The full `RppTests` modules build passes with 0 errors and 498/498 test cases, once the preamble order is right. |
 | 15 | **clang-21 builds every module cleanly, and it needs no include order.** | 30 suites and 454/454 test cases with 0 errors. Both preamble orders compile. See the D7 table. |
-| 16 | **clang-21 cannot build ReCpp at all today**, and modules are not the cause. | Four `[[clang::coro_return_type]]` errors in `tests/test_event_loop.cpp` and `<future>`. The headers-only clang-21 build gives the same four. |
+| 16 | **A `cfuture` passed through `std::future` is not portable, and this branch fixes it.** | `start_coro_on_background_thread` returned a `cfuture<void>` out of `rpp::async_task`. That instantiates `std::future<cfuture<void>>::get()`, which returns a `[[clang::coro_return_type]]` without being a coroutine, so clang-21 rejected it. A raw `std::thread` plus `join()` replaces it, matching the pattern the same file already uses at line 1079. clang-21 now passes 498/498 in both modes. |
+| 17 | **A pre-existing race lives in `test_coroutines.cpp:135`, not in the module work.** | `AssertThat(e.what(), "aargh!"s)` reads the message of a `std::runtime_error` while another thread frees the future shared state that owns it. Under 6 parallel TSAN runs it fires 2 of 6 times, on the code before this branch and after it alike. Idle, both report 0 of 6. Track it apart from the migration. |
 
 ### 2.1 The gcc-14 ordering rule, characterized
 
@@ -471,7 +472,7 @@ the macro header stays free of includes.
 |---|---|---|---|
 | `log_colors.h` | no | no | 114 macros, 0 declarations. Rule 1. |
 | `config.h` | **no** | **no** | Rule 1. Every rpp header includes it to drive the compiler feature probes, so a consumer already has it. Its integer aliases (`rpp::byte`, `rpp::uint`, `rpp::int64`) reach importers anyway, because every module that includes `config.h` re-exports them. `rpp.strview` does this today. |
-| `debugging.h` | yes | **no** | `LogError` and `Assert` belong to `debugging.h`. Splitting them means exporting `_LogError`, `_LogFuncname` and `shorten_filename`, and that trades a private surface for a small parse saving. The module ships, the macros stay in the header, and a consumer that wants `LogError` includes `<rpp/debugging.h>`. |
+| `debugging.h` | yes | **no** | `LogError` and `Assert` belong to `debugging.h`. The module ships and the macros stay in the header. Section 6.4 shows what a consumer writes. |
 | `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
 | `tests.h` | **yes** | **yes** | The only clear win. 41 macros against 45 declarations, so the module carries real weight, and `tests_macros.h` needs no include of its own. |
 
@@ -495,6 +496,68 @@ the use site.
 carries macros and declarations together, and finding 11 shows it works. CMake
 has no stable file set for it, and clang calls it experimental. Re-evaluate in
 about two years.
+
+### 6.4 How a consumer uses the logging API
+
+`debugging.h` is the hardest case, so it sets the pattern. Its surface has three
+parts, and each one reaches an importer differently.
+
+| Part | Example | How an importer gets it |
+|---|---|---|
+| global C functions | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogWrite` | the module exports them, see below |
+| `namespace rpp` C++ | `rpp::QtPrintable`, `rpp::shorten_filename`, the `__wrap` machinery | a normal `export namespace rpp` block |
+| macros | `LogInfo`, `LogWarning`, `LogError`, `Assert`, `ThrowErr` | the header, always |
+
+**A module can export a global-scope C function.** The using-declaration goes at
+global scope in the module purview, not inside `export namespace rpp`:
+
+```cpp
+export module rpp.debugging;
+export using ::SetLogSeverityFilter;   // stays ::SetLogSeverityFilter for the consumer
+export using ::GetLogSeverityFilter;
+export using ::LogSeverity;
+export using ::LogSeverityInfo;        // an unscoped enum does NOT carry its enumerators
+export using ::LogSeverityWarn;
+export using ::LogSeverityError;
+```
+
+Measured: a consumer that writes only `import rpp.debugging;` then calls
+`SetLogSeverityFilter(LogSeverityWarn)` compiles with 0 errors on gcc-14 and
+clang-21. The name keeps its global scope, so no call site changes.
+
+**Exporting an unscoped enum does not export its enumerators.** The first
+prototype exported `LogSeverity` and forgot `LogSeverityWarn`, and the consumer
+failed with `use of undeclared identifier 'LogSeverityWarn'`. Each enumerator
+needs its own using-declaration, and the generator of changeset 3 has to walk
+them.
+
+**The macros still need the header.** `import rpp.debugging;` alone gives
+`LogInfo` nothing, and the consumer fails to compile. So the answer to "how do I
+log" is one extra line:
+
+```cpp
+#include <rpp/debugging.h>   // LogInfo, LogWarning, LogError, Assert, ThrowErr
+import rpp.debugging;        // ::SetLogSeverityFilter, rpp::QtPrintable, the rest
+
+SetLogSeverityFilter(LogSeverityWarn);
+LogInfo("Beautiful Soup %d", 42);   // filtered out at Warn
+LogWarning("visible %d", 7);
+```
+
+Measured end to end on clang-21: this compiles, links against `libReCpp.a`, and
+prints only the warning. Every call site keeps the spelling it has today.
+
+**So what does the module buy for `debugging.h`?** Not a faster include. The
+header is there either way. It buys two things:
+
+1. `import rpp.debugging;` alone is enough for code that configures logging and
+   never uses a macro, which covers most library code.
+2. The Qt utilities reach other projects through the module, so a consumer that
+   wants `rpp::QtPrintable` does not have to reason about `RPP_HAS_QT` and the
+   `<QString>` include order.
+
+If those two are not worth it, `debugging.h` can stay a header-only module-free
+header like `config.h`. That call is still open.
 
 ---
 
