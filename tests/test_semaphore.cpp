@@ -125,6 +125,12 @@ TestImpl(test_semaphore)
             rpp::sleep_ms(2);
         }
 
+        // The worker counts one notify per loop, and each loop sleeps first. Stopping it
+        // the moment the last notify goes out drops whatever it has not drained yet.
+        rpp::Timer drain;
+        while (num_notified < num_notifies_sent && drain.elapsed_millis() < 2000.0)
+            rpp::sleep_ms(1);
+
         working = false;
         sem.notify(); // notify finished
         worker.join();

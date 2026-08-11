@@ -373,10 +373,12 @@ TestImpl(test_concurrent_queue)
         AssertWaitPopTimed(Millis(15), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 15.0); // this should not timeout
 
         queue.barrier_consumer_ready(); // item2 is coming after 10ms
-        AssertWaitPopTimed(Millis(20), true, /*item*/"item2", /*elapsed ms:*/ 3.0, 15.0);
+        // the upper bound only has to prove the pop woke on the push and not on its
+        // timeout, so it sits under the timeout. ASAN stretches the 10 ms producer delay.
+        AssertWaitPopTimed(Millis(50), true, /*item*/"item2", /*elapsed ms:*/ 3.0, 45.0);
 
         queue.barrier_consumer_ready(); // item3 is coming after 10ms
-        AssertWaitPopTimed(Millis(20), true, /*item*/"item3", /*elapsed ms:*/ 3.0, 15.0);
+        AssertWaitPopTimed(Millis(50), true, /*item*/"item3", /*elapsed ms:*/ 3.0, 45.0);
 
         // now we enter a long wait, but we should be notified by the producer
         queue.barrier_consumer_ready(); // item4 is coming after 10ms
@@ -563,11 +565,13 @@ TestImpl(test_concurrent_queue)
         AssertTrue(queue.wait_pop(item, Millis(10), cancelCondition));
         AssertThat(item, "item1");
 
+        // 15 ms leaves no room over the 10 ms producer delay under a sanitizer, and a
+        // single timeout there shifts every later item and cascades through the test.
         queue.barrier_consumer_ready(); // item2 is coming after 10ms
-        AssertTrue(queue.wait_pop(item, Millis(15), cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(50), cancelCondition));
         AssertThat(item, "item2");
         queue.barrier_consumer_ready(); // item3 is coming after 10ms
-        AssertTrue(queue.wait_pop(item, Millis(15), cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(50), cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
         rpp::Timer t;

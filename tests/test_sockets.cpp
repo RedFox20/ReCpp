@@ -420,14 +420,17 @@ TestImpl(test_sockets)
                 send.sendto(recv_addr, "udp_poll1");
                 send.sendto(recv_addr, "udp_poll2");
             });
+            // the bound only has to prove pollin woke on the datagram and not on its
+            // timeout, so it sits just under the timeout. A tight bound measures the
+            // scheduler instead, and ASAN stretches the 5 ms sleep above past 12 ms.
             rpp::Timer t4;
-            AssertTrue(pollin(/*millis*/15));
-            AssertLess(t4.elapsed_millis(), 9.0); // CI timing is very inconsistent
+            AssertTrue(pollin(/*millis*/25));
+            AssertLess(t4.elapsed_millis(), 24.0);
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll1"s);
             rpp::Timer t4_2;
             AssertTrue(pollin(/*millis*/15));
-            AssertLessOrEqual(t4_2.elapsed_millis(), 1.0);
+            AssertLessOrEqual(t4_2.elapsed_millis(), 5.0); // already buffered, no wait
             AssertTrue(recv.good());
             AssertThat(recv.recv_str(), "udp_poll2"s);
             f4.get();

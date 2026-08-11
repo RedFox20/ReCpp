@@ -6,25 +6,45 @@ lines.
 
 ## Open
 
-### B1. TSAN reports a race on the exception a coroutine rethrows
-`tests/test_coroutines.cpp:135`, `AssertThat(e.what(), "aargh!"s)`.
-TSAN: write in `std::runtime_error::~runtime_error` from
-`std::promise<std::string>::~promise` on one thread, read in `strlen` on another.
-Fires on 2 of 6 parallel full-suite TSAN runs, 0 of 6 idle, 0 of 8 when only
-`test_coroutines` runs. Predates the module work.
-Open question: real use-after-free, or a TSAN blind spot, because libstdc++
-refcounts the exception object in code TSAN does not instrument.
-Next step: an ASAN run under the same 6-way parallel load. ASAN detects a real
-use-after-free by shadow memory, so a clean ASAN run over many repeats points at
-the blind spot. A first attempt did not finish, because ASAN at 6-way parallel on
-8 cores takes over 10 minutes per run.
-If it is a blind spot, the fix is a `tsan_suppressions.txt` entry naming
-`std::__future_base::_Result_base::_Deleter`. ReCpp has no suppressions file yet.
+### B1. TSAN fires on about 1 in 4 plain sequential runs
+4 races in 13 sequential `RppTests` runs, gcc-14 TSAN, no parallelism. Two
+distinct sites, both in ReCpp code, both on a test teardown boundary.
 
-### B2. `test_timer` and `test_threadpool` fail under CPU oversubscription
-Both fail about 1 run in 6 when 6 test binaries share 8 cores. They pass every
-idle run. Timing assertions with no slack. CI runs on shared runners, so this is
-a real flake source.
+**B1a, `thread_pool.cpp:351`, 3 of the 4.**
+Write of 8 bytes by a pool worker in `rpp::pool_worker::run`, on the
+`generic.reset()` inside the `catch` handler. Previous read of the same address by
+the **main thread** in `rpp::test::run_test_func`, `tests.cpp:723`. So the harness
+advances to the next test while a worker is still unwinding the exception path of
+the last one. Read this as a lifecycle ordering problem, not a missing lock.
+
+**B1b, `semaphore.h:99`, 1 of the 4.**
+heap-use-after-free in `rpp::semaphore::spin_lock`, through
+`rpp::spin_lock<std::mutex>` at `mutex.h:197`, reported inside
+`__gthread_mutex_trylock`. The semaphore outlives its own mutex, or a waiter
+touches it after the owner is gone.
+
+**Not the same as the earlier coroutine sighting.** A single run once reported a
+race on the exception a coroutine rethrows, `test_coroutines.cpp:135`. 94
+sequential ASAN runs found no use-after-free anywhere, so that one looks like a
+TSAN blind spot in uninstrumented libstdc++ exception refcounting. B1a and B1b are
+the real work.
+
+### B2. Timing bounds flaked sequential ASAN at 7 percent
+Five causes, all fixed on this branch. 3 of 44 runs failed before, 1 of 50 after
+the first three fixes, 0 of 25 so far after the last two. Kept open until a longer
+sweep confirms zero.
+- `test_sockets.cpp:425`, elapsed 9.9 and 12.8 ms against a 9 ms bound.
+- `test_concurrent_queue.cpp:376`, elapsed 30.4 ms against a 15 ms bound.
+- `test_concurrent_queue.cpp:569`, a 15 ms `wait_pop` timed out and shifted every
+  later item, so one miss cascaded into four failed assertions.
+- `test_coroutines.cpp:49` and `:56`, a 50 ms sleep measured 56.5 ms against a
+  56 ms bound, and a 15 ms sleep measured 28.3 ms against a 20 ms bound.
+- `test_semaphore.cpp:132`, 4 notifies counted of 10 sent.
+Every timing bound sat just below the delay it measured, so a sanitizer erased the
+margin. Each bound now sits just under its own timeout, which is the only property
+the assertion needs. The semaphore one was different: the producer set
+`working = false` while the worker still had notifies to drain, so it now waits for
+the count first.
 
 ### B3. mamabuild cannot export C++20 modules
 `mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
