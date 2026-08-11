@@ -12,6 +12,7 @@ import rpp.strview;
 #include "type_traits.h"
 
 #include <cstdio>        // fprintf
+#include <string>        // std::string
 #include <memory>        // std::shared_ptr
 // NOTE: had to remove, because clang-18 includes <algorithm> here, which crashes clang-tidy
 //#include <unordered_map> // std::unordered_map for to_string extensions

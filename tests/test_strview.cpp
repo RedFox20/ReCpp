@@ -9,6 +9,7 @@ import rpp.strview;
 #endif
 
 #include <rpp/tests.h>
+#include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
 #include <limits>
 #include <unordered_map>
 
