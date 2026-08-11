@@ -1,6 +1,6 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 2. The `rpp.strview` module is the only one that exists today.
+Revision 2. Two modules exist today: `rpp.strview` and `rpp.debugging`.
 
 This document explains the existing experiment and records what a real build
 proves about it. It then fixes the architecture and gives a phased plan for all
@@ -23,6 +23,9 @@ proves about it. It then fixes the architecture and gives a phased plan for all
    shipped the wrong order. CLAUDE.md now carries this as a style rule.
 6. The macro decisions of section 6.3 are settled, and the include removals of
    section 4.3 are approved.
+7. `debugging.h` is split. `debugging.macros.h` holds every macro and costs 50
+   preprocessed lines against 32893. `rpp.debugging` is the second module, and
+   `RppModuleChecks` is the new module-only consumer gate. See section 6.4.
 
 ---
 
@@ -470,7 +473,7 @@ the macro header stays free of includes.
 |---|---|---|---|
 | `log_colors.h` | no | no | 114 macros, 0 declarations. Rule 1. |
 | `config.h` | **no** | **no** | Rule 1. Every rpp header includes it to drive the compiler feature probes, so a consumer already has it. Its integer aliases (`rpp::byte`, `rpp::uint`, `rpp::int64`) reach importers anyway, because every module that includes `config.h` re-exports them. `rpp.strview` does this today. |
-| `debugging.h` | yes | **no** | `LogError` and `Assert` belong to `debugging.h`. The module ships and the macros stay in the header. Section 6.4 shows what a consumer writes. |
+| `debugging.h` | yes | **yes, and it pays** | The split is done and measured. `debugging.macros.h` costs 50 preprocessed lines, `debugging.h` costs 32893. Section 6.4 has the numbers. |
 | `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
 | `tests.h` | **yes** | **yes** | The only clear win. 41 macros against 45 declarations, so the module carries real weight, and `tests_macros.h` needs no include of its own. |
 
@@ -495,67 +498,78 @@ carries macros and declarations together, and finding 11 shows it works. CMake
 has no stable file set for it, and clang calls it experimental. Re-evaluate in
 about two years.
 
-### 6.4 How a consumer uses the logging API
+### 6.4 The `debugging.h` split, done and measured
 
-`debugging.h` is the hardest case, so it sets the pattern. Its surface has three
-parts, and each one reaches an importer differently.
+`debugging.h` is the hardest case, so it sets the pattern. The split is on this
+branch, and the classic include path did not change.
 
-| Part | Example | How an importer gets it |
-|---|---|---|
-| global C functions | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogWrite` | the module exports them, see below |
-| `namespace rpp` C++ | `rpp::QtPrintable`, `rpp::shorten_filename`, the `__wrap` machinery | a normal `export namespace rpp` block |
-| macros | `LogInfo`, `LogWarning`, `LogError`, `Assert`, `ThrowErr` | the header, always |
+| File | What it holds | Preprocessed lines | Parse |
+|---|---|---|---|
+| `debugging.h` | declarations, then it includes the macro header | 32893 | 325 ms |
+| **`debugging.macros.h`** | every macro, and `config.h` | **50** | **11 ms** |
 
-**A module can export a global-scope C function.** The using-declaration goes at
-global scope in the module purview, not inside `export namespace rpp`:
+Measured with `g++-14 -std=c++20 -E`, and 5 runs of `-fsyntax-only` for the parse
+time. The macro header is **30 times cheaper to parse**, so an importer pays 11 ms
+instead of 325 ms for its macros.
+
+**One include decides that number.** The first split kept `<stdexcept>` in the
+macro header, because `ThrowErr` and `AssertEx` name `std::runtime_error`. That
+version measured 32734 lines, a saving of 0.5 percent, which is no saving at all.
+`<stdexcept>` alone costs 32690 lines and 425 ms, while `config.h` costs 46 lines
+and 13 ms. Moving `<stdexcept>` out is the entire win.
+
+So `debugging.macros.h` includes `config.h` and nothing else. A user of `ThrowErr`
+or `AssertEx` adds `<stdexcept>`, which include-what-you-use asks for anyway.
+`debugging.h` still includes it, so no existing file changes.
+
+**What each consumer writes**
+
+```cpp
+// classic, unchanged
+#include <rpp/debugging.h>
+SetLogSeverityFilter(LogSeverityWarn);
+LogInfo("Beautiful Soup %d", 42);
+
+// module
+#include <rpp/debugging.macros.h>   // 50 lines: LogInfo, LogError, Assert, ThrowErr
+#include <stdexcept>                // only when the file uses ThrowErr or AssertEx
+import rpp.debugging;               // includes first, the import last
+
+SetLogSeverityFilter(LogSeverityWarn);
+LogInfo("Beautiful Soup %d", 42);
+```
+
+Every call site keeps the spelling it has today. `SetLogSeverityFilter` keeps
+global scope, because the module exports it with a global-scope using-declaration:
 
 ```cpp
 export module rpp.debugging;
-export using ::SetLogSeverityFilter;   // stays ::SetLogSeverityFilter for the consumer
-export using ::GetLogSeverityFilter;
+export using ::SetLogSeverityFilter;
 export using ::LogSeverity;
-export using ::LogSeverityInfo;        // an unscoped enum does NOT carry its enumerators
+export using ::LogSeverityInfo;   // an unscoped enum does NOT carry its enumerators
 export using ::LogSeverityWarn;
 export using ::LogSeverityError;
 ```
 
-Measured: a consumer that writes only `import rpp.debugging;` then calls
-`SetLogSeverityFilter(LogSeverityWarn)` compiles with 0 errors on gcc-14 and
-clang-21. The name keeps its global scope, so no call site changes.
+**The cost: the module exports six names that look private.** The macros expand to
+`_LogInfo`, `_LogWarning`, `_LogError`, `_LogExcept`, `_FmtString` and
+`_LogFuncname`, so an importer needs all six visible. `rpp::__wrap` and
+`rpp::__clean_type` go the same way. This is the price of the split, and it is why
+the question was worth asking before doing it.
 
 **Exporting an unscoped enum does not export its enumerators.** The first
-prototype exported `LogSeverity` and forgot `LogSeverityWarn`, and the consumer
-failed with `use of undeclared identifier 'LogSeverityWarn'`. Each enumerator
-needs its own using-declaration, and the generator of changeset 3 has to walk
-them.
+prototype exported `LogSeverity` and forgot `LogSeverityWarn`. The consumer failed
+with `use of undeclared identifier \'LogSeverityWarn\'`. The generator of
+changeset 3 has to walk every enumerator.
 
-**The macros still need the header.** `import rpp.debugging;` alone gives
-`LogInfo` nothing, and the consumer fails to compile. So the answer to "how do I
-log" is one extra line:
+**The check that keeps this honest.** `tests/modulecheck/check_debugging.cpp`
+imports `rpp.debugging`, includes no rpp header except the macro header, and names
+every exported symbol. `<rpp/tests.h>` cannot do this job, because it includes
+`<rpp/debugging.h>` itself and would hide a missing export. CMake builds it as
+`RppModuleChecks` whenever `BUILD_WITH_MODULES=ON`. It passes on gcc-14 and
+clang-21, and both compilers still pass 498/498 in both modes.
 
-```cpp
-#include <rpp/debugging.h>   // LogInfo, LogWarning, LogError, Assert, ThrowErr
-import rpp.debugging;        // ::SetLogSeverityFilter, rpp::QtPrintable, the rest
-
-SetLogSeverityFilter(LogSeverityWarn);
-LogInfo("Beautiful Soup %d", 42);   // filtered out at Warn
-LogWarning("visible %d", 7);
-```
-
-Measured end to end on clang-21: this compiles, links against `libReCpp.a`, and
-prints only the warning. Every call site keeps the spelling it has today.
-
-**So what does the module buy for `debugging.h`?** Not a faster include. The
-header is there either way. It buys two things:
-
-1. `import rpp.debugging;` alone is enough for code that configures logging and
-   never uses a macro, which covers most library code.
-2. The Qt utilities reach other projects through the module, so a consumer that
-   wants `rpp::QtPrintable` does not have to reason about `RPP_HAS_QT` and the
-   `<QString>` include order.
-
-If those two are not worth it, `debugging.h` can stay a header-only module-free
-header like `config.h`. That call is still open.
+This is the template for the other 41 modules.
 
 ---
 
@@ -649,7 +663,7 @@ of `src/rpp/*.h`, so changeset 1 can move a header between layers.
 | Layer | Modules | Count |
 |---|---|---|
 | L0 | minmax, obfuscated_string, scope_guard | 3 |
-| L1 | bitutils, debugging, delegate, endian, future_types, math, predicates, proc_utils, sort, source_loc, **strview** ✓, timepoint, traits, type_traits | 14 |
+| L1 | bitutils, **debugging** ✓, delegate, endian, future_types, math, predicates, proc_utils, sort, source_loc, **strview** ✓, timepoint, traits, type_traits | 14 |
 | L2 | atomic_timepoint, collections, sprint, stack_trace, task, threads, timer, vec | 8 |
 | L3 | load_balancer, memory_pool, mutex, paths, tests | 5 |
 | L4 | atomic_shared_ptr, close_sync, condition_variable, file_io, sockets | 5 |
@@ -659,7 +673,7 @@ of `src/rpp/*.h`, so changeset 1 can move a header between layers.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-43 modules and one umbrella. `rpp.strview` exists, so 42 remain. Excluded:
+43 modules and one umbrella. `rpp.strview` and `rpp.debugging` exist, so 41 remain. Excluded:
 `config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
 it is Android glue. `tests.h` is in, and it is the one header whose macros split
 into `tests_macros.h`.

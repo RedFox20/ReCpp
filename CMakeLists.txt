@@ -252,7 +252,8 @@ install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 ###################################################
 
 if (BUILD_TESTS)
-    file(GLOB_RECURSE RPP_TESTS tests/*.cpp)
+    # non-recursive: tests/modulecheck/ is its own target with its own main()
+    file(GLOB RPP_TESTS tests/*.cpp)
     source_group(tests FILES ${RPP_TESTS})
 
     # we build Rpp from source again so that RPP_DEBUG=1 has an effect in unit tests
@@ -290,6 +291,7 @@ if(BUILD_WITH_MODULES)
 
     set(RPP_MODULES_SRC
         src/rpp/rpp-strview.cppm
+        src/rpp/rpp-debugging.cppm
     )
 
     # Add module interface to the library target
@@ -303,6 +305,16 @@ if(BUILD_WITH_MODULES)
         # not just the .cppm files. Without this, .cpp files that use
         # `import` won't get the -fmodule-file= flag from the build system.
         set_target_properties(RppTests PROPERTIES CXX_SCAN_FOR_MODULES ON)
+
+        # Module-only consumers. Each file imports a module and includes no rpp header,
+        # so a missing export list entry fails the build. <rpp/tests.h> cannot check this,
+        # because it includes the very headers the modules wrap.
+        file(GLOB RPP_MODULE_CHECKS tests/modulecheck/*.cpp)
+        add_executable(RppModuleChecks ${RPP_MODULE_CHECKS})
+        target_sources(RppModuleChecks PRIVATE FILE_SET CXX_MODULES FILES ${RPP_MODULES_SRC})
+        target_include_directories(RppModuleChecks PRIVATE "src")
+        target_link_libraries(RppModuleChecks ReCpp)
+        set_target_properties(RppModuleChecks PROPERTIES CXX_SCAN_FOR_MODULES ON)
     endif()
 endif()
 
