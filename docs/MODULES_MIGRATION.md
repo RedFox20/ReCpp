@@ -20,7 +20,9 @@ proves about it. It then fixes the architecture and gives a phased plan for all
    enforces it.
 5. Section 2.1 is new. gcc-14 rejects a std library include that follows an
    import, and the fix reorders every consumer preamble. The strview experiment
-   shipped the wrong order.
+   shipped the wrong order. CLAUDE.md now carries this as a style rule.
+6. The macro decisions of section 6.3 are settled, and the include removals of
+   section 4.3 are approved.
 
 ---
 
@@ -102,9 +104,9 @@ design and the plan keeps it. Section 8 makes it stronger.
 
 ## 2. Ground truth, measured
 
-Measured on this machine with gcc-14.2, clang-18.1, CMake 3.28.3, Ninja 1.11.1
-and C++20. gcc-14 is tier 1 (D7). clang-21 could not be installed here, so read
-the verification table in D7 before you trust a clang number.
+Measured on this machine with gcc-14.2, clang-21.1.5, clang-18.1, CMake 3.28.3,
+Ninja 1.11.1 and C++20. gcc-14 and clang-21 are tier 1 (D7). Every claim below
+is measured on at least one tier 1 compiler.
 
 | # | Finding | Evidence |
 |---|---|---|
@@ -115,14 +117,16 @@ the verification table in D7 before you trust a clang number.
 | 5 | `export import` re-export chains work. | A prototype `rpp.sprint` that includes `sprint.h` in its global module fragment and adds `export import rpp.strview;` gave a consumer both `rpp::string_buffer` and `rpp::strview`, plus `operator==` and the `_sv` literal. |
 | 6 | The `export import` is load-bearing. | Negative control: remove that one line and the same consumer fails with `error: missing '#include'; 'strview' must be declared before it is used`. Reachable is not visible. |
 | 7 | A module interface unit emits a **strong symbol**. | `nm` shows `T initializer for module rpp.strview` in `rpp-strview.cppm.o`, and that object sits inside `libReCpp.a`. A consumer that compiles the same `.cppm` produces the same symbol. |
-| 8 | **Both clang-18 and gcc-14 accept `import` inside a global module fragment.** | A two-module probe compiled clean on both. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
+| 8 | **gcc-14, clang-21 and clang-18 all accept `import` inside a global module fragment.** | A two-module probe compiled clean on all three, and clang-21 accepted it with `-pedantic-errors`. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
 | 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. Section 6 covers the rest. |
 | 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with modules. One imported translation unit cannot move the number. |
-| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18, gcc-13 and gcc-14 each pass 498/498. Modules: gcc-14 passes 498/498, and clang-18 is refused at configure time by the D7 guard. |
+| 10b | ReCpp passes on every compiler on this machine except clang-21. | Headers: clang-18, gcc-13 and gcc-14 each pass 498/498. Modules: gcc-14 passes 498/498, and clang-18 is refused at configure time by the D7 guard. clang-21 is finding 16. |
 | 11 | A **header unit does deliver macros**, and clang calls it experimental. | `import "rpp/endian.h";` gave a consumer the macro `RPP_BYTESWAP16` and the function `rpp::readBEU16` in one import. clang-18 warns `-Wexperimental-header-units`. See section 6, option M4. |
 | 12 | **gcc-14 rejects a std library include that follows an import.** | See section 2.1. It is a compile error, and it broke the whole modules build until the preamble moved. |
 | 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
 | 14 | gcc-14 builds every module cleanly. | The full `RppTests` modules build passes with 0 errors and 498/498 test cases, once the preamble order is right. |
+| 15 | **clang-21 builds every module cleanly, and it needs no include order.** | 30 suites and 454/454 test cases with 0 errors. Both preamble orders compile. See the D7 table. |
+| 16 | **clang-21 cannot build ReCpp at all today**, and modules are not the cause. | Four `[[clang::coro_return_type]]` errors in `tests/test_event_loop.cpp` and `<future>`. The headers-only clang-21 build gives the same four. |
 
 ### 2.1 The gcc-14 ordering rule, characterized
 
@@ -262,20 +266,41 @@ default, and [`CMakeLists.txt`](../CMakeLists.txt#L273) now rejects the option o
 a tier 2 compiler with a clear message. Without that guard, clang-18 reports the
 ambiguity of section 2.1 and gcc-13 fails deep inside a dyndep scan.
 
-**Verification status of this document.** gcc-14 is installed here, so every
-gcc-14 result is measured. **clang-21 is not available on this machine: the agent
-proxy blocks apt.llvm.org, and `mama install-clang-21` needs a `sudo` this
-container does not have.** So the clang column is clang-18, which is tier 2.
+**Verification status: both tier 1 compilers are measured.** gcc-14.2 comes from
+apt. clang-21.1.5 comes from the LLVM GitHub release tarball, because the agent
+proxy blocks apt.llvm.org and `mama install-clang-21` needs a `sudo` this
+container does not have.
 
-| Claim | gcc-14 | clang-21 |
+| Claim | gcc-14.2 | clang-21.1.5 |
 |---|---|---|
-| the modules build passes, 498/498 | measured | **unverified** |
-| `export import` re-export chain | measured | measured on clang-18 |
-| mixed import and include link and run | measured | unverified |
-| includes before imports | measured, required | unverified |
-| `import` inside a global module fragment | accepted | accepted on clang-18 |
+| the module interface unit builds | pass | pass |
+| `export import` re-export chain | pass | pass |
+| `export import` is load-bearing (negative control) | fails without it | fails without it, 4 errors |
+| mixed import and include link and run in one binary | pass | pass |
+| a std include after an import | **rejected, ~960 errors** | **accepted, 0 errors** |
+| `import` inside a global module fragment | accepted | accepted, even with `-pedantic-errors` |
+| the full modules test suite | **498/498** | **454/454**, see below |
 
-The first task of changeset 5 is to re-run this table on clang-21.
+Two results need their footnote.
+
+**Only gcc-14 needs the include order.** clang-21 compiles both orders cleanly.
+The rule in CLAUDE.md still holds for every file, because a portable file has to
+satisfy the stricter compiler.
+
+**ReCpp does not compile on clang-21 today, and modules are not the reason.**
+Four errors in `tests/test_event_loop.cpp:1222` and `<future>`:
+`function returns a type 'cfuture<>' marked with [[clang::coro_return_type]] but
+is neither a coroutine nor a coroutine wrapper`. The **headers-only** clang-21
+build produces the same four errors, so this is a pre-existing coroutine
+incompatibility. With that one test file removed, the clang-21 modules build
+passes 30 suites and 454/454 test cases with 0 errors. Fixing it is a
+prerequisite for making clang-21 a CI compiler, and it belongs before changeset
+7, not inside it.
+
+**Build note for a tarball toolchain.** A prebuilt LLVM release needs
+`-DCMAKE_CXX_FLAGS=-resource-dir=$(clang++ -print-resource-dir)`. Without it
+`clang-scan-deps` fails every `.ddi` scan with `'stddef.h' file not found`. A
+distro-packaged clang does not need this.
 
 MSVC is worth one note. It has shipped modules the longest and its support is
 good. It sits in tier 2 because ReCpp uses it for one Windows CI job, not
@@ -323,34 +348,35 @@ it. Three were checked by hand and confirmed.
 | `condition_variable.h`, `coroutines.h`, `event_loop.h` | `timer.h` | three copies of the same stale include |
 | `atomic_shared_ptr.h`, `bitutils.h`, `traits.h` | `config.h` | |
 
-### 4.3 Stage it in two commits, because removals break consumers
+### 4.3 Stage it in two commits
+
+**The removals are approved.** ReCpp breaks the accidental include chain for its
+consumers. Those includes are old backward-compatibility additions, and no
+header needs them. A consumer that breaks was already depending on something
+ReCpp never promised, and the fix belongs in the consumer.
 
 **Commit 1a, additions only.** Add the 52 missing std includes. This breaks
 nothing, downstream or in-repo. Land it and turn on the `self-contained` and
 `missing` gates. The `<tuple>` in `traits.h` and the three includes that fixed
 the modules build are already on this branch.
 
-**Commit 1b, removals.** Delete the 10 unused includes, then work the 43
-redundant and 59 std candidates by hand. This **is** a source-breaking change
-for anyone who reached a declaration through ReCpp by accident. `debugging.h`
-has 15 direct includers inside this repo alone, and `config.h` has 27. krattcam,
-krattlink and krattgcs all pull ReCpp through `add_git`, so 1b needs a
-coordinated dependency bump, not a quiet push.
+**Commit 1b, removals.** Order the work so the risk falls, not rises:
 
-Suggested order inside 1b:
+1. Delete the 10 unused includes. They are dead weight, and no header names
+   anything from them.
+2. Work the 43 redundant lines. Each one needs the missing direct include added
+   in the same commit, so the count usually stays the same and the dependency
+   becomes honest.
+3. Leave the 59 std candidates last. Some are platform-conditional
+   (`byteswap.h`, `malloc.h`, `sanitizer/tsan_interface.h`, `QString`), and a
+   removal that passes on Linux can break Windows or Android. Build every CI
+   platform before you delete one of these.
 
-1. Delete the 10 unused includes. Build ReCpp, then build one downstream project
-   against the branch.
-2. Fix whatever the downstream build reports, in the downstream project. A break
-   there is a latent bug the removal exposed.
-3. Work the 43 redundant lines. Each one needs the missing direct include added
-   at the same time, so the count of includes usually stays the same and the
-   dependency becomes honest.
-4. Leave the 59 std candidates last. Some are platform-conditional
-   (`byteswap.h`, `malloc.h`, `sanitizer/tsan_interface.h`, `QString`) and a
-   removal that passes on Linux can break Windows or Android.
+Tell the downstream teams what landed. `debugging.h` has 15 direct includers
+inside this repo, and `config.h` has 27, so the reach outside is larger. A
+one-line note in the release text saves each team the bisect.
 
-**Estimate: 1a is half a day. 1b is 2 days, most of it downstream verification.**
+**Estimate: 1a is half a day. 1b is 1 day.**
 
 ---
 
@@ -428,21 +454,47 @@ The blockers are tooling, not language. clang warns
 `-Wexperimental-header-units`. CMake has no stable file set for header units, so
 every consumer would hand-roll the build rules. GCC support is incomplete.
 
-**Recommendation: M2 for `config.h` and `endian.h`, M1 for the rest, and
-re-evaluate M4 in about two years.** That keeps 60 of the 80 public macros at
-near-zero include cost, and leaves `debugging.h` and `tests.h` alone rather than
-exporting `_LogError` to make a split work.
+### 6.3 The decisions, settled
 
-### 6.3 What needs your decision
+Two rules, then the per-header calls.
 
-1. Is M2 for `config.h` and `endian.h` worth two new headers?
-2. For `debugging.h`, is exporting `_LogError`, `_LogFuncname` and
-   `shorten_filename` acceptable in exchange for a cheap `debugging_macros.h`?
-   That is the only way to split it.
-3. `tests.h` gets no module in this plan. If a downstream project wants
-   `import rpp.tests;`, that is a separate decision, and the macros still need
-   the header.
-4. Naming: `debugging_macros.h`, `debugging.macros.h` or `debugging_defs.h`.
+**Rule 1. A header that is mostly macros stays out of the modules.** A module of
+a macro header exports almost nothing, and the consumer still has to include the
+header. `log_colors.h` (114 macros, 0 declarations) and `config.h` (64 macros,
+14 declarations) both qualify.
+
+**Rule 2. Split to a `_macros.h` case by case, never as a sweep.** A split earns
+its place only when the module then covers the whole non-macro surface, and when
+the macro header stays free of includes.
+
+| Header | Module? | Split macros? | Why |
+|---|---|---|---|
+| `log_colors.h` | no | no | 114 macros, 0 declarations. Rule 1. |
+| `config.h` | **no** | **no** | Rule 1. Every rpp header includes it to drive the compiler feature probes, so a consumer already has it. Its integer aliases (`rpp::byte`, `rpp::uint`, `rpp::int64`) reach importers anyway, because every module that includes `config.h` re-exports them. `rpp.strview` does this today. |
+| `debugging.h` | yes | **no** | `LogError` and `Assert` belong to `debugging.h`. Splitting them means exporting `_LogError`, `_LogFuncname` and `shorten_filename`, and that trades a private surface for a small parse saving. The module ships, the macros stay in the header, and a consumer that wants `LogError` includes `<rpp/debugging.h>`. |
+| `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
+| `tests.h` | **yes** | **yes** | The only clear win. 41 macros against 45 declarations, so the module carries real weight, and `tests_macros.h` needs no include of its own. |
+
+Net effect on the module count: `config.h` leaves and `tests.h` joins, so the
+total holds at 43.
+
+**`tests.h`, the one split.** `TestImpl` expands to a class that derives from
+`rpp::test`, so the type has to be visible where the macro expands. The consumer
+writes:
+
+```cpp
+#include <rpp/tests_macros.h>   // TestImpl, TestCase, AssertThat: no includes of its own
+import rpp.tests;               // rpp::test and the rest of the framework
+```
+
+`tests_macros.h` includes nothing and declares nothing. It only needs the names
+that `import rpp.tests;` already brings, and macro expansion happens later, at
+the use site.
+
+**M4, header units, stays rejected for now.** It is the only mechanism that
+carries macros and declarations together, and finding 11 shows it works. CMake
+has no stable file set for it, and clang calls it experimental. Re-evaluate in
+about two years.
 
 ---
 
@@ -535,10 +587,10 @@ of `src/rpp/*.h`, so changeset 1 can move a header between layers.
 
 | Layer | Modules | Count |
 |---|---|---|
-| L0 | config, minmax, obfuscated_string, scope_guard | 4 |
+| L0 | minmax, obfuscated_string, scope_guard | 3 |
 | L1 | bitutils, debugging, delegate, endian, future_types, math, predicates, proc_utils, sort, source_loc, **strview** ✓, timepoint, traits, type_traits | 14 |
 | L2 | atomic_timepoint, collections, sprint, stack_trace, task, threads, timer, vec | 8 |
-| L3 | load_balancer, memory_pool, mutex, paths | 4 |
+| L3 | load_balancer, memory_pool, mutex, paths, tests | 5 |
 | L4 | atomic_shared_ptr, close_sync, condition_variable, file_io, sockets | 5 |
 | L5 | binary_stream, concurrent_queue, semaphore | 3 |
 | L6 | binary_serializer, thread_pool | 2 |
@@ -547,8 +599,9 @@ of `src/rpp/*.h`, so changeset 1 can move a header between layers.
 | top | umbrella `rpp` | 1 |
 
 43 modules and one umbrella. `rpp.strview` exists, so 42 remain. Excluded:
-`log_colors.h`, `tests.h` and `jni_cpp.h`. The first two are macro frameworks
-(section 6), and the third is Android glue.
+`config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
+it is Android glue. `tests.h` is in, and it is the one header whose macros split
+into `tests_macros.h`.
 
 Per module, the loop is: generate the `.cppm`, add it to `RPP_MODULES_SRC`, add
 the import preamble to its test, build `RppModuleTests`, fix what the compiler
@@ -635,7 +688,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | Risk | Impact | Response |
 |---|---|---|
 | Changeset 1b breaks a downstream build | krattcam, krattlink or krattgcs fails to compile after a dependency bump | Build one downstream project against the branch before merging 1b. A break there is a latent bug the removal exposed. |
-| clang-21 is unverified (D7) | The whole plan rests on one measured compiler, gcc-14 | Install clang-21 and re-run the D7 table as the first task of changeset 5. clang-18 already shows one facade defect, so treat this as likely work, not a formality. |
+| clang-21 rejects `test_event_loop.cpp` (finding 16) | clang-21 cannot join CI, headers or modules, until it is fixed | Fix the four `[[clang::coro_return_type]]` errors before changeset 7. It is a coroutine annotation problem, not a module problem, so it can land at any time. |
 | Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |
 | A consumer writes its import above its includes | Hundreds of std redefinition errors on gcc-14 (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
 | Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI. |
@@ -663,14 +716,14 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | Changeset | Work | Days | Blocks |
 |---|---|---|---|
 | 1a | add 52 missing includes, turn on 2 gates | 0.5 | everything |
-| 1b | remove 10 unused, review 43 redundant and 59 std | 2 | D5, needs a downstream bump |
+| 1b | remove 10 unused, review 43 redundant and 59 std | 1 | D5 |
 | 2 | widen the missing-include check to rpp headers | 0.5 | changeset 3 |
 | 3 | generate the export lists | 1.5 | changeset 5 |
 | 4 | dual-mode test harness | 0.5 | changeset 5 |
 | 5 | 42 modules plus the umbrella | 2.5 | changeset 6 |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 |
-| 7 | CI, docs, measurement | 1 | — |
+| 7 | CI, docs, measurement | 1 | none |
 
-**Total: about 10 working days.** Changesets 1 and 2 are three of them, and they
-stand on their own value. Section 6 needs your decision before changeset 3
-starts.
+**Total: about 9 working days.** Changesets 1 and 2 are two of them, and they
+stand on their own value even if the module work stops. Every decision in
+sections 3 and 6 is settled, so changeset 1a can start now.
