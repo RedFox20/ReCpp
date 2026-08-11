@@ -339,14 +339,11 @@ if(RPP_BUILD_MODULES)
         set_target_properties(RppTests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
         # Module-only consumers. Each file imports a module and includes no rpp header,
-        # so a missing export list entry fails the build. <rpp/tests.h> cannot check this,
-        # because it includes the very headers the modules wrap.
+        # so a missing export list entry fails the build. They join RppTests rather than a
+        # target of their own: a second target that also links ReCpp would see two IFCs for
+        # the same module, and MSVC rejects that with C7684 ambiguous resolution.
         file(GLOB RPP_MODULE_CHECKS tests/modulecheck/*.cpp)
-        add_executable(RppModuleChecks ${RPP_MODULE_CHECKS})
-        target_sources(RppModuleChecks PRIVATE FILE_SET CXX_MODULES FILES ${RPP_MODULES_SRC})
-        target_include_directories(RppModuleChecks PRIVATE "src")
-        target_link_libraries(RppModuleChecks ReCpp)
-        set_target_properties(RppModuleChecks PROPERTIES CXX_SCAN_FOR_MODULES ON)
+        target_sources(RppTests PRIVATE ${RPP_MODULE_CHECKS})
     endif()
 endif()
 

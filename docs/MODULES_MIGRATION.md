@@ -260,8 +260,8 @@ weak toolchain from setting the ceiling for the strong ones.
 
 | Tier | Compilers | What they get |
 |---|---|---|
-| **1, modules** | gcc-14 and newer, clang-21 and newer | every module, the `RppModuleTests` binary, the CI module gates |
-| **2, headers only** | MSVC 2022, clang-18, gcc-13, Android NDK clang, the MIPS gcc-12 cross build | the classic `#include` path, unchanged and fully supported |
+| **1, modules** | gcc-14+, clang-21+, MSVC 19.34+ | every module, and the module-only consumer checks |
+| **2, headers only** | clang-18, gcc-13, Android NDK clang, the MIPS gcc-12 cross build | the classic `#include` path, unchanged and fully supported |
 
 This is a support decision, not a language one. D1 already makes it free:
 `libReCpp.a` and every header behave the same either way, so a tier 2 compiler
@@ -307,10 +307,12 @@ cause. A raw `std::thread` plus `join()` replaces it, and clang-21 now passes
 `clang-scan-deps` fails every `.ddi` scan with `'stddef.h' file not found`. A
 distro-packaged clang does not need this.
 
-MSVC is worth one note. It has shipped modules the longest and its support is
-good. It sits in tier 2 because ReCpp uses it for one Windows CI job, not
-because the compiler is weak. Moving it to tier 1 later costs one CI job and no
-code.
+MSVC is tier 1. A local build on MSVC 14.44 compiles both modules. It exposed one
+rule the other compilers hide: **the same `.cppm` must not reach two targets that
+also link each other.** MSVC then finds two IFCs for one module name and fails with
+`C7684 module name 'rpp.strview' has an ambiguous resolution to IFC`. The
+module-only consumer checks live inside `RppTests` for that reason, not in a target
+of their own.
 
 ---
 

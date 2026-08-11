@@ -74,6 +74,14 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C8. MSVC failed the modules build with C7684 ambiguous IFC resolution
+`RppModuleChecks` carried its own copy of the module file set and also linked
+`ReCpp`, which carries the same one. MSVC 14.44 then saw two IFCs for
+`rpp.strview` and `rpp.debugging` and refused both.
+Fixed: the module-only checks join `RppTests` instead of a target of their own,
+and the separate executable is gone. A `.cppm` must not reach two targets that
+link each other.
+
 ### C1. The modules build did not compile
 `sprint.h` swapped `#include "strview.h"` for `import rpp.strview;` under
 `RPP_BUILD_WITH_MODULES`. That dropped the transitive `<cstring>`, `<string>` and
