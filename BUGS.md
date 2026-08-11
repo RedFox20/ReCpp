@@ -29,10 +29,17 @@ sequential ASAN runs found no use-after-free anywhere, so that one looks like a
 TSAN blind spot in uninstrumented libstdc++ exception refcounting. B1a and B1b are
 the real work.
 
-### B2. Timing bounds flaked sequential ASAN at 7 percent
-Five causes, all fixed on this branch. 3 of 44 runs failed before, 1 of 50 after
-the first three fixes, 0 of 25 so far after the last two. Kept open until a longer
-sweep confirms zero.
+### B2. Timing bounds flake sequential ASAN, now 1 run in 30
+Measured on an idle machine, gcc-14 ASAN, one suite at a time.
+Before: 3 of 44 runs. After the six fixes below: 1 of 30.
+The rate fell but did not reach zero, and the survivors are at new sites
+(`test_concurrent_queue.cpp:443` and `test_sockets.cpp:398`), so this is a long
+tail and not six isolated defects. Nearly every timing assertion in the suite sets
+its bound just above the delay it measures, and a sanitizer erases that margin.
+A per-assertion widening will keep finding new sites. The suite needs one slack
+policy for sanitizer builds, for example a multiplier applied to every upper
+bound when `RPP_ASAN` or the TSAN equivalent is set.
+Six causes fixed so far:
 - `test_sockets.cpp:425`, elapsed 9.9 and 12.8 ms against a 9 ms bound.
 - `test_concurrent_queue.cpp:376`, elapsed 30.4 ms against a 15 ms bound.
 - `test_concurrent_queue.cpp:569`, a 15 ms `wait_pop` timed out and shifted every
