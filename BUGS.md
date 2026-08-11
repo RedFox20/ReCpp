@@ -6,28 +6,34 @@ lines.
 
 ## Open
 
-### B1. TSAN fires on about 1 in 4 plain sequential runs
-4 races in 13 sequential `RppTests` runs, gcc-14 TSAN, no parallelism. Two
-distinct sites, both in ReCpp code, both on a test teardown boundary.
+### B1. TSAN races stopped after the test fixes, cause not proven
+Rate before the B2 fixes: 4 races in 33 sequential runs. After: **0 in 37**
+(25 default, 12 with `history_size=7`). At the old rate, 37 clean runs has about
+1 percent probability, so the drop is real. gcc-14 TSAN, no parallelism.
 
-**B1a, `thread_pool.cpp:351`, 3 of the 4.**
-Write of 8 bytes by a pool worker in `rpp::pool_worker::run`, on the
-`generic.reset()` inside the `catch` handler. Previous read of the same address by
-the **main thread** in `rpp::test::run_test_func`, `tests.cpp:723`. So the harness
-advances to the next test while a worker is still unwinding the exception path of
-the last one. Read this as a lifecycle ordering problem, not a missing lock.
+The two sites were:
+- `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
+  main-thread read at `tests.cpp:723`, which is `typeid(e).hash_code()`.
+- `semaphore.h:99`, heap-use-after-free in `rpp::semaphore::spin_lock`.
 
-**B1b, `semaphore.h:99`, 1 of the 4.**
-heap-use-after-free in `rpp::semaphore::spin_lock`, through
-`rpp::spin_lock<std::mutex>` at `mutex.h:197`, reported inside
-`__gthread_mutex_trylock`. The semaphore outlives its own mutex, or a waiter
-touches it after the owner is gone.
+**Read them as fallout from tests failing early, not as a thread_pool defect.**
+An assertion that fails mid-test aborts the test body and leaves pool workers and
+tasks in flight while the framework moves to the next test. The semaphore one has
+a direct mechanical link: the old test set `working = false` while the worker was
+still inside `sem.wait`, so the semaphore died under a live waiter. The
+thread_pool link is plausible and unproven.
 
-**Not the same as the earlier coroutine sighting.** A single run once reported a
-race on the exception a coroutine rethrows, `test_coroutines.cpp:135`. 94
-sequential ASAN runs found no use-after-free anywhere, so that one looks like a
-TSAN blind spot in uninstrumented libstdc++ exception refcounting. B1a and B1b are
-the real work.
+A review of `pool_worker::run` found the code correct: the task moves to a local
+that outlives the try block, the handler destroys it before `unhandled_exception`
+runs, and that call cleans up the worker state.
+
+Do not add a lock here. Confirm the correlation first, by rebuilding the tree
+before the B2 fixes and re-running 30 sequential TSAN runs. If the old rate comes
+back, the tests caused it and this closes.
+
+**Disproved along the way.** Concurrent throw and catch on two threads with
+nothing shared produces no TSAN report at all, over 6 runs of 60 rounds each. So
+libstdc++ exception storage is not the explanation.
 
 ### B2. Timing bounds flake sequential ASAN, now 1 run in 30
 Measured on an idle machine, gcc-14 ASAN, one suite at a time.
