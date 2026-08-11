@@ -15,9 +15,10 @@ proves about it. It then fixes the architecture and gives a phased plan for all
    measures all three defects.
 3. Section 6 is new. It lays out the macro strategy as a decision table to vet,
    and it reports a measured result for C++20 header units.
-4. Decision D7 is new. It sets two compiler tiers: gcc-14 and clang-21 carry
-   modules, and every other compiler stays on headers. `BUILD_WITH_MODULES`
-   defaults to `AUTO`, so `CMakeLists.txt` decides per toolchain.
+4. Decision D7 is new. It sets two compiler tiers: gcc-14, clang-21 and MSVC
+   19.34 carry modules, and every older compiler stays on headers.
+   `BUILD_WITH_MODULES` defaults to `AUTO`, so `CMakeLists.txt` decides per
+   toolchain.
 5. Section 2.1 is new. gcc-14 rejects a std library include that follows an
    import, and the fix reorders every consumer preamble. The strview experiment
    shipped the wrong order. CLAUDE.md now carries this as a style rule.
@@ -25,7 +26,7 @@ proves about it. It then fixes the architecture and gives a phased plan for all
    section 4.3 are approved.
 7. `debugging.h` is split. `debugging.macros.h` holds every macro and costs 50
    preprocessed lines against 32893. `rpp.debugging` is the second module, and
-   `RppModuleChecks` is the new module-only consumer gate. See section 6.4.
+   `tests/modulecheck/` holds the module-only consumer gate. See section 6.4.
 
 ---
 
@@ -91,7 +92,7 @@ carries modules. So the same source compiles two ways:
 | Mode | How to build | What it proves |
 |---|---|---|
 | headers | `cmake -DBUILD_TESTS=ON` | the classic path still works |
-| modules | `cmake -DBUILD_TESTS=ON` on GCC 14+ or Clang 21+ with Ninja | the export list is complete |
+| modules | `cmake -DBUILD_TESTS=ON` on GCC 14+, Clang 21+ or MSVC 19.34+ | the export list is complete |
 
 The test body is the completeness gate. A name the export list forgets is a
 compile error in module mode and a silent pass in header mode. This is a good
@@ -108,8 +109,9 @@ design and the plan keeps it. Section 8 makes it stronger.
 ## 2. Ground truth, measured
 
 Measured on this machine with gcc-14.2, clang-21.1.5, clang-18.1, CMake 3.28.3,
-Ninja 1.11.1 and C++20. gcc-14 and clang-21 are tier 1 (D7). Every claim below
-is measured on at least one tier 1 compiler.
+Ninja 1.11.1 and C++20, plus one MSVC 14.44 build elsewhere. gcc-14, clang-21 and
+MSVC are tier 1 (D7). Every claim below is measured on at least one tier 1
+compiler.
 
 | # | Finding | Evidence |
 |---|---|---|
@@ -123,7 +125,7 @@ is measured on at least one tier 1 compiler.
 | 8 | **gcc-14, clang-21 and clang-18 all accept `import` inside a global module fragment.** | A two-module probe compiled clean on all three, and clang-21 accepted it with `-pedantic-errors`. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
 | 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. Section 6 covers the rest. |
 | 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with modules. One imported translation unit cannot move the number. |
-| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18, gcc-13, gcc-14 and clang-21 each pass 498/498. Modules: gcc-14 and clang-21 each pass 498/498 plus `RppModuleChecks`. gcc-13 and clang-18 fall back to headers on their own and say why. |
+| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18 and gcc-13 pass 31 suites and 498/498. Modules: gcc-14 and clang-21 pass 32 suites and 499/499, the extra suite being the module-only consumer check. gcc-13 and clang-18 fall back to headers on their own and say why. |
 | 11 | A **header unit does deliver macros**, and clang calls it experimental. | `import "rpp/endian.h";` gave a consumer the macro `RPP_BYTESWAP16` and the function `rpp::readBEU16` in one import. clang-18 warns `-Wexperimental-header-units`. See section 6, option M4. |
 | 12 | **gcc-14 rejects a std library include that follows an import.** | See section 2.1. It is a compile error, and it broke the whole modules build until the preamble moved. |
 | 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
@@ -570,9 +572,10 @@ changeset 3 has to walk every enumerator.
 **The check that keeps this honest.** `tests/modulecheck/check_debugging.cpp`
 imports `rpp.debugging`, includes no rpp header except the macro header, and names
 every exported symbol. `<rpp/tests.h>` cannot do this job, because it includes
-`<rpp/debugging.h>` itself and would hide a missing export. CMake builds it as
-`RppModuleChecks` whenever `BUILD_WITH_MODULES=ON`. It passes on gcc-14 and
-clang-21, and both compilers still pass 498/498 in both modes.
+`<rpp/debugging.h>` itself and would hide a missing export. The file compiles into
+`RppTests`, and `tests/test_modules.cpp` calls it through the normal test
+framework. It must not get a target of its own: a second target that also links
+`ReCpp` gives MSVC two IFCs for one module name, which is `C7684`.
 
 This is the template for the other 41 modules.
 
