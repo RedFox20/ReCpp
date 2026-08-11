@@ -6,34 +6,32 @@ lines.
 
 ## Open
 
-### B1. TSAN races stopped after the test fixes, cause not proven
-Rate before the B2 fixes: 4 races in 33 sequential runs. After: **0 in 37**
-(25 default, 12 with `history_size=7`). At the old rate, 37 clean runs has about
-1 percent probability, so the drop is real. gcc-14 TSAN, no parallelism.
-
-The two sites were:
+### B1. TSAN races reproduce only under CPU load, cause unknown
+Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
   main-thread read at `tests.cpp:723`, which is `typeid(e).hash_code()`.
 - `semaphore.h:99`, heap-use-after-free in `rpp::semaphore::spin_lock`.
 
-**Read them as fallout from tests failing early, not as a thread_pool defect.**
-An assertion that fails mid-test aborts the test body and leaves pool workers and
-tasks in flight while the framework moves to the next test. The semaphore one has
-a direct mechanical link: the old test set `working = false` while the worker was
-still inside `sem.wait`, so the semaphore died under a live waiter. The
-thread_pool link is plausible and unproven.
+**Measurement state, stated plainly.** The 4 of 33 came from a machine that was
+also building and running other suites. Two later sweeps on an idle machine, 67
+runs in total, reported nothing. A before-and-after comparison was attempted and
+failed: the `git stash` had nothing to stash, because the test fixes were already
+committed, so both sweeps measured the same tree. **There is no evidence either
+way about whether the B2 fixes changed this.**
 
-A review of `pool_worker::run` found the code correct: the task moves to a local
-that outlives the try block, the handler destroys it before `unhandled_exception`
-runs, and that call cleans up the worker state.
+So the only positive signal needs CPU contention, which is what a shared CI runner
+has. Reproduce it that way on purpose: run one suite while a separate load
+generator saturates the cores, and count over 50 runs. Do not run several suites
+at once, because ReCpp does not support that and the result means nothing.
 
-Do not add a lock here. Confirm the correlation first, by rebuilding the tree
-before the B2 fixes and re-running 30 sequential TSAN runs. If the old rate comes
-back, the tests caused it and this closes.
+**A review of `pool_worker::run` found the code correct.** The task moves to a
+local that outlives the try block, the handler destroys it before
+`unhandled_exception` runs, and that call cleans up the worker state. Do not add a
+lock. A wrong fix here is worse than the report.
 
-**Disproved along the way.** Concurrent throw and catch on two threads with
-nothing shared produces no TSAN report at all, over 6 runs of 60 rounds each. So
-libstdc++ exception storage is not the explanation.
+**Disproved.** Concurrent throw and catch on two threads with nothing shared
+produces no TSAN report, over 6 runs of 60 rounds each. libstdc++ exception
+storage is not the explanation.
 
 ### B2. Timing bounds flake sequential ASAN, now 1 run in 30
 Measured on an idle machine, gcc-14 ASAN, one suite at a time.
