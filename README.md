@@ -74,25 +74,30 @@ with a custom `liblog.so` that redirects `__android_log_*` to stdout/stderr with
 
 ## Experimental: C++20 Modules
 
-ReCpp has experimental support for C++20 named modules. This allows importing ReCpp headers as modules instead of using `#include`, providing faster compilation and better isolation.
+ReCpp has experimental support for C++20 named modules. A module import replaces an
+`#include` and gives the importer a much smaller preprocessing job. The full migration
+plan is in [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md).
 
 ### Requirements
+
+Modules need a tier 1 compiler. Every other compiler builds ReCpp through the headers,
+which is the default and stays fully supported. `BUILD_WITH_MODULES` refuses a tier 2
+compiler at configure time.
 
 | Requirement | Minimum |
 |-------------|---------|
 | C++ standard | C++20 |
 | CMake | 3.28+ |
-| MSVC | 19.34+ (VS 2022 17.4) |
-| Clang | 16+ (18+ recommended) |
 | GCC | 14+ |
-| Generator | Ninja (recommended) |
+| Clang | 21+ |
+| Generator | Ninja (required) |
 
 ### Building with modules
 
 Enable the `BUILD_WITH_MODULES` option alongside C++20:
 ```bash
 # mama
-CXX20=1 BUILD_WITH_MODULES=1 mama clang tsan rebuild test="-vv test_strview_module"
+CXX20=1 BUILD_WITH_MODULES=1 mama gcc build test="nogdb -vv test_strview"
 
 # CMake
 cmake -B build -G Ninja -DCXX20=ON -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON
@@ -102,45 +107,80 @@ cmake --build build
 ### Using modules
 
 Module interface units are in `src/rpp/` with the naming convention `rpp-<module>.cppm`.
-Each module wraps an existing header using the global module fragment pattern, so the traditional `#include` approach continues to work alongside modules.
+Each module wraps an existing header, so the traditional `#include` keeps working and a
+program can mix both styles in one binary.
+
+**Put every `#include` first and every `import` last.** GCC 14 re-parses a standard
+library header that follows an import, and its internal templates then collide with the
+entities the module already made reachable. One misplaced import gives hundreds of
+compile errors.
 
 ```cpp
-// Traditional header include (still works as before)
-#include <rpp/strview.h>
+#include <rpp/tests.h>   // 1. rpp headers
+#include <string>        // 2. std headers
 
-// C++20 module import
-import rpp.strview;
+import rpp.strview;      // 3. imports, last
 ```
 
-Macros (`RPPAPI`, `LogError`, `Assert`, `_sv` literal, etc.) cannot be exported from C++20 modules by design. If you need macros, combine the module import with a traditional include:
+### Macros need a header
+
+A C++20 module cannot export a macro. Where the macro surface is worth splitting, the
+macros live in a `<name>.macros.h` header that costs almost nothing to parse. Where it is
+not, include the original header.
+
 ```cpp
-import rpp.strview;
-#include <rpp/config.h>      // for RPPAPI, RPP_ENABLE_UNICODE, etc.
-#include <rpp/debugging.h>   // for LogError, Assert, etc.
+#include <rpp/debugging.macros.h>   // LogInfo, LogWarning, LogError, Assert, ThrowErr
+#include <stdexcept>                // only when the file uses ThrowErr or AssertEx
+import rpp.debugging;               // ::SetLogSeverityFilter, rpp::add_log_handler, ...
+
+SetLogSeverityFilter(LogSeverityWarn);
+LogInfo("Beautiful Soup %d", 42);
 ```
+
+`<rpp/debugging.macros.h>` costs 50 preprocessed lines. `<rpp/debugging.h>` costs 32893.
+The classic `#include <rpp/debugging.h>` still gives both the declarations and the macros,
+so no existing file changes.
+
+`RPPAPI`, `FINLINE` and the platform probes stay in `<rpp/config.h>`, which is 46
+preprocessed lines and needs no split.
 
 ### Available modules
 
-| Module | Header | Exported types |
+| Module | Header | Exported names |
 |--------|--------|----------------|
 | `rpp.strview` | [`strview.h`](src/rpp/strview.h) | `strview`, `ustrview`, `line_parser`, `keyval_parser`, `bracket_parser`, `concat`, `to_lower`, `to_upper`, `replace`, `_sv` literal, and more |
+| `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
 
 ### How it works
 
-The module interface units use the **global module fragment** to include existing headers, then re-export selected types via `using`-declarations. This is the same pattern used by `libstdc++` and `libc++` to implement `import std;`.
+A module interface unit includes its header in the **global module fragment**, then
+re-exports the names with `using`-declarations. Every declaration stays attached to the
+global module, so `import rpp.strview` and `#include <rpp/strview.h>` name the same type.
+This is the pattern `libstdc++` and `libc++` use to implement `import std;`.
 
 ```cpp
 // src/rpp/rpp-strview.cppm
 module;
-#include "strview.h"          // included in the global module fragment
+#include "strview.h"          // the umbrella include, in the global module fragment
 export module rpp.strview;
 
 export namespace rpp {
-    using rpp::strview;       // re-export as "visible" to importers
+    using rpp::strview;       // reachable becomes visible
     using rpp::line_parser;
     // ...
 }
 ```
+
+A module can also re-export a global-scope C function, which keeps the call site
+unchanged:
+
+```cpp
+export using ::SetLogSeverityFilter;
+export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumerators
+```
+
+`BUILD_WITH_MODULES=ON` also builds `RppModuleChecks`. Each file there imports one module
+and includes no rpp header except a macro header, so a missing export fails the build.
 
 ---
 
@@ -245,9 +285,9 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L199) | `1` if targeting ARM Cortex-M architecture |
 | [`RPP_ARM_ARCH`](src/rpp/config.h#L215) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
 | [`RPP_64BIT`](src/rpp/config.h#L240) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L390) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L398) | `1` if target is big-endian |
-| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L408) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L392) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L400) | `1` if target is big-endian |
+| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L410) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
 
 ### Feature Detection
 
@@ -262,57 +302,57 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 |-------|-------------|
 | [`FINLINE`](src/rpp/config.h#L233) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
 | [`NOINLINE`](src/rpp/config.h#L224) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](src/rpp/config.h#L264) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L323) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L255) | Delete copy and move constructors and assignment operators |
+| [`NODISCARD`](src/rpp/config.h#L266) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L325) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L257) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L287) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L298) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L289) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L300) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L338) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L354) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L355) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L356) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L340) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L356) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L357) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L358) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](src/rpp/config.h#L367) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](src/rpp/config.h#L368) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](src/rpp/config.h#L369) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L370) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L379) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L378) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L381) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L380) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L383) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L382) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L385) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L384) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L369) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L370) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L371) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L372) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L381) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L380) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L383) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L382) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L385) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L384) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L387) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L386) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.h#L428) | `unsigned char` |
-| [`ushort`](src/rpp/config.h#L429) | `unsigned short` |
-| [`uint`](src/rpp/config.h#L430) | `unsigned int` |
-| [`ulong`](src/rpp/config.h#L431) | `unsigned long` |
-| [`int16`](src/rpp/config.h#L433) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.h#L434) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.h#L437) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.h#L438) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.h#L444) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.h#L445) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L430) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L431) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L432) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L433) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L435) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L436) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L439) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L440) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L446) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L447) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -656,8 +696,8 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Item | Description |
 |------|-------------|
-| [`string_buffer`](src/rpp/sprint.h#L77) | Fast, always-null-terminated string builder |
-| [`format_opt`](src/rpp/sprint.h#L66) | Format options enum: `none`, `lowercase`, `uppercase` |
+| [`string_buffer`](src/rpp/sprint.h#L76) | Fast, always-null-terminated string builder |
+| [`format_opt`](src/rpp/sprint.h#L65) | Format options enum: `none`, `lowercase`, `uppercase` |
 
 ### string_buffer Methods
 
@@ -679,11 +719,11 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Function | Description |
 |----------|-------------|
-| [`to_string(char)`](src/rpp/sprint.h#L37) | Locale-agnostic char to string |
-| [`to_string(int)`](src/rpp/sprint.h#L45) | Locale-agnostic int to string |
-| [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
-| [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
-| [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
+| [`to_string(char)`](src/rpp/sprint.h#L36) | Locale-agnostic char to string |
+| [`to_string(int)`](src/rpp/sprint.h#L44) | Locale-agnostic int to string |
+| [`to_string(float)`](src/rpp/sprint.h#L50) | Locale-agnostic float to string |
+| [`to_string(double)`](src/rpp/sprint.h#L51) | Locale-agnostic double to string |
+| [`to_string(bool)`](src/rpp/sprint.h#L54) | Bool to `"true"` or `"false"` |
 | [`print(args...)`](src/rpp/sprint.h#L461) | Print to stdout |
 | [`println(args...)`](src/rpp/sprint.h#L481) | Print to stdout with newline |
 | [`to_hex_string(s, opt)`](src/rpp/sprint.h#L407) | Converts string bytes to hexadecimal representation |
@@ -1417,12 +1457,12 @@ Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_awa
 
 | Type | Description |
 |------|-------------|
-| [`task<T>`](src/rpp/task.h#L62) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
-| [`deferred<T>`](src/rpp/task.h#L63) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
-| [`done()`](src/rpp/task.h#L154) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
-| [`deferred<T>::start()`](src/rpp/task.h#L197) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
+| [`task<T>`](src/rpp/task.h#L63) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
+| [`deferred<T>`](src/rpp/task.h#L65) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
+| [`done()`](src/rpp/task.h#L179) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
+| [`deferred<T>::start()`](src/rpp/task.h#L233) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
-Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L319) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L330).
+Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L325) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L354).
 
 Example: [tests/test_task.cpp](tests/test_task.cpp)
 
@@ -1473,34 +1513,34 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L264) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L273) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
-| [`run_until_idle()`](src/rpp/event_loop.h#L289) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L301) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L319) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
-| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L349) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
-| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L367) | Pump until that future is ready, then return its value; throws on timeout |
-| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L380) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L685) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L409) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L884) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L453) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L461) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L716) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L730) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L744) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L510) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L502) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L899) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L793) | Sleep on a background thread, resume on the loop thread |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L797) | Sleep until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L234) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L241) | Block until all pending work drains, with timeout |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L247) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L226) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L217) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L223) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L229) | Thread ID of the loop's owner thread |
+| [`run_loop()`](src/rpp/event_loop.h#L287) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L296) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
+| [`run_until_idle()`](src/rpp/event_loop.h#L313) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L325) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L343) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
+| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L373) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
+| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L391) | Pump until that future is ready, then return its value; throws on timeout |
+| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L404) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L709) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L433) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L908) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L477) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L485) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L740) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L754) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L768) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L534) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L526) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L923) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L817) | Sleep on a background thread, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L821) | Sleep until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L239) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L246) | Block until all pending work drains, with timeout |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L252) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L231) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L222) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L228) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L234) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
@@ -3709,10 +3749,10 @@ Cross-platform logging with severity filtering, log handlers, timestamps, and as
 
 | Macro | Description |
 |-------|-------------|
-| [`LogInfo(format, ...)`](src/rpp/debugging.h#L283) | Log informational message |
-| [`LogWarning(format, ...)`](src/rpp/debugging.h#L289) | Log warning |
-| [`LogError(format, ...)`](src/rpp/debugging.h#L295) | Log error (debug assert) |
-| [`Assert(expression, format, ...)`](src/rpp/debugging.h#L309) | Conditional error log |
+| [`LogInfo(format, ...)`](src/rpp/debugging.macros.h#L116) | Log informational message |
+| [`LogWarning(format, ...)`](src/rpp/debugging.macros.h#L122) | Log warning |
+| [`LogError(format, ...)`](src/rpp/debugging.macros.h#L128) | Log error (debug assert) |
+| [`Assert(expression, format, ...)`](src/rpp/debugging.macros.h#L142) | Conditional error log |
 
 ### Configuration Functions
 
@@ -4343,32 +4383,32 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Item | Description |
 |------|-------------|
-| [`test`](src/rpp/tests.h#L39) | Base test class with lifecycle hooks |
-| [`test_info`](src/rpp/tests.h#L40) | Test registration metadata |
-| [`TestVerbosity`](src/rpp/tests.h#L67) | `None`, `Summary`, `TestLabels`, `AllMessages` |
+| [`test`](src/rpp/tests.h#L29) | Base test class with lifecycle hooks |
+| [`test_info`](src/rpp/tests.h#L35) | Test registration metadata |
+| [`TestVerbosity`](src/rpp/tests.h#L47) | `None`, `Summary`, `TestLabels`, `AllMessages` |
 
 ### Key Macros
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L713) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L728) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L745) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L585) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L601) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L637) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L706) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L576) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L610) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.h#L693) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.h#L708) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.h#L725) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.h#L565) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.h#L581) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L617) | Assert inequality |
+| [`AssertTrue(expr)`](src/rpp/tests.h#L686) | Assert expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.h#L556) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.h#L590) | Assert expression throws |
 
 ### Running Tests
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(patterns)`](src/rpp/tests.h#L283) | Run tests matching patterns |
-| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L294) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L283) | Run all registered tests |
-| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L65) | Registers a unit test with given name, factory and autorun flag |
+| [`test::run_tests(patterns)`](src/rpp/tests.h#L279) | Run tests matching patterns |
+| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L274) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L279) | Run all registered tests |
+| [`register_test(name, factory, autorun)`](src/rpp/tests.h#L45) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase
 
@@ -4581,8 +4621,8 @@ Function type traits for extracting return types and argument types from callabl
 
 | Trait | Description |
 |-------|-------------|
-| [`function_traits<T>`](src/rpp/traits.h#L16) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
-| [`first_arg_type<T>`](src/rpp/traits.h#L50) | First argument type of a callable |
+| [`function_traits<T>`](src/rpp/traits.h#L17) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
+| [`first_arg_type<T>`](src/rpp/traits.h#L51) | First argument type of a callable |
 
 ---
 
