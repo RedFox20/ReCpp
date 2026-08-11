@@ -6,6 +6,7 @@
  */
 #include "config.h"
 #include <type_traits>
+#include <tuple>      // std::tuple, for function_traits::arg_types
 // #include <functional> // std::function
 
 namespace rpp

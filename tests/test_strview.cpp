@@ -2,16 +2,17 @@
 #pragma execution_character_set("utf-8")
 #endif
 
-// when building with modules, there shouldn't be any differences in the test code
-// this validates our export modules are alright
-#if RPP_BUILD_WITH_MODULES
-import rpp.strview;
-#endif
-
 #include <rpp/tests.h>
 #include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
 #include <limits>
 #include <unordered_map>
+
+// When building with modules, the test code below stays identical. This checks
+// that the export list is complete. GCC 14 redefines every std entity when an
+// import comes first, so the import always goes after the includes.
+#if RPP_BUILD_WITH_MODULES
+import rpp.strview;
+#endif
 
 constexpr auto MAX_DOUBLE = std::numeric_limits<double>::max();
 constexpr auto MIN_DOUBLE = std::numeric_limits<double>::min();

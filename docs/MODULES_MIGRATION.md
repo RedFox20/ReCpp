@@ -1,10 +1,26 @@
 # ReCpp C++20 Modules Migration Plan
 
-Status: plan. The `rpp.strview` experiment is the only module that exists today.
+Revision 2. The `rpp.strview` module is the only one that exists today.
 
 This document explains the existing experiment and records what a real build
 proves about it. It then fixes the architecture and gives a phased plan for all
 43 public headers.
+
+**What changed in revision 2**
+
+1. Decision D4 is accepted and applied. [`sprint.h`](../src/rpp/sprint.h) no
+   longer imports a module.
+2. Include hygiene moves to the front as changeset 1, and it now removes
+   includes as well as adding them. [`tools/check_includes.py`](../tools/check_includes.py)
+   measures all three defects.
+3. Section 6 is new. It lays out the macro strategy as a decision table to vet,
+   and it reports a measured result for C++20 header units.
+4. Decision D7 is new. It sets two compiler tiers: gcc-14 and clang-21 carry
+   modules, and every other compiler stays on headers. `CMakeLists.txt` now
+   enforces it.
+5. Section 2.1 is new. gcc-14 rejects a std library include that follows an
+   import, and the fix reorders every consumer preamble. The strview experiment
+   shipped the wrong order.
 
 ---
 
@@ -47,17 +63,21 @@ libstdc++ and libc++ implement `import std;` the same way.
 
 ### 1.2 The dual-mode unit test
 
-[`tests/test_strview.cpp`](../tests/test_strview.cpp) starts with:
+[`tests/test_strview.cpp`](../tests/test_strview.cpp) carries a preamble, and the
+test cases below it never change:
 
 ```cpp
-// when building with modules, there shouldn't be any differences in the test code
-// this validates our export modules are alright
-#if RPP_BUILD_WITH_MODULES
-import rpp.strview;
-#endif
-
 #include <rpp/tests.h>   // TestImpl, TestCase, AssertThat are macros, so they need the header
+#include <cstring>       // strlen
+
+#if RPP_BUILD_WITH_MODULES
+import rpp.strview;      // the import goes last, see section 2.1
+#endif
 ```
+
+The experiment shipped this the other way round, with the import above the
+includes. That order costs 1603 compile errors on gcc-14. Section 2.1 explains
+why, and this branch fixes it.
 
 The 34 test cases below that preamble are identical in both modes. CMake defines
 `RPP_BUILD_WITH_MODULES=1` only on the `RppTests` target when
@@ -70,7 +90,7 @@ The 34 test cases below that preamble are identical in both modes. CMake defines
 
 The test body is the completeness gate. A name the export list forgets is a
 compile error in module mode and a silent pass in header mode. This is a good
-design and the plan keeps it. Section 6 makes it stronger.
+design and the plan keeps it. Section 8 makes it stronger.
 
 ### 1.3 What CMake does
 
@@ -82,22 +102,67 @@ design and the plan keeps it. Section 6 makes it stronger.
 
 ## 2. Ground truth, measured
 
-Measured on this machine with clang-18, CMake 3.28.3, Ninja 1.11.1, C++20.
+Measured on this machine with gcc-14.2, clang-18.1, CMake 3.28.3, Ninja 1.11.1
+and C++20. gcc-14 is tier 1 (D7). clang-21 could not be installed here, so read
+the verification table in D7 before you trust a clang number.
 
 | # | Finding | Evidence |
 |---|---|---|
-| 1 | The modules build was **broken** before this plan. | `cmake --build build-mod` failed: `tests/test_strview.cpp:58: error: missing '#include'; 'strlen' must be declared before it is used`. The headers-only build of the same tree passed 76/76. |
-| 2 | The cause is a **conditional import inside a header**. | [`sprint.h:6`](../src/rpp/sprint.h#L6) swaps `#include "strview.h"` for `import rpp.strview;`. That drops the transitive `<cstring>`, `<string>` and `<concepts>` from every file that includes `sprint.h`. `sprint.cpp` lost `memcpy` the same way. |
-| 3 | Three added includes fix it. | Added `<cstring>` to `sprint.cpp`, `<string>` to `sprint.h`, `<cstring>` to `test_strview.cpp`. The modules build then linked, and `RppTests test_strview` passed 34/34. |
-| 4 | **53 of 99 source files** rely on a transitive std include. | Scan over 8 std facilities (`<cstring>`, `<string>`, `<vector>`, `<memory>`, `<cstdio>`, `<algorithm>`, `<atomic>`, `<mutex>`). Every one of them breaks the moment its provider chain becomes an `import`. |
-| 5 | `export import` re-export chains work. | A prototype `rpp.sprint` that includes `sprint.h` in its global module fragment and adds `export import rpp.strview;` gave a consumer both `rpp::string_buffer` and `rpp::strview`, plus `operator==` and the `_sv` literal, from one `import rpp.sprint;`. |
+| 1 | The modules build was **broken** before this plan. | `cmake --build` failed: `test_strview.cpp: error: missing '#include'; 'strlen' must be declared before it is used`. The headers-only build of the same tree passed 76/76. |
+| 2 | The cause was a **conditional import inside a header**. | `sprint.h` swapped `#include "strview.h"` for `import rpp.strview;`. That dropped the transitive `<cstring>`, `<string>` and `<concepts>` from every file that includes `sprint.h`. `sprint.cpp` lost `memcpy` the same way. |
+| 3 | Three added includes fixed it. | Modules build links, `RppTests test_strview` passes 34/34, and 498/498 pass in both modes. |
+| 4 | **53 of 99 source files** relied on a transitive std include. | Scan over 8 std facilities. Every one of them breaks the moment its provider chain becomes an `import`. One is fixed, 52 remain. |
+| 5 | `export import` re-export chains work. | A prototype `rpp.sprint` that includes `sprint.h` in its global module fragment and adds `export import rpp.strview;` gave a consumer both `rpp::string_buffer` and `rpp::strview`, plus `operator==` and the `_sv` literal. |
 | 6 | The `export import` is load-bearing. | Negative control: remove that one line and the same consumer fails with `error: missing '#include'; 'strview' must be declared before it is used`. Reachable is not visible. |
-| 7 | A module interface unit emits a **strong symbol**. | `nm` shows `T initializer for module rpp.strview` in `rpp-strview.cppm.o`, and that object is inside `libReCpp.a`. A downstream project that compiles the same `.cppm` produces the same symbol. |
-| 8 | clang-18 accepts `import` inside a global module fragment. | A two-module probe compiled clean with `-pedantic-errors`. P1857R3 ends the preamble at the module declaration, so GCC and MSVC are expected to reject this. Do not rely on it. |
-| 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. `log_colors.h` (114 macros, 0 declarations), `config.h` (62), `tests.h` (39) and `debugging.h` (13) are not. |
-| 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with `BUILD_WITH_MODULES=ON`. Both pass 498/498 test cases over 31 suites. One imported translation unit cannot move the number. Section 9 explains where the real measurement belongs. |
+| 7 | A module interface unit emits a **strong symbol**. | `nm` shows `T initializer for module rpp.strview` in `rpp-strview.cppm.o`, and that object sits inside `libReCpp.a`. A consumer that compiles the same `.cppm` produces the same symbol. |
+| 8 | **Both clang-18 and gcc-14 accept `import` inside a global module fragment.** | A two-module probe compiled clean on both. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
+| 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. Section 6 covers the rest. |
+| 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with modules. One imported translation unit cannot move the number. |
+| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18, gcc-13 and gcc-14 each pass 498/498. Modules: gcc-14 passes 498/498, and clang-18 is refused at configure time by the D7 guard. |
+| 11 | A **header unit does deliver macros**, and clang calls it experimental. | `import "rpp/endian.h";` gave a consumer the macro `RPP_BYTESWAP16` and the function `rpp::readBEU16` in one import. clang-18 warns `-Wexperimental-header-units`. See section 6, option M4. |
+| 12 | **gcc-14 rejects a std library include that follows an import.** | See section 2.1. It is a compile error, and it broke the whole modules build until the preamble moved. |
+| 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
+| 14 | gcc-14 builds every module cleanly. | The full `RppTests` modules build passes with 0 errors and 498/498 test cases, once the preamble order is right. |
 
-Finding 4 is the size of the work. Finding 2 is the design error to remove.
+### 2.1 The gcc-14 ordering rule, characterized
+
+The question this answers: does the failure show up as a build error, a link
+error, or a silent duplicate symbol? **It is a compile error.** It is loud, and
+it cannot corrupt a binary.
+
+Each row is a complete translation unit compiled with `g++-14 -std=c++20 -fmodules-ts`.
+
+| Case | Result | First diagnostic |
+|---|---|---|
+| `import rpp.strview;` then `#include <string>` | **960 errors** | `/usr/include/c++/14/type_traits:214: error: redefinition of 'template<class ... _Bn> constexpr const bool std::__and_v'` |
+| `import rpp.strview;` then `#include <vector>` | **974 errors** | `bits/cpp_type_traits.h:97: error: template definition of non-template ...` |
+| `import rpp.strview;` then `#include <cstdio>` | 0 errors | a thin C wrapper pulls no libstdc++ internal template |
+| `import rpp.strview;` alone | 0 errors | |
+| `#include <string>` then `import rpp.strview;` | 0 errors | |
+
+Reading: GCC re-parses the standard library header textually, and the internal
+libstdc++ templates collide with the same entities the module already made
+reachable through its global module fragment. Order decides it. A C header such
+as `<cstdio>` stays clean because it declares no template.
+
+Two consequences:
+
+1. **Every consumer puts its includes first and its imports last.** This
+   reverses the preamble the strview experiment shipped. That preamble put
+   `import rpp.strview;` above `#include <rpp/tests.h>`, and it produced 1603
+   errors across the gcc-14 modules build. With the order flipped, the same build
+   passes with 0 errors and 498/498 test cases.
+2. **The rule needs no ODR audit.** Finding 13 shows that a program which mixes
+   both styles across separate translation units links and runs correctly. There
+   is no silent duplicate-symbol path to guard against, only a compile order to
+   respect.
+
+clang-18 accepts both orders in a minimal case. It fails on the real
+`test_strview.cpp` in include-first order with
+`error: use of overloaded operator '=' is ambiguous (with operand types 'rpp::ustring' and 'ustring')`,
+which is a clang-18 defect in the facade's using-declarations. clang-18 is tier 2
+(D7), so this does not gate the plan. **Verify it on clang-21 as the first task
+of changeset 5.**
 
 ---
 
@@ -116,7 +181,7 @@ program that mixes an `#include` and an `import` would violate the
 one-definition rule.
 
 Reject both. Keep the facade. The cost is the hand-maintained export list, and
-section 5 automates it away.
+section 7 automates it away.
 
 ### D2. One module per header, plus one umbrella module.
 
@@ -133,26 +198,27 @@ export import rpp.sprint;
 // ... every other module
 ```
 
-`import rpp;` then replaces a page of includes for consumers who want
-everything.
-
 ### D3. Named modules, not partitions.
 
 A partition such as `rpp:strview` is private to module `rpp`. An outside
 consumer can only write `import rpp;`. That removes selective import, which is
 the main reason to use modules at all.
 
-### D4. No `import` inside any header. Ever.
+### D4. No `import` inside any header. Ever. **(accepted, applied)**
 
-This reverses the current [`sprint.h:6`](../src/rpp/sprint.h#L6) design. Three
-reasons, in order of severity:
+Three reasons, in order of severity:
 
-1. A header that contains `import` **cannot be included in a global module
-   fragment** (finding 8). That breaks the facade pattern for every module whose
-   header depends on it. It is the reason `rpp-sprint.cppm` cannot exist today.
-2. It silently deletes transitive std includes from every consumer (finding 2).
+1. It silently deletes transitive std includes from every consumer. This is
+   measured, not predicted: it is what broke the build (finding 2).
+2. A header that carries an `import` puts that import wherever the header is
+   included, and the gcc-14 ordering rule then decides whether the consumer
+   compiles (section 2.1). A header cannot know where a consumer includes it.
 3. It makes the meaning of a header depend on a macro. Two translation units in
    one program then read the same header differently.
+
+Revision 1 gave a fourth reason, that an `import` is illegal inside a global
+module fragment. Finding 8 disproves it on both clang-18 and gcc-14. The rule
+stands on the three reasons above.
 
 ReCpp's own `.cpp` files keep using headers. The module facade exists for
 consumers, not for the library's own build. This mirrors libstdc++, whose own
@@ -166,7 +232,7 @@ caller cannot feed a `strview` into. Findings 5 and 6 confirm both directions.
 
 The rule: **for every `#include "X.h"` in `Y.h`, `rpp-Y.cppm` gets one
 `export import rpp.X;`.** The module graph then matches the include graph, and a
-script can check it.
+script can check it. Changeset 1 is what makes that include graph honest.
 
 ### D6. Ship `.cppm` sources. Never ship a binary module interface.
 
@@ -178,49 +244,212 @@ Consumers compile ReCpp's `.cppm` files themselves. Finding 7 adds a second
 rule: **keep the `.cppm` files out of the installed static library**, so that a
 consumer's own module object never collides with an archived copy.
 
-### D7. Macros stay in headers, and each module names its macro header.
+### D7. Two compiler tiers. Only gcc-14 and clang-21 carry modules.
 
-A module cannot export a macro. `LogError`, `Assert`, `AssertThat`, `RPPAPI`,
-`FINLINE` and `NOINLINE` are macros. 27 of 46 headers have none (finding 9), and
-those need no companion. The rest document one line:
+ReCpp builds on 8 compilers today, and their module support ranges from good to
+absent. Splitting them into tiers keeps the migration honest, and it stops a
+weak toolchain from setting the ceiling for the strong ones.
 
-```cpp
-import rpp.debugging;         // rpp::LogEvent, rpp::set_log_handler, ...
-#include <rpp/debugging.h>    // LogError, Assert, DbgAssert (macros)
+| Tier | Compilers | What they get |
+|---|---|---|
+| **1, modules** | gcc-14 and newer, clang-21 and newer | every module, the `RppModuleTests` binary, the CI module gates |
+| **2, headers only** | MSVC 2022, clang-18, gcc-13, Android NDK clang, the MIPS gcc-12 cross build | the classic `#include` path, unchanged and fully supported |
+
+This is a support decision, not a language one. D1 already makes it free:
+`libReCpp.a` and every header behave the same either way, so a tier 2 compiler
+loses nothing but the `import` syntax. `BUILD_WITH_MODULES` stays **OFF** by
+default, and [`CMakeLists.txt`](../CMakeLists.txt#L273) now rejects the option on
+a tier 2 compiler with a clear message. Without that guard, clang-18 reports the
+ambiguity of section 2.1 and gcc-13 fails deep inside a dyndep scan.
+
+**Verification status of this document.** gcc-14 is installed here, so every
+gcc-14 result is measured. **clang-21 is not available on this machine: the agent
+proxy blocks apt.llvm.org, and `mama install-clang-21` needs a `sudo` this
+container does not have.** So the clang column is clang-18, which is tier 2.
+
+| Claim | gcc-14 | clang-21 |
+|---|---|---|
+| the modules build passes, 498/498 | measured | **unverified** |
+| `export import` re-export chain | measured | measured on clang-18 |
+| mixed import and include link and run | measured | unverified |
+| includes before imports | measured, required | unverified |
+| `import` inside a global module fragment | accepted | accepted on clang-18 |
+
+The first task of changeset 5 is to re-run this table on clang-21.
+
+MSVC is worth one note. It has shipped modules the longest and its support is
+good. It sits in tier 2 because ReCpp uses it for one Windows CI job, not
+because the compiler is weak. Moving it to tier 1 later costs one CI job and no
+code.
+
+---
+
+## 4. Changeset 1: include hygiene
+
+This lands first, on its own, before any module work. It is worth doing even if
+the module migration never happens. [`tools/check_includes.py`](../tools/check_includes.py)
+measures three defects and gates each one in CI.
+
+```bash
+tools/check_includes.py all              # report
+tools/check_includes.py all --check      # CI gate, exit 1 on a finding
 ```
 
-`log_colors.h`, `tests.h` and `jni_cpp.h` get no module at all. They are macro
-frameworks or platform glue, and a module adds nothing.
+### 4.1 What the tool measures
+
+| Check | How it works | Findings today |
+|---|---|---|
+| `self-contained` | compiles each header alone, twice, with nothing before it | **0 left**: `traits.h` used `std::tuple` without `<tuple>`, and this branch fixes it |
+| `missing` | a file uses a std facility it does not include itself | **52 of 99 files** |
+| `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **10** |
+| `redundant` | same, but the header does name something the include declares, so a sibling include leaks it | **43** |
+| `std` | same, for a std header, where the scan cannot enumerate the declared names | **59** |
+
+The `unused` and `redundant` split is the important part. Both compile without
+the line. Only the first is safe to delete. Removing a `redundant` line trades a
+direct dependency for a hidden one, which is the opposite of hygiene.
+
+### 4.2 The 10 unused includes
+
+Every one of these compiles away, and the including header names nothing from
+it. Three were checked by hand and confirmed.
+
+| Header | Unused include | Note |
+|---|---|---|
+| `sockets.h` | `load_balancer.h` | carries the comment `// rpp::load_balancer`, and no use |
+| `thread_pool.h` | `threads.h` | no thread-naming call left in the header |
+| `sprint.h` | `debugging.h` | |
+| `debugging.h` | `log_colors.h` | debugging.h names no color macro |
+| `condition_variable.h`, `coroutines.h`, `event_loop.h` | `timer.h` | three copies of the same stale include |
+| `atomic_shared_ptr.h`, `bitutils.h`, `traits.h` | `config.h` | |
+
+### 4.3 Stage it in two commits, because removals break consumers
+
+**Commit 1a, additions only.** Add the 52 missing std includes. This breaks
+nothing, downstream or in-repo. Land it and turn on the `self-contained` and
+`missing` gates. The `<tuple>` in `traits.h` and the three includes that fixed
+the modules build are already on this branch.
+
+**Commit 1b, removals.** Delete the 10 unused includes, then work the 43
+redundant and 59 std candidates by hand. This **is** a source-breaking change
+for anyone who reached a declaration through ReCpp by accident. `debugging.h`
+has 15 direct includers inside this repo alone, and `config.h` has 27. krattcam,
+krattlink and krattgcs all pull ReCpp through `add_git`, so 1b needs a
+coordinated dependency bump, not a quiet push.
+
+Suggested order inside 1b:
+
+1. Delete the 10 unused includes. Build ReCpp, then build one downstream project
+   against the branch.
+2. Fix whatever the downstream build reports, in the downstream project. A break
+   there is a latent bug the removal exposed.
+3. Work the 43 redundant lines. Each one needs the missing direct include added
+   at the same time, so the count of includes usually stays the same and the
+   dependency becomes honest.
+4. Leave the 59 std candidates last. Some are platform-conditional
+   (`byteswap.h`, `malloc.h`, `sanitizer/tsan_interface.h`, `QString`) and a
+   removal that passes on Linux can break Windows or Android.
+
+**Estimate: 1a is half a day. 1b is 2 days, most of it downstream verification.**
 
 ---
 
-## 4. Phase 0: include hygiene (blocking prerequisite)
+## 5. Changeset 2: the missing-include gate goes wider
 
-Nothing else can start until every file includes what it uses. 53 of 99 files
-fail that today (finding 4).
+The `missing` check knows 8 std facilities. Extend it in two ways before the
+module work starts:
 
-Steps:
+1. Add the std facilities the module builds report as the migration proceeds.
+2. Add the same check for **rpp headers**: a header that names `rpp::strview`
+   and does not include `strview.h` has the same defect. That check turns the
+   43 redundant findings into an exact list of the includes to add.
 
-1. Run the scan in [`tools/check_std_includes.py`](#appendix-a-the-scan) over
-   `src/rpp/*.h`, `src/rpp/*.cpp` and `tests/*.cpp`.
-2. Add the missing include to each file, with a trailing comment naming the
-   symbol that needs it, matching the existing style in
-   [`sprint.cpp:4`](../src/rpp/sprint.cpp#L4).
-3. Build headers-only on clang-18, gcc-13 and MSVC. An added include must not
-   change behavior.
-4. Add the scan to CI as a hard gate, so the debt cannot come back.
-
-The scan covers 8 std facilities. Extend it as the migration finds more. The
-count is an upper bound on files to edit, not on lines: most files need one line.
-
-**Estimate: 1 day.** 53 edits are mechanical. The build cycles dominate.
+**Estimate: half a day.**
 
 ---
 
-## 5. Phase 1: generate the export lists
+## 6. Macros: the decision table to vet
 
-A hand-written export list rots. `rpp-strview.cppm` already shows two defects:
-it re-declares `using rpp::literals::operator""_sv;` under `#if
+A named module cannot export a macro. This section states the options and the
+evidence, and marks the recommendation. **Nothing here is settled.**
+
+### 6.1 Which macros are actually public
+
+README.md is the public API index, so a macro documented there is public.
+Cross-referencing every `#define` against README gives:
+
+| Header | Public macros | What they are |
+|---|---|---|
+| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX17`, and the platform probes |
+| `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
+| `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
+| `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |
+| `future_types.h` | 2 | `RPP_CORO_STD`, `RPP_HAS_COROUTINES` |
+| `mutex.h` | 2 | `RPP_HAS_CRITICAL_SECTION_MUTEX`, `RPP_SYNC_T` |
+| `close_sync.h`, `minmax.h`, `obfuscated_string.h`, `scope_guard.h`, `strview.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `make_obfuscated`, `scope_guard`, `RPP_CONSTEXPR_STRLEN` |
+
+Everything else is an implementation macro (`DELEGATE_FINLINE`, `_rpp_wrap_args`,
+`__log_format`) and needs no plan.
+
+### 6.2 The four options
+
+**M1. Do nothing. The consumer includes the header for macros.**
+```cpp
+import rpp.debugging;
+#include <rpp/debugging.h>   // LogError, Assert
+```
+Zero churn. The include re-parses the whole header, so the import buys nothing
+for that header. Correct, and it wastes the point of the module.
+
+**M2. Split the macros into a dependency-free companion header.**
+```cpp
+import rpp.debugging;
+#include <rpp/debugging_macros.h>   // parses in milliseconds, includes nothing
+```
+This works only when the macro body needs no declaration the companion has to
+carry. Measured per header:
+
+| Header | Splits cleanly? | Why |
+|---|---|---|
+| `endian.h` | **yes** | the macros expand to compiler builtins, `__builtin_bswap16` and `_byteswap_ushort` |
+| `config.h` | **yes** | the macros are already dependency-free, and `config.h` includes nothing |
+| `debugging.h` | **no, not without a cost** | `LogError` expands to `_LogError(__log_format(...))`, and that needs `_LogError`, `_LogFuncname` and `rpp::shorten_filename` visible. The module would have to export three names that look private. |
+| `tests.h` | **no** | `TestImpl` expands to a class that derives from `rpp::test`, so the type must be visible first |
+
+**M3. One shared `<rpp/macros.h>` for every public macro.** One include, one
+place to look. It couples unrelated macros, and the consumer takes all 80 to get
+one.
+
+**M4. Header units.** `import "rpp/debugging.h";` exports the declarations **and**
+the macros. Finding 11 proves it works: a consumer got `RPP_BYTESWAP16` and
+`rpp::readBEU16` from a single `import "rpp/endian.h";` on clang-18.
+
+The blockers are tooling, not language. clang warns
+`-Wexperimental-header-units`. CMake has no stable file set for header units, so
+every consumer would hand-roll the build rules. GCC support is incomplete.
+
+**Recommendation: M2 for `config.h` and `endian.h`, M1 for the rest, and
+re-evaluate M4 in about two years.** That keeps 60 of the 80 public macros at
+near-zero include cost, and leaves `debugging.h` and `tests.h` alone rather than
+exporting `_LogError` to make a split work.
+
+### 6.3 What needs your decision
+
+1. Is M2 for `config.h` and `endian.h` worth two new headers?
+2. For `debugging.h`, is exporting `_LogError`, `_LogFuncname` and
+   `shorten_filename` acceptable in exchange for a cheap `debugging_macros.h`?
+   That is the only way to split it.
+3. `tests.h` gets no module in this plan. If a downstream project wants
+   `import rpp.tests;`, that is a separate decision, and the macros still need
+   the header.
+4. Naming: `debugging_macros.h`, `debugging.macros.h` or `debugging_defs.h`.
+
+---
+
+## 7. Changeset 3: generate the export lists
+
+A hand-written export list rots. `rpp-strview.cppm` already shows a defect: it
+re-declares `using rpp::literals::operator""_sv;` under `#if
 RPP_ENABLE_UNICODE`, which is a no-op because the first using-declaration
 already brings in every overload of that name.
 
@@ -231,9 +460,8 @@ Python declaration scanner.
 The tool:
 
 1. Reads the compile flags for the header from `compile_commands.json`.
-2. Parses the header and keeps every top-level declaration in namespace `rpp`,
-   `rpp::literals` and any other nested namespace, whose source location is that
-   header and not a transitively included one.
+2. Parses the header and keeps every top-level declaration in namespace `rpp`
+   and its nested namespaces, whose source location is that header.
 3. Drops names that start with `_`, and deduplicates by name, because one
    using-declaration covers every overload.
 4. Reads the include list of the header and emits one `export import rpp.X;` per
@@ -249,7 +477,7 @@ the matching `#if`.
 
 ---
 
-## 6. Phase 2: dual-mode tests, both modes in one build
+## 8. Changeset 4: dual-mode tests, both modes in one build
 
 Today the two modes need two separate CMake configurations, so drift can sit in
 the tree until someone runs the second one. Fix that: when
@@ -268,15 +496,21 @@ endif()
 `RPP_BUILD_WITH_MODULES`. `mama build test` then runs both binaries and one
 command covers both modes.
 
-Every test file gets the same preamble, and the test body never changes:
+Every test file gets the same preamble, and the test body never changes.
+**Includes come first and the import comes last**, because of the gcc-14 rule of
+section 2.1:
 
 ```cpp
+#include <rpp/tests.h>   // the test framework is macros
+#include <string>        // whatever std facilities the test itself uses
+
 #if RPP_BUILD_WITH_MODULES
 import rpp.<module under test>;
 #endif
-#include <rpp/tests.h>   // the test framework is macros
-#include <string>        // whatever std facilities the test itself uses
 ```
+
+[`tests/test_strview.cpp`](../tests/test_strview.cpp) already carries this
+order. The reverse order cost 1603 compile errors on gcc-14.
 
 Two extra checks belong in the module-mode binary only:
 
@@ -289,17 +523,15 @@ Two extra checks belong in the module-mode binary only:
    next to another that includes `<rpp/strview.h>`, both in one binary, both
    passing a `rpp::strview` across. This pins property 1 of section 1.1.
 
-**Estimate: 0.5 day.**
+**Estimate: half a day.**
 
 ---
 
-## 7. Phase 3-4: write the modules, in dependency layers
+## 9. Changeset 5: write the modules, in dependency layers
 
 Work the include graph bottom up. A module can only build after every module it
-`export import`s exists.
-
-The layers below come from the actual `#include` graph of `src/rpp/*.h`, not from
-a guess. Every module in layer N depends only on layers below N.
+`export import`s exists. The layers below come from the actual `#include` graph
+of `src/rpp/*.h`, so changeset 1 can move a header between layers.
 
 | Layer | Modules | Count |
 |---|---|---|
@@ -314,13 +546,13 @@ a guess. Every module in layer N depends only on layers below N.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-43 modules and one umbrella. Excluded: `log_colors.h`, `tests.h`, `jni_cpp.h`
-(D7). `rpp.strview` already exists, so 42 remain.
+43 modules and one umbrella. `rpp.strview` exists, so 42 remain. Excluded:
+`log_colors.h`, `tests.h` and `jni_cpp.h`. The first two are macro frameworks
+(section 6), and the third is Android glue.
 
 Per module, the loop is: generate the `.cppm`, add it to `RPP_MODULES_SRC`, add
 the import preamble to its test, build `RppModuleTests`, fix what the compiler
-reports. Most of the fixes are missing `export import` lines and missing std
-includes the module build exposes.
+reports.
 
 Expect the template-heavy headers to be the slow ones: `delegate.h` (48
 declarations), `future.h`, `concurrent_queue.h`, `event_loop.h` and
@@ -329,16 +561,16 @@ declarations), `future.h`, `concurrent_queue.h`, `event_loop.h` and
 - **Hidden friends.** A friend operator declared inside a class in the global
   module fragment stays attached to the global module, so argument-dependent
   lookup should still find it from an importer. Compilers disagree here. The
-  macro-free compile check of section 6 is the detector.
+  macro-free compile check of section 8 is the detector.
 - **Deduction guides and variable templates.** A using-declaration re-exports a
   class template but not its deduction guides. Where a guide matters, restate it
   in the `.cppm`.
 
-**Estimate: L0-L2 is 1 day. L3-L7 is 1.5 days.**
+**Estimate: L0-L2 is 1 day. L3-L8 is 1.5 days.**
 
 ---
 
-## 8. Phase 5: make other projects able to consume this
+## 10. Changeset 6: make other projects able to consume this
 
 This is the point of the migration, and it is unwired today. `mamafile.py`
 exports only `.h` and `.natvis`, and `CMakeLists.txt` installs no file set.
@@ -358,7 +590,8 @@ Three deliverables:
    ```cmake
    install(TARGETS ReCpp EXPORT ReCppTargets
            FILE_SET CXX_MODULES DESTINATION lib/cxx-modules/rpp)
-   install(EXPORT ReCppTargets CXX_MODULES_DIRECTORY cxx-modules NAMESPACE ReCpp:: DESTINATION lib/cmake/ReCpp)
+   install(EXPORT ReCppTargets CXX_MODULES_DIRECTORY cxx-modules
+           NAMESPACE ReCpp:: DESTINATION lib/cmake/ReCpp)
    ```
    This needs CMake 3.28 on the consumer, the same floor ReCpp already sets.
 
@@ -370,7 +603,7 @@ Three deliverables:
    - The consumer must use the same C++ standard level and the same
      configuration macros, in particular `RPP_ENABLE_UNICODE`.
    - Mixing `import rpp.X` and `#include <rpp/X.h>` in one program is supported.
-   - Macros need the header (D7).
+   - Macros need a header (section 6).
 
 Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 `add_git`. Convert one file in one of them and measure.
@@ -379,87 +612,65 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ---
 
-## 9. Phase 6: CI, docs and measurement
+## 11. Changeset 7: CI, docs and measurement
 
-1. Add a modules job to `.circleci/config.yml`. Use clang-18 and gcc-14. gcc-13
-   is the current default and does not carry usable module support, so the
-   modules job must pin gcc-14, which the C++26 jobs already use.
-2. Wire `tools/check_std_includes.py --check` and
+1. Add two modules jobs to `.circleci/config.yml`, one for gcc-14 and one for
+   clang-21, matching tier 1 (D7). The existing matrix runs gcc-13 and clang-18
+   and stays headers-only. `mama install-gcc-14` and `mama install-clang-21`
+   install the tier 1 compilers, so a CI image needs no hand-built toolchain.
+2. Wire `tools/check_includes.py --check` and
    `tools/gen_module_exports.py --check` as gates.
 3. Rewrite the README modules section. It is already stale: it names a test
    suite `test_strview_module` that does not exist.
-4. Publish a compile-time measurement. The claim "faster compilation" needs a
-   number from `examples/module_consumer/`, not from ReCpp's own build. ReCpp's
-   own build gains nothing, because its `.cpp` files keep using headers (D4).
+4. Publish a compile-time measurement from `examples/module_consumer/`, not from
+   ReCpp's own build. ReCpp's own build gains nothing, because its `.cpp` files
+   keep using headers (D4).
 
 **Estimate: 1 day.**
 
 ---
 
-## 10. Risks
+## 12. Risks
 
 | Risk | Impact | Response |
 |---|---|---|
-| Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on clang and fails on gcc or MSVC | Build all three in CI from L0. The macro-free compile check finds it early. |
-| gcc-13 has no usable module support | The default CI compiler cannot run the modules job | Pin gcc-14 for that job only. Keep `BUILD_WITH_MODULES` off by default. |
+| Changeset 1b breaks a downstream build | krattcam, krattlink or krattgcs fails to compile after a dependency bump | Build one downstream project against the branch before merging 1b. A break there is a latent bug the removal exposed. |
+| clang-21 is unverified (D7) | The whole plan rests on one measured compiler, gcc-14 | Install clang-21 and re-run the D7 table as the first task of changeset 5. clang-18 already shows one facade defect, so treat this as likely work, not a formality. |
+| Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |
+| A consumer writes its import above its includes | Hundreds of std redefinition errors on gcc-14 (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
 | Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI. |
 | Duplicate module initializer symbol (finding 7) | Link failure in a consumer that compiles the `.cppm` and links `libReCpp.a` | Keep `.cppm` objects out of the shipped archive. Cover it in `examples/module_consumer/`. |
-| Binary module interface build is serial along the dependency chain | A deep module graph slows a cold build | Measure at L7. Merge leaf modules only if a real number justifies it. |
 | Sanitizer interaction | `BUILD_WITH_MEM_SAFETY` already disables `/fsanitize=address` on MSVC because of modules ([`CMakeLists.txt:154`](../CMakeLists.txt#L154)) | Keep the modules job separate from the sanitizer matrix. |
 
 ---
 
-## 11. Acceptance criteria
+## 13. Acceptance criteria
 
-The migration is done when all of these hold:
-
-1. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests` and
-   `RppModuleTests`, and both pass every test, on clang-18, gcc-14 and MSVC 2022.
-2. Every one of the 43 headers has a `.cppm`, and `gen_module_exports.py
+1. `tools/check_includes.py all --check` exits 0.
+2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests` and
+   `RppModuleTests`, and both pass every test, on gcc-14 and clang-21. Every
+   tier 2 compiler still passes the headers-only build.
+3. Every one of the 43 headers has a `.cppm`, and `gen_module_exports.py
    --check` reports no difference.
-3. `check_std_includes.py` reports zero files that rely on a transitive std
-   include.
 4. `examples/module_consumer/` builds against an installed ReCpp using only
    `import rpp;`, and links.
 5. The mixed-mode link check passes.
-6. README.md documents the contract of section 8 and carries a measured
+6. README.md documents the contract of section 10 and carries a measured
    compile-time number.
 
-**Total estimate: about 8 working days.** Phase 0 and phase 1 are half of it and
-have no module-specific risk.
+## 14. Schedule
 
----
+| Changeset | Work | Days | Blocks |
+|---|---|---|---|
+| 1a | add 52 missing includes, turn on 2 gates | 0.5 | everything |
+| 1b | remove 10 unused, review 43 redundant and 59 std | 2 | D5, needs a downstream bump |
+| 2 | widen the missing-include check to rpp headers | 0.5 | changeset 3 |
+| 3 | generate the export lists | 1.5 | changeset 5 |
+| 4 | dual-mode test harness | 0.5 | changeset 5 |
+| 5 | 42 modules plus the umbrella | 2.5 | changeset 6 |
+| 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 |
+| 7 | CI, docs, measurement | 1 | — |
 
-## Appendix A: the scan
-
-The measurement behind finding 4. Save as `tools/check_std_includes.py`, and
-extend `RULES` as the migration finds more facilities.
-
-```python
-RULES = [
-    (r'\b(memcpy|memmove|memset|memcmp|strlen|strcmp|strncmp|strcpy|strstr)\s*\(', ('cstring','string.h')),
-    (r'\bstd::(string|wstring|u16string|to_string|stoi|stod)\b', ('string',)),
-    (r'\bstd::vector\b', ('vector',)),
-    (r'\bstd::(shared_ptr|unique_ptr|make_shared|make_unique|weak_ptr)\b', ('memory',)),
-    (r'\b(printf|fprintf|snprintf|fopen|fclose|fwrite|fread|FILE)\s*[\(\*]', ('cstdio','stdio.h')),
-    (r'\bstd::(sort|find|min_element|max_element|copy|fill|remove_if)\s*\(', ('algorithm',)),
-    (r'\bstd::(atomic|atomic_int64_t|memory_order)\b', ('atomic',)),
-    (r'\bstd::(mutex|lock_guard|unique_lock|recursive_mutex)\b', ('mutex',)),
-]
-```
-
-For each file, strip comments, then report a facility that the file uses and
-does not directly include.
-
-## Appendix B: the immediate fixes already applied
-
-Three one-line includes make the current experiment build and pass. They are the
-first three edits of phase 0.
-
-| File | Added |
-|---|---|
-| [`src/rpp/sprint.h`](../src/rpp/sprint.h) | `#include <string>` |
-| [`src/rpp/sprint.cpp`](../src/rpp/sprint.cpp) | `#include <cstring>` |
-| [`tests/test_strview.cpp`](../tests/test_strview.cpp) | `#include <cstring>` |
-
-Result: `RppTests test_strview` passes 34/34 with `BUILD_WITH_MODULES=ON`.
+**Total: about 10 working days.** Changesets 1 and 2 are three of them, and they
+stand on their own value. Section 6 needs your decision before changeset 3
+starts.

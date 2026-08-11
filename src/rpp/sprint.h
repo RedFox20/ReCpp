@@ -3,11 +3,9 @@
  * String Printing and Formatting, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
-#if RPP_BUILD_WITH_MODULES
-import rpp.strview;
-#else
+// A header never imports a module. An `import` is illegal inside a global module
+// fragment, so it would block every rpp-*.cppm that includes this header.
 #include "strview.h"
-#endif
 #include "debugging.h"
 #include "type_traits.h"
 

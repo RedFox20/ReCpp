@@ -278,6 +278,14 @@ if(BUILD_WITH_MODULES)
     if(RPP_CXX_STANDARD LESS 20)
         message(FATAL_ERROR "BUILD_WITH_MODULES requires C++20 or later")
     endif()
+    # Tier 1 carries modules. An older compiler reports hundreds of std redefinition
+    # errors instead, so reject it here where the message still makes sense.
+    if((GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14) OR
+       (CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21) OR MSVC)
+        message(FATAL_ERROR "BUILD_WITH_MODULES requires GCC 14+ or Clang 21+, found "
+                            "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}. "
+                            "Use the header build instead: it supports every compiler.")
+    endif()
     message("RPP EXPERIMENTAL: C++20 Modules enabled")
 
     set(RPP_MODULES_SRC
