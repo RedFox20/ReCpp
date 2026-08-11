@@ -27,6 +27,10 @@ jobs:
         type: boolean
         default: false
         description: "Whether to generate code coverage report (only supported for gcc with ASAN)"
+      no_ninja:
+        type: string
+        default: "1"
+        description: "1 disables Ninja to save CI memory. A modules build passes an empty string"
     description: "Ubuntu << parameters.cc_version >> C++<< parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -37,7 +41,9 @@ jobs:
       SANITIZE: << parameters.sanitizer >>
       CPP_STANDARD: CXX<< parameters.cpp_version >>
       COV_PARAM: << parameters.coverage >>
-      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
+      # Ninja detects 36 cores instead of 3 and the machines OOM, so it is off by default.
+      # A modules build needs it: CMake scans module dependencies only under Ninja.
+      NO_NINJA: << parameters.no_ninja >>
     steps:
       - checkout
       - run: sudo apt-get update
@@ -95,7 +101,9 @@ jobs:
     docker:
       - image: cimg/python:3.14
     environment:
-      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
+      # Ninja detects 36 cores instead of 3 and the machines OOM, so it is off by default.
+      # A modules build needs it: CMake scans module dependencies only under Ninja.
+      NO_NINJA: 1
     steps:
       - checkout
       - run: sudo apt-get update
@@ -121,7 +129,9 @@ jobs:
     docker:
       - image: << parameters.docker_image >>
     environment:
-      NO_NINJA: 1 # disable ninja to reduce memory usage in CI, the machines keep OOM-ing due to large number of threads (detects 36 cores instead of 3)
+      # Ninja detects 36 cores instead of 3 and the machines OOM, so it is off by default.
+      # A modules build needs it: CMake scans module dependencies only under Ninja.
+      NO_NINJA: 1
     steps:
       - checkout
       - when:
@@ -186,6 +196,34 @@ workflows:
           compiler: gcc
           cc_version: gcc-14
           coverage: false # this can cause OOM in CI with GCC-14, disabling for now
+      # Clang 21 on Ubuntu: the first Clang that builds the rpp-*.cppm facades
+      - ubuntu-build:
+          matrix:
+            parameters:
+              cpp_version: ["20", "23"]
+              sanitizer: ["asan", "tsan"]
+          name: ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>-clang21
+          compiler: clang
+          cc_version: clang-21
+          coverage: false
+      # C++20 modules. These need Ninja, so they pass an empty no_ninja.
+      # CMakeLists.txt turns modules on by itself for GCC 14+ and Clang 21+.
+      - ubuntu-build:
+          name: ubuntu-cpp20-modules-gcc14
+          compiler: gcc
+          cc_version: gcc-14
+          cpp_version: "20"
+          sanitizer: "tsan"
+          coverage: false
+          no_ninja: ""
+      - ubuntu-build:
+          name: ubuntu-cpp20-modules-clang21
+          compiler: clang
+          cc_version: clang-21
+          cpp_version: "20"
+          sanitizer: "asan"
+          coverage: false
+          no_ninja: ""
       # Other platform builds
       - win64-cpp20-msvc2022
       - mipsel-cpp20-gcc12

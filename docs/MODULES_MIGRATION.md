@@ -16,8 +16,8 @@ proves about it. It then fixes the architecture and gives a phased plan for all
 3. Section 6 is new. It lays out the macro strategy as a decision table to vet,
    and it reports a measured result for C++20 header units.
 4. Decision D7 is new. It sets two compiler tiers: gcc-14 and clang-21 carry
-   modules, and every other compiler stays on headers. `CMakeLists.txt` now
-   enforces it.
+   modules, and every other compiler stays on headers. `BUILD_WITH_MODULES`
+   defaults to `AUTO`, so `CMakeLists.txt` decides per toolchain.
 5. Section 2.1 is new. gcc-14 rejects a std library include that follows an
    import, and the fix reorders every consumer preamble. The strview experiment
    shipped the wrong order. CLAUDE.md now carries this as a style rule.
@@ -85,13 +85,13 @@ includes. That order costs 1603 compile errors on gcc-14. Section 2.1 explains
 why, and this branch fixes it.
 
 The 34 test cases below that preamble are identical in both modes. CMake defines
-`RPP_BUILD_WITH_MODULES=1` only on the `RppTests` target when
-`BUILD_WITH_MODULES=ON`. So the same source compiles two ways:
+`RPP_BUILD_WITH_MODULES=1` only on the `RppTests` target when the toolchain
+carries modules. So the same source compiles two ways:
 
 | Mode | How to build | What it proves |
 |---|---|---|
 | headers | `cmake -DBUILD_TESTS=ON` | the classic path still works |
-| modules | `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` | the export list is complete |
+| modules | `cmake -DBUILD_TESTS=ON` on GCC 14+ or Clang 21+ with Ninja | the export list is complete |
 
 The test body is the completeness gate. A name the export list forgets is a
 compile error in module mode and a silent pass in header mode. This is a good
@@ -123,7 +123,7 @@ is measured on at least one tier 1 compiler.
 | 8 | **gcc-14, clang-21 and clang-18 all accept `import` inside a global module fragment.** | A two-module probe compiled clean on all three, and clang-21 accepted it with `-pedantic-errors`. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
 | 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. Section 6 covers the rest. |
 | 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with modules. One imported translation unit cannot move the number. |
-| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18, gcc-13, gcc-14 and clang-21 each pass 498/498. Modules: gcc-14 and clang-21 each pass 498/498, and clang-18 is refused at configure time by the D7 guard. |
+| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18, gcc-13, gcc-14 and clang-21 each pass 498/498. Modules: gcc-14 and clang-21 each pass 498/498 plus `RppModuleChecks`. gcc-13 and clang-18 fall back to headers on their own and say why. |
 | 11 | A **header unit does deliver macros**, and clang calls it experimental. | `import "rpp/endian.h";` gave a consumer the macro `RPP_BYTESWAP16` and the function `rpp::readBEU16` in one import. clang-18 warns `-Wexperimental-header-units`. See section 6, option M4. |
 | 12 | **gcc-14 rejects a std library include that follows an import.** | See section 2.1. It is a compile error, and it broke the whole modules build until the preamble moved. |
 | 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
@@ -266,8 +266,11 @@ weak toolchain from setting the ceiling for the strong ones.
 This is a support decision, not a language one. D1 already makes it free:
 `libReCpp.a` and every header behave the same either way, so a tier 2 compiler
 loses nothing but the `import` syntax. `BUILD_WITH_MODULES` stays **OFF** by
-default, and [`CMakeLists.txt`](../CMakeLists.txt#L273) now rejects the option on
-a tier 2 compiler with a clear message. Without that guard, clang-18 reports the
+default is `AUTO`. [`CMakeLists.txt`](../CMakeLists.txt#L274) hardcodes the first
+supported version of each family, GCC 14, Clang 21 and MSVC 19.34, and it also
+checks CMake 3.28, C++20 and the generator. `AUTO` turns modules on wherever the
+toolchain supports them, so a CI job needs no flag. `ON` demands them and names
+the exact reason when it cannot. Without that guard, clang-18 reports the
 ambiguity of section 2.1 and gcc-13 fails deep inside a dyndep scan.
 
 **Verification status: both tier 1 compilers are measured.** gcc-14.2 comes from

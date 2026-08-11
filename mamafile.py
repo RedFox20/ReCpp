@@ -67,6 +67,12 @@ class ReCpp(mama.BuildTarget):
 
 
     def test(self, args):
+        # RppModuleChecks only exists in a modules build. It imports each module and
+        # includes no rpp header, so a missing export list entry fails there first.
+        checks = self.source_dir('bin/RppModuleChecks')
+        if os.path.exists(checks):
+            self.run_program(self.source_dir('bin'), checks)
+
         if 'nogdb' in args:
             args = args.replace('nogdb', '')
             self.run_program(self.source_dir('bin'), self.source_dir(f'bin/RppTests {args}'))

@@ -4,7 +4,9 @@ project(ReCpp)
 option(BUILD_TESTS "Build RppTests executable for unit testing?" OFF)
 option(BUILD_WITH_LIBDW "Use libdw on linux for stack tracing" ON)
 option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly improves performance." ON)
-option(BUILD_WITH_MODULES "Experimental: Build with C++20 module support" OFF)
+set(BUILD_WITH_MODULES "AUTO" CACHE STRING
+    "Experimental C++20 modules: AUTO builds them where the toolchain supports it, ON demands them, OFF never")
+set_property(CACHE BUILD_WITH_MODULES PROPERTY STRINGS AUTO ON OFF)
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 option(RPP_USE_LIBCXX "On Clang, link against libc++ (LLVM stdlib). OFF uses the distro default (typically libstdc++ on Linux). Set OFF when ReCpp must interop with libstdc++-built runtimes — e.g. Ubuntu's libclang_rt.fuzzer." ON)
 
@@ -272,22 +274,52 @@ endif()
 ###################################################
 
 # Experimental C++20 Modules support
-if(BUILD_WITH_MODULES)
-    if(CMAKE_VERSION VERSION_LESS "3.28")
-        message(FATAL_ERROR "BUILD_WITH_MODULES requires CMake 3.28+, found ${CMAKE_VERSION}")
+# The first version of each compiler family that builds the rpp-*.cppm facades.
+# Below these, the same sources give hundreds of std redefinition or ambiguity errors.
+set(RPP_MODULES_MIN_GCC   14)     # GCC 13 has no CMake-usable module support
+set(RPP_MODULES_MIN_CLANG 21)     # Clang 18 mis-resolves the facade using-declarations
+set(RPP_MODULES_MIN_MSVC  19.34)  # VS 2022 17.4
+
+# Every reason a build cannot carry modules, collected so the message can name it.
+set(RPP_NO_MODULES "")
+if(CMAKE_VERSION VERSION_LESS "3.28")
+    set(RPP_NO_MODULES "CMake ${CMAKE_VERSION} is older than 3.28")
+elseif(RPP_CXX_STANDARD LESS 20)
+    set(RPP_NO_MODULES "C++${RPP_CXX_STANDARD} is older than C++20")
+elseif(NOT CMAKE_GENERATOR MATCHES "Ninja|Visual Studio")
+    # CMake drives module dependency scanning only on these two generators
+    set(RPP_NO_MODULES "generator '${CMAKE_GENERATOR}' cannot scan module dependencies")
+elseif(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC})
+    set(RPP_NO_MODULES "GCC ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_GCC}")
+elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG})
+    set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
+elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
+    set(RPP_NO_MODULES "MSVC ${MSVC_VERSION} is older than ${RPP_MODULES_MIN_MSVC}")
+endif()
+
+# AUTO builds modules wherever the toolchain supports them, so a CI job needs no flag.
+# ON demands them and fails when it cannot. OFF never builds them.
+if(BUILD_WITH_MODULES STREQUAL "AUTO")
+    if(RPP_NO_MODULES)
+        message("RPP MODULES: off, ${RPP_NO_MODULES}")
+        set(RPP_BUILD_MODULES OFF)
+    else()
+        set(RPP_BUILD_MODULES ON)
     endif()
-    if(RPP_CXX_STANDARD LESS 20)
-        message(FATAL_ERROR "BUILD_WITH_MODULES requires C++20 or later")
+elseif(BUILD_WITH_MODULES)
+    if(RPP_NO_MODULES)
+        message(FATAL_ERROR "BUILD_WITH_MODULES=ON but ${RPP_NO_MODULES}. "
+                            "Requires CMake 3.28+, C++20, a Ninja or Visual Studio generator, and "
+                            "GCC ${RPP_MODULES_MIN_GCC}+, Clang ${RPP_MODULES_MIN_CLANG}+ or MSVC ${RPP_MODULES_MIN_MSVC}+. "
+                            "The header build supports every compiler.")
     endif()
-    # Tier 1 carries modules. An older compiler reports hundreds of std redefinition
-    # errors instead, so reject it here where the message still makes sense.
-    if((GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14) OR
-       (CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21) OR MSVC)
-        message(FATAL_ERROR "BUILD_WITH_MODULES requires GCC 14+ or Clang 21+, found "
-                            "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}. "
-                            "Use the header build instead: it supports every compiler.")
-    endif()
-    message("RPP EXPERIMENTAL: C++20 Modules enabled")
+    set(RPP_BUILD_MODULES ON)
+else()
+    set(RPP_BUILD_MODULES OFF)
+endif()
+
+if(RPP_BUILD_MODULES)
+    message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 
     set(RPP_MODULES_SRC
         src/rpp/rpp-strview.cppm
