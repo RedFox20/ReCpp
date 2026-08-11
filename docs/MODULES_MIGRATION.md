@@ -120,7 +120,7 @@ is measured on at least one tier 1 compiler.
 | 8 | **gcc-14, clang-21 and clang-18 all accept `import` inside a global module fragment.** | A two-module probe compiled clean on all three, and clang-21 accepted it with `-pedantic-errors`. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
 | 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. Section 6 covers the rest. |
 | 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with modules. One imported translation unit cannot move the number. |
-| 10b | ReCpp passes on every compiler on this machine except clang-21. | Headers: clang-18, gcc-13 and gcc-14 each pass 498/498. Modules: gcc-14 passes 498/498, and clang-18 is refused at configure time by the D7 guard. clang-21 is finding 16. |
+| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18, gcc-13, gcc-14 and clang-21 each pass 498/498. Modules: gcc-14 and clang-21 each pass 498/498, and clang-18 is refused at configure time by the D7 guard. |
 | 11 | A **header unit does deliver macros**, and clang calls it experimental. | `import "rpp/endian.h";` gave a consumer the macro `RPP_BYTESWAP16` and the function `rpp::readBEU16` in one import. clang-18 warns `-Wexperimental-header-units`. See section 6, option M4. |
 | 12 | **gcc-14 rejects a std library include that follows an import.** | See section 2.1. It is a compile error, and it broke the whole modules build until the preamble moved. |
 | 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
@@ -280,7 +280,7 @@ container does not have.
 | mixed import and include link and run in one binary | pass | pass |
 | a std include after an import | **rejected, ~960 errors** | **accepted, 0 errors** |
 | `import` inside a global module fragment | accepted | accepted, even with `-pedantic-errors` |
-| the full modules test suite | **498/498** | **454/454**, see below |
+| the full modules test suite | **498/498** | **498/498** |
 
 Two results need their footnote.
 
@@ -288,15 +288,13 @@ Two results need their footnote.
 The rule in CLAUDE.md still holds for every file, because a portable file has to
 satisfy the stricter compiler.
 
-**ReCpp does not compile on clang-21 today, and modules are not the reason.**
-Four errors in `tests/test_event_loop.cpp:1222` and `<future>`:
-`function returns a type 'cfuture<>' marked with [[clang::coro_return_type]] but
-is neither a coroutine nor a coroutine wrapper`. The **headers-only** clang-21
-build produces the same four errors, so this is a pre-existing coroutine
-incompatibility. With that one test file removed, the clang-21 modules build
-passes 30 suites and 454/454 test cases with 0 errors. Fixing it is a
-prerequisite for making clang-21 a CI compiler, and it belongs before changeset
-7, not inside it.
+**clang-21 needed one fix outside the module work, and this branch carries it.**
+`tests/test_event_loop.cpp` passed a `cfuture<void>` through `rpp::async_task`,
+which instantiates `std::future<cfuture<void>>::get()`. clang-21 rejects that:
+the function returns a `[[clang::coro_return_type]]` without being a coroutine.
+The headers-only clang-21 build failed the same way, so modules were never the
+cause. A raw `std::thread` plus `join()` replaces it, and clang-21 now passes
+498/498 in both modes.
 
 **Build note for a tarball toolchain.** A prebuilt LLVM release needs
 `-DCMAKE_CXX_FLAGS=-resource-dir=$(clang++ -print-resource-dir)`. Without it
@@ -751,7 +749,8 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | Risk | Impact | Response |
 |---|---|---|
 | Changeset 1b breaks a downstream build | krattcam, krattlink or krattgcs fails to compile after a dependency bump | Build one downstream project against the branch before merging 1b. A break there is a latent bug the removal exposed. |
-| clang-21 rejects `test_event_loop.cpp` (finding 16) | clang-21 cannot join CI, headers or modules, until it is fixed | Fix the four `[[clang::coro_return_type]]` errors before changeset 7. It is a coroutine annotation problem, not a module problem, so it can land at any time. |
+| A `[[clang::coro_return_type]]` reaches a non-coroutine (finding 16) | clang-21 refuses the file, headers and modules alike | Never pass an `rpp::cfuture` through `std::future` or `std::async`. The fix is on this branch. A future case needs `RPP_CORO_WRAPPER`, which `config.h` already defines and nothing used until now. |
+| The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | Track it as its own bug. `e.what()` reads a message the future shared state may free on another thread. |
 | Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |
 | A consumer writes its import above its includes | Hundreds of std redefinition errors on gcc-14 (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
 | Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI. |
