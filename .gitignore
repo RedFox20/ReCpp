@@ -16,3 +16,10 @@ mama\.cmake
 .vscode/
 process.yml
 __pycache__/
+
+# local sanitizer and compiler-matrix build dirs
+asan/
+tsan/
+tsn/
+ubsan/
+cmake-build-*/
