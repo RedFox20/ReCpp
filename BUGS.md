@@ -6,6 +6,32 @@ lines.
 
 ## Open
 
+### B0. CI triage, measured against the last merged PR
+Baseline is PR #56, the last merge into master. These jobs were **already red
+there**, before this branch existed:
+`ubuntu-cpp20-tsan-gcc13`, `ubuntu-cpp23-tsan-gcc13`, `ubuntu-cpp26-tsan-gcc14`,
+`ubuntu-cpp23-tsan-clang18`.
+That is B1 reproducing in CI. A shared 3-CPU runner supplies the contention that
+an idle developer machine does not.
+
+Regressed on this branch, so they are ours:
+- 5 clang-21 jobs. `mama install-clang-21` runs `apt-get install clang-21`, and the
+  CI image has no such package. Fixed: the matrix uses clang-20, and the clang-21
+  modules job is gone. `CMakeLists.txt` needs Clang 21 for modules, so clang-20
+  falls back to headers by itself.
+- `ubuntu-cpp20-modules-gcc14`. Cause unknown, the log is not reachable from here.
+  ASAN plus modules on gcc-14 builds and passes 499/499 locally, so that
+  combination is not it.
+- `ubuntu-cpp20-clang-tidy-clang18`, `ubuntu-cpp23-clang-tidy-clang18`,
+  `ubuntu-cpp23-asan-gcc13`. Cause unknown. `run_clang_tidy` over `src/rpp/`
+  passes locally on clang-18 with exit 0, so the clang-tidy jobs fail in their
+  build or test step, not the analysis. Both jobs also run the full suite, which
+  makes B2 the first suspect.
+
+Improved against the baseline, red there and green here:
+`ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-clang-tidy-gcc13`,
+`android-cpp20-r28b`, `android-cpp20-r29`, `win64-cpp20-msvc2022`.
+
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a

@@ -196,30 +196,24 @@ workflows:
           compiler: gcc
           cc_version: gcc-14
           coverage: false # this can cause OOM in CI with GCC-14, disabling for now
-      # Clang 21 on Ubuntu: the first Clang that builds the rpp-*.cppm facades
+      # Clang 20 on Ubuntu. clang-21 is not in the CI image apt sources, so
+      # `mama install-clang-21` cannot run. Modules stay off here: CMakeLists.txt
+      # needs Clang 21, sees 20, and falls back to headers with a message.
       - ubuntu-build:
           matrix:
             parameters:
               cpp_version: ["20", "23"]
-              sanitizer: ["asan", "tsan"]
-          name: ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>-clang21
+              sanitizer: ["asan"]
+          name: ubuntu-cpp<< matrix.cpp_version >>-<< matrix.sanitizer >>-clang20
           compiler: clang
-          cc_version: clang-21
+          cc_version: clang-20
           coverage: false
       # C++20 modules. These need Ninja, so they pass an empty no_ninja.
-      # CMakeLists.txt turns modules on by itself for GCC 14+ and Clang 21+.
+      # CMakeLists.txt turns modules on by itself for GCC 14+, Clang 21+ and MSVC 19.34+.
       - ubuntu-build:
           name: ubuntu-cpp20-modules-gcc14
           compiler: gcc
           cc_version: gcc-14
-          cpp_version: "20"
-          sanitizer: "tsan"
-          coverage: false
-          no_ninja: ""
-      - ubuntu-build:
-          name: ubuntu-cpp20-modules-clang21
-          compiler: clang
-          cc_version: clang-21
           cpp_version: "20"
           sanitizer: "asan"
           coverage: false
