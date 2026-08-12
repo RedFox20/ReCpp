@@ -17,7 +17,7 @@ gives the phased plan for the remaining 41 headers.
 | Include-order style rule | in CLAUDE.md |
 | `tools/check_includes.py` | 3 checks, 0 self-contained failures left |
 | `tests/test_modules.cpp` | module consumer test, 3 cases |
-| CI | 6 distinct failures fixed, see `BUGS.md` B0 |
+| CI | green, all 24 jobs. 5 causes fixed, see `BUGS.md` C9 |
 
 **Not started:** changesets 1 through 7 below. Changeset 1a is the next action and
 blocks nothing else.
@@ -735,7 +735,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
    one once the image carries it, or once mama adds the LLVM apt source. Three CI
    traps are already handled and worth keeping: TSAN needs `setarch -R` to start,
    ninja ignores `jobs=` so a Ninja job needs `taskset`, and `run_clang_tidy` has
-   to find the compile database under `linux-clang`. See `BUGS.md` B0.
+   to find the compile database under `linux-clang`. See `BUGS.md` C9.
 2. Wire `tools/check_includes.py --check` and
    `tools/gen_module_exports.py --check` as gates.
 3. Rewrite the README modules section. It is already stale: it names a test

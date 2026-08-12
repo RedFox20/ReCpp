@@ -6,50 +6,6 @@ lines.
 
 ## Open
 
-### B0. CI triage, measured against the last merged PR
-Baseline is PR #56, the last merge into master. These jobs were **already red
-there**, before this branch existed:
-`ubuntu-cpp20-tsan-gcc13`, `ubuntu-cpp23-tsan-gcc13`, `ubuntu-cpp26-tsan-gcc14`,
-`ubuntu-cpp23-tsan-clang18`.
-
-**This is not B1.** TSAN never starts on these runners:
-`FATAL: ThreadSanitizer: unexpected memory mapping 0x6277eeea4000-0x6277eeece000`,
-exit 66. The runner kernel hands out a mapping outside the layout TSAN needs, so
-the process aborts before a single test runs. An earlier revision of this entry
-read it as B1 reproducing in CI, which was wrong.
-Fixed: the test step runs under `setarch $(uname -m) -R`, which turns off address
-space randomization for the process and its children, unprivileged.
-
-Regressed on this branch, so they are ours:
-- 5 clang-21 jobs. `mama install-clang-21` runs `apt-get install clang-21`, and the
-  CI image has no such package. Fixed: the matrix uses clang-20, and the clang-21
-  modules job is gone. `CMakeLists.txt` needs Clang 21 for modules, so clang-20
-  falls back to headers by itself.
-- `ubuntu-cpp20-modules-gcc14`. It exited with no message, and it ran TSAN at the
-  time. That matches the TSAN startup abort above. The job now runs ASAN, and
-  `setarch -R` covers the rest.
-- `ubuntu-cpp20-clang-tidy-clang18`, `ubuntu-cpp23-clang-tidy-clang18`:
-  `ERROR: packages/ReCpp/linux/compile_commands.json not found`. A clang build
-  lands in `linux-clang`, and `run_clang_tidy` only looked in `linux`. This is a
-  mama layout change, not a branch change, and the baseline run predates it.
-  Fixed: the script falls back to the newest `linux*/compile_commands.json`.
-- `ubuntu-cpp20-modules-gcc14` again, this time dying during BUILD with no output.
-  It is the only job that runs Ninja, because modules need it. mama passes `jobs=`
-  to make and msbuild but never to ninja, see `_buildsys_flags`, so ninja sizes
-  itself from the host core count rather than the container limit and the 6 GB box
-  OOMs. Fixed: the build step prefixes `taskset -c 0-2` when Ninja is on, because
-  ninja reads the affinity mask. Reported upstream.
-- `win64-cpp20-msvc2022`: `test_timer.cpp:540 clock_type_monotonic_coarse:
-  elapsed_ms => '0' must be greater or equal than '10'`. `GetTickCount64` ticks
-  every ~15.6 ms, and a 20 ms spin can land inside one tick on a virtualized
-  runner. Fixed: both coarse-clock tests spin 80 ms, which crosses several ticks.
-- `ubuntu-cpp23-asan-gcc13`. Still unknown. It runs the full suite, so B2 is the
-  first suspect.
-
-Improved against the baseline, red there and green here:
-`ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-clang-tidy-gcc13`,
-`android-cpp20-r28b`, `android-cpp20-r29`, `win64-cpp20-msvc2022`.
-
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
@@ -64,8 +20,8 @@ committed, so both sweeps measured the same tree. **There is no evidence either
 way about whether the B2 fixes changed this.**
 
 So the only positive signal needs CPU contention. CI cannot supply the evidence
-either: TSAN aborts at startup on those runners, see B0, so the red TSAN jobs say
-nothing about races. Reproduce it locally on purpose: run one suite while a
+either. TSAN aborted at startup on those runners until C9 fixed it, so no TSAN job
+before that says anything about races. Reproduce it locally on purpose: run one suite while a
 separate load generator saturates the cores, and count over 50 runs. Do not run
 several suites at once, because ReCpp does not support that and the result means
 nothing.
@@ -123,6 +79,31 @@ inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C9. CI was red in 5 job classes, and all 24 jobs pass now
+The baseline is PR #56, the last merge into master. Five separate causes:
+- 4 TSAN jobs. TSAN aborted before the first test:
+  `FATAL: ThreadSanitizer: unexpected memory mapping`, exit 66. The runner kernel
+  hands out a mapping outside the layout TSAN needs. **This was never B1.**
+  Fixed: the test step runs under `setarch $(uname -m) -R`, which turns off
+  address space randomization without a privilege.
+- 5 clang-21 jobs. `mama install-clang-21` runs `apt-get install clang-21`, and the
+  image carries no such package. Fixed: the matrix uses clang-20. `CMakeLists.txt`
+  needs Clang 21 for modules, so clang-20 falls back to headers by itself.
+- 2 clang-tidy jobs: `packages/ReCpp/linux/compile_commands.json not found`. A
+  clang build lands in `linux-clang`. Fixed: `run_clang_tidy` falls back to the
+  newest `linux*/compile_commands.json`.
+- `ubuntu-cpp20-modules-gcc14` died during BUILD with no output. Modules need
+  Ninja, and mama passes `jobs=` to make and msbuild but never to ninja, so ninja
+  sized itself from the host core count and the 6 GB box ran out of memory. Fixed:
+  the build step prefixes `taskset -c 0-2`, because ninja reads the affinity mask.
+  Reported upstream.
+- `win64-cpp20-msvc2022`: `test_timer.cpp:540 clock_type_monotonic_coarse` measured
+  0 ms against a 10 ms bound. `GetTickCount64` ticks every ~15.6 ms, so a 20 ms
+  spin can land inside one tick. Fixed: both coarse-clock tests spin 80 ms.
+
+`ubuntu-cpp23-asan-gcc13` never reproduced and is green. B2 is the first suspect
+if it flakes again.
 
 ### C8. MSVC failed the modules build with C7684 ambiguous IFC resolution
 `RppModuleChecks` carried its own copy of the module file set and also linked
