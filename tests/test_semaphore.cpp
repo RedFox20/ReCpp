@@ -18,7 +18,7 @@ TestImpl(test_semaphore)
     {
     }
 
-    TestCleanup()
+    TestCaseCleanup() // per case: TestCleanup() runs once for the whole suite
     {
         // co_await hands the resume to a pool thread, and that thread destroys the coroutine
         // frame AFTER .get() already returned. Wait, or the next case allocates into memory

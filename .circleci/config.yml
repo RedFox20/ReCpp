@@ -160,7 +160,11 @@ jobs:
             export PIPENV_PIPFILE=$(pwd)/Pipfile
             cd tests/consumer
             # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
-            CXX20=1 taskset -c 0-2 pipenv run mama gcc verbose build test jobs=3
+            CXX20=1 taskset -c 0-2 pipenv run mama gcc verbose build test jobs=3 2>&1 | tee build.log
+            # AUTO turns modules off and keeps going, so without this the job would still pass
+            # if ReCpp stopped enabling modules when another project builds it
+            grep -q "C++20 Modules enabled" build.log \
+              || { echo "FAIL: ReCpp built no modules as a dependency"; grep -i "MODULES" build.log; exit 1; }
   android-build:
     parameters:
       docker_image:

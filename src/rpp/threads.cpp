@@ -109,7 +109,9 @@ namespace rpp
                 PWSTR name = nullptr;
                 if (SUCCEEDED(GetThreadDescription(thread_handle, &name)))
                 {
-                    thread_name = rpp::to_string(name); // wchar_t* to std::string
+                    // MSVC keeps wchar_t distinct from char16_t, so to_string(name) picks the
+                    // bool overload and every thread reports "true". Both hold UTF-16 here.
+                    thread_name = rpp::to_string(reinterpret_cast<const char16_t*>(name));
                     LocalFree(name);
                 }
                 CloseHandle(thread_handle);
@@ -144,21 +146,28 @@ namespace rpp
     }
 
 #if __linux__
+    /// @returns the text of a cgroup control file. A sysfs file reports size 0, so
+    ///          file::read_all_text() reads nothing and only a bounded read sees the value.
+    static rpp::strview read_cgroup(const char* path, char (&buf)[64]) noexcept
+    {
+        rpp::file f { path, rpp::file::READONLY };
+        int n = f ? f.read(buf, sizeof(buf) - 1) : 0;
+        return { buf, n > 0 ? n : 0 };
+    }
+
     /// @returns the cores the cgroup CPU quota allows, or 0 when nothing caps the group.
     ///          A file that holds "max" or -1 parses to 0 or a negative, which means no cap.
     static int cgroup_quota_cores() noexcept
     {
-        // cgroup v2 puts "<quota> <period>" in one file
-        std::string cpu_max = rpp::file::read_all_text("/sys/fs/cgroup/cpu.max");
-        rpp::strview line { cpu_max };
+        char buf[64];
+        rpp::strview line = read_cgroup("/sys/fs/cgroup/cpu.max", buf); // v2 "<quota> <period>"
         rpp::int64 quota  = line.next(' ').to_int64();
         rpp::int64 period = line.to_int64();
         if (quota <= 0) // cgroup v1 splits the same pair over two files
         {
-            std::string q = rpp::file::read_all_text("/sys/fs/cgroup/cpu/cpu.cfs_quota_us");
-            std::string p = rpp::file::read_all_text("/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-            quota  = rpp::strview{q}.to_int64();
-            period = rpp::strview{p}.to_int64();
+            char qbuf[64], pbuf[64];
+            quota  = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", qbuf).to_int64();
+            period = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_period_us", pbuf).to_int64();
         }
         return (quota > 0 && period > 0) ? rpp::max(1, int(quota / period)) : 0;
     }
@@ -169,9 +178,9 @@ namespace rpp
     // @returns the cores this process may use, or 0 when nothing caps it
     static int max_usable_cores() noexcept
     {
+        int cap = 0; // a process can carry a quota AND a narrower mask, so the smaller wins
     #if __linux__ // covers Android and Yocto
-        if (int cores = cgroup_quota_cores())
-            return cores;
+        cap = cgroup_quota_cores();
         cpu_set_t set;
         CPU_ZERO(&set);
         if (sched_getaffinity(0, sizeof(set), &set) == 0)
@@ -179,7 +188,7 @@ namespace rpp
             int n = 0;
             for (int i = 0; i < CPU_SETSIZE; ++i)
                 if (CPU_ISSET(i, &set)) ++n;
-            if (n > 0) return n;
+            if (n > 0 && (cap == 0 || n < cap)) cap = n;
         }
     #elif _WIN32
         DWORD_PTR process_mask = 0, system_mask = 0;
@@ -188,10 +197,10 @@ namespace rpp
             int n = 0;
             for (DWORD_PTR m = process_mask; m; m >>= 1)
                 n += int(m & 1);
-            if (n > 0) return n;
+            if (n > 0) cap = n;
         }
     #endif
-        return 0; // macOS and iOS cap nothing we can read
+        return cap; // macOS and iOS cap nothing we can read
     }
 
 # if _WIN32
