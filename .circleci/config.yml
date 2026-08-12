@@ -322,6 +322,8 @@ workflows:
       - android-build:
           name: android-cpp20-r29-ninja
           docker_image: "cimg/android:2026.03.1-ndk"
-          toolchain: "ndk-r29-clang++20-ninja"
+          # NDK r29 ships Clang 21, so this job clears the version check and the
+          # clang-scan-deps guard is what decides whether it builds modules
+          toolchain: "ndk-r29-ninja"
           ndk_version: "29.0.14206865"
           no_ninja: ""
