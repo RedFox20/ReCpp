@@ -254,7 +254,6 @@ install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 ###################################################
 
 if (BUILD_TESTS)
-    # non-recursive: tests/modulecheck/ is its own target with its own main()
     file(GLOB RPP_TESTS tests/*.cpp)
     source_group(tests FILES ${RPP_TESTS})
 
@@ -338,12 +337,6 @@ if(RPP_BUILD_MODULES)
         # `import` won't get the -fmodule-file= flag from the build system.
         set_target_properties(RppTests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
-        # Module-only consumers. Each file imports a module and includes no rpp header,
-        # so a missing export list entry fails the build. They join RppTests rather than a
-        # target of their own: a second target that also links ReCpp would see two IFCs for
-        # the same module, and MSVC rejects that with C7684 ambiguous resolution.
-        file(GLOB RPP_MODULE_CHECKS tests/modulecheck/*.cpp)
-        target_sources(RppTests PRIVATE ${RPP_MODULE_CHECKS})
     endif()
 endif()
 

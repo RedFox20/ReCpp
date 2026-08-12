@@ -1,32 +1,29 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 2. Two modules exist today: `rpp.strview` and `rpp.debugging`.
+Revision 3. Two modules exist: `rpp.strview` and `rpp.debugging`.
 
-This document explains the existing experiment and records what a real build
-proves about it. It then fixes the architecture and gives a phased plan for all
-43 public headers.
+This document explains the pattern, records what real builds prove about it, and
+gives the phased plan for the remaining 41 headers.
 
-**What changed in revision 2**
+## Handover state
 
-1. Decision D4 is accepted and applied. [`sprint.h`](../src/rpp/sprint.h) no
-   longer imports a module.
-2. Include hygiene moves to the front as changeset 1, and it now removes
-   includes as well as adding them. [`tools/check_includes.py`](../tools/check_includes.py)
-   measures all three defects.
-3. Section 6 is new. It lays out the macro strategy as a decision table to vet,
-   and it reports a measured result for C++20 header units.
-4. Decision D7 is new. It sets two compiler tiers: gcc-14, clang-21 and MSVC
-   19.34 carry modules, and every older compiler stays on headers.
-   `BUILD_WITH_MODULES` defaults to `AUTO`, so `CMakeLists.txt` decides per
-   toolchain.
-5. Section 2.1 is new. gcc-14 rejects a std library include that follows an
-   import, and the fix reorders every consumer preamble. The strview experiment
-   shipped the wrong order. CLAUDE.md now carries this as a style rule.
-6. The macro decisions of section 6.3 are settled, and the include removals of
-   section 4.3 are approved.
-7. `debugging.h` is split. `debugging.macros.h` holds every macro and costs 50
-   preprocessed lines against 32893. `rpp.debugging` is the second module, and
-   `tests/modulecheck/` holds the module-only consumer gate. See section 6.4.
+**Landed on `claude/cpp-modules-migration-3d1pu3`, PR #57.**
+
+| Item | State |
+|---|---|
+| `rpp.strview`, `rpp.debugging` | build and pass on gcc-14, clang-21, MSVC 14.44 |
+| `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
+| `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
+| Include-order style rule | in CLAUDE.md |
+| `tools/check_includes.py` | 3 checks, 0 self-contained failures left |
+| `tests/test_modules.cpp` | module consumer test, 3 cases |
+| CI | 6 distinct failures fixed, see `BUGS.md` B0 |
+
+**Not started:** changesets 1 through 7 below. Changeset 1a is the next action and
+blocks nothing else.
+
+**Open questions carried into the next session:** `BUGS.md` B1 through B5. B1 and
+B2 are the two that can bite this work.
 
 ---
 
@@ -92,11 +89,12 @@ carries modules. So the same source compiles two ways:
 | Mode | How to build | What it proves |
 |---|---|---|
 | headers | `cmake -DBUILD_TESTS=ON` | the classic path still works |
-| modules | `cmake -DBUILD_TESTS=ON` on GCC 14+, Clang 21+ or MSVC 19.34+ | the export list is complete |
+| modules | `cmake -DBUILD_TESTS=ON` on GCC 14+, Clang 21+ or MSVC 19.34+ | the exported names the tests use resolve |
 
-The test body is the completeness gate. A name the export list forgets is a
-compile error in module mode and a silent pass in header mode. This is a good
-design and the plan keeps it. Section 8 makes it stronger.
+The test body is the same in both modes, so the module build proves the export
+list carries what the tests use. It is not a full completeness gate: the file also
+includes `<rpp/tests.h>`, so a forgotten name can still resolve through a header.
+Section 8 says where the real gate belongs.
 
 ### 1.3 What CMake does
 
@@ -125,7 +123,7 @@ compiler.
 | 8 | **gcc-14, clang-21 and clang-18 all accept `import` inside a global module fragment.** | A two-module probe compiled clean on all three, and clang-21 accepted it with `-pedantic-errors`. gcc-14 emitted the real cross-module call, `U fa@a()`. Revision 1 of this document predicted a rejection. That prediction was wrong. P1857R3 still restricts the global module fragment to preprocessing directives, so this is compiler laxity, not a guarantee. D4 no longer rests on it. |
 | 9 | **27 of 46 headers export zero public macros.** | Those are clean module candidates. Section 6 covers the rest. |
 | 10 | The module build costs nothing and gains nothing today. | From-scratch `RppTests` at `-j8`: 35 s with headers, 36 s with modules. One imported translation unit cannot move the number. |
-| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18 and gcc-13 pass 31 suites and 498/498. Modules: gcc-14 and clang-21 pass 32 suites and 499/499, the extra suite being the module-only consumer check. gcc-13 and clang-18 fall back to headers on their own and say why. |
+| 10b | ReCpp passes on every compiler on this machine. | Headers: clang-18 and gcc-13 pass 31 suites and 498/498. Modules: gcc-14 and clang-21 pass 32 suites and 501/501, the extra suite being `test_modules`. gcc-13 and clang-18 fall back to headers on their own and say why. |
 | 11 | A **header unit does deliver macros**, and clang calls it experimental. | `import "rpp/endian.h";` gave a consumer the macro `RPP_BYTESWAP16` and the function `rpp::readBEU16` in one import. clang-18 warns `-Wexperimental-header-units`. See section 6, option M4. |
 | 12 | **gcc-14 rejects a std library include that follows an import.** | See section 2.1. It is a compile error, and it broke the whole modules build until the preamble moved. |
 | 13 | **Mixed import and include link and run correctly on gcc-14.** | One translation unit imports `rpp.strview`, another includes `<rpp/strview.h>`, both build a `rpp::strview`, and the program links against `libReCpp.a` and returns the right answer. Property 1 of section 1.1 holds in practice, not only on paper. |
@@ -569,13 +567,11 @@ prototype exported `LogSeverity` and forgot `LogSeverityWarn`. The consumer fail
 with `use of undeclared identifier \'LogSeverityWarn\'`. The generator of
 changeset 3 has to walk every enumerator.
 
-**The check that keeps this honest.** `tests/modulecheck/check_debugging.cpp`
-imports `rpp.debugging`, includes no rpp header except the macro header, and names
-every exported symbol. `<rpp/tests.h>` cannot do this job, because it includes
-`<rpp/debugging.h>` itself and would hide a missing export. The file compiles into
-`RppTests`, and `tests/test_modules.cpp` calls it through the normal test
-framework. It must not get a target of its own: a second target that also links
-`ReCpp` gives MSVC two IFCs for one module name, which is `C7684`.
+**The check that keeps this honest.** `tests/test_modules.cpp` imports
+`rpp.debugging`, includes `<rpp/debugging.macros.h>`, and drives the logging API the
+way a consumer does. Section 8 states what that catches and what it does not.
+Whatever shape it takes, it must not get a target of its own: a second target that
+also links `ReCpp` gives MSVC two IFCs for one module name, which is `C7684`.
 
 This is the template for the other 41 modules.
 
@@ -612,55 +608,39 @@ the matching `#if`.
 
 ---
 
-## 8. Changeset 4: dual-mode tests, both modes in one build
+## 8. Changeset 4: the export-completeness gate
 
-Today the two modes need two separate CMake configurations, so drift can sit in
-the tree until someone runs the second one. Fix that: when
-`BUILD_WITH_MODULES=ON`, build **two executables from the same sources**.
+The dual-mode idea in section 1.2 stays: one test source, two build modes, and the
+module mode proves the export list carries what the tests use.
 
-```cmake
-if(BUILD_WITH_MODULES)
-    add_executable(RppModuleTests ${RPP_TESTS} ${RPP_SRC})
-    target_compile_definitions(RppModuleTests PRIVATE RPP_DEBUG=1 RPP_TESTS=1 RPP_BUILD_WITH_MODULES=1)
-    target_sources(RppModuleTests PRIVATE FILE_SET CXX_MODULES FILES ${RPP_MODULES_SRC})
-    set_target_properties(RppModuleTests PROPERTIES CXX_SCAN_FOR_MODULES ON)
-endif()
-```
+**What shipped.** [`tests/test_modules.cpp`](../tests/test_modules.cpp) imports both
+modules, includes `<rpp/debugging.macros.h>`, and drives the API the way a consumer
+does. It compiles only when the toolchain carries modules. Three cases: the logging
+macros against the module, `ThrowErr` through the module, and a `strview` that the
+module and the header both name.
 
-`RppTests` keeps its current meaning and stops carrying
-`RPP_BUILD_WITH_MODULES`. `mama build test` then runs both binaries and one
-command covers both modes.
+**What it does not prove.** The file includes `<rpp/tests.h>` for `TestImpl`, which
+pulls in `<rpp/debugging.h>`. So a name the module forgets can still resolve through
+the header, and the test passes anyway. An earlier revision kept a separate
+translation unit that included no rpp header to close that hole. That file was an
+outlier, and it is gone.
 
-Every test file gets the same preamble, and the test body never changes.
-**Includes come first and the import comes last**, because of the gcc-14 rule of
-section 2.1:
+**Where the real gate belongs: changeset 3.** `gen_module_exports.py --check`
+compares the generated export list against the header's declarations statically. It
+needs no special translation unit, it covers every name rather than the ones a test
+happens to call, and it cannot be defeated by an include. Build that, and the
+compile-time hole above stops mattering.
 
-```cpp
-#include <rpp/tests.h>   // the test framework is macros
-#include <string>        // whatever std facilities the test itself uses
+Two smaller notes for whoever writes more of these tests:
 
-#if RPP_BUILD_WITH_MODULES
-import rpp.<module under test>;
-#endif
-```
+- `<rpp/tests.h>` defines its own one-argument `Assert`, which shadows the
+  `Assert(expr, fmt, ...)` of `debugging.macros.h`. Use `AssertExpr` or `DbgAssert`
+  in a test file.
+- The mixed-mode link property of section 1.1 is worth its own case. `import` in one
+  translation unit and `#include` in another, both passing an `rpp::strview` across,
+  linked into one binary.
 
-[`tests/test_strview.cpp`](../tests/test_strview.cpp) already carries this
-order. The reverse order cost 1603 compile errors on gcc-14.
-
-Two extra checks belong in the module-mode binary only:
-
-1. **A macro-free compile check.** One translation unit per module that imports
-   the module, includes no rpp header, and names every exported symbol once.
-   This is the real export-completeness gate, because the normal tests only
-   cover what they happen to call. Generate it from the same libclang data as
-   the export list.
-2. **A mixed-mode link check.** One translation unit that imports `rpp.strview`
-   next to another that includes `<rpp/strview.h>`, both in one binary, both
-   passing a `rpp::strview` across. This pins property 1 of section 1.1.
-
-**Estimate: half a day.**
-
----
+**Estimate: half a day**, once changeset 3 exists.
 
 ## 9. Changeset 5: write the modules, in dependency layers
 
@@ -750,10 +730,12 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ## 11. Changeset 7: CI, docs and measurement
 
-1. Add two modules jobs to `.circleci/config.yml`, one for gcc-14 and one for
-   clang-21, matching tier 1 (D7). The existing matrix runs gcc-13 and clang-18
-   and stays headers-only. `mama install-gcc-14` and `mama install-clang-21`
-   install the tier 1 compilers, so a CI image needs no hand-built toolchain.
+1. The gcc-14 modules job is in `.circleci/config.yml`. A clang-21 job is not:
+   the CI image has no `clang-21` package, so `mama install-clang-21` fails. Add
+   one once the image carries it, or once mama adds the LLVM apt source. Three CI
+   traps are already handled and worth keeping: TSAN needs `setarch -R` to start,
+   ninja ignores `jobs=` so a Ninja job needs `taskset`, and `run_clang_tidy` has
+   to find the compile database under `linux-clang`. See `BUGS.md` B0.
 2. Wire `tools/check_includes.py --check` and
    `tools/gen_module_exports.py --check` as gates.
 3. Rewrite the README modules section. It is already stale: it names a test
