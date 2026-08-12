@@ -4,8 +4,8 @@
 #if !RPP_BARE_METAL
 # include <thread> // hardware_concurrency
 # include <vector>
-# include <cstdio>  // fopen, fscanf: reading the cgroup CPU quota
-# include "minmax.h" // rpp::max
+# include "file_io.h" // rpp::file::read_all_text, reading the cgroup CPU quota
+# include "minmax.h"  // rpp::max
 # if __APPLE__ || __linux__
 #  include <pthread.h>
 #  include <unistd.h> // getpid()
@@ -144,19 +144,23 @@ namespace rpp
     }
 
 #if __linux__
-    /// @returns how many of the integers it read, so a caller can tell a partial read apart
-    static int read_ints(const char* path, long long& a, long long& b) noexcept
+    /// @returns the cores the cgroup CPU quota allows, or 0 when nothing caps the group.
+    ///          A file that holds "max" or -1 parses to 0 or a negative, which means no cap.
+    static int cgroup_quota_cores() noexcept
     {
-        std::FILE* f = std::fopen(path, "r");
-        if (!f) return 0;
-        int n = std::fscanf(f, "%lld %lld", &a, &b);
-        std::fclose(f);
-        return n < 0 ? 0 : n;
-    }
-    static int read_ints(const char* path, long long& a) noexcept
-    {
-        long long unused = 0;
-        return read_ints(path, a, unused) >= 1 ? 1 : 0;
+        // cgroup v2 puts "<quota> <period>" in one file
+        std::string cpu_max = rpp::file::read_all_text("/sys/fs/cgroup/cpu.max");
+        rpp::strview line { cpu_max };
+        rpp::int64 quota  = line.next(' ').to_int64();
+        rpp::int64 period = line.to_int64();
+        if (quota <= 0) // cgroup v1 splits the same pair over two files
+        {
+            std::string q = rpp::file::read_all_text("/sys/fs/cgroup/cpu/cpu.cfs_quota_us");
+            std::string p = rpp::file::read_all_text("/sys/fs/cgroup/cpu/cpu.cfs_period_us");
+            quota  = rpp::strview{q}.to_int64();
+            period = rpp::strview{p}.to_int64();
+        }
+        return (quota > 0 && period > 0) ? rpp::max(1, int(quota / period)) : 0;
     }
 #endif
 
@@ -166,16 +170,8 @@ namespace rpp
     static int max_usable_cores() noexcept
     {
     #if __linux__ // covers Android and Yocto
-        // cgroup v2 cpu.max holds "<quota> <period>", and writes "max" when unlimited.
-        // cgroup v1 splits the same pair over two files and writes -1 when unlimited.
-        long long quota = 0, period = 0;
-        if (read_ints("/sys/fs/cgroup/cpu.max", quota, period) == 2 ||
-            (read_ints("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", quota) == 1 &&
-             read_ints("/sys/fs/cgroup/cpu/cpu.cfs_period_us", period) == 1))
-        {
-            if (quota > 0 && period > 0)
-                return rpp::max(1, int(quota / period));
-        }
+        if (int cores = cgroup_quota_cores())
+            return cores;
         cpu_set_t set;
         CPU_ZERO(&set);
         if (sched_getaffinity(0, sizeof(set), &set) == 0)
