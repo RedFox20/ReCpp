@@ -132,6 +132,19 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C12. Every Windows thread name read back as "true"
+`get_thread_name()` passed a `PWSTR` to `rpp::to_string()`. MSVC keeps `wchar_t`
+distinct from `char16_t`, and `ustring` is `std::u16string`, so no UTF-16 overload
+matched. A pointer converts to `bool`, so `to_string(bool)` won and every thread
+reported "true".
+It predates this branch. It surfaced only after the B8 fix stopped Windows from
+aborting in `test_event_loop`, which used to end the run before `test_threadpool`.
+Fixed at the root: `strview.h` gains `to_string(const wchar_t*, int)` under
+`_WIN32`, matching the `_MSC_VER` guard on `ustrview(const wchar_t*)`. A wide
+string can no longer bind to the bool overload.
+Verified with `-fshort-wchar`, which gives Linux a 16 bit `wchar_t`: the overload
+returns "TestThread", not "true". `test_strview` covers it.
+
 ### C11. A modules build broke every consumer on a toolchain without clang-scan-deps
 KrattGCS failed its Android build: `"" -format=p1689 --`, then
 `sh: line 1: : command not found`, exit 127, on every `.cppm` scan.

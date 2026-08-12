@@ -109,9 +109,7 @@ namespace rpp
                 PWSTR name = nullptr;
                 if (SUCCEEDED(GetThreadDescription(thread_handle, &name)))
                 {
-                    // MSVC keeps wchar_t distinct from char16_t, so to_string(name) picks the
-                    // bool overload and every thread reports "true". Both hold UTF-16 here.
-                    thread_name = rpp::to_string(reinterpret_cast<const char16_t*>(name));
+                    thread_name = rpp::to_string(name); // wchar_t* to std::string
                     LocalFree(name);
                 }
                 CloseHandle(thread_handle);
