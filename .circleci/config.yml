@@ -58,7 +58,11 @@ jobs:
             COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage=src" || echo "")
             # disable clang + clang-tidy sanitizer combination
             SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
-            pipenv run mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=3
+            # mama passes jobs= to make and msbuild but never to ninja, and ninja then sizes
+            # itself from the host core count, not the container limit, and the box OOMs.
+            # taskset pins the affinity, which is what ninja reads.
+            NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-2" || echo "")
+            $NINJA_CAP pipenv run mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=3
       - run:
           name: Test << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>
           command: |

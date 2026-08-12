@@ -33,6 +33,16 @@ Regressed on this branch, so they are ours:
   lands in `linux-clang`, and `run_clang_tidy` only looked in `linux`. This is a
   mama layout change, not a branch change, and the baseline run predates it.
   Fixed: the script falls back to the newest `linux*/compile_commands.json`.
+- `ubuntu-cpp20-modules-gcc14` again, this time dying during BUILD with no output.
+  It is the only job that runs Ninja, because modules need it. mama passes `jobs=`
+  to make and msbuild but never to ninja, see `_buildsys_flags`, so ninja sizes
+  itself from the host core count rather than the container limit and the 6 GB box
+  OOMs. Fixed: the build step prefixes `taskset -c 0-2` when Ninja is on, because
+  ninja reads the affinity mask. Reported upstream.
+- `win64-cpp20-msvc2022`: `test_timer.cpp:540 clock_type_monotonic_coarse:
+  elapsed_ms => '0' must be greater or equal than '10'`. `GetTickCount64` ticks
+  every ~15.6 ms, and a 20 ms spin can land inside one tick on a virtualized
+  runner. Fixed: both coarse-clock tests spin 80 ms, which crosses several ticks.
 - `ubuntu-cpp23-asan-gcc13`. Still unknown. It runs the full suite, so B2 is the
   first suspect.
 
