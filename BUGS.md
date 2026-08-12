@@ -26,6 +26,17 @@ Nothing joins that teardown, so no consumer can know the frame is gone.
 Worked around in the test: `test_semaphore` waits for `active_tasks()` to reach 0
 between cases. The library ordering is unchanged and still unsynchronized.
 
+### B10. A test handed the event_loop a pool that dies before the loop
+`test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
+the loop a raw pointer to it. The case returns, the local pool dies, and only then
+does `TestCaseCleanup()` destroy the loop, so the loop outlives the pool it points
+at. Android caught it in CI:
+`FORTIFY: pthread_mutex_trylock called on a destroyed mutex`, then `SIGABRT` on
+`rpp_task_13`, during the next case.
+Fixed: the pool is a fixture member now, and cleanup destroys the loop first.
+The same shape can hit any consumer that gives `event_loop` a pool with a shorter
+life. `event_loop` takes a raw `thread_pool*` and documents no lifetime rule.
+
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a

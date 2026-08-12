@@ -29,6 +29,8 @@ TestImpl(test_event_loop)
 #if RPP_HAS_COROUTINES
 
     rpp::AtomicTimeSource clock;
+    // a loop can hold a raw pointer to this pool, so the pool must outlive the loop
+    std::unique_ptr<rpp::thread_pool> custom_pool;
     std::unique_ptr<rpp::event_loop> loop;
     const uint64 main_tid = rpp::get_thread_id();
 
@@ -46,7 +48,8 @@ TestImpl(test_event_loop)
     }
     TestCaseCleanup()
     {
-        loop.reset();
+        loop.reset();        // the loop may point at custom_pool, so it goes first
+        custom_pool.reset(); // and only then may the pool and its mutex die
     }
 
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
@@ -737,8 +740,10 @@ TestImpl(test_event_loop)
     // ─── Constructor with explicit thread pool ──────────────────
     TestCaseCoro(custom_thread_pool)
     {
-        rpp::thread_pool pool;
-        loop = std::make_unique<rpp::event_loop>(0, &pool);
+        // a local pool would die when this case returns, and TestCaseCleanup destroys the
+        // loop after that, so a worker could touch the destroyed pool mutex
+        custom_pool = std::make_unique<rpp::thread_pool>();
+        loop = std::make_unique<rpp::event_loop>(0, custom_pool.get());
 
         std::atomic<bool> bg_ran_on_custom_pool{false};
         int result = co_await loop->run_async([&]() -> int {
