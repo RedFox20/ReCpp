@@ -256,6 +256,7 @@ TestImpl(test_sprint)
         sb.clear();
     }
 
+#if RPP_ENABLE_UNICODE // config.h turns this off for macOS, MIPS, Yocto and Raspi
     // Windows holds UTF-16 in a wchar_t and every other platform holds UTF-32. Reading
     // UTF-32 as UTF-16 truncated "hello world" to "h" and still reported a length of 11.
     TestCase(string_buffer_write_wide_string)
@@ -277,6 +278,7 @@ TestImpl(test_sprint)
         sb.write(L""); // an empty wide string appends nothing
         AssertThat(sb.size(), 0);
     }
+#endif // RPP_ENABLE_UNICODE
 
     TestCase(string_buffer_shift_op)
     {
