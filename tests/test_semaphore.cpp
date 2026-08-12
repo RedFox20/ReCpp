@@ -1,6 +1,7 @@
 #include <rpp/semaphore.h>
 #include <rpp/coroutines.h>
 #include <rpp/future.h>
+#include <rpp/thread_pool.h> // draining the pool between test cases
 #include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
@@ -15,6 +16,17 @@ TestImpl(test_semaphore)
 {
     TestInit(test_semaphore)
     {
+    }
+
+    TestCaseCleanup() // per case: TestCleanup() runs once for the whole suite
+    {
+        // co_await hands the resume to a pool thread, and that thread destroys the coroutine
+        // frame AFTER .get() already returned. Wait, or the next case allocates into memory
+        // the previous case is still freeing.
+        rpp::Timer quiesce;
+        while (rpp::thread_pool::global().active_tasks() > 0 && quiesce.elapsed_ms() < 1000.0)
+            rpp::sleep_ms(1);
+        rpp::thread_pool::global().clear_idle_tasks();
     }
 
     TestCase(can_notify_and_wait)

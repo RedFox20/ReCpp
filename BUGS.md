@@ -6,6 +6,58 @@ lines.
 
 ## Open
 
+### B6. A consumer builds modules that no consumer can import
+`package()` exports `.h` and `.natvis` only, so a downstream project compiles two
+BMIs and then cannot `import` either one. See B3. AUTO still turns modules on in
+a dependency build, which is where C11 broke KrattGCS.
+The owner chose to keep AUTO as the default, so this stays open until B3 lands and
+makes the modules reachable. Until then a consumer pays the build cost for nothing.
+
+### B9. A pool thread tears down a coroutine frame after `.get()` returned
+TSAN, `test_semaphore::co_await_semaphore_already_signaled`, on clang-18:
+`operator delete` from `~promise()` on `rpp_task_20`, against a main-thread read
+of the same address. The trace names `test_co_await_semaphore_timeout`, which is
+the **previous** test case.
+`semaphore::co_await_handle::await_suspend` posts the resume to a detached pool
+task. That task sets the promise, which releases `.get()`, and only then destroys
+the coroutine frame. The main thread runs the next case while the pool thread is
+still freeing, and the allocator hands the same address out again.
+Nothing joins that teardown, so no consumer can know the frame is gone.
+Worked around in the test: `test_semaphore` waits for `active_tasks()` to reach 0
+between cases. The library ordering is unchanged and still unsynchronized.
+
+### B7. `num_physical_cores()` reports host cores inside a container
+`std::thread::hardware_concurrency()` answers for the host, not for the cores a
+container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
+container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
+serial loop, which failed `test_threadpool.cpp:239`.
+`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
+`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
+Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
+then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
+`num_physical_cores()` never reports more than that. Linux covers Android and
+Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
+The `CIRCLECI` guess that divided by 4 is gone.
+Verified: `taskset -c 0` gives 1 core where the machine reports 4.
+The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
+because a shared runner cannot measure that ratio.
+Tracked: https://github.com/RedFox20/ReCpp/issues/60
+
+### B8. `pump_until_ready_times_out_without_blocking` aborted on Windows
+The job printed the test name and `Exited with code exit status 1`, with no
+assertion text, so the process died instead of failing an assertion. Not
+reproduced on Linux, and CircleCI logs are not reachable from the dev container.
+Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
+the owner destroys it, which matches an exit with no output, but nothing proves
+that path ran.
+Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
+drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
+waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
+unwinding left a pool task mid-sleep with a continuation into a loop that the next
+`TestCaseSetup()` destroys.
+Next Windows failure should print the diagnostic line first. That names which half
+of the test died.
+
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
@@ -79,6 +131,45 @@ inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C12. Every Windows thread name read back as "true"
+`get_thread_name()` passed a `PWSTR` to `rpp::to_string()`. MSVC keeps `wchar_t`
+distinct from `char16_t`, and `ustring` is `std::u16string`, so no UTF-16 overload
+matched. A pointer converts to `bool`, so `to_string(bool)` won and every thread
+reported "true".
+It predates this branch. It surfaced only after the B8 fix stopped Windows from
+aborting in `test_event_loop`, which used to end the run before `test_threadpool`.
+Fixed at the root: `strview.h` gains `to_string(const wchar_t*, int)` under
+`_WIN32`, matching the `_MSC_VER` guard on `ustrview(const wchar_t*)`. A wide
+string can no longer bind to the bool overload.
+Verified with `-fshort-wchar`, which gives Linux a 16 bit `wchar_t`: the overload
+returns "TestThread", not "true". `test_strview` covers it.
+
+### C11. A modules build broke every consumer on a toolchain without clang-scan-deps
+KrattGCS failed its Android build: `"" -format=p1689 --`, then
+`sh: line 1: : command not found`, exit 127, on every `.cppm` scan.
+Clang scans module dependencies with a separate `clang-scan-deps` binary, and the
+Android NDK ships none. CMake's `find_program` leaves
+`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` empty and still writes the scan rule, so the
+configure passes and every ninja scan runs an empty command. AUTO checked the CMake
+version, the C++ standard, the generator and the compiler version, but never the
+scanner.
+Fixed: AUTO also requires an existing `clang-scan-deps` when the compiler is Clang.
+Reproduced and verified on one tree: the old CMakeLists printed `Modules enabled`
+and failed the build, the new one prints
+`RPP MODULES: off, the Clang toolchain ships no clang-scan-deps` and builds clean.
+
+CI missed it for two reasons, and both now have a job:
+- Every Android job forced `NO_NINJA=1`, so CI never ran the NDK under the one
+  generator that scans modules. `android-cpp20-r29-ninja` runs it.
+- CI only ever built ReCpp as the root target. `consumer-integration` builds
+  `tests/consumer`, which declares ReCpp through `add_local` and links the exported
+  package, on gcc-14 with Ninja so modules turn on inside a dependency build.
+
+Both modules jobs now pass `BUILD_WITH_MODULES=ON` instead of trusting AUTO. AUTO
+turns modules off and keeps going, so a job named modules could pass while it built
+headers only. `ubuntu-cpp20-modules-clang21` also installs `clang-tools-21`, because
+that package, not `clang-21`, carries `clang-scan-deps`.
 
 ### C9. CI was red in 5 job classes, and all 24 jobs pass now
 The baseline is PR #56, the last merge into master. Five separate causes:

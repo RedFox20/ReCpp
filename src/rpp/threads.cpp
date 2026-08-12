@@ -4,9 +4,14 @@
 #if !RPP_BARE_METAL
 # include <thread> // hardware_concurrency
 # include <vector>
+# include "file_io.h" // rpp::file::read_all_text, reading the cgroup CPU quota
+# include "minmax.h"  // rpp::max
 # if __APPLE__ || __linux__
 #  include <pthread.h>
 #  include <unistd.h> // getpid()
+# endif
+# if __linux__
+#  include <sched.h> // sched_getaffinity
 # endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -138,6 +143,64 @@ namespace rpp
     #endif
     }
 
+#if __linux__
+    /// @returns the text of a cgroup control file. A sysfs file reports size 0, so
+    ///          file::read_all_text() reads nothing and only a bounded read sees the value.
+    static rpp::strview read_cgroup(const char* path, char (&buf)[64]) noexcept
+    {
+        rpp::file f { path, rpp::file::READONLY };
+        int n = f ? f.read(buf, sizeof(buf) - 1) : 0;
+        return { buf, n > 0 ? n : 0 };
+    }
+
+    /// @returns the cores the cgroup CPU quota allows, or 0 when nothing caps the group.
+    ///          A file that holds "max" or -1 parses to 0 or a negative, which means no cap.
+    static int cgroup_quota_cores() noexcept
+    {
+        char buf[64];
+        rpp::strview line = read_cgroup("/sys/fs/cgroup/cpu.max", buf); // v2 "<quota> <period>"
+        rpp::int64 quota  = line.next(' ').to_int64();
+        rpp::int64 period = line.to_int64();
+        if (quota <= 0) // cgroup v1 splits the same pair over two files
+        {
+            char qbuf[64], pbuf[64];
+            quota  = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", qbuf).to_int64();
+            period = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_period_us", pbuf).to_int64();
+        }
+        return (quota > 0 && period > 0) ? rpp::max(1, int(quota / period)) : 0;
+    }
+#endif
+
+    // A container caps CPU with a cgroup quota or an affinity mask, and neither the core count
+    // nor hardware_concurrency() sees the cap, so a pool sized by them oversubscribes.
+    // @returns the cores this process may use, or 0 when nothing caps it
+    static int max_usable_cores() noexcept
+    {
+        int cap = 0; // a process can carry a quota AND a narrower mask, so the smaller wins
+    #if __linux__ // covers Android and Yocto
+        cap = cgroup_quota_cores();
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        if (sched_getaffinity(0, sizeof(set), &set) == 0)
+        {
+            int n = 0;
+            for (int i = 0; i < CPU_SETSIZE; ++i)
+                if (CPU_ISSET(i, &set)) ++n;
+            if (n > 0 && (cap == 0 || n < cap)) cap = n;
+        }
+    #elif _WIN32
+        DWORD_PTR process_mask = 0, system_mask = 0;
+        if (GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask))
+        {
+            int n = 0;
+            for (DWORD_PTR m = process_mask; m; m >>= 1)
+                n += int(m & 1);
+            if (n > 0) cap = n;
+        }
+    #endif
+        return cap; // macOS and iOS cap nothing we can read
+    }
+
 # if _WIN32
     int num_physical_cores() noexcept
     {
@@ -154,7 +217,10 @@ namespace rpp
                 if (info.Relationship == RelationProcessorCore)
                     ++cores;
             }
-            return cores > 0 ? cores : 1;
+            if (cores <= 0) cores = 1;
+            if (int usable = max_usable_cores(); usable > 0 && usable < cores)
+                cores = usable;
+            return cores;
         }();
         return num_cores;
     }
@@ -165,22 +231,16 @@ namespace rpp
         {
         // TODO: figure out which types of CPU-s have SMT/HT
         #if MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID
-            #if RPP_TESTS
-                int hyperthreading_factor = 1;
-                if (std::getenv("CIRCLECI") != nullptr)
-                {
-                    // CIRCLECI machines usually report actual hardware threads -- e.g. 36 threads
-                    // even though scheduler only has access to 3/4/6/8 cores
-                    hyperthreading_factor = 4;
-                }
-            #else
-                constexpr int hyperthreading_factor = 1;
-            #endif
+            constexpr int hyperthreading_factor = 1;
         #else
             constexpr int hyperthreading_factor = 2;
         #endif
             int n = (int)std::thread::hardware_concurrency() / hyperthreading_factor;
-            return n > 0 ? n : 1;
+            if (n <= 0) n = 1;
+            // the CIRCLECI guess this replaces divided by 4, which is still wrong on a 3 CPU box
+            if (int usable = max_usable_cores(); usable > 0 && usable < n)
+                n = usable;
+            return n;
         }();
         return num_cores;
     }

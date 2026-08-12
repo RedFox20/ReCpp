@@ -392,6 +392,18 @@ TestImpl(test_strview)
         AssertEqual(path, u8"/tmp/äöüß/hello.txt");
         AssertEqual(path.length(), 23);
     }
+
+    // Without a wchar_t overload, a wide string converts to bool and to_string(bool) wins,
+    // so every wide string becomes "true". That shipped, and get_thread_name() returned it.
+    TestCase(can_convert_wide_string_to_utf8)
+    {
+    #if _WIN32
+        AssertEqual(rpp::to_string(L"TestThread"), "TestThread");
+        AssertEqual(rpp::to_string(L""), "");
+        AssertEqual(rpp::to_string(L"hello: äöüß"), u8"hello: äöüß");
+        AssertEqual(rpp::to_string(L"hello", 4), "hell"); // an explicit length still applies
+    #endif
+    }
 #endif // RPP_ENABLE_UNICODE
 
 };

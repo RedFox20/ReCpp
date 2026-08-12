@@ -395,10 +395,10 @@ while (text.next(line, '\n'))
 | [`to_int(str, len, end)`](src/rpp/strview.h#L123) | Fast locale-agnostic atoi |
 | [`to_inthx(str, len, end)`](src/rpp/strview.h#L144) | Fast locale-agnostic atoi for HEX strings |
 | [`_tostring(buffer, value)`](src/rpp/strview.h#L165) | Fast locale-agnostic itoa/ftoa for int, float, double |
-| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1533) | Replaces characters in a string buffer |
+| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1544) | Replaces characters in a string buffer |
 | [`concat(a, b, ...)`](src/rpp/strview.h#L1403) | Concatenates multiple strviews into std::string |
-| [`to_lower(str, len)`](src/rpp/strview.h#L1513) | Converts string to lowercase |
-| [`to_upper(str, len)`](src/rpp/strview.h#L1518) | Converts string to uppercase |
+| [`to_lower(str, len)`](src/rpp/strview.h#L1524) | Converts string to lowercase |
+| [`to_upper(str, len)`](src/rpp/strview.h#L1529) | Converts string to uppercase |
 | [`operator""_sv`](src/rpp/strview.h#L1297) | String literal for creating `strview` |
 | [`strcontains(str, len, ch)`](src/rpp/strview.h#L78) | Checks if character is found within a string |
 | [`strcontainsi(str, len, ch)`](src/rpp/strview.h#L79) | Case-insensitive character search |
@@ -413,9 +413,9 @@ while (text.next(line, '\n'))
 
 | Class | Description |
 |-------|-------------|
-| [`line_parser`](src/rpp/strview.h#L1550) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
-| [`keyval_parser`](src/rpp/strview.h#L1588) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
-| [`bracket_parser`](src/rpp/strview.h#L1637) | Parses a buffer for balanced-parentheses structures |
+| [`line_parser`](src/rpp/strview.h#L1561) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
+| [`keyval_parser`](src/rpp/strview.h#L1599) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
+| [`bracket_parser`](src/rpp/strview.h#L1648) | Parses a buffer for balanced-parentheses structures |
 
 ### strview Class
 
@@ -659,6 +659,7 @@ if (a < b) // true — lexicographic ordering via compare()
 | [`next(char16_t delim)`](src/rpp/strview.h#L1230) | Returns next token directly |
 | [`to_string()`](src/rpp/strview.h#L1003) | Convert to `std::u16string` |
 | [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1084) | Copy to null-terminated C-string buffer |
+| [`to_string(const wchar_t* wstr, int wstrlen)`](src/rpp/strview.h#L1488) | Converts a UTF-16 wide string to UTF-8, Windows only |
 
 ```cpp
 #define RPP_ENABLE_UNICODE 1
@@ -1748,8 +1749,8 @@ Thread naming and information utilities.
 | [`get_this_thread_name()`](src/rpp/threads.h#L21) | Get current thread name |
 | [`get_thread_id()`](src/rpp/threads.h#L31) | Get current thread ID (uint64) |
 | [`get_process_id()`](src/rpp/threads.h#L36) | Get current process ID (uint32) |
-| [`num_physical_cores()`](src/rpp/threads.h#L41) | Number of physical CPU cores |
-| [`yield()`](src/rpp/threads.h#L47) | Yield execution to another thread |
+| [`num_physical_cores()`](src/rpp/threads.h#L42) | Number of physical CPU cores |
+| [`yield()`](src/rpp/threads.h#L48) | Yield execution to another thread |
 | [`get_thread_name(thread_id)`](src/rpp/threads.h#L26) | Returns the debug name of a thread by its ID |
 
 ---

@@ -1,5 +1,6 @@
 /obj
 /bin
+tests/consumer/bin/
 packages/
 MSVC/packages.config
 ipch/

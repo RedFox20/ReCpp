@@ -1478,6 +1478,17 @@ namespace rpp
      */
     string to_string(const char16_t* utf16, int utf16len = -1) noexcept;
     FINLINE string to_string(ustrview utf16) noexcept { return to_string(utf16.str, utf16.len); }
+#if _WIN32
+    /**
+     * @brief Converts a UTF-16 wide string to a UTF-8 String. Windows only, because only
+     *        there does wchar_t hold UTF-16.
+     * @note Without this overload a wchar_t* converts to bool and silently picks
+     *       to_string(bool), so every wide string turns into "true".
+     */
+    FINLINE string to_string(const wchar_t* wstr, int wstrlen = -1) noexcept {
+        return to_string(reinterpret_cast<const char16_t*>(wstr), wstrlen);
+    }
+#endif
     /**
      * @brief Buffer style conversion for less allocations
      * @returns -1 on failure, [0..out_max-1] on success
