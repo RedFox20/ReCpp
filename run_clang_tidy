@@ -27,11 +27,20 @@ while [[ $# -gt 0 ]]; do
 done
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 
+# mama names the build dir after the platform, and suffixes the compiler when it is
+# not the default, so a clang build lands in linux-clang. Take the newest match.
 COMPILE_DB="$SCRIPT_DIR/packages/ReCpp/$PLATFORM/compile_commands.json"
 if [ ! -f "$COMPILE_DB" ]; then
-    echo "ERROR: $COMPILE_DB not found. Run 'mama build' first." >&2
-    exit 1
+    CANDIDATE=$(ls -t "$SCRIPT_DIR"/packages/ReCpp/"$PLATFORM"*/compile_commands.json 2>/dev/null | head -1 || true)
+    if [ -n "$CANDIDATE" ]; then
+        COMPILE_DB="$CANDIDATE"
+    else
+        echo "ERROR: no compile_commands.json under $SCRIPT_DIR/packages/ReCpp/$PLATFORM*/. Run 'mama build' first." >&2
+        ls -la "$SCRIPT_DIR/packages/ReCpp/" 2>/dev/null >&2 || true
+        exit 1
+    fi
 fi
+echo "Using compile database: $COMPILE_DB"
 
 # deduplicate compile_commands.json (tests recompile sources with RPP_DEBUG=1)
 "$SCRIPT_DIR/.circleci/dedup_compile_commands.py" "$COMPILE_DB" > /dev/null

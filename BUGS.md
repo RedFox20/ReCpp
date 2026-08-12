@@ -11,22 +11,30 @@ Baseline is PR #56, the last merge into master. These jobs were **already red
 there**, before this branch existed:
 `ubuntu-cpp20-tsan-gcc13`, `ubuntu-cpp23-tsan-gcc13`, `ubuntu-cpp26-tsan-gcc14`,
 `ubuntu-cpp23-tsan-clang18`.
-That is B1 reproducing in CI. A shared 3-CPU runner supplies the contention that
-an idle developer machine does not.
+
+**This is not B1.** TSAN never starts on these runners:
+`FATAL: ThreadSanitizer: unexpected memory mapping 0x6277eeea4000-0x6277eeece000`,
+exit 66. The runner kernel hands out a mapping outside the layout TSAN needs, so
+the process aborts before a single test runs. An earlier revision of this entry
+read it as B1 reproducing in CI, which was wrong.
+Fixed: the test step runs under `setarch $(uname -m) -R`, which turns off address
+space randomization for the process and its children, unprivileged.
 
 Regressed on this branch, so they are ours:
 - 5 clang-21 jobs. `mama install-clang-21` runs `apt-get install clang-21`, and the
   CI image has no such package. Fixed: the matrix uses clang-20, and the clang-21
   modules job is gone. `CMakeLists.txt` needs Clang 21 for modules, so clang-20
   falls back to headers by itself.
-- `ubuntu-cpp20-modules-gcc14`. Cause unknown, the log is not reachable from here.
-  ASAN plus modules on gcc-14 builds and passes 499/499 locally, so that
-  combination is not it.
-- `ubuntu-cpp20-clang-tidy-clang18`, `ubuntu-cpp23-clang-tidy-clang18`,
-  `ubuntu-cpp23-asan-gcc13`. Cause unknown. `run_clang_tidy` over `src/rpp/`
-  passes locally on clang-18 with exit 0, so the clang-tidy jobs fail in their
-  build or test step, not the analysis. Both jobs also run the full suite, which
-  makes B2 the first suspect.
+- `ubuntu-cpp20-modules-gcc14`. It exited with no message, and it ran TSAN at the
+  time. That matches the TSAN startup abort above. The job now runs ASAN, and
+  `setarch -R` covers the rest.
+- `ubuntu-cpp20-clang-tidy-clang18`, `ubuntu-cpp23-clang-tidy-clang18`:
+  `ERROR: packages/ReCpp/linux/compile_commands.json not found`. A clang build
+  lands in `linux-clang`, and `run_clang_tidy` only looked in `linux`. This is a
+  mama layout change, not a branch change, and the baseline run predates it.
+  Fixed: the script falls back to the newest `linux*/compile_commands.json`.
+- `ubuntu-cpp23-asan-gcc13`. Still unknown. It runs the full suite, so B2 is the
+  first suspect.
 
 Improved against the baseline, red there and green here:
 `ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-clang-tidy-gcc13`,
@@ -45,10 +53,12 @@ failed: the `git stash` had nothing to stash, because the test fixes were alread
 committed, so both sweeps measured the same tree. **There is no evidence either
 way about whether the B2 fixes changed this.**
 
-So the only positive signal needs CPU contention, which is what a shared CI runner
-has. Reproduce it that way on purpose: run one suite while a separate load
-generator saturates the cores, and count over 50 runs. Do not run several suites
-at once, because ReCpp does not support that and the result means nothing.
+So the only positive signal needs CPU contention. CI cannot supply the evidence
+either: TSAN aborts at startup on those runners, see B0, so the red TSAN jobs say
+nothing about races. Reproduce it locally on purpose: run one suite while a
+separate load generator saturates the cores, and count over 50 runs. Do not run
+several suites at once, because ReCpp does not support that and the result means
+nothing.
 
 **A review of `pool_worker::run` found the code correct.** The task moves to a
 local that outlives the try block, the handler destroys it before

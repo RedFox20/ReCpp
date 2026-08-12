@@ -64,7 +64,9 @@ jobs:
           command: |
             export $CPP_STANDARD=1
             COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
-            pipenv run mama $COMPILER verbose $COV_FLAGS test="nogdb -vv" jobs=3
+            # setarch -R turns off address space randomization. Without it TSAN aborts on
+            # these runners with "FATAL: ThreadSanitizer: unexpected memory mapping".
+            setarch $(uname -m) -R pipenv run mama $COMPILER verbose $COV_FLAGS test="nogdb -vv" jobs=3
       - when:
           condition:
             and:
