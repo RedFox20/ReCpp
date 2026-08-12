@@ -1299,9 +1299,23 @@ TestImpl(test_event_loop)
         }();
         rpp::Timer wall;
         bool ready = loop->pump_until_ready(fut, rpp::millis(20));
-        AssertThat(ready, false);              // 200ms work can't finish in a 20ms budget
-        AssertLess(wall.elapsed_ms(), 2000.0); // returned promptly — did NOT block on get()
-        loop->run_until_ready(fut);            // drain so the coroutine frame completes cleanly
+        double pump_ms = wall.elapsed_ms();
+        // print before asserting: this test has aborted on Windows with no other output
+        print_info("pump_until_ready: ready=%d after %.1fms\n", (int)ready, pump_ms);
+
+        AssertThat(ready, false);    // 200ms work can't finish in a 20ms budget
+        AssertLess(pump_ms, 2000.0); // returned promptly — did NOT block on get()
+
+        // Drain without throwing. run_until_ready throws on timeout, and unwinding here would
+        // leave the pool task mid-sleep with a continuation into a loop the next test destroys.
+        AssertThat(loop->pump_until_ready(fut, rpp::seconds(15)), true);
+        AssertThat(fut.get(), 1);
+
+        // the loop must own nothing in flight before the fixture replaces it
+        rpp::Timer drain;
+        while (loop->has_background_tasks() && drain.elapsed_ms() < 1000.0)
+            loop->run_once(rpp::millis(5));
+        AssertThat(loop->has_background_tasks(), false);
     }
 
     // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).

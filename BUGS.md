@@ -13,6 +13,34 @@ a dependency build, which is where C11 broke KrattGCS.
 The owner chose to keep AUTO as the default, so this stays open until B3 lands and
 makes the modules reachable. Until then a consumer pays the build cost for nothing.
 
+### B7. `num_physical_cores()` reports host cores inside a container
+`std::thread::hardware_concurrency()` answers for the host, not for the cores a
+container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
+container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
+serial loop, which failed `test_threadpool.cpp:239`.
+`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
+`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
+Fix: read the cgroup CPU quota, `/sys/fs/cgroup/cpu.max` on v2, and take the
+minimum of that, `sched_getaffinity` and the hardware answer.
+Workaround in place: `test_threadpool.cpp` skips the parallel-against-serial bound
+when `CIRCLECI` is set. The correctness assertions still run everywhere.
+Tracked: https://github.com/RedFox20/ReCpp/issues/60
+
+### B8. `pump_until_ready_times_out_without_blocking` aborted on Windows
+The job printed the test name and `Exited with code exit status 1`, with no
+assertion text, so the process died instead of failing an assertion. Not
+reproduced on Linux, and CircleCI logs are not reachable from the dev container.
+Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
+the owner destroys it, which matches an exit with no output, but nothing proves
+that path ran.
+Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
+drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
+waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
+unwinding left a pool task mid-sleep with a continuation into a loop that the next
+`TestCaseSetup()` destroys.
+Next Windows failure should print the diagnostic line first. That names which half
+of the test died.
+
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
