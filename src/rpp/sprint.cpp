@@ -146,6 +146,39 @@ namespace rpp
     void string_buffer::write(double value) noexcept { reserve(48); len += _tostring(&ptr[len], value); }
 
 #if RPP_ENABLE_UNICODE
+    void string_buffer::write_codepoint(char32_t codepoint) noexcept
+    {
+        int char_size;
+        if      (codepoint <= 0x7F)   char_size = 1;
+        else if (codepoint <= 0x7FF)  char_size = 2;
+        else if (codepoint <= 0xFFFF) char_size = 3;
+        else                          char_size = 4;
+        reserve(char_size);
+
+        if (char_size == 1)
+        {
+            ptr[len++] = (static_cast<char>(codepoint));
+        }
+        else if (char_size == 2)
+        {
+            ptr[len++] = (static_cast<char>(0xC0 | (codepoint >> 6)));
+            ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        else if (char_size == 3)
+        {
+            ptr[len++] = (static_cast<char>(0xE0 | (codepoint >> 12)));
+            ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        else
+        {
+            ptr[len++] = (static_cast<char>(0xF0 | (codepoint >> 18)));
+            ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+    }
+
     void string_buffer::write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept
     {
         // if UTF-16 contains only ASCII, then UTF-8 will be the same length
@@ -162,38 +195,16 @@ namespace rpp
                 char32_t low = utf16[++i] - 0xDC00; // consume i+1 pair
                 codepoint = (high << 10) + low + 0x10000;
             }
-
-            // Convert to UTF-8
-            int char_size;
-            if      (codepoint <= 0x7F)   char_size = 1;
-            else if (codepoint <= 0x7FF)  char_size = 2;
-            else if (codepoint <= 0xFFFF) char_size = 3;
-            else                          char_size = 4;
-            reserve(char_size);
-
-            if (char_size == 1)
-            {
-                ptr[len++] = (static_cast<char>(codepoint));
-            }
-            else if (char_size == 2)
-            {
-                ptr[len++] = (static_cast<char>(0xC0 | (codepoint >> 6)));
-                ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
-            }
-            else if (char_size == 3)
-            {
-                ptr[len++] = (static_cast<char>(0xE0 | (codepoint >> 12)));
-                ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-                ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
-            }
-            else
-            {
-                ptr[len++] = (static_cast<char>(0xF0 | (codepoint >> 18)));
-                ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
-                ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-                ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
-            }
+            write_codepoint(codepoint);
         }
+        ptr[len] = '\0';
+    }
+
+    void string_buffer::write_utf32_as_utf8(const char32_t* utf32, int utflength) noexcept
+    {
+        reserve(utflength); // ASCII stays one byte per code point
+        for (int i = 0; i < utflength; ++i)
+            write_codepoint(utf32[i]); // UTF-32 carries the code point already, no surrogates
         ptr[len] = '\0';
     }
 #endif // RPP_ENABLE_UNICODE

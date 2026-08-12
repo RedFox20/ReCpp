@@ -26,38 +26,6 @@ Nothing joins that teardown, so no consumer can know the frame is gone.
 Worked around in the test: `test_semaphore` waits for `active_tasks()` to reach 0
 between cases. The library ordering is unchanged and still unsynchronized.
 
-### B7. `num_physical_cores()` reports host cores inside a container
-`std::thread::hardware_concurrency()` answers for the host, not for the cores a
-container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
-container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
-serial loop, which failed `test_threadpool.cpp:239`.
-`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
-`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
-Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
-then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
-`num_physical_cores()` never reports more than that. Linux covers Android and
-Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
-The `CIRCLECI` guess that divided by 4 is gone.
-Verified: `taskset -c 0` gives 1 core where the machine reports 4.
-The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
-because a shared runner cannot measure that ratio.
-Tracked: https://github.com/RedFox20/ReCpp/issues/60
-
-### B8. `pump_until_ready_times_out_without_blocking` aborted on Windows
-The job printed the test name and `Exited with code exit status 1`, with no
-assertion text, so the process died instead of failing an assertion. Not
-reproduced on Linux, and CircleCI logs are not reachable from the dev container.
-Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
-the owner destroys it, which matches an exit with no output, but nothing proves
-that path ran.
-Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
-drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
-waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
-unwinding left a pool task mid-sleep with a continuation into a loop that the next
-`TestCaseSetup()` destroys.
-Next Windows failure should print the diagnostic line first. That names which half
-of the test died.
-
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
@@ -131,6 +99,40 @@ inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C14. `num_physical_cores()` reported host cores inside a container
+`std::thread::hardware_concurrency()` answers for the host, not for the cores a
+container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
+container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
+serial loop, which failed `test_threadpool.cpp:239`.
+`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
+`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
+Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
+then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
+`num_physical_cores()` never reports more than that. Linux covers Android and
+Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
+The `CIRCLECI` guess that divided by 4 is gone.
+Verified: `taskset -c 0` gives 1 core where the machine reports 4.
+The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
+because a shared runner cannot measure that ratio.
+Tracked: https://github.com/RedFox20/ReCpp/issues/60
+
+### C13. `pump_until_ready_times_out_without_blocking` aborted on Windows
+The job printed the test name and `Exited with code exit status 1`, with no
+assertion text, so the process died instead of failing an assertion. Not
+reproduced on Linux, and CircleCI logs are not reachable from the dev container.
+Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
+the owner destroys it, which matches an exit with no output, but nothing proves
+that path ran.
+Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
+drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
+waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
+unwinding left a pool task mid-sleep with a continuation into a loop that the next
+`TestCaseSetup()` destroys.
+Next Windows failure should print the diagnostic line first. That names which half
+of the test died.
+All 27 CI jobs pass on the merge, Windows included, so the abort is gone.
+The root cause was never proven. Reopen with the printed diagnostic if it returns.
 
 ### C12. Every Windows thread name read back as "true"
 `get_thread_name()` passed a `PWSTR` to `rpp::to_string()`. MSVC keeps `wchar_t`

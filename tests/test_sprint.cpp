@@ -253,6 +253,28 @@ TestImpl(test_sprint)
         sb.clear();
     }
 
+    // Windows holds UTF-16 in a wchar_t and every other platform holds UTF-32. Reading
+    // UTF-32 as UTF-16 truncated "hello world" to "h" and still reported a length of 11.
+    TestCase(string_buffer_write_wide_string)
+    {
+        string_buffer sb;
+        sb.write(L"hello world");
+        AssertThat(sb.view(), "hello world");
+        sb.clear();
+
+        sb.write(std::wstring{L"abcdef"});
+        AssertThat(sb.view(), "abcdef");
+        sb.clear();
+
+        sb.write(std::wstring_view{L"äöü"}); // 2 UTF-8 bytes per code point
+        AssertThat(sb.view(), u8"äöü");
+        AssertThat(sb.size(), 6);
+        sb.clear();
+
+        sb.write(L""); // an empty wide string appends nothing
+        AssertThat(sb.size(), 0);
+    }
+
     TestCase(string_buffer_shift_op)
     {
         string_buffer sb;

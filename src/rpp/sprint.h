@@ -143,16 +143,28 @@ namespace rpp
 #if RPP_ENABLE_UNICODE
         // input as UTF-16 string, converted directly to UTF-8
         void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;
+        /// @brief Appends UTF-32, which is what a wchar_t holds outside Windows
+        void write_utf32_as_utf8(const char32_t* utf32, int utflength) noexcept;
+        /// @brief Appends one code point as 1 to 4 UTF-8 bytes
+        void write_codepoint(char32_t codepoint) noexcept;
 
     // Qt support for QString and QStringView with automatic fast conversion to UTF-8
     #if RPP_HAS_QT
         FINLINE void write(const QString& str)     noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.constData()), str.length()); }
         FINLINE void write(const QStringView& str) noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.data()), str.length()); }
     #endif
-        // support Wide Strings by converting them to UTF-8
-        FINLINE void write(const std::wstring& value) noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size())); }
-        FINLINE void write(std::wstring_view value)   noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value.data()), static_cast<int>(value.size())); }
-        FINLINE void write(const wchar_t* value)      noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(value), utf16len(value)); }
+        // support Wide Strings by converting them to UTF-8. Windows holds UTF-16 in a
+        // wchar_t and every other platform holds UTF-32, so the decoder must match the size.
+        FINLINE void write_wide_as_utf8(const wchar_t* wide, int widelength) noexcept
+        {
+            if constexpr (sizeof(wchar_t) == 2)
+                write_utf16_as_utf8(reinterpret_cast<const char16_t*>(wide), widelength);
+            else
+                write_utf32_as_utf8(reinterpret_cast<const char32_t*>(wide), widelength);
+        }
+        FINLINE void write(const std::wstring& value) noexcept { write_wide_as_utf8(value.data(), static_cast<int>(value.size())); }
+        FINLINE void write(std::wstring_view value)   noexcept { write_wide_as_utf8(value.data(), static_cast<int>(value.size())); }
+        FINLINE void write(const wchar_t* value)      noexcept { write_wide_as_utf8(value, utf16len(value)); }
         // support UTF16 strings directly
         FINLINE void write(const ustring& value)  noexcept { write_utf16_as_utf8(value.data(), static_cast<int>(value.size())); }
         FINLINE void write(ustrview value)        noexcept { write_utf16_as_utf8(value.data(), static_cast<int>(value.size())); }
