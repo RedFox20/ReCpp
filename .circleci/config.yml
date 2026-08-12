@@ -31,6 +31,14 @@ jobs:
         type: string
         default: "1"
         description: "1 disables Ninja to save CI memory. A modules build passes an empty string"
+      build_with_modules:
+        type: string
+        default: ""
+        description: "ON demands modules, so a toolchain that cannot build them fails the configure"
+      llvm_apt:
+        type: boolean
+        default: false
+        description: "Register apt.llvm.org, for a clang release the CI image does not carry"
     description: "Ubuntu << parameters.cc_version >> C++<< parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -44,10 +52,24 @@ jobs:
       # Ninja detects 36 cores instead of 3 and the machines OOM, so it is off by default.
       # A modules build needs it: CMake scans module dependencies only under Ninja.
       NO_NINJA: << parameters.no_ninja >>
+      BUILD_WITH_MODULES: << parameters.build_with_modules >>
     steps:
       - checkout
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr ninja-build
+      - when:
+          condition: << parameters.llvm_apt >>
+          steps:
+            - run:
+                name: Register apt.llvm.org for << parameters.cc_version >>
+                command: |
+                  LLVM_VER=$(echo "<< parameters.cc_version >>" | cut -d- -f2)
+                  wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+                  chmod +x llvm.sh
+                  sudo ./llvm.sh $LLVM_VER
+                  # CMake scans module dependencies with clang-scan-deps, which ships in
+                  # clang-tools. Without it a modules build configures and then fails.
+                  sudo apt-get install -y clang-tools-$LLVM_VER
       - run: pipenv install mama
       - run: pipenv run mama install-<< parameters.cc_version >>
       - run: make configure-cmake
@@ -117,6 +139,28 @@ jobs:
       - run: pipenv install mama
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama mips verbose build jobs=3
+  consumer-integration:
+    description: Build ReCpp as another project builds it, as a dependency and not the root
+    resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
+    docker:
+      - image: cimg/python:3.14
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev ninja-build
+      - run: pipenv install mama
+      # gcc-14 plus Ninja is the configuration that turns modules on by itself, so this
+      # job builds ReCpp with modules the way a downstream project builds it.
+      - run: pipenv run mama install-gcc-14
+      - run: make configure-cmake
+      - run:
+          name: Build and run the consumer
+          command: |
+            # the Pipfile lives at the repo root, and the consumer builds one level down
+            export PIPENV_PIPFILE=$(pwd)/Pipfile
+            cd tests/consumer
+            # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
+            CXX20=1 taskset -c 0-2 pipenv run mama gcc verbose build test jobs=3
   android-build:
     parameters:
       docker_image:
@@ -130,6 +174,10 @@ jobs:
         type: string
         default: ""
         description: "Override NDK version, e.g. 29.0.14206865 to use NDK r29 instead of the default LTS"
+      no_ninja:
+        type: string
+        default: "1"
+        description: "1 disables Ninja to save CI memory. Pass an empty string to test the Ninja path"
     description: "Android << parameters.toolchain >> C++20 build with clang-tidy sanitizer"
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -137,7 +185,7 @@ jobs:
     environment:
       # Ninja detects 36 cores instead of 3 and the machines OOM, so it is off by default.
       # A modules build needs it: CMake scans module dependencies only under Ninja.
-      NO_NINJA: 1
+      NO_NINJA: << parameters.no_ninja >>
     steps:
       - checkout
       - when:
@@ -158,7 +206,9 @@ jobs:
           name: Build Android NDK << parameters.toolchain >>
           command: |
               echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-              CXX20=1 mama android verbose build with_tests jobs=3
+              # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
+              NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-2" || echo "")
+              $NINJA_CAP env CXX20=1 mama android verbose build with_tests jobs=3
       - run:
           name: Run Tests Android NDK << parameters.toolchain >> (QEMU aarch64)
           command: ./run_android_tests -vv
@@ -215,7 +265,8 @@ workflows:
           cc_version: clang-20
           coverage: false
       # C++20 modules. These need Ninja, so they pass an empty no_ninja.
-      # CMakeLists.txt turns modules on by itself for GCC 14+, Clang 21+ and MSVC 19.34+.
+      # They also pass BUILD_WITH_MODULES=ON, not AUTO. AUTO turns modules off and
+      # keeps going, so a job named modules would pass while it tested only headers.
       - ubuntu-build:
           name: ubuntu-cpp20-modules-gcc14
           compiler: gcc
@@ -224,6 +275,21 @@ workflows:
           sanitizer: "asan"
           coverage: false
           no_ninja: ""
+          build_with_modules: "ON"
+      # Clang 21 is not in the CI image apt sources, so this job registers apt.llvm.org
+      # and adds clang-tools-21, which carries the clang-scan-deps that CMake needs.
+      - ubuntu-build:
+          name: ubuntu-cpp20-modules-clang21
+          compiler: clang
+          cc_version: clang-21
+          cpp_version: "20"
+          sanitizer: "asan"
+          coverage: false
+          no_ninja: ""
+          build_with_modules: "ON"
+          llvm_apt: true
+      # Integration: ReCpp as somebody else's dependency
+      - consumer-integration
       # Other platform builds
       - win64-cpp20-msvc2022
       - mipsel-cpp20-gcc12
@@ -247,3 +313,11 @@ workflows:
           docker_image: "cimg/android:2026.03.1-ndk"
           toolchain: "ndk-r29-clang++20"
           ndk_version: "29.0.14206865"
+      # Every other Android job forces NO_NINJA=1, so CI never ran the NDK under Ninja.
+      # That is the generator a consumer picks, and the only one that scans modules.
+      - android-build:
+          name: android-cpp20-r29-ninja
+          docker_image: "cimg/android:2026.03.1-ndk"
+          toolchain: "ndk-r29-clang++20-ninja"
+          ndk_version: "29.0.14206865"
+          no_ninja: ""

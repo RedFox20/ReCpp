@@ -294,6 +294,11 @@ elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG
     set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
 elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
     set(RPP_NO_MODULES "MSVC ${MSVC_VERSION} is older than ${RPP_MODULES_MIN_MSVC}")
+elseif(CLANG AND NOT EXISTS "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
+    # Clang scans module dependencies with a separate clang-scan-deps binary, and an
+    # Android NDK ships none. CMake leaves the variable empty and writes a scan rule
+    # that starts with "", so the configure passes and every ninja scan exits 127.
+    set(RPP_NO_MODULES "the Clang toolchain ships no clang-scan-deps")
 endif()
 
 # AUTO builds modules wherever the toolchain supports them, so a CI job needs no flag.

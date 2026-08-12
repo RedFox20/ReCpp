@@ -730,12 +730,14 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ## 11. Changeset 7: CI, docs and measurement
 
-1. The gcc-14 modules job is in `.circleci/config.yml`. A clang-21 job is not:
-   the CI image has no `clang-21` package, so `mama install-clang-21` fails. Add
-   one once the image carries it, or once mama adds the LLVM apt source. Three CI
-   traps are already handled and worth keeping: TSAN needs `setarch -R` to start,
-   ninja ignores `jobs=` so a Ninja job needs `taskset`, and `run_clang_tidy` has
-   to find the compile database under `linux-clang`. See `BUGS.md` C9.
+1. Both modules jobs are in `.circleci/config.yml`, gcc-14 and clang-21. The
+   clang-21 one registers apt.llvm.org itself, because the CI image carries no
+   such package. Five CI traps are handled and worth keeping: TSAN needs
+   `setarch -R` to start, ninja ignores `jobs=` so a Ninja job needs `taskset`,
+   `run_clang_tidy` has to find the compile database under `linux-clang`,
+   `clang-scan-deps` ships in `clang-tools-N` and not in `clang-N`, and a modules
+   job must pass `BUILD_WITH_MODULES=ON` so a silent AUTO fallback fails it.
+   See `BUGS.md` C9 and C11.
 2. Wire `tools/check_includes.py --check` and
    `tools/gen_module_exports.py --check` as gates.
 3. Rewrite the README modules section. It is already stale: it names a test

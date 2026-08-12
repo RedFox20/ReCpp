@@ -6,6 +6,13 @@ lines.
 
 ## Open
 
+### B6. A consumer builds modules that no consumer can import
+`package()` exports `.h` and `.natvis` only, so a downstream project compiles two
+BMIs and then cannot `import` either one. See B3. AUTO still turns modules on in
+a dependency build, which is where C11 broke KrattGCS.
+The owner chose to keep AUTO as the default, so this stays open until B3 lands and
+makes the modules reachable. Until then a consumer pays the build cost for nothing.
+
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
 - `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
@@ -79,6 +86,32 @@ inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C11. A modules build broke every consumer on a toolchain without clang-scan-deps
+KrattGCS failed its Android build: `"" -format=p1689 --`, then
+`sh: line 1: : command not found`, exit 127, on every `.cppm` scan.
+Clang scans module dependencies with a separate `clang-scan-deps` binary, and the
+Android NDK ships none. CMake's `find_program` leaves
+`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` empty and still writes the scan rule, so the
+configure passes and every ninja scan runs an empty command. AUTO checked the CMake
+version, the C++ standard, the generator and the compiler version, but never the
+scanner.
+Fixed: AUTO also requires an existing `clang-scan-deps` when the compiler is Clang.
+Reproduced and verified on one tree: the old CMakeLists printed `Modules enabled`
+and failed the build, the new one prints
+`RPP MODULES: off, the Clang toolchain ships no clang-scan-deps` and builds clean.
+
+CI missed it for two reasons, and both now have a job:
+- Every Android job forced `NO_NINJA=1`, so CI never ran the NDK under the one
+  generator that scans modules. `android-cpp20-r29-ninja` runs it.
+- CI only ever built ReCpp as the root target. `consumer-integration` builds
+  `tests/consumer`, which declares ReCpp through `add_local` and links the exported
+  package, on gcc-14 with Ninja so modules turn on inside a dependency build.
+
+Both modules jobs now pass `BUILD_WITH_MODULES=ON` instead of trusting AUTO. AUTO
+turns modules off and keeps going, so a job named modules could pass while it built
+headers only. `ubuntu-cpp20-modules-clang21` also installs `clang-tools-21`, because
+that package, not `clang-21`, carries `clang-scan-deps`.
 
 ### C9. CI was red in 5 job classes, and all 24 jobs pass now
 The baseline is PR #56, the last merge into master. Five separate causes:
