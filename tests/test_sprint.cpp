@@ -266,8 +266,10 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "abcdef");
         sb.clear();
 
-        sb.write(std::wstring_view{L"äöü"}); // 2 UTF-8 bytes per code point
-        AssertThat(sb.view(), u8"äöü");
+        // \u escapes, not literal text: this file carries no BOM, so MSVC would read a
+        // non-ASCII byte as the system codepage
+        sb.write(std::wstring_view{L"\u00e4\u00f6\u00fc"}); // ae oe ue, 2 UTF-8 bytes each
+        AssertThat(sb.view(), u8"\u00e4\u00f6\u00fc");
         AssertThat(sb.size(), 6);
         sb.clear();
 
