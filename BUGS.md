@@ -13,18 +13,25 @@ a dependency build, which is where C11 broke KrattGCS.
 The owner chose to keep AUTO as the default, so this stays open until B3 lands and
 makes the modules reachable. Until then a consumer pays the build cost for nothing.
 
-### B9. A pool thread tears down a coroutine frame after `.get()` returned
-TSAN, `test_semaphore::co_await_semaphore_already_signaled`, on clang-18:
-`operator delete` from `~promise()` on `rpp_task_20`, against a main-thread read
-of the same address. The trace names `test_co_await_semaphore_timeout`, which is
-the **previous** test case.
-`semaphore::co_await_handle::await_suspend` posts the resume to a detached pool
-task. That task sets the promise, which releases `.get()`, and only then destroys
-the coroutine frame. The main thread runs the next case while the pool thread is
-still freeing, and the allocator hands the same address out again.
-Nothing joins that teardown, so no consumer can know the frame is gone.
-Worked around in the test: `test_semaphore` waits for `active_tasks()` to reach 0
-between cases. The library ordering is unchanged and still unsynchronized.
+### B9. A detached pool task frees its promise after the test that made it ended
+Two TSAN reports from CI on clang-18, both the same shape: `operator delete` from
+`~promise()` on a pool worker, against the main thread in `pthread_cond_wait`
+inside `run_test_func`.
+The thread-creation stack names the culprit each time, and it is always an
+**earlier** test:
+- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
+- a task from `test_future.cpp:103` freed during a later `test_future` case
+
+`async_task`, `cfuture::then()` and `semaphore::co_await_handle::await_suspend`
+all post through `parallel_task_detached`. The task owns the promise, and nothing
+joins it, so it destroys the promise long after `.get()` released the waiter.
+Fixed in the test framework, which is where CLAUDE.md puts a test-only race:
+`run_test_func` now waits for `thread_pool::global().active_tasks()` to reach 0
+after every case, and it prints a warning when a case leaves work running.
+Verified that the signal is live: `active_tasks()` reads 1 while a detached task
+sleeps, and the drain returns the moment it reaches 0.
+The library ordering is unchanged. A consumer that detaches a task still owns the
+lifetime problem, so this stays open until `async_task` offers a join.
 
 ### B10. A test handed the event_loop a pool that dies before the loop
 `test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
