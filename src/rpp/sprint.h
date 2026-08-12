@@ -3,15 +3,14 @@
  * String Printing and Formatting, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
-#if RPP_BUILD_WITH_MODULES
-import rpp.strview;
-#else
+// A header never imports a module. An `import` is illegal inside a global module
+// fragment, so it would block every rpp-*.cppm that includes this header.
 #include "strview.h"
-#endif
 #include "debugging.h"
 #include "type_traits.h"
 
 #include <cstdio>        // fprintf
+#include <string>        // std::string
 #include <memory>        // std::shared_ptr
 // NOTE: had to remove, because clang-18 includes <algorithm> here, which crashes clang-tidy
 //#include <unordered_map> // std::unordered_map for to_string extensions

@@ -37,6 +37,49 @@ shapes what fits inside it.** These gates are not negotiable for brevity:
 4. **Run the full test suite** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"`.
    All tests must pass with no data race. A task is not complete until they do.
 
+## Code Style: includes and imports
+
+### Includes come before imports. Always.
+
+In any file that mixes both, put every `#include` first and every `import` last.
+
+```cpp
+#include <rpp/tests.h>   // 1. rpp headers
+#include <cstring>       // 2. std headers
+#include <limits>
+
+#if RPP_BUILD_WITH_MODULES
+import rpp.strview;      // 3. imports, last
+#endif
+```
+
+GCC 14 re-parses a standard library header that follows an import. Its internal
+templates then collide with the entities the module already made reachable. One
+`#include <string>` after one `import` gives about 960 compile errors. The whole
+`RppTests` module build gave 1603 errors from a single misplaced import.
+
+`<cstdio>` and other C wrappers do not trigger it, because they declare no
+template. Do not use that as a reason to break the order.
+
+The error is loud and it stops the compiler. It never reaches the linker, and it
+never becomes a duplicate symbol. A program that mixes `import rpp.strview` in
+one translation unit and `#include <rpp/strview.h>` in another links and runs
+correctly.
+
+### A header never contains an `import`
+
+A header does not control where a consumer includes it, so it cannot keep the
+order above. An `import` in a header also removes every transitive std include
+from each consumer, which breaks files that never mentioned modules.
+
+Only a `.cpp`, a test, or a `.cppm` carries an `import`.
+
+### Include what you use
+
+Every file includes the headers for the names it uses. Do not rely on a
+transitive include. Run `tools/check_includes.py all` before you commit a header
+change. The migration plan is in [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md).
+
 ## ReCpp Modules
 
 All headers are in `src/rpp/`. Test files are in `tests/`.

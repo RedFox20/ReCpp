@@ -1,6 +1,7 @@
 #include "sprint.h"
 #include <cstdarg> // va_start
 #include <cstdlib> // malloc/free/realloc
+#include <cstring> // memcpy
 
 namespace rpp
 {

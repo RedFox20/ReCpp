@@ -532,26 +532,27 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
         AssertThat(t1.is_valid(), true);
-        // Windows: GetTickCount64 has ~15.6ms resolution, need longer spin than 10ms
-        spin_sleep_for_us(20'000, /*full_spin*/true);
+        // Windows GetTickCount64 ticks every ~15.6ms, and a virtualized runner can tick
+        // slower still. A 20ms spin once measured 0ms, so spin across several ticks.
+        spin_sleep_for_us(80'000, /*full_spin*/true);
         rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
         rpp::int64 elapsed_ms = (t2 - t1).millis();
-        print_info("MonotonicCoarse 20ms elapsed: %lldms\n", elapsed_ms);
+        print_info("MonotonicCoarse 80ms elapsed: %lldms\n", elapsed_ms);
         AssertGreaterOrEqual(elapsed_ms, 10);
-        AssertLessOrEqual(elapsed_ms, 50);
+        AssertLessOrEqual(elapsed_ms, 200);
     }
 
     TestCase(clock_type_boottime)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Boottime);
         AssertThat(t1.is_valid(), true);
-        // Windows: GetTickCount64 has ~15.6ms resolution, need longer spin than 10ms
-        spin_sleep_for_us(20'000, /*full_spin*/true);
+        // Boottime shares GetTickCount64 on Windows, so it needs the same tick headroom
+        spin_sleep_for_us(80'000, /*full_spin*/true);
         rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Boottime);
         rpp::int64 elapsed_ms = (t2 - t1).millis();
-        print_info("Boottime 20ms elapsed: %lldms\n", elapsed_ms);
+        print_info("Boottime 80ms elapsed: %lldms\n", elapsed_ms);
         AssertGreaterOrEqual(elapsed_ms, 10);
-        AssertLessOrEqual(elapsed_ms, 50);
+        AssertLessOrEqual(elapsed_ms, 200);
     }
 
     TestCase(clock_type_process_cpu)

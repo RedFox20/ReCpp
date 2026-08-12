@@ -41,19 +41,19 @@ TestImpl(test_coroutines)
     }
     TestCase(basic_duration_coro)
     {
+        // The lower bound is the real property: the sleep must not wake early. The upper
+        // bound only catches a gross overshoot, because a sanitizer adds tens of ms.
         rpp::Timer t1;
         duration_coro(50).get();
         double e = t1.elapsed_millis();
-        // require some level of acceptable accuracy in the sleeps
         AssertGreater(e, 49.0);
-        AssertLess(e, 56.0);
+        AssertLess(e, 75.0);
 
         rpp::Timer t2;
         duration_coro(15).get();
         double e2 = t2.elapsed_millis();
-        // require some level of acceptable accuracy in the sleeps
         AssertGreater(e2, 14.0);
-        AssertLess(e2, 20.0);
+        AssertLess(e2, 40.0);
     }
 
 

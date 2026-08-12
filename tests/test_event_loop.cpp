@@ -1218,13 +1218,15 @@ TestImpl(test_event_loop)
     uint64 start_coro_on_background_thread(MakeCoro make_coro)
     {
         std::atomic<uint64> launcher_tid{0};
-        rpp::cfuture<void> fut = rpp::async_task(
-            [&]() -> rpp::cfuture<void>
-            {
-                launcher_tid = rpp::get_thread_id();
-                return make_coro(); // start the coroutine here, off the loop thread
-            }
-        ).get();
+        rpp::cfuture<void> fut;
+        // The task returns void and assigns the coroutine future instead of returning it.
+        // Returning it would instantiate std::future<cfuture<void>>::get(), a non-coroutine
+        // returning a coro type, which no RPP_CORO_WRAPPER can annotate inside libstdc++.
+        rpp::async_task([&]
+        {
+            launcher_tid = rpp::get_thread_id();
+            fut = make_coro(); // start the coroutine here, off the loop thread
+        }).get(); // fut is set before anything below reads it
 
         loop_until(rpp::millis(2000), [&]{ return fut.await_ready(); });
 
