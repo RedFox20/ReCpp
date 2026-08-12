@@ -143,10 +143,15 @@ namespace rpp
 #if RPP_ENABLE_UNICODE
         // input as UTF-16 string, converted directly to UTF-8
         void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;
-        /// @brief Appends UTF-32, which is what a wchar_t holds outside Windows
-        void write_utf32_as_utf8(const char32_t* utf32, int utflength) noexcept;
-        /// @brief Appends one code point as 1 to 4 UTF-8 bytes
+        /// @brief Appends wide text where a wchar_t holds UTF-32, which is every
+        ///        platform except Windows. It takes wchar_t, because reading a wchar_t
+        ///        through a char32_t pointer breaks strict aliasing.
+        void write_wide32_as_utf8(const wchar_t* wide, int widelength) noexcept;
+    private:
+        /// @brief Appends one code point as 1 to 4 UTF-8 bytes. It writes no terminator,
+        ///        so only a caller that terminates the buffer afterwards may use it.
         void write_codepoint(char32_t codepoint) noexcept;
+    public:
 
     // Qt support for QString and QStringView with automatic fast conversion to UTF-8
     #if RPP_HAS_QT
@@ -160,7 +165,7 @@ namespace rpp
             if constexpr (sizeof(wchar_t) == 2)
                 write_utf16_as_utf8(reinterpret_cast<const char16_t*>(wide), widelength);
             else
-                write_utf32_as_utf8(reinterpret_cast<const char32_t*>(wide), widelength);
+                write_wide32_as_utf8(wide, widelength);
         }
         FINLINE void write(const std::wstring& value) noexcept { write_wide_as_utf8(value.data(), static_cast<int>(value.size())); }
         FINLINE void write(std::wstring_view value)   noexcept { write_wide_as_utf8(value.data(), static_cast<int>(value.size())); }

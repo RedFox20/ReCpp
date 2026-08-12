@@ -200,11 +200,11 @@ namespace rpp
         ptr[len] = '\0';
     }
 
-    void string_buffer::write_utf32_as_utf8(const char32_t* utf32, int utflength) noexcept
+    void string_buffer::write_wide32_as_utf8(const wchar_t* wide, int widelength) noexcept
     {
-        reserve(utflength); // ASCII stays one byte per code point
-        for (int i = 0; i < utflength; ++i)
-            write_codepoint(utf32[i]); // UTF-32 carries the code point already, no surrogates
+        reserve(widelength); // ASCII stays one byte per code point
+        for (int i = 0; i < widelength; ++i)
+            write_codepoint(static_cast<char32_t>(wide[i])); // UTF-32 needs no surrogate pair
         ptr[len] = '\0';
     }
 #endif // RPP_ENABLE_UNICODE
