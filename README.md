@@ -1748,8 +1748,8 @@ Thread naming and information utilities.
 | [`get_this_thread_name()`](src/rpp/threads.h#L21) | Get current thread name |
 | [`get_thread_id()`](src/rpp/threads.h#L31) | Get current thread ID (uint64) |
 | [`get_process_id()`](src/rpp/threads.h#L36) | Get current process ID (uint32) |
-| [`num_physical_cores()`](src/rpp/threads.h#L41) | Number of physical CPU cores |
-| [`yield()`](src/rpp/threads.h#L47) | Yield execution to another thread |
+| [`num_physical_cores()`](src/rpp/threads.h#L42) | Number of physical CPU cores |
+| [`yield()`](src/rpp/threads.h#L48) | Yield execution to another thread |
 | [`get_thread_name(thread_id)`](src/rpp/threads.h#L26) | Returns the debug name of a thread by its ID |
 
 ---

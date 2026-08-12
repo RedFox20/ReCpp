@@ -36,7 +36,8 @@ namespace rpp
     RPPAPI uint32 get_process_id() noexcept;
 
     /**
-     * @returns Number of physicals cores on the system
+     * @returns Number of physical cores this process may use. A container limits CPU with a
+     *          cgroup quota or an affinity mask, and this never reports more than that allows.
      */
     RPPAPI int num_physical_cores() noexcept;
 #endif // !RPP_BARE_METAL

@@ -13,6 +13,19 @@ a dependency build, which is where C11 broke KrattGCS.
 The owner chose to keep AUTO as the default, so this stays open until B3 lands and
 makes the modules reachable. Until then a consumer pays the build cost for nothing.
 
+### B9. A pool thread tears down a coroutine frame after `.get()` returned
+TSAN, `test_semaphore::co_await_semaphore_already_signaled`, on clang-18:
+`operator delete` from `~promise()` on `rpp_task_20`, against a main-thread read
+of the same address. The trace names `test_co_await_semaphore_timeout`, which is
+the **previous** test case.
+`semaphore::co_await_handle::await_suspend` posts the resume to a detached pool
+task. That task sets the promise, which releases `.get()`, and only then destroys
+the coroutine frame. The main thread runs the next case while the pool thread is
+still freeing, and the allocator hands the same address out again.
+Nothing joins that teardown, so no consumer can know the frame is gone.
+Worked around in the test: `test_semaphore` waits for `active_tasks()` to reach 0
+between cases. The library ordering is unchanged and still unsynchronized.
+
 ### B7. `num_physical_cores()` reports host cores inside a container
 `std::thread::hardware_concurrency()` answers for the host, not for the cores a
 container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
@@ -20,10 +33,14 @@ container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
 serial loop, which failed `test_threadpool.cpp:239`.
 `threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
 `MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
-Fix: read the cgroup CPU quota, `/sys/fs/cgroup/cpu.max` on v2, and take the
-minimum of that, `sched_getaffinity` and the hardware answer.
-Workaround in place: `test_threadpool.cpp` skips the parallel-against-serial bound
-when `CIRCLECI` is set. The correctness assertions still run everywhere.
+Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
+then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
+`num_physical_cores()` never reports more than that. Linux covers Android and
+Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
+The `CIRCLECI` guess that divided by 4 is gone.
+Verified: `taskset -c 0` gives 1 core where the machine reports 4.
+The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
+because a shared runner cannot measure that ratio.
 Tracked: https://github.com/RedFox20/ReCpp/issues/60
 
 ### B8. `pump_until_ready_times_out_without_blocking` aborted on Windows
