@@ -161,9 +161,6 @@ namespace rpp
     #endif
         // support Wide Strings by converting them to UTF-8. Windows holds UTF-16 in a
         // wchar_t and every other platform holds UTF-32, so the decoder must match the size.
-        // A wrong macro picks the wrong decoder and corrupts the text, so prove it here.
-        static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
-                      "RPP_WCHAR_IS_UTF32 does not match wchar_t on this compiler");
         FINLINE void write_wide_as_utf8(const wchar_t* wide, int widelength) noexcept
         {
         #if RPP_WCHAR_IS_UTF32

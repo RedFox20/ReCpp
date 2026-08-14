@@ -113,6 +113,29 @@ lost 3 jobs of 27. That sample is small, but at that rate an all-green board is
 rare, near 1 run in 20. A PR that cannot show green teaches the reader to ignore
 a red job, which is the real cost and the argument for the slack policy above.
 
+Two CI logs name the assertions, and both belong to this tail:
+
+- `test_concurrent_queue.cpp:411`, `wait_pop_until`, elapsed 12.56 ms against a
+  10.0 ms upper bound, on an Android job.
+- `test_semaphore.cpp:184`, `can_notify_worker_thread_sub_millisecond`, 465
+  notifies counted of 500 sent, on gcc-14.
+
+The semaphore one was not a bound at all. It repeats the defect this list already
+fixed at `test_semaphore.cpp:132`, because the sibling test never got that fix. It
+waited a fixed 5000 us instead of waiting for the count, so a slow worker lost
+whatever it had not drained. Both tests call `drain_notifies()` now.
+
+The Android job also narrows the open item. That job runs clang-tidy, not a
+sanitizer, so a multiplier keyed on `RPP_ASAN` or the TSAN equivalent would not
+have caught it. A loaded machine is enough. The policy has to widen an upper bound
+by load, not by sanitizer.
+
+The tail reproduces locally, which the entry above assumed it did not. A
+`clang-tidy` build lost `test_concurrent_queue.cpp:447` at 18.196 ms against an
+18.0 ms bound, and `test_sockets.cpp:398` cascaded 8 assertions from one missed
+`pollin`. Three plain runs of the same binary passed 501/501. So the slack policy
+can prove itself on a loaded machine, without waiting for CI.
+
 ### B3. mamabuild cannot export C++20 modules
 `mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
 a consumer. `CMakeLists.txt` has no `install(TARGETS ... FILE_SET CXX_MODULES)`.

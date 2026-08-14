@@ -182,6 +182,13 @@
 #    define RPP_WCHAR_IS_UTF32 1
 #  endif
 #endif
+#ifdef __cplusplus
+// Two branches above guess without asking the compiler: _WIN32, and the fallback for a
+// compiler that defines no __SIZEOF_WCHAR_T__. A wrong guess picks the wrong decoder and
+// corrupts the text, so stop the build instead.
+static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
+              "RPP_WCHAR_IS_UTF32 does not match wchar_t on this compiler");
+#endif
 
 #ifndef RPP_FREERTOS
 #  define RPP_FREERTOS 0

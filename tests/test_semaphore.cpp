@@ -112,6 +112,17 @@ TestImpl(test_semaphore)
         }
     }
 
+    /// @brief Waits until the worker counts every notify it was sent.
+    /// The worker counts one notify per loop, and each loop sleeps first. Stopping it the
+    /// moment the last notify goes out drops whatever it has not drained yet. The bound
+    /// makes a stuck worker fail the assert instead of hanging the suite.
+    static void drain_notifies(const std::atomic_int& counted, int expected) noexcept
+    {
+        rpp::Timer drain;
+        while (counted < expected && drain.elapsed_millis() < 2000.0)
+            rpp::sleep_ms(1);
+    }
+
     TestCase(can_notify_worker_thread)
     {
         rpp::semaphore sem;
@@ -137,12 +148,7 @@ TestImpl(test_semaphore)
             rpp::sleep_ms(2);
         }
 
-        // The worker counts one notify per loop, and each loop sleeps first. Stopping it
-        // the moment the last notify goes out drops whatever it has not drained yet.
-        rpp::Timer drain;
-        while (num_notified < num_notifies_sent && drain.elapsed_millis() < 2000.0)
-            rpp::sleep_ms(1);
-
+        drain_notifies(num_notified, num_notifies_sent);
         working = false;
         sem.notify(); // notify finished
         worker.join();
@@ -176,7 +182,7 @@ TestImpl(test_semaphore)
             spin_sleep_for_us(100);
         }
 
-        spin_sleep_for_us(5000);
+        drain_notifies(num_notified, num_notifies_sent);
         working = false;
         sem.notify(); // notify finished
         worker.join();
