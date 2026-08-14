@@ -102,10 +102,16 @@ failed `ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-asan-gcc13` and
 `android-cpp20-r29-ninja`, while the parent commit passed all 27 jobs. The commit
 changed no machine code: an `-O2` disassembly of `sprint.cpp` from each commit
 differs in 0 instructions, because the edit only moves a declaration behind
-`#if RPP_WCHAR_IS_UTF32`, which stays 1 on both platforms. The C++23 twin of each
-failing job passed, and `gcc asan` C++20 passed locally at 501/501. So the three
-failures are this tail, not the commit. A red job after an inert change costs more
-time than the flake itself, which is the argument for the slack policy above.
+`#if RPP_WCHAR_IS_UTF32`, which stays 1 on both platforms.
+
+The next commit settled it. `b82a690` edits this file and nothing else, and it
+failed `mipsel-cpp20-gcc12`, `ubuntu-cpp26-asan-gcc14` and
+`android-cpp20-r27-clang-tidy-clang18`. All three passed on `3f6457d`, and all
+three earlier failures passed here. A markdown edit cannot break a mipsel build,
+so the failing set is random and it does not depend on the code. Two runs each
+lost 3 jobs of 27. That sample is small, but at that rate an all-green board is
+rare, near 1 run in 20. A PR that cannot show green teaches the reader to ignore
+a red job, which is the real cost and the argument for the slack policy above.
 
 ### B3. mamabuild cannot export C++20 modules
 `mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
