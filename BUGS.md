@@ -97,6 +97,16 @@ the assertion needs. The semaphore one was different: the producer set
 `working = false` while the worker still had notifies to drain, so it now waits for
 the count first.
 
+The tail also reaches CI, and it hides behind a code change. Commit `3f6457d`
+failed `ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-asan-gcc13` and
+`android-cpp20-r29-ninja`, while the parent commit passed all 27 jobs. The commit
+changed no machine code: an `-O2` disassembly of `sprint.cpp` from each commit
+differs in 0 instructions, because the edit only moves a declaration behind
+`#if RPP_WCHAR_IS_UTF32`, which stays 1 on both platforms. The C++23 twin of each
+failing job passed, and `gcc asan` C++20 passed locally at 501/501. So the three
+failures are this tail, not the commit. A red job after an inert change costs more
+time than the flake itself, which is the argument for the slack policy above.
+
 ### B3. mamabuild cannot export C++20 modules
 `mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
 a consumer. `CMakeLists.txt` has no `install(TARGETS ... FILE_SET CXX_MODULES)`.
