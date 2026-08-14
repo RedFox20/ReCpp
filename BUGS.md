@@ -155,12 +155,6 @@ A binary module interface is not portable, so a consumer must compile the
 producer's `.cppm` inside its own target. mama has no way to express that.
 Tracked upstream: https://github.com/RedFox20/Mama/issues/41
 
-### B4. 52 files use a std facility they do not include
-`tools/check_includes.py missing`. Each one breaks the moment its provider chain
-becomes an `import`. Also 10 unused and 43 redundant rpp includes, and 59 std
-include candidates, from `tools/check_includes.py unused`.
-Plan: `docs/MODULES_MIGRATION.md` changeset 1.
-
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
