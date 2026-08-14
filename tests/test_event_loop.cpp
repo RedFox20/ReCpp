@@ -784,15 +784,14 @@ TestImpl(test_event_loop)
 
         AssertGreater(loop->background_tasks(), 0);
 
-        // let it finish, then spin until the awaiter has posted the resume event.
-        // A bare sleep_ms(N) would be a race: the bg thread must finish its work,
-        // call fetch_sub, and call post_resume before we sample the counters.
+        // post_resume_from_suspension() posts the resume BEFORE it drops the counter,
+        // so a pending completion alone does not prove the counter reached 0 yet
         bg_may_finish.store(true);
-        while (loop->pending_completions() == 0)
+        rpp::Timer drain;
+        while ((loop->pending_completions() == 0 || loop->background_tasks() != 0)
+               && drain.elapsed_ms() < 1000.0)
             rpp::sleep_ms(1);
 
-        // the background task finished: the resume event should be pending
-        // and background_tasks should drop back to 0
         AssertThat(loop->background_tasks(), 0);
         AssertGreater(loop->pending_completions(), 0);
 
