@@ -6,6 +6,17 @@ lines.
 
 ## Open
 
+### B11. mama's compiler-seed cache drops clang-scan-deps, so a dependency build loses modules
+Not a ReCpp defect. `consumer-clang21` builds ReCpp as a dependency, and it reported
+`the Clang toolchain ships no clang-scan-deps` while all three copies of the binary sat
+on the box, one of them beside the compiler. `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` was
+absent from `CMakeCache.txt`, not `NOTFOUND`, so the `find_program` never ran.
+`Compiler/Clang-FindBinUtils.cmake` runs only from `CMakeDetermineCXXCompiler.cmake:203`,
+which CMake skips when `CMakeCXXCompiler.cmake` already exists. mama seeds that exact
+file, and the log shows `seed[RppConsumer] ... hit -> use` with `Configuring done (0.0s)`.
+The seed replays 5 cache keys and none of the 3 that module scanning needs.
+The job passes `nocache` until mama replays them. Reported to mamabuild.
+
 ### B6. A consumer builds modules that no consumer can import
 `package()` exports `.h` and `.natvis` only, so a downstream project compiles two
 BMIs and then cannot `import` either one. See B3. AUTO still turns modules on in

@@ -154,6 +154,10 @@ jobs:
         type: boolean
         default: false
         description: "Register apt.llvm.org, for a clang release the CI image does not carry"
+      mama_flags:
+        type: string
+        default: ""
+        description: "Extra mama flags. clang needs nocache, see BUGS.md B11"
     description: Build ReCpp with << parameters.cc_version >> as another project builds it, as a dependency and not the root
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -192,7 +196,7 @@ jobs:
             export PIPENV_PIPFILE=$(pwd)/Pipfile
             cd tests/consumer
             # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
-            CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> verbose build test jobs=3 2>&1 | tee build.log
+            CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> << parameters.mama_flags >> verbose build test jobs=3 2>&1 | tee build.log
             # AUTO turns modules off and keeps going, so without this the job would still pass
             # if ReCpp stopped enabling modules when another project builds it
             # AUTO turns modules off and keeps going, so without this the job would still pass
@@ -374,6 +378,9 @@ workflows:
           compiler: clang
           cc_version: clang-21
           llvm_apt: true
+          # the compiler-seed cache skips the step that finds clang-scan-deps, so a
+          # dependency build reports no scan-deps and drops modules. BUGS.md B11
+          mama_flags: "nocache"
       - consumer-integration-msvc:
           name: consumer-msvc2022
       # Other platform builds
