@@ -1,3 +1,6 @@
+﻿#if _MSC_VER
+#pragma execution_character_set("utf-8")
+#endif
 #include <rpp/sprint.h>
 #include <rpp/file_io.h>
 #include <map>
@@ -252,6 +255,33 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "*{external_to_string}");
         sb.clear();
     }
+
+#if RPP_ENABLE_UNICODE // config.h turns this off for macOS, MIPS, Yocto and Raspi
+    // Windows holds UTF-16 in a wchar_t and every other platform holds UTF-32. Reading
+    // UTF-32 as UTF-16 truncated "hello world" to "h" and still reported a length of 11.
+    TestCase(string_buffer_write_wide_string)
+    {
+        // a wrong macro selects the wrong decoder, which is the corruption this case pins
+        AssertThat(RPP_WCHAR_IS_UTF32 == 1, sizeof(wchar_t) == 4);
+
+        string_buffer sb;
+        sb.write(L"hello world");
+        AssertThat(sb.view(), "hello world");
+        sb.clear();
+
+        sb.write(std::wstring{L"abcdef"});
+        AssertThat(sb.view(), "abcdef");
+        sb.clear();
+
+        sb.write(std::wstring_view{L"äöü"}); // 2 UTF-8 bytes per code point
+        AssertThat(sb.view(), u8"äöü");
+        AssertThat(sb.size(), 6);
+        sb.clear();
+
+        sb.write(L""); // an empty wide string appends nothing
+        AssertThat(sb.size(), 0);
+    }
+#endif // RPP_ENABLE_UNICODE
 
     TestCase(string_buffer_shift_op)
     {

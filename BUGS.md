@@ -6,6 +6,17 @@ lines.
 
 ## Open
 
+### B11. mama's compiler-seed cache drops clang-scan-deps, so a dependency build loses modules
+Not a ReCpp defect. `consumer-clang21` builds ReCpp as a dependency, and it reported
+`the Clang toolchain ships no clang-scan-deps` while all three copies of the binary sat
+on the box, one of them beside the compiler. `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` was
+absent from `CMakeCache.txt`, not `NOTFOUND`, so the `find_program` never ran.
+`Compiler/Clang-FindBinUtils.cmake` runs only from `CMakeDetermineCXXCompiler.cmake:203`,
+which CMake skips when `CMakeCXXCompiler.cmake` already exists. mama seeds that exact
+file, and the log shows `seed[RppConsumer] ... hit -> use` with `Configuring done (0.0s)`.
+The seed replays 5 cache keys and none of the 3 that module scanning needs.
+The job passes `nocache` until mama replays them. Reported to mamabuild.
+
 ### B6. A consumer builds modules that no consumer can import
 `package()` exports `.h` and `.natvis` only, so a downstream project compiles two
 BMIs and then cannot `import` either one. See B3. AUTO still turns modules on in
@@ -13,50 +24,36 @@ a dependency build, which is where C11 broke KrattGCS.
 The owner chose to keep AUTO as the default, so this stays open until B3 lands and
 makes the modules reachable. Until then a consumer pays the build cost for nothing.
 
-### B9. A pool thread tears down a coroutine frame after `.get()` returned
-TSAN, `test_semaphore::co_await_semaphore_already_signaled`, on clang-18:
-`operator delete` from `~promise()` on `rpp_task_20`, against a main-thread read
-of the same address. The trace names `test_co_await_semaphore_timeout`, which is
-the **previous** test case.
-`semaphore::co_await_handle::await_suspend` posts the resume to a detached pool
-task. That task sets the promise, which releases `.get()`, and only then destroys
-the coroutine frame. The main thread runs the next case while the pool thread is
-still freeing, and the allocator hands the same address out again.
-Nothing joins that teardown, so no consumer can know the frame is gone.
-Worked around in the test: `test_semaphore` waits for `active_tasks()` to reach 0
-between cases. The library ordering is unchanged and still unsynchronized.
+### B9. A detached pool task frees its promise after the test that made it ended
+Two TSAN reports from CI on clang-18, both the same shape: `operator delete` from
+`~promise()` on a pool worker, against the main thread in `pthread_cond_wait`
+inside `run_test_func`.
+The thread-creation stack names the culprit each time, and it is always an
+**earlier** test:
+- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
+- a task from `test_future.cpp:103` freed during a later `test_future` case
 
-### B7. `num_physical_cores()` reports host cores inside a container
-`std::thread::hardware_concurrency()` answers for the host, not for the cores a
-container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
-container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
-serial loop, which failed `test_threadpool.cpp:239`.
-`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
-`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
-Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
-then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
-`num_physical_cores()` never reports more than that. Linux covers Android and
-Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
-The `CIRCLECI` guess that divided by 4 is gone.
-Verified: `taskset -c 0` gives 1 core where the machine reports 4.
-The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
-because a shared runner cannot measure that ratio.
-Tracked: https://github.com/RedFox20/ReCpp/issues/60
+`async_task`, `cfuture::then()` and `semaphore::co_await_handle::await_suspend`
+all post through `parallel_task_detached`. The task owns the promise, and nothing
+joins it, so it destroys the promise long after `.get()` released the waiter.
+Fixed in the test framework, which is where CLAUDE.md puts a test-only race:
+`run_test_func` now waits for `thread_pool::global().active_tasks()` to reach 0
+after every case, and it prints a warning when a case leaves work running.
+Verified that the signal is live: `active_tasks()` reads 1 while a detached task
+sleeps, and the drain returns the moment it reaches 0.
+The library ordering is unchanged. A consumer that detaches a task still owns the
+lifetime problem, so this stays open until `async_task` offers a join.
 
-### B8. `pump_until_ready_times_out_without_blocking` aborted on Windows
-The job printed the test name and `Exited with code exit status 1`, with no
-assertion text, so the process died instead of failing an assertion. Not
-reproduced on Linux, and CircleCI logs are not reachable from the dev container.
-Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
-the owner destroys it, which matches an exit with no output, but nothing proves
-that path ran.
-Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
-drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
-waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
-unwinding left a pool task mid-sleep with a continuation into a loop that the next
-`TestCaseSetup()` destroys.
-Next Windows failure should print the diagnostic line first. That names which half
-of the test died.
+### B10. A test handed the event_loop a pool that dies before the loop
+`test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
+the loop a raw pointer to it. The case returns, the local pool dies, and only then
+does `TestCaseCleanup()` destroy the loop, so the loop outlives the pool it points
+at. Android caught it in CI:
+`FORTIFY: pthread_mutex_trylock called on a destroyed mutex`, then `SIGABRT` on
+`rpp_task_13`, during the next case.
+Fixed: the pool is a fixture member now, and cleanup destroys the loop first.
+The same shape can hit any consumer that gives `event_loop` a pool with a shorter
+life. `event_loop` takes a raw `thread_pool*` and documents no lifetime rule.
 
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
@@ -111,6 +108,45 @@ the assertion needs. The semaphore one was different: the producer set
 `working = false` while the worker still had notifies to drain, so it now waits for
 the count first.
 
+The tail also reaches CI, and it hides behind a code change. Commit `3f6457d`
+failed `ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-asan-gcc13` and
+`android-cpp20-r29-ninja`, while the parent commit passed all 27 jobs. The commit
+changed no machine code: an `-O2` disassembly of `sprint.cpp` from each commit
+differs in 0 instructions, because the edit only moves a declaration behind
+`#if RPP_WCHAR_IS_UTF32`, which stays 1 on both platforms.
+
+The next commit settled it. `b82a690` edits this file and nothing else, and it
+failed `mipsel-cpp20-gcc12`, `ubuntu-cpp26-asan-gcc14` and
+`android-cpp20-r27-clang-tidy-clang18`. All three passed on `3f6457d`, and all
+three earlier failures passed here. A markdown edit cannot break a mipsel build,
+so the failing set is random and it does not depend on the code. Two runs each
+lost 3 jobs of 27. That sample is small, but at that rate an all-green board is
+rare, near 1 run in 20. A PR that cannot show green teaches the reader to ignore
+a red job, which is the real cost and the argument for the slack policy above.
+
+Two CI logs name the assertions, and both belong to this tail:
+
+- `test_concurrent_queue.cpp:411`, `wait_pop_until`, elapsed 12.56 ms against a
+  10.0 ms upper bound, on an Android job.
+- `test_semaphore.cpp:184`, `can_notify_worker_thread_sub_millisecond`, 465
+  notifies counted of 500 sent, on gcc-14.
+
+The semaphore one was not a bound at all. It repeats the defect this list already
+fixed at `test_semaphore.cpp:132`, because the sibling test never got that fix. It
+waited a fixed 5000 us instead of waiting for the count, so a slow worker lost
+whatever it had not drained. Both tests call `drain_notifies()` now.
+
+The Android job also narrows the open item. That job runs clang-tidy, not a
+sanitizer, so a multiplier keyed on `RPP_ASAN` or the TSAN equivalent would not
+have caught it. A loaded machine is enough. The policy has to widen an upper bound
+by load, not by sanitizer.
+
+The tail reproduces locally, which the entry above assumed it did not. A
+`clang-tidy` build lost `test_concurrent_queue.cpp:447` at 18.196 ms against an
+18.0 ms bound, and `test_sockets.cpp:398` cascaded 8 assertions from one missed
+`pollin`. Three plain runs of the same binary passed 501/501. So the slack policy
+can prove itself on a loaded machine, without waiting for CI.
+
 ### B3. mamabuild cannot export C++20 modules
 `mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
 a consumer. `CMakeLists.txt` has no `install(TARGETS ... FILE_SET CXX_MODULES)`.
@@ -131,6 +167,40 @@ inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C14. `num_physical_cores()` reported host cores inside a container
+`std::thread::hardware_concurrency()` answers for the host, not for the cores a
+container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
+container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
+serial loop, which failed `test_threadpool.cpp:239`.
+`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
+`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
+Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
+then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
+`num_physical_cores()` never reports more than that. Linux covers Android and
+Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
+The `CIRCLECI` guess that divided by 4 is gone.
+Verified: `taskset -c 0` gives 1 core where the machine reports 4.
+The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
+because a shared runner cannot measure that ratio.
+Tracked: https://github.com/RedFox20/ReCpp/issues/60
+
+### C13. `pump_until_ready_times_out_without_blocking` aborted on Windows
+The job printed the test name and `Exited with code exit status 1`, with no
+assertion text, so the process died instead of failing an assertion. Not
+reproduced on Linux, and CircleCI logs are not reachable from the dev container.
+Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
+the owner destroys it, which matches an exit with no output, but nothing proves
+that path ran.
+Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
+drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
+waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
+unwinding left a pool task mid-sleep with a continuation into a loop that the next
+`TestCaseSetup()` destroys.
+Next Windows failure should print the diagnostic line first. That names which half
+of the test died.
+All 27 CI jobs pass on the merge, Windows included, so the abort is gone.
+The root cause was never proven. Reopen with the printed diagnostic if it returns.
 
 ### C12. Every Windows thread name read back as "true"
 `get_thread_name()` passed a `PWSTR` to `rpp::to_string()`. MSVC keeps `wchar_t`

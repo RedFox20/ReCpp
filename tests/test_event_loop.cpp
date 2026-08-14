@@ -29,6 +29,8 @@ TestImpl(test_event_loop)
 #if RPP_HAS_COROUTINES
 
     rpp::AtomicTimeSource clock;
+    // a loop can hold a raw pointer to this pool, so the pool must outlive the loop
+    std::unique_ptr<rpp::thread_pool> custom_pool;
     std::unique_ptr<rpp::event_loop> loop;
     const uint64 main_tid = rpp::get_thread_id();
 
@@ -46,7 +48,8 @@ TestImpl(test_event_loop)
     }
     TestCaseCleanup()
     {
-        loop.reset();
+        loop.reset();        // the loop may point at custom_pool, so it goes first
+        custom_pool.reset(); // and only then may the pool and its mutex die
     }
 
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
@@ -737,8 +740,10 @@ TestImpl(test_event_loop)
     // ─── Constructor with explicit thread pool ──────────────────
     TestCaseCoro(custom_thread_pool)
     {
-        rpp::thread_pool pool;
-        loop = std::make_unique<rpp::event_loop>(0, &pool);
+        // a local pool would die when this case returns, and TestCaseCleanup destroys the
+        // loop after that, so a worker could touch the destroyed pool mutex
+        custom_pool = std::make_unique<rpp::thread_pool>();
+        loop = std::make_unique<rpp::event_loop>(0, custom_pool.get());
 
         std::atomic<bool> bg_ran_on_custom_pool{false};
         int result = co_await loop->run_async([&]() -> int {
@@ -779,15 +784,14 @@ TestImpl(test_event_loop)
 
         AssertGreater(loop->background_tasks(), 0);
 
-        // let it finish, then spin until the awaiter has posted the resume event.
-        // A bare sleep_ms(N) would be a race: the bg thread must finish its work,
-        // call fetch_sub, and call post_resume before we sample the counters.
+        // post_resume_from_suspension() posts the resume BEFORE it drops the counter,
+        // so a pending completion alone does not prove the counter reached 0 yet
         bg_may_finish.store(true);
-        while (loop->pending_completions() == 0)
+        rpp::Timer drain;
+        while ((loop->pending_completions() == 0 || loop->background_tasks() != 0)
+               && drain.elapsed_ms() < 1000.0)
             rpp::sleep_ms(1);
 
-        // the background task finished: the resume event should be pending
-        // and background_tasks should drop back to 0
         AssertThat(loop->background_tasks(), 0);
         AssertGreater(loop->pending_completions(), 0);
 
@@ -1280,11 +1284,13 @@ TestImpl(test_event_loop)
     // without a blocking get() — the continuation resumes on this thread, so we pump.
     TestCase(run_until_ready_pumps_future_on_owner_thread)
     {
-        rpp::cfuture<int> fut = [&]() -> rpp::cfuture<int>
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<int>
         {
             int v = co_await loop->run_async([] { rpp::sleep_ms(5); return 7; });
             co_return v * 6;
-        }();
+        };
+        rpp::cfuture<int> fut = coro();
         int result = loop->run_until_ready(fut);
         AssertThat(result, 42);
     }
@@ -1292,11 +1298,13 @@ TestImpl(test_event_loop)
     // pump_until_ready returns false on timeout instead of blocking on get().
     TestCase(pump_until_ready_times_out_without_blocking)
     {
-        rpp::cfuture<int> fut = [&]() -> rpp::cfuture<int>
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<int>
         {
             co_await loop->run_async([] { rpp::sleep_ms(200); return 1; });
             co_return 1;
-        }();
+        };
+        rpp::cfuture<int> fut = coro();
         rpp::Timer wall;
         bool ready = loop->pump_until_ready(fut, rpp::millis(20));
         double pump_ms = wall.elapsed_ms();
