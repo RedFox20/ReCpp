@@ -1284,11 +1284,13 @@ TestImpl(test_event_loop)
     // without a blocking get() — the continuation resumes on this thread, so we pump.
     TestCase(run_until_ready_pumps_future_on_owner_thread)
     {
-        rpp::cfuture<int> fut = [&]() -> rpp::cfuture<int>
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<int>
         {
             int v = co_await loop->run_async([] { rpp::sleep_ms(5); return 7; });
             co_return v * 6;
-        }();
+        };
+        rpp::cfuture<int> fut = coro();
         int result = loop->run_until_ready(fut);
         AssertThat(result, 42);
     }
@@ -1296,11 +1298,13 @@ TestImpl(test_event_loop)
     // pump_until_ready returns false on timeout instead of blocking on get().
     TestCase(pump_until_ready_times_out_without_blocking)
     {
-        rpp::cfuture<int> fut = [&]() -> rpp::cfuture<int>
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<int>
         {
             co_await loop->run_async([] { rpp::sleep_ms(200); return 1; });
             co_return 1;
-        }();
+        };
+        rpp::cfuture<int> fut = coro();
         rpp::Timer wall;
         bool ready = loop->pump_until_ready(fut, rpp::millis(20));
         double pump_ms = wall.elapsed_ms();

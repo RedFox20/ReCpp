@@ -176,6 +176,11 @@ jobs:
                   # CMake scans module dependencies with clang-scan-deps, which ships in
                   # clang-tools. Without it a modules build configures and then fails.
                   sudo apt-get install -y clang-tools-$LLVM_VER
+                  # CMake also accepts the unversioned name, so alias it the way mama aliases clang
+                  sudo update-alternatives --install /usr/bin/clang-scan-deps clang-scan-deps \
+                                           /usr/bin/clang-scan-deps-$LLVM_VER 100
+                  # fail here, where the cause is obvious, instead of at the modules check later
+                  clang-scan-deps --version
       # Ninja plus a compiler over the modules minimum turns modules on by itself, so this
       # job builds ReCpp with modules the way a downstream project builds it.
       - run: pipenv run mama install-<< parameters.cc_version >>
@@ -190,8 +195,20 @@ jobs:
             CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> verbose build test jobs=3 2>&1 | tee build.log
             # AUTO turns modules off and keeps going, so without this the job would still pass
             # if ReCpp stopped enabling modules when another project builds it
-            grep -q "C++20 Modules enabled" build.log \
-              || { echo "FAIL: ReCpp built no modules as a dependency"; grep -i "MODULES" build.log; exit 1; }
+            # AUTO turns modules off and keeps going, so without this the job would still pass
+            # if ReCpp stopped enabling modules when another project builds it
+            if ! grep -q "C++20 Modules enabled" build.log; then
+              echo "FAIL: ReCpp built no modules as a dependency"
+              grep -i "MODULES" build.log
+              # a missing binary blames this job, a set binary with an empty cache entry blames
+              # the build tool, which configures a dependency differently from a root target
+              echo "--- clang-scan-deps on this box ---"
+              ls -la /usr/bin/clang-scan-deps* /usr/lib/llvm-*/bin/clang-scan-deps 2>&1 | head
+              echo "--- what cmake resolved for the ReCpp dependency ---"
+              find .. -name CMakeCache.txt -path "*ReCpp*" \
+                   -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
+              exit 1
+            fi
   consumer-integration-msvc:
     description: Build ReCpp with MSVC as another project builds it, as a dependency and not the root
     executor:
