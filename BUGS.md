@@ -52,8 +52,14 @@ at. Android caught it in CI:
 `FORTIFY: pthread_mutex_trylock called on a destroyed mutex`, then `SIGABRT` on
 `rpp_task_13`, during the next case.
 Fixed: the pool is a fixture member now, and cleanup destroys the loop first.
-The same shape can hit any consumer that gives `event_loop` a pool with a shorter
-life. `event_loop` takes a raw `thread_pool*` and documents no lifetime rule.
+The constructor and `set_time_source()` now mark every borrowed pointer
+`RPP_LIFETIMEBOUND`, and the doxygen states that the loop must not outlive the
+pool or the clock.
+This stays open, because the annotation does not catch the shape that caused it.
+Measured on clang-18: `lifetimebound` warns when a reference parameter binds a
+temporary, which is what `strview.h` uses it for. It stays silent when a pointer
+parameter takes a local that a longer-lived object then stores. Closing this
+needs an owning handle or a runtime guard, not an attribute.
 
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
