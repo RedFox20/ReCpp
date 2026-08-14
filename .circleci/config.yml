@@ -140,7 +140,21 @@ jobs:
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama mips verbose build jobs=3
   consumer-integration:
-    description: Build ReCpp as another project builds it, as a dependency and not the root
+    parameters:
+      compiler:
+        type: enum
+        enum: ["clang", "gcc"]
+        default: "gcc"
+        description: "Compiler the consumer builds ReCpp with"
+      cc_version:
+        type: string
+        default: "gcc-14"
+        description: "Compiler version. It must clear the modules minimum, gcc-14 or clang-21"
+      llvm_apt:
+        type: boolean
+        default: false
+        description: "Register apt.llvm.org, for a clang release the CI image does not carry"
+    description: Build ReCpp with << parameters.cc_version >> as another project builds it, as a dependency and not the root
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
       - image: cimg/python:3.14
@@ -149,22 +163,63 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev ninja-build
       - run: pipenv install mama
-      # gcc-14 plus Ninja is the configuration that turns modules on by itself, so this
+      - when:
+          condition: << parameters.llvm_apt >>
+          steps:
+            - run:
+                name: Register apt.llvm.org for << parameters.cc_version >>
+                command: |
+                  LLVM_VER=$(echo "<< parameters.cc_version >>" | cut -d- -f2)
+                  wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+                  chmod +x llvm.sh
+                  sudo ./llvm.sh $LLVM_VER
+                  # CMake scans module dependencies with clang-scan-deps, which ships in
+                  # clang-tools. Without it a modules build configures and then fails.
+                  sudo apt-get install -y clang-tools-$LLVM_VER
+      # Ninja plus a compiler over the modules minimum turns modules on by itself, so this
       # job builds ReCpp with modules the way a downstream project builds it.
-      - run: pipenv run mama install-gcc-14
+      - run: pipenv run mama install-<< parameters.cc_version >>
       - run: make configure-cmake
       - run:
-          name: Build and run the consumer
+          name: Build and run the consumer with << parameters.cc_version >>
           command: |
             # the Pipfile lives at the repo root, and the consumer builds one level down
             export PIPENV_PIPFILE=$(pwd)/Pipfile
             cd tests/consumer
             # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
-            CXX20=1 taskset -c 0-2 pipenv run mama gcc verbose build test jobs=3 2>&1 | tee build.log
+            CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> verbose build test jobs=3 2>&1 | tee build.log
             # AUTO turns modules off and keeps going, so without this the job would still pass
             # if ReCpp stopped enabling modules when another project builds it
             grep -q "C++20 Modules enabled" build.log \
               || { echo "FAIL: ReCpp built no modules as a dependency"; grep -i "MODULES" build.log; exit 1; }
+  consumer-integration-msvc:
+    description: Build ReCpp with MSVC as another project builds it, as a dependency and not the root
+    executor:
+      name: win/default
+      size: medium # can be medium(4 CPU), large, xlarge, 2xlarge
+    steps:
+      - checkout
+      - run: pip3 install mama
+      - run: choco install cmake -y
+      - run:
+          name: Build and run the consumer
+          command: |
+              $env:Path+=";$Env:ProgramFiles\CMake\bin";
+              $env:CXX20="1";
+              cd tests/consumer
+              # a bare cmake message() writes to stderr, so the log needs 2>&1 to catch the
+              # modules line, and Continue keeps those lines from aborting the step
+              $ErrorActionPreference = 'Continue'
+              # mama picks a Visual Studio generator, and CMake scans modules on that one too
+              mama windows verbose build test jobs=4 2>&1 | Tee-Object -FilePath build.log
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              # AUTO turns modules off and keeps going, so without this the job would still pass
+              # if ReCpp stopped enabling modules when another project builds it
+              if (-not (Select-String -Path build.log -Pattern 'C\+\+20 Modules enabled' -Quiet)) {
+                  Write-Host "FAIL: ReCpp built no modules as a dependency"
+                  Select-String -Path build.log -Pattern 'MODULES'
+                  exit 1
+              }
   android-build:
     parameters:
       docker_image:
@@ -292,8 +347,18 @@ workflows:
           no_ninja: ""
           build_with_modules: "ON"
           llvm_apt: true
-      # Integration: ReCpp as somebody else's dependency
-      - consumer-integration
+      # Integration: ReCpp as somebody else's dependency, on all three compiler families
+      - consumer-integration:
+          name: consumer-integration
+          compiler: gcc
+          cc_version: gcc-14
+      - consumer-integration:
+          name: consumer-clang21
+          compiler: clang
+          cc_version: clang-21
+          llvm_apt: true
+      - consumer-integration-msvc:
+          name: consumer-msvc2022
       # Other platform builds
       - win64-cpp20-msvc2022
       - mipsel-cpp20-gcc12
