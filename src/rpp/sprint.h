@@ -145,12 +145,10 @@ namespace rpp
         void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;
     private:
     #if RPP_WCHAR_IS_UTF32
-        /// @brief Appends wide text where a wchar_t holds UTF-32. It takes wchar_t, because
-        ///        reading a wchar_t through a char32_t pointer breaks strict aliasing.
+        /// @brief Appends UTF-32 wide text. Takes wchar_t, because a char32_t* would alias it.
         void write_wide32_as_utf8(const wchar_t* wide, int widelength) noexcept;
     #endif
-        /// @brief Appends one code point as 1 to 4 UTF-8 bytes. It writes no terminator,
-        ///        so only a caller that terminates the buffer afterwards may use it.
+        /// @brief Appends one code point as 1 to 4 UTF-8 bytes. The caller writes the terminator.
         void write_codepoint(char32_t codepoint) noexcept;
     public:
 
@@ -159,8 +157,7 @@ namespace rpp
         FINLINE void write(const QString& str)     noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.constData()), str.length()); }
         FINLINE void write(const QStringView& str) noexcept { write_utf16_as_utf8(reinterpret_cast<const char16_t*>(str.data()), str.length()); }
     #endif
-        // support Wide Strings by converting them to UTF-8. Windows holds UTF-16 in a
-        // wchar_t and every other platform holds UTF-32, so the decoder must match the size.
+        // support Wide Strings by converting them to UTF-8
         FINLINE void write_wide_as_utf8(const wchar_t* wide, int widelength) noexcept
         {
         #if RPP_WCHAR_IS_UTF32

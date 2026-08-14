@@ -172,9 +172,7 @@
 #  endif
 #endif
 
-/// @brief 1 when a wchar_t holds a whole UTF-32 code point, 0 when it holds UTF-16.
-/// The preprocessor cannot evaluate sizeof, so this reads the compiler macro instead.
-/// Windows defines no such macro and always uses a 16-bit wchar_t.
+/// @brief 1 when a wchar_t holds UTF-32, 0 when it holds UTF-16.
 #ifndef RPP_WCHAR_IS_UTF32
 #  if defined(_WIN32) || (defined(__SIZEOF_WCHAR_T__) && __SIZEOF_WCHAR_T__ == 2)
 #    define RPP_WCHAR_IS_UTF32 0
@@ -183,9 +181,7 @@
 #  endif
 #endif
 #ifdef __cplusplus
-// Two branches above guess without asking the compiler: _WIN32, and the fallback for a
-// compiler that defines no __SIZEOF_WCHAR_T__. A wrong guess picks the wrong decoder and
-// corrupts the text, so stop the build instead.
+// _WIN32 and the fallback both guess, and a wrong guess corrupts the decoded text
 static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
               "RPP_WCHAR_IS_UTF32 does not match wchar_t on this compiler");
 #endif
