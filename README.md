@@ -278,16 +278,16 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_BARE_METAL`](src/rpp/config.h#L188) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
-| [`RPP_FREERTOS`](src/rpp/config.h#L176) | `1` if targeting FreeRTOS |
-| [`RPP_STM32_HAL`](src/rpp/config.h#L180) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
-| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L194) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
-| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L199) | `1` if targeting ARM Cortex-M architecture |
-| [`RPP_ARM_ARCH`](src/rpp/config.h#L215) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
-| [`RPP_64BIT`](src/rpp/config.h#L240) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L392) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L400) | `1` if target is big-endian |
-| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L410) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
+| [`RPP_BARE_METAL`](src/rpp/config.h#L199) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
+| [`RPP_FREERTOS`](src/rpp/config.h#L187) | `1` if targeting FreeRTOS |
+| [`RPP_STM32_HAL`](src/rpp/config.h#L191) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
+| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L205) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
+| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L210) | `1` if targeting ARM Cortex-M architecture |
+| [`RPP_ARM_ARCH`](src/rpp/config.h#L226) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
+| [`RPP_64BIT`](src/rpp/config.h#L251) | `1` if compiling for a 64-bit target |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L403) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L411) | `1` if target is big-endian |
+| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L421) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
 
 ### Feature Detection
 
@@ -295,64 +295,65 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 |-------|-------------|
 | [`RPP_HAS_QT`](src/rpp/config.h#L157) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
 | [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L167) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
+| [`RPP_WCHAR_IS_UTF32`](src/rpp/config.h#L180) | `1` if a `wchar_t` holds a whole UTF-32 code point, `0` if it holds UTF-16 (Windows) |
 
 ### Function Attributes
 
 | Macro | Description |
 |-------|-------------|
-| [`FINLINE`](src/rpp/config.h#L233) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
-| [`NOINLINE`](src/rpp/config.h#L224) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](src/rpp/config.h#L266) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L325) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L257) | Delete copy and move constructors and assignment operators |
+| [`FINLINE`](src/rpp/config.h#L244) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
+| [`NOINLINE`](src/rpp/config.h#L235) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
+| [`NODISCARD`](src/rpp/config.h#L277) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L336) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L268) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L289) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L300) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L300) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L311) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L340) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L356) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L357) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L358) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L351) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L367) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L368) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L369) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](src/rpp/config.h#L369) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](src/rpp/config.h#L370) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](src/rpp/config.h#L371) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L372) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L381) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L380) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L383) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L382) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L385) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L384) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L387) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L386) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L380) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L381) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L382) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L383) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L392) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L391) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L394) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L393) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L396) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L395) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L398) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L397) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.h#L430) | `unsigned char` |
-| [`ushort`](src/rpp/config.h#L431) | `unsigned short` |
-| [`uint`](src/rpp/config.h#L432) | `unsigned int` |
-| [`ulong`](src/rpp/config.h#L433) | `unsigned long` |
-| [`int16`](src/rpp/config.h#L435) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.h#L436) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.h#L439) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.h#L440) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.h#L446) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.h#L447) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L441) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L442) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L443) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L444) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L446) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L447) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L450) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L451) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L457) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L458) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -705,11 +706,11 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | Method | Description |
 |--------|-------------|
 | [`write(const T& v)`](src/rpp/sprint.h#L124) | Write a value (auto-converts most types) |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L351) | Write values followed by newline |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L361) | Write values followed by newline |
 | [`writef(const char* format, ...)`](src/rpp/sprint.h#L122) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L297) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L254) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L359) | Pretty-print a value |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L307) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L264) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L369) | Pretty-print a value |
 | [`clear()`](src/rpp/sprint.h#L113) | Clear the buffer |
 | [`reserve(int capacity)`](src/rpp/sprint.h#L114) | Reserve capacity |
 | [`resize(int size)`](src/rpp/sprint.h#L115) | Resize buffer |
@@ -725,9 +726,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L50) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L51) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L54) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L473) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L493) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L419) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L483) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L503) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L429) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 

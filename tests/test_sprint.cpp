@@ -261,6 +261,9 @@ TestImpl(test_sprint)
     // UTF-32 as UTF-16 truncated "hello world" to "h" and still reported a length of 11.
     TestCase(string_buffer_write_wide_string)
     {
+        // a wrong macro selects the wrong decoder, which is the corruption this case pins
+        AssertThat(RPP_WCHAR_IS_UTF32 == 1, sizeof(wchar_t) == 4);
+
         string_buffer sb;
         sb.write(L"hello world");
         AssertThat(sb.view(), "hello world");

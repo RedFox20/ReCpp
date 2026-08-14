@@ -200,6 +200,7 @@ namespace rpp
         ptr[len] = '\0';
     }
 
+#if RPP_WCHAR_IS_UTF32
     void string_buffer::write_wide32_as_utf8(const wchar_t* wide, int widelength) noexcept
     {
         reserve(widelength); // ASCII stays one byte per code point
@@ -207,6 +208,7 @@ namespace rpp
             write_codepoint(static_cast<char32_t>(wide[i])); // UTF-32 needs no surrogate pair
         ptr[len] = '\0';
     }
+#endif // RPP_WCHAR_IS_UTF32
 #endif // RPP_ENABLE_UNICODE
 
     static const char HEX[16]   = { '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };

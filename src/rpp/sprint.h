@@ -143,11 +143,12 @@ namespace rpp
 #if RPP_ENABLE_UNICODE
         // input as UTF-16 string, converted directly to UTF-8
         void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;
-        /// @brief Appends wide text where a wchar_t holds UTF-32, which is every
-        ///        platform except Windows. It takes wchar_t, because reading a wchar_t
-        ///        through a char32_t pointer breaks strict aliasing.
-        void write_wide32_as_utf8(const wchar_t* wide, int widelength) noexcept;
     private:
+    #if RPP_WCHAR_IS_UTF32
+        /// @brief Appends wide text where a wchar_t holds UTF-32. It takes wchar_t, because
+        ///        reading a wchar_t through a char32_t pointer breaks strict aliasing.
+        void write_wide32_as_utf8(const wchar_t* wide, int widelength) noexcept;
+    #endif
         /// @brief Appends one code point as 1 to 4 UTF-8 bytes. It writes no terminator,
         ///        so only a caller that terminates the buffer afterwards may use it.
         void write_codepoint(char32_t codepoint) noexcept;
@@ -160,12 +161,16 @@ namespace rpp
     #endif
         // support Wide Strings by converting them to UTF-8. Windows holds UTF-16 in a
         // wchar_t and every other platform holds UTF-32, so the decoder must match the size.
+        // A wrong macro picks the wrong decoder and corrupts the text, so prove it here.
+        static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
+                      "RPP_WCHAR_IS_UTF32 does not match wchar_t on this compiler");
         FINLINE void write_wide_as_utf8(const wchar_t* wide, int widelength) noexcept
         {
-            if constexpr (sizeof(wchar_t) == 2)
-                write_utf16_as_utf8(reinterpret_cast<const char16_t*>(wide), widelength);
-            else
-                write_wide32_as_utf8(wide, widelength);
+        #if RPP_WCHAR_IS_UTF32
+            write_wide32_as_utf8(wide, widelength);
+        #else
+            write_utf16_as_utf8(reinterpret_cast<const char16_t*>(wide), widelength);
+        #endif
         }
         FINLINE void write(const std::wstring& value) noexcept { write_wide_as_utf8(value.data(), static_cast<int>(value.size())); }
         FINLINE void write(std::wstring_view value)   noexcept { write_wide_as_utf8(value.data(), static_cast<int>(value.size())); }

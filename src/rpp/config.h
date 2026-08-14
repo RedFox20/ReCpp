@@ -172,6 +172,17 @@
 #  endif
 #endif
 
+/// @brief 1 when a wchar_t holds a whole UTF-32 code point, 0 when it holds UTF-16.
+/// The preprocessor cannot evaluate sizeof, so this reads the compiler macro instead.
+/// Windows defines no such macro and always uses a 16-bit wchar_t.
+#ifndef RPP_WCHAR_IS_UTF32
+#  if defined(_WIN32) || (defined(__SIZEOF_WCHAR_T__) && __SIZEOF_WCHAR_T__ == 2)
+#    define RPP_WCHAR_IS_UTF32 0
+#  else
+#    define RPP_WCHAR_IS_UTF32 1
+#  endif
+#endif
+
 #ifndef RPP_FREERTOS
 #  define RPP_FREERTOS 0
 #endif
