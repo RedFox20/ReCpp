@@ -270,90 +270,90 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | Macro | Description |
 |-------|-------------|
 | [`RPP_ASAN`](src/rpp/config.h#L123) | `1` if AddressSanitizer is enabled |
-| [`RPP_TSAN`](src/rpp/config.h#L131) | `1` if ThreadSanitizer is enabled |
-| [`RPP_UBSAN`](src/rpp/config.h#L140) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
-| [`RPP_SANITIZERS`](src/rpp/config.h#L148) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
+| [`RPP_TSAN`](src/rpp/config.h#L132) | `1` if ThreadSanitizer is enabled |
+| [`RPP_UBSAN`](src/rpp/config.h#L142) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
+| [`RPP_SANITIZERS`](src/rpp/config.h#L150) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
 
 ### Platform & Architecture
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_BARE_METAL`](src/rpp/config.h#L202) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
-| [`RPP_FREERTOS`](src/rpp/config.h#L190) | `1` if targeting FreeRTOS |
-| [`RPP_STM32_HAL`](src/rpp/config.h#L194) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
-| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L208) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
-| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L213) | `1` if targeting ARM Cortex-M architecture |
-| [`RPP_ARM_ARCH`](src/rpp/config.h#L229) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
-| [`RPP_64BIT`](src/rpp/config.h#L254) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L406) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L414) | `1` if target is big-endian |
-| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L424) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
+| [`RPP_BARE_METAL`](src/rpp/config.h#L204) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
+| [`RPP_FREERTOS`](src/rpp/config.h#L192) | `1` if targeting FreeRTOS |
+| [`RPP_STM32_HAL`](src/rpp/config.h#L196) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
+| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L210) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
+| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L215) | `1` if targeting ARM Cortex-M architecture |
+| [`RPP_ARM_ARCH`](src/rpp/config.h#L231) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
+| [`RPP_64BIT`](src/rpp/config.h#L256) | `1` if compiling for a 64-bit target |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L408) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L416) | `1` if target is big-endian |
+| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L426) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
 
 ### Feature Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_QT`](src/rpp/config.h#L157) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
-| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L167) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
+| [`RPP_HAS_QT`](src/rpp/config.h#L159) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
+| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L169) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
 | [`RPP_WCHAR_IS_UTF32`](src/rpp/config.h#L180) | `1` if a `wchar_t` holds a whole UTF-32 code point, `0` if it holds UTF-16 (Windows) |
 
 ### Function Attributes
 
 | Macro | Description |
 |-------|-------------|
-| [`FINLINE`](src/rpp/config.h#L247) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
-| [`NOINLINE`](src/rpp/config.h#L238) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](src/rpp/config.h#L280) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L339) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L271) | Delete copy and move constructors and assignment operators |
+| [`FINLINE`](src/rpp/config.h#L249) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
+| [`NOINLINE`](src/rpp/config.h#L240) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
+| [`NODISCARD`](src/rpp/config.h#L282) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L341) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L273) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L303) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L314) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L305) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L316) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L354) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L370) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L371) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L372) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L356) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L372) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L373) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L374) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_SHORT_SIZE`](src/rpp/config.h#L383) | Size of `short` in bytes (platform-dependent) |
-| [`RPP_INT_SIZE`](src/rpp/config.h#L384) | Size of `int` in bytes |
-| [`RPP_LONG_SIZE`](src/rpp/config.h#L385) | Size of `long` in bytes |
-| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L386) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L395) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L394) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L397) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L396) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L399) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L398) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L401) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L400) | 32-bit unsigned integer limits |
+| [`RPP_SHORT_SIZE`](src/rpp/config.h#L385) | Size of `short` in bytes (platform-dependent) |
+| [`RPP_INT_SIZE`](src/rpp/config.h#L386) | Size of `int` in bytes |
+| [`RPP_LONG_SIZE`](src/rpp/config.h#L387) | Size of `long` in bytes |
+| [`RPP_LONG_LONG_SIZE`](src/rpp/config.h#L388) | Size of `long long` in bytes |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L397) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L396) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L399) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L398) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L401) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L400) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L403) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L402) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.h#L444) | `unsigned char` |
-| [`ushort`](src/rpp/config.h#L445) | `unsigned short` |
-| [`uint`](src/rpp/config.h#L446) | `unsigned int` |
-| [`ulong`](src/rpp/config.h#L447) | `unsigned long` |
-| [`int16`](src/rpp/config.h#L449) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.h#L450) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.h#L453) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.h#L454) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.h#L460) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.h#L461) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.h#L446) | `unsigned char` |
+| [`ushort`](src/rpp/config.h#L447) | `unsigned short` |
+| [`uint`](src/rpp/config.h#L448) | `unsigned int` |
+| [`ulong`](src/rpp/config.h#L449) | `unsigned long` |
+| [`int16`](src/rpp/config.h#L451) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.h#L452) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.h#L455) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.h#L456) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.h#L462) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.h#L463) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -1307,33 +1307,33 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 
 | Item | Description |
 |------|-------------|
-| [`cfuture<T>`](src/rpp/future.h#L121) | Extended `std::future` with composition and coroutine support |
-| [`async_task(task)`](src/rpp/future.h#L32) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L946) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L963) | Create an already-errored future |
-| [`wait_all(futures)`](src/rpp/future.h#L1031) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L985) | Block and gather results from all futures |
+| [`cfuture<T>`](src/rpp/future.h#L107) | Extended `std::future` with composition and coroutine support |
+| [`async_task(task)`](src/rpp/future.h#L30) | Launch a task on the thread pool, returns `cfuture<T>` |
+| [`make_ready_future(value)`](src/rpp/future.h#L932) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L949) | Create an already-errored future |
+| [`wait_all(futures)`](src/rpp/future.h#L1017) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L986) | Block and gather results from all futures |
 
 ### cfuture Methods
 
 | Method | Description |
 |--------|-------------|
-| [`~cfuture()`](src/rpp/future.h#L135) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
-| [`then()`](src/rpp/future.h#L163) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
-| [`then(Task task)`](src/rpp/future.h#L180) | Chain a continuation that receives the result (runs via `async_task`) |
-| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L207) | Chain with 1–4 typed exception recovery handlers |
-| [`then(cfuture<U>&& next)`](src/rpp/future.h#L259) | Chain by waiting for this future, then returning the result of `next` |
-| [`continue_with(Task task)`](src/rpp/future.h#L283) | Fire-and-forget continuation (moves `*this` into background) |
-| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L283) | Fire-and-forget continuation with 1–4 typed exception handlers |
-| [`detach()`](src/rpp/future.h#L338) | Abandon future, wait in background (swallows exceptions) |
-| [`chain_async(Task task)`](src/rpp/future.h#L370) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
-| [`chain_async(cfuture&& next)`](src/rpp/future.h#L383) | Sequential chaining with another future |
-| [`await_ready()`](src/rpp/future.h#L397) | Non-blocking check if the future is already finished |
-| [`collect_ready(T* result)`](src/rpp/future.h#L428) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
-| [`collect_wait(T* result)`](src/rpp/future.h#L446) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
-| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L458) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L477) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L497) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`~cfuture()`](src/rpp/future.h#L121) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
+| [`then()`](src/rpp/future.h#L166) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
+| [`then(Task task)`](src/rpp/future.h#L193) | Chain a continuation that receives the result (runs via `async_task`) |
+| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L203) | Chain with 1–4 typed exception recovery handlers |
+| [`then(cfuture<U>&& next)`](src/rpp/future.h#L245) | Chain by waiting for this future, then returning the result of `next` |
+| [`continue_with(Task task)`](src/rpp/future.h#L279) | Fire-and-forget continuation (moves `*this` into background) |
+| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L279) | Fire-and-forget continuation with 1–4 typed exception handlers |
+| [`detach()`](src/rpp/future.h#L324) | Abandon future, wait in background (swallows exceptions) |
+| [`chain_async(Task task)`](src/rpp/future.h#L356) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
+| [`chain_async(cfuture&& next)`](src/rpp/future.h#L369) | Sequential chaining with another future |
+| [`await_ready()`](src/rpp/future.h#L383) | Non-blocking check if the future is already finished |
+| [`collect_ready(T* result)`](src/rpp/future.h#L414) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L432) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L444) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L463) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L483) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`RPP_HAS_COROUTINES`](src/rpp/future_types.h#L12) | Detects whether C++20 coroutine headers are available |
 | [`RPP_CORO_STD`](src/rpp/future_types.h#L13) | Namespace alias for coroutine types (std or std::experimental) |
 
@@ -1653,7 +1653,7 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](src/rpp/thread_pool.h#L408) | Thread pool manager with auto-scaling workers |
+| [`thread_pool`](src/rpp/thread_pool.h#L406) | Thread pool manager with auto-scaling workers |
 | [`pool_task_handle`](src/rpp/thread_pool.h#L144) | Waitable, reference-counted handle for pool tasks |
 | [`pool_worker`](src/rpp/thread_pool.h#L118) | Individual worker thread in the pool |
 
@@ -1661,8 +1661,8 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L599) | Split work across threads |
-| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L549) | Run a single async task, returns `pool_task_handle` |
+| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L601) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L551) | Run a single async task, returns `pool_task_handle` |
 | [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L445) | Set max concurrent workers |
 | [`max_parallelism()`](src/rpp/thread_pool.h#L448) | Get max concurrent workers |
 | [`active_tasks()`](src/rpp/thread_pool.h#L461) | Number of currently running tasks |
@@ -1675,9 +1675,9 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L599) | Parallel for on the global thread pool |
-| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L620) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](src/rpp/thread_pool.h#L549) | Run async task on the global pool |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L601) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L622) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L551) | Run async task on the global pool |
 | [`action<TArgs...>`](src/rpp/thread_pool.h#L48) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for

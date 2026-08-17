@@ -81,15 +81,18 @@ class ReCpp(mama.BuildTarget):
             self.gdb(f"bin/RppTests {args}", src_dir=True) # GDB drives the timing, do not interrupt it
 
     def run_tests_with_timeout(self, args):
-        """Runs RppTests and fails the build if the tests hang, instead of waiting forever."""
+        """Runs RppTests with a deadlock timeout unless repeat mode is active."""
         bin_dir = self.source_dir('bin')
-        command = [self.source_dir('bin/RppTests')] + shlex.split(args)
+        test_args = shlex.split(args)
+        command = [self.source_dir('bin/RppTests')] + test_args
+        # Repeat mode runs until failure, so a fixed timeout would stop a healthy run.
+        is_repeat = '-r' in test_args or '--repeat' in test_args
+        timeout = None if is_repeat else self.TEST_TIMEOUT_SECONDS
         try:
-            result = subprocess.run(command, cwd=bin_dir, timeout=self.TEST_TIMEOUT_SECONDS)
+            result = subprocess.run(command, cwd=bin_dir, timeout=timeout)
         except subprocess.TimeoutExpired:
             raise RuntimeError(f'RppTests timed out after {self.TEST_TIMEOUT_SECONDS}s: a test is hung. '
                                'The last test name printed before this is the one that hung. '
                                'Run the same test without `nogdb` to attach GDB and get the stack.')
         if result.returncode != 0:
             raise RuntimeError(f'RppTests failed with exit code {result.returncode}')
-

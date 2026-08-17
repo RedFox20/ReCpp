@@ -57,8 +57,9 @@ namespace
         worker_cleanup_marker_task& operator=(const worker_cleanup_marker_task&) = delete;
         worker_cleanup_marker_task& operator=(worker_cleanup_marker_task&&) = delete;
 
+        // The source must keep sharing the state after the move to expose delayed cleanup.
         worker_cleanup_marker_task(worker_cleanup_marker_task&& other) noexcept
-            : state{other.state} // COPY, not move: the moved-from object may keep cleanup ownership
+            : state{other.state} // NOLINT(performance-move-constructor-init)
             , should_throw{other.should_throw}
             , owns_cleanup{other.owns_cleanup && !other.has_run}
             , has_run{other.has_run}
@@ -98,9 +99,30 @@ namespace
         throwing_move_result(const throwing_move_result&) = default;
         throwing_move_result& operator=(const throwing_move_result&) = default;
         throwing_move_result& operator=(throwing_move_result&&) = default;
-        [[noreturn]] throwing_move_result(throwing_move_result&&)
+        // This type exists to verify that a result move can fail.
+        // NOLINTNEXTLINE(performance-noexcept-move-constructor)
+        [[noreturn]] throwing_move_result(throwing_move_result&& other)
         {
+            (void)other;
             throw std::runtime_error("move ctor failed");
+        }
+    };
+
+    struct copy_throws_move_succeeds_result
+    {
+        int value = worker_cleanup_state::RESULT;
+
+        copy_throws_move_succeeds_result() = default;
+        copy_throws_move_succeeds_result(const copy_throws_move_succeeds_result& other)
+        {
+            (void)other;
+            throw std::runtime_error("copy ctor failed");
+        }
+        // A potentially throwing move must still be preferred over the failing copy.
+        // NOLINTNEXTLINE(performance-noexcept-move-constructor)
+        copy_throws_move_succeeds_result(copy_throws_move_succeeds_result&& other) noexcept(false)
+            : value{other.value}
+        {
         }
     };
 }
@@ -683,6 +705,31 @@ TestImpl(test_threadpool)
         AssertTrue(task_done.load());
     }
 
+    TestCase(wait_until_idle_waits_for_parallel_for)
+    {
+        thread_pool pool{2};
+        rpp::semaphore started;
+        rpp::semaphore release;
+
+        std::thread parallel_for_thread{[&] {
+            pool.parallel_for(0, 2, 1, [&](int, int) {
+                started.notify();
+                release.wait();
+            });
+        }};
+
+        started.wait();
+        started.wait();
+        wait_result while_parallel_for_runs = pool.wait_until_idle(rpp::millis(50));
+
+        release.notify();
+        release.notify();
+        parallel_for_thread.join();
+
+        AssertThat(while_parallel_for_runs, wait_result::timeout);
+        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+    }
+
     // Regression: run_test_func drains the pool between cases, and that only prevents the
     // cross-case use-after-free if "idle" also means the worker already destroyed the task
     // delegate. A task stays running until after that destruction, so this pins it.
@@ -760,5 +807,13 @@ TestImpl(test_threadpool)
     {
         rpp::cfuture<throwing_move_result> future = rpp::async_task([]{ return throwing_move_result{}; });
         AssertThrows(future.get(), std::runtime_error);
+    }
+
+    TestCase(async_task_moves_a_result_when_copy_throws)
+    {
+        rpp::cfuture<copy_throws_move_succeeds_result> future = rpp::async_task([] {
+            return copy_throws_move_succeeds_result{};
+        });
+        AssertThat(future.get().value, worker_cleanup_state::RESULT);
     }
 };

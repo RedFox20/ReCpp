@@ -457,28 +457,31 @@ namespace rpp
         rpp::TimePoint end = rpp::TimePoint::monotonic_now() + timeout;
         for (;;)
         {
-            // snapshot one busy task, then wait on it with every pool lock released
             pool_task_handle busy { nullptr };
+            bool parallel_for_active = false;
             { std::lock_guard lock{TasksMutex};
-                for (auto& worker : Workers)
+                for (worker_ptr& worker : Workers)
                 {
-                    if (pool_task_handle task = worker->running_task(); task.is_running())
+                    pool_task_handle task = worker->running_task();
+                    if (task.is_running())
                     {
                         busy = std::move(task);
                         break;
                     }
                 }
+                parallel_for_active = ActiveParallelForCalls > 0;
             }
-            if (!busy.is_running())
-                return wait_result::finished; // nothing left running
+            if (!busy.is_running() && !parallel_for_active)
+                return wait_result::finished;
 
             rpp::Duration remaining = end - rpp::TimePoint::monotonic_now();
             if (remaining <= rpp::Duration::zero())
                 return wait_result::timeout;
 
-            // block on the task, never on a sleep interval, so this wakes the moment it ends.
-            // a task that finishes here may be replaced by a new one, so re-scan the workers
-            (void)busy.wait(remaining, std::nothrow);
+            if (busy.is_running())
+                (void)busy.wait(remaining, std::nothrow);
+            else
+                (void)ParallelForIdle.wait_no_unset(remaining);
         }
     }
 
@@ -559,6 +562,25 @@ namespace rpp
         return parallel_for_task{ std::move(w), std::move(new_task) };
     }
 
+    void thread_pool::begin_parallel_for() noexcept
+    {
+        std::lock_guard lock{TasksMutex};
+        if (ActiveParallelForCalls++ == 0)
+            ParallelForIdle.unset();
+    }
+
+    void thread_pool::finish_parallel_for(parallel_for_task* active, int spawned) noexcept
+    {
+        std::lock_guard lock{TasksMutex};
+        for (int i = 0; i < spawned; ++i)
+        {
+            Workers.emplace_back(std::move(active[i].worker));
+            active[i].~parallel_for_task(); // manually clean up since we used alloca
+        }
+        if (--ActiveParallelForCalls == 0)
+            ParallelForIdle.notify_all();
+    }
+
     thread_pool::parallel_for_params::parallel_for_params(int range, int max_range_size, int max_parallelism) noexcept
     {
         max_tasks = max_parallelism; // maximum number of Tasks to use, 0 disables parallelism
@@ -603,6 +625,8 @@ namespace rpp
             range_task(range_start, range_end);
             return;
         }
+
+        begin_parallel_for();
 
         auto* active = static_cast<parallel_for_task*>(
             alloca(unsigned(p.max_tasks) * sizeof(parallel_for_task))
@@ -673,14 +697,7 @@ namespace rpp
         TaskDebug("parallel_for wait_on_all %.3fms", wait_on_all.elapsed_millis());
 
         // and finally throw them back into the pool
-        {
-            std::lock_guard lock{TasksMutex};
-            for (int i = 0; i < spawned; ++i)
-            {
-                Workers.emplace_back(std::move(active[i].worker));
-                active[i].~parallel_for_task(); // manually clean up since we used alloca
-            }
-        }
+        finish_parallel_for(active, spawned);
 
         if (err) std::rethrow_exception(err);
     }

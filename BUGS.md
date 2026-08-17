@@ -56,9 +56,9 @@ at. Android caught it in CI:
 `FORTIFY: pthread_mutex_trylock called on a destroyed mutex`, then `SIGABRT` on
 `rpp_task_13`, during the next case.
 Fixed: the pool is a fixture member now, and cleanup destroys the loop first.
-The constructor and `set_time_source()` now mark every borrowed pointer
-`RPP_LIFETIMEBOUND`, and the doxygen states that the loop must not outlive the
-pool or the clock.
+The constructor now marks each borrowed pointer `RPP_LIFETIMEBOUND`. Clang
+rejects this annotation on the void `set_time_source()` function. Its doxygen
+states that the loop must not outlive the pool or the clock.
 The annotation does not catch the shape that caused it. Measured on clang-18:
 `lifetimebound` warns when a reference parameter binds a temporary, which is what
 `strview.h` uses it for. It stays silent when a pointer parameter takes a local

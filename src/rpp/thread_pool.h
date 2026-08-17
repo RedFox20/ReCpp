@@ -317,6 +317,7 @@ namespace rpp
     class RPPAPI pool_worker
     {
         friend class pool_task_handle;
+        friend class thread_pool;
     private:
         rpp::semaphore_flag new_task_flag;
         std::thread th;
@@ -353,18 +354,6 @@ namespace rpp
             return current_task.is_running();
         }
 
-        /**
-         * @returns A strong handle to the task this worker runs, or a null handle if idle.
-         * @note The strong ref lets the caller wait on the task after releasing every lock.
-         */
-        pool_task_handle running_task() const noexcept
-        {
-            auto lock = new_task_flag.spin_lock(); // same lifetime rule as running()
-            if (!current_task.is_running())
-                return pool_task_handle{nullptr};
-            return current_task;
-        }
-
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param max_idle_seconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
         void max_idle_time(float max_idle_seconds = 15) noexcept;
@@ -388,6 +377,15 @@ namespace rpp
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
+        // Returns a strong task handle while new_task_flag protects current_task.
+        pool_task_handle running_task() const noexcept
+        {
+            auto lock = new_task_flag.spin_lock();
+            if (!current_task.is_running())
+                return pool_task_handle{nullptr};
+            return current_task;
+        }
+
         void set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept;
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
@@ -417,6 +415,8 @@ namespace rpp
 
         rpp::mutex TasksMutex;
         std::vector<worker_ptr> Workers;
+        rpp::semaphore_flag ParallelForIdle;
+        int ActiveParallelForCalls = 0; // guarded by TasksMutex
         float TaskMaxIdleTime = 15; // new task timeout in seconds
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for, 0 to disable
 
@@ -501,6 +501,8 @@ namespace rpp
         // the task is removed from TaskPool to avoid concurrency issues with regular parallel tasks
         parallel_for_task start_range_task(int range_start, int range_end,
                                            const action<int, int>& range_task) noexcept;
+        void begin_parallel_for() noexcept;
+        void finish_parallel_for(parallel_for_task* active, int spawned) noexcept;
 
         struct parallel_for_params
         {
