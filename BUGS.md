@@ -36,13 +36,17 @@ The thread-creation stack names the culprit each time, and it is always an
 `async_task`, `cfuture::then()` and `semaphore::co_await_handle::await_suspend`
 all post through `parallel_task_detached`. The task owns the promise, and nothing
 joins it, so it destroys the promise long after `.get()` released the waiter.
-Fixed in the test framework, which is where CLAUDE.md puts a test-only race:
-`run_test_func` now waits for `thread_pool::global().active_tasks()` to reach 0
-after every case, and it prints a warning when a case leaves work running.
-Verified that the signal is live: `active_tasks()` reads 1 while a detached task
-sleeps, and the drain returns the moment it reaches 0.
-The library ordering is unchanged. A consumer that detaches a task still owns the
-lifetime problem, so this stays open until `async_task` offers a join.
+A drain in `run_test_func` waited for `active_tasks()` to reach 0 after every
+case. It is reverted, because it cannot work: `active_tasks()` locks `TasksMutex`
+and counts `task->running()` over `Workers`, so it counts busy WORKERS, not
+pending WORK. A job that `parallel_task_detached` posted but no worker picked up
+yet reads 0, and the drain returns at once. The pool exposes no queue depth, so
+no correct drain can be written from outside it.
+Nothing in the test framework covers this now. Closing it needs either a queued
+work count on `thread_pool`, or the join that `async_task` still does not offer.
+`continue_with()` also lacks the release discipline `async_task` has: it captures
+`f=std::move(*this)` and drops that reference only when the pool destroys the
+lambda.
 
 ### B10. A test handed the event_loop a pool that dies before the loop
 `test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave

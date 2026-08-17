@@ -749,16 +749,6 @@ namespace rpp
                 consolef(Red, "%s::%s FAILED %s\n", name.str, test.name.str, get_time_str(test.elapsed_time));
         }
 
-        // A detached pool task outlives the case that started it, and it destroys its promise
-        // whenever it finishes. TSAN reports that free against whatever the next case does with
-        // the same address. Wait here, so no case inherits the work of the one before it.
-        rpp::thread_pool& pool = rpp::thread_pool::global();
-        rpp::Timer drain;
-        while (pool.active_tasks() > 0 && drain.elapsed_millis() < 1000.0)
-            rpp::sleep_ms(1);
-        if (int leaked = pool.active_tasks(); leaked > 0)
-            consolef(Yellow, "%s::%s left %d pool task(s) running\n", name.str, test.name.str, leaked);
-
         return test.success;
     }
 
