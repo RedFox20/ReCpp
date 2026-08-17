@@ -244,13 +244,13 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
 
-        cfuture<> producer = rpp::async_task([&] {
+        cfuture<> producer = rpp::async_task([&queue] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
         });
 
-        cfuture<> consumer = rpp::async_task([&] {
+        cfuture<> consumer = rpp::async_task([&queue] {
             std::string item1 = *queue.wait_pop();
             AssertThat(item1, "item1");
             std::string item2 = *queue.wait_pop();
@@ -269,16 +269,20 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_2_producer_consumer)
     {
         concurrent_queue<std::string> queue;
+        std::barrier final_wait_gate{2};
 
-        cfuture<> producer = rpp::async_task([&queue] {
+        cfuture<> producer = rpp::async_task([&queue,&final_wait_gate] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
-            rpp::sleep_ms(2);
+            final_wait_gate.arrive_and_wait();
+            // this sleep must be much larger to try and defeat the race condition
+            // between notify_one() and final wait_pop() in the consumer
+            rpp::sleep_ms(15);
             queue.notify_one(); // notify consumer
         });
 
-        cfuture<> consumer = rpp::async_task([&queue] {
+        cfuture<> consumer = rpp::async_task([&queue,&final_wait_gate] {
             std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
@@ -289,6 +293,7 @@ TestImpl(test_concurrent_queue)
 
             // enter infinite wait, but we should be notified by the producer
             std::string item4;
+            final_wait_gate.arrive_and_wait();
             AssertFalse(queue.wait_pop(item4));
             AssertThat(item4, "");
         });
