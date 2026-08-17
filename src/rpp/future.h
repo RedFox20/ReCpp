@@ -8,9 +8,7 @@
 #include "future_types.h"
 #include "traits.h"
 #include "debugging.h" // __assertion_failure
-#if RPP_HAS_COROUTINES
-#  include <optional> // for cfuture<T>::promise_type (coroutine awaiter)
-#endif
+#include <optional> // for async_task() deterministic task cleanup
 
 namespace rpp
 {
@@ -34,44 +32,41 @@ namespace rpp
         using T = task_return_t<Task>; // decay_t on the return type
         cpromise<T> p;
         cfuture<T> f = p.get_future();
-        rpp::parallel_task_detached([move_args(p, task)]() mutable noexcept
+        // std::optional is used to enforce task cleanup in edge cases
+        // where shared/copy-like moves can leave the object valid but unspecified,
+        // causing a potential race condition during latent cleanup
+        rpp::parallel_task_detached([ task = std::optional<Task>{std::move(task)},
+                                      p = std::move(p) ]() mutable noexcept
         {
             try {
                 if constexpr (std::is_same_v<T, void>)
                 {
-                    task();
+                    (*task)();
                     // run task destructor before calling continuation
                     // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
-                    if constexpr (!std::is_trivially_destructible_v<Task>) {
-                        Task t = std::move(task);
-                        (void)t;
-                    }
+                    task.reset();
                     // notify the awaiters that the value is set
                     p.set_value();
                 }
                 else
                 {
-                    T value = task();
+                    T value = (*task)();
                     // run task destructor before calling continuation
                     // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
-                    if constexpr (!std::is_trivially_destructible_v<Task>) {
-                        Task t = std::move(task);
-                        (void)t;
-                    }
+                    task.reset();
                     // notify the awaiters that the value is set
-                    p.set_value(std::move(value));
+                    if constexpr (std::is_copy_constructible_v<T> && !std::is_nothrow_move_constructible_v<T>)
+                        p.set_value(value);
+                    else
+                        p.set_value(std::move(value));
                 }
-                // Release the promise reference to the shared state NOW, so that
-                // the pool_worker's generic.reset() only destroys a moved-from promise (no-op).
-                // This avoids a TSAN race between operator delete in ~promise()
-                // and pthread_cond_wait in future::get() on another thread.
+                // move the promise AFTER set_value, in case set_value() throws due to move CTOR
                 cpromise<T> release = std::move(p);
                 (void)release;
             } catch (...) {
-                // Release the promise reference to the shared state NOW, so that
-                // the pool_worker's generic.reset() only destroys a moved-from promise (no-op).
-                // This avoids a TSAN race between operator delete in ~promise()
-                // and pthread_cond_wait in future::get() on another thread.
+                // run task destructor before calling continuation
+                task.reset();
+                // Move the promise before waking up a future::get() which might destroy this lambda
                 cpromise<T> release = std::move(p);
                 release.set_exception(std::current_exception());
             }

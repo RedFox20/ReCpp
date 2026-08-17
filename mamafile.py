@@ -1,5 +1,7 @@
 import mama
 import os
+import shlex
+import subprocess
 
 class ReCpp(mama.BuildTarget):
 
@@ -66,10 +68,28 @@ class ReCpp(mama.BuildTarget):
         self.papa_deploy(f'.', src_dir=False)
 
 
+    # The whole suite runs in ~5 seconds, so this limit only ever triggers on a deadlock.
+    # It turns a hung CI job into a clear failure instead of a job that runs until the
+    # platform kills it, which gives no output at all.
+    TEST_TIMEOUT_SECONDS = 30
+
     def test(self, args):
         if 'nogdb' in args:
             args = args.replace('nogdb', '')
-            self.run_program(self.source_dir('bin'), self.source_dir(f'bin/RppTests {args}'))
+            self.run_tests_with_timeout(args)
         else:
-            self.gdb(f"bin/RppTests {args}", src_dir=True)
+            self.gdb(f"bin/RppTests {args}", src_dir=True) # GDB drives the timing, do not interrupt it
+
+    def run_tests_with_timeout(self, args):
+        """Runs RppTests and fails the build if the tests hang, instead of waiting forever."""
+        bin_dir = self.source_dir('bin')
+        command = [self.source_dir('bin/RppTests')] + shlex.split(args)
+        try:
+            result = subprocess.run(command, cwd=bin_dir, timeout=self.TEST_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f'RppTests timed out after {self.TEST_TIMEOUT_SECONDS}s: a test is hung. '
+                               'The last test name printed before this is the one that hung. '
+                               'Run the same test without `nogdb` to attach GDB and get the stack.')
+        if result.returncode != 0:
+            raise RuntimeError(f'RppTests failed with exit code {result.returncode}')
 

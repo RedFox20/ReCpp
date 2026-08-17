@@ -6,6 +6,7 @@
 #include <rpp/threads.h> // thread naming
 #include <atomic>
 #include <cstdlib> // getenv
+#include <memory> // shared_ptr
 #include <thread>  // hardware_concurrency
 #include <latch>
 #include <unordered_set>
@@ -20,6 +21,90 @@ namespace rpp
     }
 }
 
+namespace
+{
+    // Gates shared with the worker so the tests can inspect future readiness while task
+    // cleanup is deliberately suspended.
+    struct worker_cleanup_state
+    {
+        static constexpr int MARKER = 0xC1EA;
+        static constexpr int RESULT = 4242;
+        static constexpr rpp::Duration TIMEOUT = rpp::seconds(5);
+
+        std::atomic_int marker { 0 };
+        rpp::semaphore cleanup_started;
+        rpp::semaphore allow_cleanup;
+        rpp::semaphore cleanup_finished;
+    };
+
+    // @tparam R return type of the task, so the void and non-void async_task paths
+    //         can be exercised by the same marker.
+    template<class R = void>
+    struct worker_cleanup_marker_task
+    {
+        std::shared_ptr<worker_cleanup_state> state;
+        bool should_throw = false;
+        bool owns_cleanup = true;
+        bool has_run = false;
+
+        explicit worker_cleanup_marker_task(std::shared_ptr<worker_cleanup_state> state,
+                                            bool should_throw = false) noexcept
+            : state{std::move(state)}, should_throw{should_throw}
+        {
+        }
+
+        worker_cleanup_marker_task(const worker_cleanup_marker_task&) = delete;
+        worker_cleanup_marker_task& operator=(const worker_cleanup_marker_task&) = delete;
+        worker_cleanup_marker_task& operator=(worker_cleanup_marker_task&&) = delete;
+
+        worker_cleanup_marker_task(worker_cleanup_marker_task&& other) noexcept
+            : state{other.state} // COPY, not move: the moved-from object may keep cleanup ownership
+            , should_throw{other.should_throw}
+            , owns_cleanup{other.owns_cleanup && !other.has_run}
+            , has_run{other.has_run}
+        {
+            // Before execution, moves transfer cleanup ownership normally. A move AFTER the
+            // task ran deliberately leaves ownership behind, which is what catches a cleanup
+            // that only destroys a moved-to temporary and leaves the original husk alive.
+            if (owns_cleanup)
+                other.owns_cleanup = false;
+        }
+
+        ~worker_cleanup_marker_task() noexcept
+        {
+            if (!owns_cleanup)
+                return;
+            state->cleanup_started.notify();
+            // bounded: an aborted test must never strand this pool worker forever
+            (void)state->allow_cleanup.wait(worker_cleanup_state::TIMEOUT);
+            state->marker.store(worker_cleanup_state::MARKER, std::memory_order_release);
+            state->cleanup_finished.notify();
+        }
+
+        R operator()()
+        {
+            has_run = true;
+            if (should_throw)
+                throw std::runtime_error("task failed");
+            if constexpr (!std::is_void_v<R>)
+                return R(worker_cleanup_state::RESULT);
+        }
+    };
+
+    // Copying into the promise succeeds, but moving the result out of the future throws.
+    struct throwing_move_result
+    {
+        throwing_move_result() = default;
+        throwing_move_result(const throwing_move_result&) = default;
+        throwing_move_result& operator=(const throwing_move_result&) = default;
+        throwing_move_result& operator=(throwing_move_result&&) = default;
+        [[noreturn]] throwing_move_result(throwing_move_result&&)
+        {
+            throw std::runtime_error("move ctor failed");
+        }
+    };
+}
+
 
 TestImpl(test_threadpool)
 {
@@ -30,9 +115,10 @@ TestImpl(test_threadpool)
 
     TestCleanup()
     {
-        thread_pool::global().clear_idle_tasks();
-        if (thread_pool::global().active_tasks() > 0)
+        // wait the pool out before reporting, so a task that is merely slow is not called dangling
+        if (thread_pool::global().wait_until_idle(rpp::seconds(1)) == wait_result::timeout)
             print_error("Dangling tasks detected: %d\n", thread_pool::global().active_tasks());
+        thread_pool::global().clear_idle_tasks();
     }
 
     TestCaseSetup()
@@ -571,4 +657,108 @@ TestImpl(test_threadpool)
         AssertThat((int)completed, ITERATIONS);
     }
 
+    TestCase(wait_until_idle_on_an_idle_pool)
+    {
+        thread_pool pool{4};
+        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+    }
+
+    TestCase(wait_until_idle_waits_for_a_running_task)
+    {
+        thread_pool pool{4};
+        rpp::semaphore release;
+        std::atomic_bool task_done { false };
+
+        pool.parallel_task_detached([&] {
+            release.wait(); // hold the worker until this test lets go
+            task_done = true;
+        });
+
+        // the task cannot finish while it is parked, so the pool must report busy
+        AssertThat(pool.wait_until_idle(rpp::millis(50)), wait_result::timeout);
+        AssertFalse(task_done.load());
+
+        release.notify();
+        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+        AssertTrue(task_done.load());
+    }
+
+    // Regression: run_test_func drains the pool between cases, and that only prevents the
+    // cross-case use-after-free if "idle" also means the worker already destroyed the task
+    // delegate. A task stays running until after that destruction, so this pins it.
+    TestCase(wait_until_idle_covers_task_delegate_destruction)
+    {
+        std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
+
+        thread_pool pool{4};
+        pool.parallel_task_detached(worker_cleanup_marker_task<>{state});
+
+        state->cleanup_started.wait();
+        AssertThat(pool.wait_until_idle(rpp::millis(50)), wait_result::timeout);
+        AssertThat((int)state->marker.load(std::memory_order_acquire), 0);
+
+        state->allow_cleanup.notify();
+        state->cleanup_finished.wait();
+        AssertThat(pool.wait_until_idle(worker_cleanup_state::TIMEOUT), wait_result::finished);
+        AssertThat((int)state->marker.load(std::memory_order_acquire), worker_cleanup_state::MARKER);
+    }
+
+    TestCase(async_task_future_not_ready_before_worker_cleanup)
+    {
+        std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
+        rpp::cfuture<> future = rpp::async_task(worker_cleanup_marker_task<>{state});
+
+        state->cleanup_started.wait();
+        const bool future_was_ready_during_cleanup = future.await_ready();
+
+        state->allow_cleanup.notify();
+        state->cleanup_finished.wait();
+        future.get();
+
+        AssertThat((int)state->marker.load(std::memory_order_acquire), worker_cleanup_state::MARKER);
+        AssertThat(future_was_ready_during_cleanup, false);
+    }
+
+    // async_task writes the destroy-then-publish sequence out THREE times: void, non-void
+    // and the catch handler. The test above covers void only, so a regression can land in
+    // either of the other two copies while every existing test stays green.
+    TestCase(async_task_nonvoid_future_not_ready_before_worker_cleanup)
+    {
+        std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
+        rpp::cfuture<int> future = rpp::async_task(worker_cleanup_marker_task<int>{state});
+
+        state->cleanup_started.wait();
+        const bool future_was_ready_during_cleanup = future.await_ready();
+
+        state->allow_cleanup.notify();
+        state->cleanup_finished.wait();
+
+        AssertThat(future_was_ready_during_cleanup, false);
+        AssertThat(future.get(), worker_cleanup_state::RESULT);
+    }
+
+    // the catch handler is the third copy of the sequence, and the exception must still
+    // reach the caller after the task was destroyed
+    TestCase(async_task_throwing_task_destroyed_before_future_ready)
+    {
+        std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
+        rpp::cfuture<> future = rpp::async_task(worker_cleanup_marker_task<>{state, /*should_throw*/true});
+
+        state->cleanup_started.wait();
+        const bool future_was_ready_during_cleanup = future.await_ready();
+
+        state->allow_cleanup.notify();
+        state->cleanup_finished.wait();
+
+        AssertThat(future_was_ready_during_cleanup, false);
+        AssertThrows(future.get(), std::runtime_error);
+    }
+
+    // A copyable result with a throwing move must still be published successfully. The
+    // subsequent move out of the future propagates that exception to the caller.
+    TestCase(async_task_survives_a_throwing_result_move_ctor)
+    {
+        rpp::cfuture<throwing_move_result> future = rpp::async_task([]{ return throwing_move_result{}; });
+        AssertThrows(future.get(), std::runtime_error);
+    }
 };

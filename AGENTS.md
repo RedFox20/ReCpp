@@ -1,14 +1,21 @@
-# ReCpp Instructions for Claude
+# ReCpp Instructions for Agents
+
+This file is the single source of instructions for every coding agent. Codex and other
+agents read it directly. Claude Code loads it through `.claude/rules/recpp.md`.
 
 Read the additional instructions in `.github/copilot-instructions.md`.
 
+## Scope: ReCpp is a standalone repo
+
+ReCpp is often checked out inside a larger tree. A `CLAUDE.md` in any parent directory
+does NOT apply here, and `.claude/settings.json` excludes those files. ReCpp is the
+project, not a dependency of the tree that contains it.
+
 ## MANDATORY: writing style and response shape (always on)
 
-Two style skills are project defaults. This file imports them, so they load every
-session. Do not wait to be asked. Do not invoke them manually.
-
-@.claude/skills/ste-writing/SKILL.md
-@.claude/skills/output-style/SKILL.md
+Two style skills are project defaults. `.claude/rules/` loads them every session. Do not
+wait to be asked. Do not invoke them manually. Any agent that does not read
+`.claude/rules/` must read both `SKILL.md` files under `.claude/skills/` instead.
 
 - **`ste-writing`** governs *prose*: README.md, docs, commit messages, PR text,
   doxygen blocks, code comments, and `ThrowErr()` and `Log*` strings. It does not
@@ -17,7 +24,7 @@ session. Do not wait to be asked. Do not invoke them manually.
   number multi-step work, restate progress, suppress tangents, and drop all
   preamble and closing pleasantries.
 
-If a style rule collides with the rest of this file, **CLAUDE.md wins. The style
+If a style rule collides with the rest of this file, **this file wins. The style
 shapes what fits inside it.** These gates are not negotiable for brevity:
 
 - the mandatory unit test
@@ -37,7 +44,51 @@ shapes what fits inside it.** These gates are not negotiable for brevity:
 4. **Run the full test suite** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"`.
    All tests must pass with no data race. A task is not complete until they do.
 
-## Code Style: includes and imports
+## Code Style
+
+### Prefer explicit types when the type is not obvious
+
+Do not overuse `auto` merely to save typing. Use the explicit type name when it
+communicates ownership, lifetime, precision, or the ReCpp abstraction being used.
+
+```cpp
+rpp::cfuture<> future = rpp::async_task(run_work);
+rpp::TimePoint deadline = rpp::TimePoint::now() + rpp::millis(100);
+```
+
+Use `auto` when the type is already unmistakable from the initializer or when
+spelling it would obscure the code, such as iterators and complex template
+implementation details.
+
+### Do not wrap immediately after `=`
+
+Keep the declared name and the start of its initializer together. Never put `=`
+at the end of a line and move the entire expression to the next line.
+
+```cpp
+// good
+const bool future_was_ready_during_cleanup = future.await_ready();
+
+// bad
+const bool future_was_ready_during_cleanup =
+    future.await_ready();
+```
+
+When an initializer is too long, wrap inside its argument list or another natural
+expression boundary while keeping `type name = expression` on the first line.
+
+### Use ReCpp timing, scheduling, and readiness APIs
+
+Do not introduce `std::chrono` or standard thread timing helpers into ReCpp source
+or tests. ReCpp provides its own consistent alternatives:
+
+- Use `future.await_ready()` for a non-blocking future readiness check.
+- Use `rpp::yield()` instead of `std::this_thread::yield()`.
+- Use `rpp::Duration`, `rpp::TimePoint`, and ReCpp duration helpers such as
+  `rpp::millis()` for durations, deadlines, waits, and sleeps.
+
+Prefer the ReCpp overload whenever both a standard-library and a ReCpp timing API
+are available.
 
 ### Includes come before imports. Always.
 

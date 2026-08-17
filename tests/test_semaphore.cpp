@@ -23,9 +23,7 @@ TestImpl(test_semaphore)
         // co_await hands the resume to a pool thread, and that thread destroys the coroutine
         // frame AFTER .get() already returned. Wait, or the next case allocates into memory
         // the previous case is still freeing.
-        rpp::Timer quiesce;
-        while (rpp::thread_pool::global().active_tasks() > 0 && quiesce.elapsed_ms() < 1000.0)
-            rpp::sleep_ms(1);
+        (void)rpp::thread_pool::global().wait_until_idle(rpp::seconds(1));
         rpp::thread_pool::global().clear_idle_tasks();
     }
 

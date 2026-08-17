@@ -452,6 +452,36 @@ namespace rpp
         return active;
     }
 
+    wait_result thread_pool::wait_until_idle(rpp::Duration timeout) noexcept
+    {
+        rpp::TimePoint end = rpp::TimePoint::monotonic_now() + timeout;
+        for (;;)
+        {
+            // snapshot one busy task, then wait on it with every pool lock released
+            pool_task_handle busy { nullptr };
+            { std::lock_guard lock{TasksMutex};
+                for (auto& worker : Workers)
+                {
+                    if (pool_task_handle task = worker->running_task(); task.is_running())
+                    {
+                        busy = std::move(task);
+                        break;
+                    }
+                }
+            }
+            if (!busy.is_running())
+                return wait_result::finished; // nothing left running
+
+            rpp::Duration remaining = end - rpp::TimePoint::monotonic_now();
+            if (remaining <= rpp::Duration::zero())
+                return wait_result::timeout;
+
+            // block on the task, never on a sleep interval, so this wakes the moment it ends.
+            // a task that finishes here may be replaced by a new one, so re-scan the workers
+            (void)busy.wait(remaining, std::nothrow);
+        }
+    }
+
     int thread_pool::idle_tasks() noexcept
     {
         std::lock_guard lock{TasksMutex};

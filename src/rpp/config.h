@@ -127,6 +127,7 @@
 #  endif
 #endif
 
+/// @brief evaluates TRUE if ThreadSanitizer is enabled
 #if defined(__SANITIZE_THREAD__)
 #  define RPP_TSAN 1
 #elif __clang__
@@ -135,6 +136,7 @@
 #  endif
 #endif
 
+/// @brief evaluates TRUE if UndefinedBehaviorSanitizer is enabled
 #if __clang__
 #  if __has_feature(undefined_behavior_sanitizer)
 #    define RPP_UBSAN 1

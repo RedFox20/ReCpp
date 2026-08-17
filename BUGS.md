@@ -292,7 +292,7 @@ includes went in.
 `test_strview.cpp` had `import rpp.strview;` above `#include <rpp/tests.h>`.
 gcc-14 re-parses a std header that follows an import and gave 1603 redefinition
 errors.
-Fixed: includes first, import last. The rule is now a style rule in CLAUDE.md.
+Fixed: includes first, import last. The rule is now a style rule in AGENTS.md.
 
 ### C3. clang-21 refused `tests/test_event_loop.cpp`
 `start_coro_on_background_thread` returned `rpp::cfuture<void>` out of

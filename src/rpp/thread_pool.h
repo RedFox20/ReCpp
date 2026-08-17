@@ -353,6 +353,18 @@ namespace rpp
             return current_task.is_running();
         }
 
+        /**
+         * @returns A strong handle to the task this worker runs, or a null handle if idle.
+         * @note The strong ref lets the caller wait on the task after releasing every lock.
+         */
+        pool_task_handle running_task() const noexcept
+        {
+            auto lock = new_task_flag.spin_lock(); // same lifetime rule as running()
+            if (!current_task.is_running())
+                return pool_task_handle{nullptr};
+            return current_task;
+        }
+
         // Sets the maximum idle time before this pool task is abandoned to free up thread handles
         // @param max_idle_seconds Maximum number of seconds to remain idle. If set to 0, the pool task is kept alive forever
         void max_idle_time(float max_idle_seconds = 15) noexcept;
@@ -447,6 +459,24 @@ namespace rpp
 
         // number of thread pool Tasks that are currently running
         int active_tasks() noexcept;
+
+        /**
+         * @brief Waits until no pool task is running anymore, or until the timeout expires.
+         *
+         * A task counts as running from the moment it is assigned to a worker, before that
+         * worker picks it up, until the worker has destroyed the task delegate. So this also
+         * covers the cleanup during which a worker still touches state the caller owns.
+         *
+         * @note This blocks on the busy task itself, never on a sleep interval, so it returns
+         *       as soon as the pool drains. Prefer it over a poll loop on active_tasks().
+         * @param timeout Maximum time to wait for the pool to drain.
+         * @returns finished if the pool became idle, timeout if it did not.
+         * @code
+         *     // make sure no worker outlives this scope and touches its locals
+         *     rpp::thread_pool::global().wait_until_idle(rpp::seconds(1));
+         * @endcode
+         */
+        wait_result wait_until_idle(rpp::Duration timeout) noexcept;
 
         // number of thread pool Tasks that are in idle state
         int idle_tasks() noexcept;

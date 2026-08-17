@@ -1,6 +1,6 @@
 ---
 name: ste-writing
-description: Write prose in ASD-STE100 Simplified Technical English. Applies to docs, README.md, commit messages, PR text, code comments, doxygen, and error/log strings. Always active in ReCpp via CLAUDE.md; also invocable as /ste-writing.
+description: Write prose in ASD-STE100 Simplified Technical English. Applies to docs, README.md, commit messages, PR text, code comments, doxygen, and error/log strings. Always active in ReCpp via .claude/rules/; also invocable as /ste-writing.
 ---
 
 # ste-writing
@@ -58,7 +58,7 @@ Write only the requested text. No preamble, no summary, no closing remarks.
 ## Modes
 
 - **strict** — error and log strings, `ThrowErr()` and `LogError()` messages,
-  build and test instructions in CLAUDE.md, and any comment on a workaround:
+  build and test instructions in AGENTS.md, and any comment on a workaround:
   apply every rule and both length caps.
 - **STE-flavored** — general prose (README.md tables and sections, PR
   descriptions, commit bodies): apply the sentence, paragraph, active-voice,
@@ -90,7 +90,7 @@ lines.
 
 ## README.md rules
 
-README.md is the public API index. CLAUDE.md requires a line reference for each
+README.md is the public API index. AGENTS.md requires a line reference for each
 documented symbol.
 
 - Keep the display text equal to the declaration, so `update_doc_linerefs.py`

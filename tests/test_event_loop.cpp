@@ -436,14 +436,10 @@ TestImpl(test_event_loop)
             co_return v;
         };
 
-        auto future = coro();
+        rpp::cfuture<int> future = coro();
 
-        // poll until done
-        rpp::Timer t;
-        while (loop->has_pending_work() && t.elapsed_millis() < 500.0)
-        {
-            loop->run_once(rpp::Duration::from_millis(10));
-        }
+        // pumps the loop until the future resolves, instead of polling has_pending_work()
+        AssertThat(loop->pump_until_ready(future, rpp::millis(500)), true);
         AssertThat(resume_count.load(), 1);
         AssertThat(future.get(), 42);
     }
@@ -1320,9 +1316,7 @@ TestImpl(test_event_loop)
         AssertThat(fut.get(), 1);
 
         // the loop must own nothing in flight before the fixture replaces it
-        rpp::Timer drain;
-        while (loop->has_background_tasks() && drain.elapsed_ms() < 1000.0)
-            loop->run_once(rpp::millis(5));
+        AssertThat(loop->wait_on_all(rpp::millis(1000)), true);
         AssertThat(loop->has_background_tasks(), false);
     }
 
