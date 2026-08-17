@@ -163,9 +163,8 @@ namespace rpp
         rpp::int64 period = line.to_int64();
         if (quota <= 0) // cgroup v1 splits the same pair over two files
         {
-            char qbuf[64], pbuf[64];
-            quota  = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", qbuf).to_int64();
-            period = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_period_us", pbuf).to_int64();
+            quota  = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", buf).to_int64();
+            period = read_cgroup("/sys/fs/cgroup/cpu/cpu.cfs_period_us", buf).to_int64();
         }
         return (quota > 0 && period > 0) ? rpp::max(1, int(quota / period)) : 0;
     }
