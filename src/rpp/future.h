@@ -56,16 +56,15 @@ namespace rpp
                     // provides deterministic sequencing: DownloadAndSaveFile().then(OpenAndParseFile);
                     task.reset();
                     // notify the awaiters that the value is set
-                    if constexpr (!std::is_nothrow_move_constructible_v<T> && std::is_copy_constructible_v<T>) {
-                        try {
-                            p.set_value(value); // copy may throw!
-                        } catch (...) {
-                            if constexpr (std::is_move_constructible_v<T>)
-                                p.set_value(std::move(value)); // move fallback (may throw too)
-                            else
-                                throw; // no fallback, rethrow
-                        }
-                    } else {
+                    // GCC TSAN can deadlock if set_value retries after a constructor throws.
+                    // Copy only when the copy constructor cannot throw. Otherwise, move once.
+                    if constexpr (!std::is_nothrow_move_constructible_v<T> &&
+                                  std::is_nothrow_copy_constructible_v<T>)
+                    {
+                        p.set_value(value);
+                    }
+                    else
+                    {
                         p.set_value(std::move(value));
                     }
                 }
