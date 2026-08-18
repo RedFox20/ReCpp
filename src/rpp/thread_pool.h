@@ -377,15 +377,8 @@ namespace rpp
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
-        // Returns a strong task handle while new_task_flag protects current_task.
-        pool_task_handle running_task() const noexcept
-        {
-            auto lock = new_task_flag.spin_lock();
-            if (!current_task.is_running())
-                return pool_task_handle{nullptr};
-            return current_task;
-        }
-
+        // @returns a strong task handle while new_task_flag protects current_task.
+        pool_task_handle running_task() const noexcept;
         void set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept;
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
@@ -415,10 +408,9 @@ namespace rpp
 
         rpp::mutex TasksMutex;
         std::vector<worker_ptr> Workers;
-        rpp::semaphore_flag ParallelForIdle;
-        int ActiveParallelForCalls = 0; // guarded by TasksMutex
         float TaskMaxIdleTime = 15; // new task timeout in seconds
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for, 0 to disable
+        std::atomic_int ParallelForTasks = 0; // number of currently active parallel for-s
 
     public:
         using duration = pool_task_handle::duration;
@@ -466,9 +458,9 @@ namespace rpp
          * A task counts as running from the moment it is assigned to a worker, before that
          * worker picks it up, until the worker has destroyed the task delegate. So this also
          * covers the cleanup during which a worker still touches state the caller owns.
+         * 
+         * This also ensures all parallel_for groups have finished.
          *
-         * @note This blocks on the busy task itself, never on a sleep interval, so it returns
-         *       as soon as the pool drains. Prefer it over a poll loop on active_tasks().
          * @param timeout Maximum time to wait for the pool to drain.
          * @returns finished if the pool became idle, timeout if it did not.
          * @code
@@ -501,8 +493,6 @@ namespace rpp
         // the task is removed from TaskPool to avoid concurrency issues with regular parallel tasks
         parallel_for_task start_range_task(int range_start, int range_end,
                                            const action<int, int>& range_task) noexcept;
-        void begin_parallel_for() noexcept;
-        void finish_parallel_for(parallel_for_task* active, int spawned) noexcept;
 
         struct parallel_for_params
         {

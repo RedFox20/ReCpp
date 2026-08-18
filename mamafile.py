@@ -1,7 +1,6 @@
 import mama
-import os
-import shlex
-import subprocess
+from mama.utils.system import error
+import os, sys, shlex, subprocess
 
 class ReCpp(mama.BuildTarget):
 
@@ -104,8 +103,10 @@ class ReCpp(mama.BuildTarget):
         try:
             result = subprocess.run(command, cwd=bin_dir, timeout=timeout)
         except subprocess.TimeoutExpired:
-            raise RuntimeError(f'RppTests timed out after {self.TEST_TIMEOUT_SECONDS}s: a test is hung. '
-                               'The last test name printed before this is the one that hung. '
-                               'Run the same test without `nogdb` to attach GDB and get the stack.')
+            error(f'RppTests timed out after {self.TEST_TIMEOUT_SECONDS}s: a test is hung. '
+                   'The last test name printed before this is the one that hung. '
+                   'Run the same test without `nogdb` to attach GDB and get the stack.')
+            sys.exit(-1)
         if result.returncode != 0:
-            raise RuntimeError(f'RppTests failed with exit code {result.returncode}')
+            error(f'RppTests failed with exit code {result.returncode}')
+            sys.exit(result.returncode)

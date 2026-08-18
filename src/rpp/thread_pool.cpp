@@ -202,6 +202,14 @@ namespace rpp
     }
     // NOLINTEND(clang-analyzer-cplusplus.Move)
 
+    pool_task_handle pool_worker::running_task() const noexcept
+    {
+        auto lock = new_task_flag.spin_lock(); // same lifetime rule as running()
+        if (!current_task.is_running())
+            return pool_task_handle{nullptr};
+        return current_task;
+    }
+
     void pool_worker::set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept
     {
         if (out)
@@ -457,9 +465,11 @@ namespace rpp
         rpp::TimePoint end = rpp::TimePoint::monotonic_now() + timeout;
         for (;;)
         {
+            // snapshot one busy task, then wait on it with every pool lock released
             pool_task_handle busy { nullptr };
             bool parallel_for_active = false;
-            { std::lock_guard lock{TasksMutex};
+            {
+                std::lock_guard lock{TasksMutex};
                 for (worker_ptr& worker : Workers)
                 {
                     pool_task_handle task = worker->running_task();
@@ -469,7 +479,7 @@ namespace rpp
                         break;
                     }
                 }
-                parallel_for_active = ActiveParallelForCalls > 0;
+                parallel_for_active = ParallelForTasks.load(std::memory_order_acquire) > 0;
             }
             if (!busy.is_running() && !parallel_for_active)
                 return wait_result::finished;
@@ -480,8 +490,8 @@ namespace rpp
 
             if (busy.is_running())
                 (void)busy.wait(remaining, std::nothrow);
-            else
-                (void)ParallelForIdle.wait_no_unset(remaining);
+            else // parallel_for_active
+                rpp::sleep_ms(1); // yield aggressively
         }
     }
 
@@ -562,25 +572,6 @@ namespace rpp
         return parallel_for_task{ std::move(w), std::move(new_task) };
     }
 
-    void thread_pool::begin_parallel_for() noexcept
-    {
-        std::lock_guard lock{TasksMutex};
-        if (ActiveParallelForCalls++ == 0)
-            ParallelForIdle.unset();
-    }
-
-    void thread_pool::finish_parallel_for(parallel_for_task* active, int spawned) noexcept
-    {
-        std::lock_guard lock{TasksMutex};
-        for (int i = 0; i < spawned; ++i)
-        {
-            Workers.emplace_back(std::move(active[i].worker));
-            active[i].~parallel_for_task(); // manually clean up since we used alloca
-        }
-        if (--ActiveParallelForCalls == 0)
-            ParallelForIdle.notify_all();
-    }
-
     thread_pool::parallel_for_params::parallel_for_params(int range, int max_range_size, int max_parallelism) noexcept
     {
         max_tasks = max_parallelism; // maximum number of Tasks to use, 0 disables parallelism
@@ -626,7 +617,22 @@ namespace rpp
             return;
         }
 
-        begin_parallel_for();
+        // exchange and compare to try and start a new parallel for call,
+        // forbidding any NESTED calls to parallel_for() until this one is finished
+        int active_calls = ParallelForTasks.fetch_add(1, std::memory_order_acquire);
+        if (active_calls > 0)
+        {
+            LogError("parallel_for %d active calls detected, rearchitect your tasks! (running sequentially)",
+                     active_calls+1);
+            try {
+                range_task(range_start, range_end);
+                ParallelForTasks.fetch_sub(1, std::memory_order_release);
+            } catch (...) {
+                ParallelForTasks.fetch_sub(1, std::memory_order_release);
+                throw;
+            }
+            return;
+        }
 
         auto* active = static_cast<parallel_for_task*>(
             alloca(unsigned(p.max_tasks) * sizeof(parallel_for_task))
@@ -697,8 +703,17 @@ namespace rpp
         TaskDebug("parallel_for wait_on_all %.3fms", wait_on_all.elapsed_millis());
 
         // and finally throw them back into the pool
-        finish_parallel_for(active, spawned);
+        {
+            std::lock_guard lock{TasksMutex};
+            for (int i = 0; i < spawned; ++i)
+            {
+                Workers.emplace_back(std::move(active[i].worker));
+                active[i].~parallel_for_task(); // manually clean up since we used alloca
+            }
+        }
 
+        // cleanup: decrement the active parallel for call count, allowing nested calls to run
+        ParallelForTasks.fetch_sub(1, std::memory_order_release);
         if (err) std::rethrow_exception(err);
     }
 
