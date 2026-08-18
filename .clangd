@@ -1,0 +1,4 @@
+# mamafile.py points packages/ReCpp/compile_commands.json at the build dir of the
+# last mama build. This path stays fixed when you switch compiler or sanitizer.
+CompileFlags:
+  CompilationDatabase: packages/ReCpp

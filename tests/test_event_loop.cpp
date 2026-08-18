@@ -1303,7 +1303,7 @@ TestImpl(test_event_loop)
         rpp::cfuture<int> fut = coro();
         rpp::Timer wall;
         bool ready = loop->pump_until_ready(fut, rpp::millis(20));
-        double pump_ms = wall.elapsed_ms();
+        double pump_ms = wall.elapsed_millis();
         // print before asserting: this test has aborted on Windows with no other output
         print_info("pump_until_ready: ready=%d after %.1fms\n", (int)ready, pump_ms);
 

@@ -112,7 +112,10 @@ namespace
     {
         int value = worker_cleanup_state::RESULT;
 
-        copy_throws_move_succeeds_result() = default;
+        explicit copy_throws_move_succeeds_result(int initial_value) noexcept
+            : value{initial_value}
+        {
+        }
         copy_throws_move_succeeds_result(const copy_throws_move_succeeds_result& other)
         {
             (void)other;
@@ -812,7 +815,7 @@ TestImpl(test_threadpool)
     TestCase(async_task_moves_a_result_when_copy_throws)
     {
         rpp::cfuture<copy_throws_move_succeeds_result> future = rpp::async_task([] {
-            return copy_throws_move_succeeds_result{};
+            return copy_throws_move_succeeds_result{worker_cleanup_state::RESULT};
         });
         AssertThat(future.get().value, worker_cleanup_state::RESULT);
     }

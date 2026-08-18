@@ -554,7 +554,7 @@ TestImpl(test_concurrent_queue)
         std::atomic_bool finished = false;
         producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            queue.barrier_push_after_delay_ms("item1", 10);
+            queue.barrier_push_after_delay_ms("item1", 15); // wait a bit longer
             queue.barrier_push_after_delay_ms("item2", 10);
             queue.barrier_push_after_delay_ms("item3", 10);
             spin_sleep_for_ms(10);
@@ -565,9 +565,12 @@ TestImpl(test_concurrent_queue)
 
         auto cancelCondition = [&] { return (bool)finished; };
         std::string item;
+
+        // this should timeout because producer pushes later
+        AssertFalse(queue.wait_pop(item, Millis(1), cancelCondition));
+
         queue.barrier_consumer_ready(); // item1 is coming after 10ms
-        AssertFalse(queue.wait_pop(item, Millis(5), cancelCondition)); // this should timeout
-        AssertTrue(queue.wait_pop(item, Millis(10), cancelCondition));
+        AssertTrue(queue.wait_pop(item, Millis(50), cancelCondition));
         AssertThat(item, "item1");
 
         // 15 ms leaves no room over the 10 ms producer delay under a sanitizer, and a

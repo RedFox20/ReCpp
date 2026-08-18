@@ -34,6 +34,7 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
+        self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
         if self.windows:
@@ -61,6 +62,18 @@ class ReCpp(mama.BuildTarget):
             self.export_syslib('log')
         elif self.macos or self.ios:
             self.export_syslib('-framework Foundation')
+
+
+    def link_compile_commands(self):
+        """Points packages/ReCpp/compile_commands.json at packages/ReCpp/<build_dir>/compile_commands.json"""
+        target = self.build_dir('compile_commands.json') # the actual thing
+        if os.path.exists(target):
+            try:
+                link = self.build_dir('../compile_commands.json')
+                if os.path.islink(link) or os.path.exists(link): os.remove(link)
+                os.symlink(f'{self.dep.build_dir_name}/compile_commands.json', link)
+            except OSError:
+                pass # an IDE convenience never fails the build
 
 
     def deploy(self):
