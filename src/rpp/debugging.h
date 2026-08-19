@@ -4,7 +4,7 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
-#include "log_colors.h"
+#include "log_colors.h" // re-export, consumers color their own log text
 #include <assert.h> // platform specific assert stuff
 #include <stdarg.h>
 #include <stdio.h> // fprintf
@@ -196,4 +196,4 @@ namespace rpp
 
 // Every macro of this header lives in debugging.macros.h, because a module cannot export one.
 // An importer of rpp.debugging includes that header directly instead of this one.
-#include "debugging.macros.h"
+#include "debugging.macros.h" // re-export

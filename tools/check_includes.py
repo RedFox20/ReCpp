@@ -12,6 +12,10 @@ The `unused` check works by deletion. It copies the tree, comments out one
 need the line. Run `missing` first: a header can look self-contained only because
 a sibling header leaks the declaration into it.
 
+A header that re-exports another one for its consumers names nothing from it, and
+the deletion test cannot tell that apart from a stale include. Mark the line
+`#include "x.h" // re-export` and no check reports it.
+
 Usage:
   tools/check_includes.py self-contained [--check]
   tools/check_includes.py unused [--check] [--only strview.h]
@@ -39,6 +43,8 @@ RULES = [
     (r'\bstd::(mutex|lock_guard|unique_lock|recursive_mutex)\b', ('mutex',)),
 ]
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
+# a header may re-export another one for its consumers, and then names nothing from it
+REEXPORT_RE = re.compile(r'^\s*#\s*include\s*[<"][^>"]+[>"][^\n]*//[^\n]*\bre-export\b', re.M)
 # a quoted include is an rpp header, an angled one is not. <math.h> is not src/rpp/math.h.
 QUOTED_RE = re.compile(r'^\s*#\s*include\s*"([^"]+)"', re.M)
 
@@ -121,8 +127,11 @@ def _probe_unused(args) -> list[tuple[str, str]]:
     original = open(path, encoding='utf-8', errors='replace').read()
     found = []
     quoted_spans = {m.start() for m in QUOTED_RE.finditer(original)}
+    reexports = {m.start() for m in REEXPORT_RE.finditer(original)}
     try:
         for m in INCLUDE_RE.finditer(original):
+            if m.start() in reexports:
+                continue  # the author states the consumer needs it, so removing it is not the fix
             patched = original[:m.start()] + '//' + original[m.start():]
             open(path, 'w', encoding='utf-8').write(patched)
             ok, _ = compile_header(header, worktree)

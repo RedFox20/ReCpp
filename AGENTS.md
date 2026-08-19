@@ -145,6 +145,10 @@ Every file includes the headers for the names it uses. Do not rely on a
 transitive include. Run `tools/check_includes.py all` before you commit a header
 change. The migration plan is in [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md).
 
+A header that re-exports another one for its consumers names nothing from it, so
+the scan reads it as stale. Mark the line `#include "x.h" // re-export` and no
+check reports it. Do not delete a re-export to clear a finding.
+
 ## ReCpp Modules
 
 All headers are in `src/rpp/`. Test files are in `tests/`.

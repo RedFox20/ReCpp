@@ -342,7 +342,7 @@ tools/check_includes.py self-contained --check  # CI gate, exit 1 on a finding
 |---|---|---|
 | `self-contained` | compiles each header alone, twice, with nothing before it | **0**, and the CI gate holds it there |
 | `missing` | a file uses a std facility it does not include itself | **dropped**, see above |
-| `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **1 left**: this branch removed 3 |
+| `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **0**: this branch removed 3 and marked 2 re-exports |
 | `redundant` | same, but the header does name something the include declares, so a sibling include leaks it | **49** |
 | `std` | same, for a std header, where the scan cannot enumerate the declared names | **60** |
 
@@ -362,18 +362,25 @@ declared itself, and a header also hands over the names it re-exports.
 now walks the quoted includes, and 11 of the 15 candidates turned out to be
 `redundant` instead.
 
-Four survive the corrected scan. This branch removes three of them.
+Four survive the corrected scan. Three are stale, and this branch removes them.
 
 | Header | Unused include | Note |
 |---|---|---|
 | `atomic_shared_ptr.h` | `config.h` | removed, its one macro guard reads a std feature-test macro |
 | `bitutils.h` | `config.h` | removed, it names only `<cstdint>` types |
 | `traits.h` | `config.h` | removed, it names only `<type_traits>` and `<tuple>` |
-| `debugging.h` | `log_colors.h` | kept, a public re-export that no in-repo file needs |
+| `debugging.h` | `log_colors.h` | kept, `debugging.h` re-exports the color macros |
 
-`log_colors.h` stays. No file in this repo reads a color macro through
-`debugging.h`, but the include is part of the public surface, and a consumer
-outside cannot be measured from here.
+The fourth is a re-export, and the deletion test cannot see the difference. A
+re-export serves the consumer, so the including header names nothing from it and
+looks stale every time the scan runs. Mark the line and no check reports it:
+
+```cpp
+#include "log_colors.h" // re-export, consumers color their own log text
+```
+
+`debugging.h` carries the marker on `log_colors.h` and on `debugging.macros.h`.
+The scan now reports 0 unused includes, so this check can join the CI gate.
 
 ### 4.3 Changeset 1b, the removals
 
@@ -384,8 +391,8 @@ ReCpp never promised, and the fix belongs in the consumer.
 
 Order the work so the risk falls, not rises:
 
-1. Delete the unused includes. Three are gone, and `log_colors.h` needs the
-   owner to decide on the public surface.
+1. Delete the unused includes. Three are gone, and the two re-exports carry a
+   marker. The count is 0.
 2. Work the 49 redundant lines. Each one needs the missing direct include added
    in the same commit, so the count usually stays the same and the dependency
    becomes honest.
