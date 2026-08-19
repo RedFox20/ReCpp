@@ -39,6 +39,10 @@ jobs:
         type: boolean
         default: false
         description: "Register apt.llvm.org, for a clang release the CI image does not carry"
+      check_includes:
+        type: boolean
+        default: false
+        description: "Run the header self-containment gate. One job is enough, so it is opt-in"
     description: "Ubuntu << parameters.cc_version >> C++<< parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -72,6 +76,16 @@ jobs:
                   sudo apt-get install -y clang-tools-$LLVM_VER
       - run: pipenv install mama
       - run: pipenv run mama install-<< parameters.cc_version >>
+      - when:
+          condition: << parameters.check_includes >>
+          steps:
+            - run:
+                name: Header self-containment gate
+                command: |
+                  # every header must compile alone, so a consumer may include any one first
+                  export CXX=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
+                  export CXXSTD=c++<< parameters.cpp_version >>
+                  python3 tools/check_includes.py self-contained --check
       - run: make configure-cmake
       - run:
           name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>
@@ -356,6 +370,8 @@ workflows:
           coverage: false
           no_ninja: ""
           build_with_modules: "ON"
+          # one job proves header self-containment, so it runs only here
+          check_includes: true
       # Clang 21 is not in the CI image apt sources, so this job registers apt.llvm.org
       # and adds clang-tools-21, which carries the clang-scan-deps that CMake needs.
       - ubuntu-build:

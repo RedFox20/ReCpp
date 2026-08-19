@@ -58,6 +58,17 @@ def compile_header(header: str, include_root: str) -> tuple[bool, str]:
         return p.returncode == 0, p.stderr
 
 
+def describe_failure(header: str, err: str) -> str:
+    """One line: the header, the location the compiler stopped at, and its reason."""
+    line = next((l for l in err.splitlines() if ' error: ' in l), '')
+    if not line:
+        return f'{SRC}/{header} does not compile on its own, and the compiler printed no error'
+    where, _, why = line.partition(' error: ')
+    # the compiler prints an absolute path, which is noise next to the repo-relative header
+    where = where.strip().rstrip(':').replace(os.getcwd() + os.sep, '')
+    return f'{SRC}/{header} does not compile on its own -- {where}: {why.strip()}'
+
+
 def strip_comments(src: str) -> str:
     return re.sub(r'//[^\n]*|/\*.*?\*/', '', src, flags=re.S)
 
@@ -68,8 +79,7 @@ def check_self_contained() -> list[str]:
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as ex:
         for h, (ok, err) in zip(headers(), ex.map(lambda h: compile_header(h, root), headers())):
             if not ok:
-                first = next((l for l in err.splitlines() if ' error: ' in l), err.splitlines()[0] if err else '?')
-                bad.append(f'{SRC}/{h}: {first.strip()}')
+                bad.append(describe_failure(h, err))
     return bad
 
 
@@ -171,7 +181,8 @@ def main() -> int:
         if mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
         elif mode == 'missing':      found, gate = (lambda r: (r, len(r)))(check_missing())
         else:                        found, gate = check_unused(a.only)
-        print(f'== {mode}: {gate} findings that fail the gate ==')
+        noun, verb = ('finding', 'fails') if gate == 1 else ('findings', 'fail')
+        print(f'== {mode}: {gate} {noun} that {verb} the gate ==')
         for line in found: print(f'  {line}')
         gated += gate
     return 1 if (a.check and gated) else 0
