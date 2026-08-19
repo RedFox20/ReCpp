@@ -18,6 +18,7 @@ Usage:
   tools/check_includes.py missing [--check]
 """
 import argparse, os, re, shutil, subprocess, sys, tempfile
+from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 
 SRC = 'src/rpp'
@@ -84,12 +85,33 @@ DECL_RES = [
 ]
 
 
-def declared_names(path: str) -> set[str]:
+@lru_cache(maxsize=None)
+def own_names(path: str) -> frozenset:
+    """Returns the names one file declares itself."""
     src = strip_comments(open(path, encoding='utf-8', errors='replace').read())
     names = set()
     for r in DECL_RES:
         names |= set(r.findall(src))
-    return {n for n in names if len(n) > 2}
+    return frozenset(n for n in names if len(n) > 2)
+
+
+def declared_names(path: str) -> set[str]:
+    """Returns the names a header offers, including the ones it re-exports.
+
+    A header hands the consumer every name its own includes declare. debugging.h
+    declares no LogError and re-exports it from debugging.macros.h. A scan that
+    stops at the first file therefore reports a used include as unused.
+    """
+    names, seen, todo = set(), set(), [path]
+    while todo:
+        f = todo.pop()
+        if f in seen or not os.path.isfile(f):
+            continue
+        seen.add(f)
+        names |= own_names(f)
+        src = open(f, encoding='utf-8', errors='replace').read()
+        todo += [os.path.join(SRC, i) for i in QUOTED_RE.findall(src)]
+    return names
 
 
 def _probe_unused(args) -> list[tuple[str, str]]:

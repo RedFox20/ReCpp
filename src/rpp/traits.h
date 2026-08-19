@@ -4,7 +4,6 @@
  * Copyright (c) 2017-2018, 2023, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include "config.h"
 #include <type_traits>
 #include <tuple>      // std::tuple, for function_traits::arg_types
 // #include <functional> // std::function

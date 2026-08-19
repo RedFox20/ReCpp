@@ -340,11 +340,11 @@ tools/check_includes.py self-contained --check  # CI gate, exit 1 on a finding
 
 | Check | How it works | Findings today |
 |---|---|---|
-| `self-contained` | compiles each header alone, twice, with nothing before it | **0 left**: `traits.h` used `std::tuple` without `<tuple>`, and this branch fixes it |
+| `self-contained` | compiles each header alone, twice, with nothing before it | **0**, and the CI gate holds it there |
 | `missing` | a file uses a std facility it does not include itself | **dropped**, see above |
-| `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **10** |
-| `redundant` | same, but the header does name something the include declares, so a sibling include leaks it | **43** |
-| `std` | same, for a std header, where the scan cannot enumerate the declared names | **59** |
+| `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **1 left**: this branch removed 3 |
+| `redundant` | same, but the header does name something the include declares, so a sibling include leaks it | **49** |
+| `std` | same, for a std header, where the scan cannot enumerate the declared names | **60** |
 
 `self-contained` protects a consumer that includes one header first. It reports 0
 today, so the gate costs nothing and it stops a regression. Turn that one on alone.
@@ -353,19 +353,27 @@ The `unused` and `redundant` split is the important part of what remains. Both c
 the line. Only the first is safe to delete. Removing a `redundant` line trades a
 direct dependency for a hidden one, which is the opposite of hygiene.
 
-### 4.2 The 10 unused includes
+### 4.2 The unused includes
 
-Every one of these compiles away, and the including header names nothing from
-it. Three were checked by hand and confirmed.
+The first count of 10 was wrong. The scan read only the names the included file
+declared itself, and a header also hands over the names it re-exports.
+`condition_variable.h` calls `LogError`, which `debugging.h` re-exports from
+`debugging.macros.h`, so the scan called a used include unused. `declared_names`
+now walks the quoted includes, and 11 of the 15 candidates turned out to be
+`redundant` instead.
+
+Four survive the corrected scan. This branch removes three of them.
 
 | Header | Unused include | Note |
 |---|---|---|
-| `sockets.h` | `load_balancer.h` | carries the comment `// rpp::load_balancer`, and no use |
-| `thread_pool.h` | `threads.h` | no thread-naming call left in the header |
-| `sprint.h` | `debugging.h` | |
-| `debugging.h` | `log_colors.h` | debugging.h names no color macro |
-| `condition_variable.h`, `coroutines.h`, `event_loop.h` | `timer.h` | three copies of the same stale include |
-| `atomic_shared_ptr.h`, `bitutils.h`, `traits.h` | `config.h` | |
+| `atomic_shared_ptr.h` | `config.h` | removed, its one macro guard reads a std feature-test macro |
+| `bitutils.h` | `config.h` | removed, it names only `<cstdint>` types |
+| `traits.h` | `config.h` | removed, it names only `<type_traits>` and `<tuple>` |
+| `debugging.h` | `log_colors.h` | kept, a public re-export that no in-repo file needs |
+
+`log_colors.h` stays. No file in this repo reads a color macro through
+`debugging.h`, but the include is part of the public surface, and a consumer
+outside cannot be measured from here.
 
 ### 4.3 Changeset 1b, the removals
 
@@ -376,12 +384,12 @@ ReCpp never promised, and the fix belongs in the consumer.
 
 Order the work so the risk falls, not rises:
 
-1. Delete the 10 unused includes. They are dead weight, and no header names
-   anything from them.
-2. Work the 43 redundant lines. Each one needs the missing direct include added
+1. Delete the unused includes. Three are gone, and `log_colors.h` needs the
+   owner to decide on the public surface.
+2. Work the 49 redundant lines. Each one needs the missing direct include added
    in the same commit, so the count usually stays the same and the dependency
    becomes honest.
-3. Leave the 59 std candidates last. Some are platform-conditional
+3. Leave the 60 std candidates last. Some are platform-conditional
    (`byteswap.h`, `malloc.h`, `sanitizer/tsan_interface.h`, `QString`), and a
    removal that passes on Linux can break Windows or Android. Build every CI
    platform before you delete one of these.
@@ -796,7 +804,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 | Changeset | Work | Days | Blocks |
 |---|---|---|---|
-| 1b | remove 10 unused, review 43 redundant and 59 std | 1 | D5 |
+| 1b | remove 3 unused, review 49 redundant and 60 std | 1 | D5 |
 | 2 | add the rpp-header include check | 0.5 | changeset 3 |
 | 3 | generate the export lists | 1.5 | changeset 5 |
 | 4 | dual-mode test harness | 0.5 | changeset 5 |

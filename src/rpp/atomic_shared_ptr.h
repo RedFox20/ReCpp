@@ -9,7 +9,6 @@
  *   - Native alias when __cpp_lib_atomic_shared_ptr is defined
  *   - Spinlock-based fallback otherwise
  */
-#include "config.h"
 #include "mutex.h"
 #include <memory>
 #include <atomic>
