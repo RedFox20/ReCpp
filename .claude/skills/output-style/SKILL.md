@@ -1,6 +1,6 @@
 ---
 name: output-style
-description: Default ReCpp response shape — lead with the next action, number multi-step work, restate state across turns, suppress tangents, give specific time estimates, make wins visible. Always active via CLAUDE.md; also invocable as /output-style.
+description: Default ReCpp response shape — lead with the next action, number multi-step work, restate state across turns, suppress tangents, give specific time estimates, make wins visible. Always active via .claude/rules/; also invocable as /output-style.
 ---
 
 # output-style
@@ -176,7 +176,7 @@ Override the defaults when:
    wins and the shape stays. Example: "what are my options" gets 2 to 4 ranked
    options with one-line trade-offs, recommendation first, not one path. The
    options are the answer.
-6. A rule fights the harness or CLAUDE.md. The system prompt and CLAUDE.md
+6. A rule fights the harness or AGENTS.md. The system prompt and AGENTS.md
    outrank this skill. Announce a tool call when the harness requires it. Do the
    work instead of asking "want me to". Never let brevity skip the mandatory
    unit test, the TSAN build, the clang-tidy pass, or the full test suite run.

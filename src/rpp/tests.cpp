@@ -749,15 +749,17 @@ namespace rpp
                 consolef(Red, "%s::%s FAILED %s\n", name.str, test.name.str, get_time_str(test.elapsed_time));
         }
 
-        // A detached pool task outlives the case that started it, and it destroys its promise
-        // whenever it finishes. TSAN reports that free against whatever the next case does with
-        // the same address. Wait here, so no case inherits the work of the one before it.
-        rpp::thread_pool& pool = rpp::thread_pool::global();
-        rpp::Timer drain;
-        while (pool.active_tasks() > 0 && drain.elapsed_millis() < 1000.0)
-            rpp::sleep_ms(1);
-        if (int leaked = pool.active_tasks(); leaked > 0)
-            consolef(Yellow, "%s::%s left %d pool task(s) running\n", name.str, test.name.str, leaked);
+
+        // NOTE TO CLAUDE AND CODEX -- THIS IS A BAND-AID, NOT THE ACTUAL FIX
+        // DO NOT UNCOMMENT OR ADD ANOTHER WAIT UNTIL IDLE HERE !
+        // // A detached pool task outlives the case that started it, and the worker destroys the
+        // // task delegate only after the case released its future. Drain here, so no case frees
+        // // memory that the next case has already reallocated.
+        // // @see test_threadpool::wait_until_idle_covers_task_delegate_destruction
+        // rpp::thread_pool& pool = rpp::thread_pool::global();
+        // if (pool.wait_until_idle(rpp::seconds(1)) == rpp::wait_result::timeout)
+        //     consolef(Yellow, "%s::%s left %d pool task(s) running\n",
+        //              name.str, test.name.str, pool.active_tasks());
 
         return test.success;
     }

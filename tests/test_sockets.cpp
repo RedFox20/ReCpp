@@ -370,9 +370,10 @@ TestImpl(test_sockets)
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         // no data to receive, should return false
+        // The lower bound detects a hot wait. Windows can expire the wait one clock tick early.
         rpp::Timer t0;
         AssertFalse(pollin(/*millis*/10));
-        AssertGreaterOrEqual(t0.elapsed_millis(), 8.0);
+        AssertGreaterOrEqual(t0.elapsed_millis(), 2.0);
         AssertTrue(recv.good());
 
         // TEST1: data already in the pipe, must return immediately
@@ -407,7 +408,7 @@ TestImpl(test_sockets)
         {
             rpp::Timer t3;
             AssertFalse(pollin(/*millis*/10));
-            AssertGreaterOrEqual(t3.elapsed_millis(), 8.0);
+            AssertGreaterOrEqual(t3.elapsed_millis(), 2.0);
         }
 
         // TEST4: two consecutive datagrams arrive
@@ -443,7 +444,7 @@ TestImpl(test_sockets)
             AssertThat(recv.available(), 0);
             rpp::Timer t5;
             AssertFalse(pollin(/*millis*/10));
-            AssertGreaterOrEqual(t5.elapsed_millis(), 8.0);
+            AssertGreaterOrEqual(t5.elapsed_millis(), 2.0);
             AssertTrue(recv.good());
             AssertThat(recv.available(), 0);
         }

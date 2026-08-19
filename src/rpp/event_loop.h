@@ -194,10 +194,15 @@ namespace rpp
          * @param main_thr_id Captures the main thread ID where the loop will supposedly run.
          * @param background_task_pool Optional thread pool for running background tasks.
          *                             If null, then global thread pool is used.
+         *                             The loop borrows it and MUST NOT outlive it. A pool
+         *                             with a shorter scope leaves a background worker
+         *                             touching freed state.
+         * @param warpable_clock Optional clock for delay() and delay_until().
+         *                       The loop borrows it and MUST NOT outlive it.
          */
         event_loop(rpp::uint64 main_thr_id = 0/*0=rpp::get_thread_id()*/,
-                   rpp::thread_pool* background_task_pool = nullptr,
-                   rpp::AtomicTimeSource* warpable_clock = nullptr) noexcept;
+                   rpp::thread_pool* background_task_pool RPP_LIFETIMEBOUND = nullptr,
+                   rpp::AtomicTimeSource* warpable_clock RPP_LIFETIMEBOUND = nullptr) noexcept;
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
 
@@ -205,6 +210,8 @@ namespace rpp
          * @brief Attaches a warpable clock used by delay()/delay_until(). When set, a pending
          *        delay tracks this source's virtual time, so warp_forward() advances the wait.
          *        Pass null to revert to wall-clock timing.
+         *        The loop borrows the clock and MUST NOT outlive it. No attribute states
+         *        that: clang rejects lifetimebound on a function that returns void.
          */
         void set_time_source(rpp::AtomicTimeSource* clock) noexcept { time_source = clock; }
 

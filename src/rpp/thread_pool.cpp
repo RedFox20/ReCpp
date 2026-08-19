@@ -202,6 +202,14 @@ namespace rpp
     }
     // NOLINTEND(clang-analyzer-cplusplus.Move)
 
+    pool_task_handle pool_worker::running_task() const noexcept
+    {
+        auto lock = new_task_flag.spin_lock(); // same lifetime rule as running()
+        if (!current_task.is_running())
+            return pool_task_handle{nullptr};
+        return current_task;
+    }
+
     void pool_worker::set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept
     {
         if (out)
@@ -452,6 +460,41 @@ namespace rpp
         return active;
     }
 
+    wait_result thread_pool::wait_until_idle(rpp::Duration timeout) noexcept
+    {
+        rpp::TimePoint end = rpp::TimePoint::monotonic_now() + timeout;
+        for (;;)
+        {
+            // snapshot one busy task, then wait on it with every pool lock released
+            pool_task_handle busy { nullptr };
+            bool parallel_for_active = false;
+            {
+                std::lock_guard lock{TasksMutex};
+                for (worker_ptr& worker : Workers)
+                {
+                    pool_task_handle task = worker->running_task();
+                    if (task.is_running())
+                    {
+                        busy = std::move(task);
+                        break;
+                    }
+                }
+                parallel_for_active = ParallelForTasks.load(std::memory_order_acquire) > 0;
+            }
+            if (!busy.is_running() && !parallel_for_active)
+                return wait_result::finished;
+
+            rpp::Duration remaining = end - rpp::TimePoint::monotonic_now();
+            if (remaining <= rpp::Duration::zero())
+                return wait_result::timeout;
+
+            if (busy.is_running())
+                (void)busy.wait(remaining, std::nothrow);
+            else // parallel_for_active
+                rpp::sleep_ms(1); // yield aggressively
+        }
+    }
+
     int thread_pool::idle_tasks() noexcept
     {
         std::lock_guard lock{TasksMutex};
@@ -574,6 +617,23 @@ namespace rpp
             return;
         }
 
+        // exchange and compare to try and start a new parallel for call,
+        // forbidding any NESTED calls to parallel_for() until this one is finished
+        int active_calls = ParallelForTasks.fetch_add(1, std::memory_order_acquire);
+        if (active_calls > 0)
+        {
+            LogError("parallel_for %d active calls detected, rearchitect your tasks! (running sequentially)",
+                     active_calls+1);
+            try {
+                range_task(range_start, range_end);
+                ParallelForTasks.fetch_sub(1, std::memory_order_release);
+            } catch (...) {
+                ParallelForTasks.fetch_sub(1, std::memory_order_release);
+                throw;
+            }
+            return;
+        }
+
         auto* active = static_cast<parallel_for_task*>(
             alloca(unsigned(p.max_tasks) * sizeof(parallel_for_task))
         );
@@ -652,6 +712,8 @@ namespace rpp
             }
         }
 
+        // cleanup: decrement the active parallel for call count, allowing nested calls to run
+        ParallelForTasks.fetch_sub(1, std::memory_order_release);
         if (err) std::rethrow_exception(err);
     }
 

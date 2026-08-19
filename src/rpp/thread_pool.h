@@ -317,6 +317,7 @@ namespace rpp
     class RPPAPI pool_worker
     {
         friend class pool_task_handle;
+        friend class thread_pool;
     private:
         rpp::semaphore_flag new_task_flag;
         std::thread th;
@@ -376,6 +377,8 @@ namespace rpp
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
+        // @returns a strong task handle while new_task_flag protects current_task.
+        pool_task_handle running_task() const noexcept;
         void set_current_task_and_unlock(lock_t& lock, pool_task_handle* out) noexcept;
         void unhandled_exception(const char* what) noexcept;
         void run() noexcept;
@@ -407,6 +410,7 @@ namespace rpp
         std::vector<worker_ptr> Workers;
         float TaskMaxIdleTime = 15; // new task timeout in seconds
         uint32_t MaxParallelism = 0; // maximum parallelism in parallel_for, 0 to disable
+        std::atomic_int ParallelForTasks = 0; // number of currently active parallel for-s
 
     public:
         using duration = pool_task_handle::duration;
@@ -447,6 +451,24 @@ namespace rpp
 
         // number of thread pool Tasks that are currently running
         int active_tasks() noexcept;
+
+        /**
+         * @brief Waits until no pool task is running anymore, or until the timeout expires.
+         *
+         * A task counts as running from the moment it is assigned to a worker, before that
+         * worker picks it up, until the worker has destroyed the task delegate. So this also
+         * covers the cleanup during which a worker still touches state the caller owns.
+         * 
+         * This also ensures all parallel_for groups have finished.
+         *
+         * @param timeout Maximum time to wait for the pool to drain.
+         * @returns finished if the pool became idle, timeout if it did not.
+         * @code
+         *     // make sure no worker outlives this scope and touches its locals
+         *     rpp::thread_pool::global().wait_until_idle(rpp::seconds(1));
+         * @endcode
+         */
+        wait_result wait_until_idle(rpp::Duration timeout) noexcept;
 
         // number of thread pool Tasks that are in idle state
         int idle_tasks() noexcept;

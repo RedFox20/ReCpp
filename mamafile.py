@@ -1,5 +1,6 @@
 import mama
-import os
+from mama.utils.system import error
+import os, sys, shlex, subprocess
 
 class ReCpp(mama.BuildTarget):
 
@@ -32,6 +33,7 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
+        self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
         if self.windows:
@@ -61,15 +63,50 @@ class ReCpp(mama.BuildTarget):
             self.export_syslib('-framework Foundation')
 
 
+    def link_compile_commands(self):
+        """Points packages/ReCpp/compile_commands.json at packages/ReCpp/<build_dir>/compile_commands.json"""
+        target = self.build_dir('compile_commands.json') # the actual thing
+        if os.path.exists(target):
+            try:
+                link = self.build_dir('../compile_commands.json')
+                if os.path.islink(link) or os.path.exists(link): os.remove(link)
+                os.symlink(f'{self.dep.build_dir_name}/compile_commands.json', link)
+            except OSError:
+                pass # an IDE convenience never fails the build
+
+
     def deploy(self):
         # deploy directly to build directory
         self.papa_deploy(f'.', src_dir=False)
 
 
+    # The whole suite runs in ~5 seconds, so this limit only ever triggers on a deadlock.
+    # It turns a hung CI job into a clear failure instead of a job that runs until the
+    # platform kills it, which gives no output at all.
+    TEST_TIMEOUT_SECONDS = 30
+
     def test(self, args):
         if 'nogdb' in args:
             args = args.replace('nogdb', '')
-            self.run_program(self.source_dir('bin'), self.source_dir(f'bin/RppTests {args}'))
+            self.run_tests_with_timeout(args)
         else:
-            self.gdb(f"bin/RppTests {args}", src_dir=True)
+            self.gdb(f"bin/RppTests {args}", src_dir=True) # GDB drives the timing, do not interrupt it
 
+    def run_tests_with_timeout(self, args):
+        """Runs RppTests with a deadlock timeout unless repeat mode is active."""
+        bin_dir = self.source_dir('bin')
+        test_args = shlex.split(args)
+        command = [self.source_dir('bin/RppTests')] + test_args
+        # Repeat mode runs until failure, so a fixed timeout would stop a healthy run.
+        is_repeat = '-r' in test_args or '--repeat' in test_args
+        timeout = None if is_repeat else self.TEST_TIMEOUT_SECONDS
+        try:
+            result = subprocess.run(command, cwd=bin_dir, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            error(f'RppTests timed out after {self.TEST_TIMEOUT_SECONDS}s: a test is hung. '
+                   'The last test name printed before this is the one that hung. '
+                   'Run the same test without `nogdb` to attach GDB and get the stack.')
+            sys.exit(-1)
+        if result.returncode != 0:
+            error(f'RppTests failed with exit code {result.returncode}')
+            sys.exit(result.returncode)

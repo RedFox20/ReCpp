@@ -24,26 +24,6 @@ a dependency build, which is where C11 broke KrattGCS.
 The owner chose to keep AUTO as the default, so this stays open until B3 lands and
 makes the modules reachable. Until then a consumer pays the build cost for nothing.
 
-### B9. A detached pool task frees its promise after the test that made it ended
-Two TSAN reports from CI on clang-18, both the same shape: `operator delete` from
-`~promise()` on a pool worker, against the main thread in `pthread_cond_wait`
-inside `run_test_func`.
-The thread-creation stack names the culprit each time, and it is always an
-**earlier** test:
-- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
-- a task from `test_future.cpp:103` freed during a later `test_future` case
-
-`async_task`, `cfuture::then()` and `semaphore::co_await_handle::await_suspend`
-all post through `parallel_task_detached`. The task owns the promise, and nothing
-joins it, so it destroys the promise long after `.get()` released the waiter.
-Fixed in the test framework, which is where CLAUDE.md puts a test-only race:
-`run_test_func` now waits for `thread_pool::global().active_tasks()` to reach 0
-after every case, and it prints a warning when a case leaves work running.
-Verified that the signal is live: `active_tasks()` reads 1 while a detached task
-sleeps, and the drain returns the moment it reaches 0.
-The library ordering is unchanged. A consumer that detaches a task still owns the
-lifetime problem, so this stays open until `async_task` offers a join.
-
 ### B10. A test handed the event_loop a pool that dies before the loop
 `test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
 the loop a raw pointer to it. The case returns, the local pool dies, and only then
@@ -52,8 +32,17 @@ at. Android caught it in CI:
 `FORTIFY: pthread_mutex_trylock called on a destroyed mutex`, then `SIGABRT` on
 `rpp_task_13`, during the next case.
 Fixed: the pool is a fixture member now, and cleanup destroys the loop first.
-The same shape can hit any consumer that gives `event_loop` a pool with a shorter
-life. `event_loop` takes a raw `thread_pool*` and documents no lifetime rule.
+The constructor now marks each borrowed pointer `RPP_LIFETIMEBOUND`. Clang
+rejects this annotation on the void `set_time_source()` function. Its doxygen
+states that the loop must not outlive the pool or the clock.
+The annotation does not catch the shape that caused it. Measured on clang-18:
+`lifetimebound` warns when a reference parameter binds a temporary, which is what
+`strview.h` uses it for. It stays silent when a pointer parameter takes a local
+that a longer-lived object then stores. A reference overload would make the
+compiler help, but the constructor has two optional pointers, so that needs a
+combination of overloads for every case.
+The owner closed this: the documented contract plus the annotation is the
+practical limit, and no further work is planned.
 
 ### B1. TSAN races reproduce only under CPU load, cause unknown
 Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
@@ -155,18 +144,36 @@ A binary module interface is not portable, so a consumer must compile the
 producer's `.cppm` inside its own target. mama has no way to express that.
 Tracked upstream: https://github.com/RedFox20/Mama/issues/41
 
-### B4. 52 files use a std facility they do not include
-`tools/check_includes.py missing`. Each one breaks the moment its provider chain
-becomes an `import`. Also 10 unused and 43 redundant rpp includes, and 59 std
-include candidates, from `tools/check_includes.py unused`.
-Plan: `docs/MODULES_MIGRATION.md` changeset 1.
-
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C15. TSAN blamed a pool worker for freeing a promise the waiter still used (was B9)
+Three CI reports on clang, all one shape: `operator delete` from `~promise()` on a
+pool worker, against a main thread `pthread_mutex_lock` or `pthread_cond_wait`
+inside `run_test_func`:
+- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
+- a task from `test_future.cpp:103` freed during a later `test_future` case
+- a task from `test_threadpool.cpp:435` freed during
+  `async_task_throwing_task_destroyed_before_future_ready`
+
+Not a lifetime defect, and not a detached-task defect. libc++ keeps the future
+shared state and its acquire-release refcount inside `libc++.so`, and the build
+does not instrument that library. TSAN sees the mutex traffic and it sees the
+`delete`, but never the order between them. Whoever drops the last reference runs
+the `delete`, and the worker wins that race whenever `get()` returns and the waiter
+releases first. 20 lines with one `std::promise` and one thread reproduce the
+report with no ReCpp code. The same program is clean under libstdc++, which keeps
+that refcount in an instrumented header.
+Fixed: `tests/main.cpp` returns `race:std::__1::promise` from
+`__tsan_default_suppressions()`, beside the libc++ ASAN workaround that was already
+there. `test_threadpool::pool_task_frees_the_promise_after_the_waiter_released`
+forces the order on demand.
+`continue_with()` holds its future reference until the pool destroys the lambda.
+That is the same pattern, and the same suppression covers it.
 
 ### C14. `num_physical_cores()` reported host cores inside a container
 `std::thread::hardware_concurrency()` answers for the host, not for the cores a
@@ -285,7 +292,7 @@ includes went in.
 `test_strview.cpp` had `import rpp.strview;` above `#include <rpp/tests.h>`.
 gcc-14 re-parses a std header that follows an import and gave 1603 redefinition
 errors.
-Fixed: includes first, import last. The rule is now a style rule in CLAUDE.md.
+Fixed: includes first, import last. The rule is now a style rule in AGENTS.md.
 
 ### C3. clang-21 refused `tests/test_event_loop.cpp`
 `start_coro_on_background_thread` returned `rpp::cfuture<void>` out of

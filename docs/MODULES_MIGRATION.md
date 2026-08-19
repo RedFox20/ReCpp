@@ -14,7 +14,7 @@ gives the phased plan for the remaining 41 headers.
 | `rpp.strview`, `rpp.debugging` | build and pass on gcc-14, clang-21, MSVC 14.44 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
-| Include-order style rule | in CLAUDE.md |
+| Include-order style rule | in AGENTS.md |
 | `tools/check_includes.py` | 3 checks, 0 self-contained failures left |
 | `tests/test_modules.cpp` | module consumer test, 3 cases |
 | CI | green, all 24 jobs. 5 causes fixed, see `BUGS.md` C9 |
@@ -116,7 +116,7 @@ compiler.
 | 1 | The modules build was **broken** before this plan. | `cmake --build` failed: `test_strview.cpp: error: missing '#include'; 'strlen' must be declared before it is used`. The headers-only build of the same tree passed 76/76. |
 | 2 | The cause was a **conditional import inside a header**. | `sprint.h` swapped `#include "strview.h"` for `import rpp.strview;`. That dropped the transitive `<cstring>`, `<string>` and `<concepts>` from every file that includes `sprint.h`. `sprint.cpp` lost `memcpy` the same way. |
 | 3 | Three added includes fixed it. | Modules build links, `RppTests test_strview` passes 34/34, and 498/498 pass in both modes. |
-| 4 | **53 of 99 source files** relied on a transitive std include. | Scan over 8 std facilities. Every one of them breaks the moment its provider chain becomes an `import`. One is fixed, 52 remain. |
+| 4 | **53 of 99 source files** rely on a transitive std include, and that is safe. | Scan over 8 std facilities. The earlier claim, that each one breaks when its provider chain becomes an `import`, is **disproved**. A facade includes its header in the global module fragment, which keeps those declarations reachable to an importer. Negative control on GCC 14.2: delete `#include <string>` from `tests/test_modules.cpp` and keep `import rpp.strview;`, and the modules build still passes. Row 2 is a different failure, an `import` inside a header, which AGENTS.md now forbids. |
 | 5 | `export import` re-export chains work. | A prototype `rpp.sprint` that includes `sprint.h` in its global module fragment and adds `export import rpp.strview;` gave a consumer both `rpp::string_buffer` and `rpp::strview`, plus `operator==` and the `_sv` literal. |
 | 6 | The `export import` is load-bearing. | Negative control: remove that one line and the same consumer fails with `error: missing '#include'; 'strview' must be declared before it is used`. Reachable is not visible. |
 | 7 | A module interface unit emits a **strong symbol**. | `nm` shows `T initializer for module rpp.strview` in `rpp-strview.cppm.o`, and that object sits inside `libReCpp.a`. A consumer that compiles the same `.cppm` produces the same symbol. |
@@ -291,7 +291,7 @@ container does not have.
 Two results need their footnote.
 
 **Only gcc-14 needs the include order.** clang-21 compiles both orders cleanly.
-The rule in CLAUDE.md still holds for every file, because a portable file has to
+The rule in AGENTS.md still holds for every file, because a portable file has to
 satisfy the stricter compiler.
 
 **clang-21 needed one fix outside the module work, and this branch carries it.**

@@ -717,8 +717,7 @@ TestImpl(test_file_io)
         const int FILE_SIZE = 4096;
         const int TRUNCATE_SIZE = FILE_SIZE / 2;
         std::vector<char> testData = generate_test_data(FILE_SIZE);
-        AssertThat(file::write_new(TestFile, testData.data(), testData.size()),
-                   FILE_SIZE);
+        AssertThat(file::write_new(TestFile, testData.data(), (int)testData.size()), FILE_SIZE);
 
         file f { TestFile, file::READWRITE };
         f.truncate_front(TRUNCATE_SIZE);
@@ -738,8 +737,7 @@ TestImpl(test_file_io)
         const int FILE_SIZE = 4 * 1024 * 1024;
         const int TRUNCATE_SIZE = FILE_SIZE / 2;
         std::vector<char> testData = generate_test_data(FILE_SIZE);
-        AssertThat(file::write_new(TestFile, testData.data(), testData.size()),
-                   FILE_SIZE);
+        AssertThat(file::write_new(TestFile, testData.data(), (int)testData.size()), FILE_SIZE);
 
         file f = { TestFile, file::READWRITE };
         f.truncate_front_sb(TRUNCATE_SIZE);
