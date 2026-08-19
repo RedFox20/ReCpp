@@ -804,6 +804,50 @@ TestImpl(test_threadpool)
         AssertThrows(future.get(), std::runtime_error);
     }
 
+    TestCase(async_task_exception_state_cleanup_race)
+    {
+        thread_pool& pool = thread_pool::global();
+        AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
+        pool.clear_idle_tasks();
+
+        // the exception must reach the caller every time, with no deadlock and no race
+        for (int iteration = 0; iteration != 20; ++iteration)
+        {
+            rpp::cfuture<> future = rpp::async_task([] {
+                throw std::runtime_error("task failed");
+            });
+            AssertThrows(future.get(), std::runtime_error);
+        }
+        // no worker count assert here: get() returns as soon as set_exception publishes,
+        // which is BEFORE the worker destroys the delegate and clears its running flag,
+        // so the next iteration can find that worker busy and the pool adds a second one
+        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+    }
+
+    // Regression for BUGS.md C15: the worker drops the LAST reference to the future state.
+    // It does that after the waiter consumed the future and released its own reference.
+    // libc++ hides that acquire-release refcount inside the uninstrumented libc++.so.
+    // TSAN then reports the delete as a race against the future::get() before it.
+    // tests/main.cpp suppresses that report. This case forces the order on demand.
+    TestCase(pool_task_frees_the_promise_after_the_waiter_released)
+    {
+        rpp::cpromise<void> promise;
+        rpp::cfuture<> future = promise.get_future();
+
+        // the worker publishes the value, then keeps the promise until the waiter is gone
+        pool_task_handle task = rpp::parallel_task([p = std::move(promise)]() mutable
+        {
+            p.set_value();
+            rpp::sleep_ms(50);
+        }); // the worker destroys the delegate here, and the promise dies with it
+
+        future.get(); // the waiter releases its reference before the worker releases its own
+        // TSAN builds a report for this delete and symbolizes it before the suppression
+        // matches, and the worker pays that cost, so the wait needs a generous timeout.
+        // 15 seconds is the limit which _cv_remaining_duration() accepts.
+        AssertThat(task.wait(rpp::seconds(10)), wait_result::finished);
+    }
+
     // A copyable result with a throwing move must still be published successfully. The
     // subsequent move out of the future propagates that exception to the caller.
     TestCase(async_task_survives_a_throwing_result_move_ctor)

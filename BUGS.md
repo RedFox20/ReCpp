@@ -24,30 +24,6 @@ a dependency build, which is where C11 broke KrattGCS.
 The owner chose to keep AUTO as the default, so this stays open until B3 lands and
 makes the modules reachable. Until then a consumer pays the build cost for nothing.
 
-### B9. A detached pool task frees its promise after the test that made it ended
-Two TSAN reports from CI on clang-18, both the same shape: `operator delete` from
-`~promise()` on a pool worker, against the main thread in `pthread_cond_wait`
-inside `run_test_func`.
-The thread-creation stack names the culprit each time, and it is always an
-**earlier** test:
-- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
-- a task from `test_future.cpp:103` freed during a later `test_future` case
-
-`async_task`, `cfuture::then()` and `semaphore::co_await_handle::await_suspend`
-all post through `parallel_task_detached`. The task owns the promise, and nothing
-joins it, so it destroys the promise long after `.get()` released the waiter.
-A drain in `run_test_func` waited for `active_tasks()` to reach 0 after every
-case. It is reverted, because it cannot work: `active_tasks()` locks `TasksMutex`
-and counts `task->running()` over `Workers`, so it counts busy WORKERS, not
-pending WORK. A job that `parallel_task_detached` posted but no worker picked up
-yet reads 0, and the drain returns at once. The pool exposes no queue depth, so
-no correct drain can be written from outside it.
-Nothing in the test framework covers this now. Closing it needs either a queued
-work count on `thread_pool`, or the join that `async_task` still does not offer.
-`continue_with()` also lacks the release discipline `async_task` has: it captures
-`f=std::move(*this)` and drops that reference only when the pool destroys the
-lambda.
-
 ### B10. A test handed the event_loop a pool that dies before the loop
 `test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
 the loop a raw pointer to it. The case returns, the local pool dies, and only then
@@ -174,6 +150,30 @@ inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C15. TSAN blamed a pool worker for freeing a promise the waiter still used (was B9)
+Three CI reports on clang, all one shape: `operator delete` from `~promise()` on a
+pool worker, against a main thread `pthread_mutex_lock` or `pthread_cond_wait`
+inside `run_test_func`:
+- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
+- a task from `test_future.cpp:103` freed during a later `test_future` case
+- a task from `test_threadpool.cpp:435` freed during
+  `async_task_throwing_task_destroyed_before_future_ready`
+
+Not a lifetime defect, and not a detached-task defect. libc++ keeps the future
+shared state and its acquire-release refcount inside `libc++.so`, and the build
+does not instrument that library. TSAN sees the mutex traffic and it sees the
+`delete`, but never the order between them. Whoever drops the last reference runs
+the `delete`, and the worker wins that race whenever `get()` returns and the waiter
+releases first. 20 lines with one `std::promise` and one thread reproduce the
+report with no ReCpp code. The same program is clean under libstdc++, which keeps
+that refcount in an instrumented header.
+Fixed: `tests/main.cpp` returns `race:std::__1::promise` from
+`__tsan_default_suppressions()`, beside the libc++ ASAN workaround that was already
+there. `test_threadpool::pool_task_frees_the_promise_after_the_waiter_released`
+forces the order on demand.
+`continue_with()` holds its future reference until the pool destroys the lambda.
+That is the same pattern, and the same suppression covers it.
 
 ### C14. `num_physical_cores()` reported host cores inside a container
 `std::thread::hardware_concurrency()` answers for the host, not for the cores a
