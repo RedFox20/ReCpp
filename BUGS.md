@@ -151,6 +151,17 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C16. The 52 missing std includes were not a defect (was B4)
+B4 claimed each of the 52 files breaks when its provider chain becomes an `import`.
+Negative control on GCC 14.2: delete `#include <string>` from
+`tests/test_modules.cpp`, keep `import rpp.strview;`, and the modules build passes.
+A facade includes its header in the global module fragment, so those declarations
+stay reachable to an importer.
+The 1603-error incident was an `import` inside a header, a different failure that
+AGENTS.md now forbids. Changeset 1a is dropped from the migration plan.
+An rpp include is not the same: finding 6 in that plan proves a missing
+`export import` breaks the consumer, so changeset 2 keeps the rpp-header check.
+
 ### C15. TSAN blamed a pool worker for freeing a promise the waiter still used (was B9)
 Three CI reports on clang, all one shape: `operator delete` from `~promise()` on a
 pool worker, against a main thread `pthread_mutex_lock` or `pthread_cond_wait`
@@ -172,8 +183,6 @@ Fixed: `tests/main.cpp` returns `race:std::__1::promise` from
 `__tsan_default_suppressions()`, beside the libc++ ASAN workaround that was already
 there. `test_threadpool::pool_task_frees_the_promise_after_the_waiter_released`
 forces the order on demand.
-`continue_with()` holds its future reference until the pool destroys the lambda.
-That is the same pattern, and the same suppression covers it.
 
 ### C14. `num_physical_cores()` reported host cores inside a container
 `std::thread::hardware_concurrency()` answers for the host, not for the cores a

@@ -19,8 +19,9 @@ gives the phased plan for the remaining 41 headers.
 | `tests/test_modules.cpp` | module consumer test, 3 cases |
 | CI | green, all 24 jobs. 5 causes fixed, see `BUGS.md` C9 |
 
-**Not started:** changesets 1 through 7 below. Changeset 1a is the next action and
-blocks nothing else.
+**Not started:** changesets 1b through 7 below. Changeset 1a is dropped, see
+section 4. Turning on the `self-contained` gate is the next action, and it blocks
+nothing.
 
 **Open questions carried into the next session:** `BUGS.md` B1 through B5. B1 and
 B2 are the two that can bite this work.
@@ -240,7 +241,7 @@ caller cannot feed a `strview` into. Findings 5 and 6 confirm both directions.
 
 The rule: **for every `#include "X.h"` in `Y.h`, `rpp-Y.cppm` gets one
 `export import rpp.X;`.** The module graph then matches the include graph, and a
-script can check it. Changeset 1 is what makes that include graph honest.
+script can check it. Changeset 2 is what makes that include graph honest.
 
 ### D6. Ship `.cppm` sources. Never ship a binary module interface.
 
@@ -318,13 +319,21 @@ of their own.
 
 ## 4. Changeset 1: include hygiene
 
-This lands first, on its own, before any module work. It is worth doing even if
-the module migration never happens. [`tools/check_includes.py`](../tools/check_includes.py)
-measures three defects and gates each one in CI.
+**The `missing` check is dropped. It measures no defect.** The claim was that each
+of its 52 findings breaks when its provider chain becomes an `import`. A negative
+control on GCC 14.2 disproves it: delete `#include <string>` from
+`tests/test_modules.cpp`, keep `import rpp.strview;`, and the modules build passes.
+A facade includes its header in the global module fragment, so those declarations
+stay reachable to an importer. See `BUGS.md` C16.
+
+The header failure that did happen was an `import` inside a header. That is a
+different defect, and D4 forbids it.
+
+The other checks in [`tools/check_includes.py`](../tools/check_includes.py) survive.
 
 ```bash
-tools/check_includes.py all              # report
-tools/check_includes.py all --check      # CI gate, exit 1 on a finding
+tools/check_includes.py all                     # report every check
+tools/check_includes.py self-contained --check  # CI gate, exit 1 on a finding
 ```
 
 ### 4.1 What the tool measures
@@ -332,12 +341,15 @@ tools/check_includes.py all --check      # CI gate, exit 1 on a finding
 | Check | How it works | Findings today |
 |---|---|---|
 | `self-contained` | compiles each header alone, twice, with nothing before it | **0 left**: `traits.h` used `std::tuple` without `<tuple>`, and this branch fixes it |
-| `missing` | a file uses a std facility it does not include itself | **52 of 99 files** |
+| `missing` | a file uses a std facility it does not include itself | **dropped**, see above |
 | `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **10** |
 | `redundant` | same, but the header does name something the include declares, so a sibling include leaks it | **43** |
 | `std` | same, for a std header, where the scan cannot enumerate the declared names | **59** |
 
-The `unused` and `redundant` split is the important part. Both compile without
+`self-contained` protects a consumer that includes one header first. It reports 0
+today, so the gate costs nothing and it stops a regression. Turn that one on alone.
+
+The `unused` and `redundant` split is the important part of what remains. Both compile without
 the line. Only the first is safe to delete. Removing a `redundant` line trades a
 direct dependency for a hidden one, which is the opposite of hygiene.
 
@@ -355,19 +367,14 @@ it. Three were checked by hand and confirmed.
 | `condition_variable.h`, `coroutines.h`, `event_loop.h` | `timer.h` | three copies of the same stale include |
 | `atomic_shared_ptr.h`, `bitutils.h`, `traits.h` | `config.h` | |
 
-### 4.3 Stage it in two commits
+### 4.3 Changeset 1b, the removals
 
 **The removals are approved.** ReCpp breaks the accidental include chain for its
 consumers. Those includes are old backward-compatibility additions, and no
 header needs them. A consumer that breaks was already depending on something
 ReCpp never promised, and the fix belongs in the consumer.
 
-**Commit 1a, additions only.** Add the 52 missing std includes. This breaks
-nothing, downstream or in-repo. Land it and turn on the `self-contained` and
-`missing` gates. The `<tuple>` in `traits.h` and the three includes that fixed
-the modules build are already on this branch.
-
-**Commit 1b, removals.** Order the work so the risk falls, not rises:
+Order the work so the risk falls, not rises:
 
 1. Delete the 10 unused includes. They are dead weight, and no header names
    anything from them.
@@ -383,19 +390,25 @@ Tell the downstream teams what landed. `debugging.h` has 15 direct includers
 inside this repo, and `config.h` has 27, so the reach outside is larger. A
 one-line note in the release text saves each team the bisect.
 
-**Estimate: 1a is half a day. 1b is 1 day.**
+**Estimate: 1 day.**
 
 ---
 
-## 5. Changeset 2: the missing-include gate goes wider
+## 5. Changeset 2: the rpp-header include check
 
-The `missing` check knows 8 std facilities. Extend it in two ways before the
-module work starts:
+The std half of this check went with changeset 1a. The rpp half is load-bearing
+for modules, and for a different reason.
 
-1. Add the std facilities the module builds report as the migration proceeds.
-2. Add the same check for **rpp headers**: a header that names `rpp::strview`
-   and does not include `strview.h` has the same defect. That check turns the
-   43 redundant findings into an exact list of the includes to add.
+D5 gives each module one `export import rpp.X;` per rpp include, and changeset 3
+generates those lines from the include list. Finding 6 measured what a missing one
+costs: the consumer fails with
+`error: missing '#include'; 'strview' must be declared before it is used`.
+**Reachable is not visible for an rpp name, even though it is for a std name.**
+
+A header that names `rpp::strview` and does not include `strview.h` yields a
+`.cppm` with a missing `export import`. Every importer of it then breaks. Add this
+check before changeset 3 generates anything from the include graph. It also turns
+the 43 redundant findings into an exact list of the includes to add.
 
 **Estimate: half a day.**
 
@@ -646,7 +659,7 @@ Two smaller notes for whoever writes more of these tests:
 
 Work the include graph bottom up. A module can only build after every module it
 `export import`s exists. The layers below come from the actual `#include` graph
-of `src/rpp/*.h`, so changeset 1 can move a header between layers.
+of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 
 | Layer | Modules | Count |
 |---|---|---|
@@ -738,7 +751,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
    `clang-scan-deps` ships in `clang-tools-N` and not in `clang-N`, and a modules
    job must pass `BUILD_WITH_MODULES=ON` so a silent AUTO fallback fails it.
    See `BUGS.md` C9 and C11.
-2. Wire `tools/check_includes.py --check` and
+2. Wire `tools/check_includes.py self-contained --check` and
    `tools/gen_module_exports.py --check` as gates.
 3. Rewrite the README modules section. It is already stale: it names a test
    suite `test_strview_module` that does not exist.
@@ -767,7 +780,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ## 13. Acceptance criteria
 
-1. `tools/check_includes.py all --check` exits 0.
+1. `tools/check_includes.py self-contained --check` exits 0.
 2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests` and
    `RppModuleTests`, and both pass every test, on gcc-14 and clang-21. Every
    tier 2 compiler still passes the headers-only build.
@@ -783,15 +796,14 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 | Changeset | Work | Days | Blocks |
 |---|---|---|---|
-| 1a | add 52 missing includes, turn on 2 gates | 0.5 | everything |
 | 1b | remove 10 unused, review 43 redundant and 59 std | 1 | D5 |
-| 2 | widen the missing-include check to rpp headers | 0.5 | changeset 3 |
+| 2 | add the rpp-header include check | 0.5 | changeset 3 |
 | 3 | generate the export lists | 1.5 | changeset 5 |
 | 4 | dual-mode test harness | 0.5 | changeset 5 |
 | 5 | 42 modules plus the umbrella | 2.5 | changeset 6 |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 |
 | 7 | CI, docs, measurement | 1 | none |
 
-**Total: about 9 working days.** Changesets 1 and 2 are two of them, and they
+**Total: about 8.5 working days.** Changesets 1b and 2 are 1.5 of them, and they
 stand on their own value even if the module work stops. Every decision in
-sections 3 and 6 is settled, so changeset 1a can start now.
+sections 3 and 6 is settled, and nothing blocks the start.
