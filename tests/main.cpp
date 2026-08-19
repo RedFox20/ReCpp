@@ -13,12 +13,8 @@
     #endif
 #endif
 
-// libc++ keeps the std::promise and std::future shared state inside libc++.so, and this
-// build does not instrument that library. TSAN cannot see the acquire-release refcount
-// which orders the final delete of that state. A thread which publishes a value and then
-// destroys the promise looks like it deletes the state under a waiter that just used it.
-// The same code is race-free under libstdc++, which keeps that refcount in a header.
-// See BUGS.md C15. test_threadpool reproduces the order on demand.
+// TSAN cannot see the future refcount inside the uninstrumented libc++.so, so a promise
+// destroyed after the waiter released looks like a race. See BUGS.md C15.
 #if defined(__clang__) && defined(__has_feature)
     #if __has_feature(thread_sanitizer)
         extern "C" const char* __tsan_default_suppressions() { // NOLINT(bugprone-reserved-identifier)

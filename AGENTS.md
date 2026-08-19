@@ -13,9 +13,9 @@ project, not a dependency of the tree that contains it.
 
 ## MANDATORY: writing style and response shape (always on)
 
-Two style skills are project defaults. `.claude/rules/` loads them every session. Do not
-wait to be asked. Do not invoke them manually. Any agent that does not read
-`.claude/rules/` must read both `SKILL.md` files under `.claude/skills/` instead.
+Three skills are project defaults. `.claude/rules/` loads them every session. Do not
+wait to be asked. Any agent that does not read `.claude/rules/` must read the
+`SKILL.md` files under `.claude/skills/` instead.
 
 - **`ste-writing`** governs *prose*: README.md, docs, commit messages, PR text,
   doxygen blocks, code comments, and `ThrowErr()` and `Log*` strings. It does not
@@ -23,26 +23,40 @@ wait to be asked. Do not invoke them manually. Any agent that does not read
 - **`output-style`** governs *responses to the user*: lead with the next action,
   number multi-step work, restate progress, suppress tangents, and drop all
   preamble and closing pleasantries.
+- **`recpp-pre-review`** is the second pass over your own prose. Run it before you
+  report the work, before a commit message, and before you call the reviewer. The
+  first draft never carries the STE rules.
+
+A fourth skill, **`recpp-review`**, reviews a change. It runs in the
+`recpp-reviewer` subagent and it owns the rule ids, the gates, and the report
+format.
 
 If a style rule collides with the rest of this file, **this file wins. The style
 shapes what fits inside it.** These gates are not negotiable for brevity:
 
 - the mandatory unit test
-- the TSAN build
 - the clang-tidy pass
+- the Linux GCC, Linux Clang, Android, and Windows builds
 - the full test suite run
 - the README.md line-reference update
+
+A TSAN run is a suggestion, not a gate. TSAN reports false positives, so a report
+goes to `BUGS.md` for later analysis. See `recpp-review` R10 and R11.
 
 ## Development Requirements
 
 1. **Unit tests are mandatory** — add a test in `tests/` for every new feature and
    every bug fix.
-2. **Always build with TSAN** — put `tsan` in every build command. A switch between
-   a regular build and a TSAN build forces a full rebuild.
-3. **Validate with clang-tidy** — run `CXX20=1 mama gcc tsan build clang-tidy test="nogdb -vv"`.
+2. **Keep the tests fast** — the suite runs 512 cases in about 4.3 seconds, and 5.5
+   under TSAN. Wait on an event, not on the clock. A sleep over 10ms needs a reason.
+3. **Validate with clang-tidy** — run `CXX23=1 mama gcc build clang-tidy test="nogdb -vv"`.
    Fix every warning before you call the task complete.
-4. **Run the full test suite** — run `CXX20=1 mama gcc tsan build test="nogdb -vv"`.
-   All tests must pass with no data race. A task is not complete until they do.
+4. **Run the full test suite** — run `CXX23=1 mama gcc build test="nogdb -vv"`, and
+   the Clang, Android, and Windows gates in `recpp-review` R9. A task is not
+   complete until they pass.
+5. **TSAN is optional** — add `tsan` when you hunt a race. mama gives each compiler
+   and sanitizer its own build directory, so a switch rebuilds nothing in the other
+   one. Write a report into `BUGS.md` instead of patching it on the spot.
 
 ## Code Style
 
@@ -211,28 +225,31 @@ sudo apt-get install libdw-dev
 
 ## Building with mama
 
-Put `tsan` in every build command. This keeps the build configuration consistent.
+The build picks C++23 on gcc 13, clang 16, Apple clang 15, and MSVC 19.35 or newer.
+Every older compiler gets C++20. Set `CXX20=1` to pin the older standard, and
+`CXX26=1` to test the newest one.
+
 The `nogdb` argument reduces the output noise. Omit it if you want mama to attach
 GDB when it starts the tests.
 
 ```bash
-# basic build and test (C++20 with TSAN)
-CXX20=1 mama gcc tsan build test="nogdb -vv"
+# basic build and test, with TSAN
+mama gcc tsan build test="nogdb -vv"
 
 # full reconfigure + rebuild + test
-CXX20=1 mama gcc tsan rebuild test="nogdb -vv"
+mama gcc tsan rebuild test="nogdb -vv"
 
 # build project with clang instead of gcc
-CXX20=1 mama clang tsan build test="nogdb -vv"
+mama clang tsan build test="nogdb -vv"
 
 # build project and run a specific test suite
-CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue"
+mama gcc tsan build test="nogdb -vv test_concurrent_queue"
 
 # build project and run a specific test
-CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop"
+mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop"
 
 # build project and run a specific test until failure (up to N iterations)
-CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
+mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
 ```
 
 ### Address Sanitizer (mama)
@@ -240,12 +257,12 @@ You cannot combine ASAN and TSAN. Use ASAN only when you debug a memory error. A
 needs a reconfigure. Omit `nogdb` here. mama then attaches GDB to the tests, and GDB
 gives a full stack trace on a fatal crash.
 ```bash
-CXX20=1 mama gcc asan configure build test="-vv"
+mama gcc asan configure build test="-vv"
 ```
 
 ### clang-tidy (mama)
 ```bash
-CXX20=1 mama gcc tsan build clang-tidy test="nogdb -vv"
+mama gcc tsan build clang-tidy test="nogdb -vv"
 ```
 
 ## Building with CMake directly

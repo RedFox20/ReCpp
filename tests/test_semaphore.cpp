@@ -207,7 +207,7 @@ TestImpl(test_semaphore)
         });
 
         std::thread consumer([&] {
-            constexpr auto timeout = millis(5000); // use a huge timeout to make bugs obvious
+            constexpr auto timeout = rpp::seconds(1); // a stuck semaphore must fail the case, not hang it
             while (working) {
                 if (sem.wait(timeout) == rpp::semaphore::notified) {
                     if (!working) break; // stopped

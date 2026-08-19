@@ -29,7 +29,7 @@ namespace
     {
         static constexpr int MARKER = 0xC1EA;
         static constexpr int RESULT = 4242;
-        static constexpr rpp::Duration TIMEOUT = rpp::seconds(5);
+        static constexpr rpp::Duration TIMEOUT = rpp::seconds(1);
 
         std::atomic_int marker { 0 };
         rpp::semaphore cleanup_started;
@@ -685,7 +685,7 @@ TestImpl(test_threadpool)
     TestCase(wait_until_idle_on_an_idle_pool)
     {
         thread_pool pool{4};
-        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+        AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
     }
 
     TestCase(wait_until_idle_waits_for_a_running_task)
@@ -704,7 +704,7 @@ TestImpl(test_threadpool)
         AssertFalse(task_done.load());
 
         release.notify();
-        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+        AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
         AssertTrue(task_done.load());
     }
 
@@ -730,7 +730,7 @@ TestImpl(test_threadpool)
         parallel_for_thread.join();
 
         AssertThat(while_parallel_for_runs, wait_result::timeout);
-        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+        AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
     }
 
     // Regression: run_test_func drains the pool between cases, and that only prevents the
@@ -818,17 +818,13 @@ TestImpl(test_threadpool)
             });
             AssertThrows(future.get(), std::runtime_error);
         }
-        // no worker count assert here: get() returns as soon as set_exception publishes,
-        // which is BEFORE the worker destroys the delegate and clears its running flag,
-        // so the next iteration can find that worker busy and the pool adds a second one
-        AssertThat(pool.wait_until_idle(rpp::seconds(5)), wait_result::finished);
+        // no worker count assert: get() returns before the worker clears its running flag,
+        // so the next iteration can find it busy and the pool adds a second worker
+        AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
     }
 
-    // Regression for BUGS.md C15: the worker drops the LAST reference to the future state.
-    // It does that after the waiter consumed the future and released its own reference.
-    // libc++ hides that acquire-release refcount inside the uninstrumented libc++.so.
-    // TSAN then reports the delete as a race against the future::get() before it.
-    // tests/main.cpp suppresses that report. This case forces the order on demand.
+    // the worker must free the future state safely after the waiter released it,
+    // which is the order TSAN reports as a race under libc++, see BUGS.md C15
     TestCase(pool_task_frees_the_promise_after_the_waiter_released)
     {
         rpp::cpromise<void> promise;
@@ -842,10 +838,8 @@ TestImpl(test_threadpool)
         }); // the worker destroys the delegate here, and the promise dies with it
 
         future.get(); // the waiter releases its reference before the worker releases its own
-        // TSAN builds a report for this delete and symbolizes it before the suppression
-        // matches, and the worker pays that cost, so the wait needs a generous timeout.
-        // 15 seconds is the limit which _cv_remaining_duration() accepts.
-        AssertThat(task.wait(rpp::seconds(10)), wait_result::finished);
+        // a TSAN build symbolizes the suppressed report on the worker, so allow a long wait
+        AssertThat(task.wait(rpp::seconds(1)), wait_result::finished);
     }
 
     // A copyable result with a throwing move must still be published successfully. The

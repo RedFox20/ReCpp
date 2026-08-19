@@ -56,7 +56,25 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 string(TOUPPER ${CMAKE_BUILD_TYPE} CURRENT_BUILD_TYPE)
 
-set(RPP_CXX_STANDARD 20) # default to C++20, can be overridden by env vars
+# the C++23 default needs gcc 13, clang 16, Apple clang 15, or MSVC 19.35 (VS2022 17.5)
+set(RPP_CXX23_MIN 0) # 0 keeps an unknown compiler on C++20
+if(GCC)
+    set(RPP_CXX23_MIN 13)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    set(RPP_CXX23_MIN 15)
+elseif(CLANG)
+    set(RPP_CXX23_MIN 16)
+elseif(MSVC)
+    set(RPP_CXX23_MIN 19.35)
+endif()
+
+# assign defaults, env vars override it below
+if(RPP_CXX23_MIN AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL RPP_CXX23_MIN)
+    set(RPP_CXX_STANDARD 23)
+else()
+    set(RPP_CXX_STANDARD 20) # fallback to C++20
+endif()
+
 if(CXX26)
     set(RPP_CXX_STANDARD 26)
 elseif(CXX23)

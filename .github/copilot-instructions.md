@@ -3,41 +3,41 @@
 ## Testing changes
 This project uses mama build tool, and a custom RppTest framework for unit tests.
 
-1. **Compile with C++20 and run all tests**: After modifying any code, ensure that the project compiles with C++20 and that all tests pass. If you minimize output with `tail`, then include at least 50-80 lines of output. Make sure you don't accidentally confuse a random warning with the actual error.
+1. **Compile and run all tests**: After modifying any code, ensure that the project compiles and that all tests pass. The build picks C++23 on gcc 13, clang 16, Apple clang 15, and MSVC 19.35 or newer, and C++20 on anything older. Set `CXX20=1` to pin the older standard. If you minimize output with `tail`, then include at least 50-80 lines of output. Make sure you don't accidentally confuse a random warning with the actual error.
 ```bash
 # build without reconfigure (faster if you do not need to fully reconfigure)
 # -vv means extra verbose, -v means medium verbose
-CXX20=1 mama gcc build test="-vv"
+mama gcc build test="-vv"
 
 # reconfigure CMake and build everything
-CXX20=1 mama gcc rebuild test="-vv"
+mama gcc rebuild test="-vv"
 ```
 2. **Run specific unit test suite**: If you modified a specific module, you can run only the relevant unit tests to save time. For example, if you modified `concurrent_queue.h`, you can run find the matching `TestImpl(test_concurrent_queue)` in `test_concurrent_queue.cpp` and run that test file:
 ```bash
-CXX20=1 mama gcc build test="-vv test_concurrent_queue"
+mama gcc build test="-vv test_concurrent_queue"
 ```
 3. **Run a specific failing test**: If you have a specific test that is failing, you can run just that test using the following command. You can find the test name in the test output, it will be something like `test_concurrent_queue::push_and_pop`:
 ```bash
-CXX20=1 mama gcc build test="-vv test_concurrent_queue::push_and_pop"
+mama gcc build test="-vv test_concurrent_queue::push_and_pop"
 ```
-4. **Run tests with sanitizers**: If you want to check for memory or threading errors, you can build and run the tests with sanitizers enabled. It usually needs a full rebuild to apply a change in sanitizer flags. Later you can use regular build command.
+4. **Run tests with sanitizers**: If you want to check for memory or threading errors, you can build and run the tests with sanitizers enabled. mama gives each sanitizer its own build directory, such as `packages/ReCpp/linux-tsan`, so a switch back to the regular build rebuilds nothing and never mixes sanitized objects with regular ones.
 ```bash
 # run AddressSanitizer, by default it runs with gdb
-CXX20=1 mama gcc asan build test="-vv"
+mama gcc asan build test="-vv"
 
 # run with AddressSanitizer until failure
-CXX20=1 mama gcc asan build test="-vv test_event_loop::ui_simulation_message_and_video_pipelines" test_until_failure=20
+mama gcc asan build test="-vv test_event_loop::ui_simulation_message_and_video_pipelines" test_until_failure=20
 
 # run ThreadSanitizer
-CXX20=1 mama gcc tsan build test="nogdb -vv"
+mama gcc tsan build test="nogdb -vv"
 
 # run a specific test with ThreadSanitizer until failure:
-CXX20=1 mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
+mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
 ```
-5. **You can choose between gcc or clang**: By default, the build uses gcc, but you can switch to clang by replacing `gcc` with `clang` in the above commands. Note that a full rebuild is needed when switching compilers.
+5. **You can choose between gcc or clang**: By default, the build uses gcc, but you can switch to clang by replacing `gcc` with `clang` in the above commands. Each compiler keeps its own build directory, `linux` and `linux-clang`, so a switch rebuilds nothing in the other one.
 ```bash
 # build with clang
-CXX20=1 mama clang build test="-vv"
+mama clang build test="-vv"
 ```
 6. **Run tests on windows**: If you are running on Windows, then MSVC++ is the default compiler. The run command does not specify a compiler and doesn't specify nogdb. You can still enable sanitizers with asan/tsan options.
 ```cmd
@@ -45,7 +45,7 @@ mama build test="-vv"
 ```
 7. **Running clang-tidy for static analysis**: You can run clang-tidy to check for common C++ issues and enforce coding standards. This is especially useful for catching potential bugs or issues in the code. There is a .clang-tidy config file in the project root.
 ```bash
-CXX20=1 mama gcc build clang-tidy test
+mama gcc build clang-tidy test
 ```
 
 ## After modifying any header file in `src/rpp/`

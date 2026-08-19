@@ -1138,7 +1138,7 @@ TestImpl(test_event_loop)
 
         clock.warp_forward(rpp::seconds(10)); // advance virtual time past the deadline
 
-        loop_until(rpp::millis(2000), [&]{ return done.load(); });
+        loop_until(rpp::seconds(1), [&]{ return done.load(); });
         AssertThat(done.load(), true);
     }
 
@@ -1182,9 +1182,9 @@ TestImpl(test_event_loop)
         });
 
         // NOTE: hook warps +500ms each call
-        rpp::Duration spent = loop_until(rpp::millis(2000), [&]{ return done.load(); });
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return done.load(); });
         AssertThat(done.load(), true);
-        AssertLess(spent, rpp::millis(2000)); // ~10s wall without the warp hook
+        AssertLess(spent, rpp::seconds(1)); // without the hook this spends the whole virtual delay
     }
 
     // ─── loop hook drives time warp under run_until_idle() ──────
@@ -1228,7 +1228,7 @@ TestImpl(test_event_loop)
             fut = make_coro(); // start the coroutine here, off the loop thread
         }).get(); // fut is set before anything below reads it
 
-        loop_until(rpp::millis(2000), [&]{ return fut.await_ready(); });
+        loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
 
         fut.get(); // ready in the success path; rethrows any coroutine exception
         return launcher_tid.load();
