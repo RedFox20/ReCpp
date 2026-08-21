@@ -36,6 +36,10 @@ class ReCpp(mama.BuildTarget):
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
+        # the floors match RPP_MODULES_MIN_* in CMakeLists.txt, so a consumer and ReCpp
+        # itself agree on which toolchain builds a module and which keeps the header
+        self.export_modules('src/rpp', ['rpp-strview.cppm', 'rpp-debugging.cppm'],
+                            min_gnu='14', min_clang='21', min_msvc='19.34')
         if self.windows:
             self.export_lib(f'{self.cmake_build_type}/ReCpp.lib')
         else:
@@ -76,8 +80,8 @@ class ReCpp(mama.BuildTarget):
 
 
     def deploy(self):
-        # deploy directly to build directory
-        self.papa_deploy(f'.', src_dir=False)
+        # a subdir of the build dir, because the module strip cannot edit the build dir in place
+        self.papa_deploy('ReCpp', src_dir=False)
 
 
     # The whole suite runs in ~5 seconds, so this limit only ever triggers on a deadlock.
