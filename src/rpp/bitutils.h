@@ -1,5 +1,4 @@
 #pragma once
-#include "config.h"
 #include <cstdint> // uint8_t
 
 namespace rpp

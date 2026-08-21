@@ -2694,24 +2694,24 @@ Portable atomic `shared_ptr` and `weak_ptr` wrappers. Uses native `std::atomic<s
 
 | Type | Description |
 |------|-------------|
-| [`atomic_shared_ptr<T>`](src/rpp/atomic_shared_ptr.h#L50) | Thread-safe atomic shared_ptr with load/store/exchange |
-| [`atomic_weak_ptr<T>`](src/rpp/atomic_shared_ptr.h#L110) | Thread-safe atomic weak_ptr with load/store/exchange |
+| [`atomic_shared_ptr<T>`](src/rpp/atomic_shared_ptr.h#L49) | Thread-safe atomic shared_ptr with load/store/exchange |
+| [`atomic_weak_ptr<T>`](src/rpp/atomic_shared_ptr.h#L109) | Thread-safe atomic weak_ptr with load/store/exchange |
 
 ### atomic_shared_ptr Methods
 
 | Method | Description |
 |--------|-------------|
-| [`load(memory_order)`](src/rpp/atomic_shared_ptr.h#L78) | Atomically load a copy of the shared_ptr |
-| [`store(shared_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L86) | Atomically replace the stored shared_ptr |
-| [`exchange(shared_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L94) | Atomically replace and return the old shared_ptr |
+| [`load(memory_order)`](src/rpp/atomic_shared_ptr.h#L77) | Atomically load a copy of the shared_ptr |
+| [`store(shared_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L85) | Atomically replace the stored shared_ptr |
+| [`exchange(shared_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L93) | Atomically replace and return the old shared_ptr |
 
 ### atomic_weak_ptr Methods
 
 | Method | Description |
 |--------|-------------|
-| [`load(memory_order)`](src/rpp/atomic_shared_ptr.h#L138) | Atomically load a copy of the weak_ptr |
-| [`store(weak_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L146) | Atomically replace the stored weak_ptr |
-| [`exchange(weak_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L154) | Atomically replace and return the old weak_ptr |
+| [`load(memory_order)`](src/rpp/atomic_shared_ptr.h#L137) | Atomically load a copy of the weak_ptr |
+| [`store(weak_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L145) | Atomically replace the stored weak_ptr |
+| [`exchange(weak_ptr, memory_order)`](src/rpp/atomic_shared_ptr.h#L153) | Atomically replace and return the old weak_ptr |
 
 ### Example
 
@@ -3921,21 +3921,21 @@ Fixed-length bit array.
 
 | Class | Description |
 |-------|-------------|
-| [`bit_array`](src/rpp/bitutils.h#L13) | Dynamic bit array with set/unset/test operations |
+| [`bit_array`](src/rpp/bitutils.h#L12) | Dynamic bit array with set/unset/test operations |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`set(int bit)`](src/rpp/bitutils.h#L63) | Set a bit |
-| [`set(int bit, bool value)`](src/rpp/bitutils.h#L70) | Set a bit to a value |
-| [`unset(int bit)`](src/rpp/bitutils.h#L76) | Clear a bit |
-| [`isSet(int bit)`](src/rpp/bitutils.h#L81) | Test a bit |
-| [`checkAndSet(int bit)`](src/rpp/bitutils.h#L87) | Test and set atomically |
-| [`reset(int numBits)`](src/rpp/bitutils.h#L57) | Reset with new size |
-| [`sizeBytes()`](src/rpp/bitutils.h#L47) / [`sizeBits()`](src/rpp/bitutils.h#L49) | Size queries |
-| [`getBuffer()`](src/rpp/bitutils.h#L51) / [`getByte(int i)`](src/rpp/bitutils.h#L92) | Raw access |
-| [`copy()`](src/rpp/bitutils.h#L101) / [`copyNegated()`](src/rpp/bitutils.h#L110) | Copy operations |
+| [`set(int bit)`](src/rpp/bitutils.h#L62) | Set a bit |
+| [`set(int bit, bool value)`](src/rpp/bitutils.h#L69) | Set a bit to a value |
+| [`unset(int bit)`](src/rpp/bitutils.h#L75) | Clear a bit |
+| [`isSet(int bit)`](src/rpp/bitutils.h#L80) | Test a bit |
+| [`checkAndSet(int bit)`](src/rpp/bitutils.h#L86) | Test and set atomically |
+| [`reset(int numBits)`](src/rpp/bitutils.h#L56) | Reset with new size |
+| [`sizeBytes()`](src/rpp/bitutils.h#L46) / [`sizeBits()`](src/rpp/bitutils.h#L48) | Size queries |
+| [`getBuffer()`](src/rpp/bitutils.h#L50) / [`getByte(int i)`](src/rpp/bitutils.h#L91) | Raw access |
+| [`copy()`](src/rpp/bitutils.h#L100) / [`copyNegated()`](src/rpp/bitutils.h#L109) | Copy operations |
 
 ### Example: Bit Array Operations
 
@@ -4624,8 +4624,8 @@ Function type traits for extracting return types and argument types from callabl
 
 | Trait | Description |
 |-------|-------------|
-| [`function_traits<T>`](src/rpp/traits.h#L17) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
-| [`first_arg_type<T>`](src/rpp/traits.h#L51) | First argument type of a callable |
+| [`function_traits<T>`](src/rpp/traits.h#L16) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
+| [`first_arg_type<T>`](src/rpp/traits.h#L50) | First argument type of a callable |
 
 ---
 

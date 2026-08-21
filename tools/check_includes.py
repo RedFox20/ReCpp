@@ -12,12 +12,17 @@ The `unused` check works by deletion. It copies the tree, comments out one
 need the line. Run `missing` first: a header can look self-contained only because
 a sibling header leaks the declaration into it.
 
+A header that re-exports another one for its consumers names nothing from it, and
+the deletion test cannot tell that apart from a stale include. Mark the line
+`#include "x.h" // re-export` and no check reports it.
+
 Usage:
   tools/check_includes.py self-contained [--check]
   tools/check_includes.py unused [--check] [--only strview.h]
   tools/check_includes.py missing [--check]
 """
 import argparse, os, re, shutil, subprocess, sys, tempfile
+from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 
 SRC = 'src/rpp'
@@ -38,6 +43,8 @@ RULES = [
     (r'\bstd::(mutex|lock_guard|unique_lock|recursive_mutex)\b', ('mutex',)),
 ]
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
+# a header may re-export another one for its consumers, and then names nothing from it
+REEXPORT_RE = re.compile(r'^\s*#\s*include\s*[<"][^>"]+[>"][^\n]*//[^\n]*\bre-export\b', re.M)
 # a quoted include is an rpp header, an angled one is not. <math.h> is not src/rpp/math.h.
 QUOTED_RE = re.compile(r'^\s*#\s*include\s*"([^"]+)"', re.M)
 
@@ -84,12 +91,33 @@ DECL_RES = [
 ]
 
 
-def declared_names(path: str) -> set[str]:
+@lru_cache(maxsize=None)
+def own_names(path: str) -> frozenset:
+    """Returns the names one file declares itself."""
     src = strip_comments(open(path, encoding='utf-8', errors='replace').read())
     names = set()
     for r in DECL_RES:
         names |= set(r.findall(src))
-    return {n for n in names if len(n) > 2}
+    return frozenset(n for n in names if len(n) > 2)
+
+
+def declared_names(path: str) -> set[str]:
+    """Returns the names a header offers, including the ones it re-exports.
+
+    A header hands the consumer every name its own includes declare. debugging.h
+    declares no LogError and re-exports it from debugging.macros.h. A scan that
+    stops at the first file therefore reports a used include as unused.
+    """
+    names, seen, todo = set(), set(), [path]
+    while todo:
+        f = todo.pop()
+        if f in seen or not os.path.isfile(f):
+            continue
+        seen.add(f)
+        names |= own_names(f)
+        src = open(f, encoding='utf-8', errors='replace').read()
+        todo += [os.path.join(SRC, i) for i in QUOTED_RE.findall(src)]
+    return names
 
 
 def _probe_unused(args) -> list[tuple[str, str]]:
@@ -99,8 +127,11 @@ def _probe_unused(args) -> list[tuple[str, str]]:
     original = open(path, encoding='utf-8', errors='replace').read()
     found = []
     quoted_spans = {m.start() for m in QUOTED_RE.finditer(original)}
+    reexports = {m.start() for m in REEXPORT_RE.finditer(original)}
     try:
         for m in INCLUDE_RE.finditer(original):
+            if m.start() in reexports:
+                continue  # the author states the consumer needs it, so removing it is not the fix
             patched = original[:m.start()] + '//' + original[m.start():]
             open(path, 'w', encoding='utf-8').write(patched)
             ok, _ = compile_header(header, worktree)
