@@ -3,16 +3,18 @@ orbs:
   win: circleci/windows@5.0 # VS2022
 
 parameters:
-  mama_branch:
+  mama_ref:
     type: string
-    # TEMPORARY: every job installs mama from this Mama branch instead of the released one.
+    # TEMPORARY: every job installs mama from this Mama commit instead of the released one.
     # Empty the string to go back to the mama on PyPI. Nothing else changes.
-    default: "feature/support-module-cppm"
+    # Pin a commit, not a branch. A branch moves under CI, and a broken tip then fails
+    # every job here for a reason that is not in this repository.
+    default: "c893dfa33437c1dfe5cbf12a0356173e4d39e161"
 
 commands:
   install_mama:
     description: >
-      Replaces the released mama with a build of pipeline.parameters.mama_branch.
+      Replaces the released mama with a build of pipeline.parameters.mama_ref.
       The released install stays, so pip resolves the dependencies from PyPI and this
       overwrites the mama package alone. It does nothing when the parameter is empty.
     parameters:
@@ -22,11 +24,15 @@ commands:
         description: "the pip that writes to the same environment as the mama on PATH"
     steps:
       - when:
-          condition: << pipeline.parameters.mama_branch >>
+          condition: << pipeline.parameters.mama_ref >>
           steps:
             - run:
-                name: Install mama from << pipeline.parameters.mama_branch >>
-                command: << parameters.pip >> install --no-deps --force-reinstall "git+https://github.com/RedFox20/Mama.git@<< pipeline.parameters.mama_branch >>"
+                name: Install mama << pipeline.parameters.mama_ref >>
+                command: |
+                  << parameters.pip >> install --no-deps --force-reinstall \
+                      "git+https://github.com/RedFox20/Mama.git@<< pipeline.parameters.mama_ref >>"
+                  # name the commit the job actually got, so a mama defect is attributable
+                  << parameters.pip >> show mama
 
 jobs:
   ubuntu-build:
