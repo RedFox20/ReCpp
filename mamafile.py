@@ -36,7 +36,6 @@ class ReCpp(mama.BuildTarget):
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
-        self.export_modules('src/rpp', ['rpp-strview.cppm', 'rpp-debugging.cppm'])
         if self.windows:
             self.export_lib(f'{self.cmake_build_type}/ReCpp.lib')
         else:
