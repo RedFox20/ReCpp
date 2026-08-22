@@ -115,6 +115,9 @@ jobs:
             - run:
                 name: Header and import-order gates
                 command: |
+                  # the tree conforms, so a scan that reports nothing passes the gate below.
+                  # this runs the scan over crafted sources and pins the line each one names
+                  python3 tools/check_includes.py selftest --check
                   # every header must compile alone, so a consumer may include any one first
                   export CXX=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
                   export CXXSTD=c++<< parameters.cpp_version >>
