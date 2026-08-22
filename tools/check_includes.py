@@ -201,7 +201,8 @@ def check_missing() -> list[str]:
     return bad
 
 
-IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import[ \t]+[<"A-Za-z_]', re.M)
+# the operand is a module name, a header unit in <> or "", or a partition starting with :
+IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import[ \t]*[<":A-Za-z_]', re.M)
 
 
 def check_import_order() -> list[str]:
