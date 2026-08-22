@@ -223,11 +223,19 @@ def _line_start(out: list, i: int) -> int:
     return j
 
 
-def _header_name_end(src: str, i: int) -> int:
-    """The index past the `<name>` at `i`, or -1. A header name never crosses a newline."""
-    close = src.find('>', i + 1)
+# `#include_next` names a header the same way, so it carries the same ordering hazard
+_HEADER_DIRECTIVES = ('include', 'include_next', 'import')
+
+
+def _header_name_end(src: str, i: int, close: str) -> int:
+    """The index past the header name at `i`, or -1.
+
+    A header name never crosses a newline, and it holds no escape, so a backslash before
+    the closing character closes nothing. `import "foo\\";` names a header called `foo\\`.
+    """
+    end = src.find(close, i + 1)
     newline = src.find('\n', i + 1)
-    return close + 1 if close >= 0 and (newline < 0 or close < newline) else -1
+    return end + 1 if end >= 0 and (newline < 0 or end < newline) else -1
 
 
 def _ends_name(src: str, at: int) -> bool:
@@ -323,7 +331,7 @@ def _at_operand(before: str) -> bool:
     r.skip()
     if r.punct('#', '%:'):
         r.skip()
-        if r.word() not in ('include', 'import'):
+        if r.word() not in _HEADER_DIRECTIVES:
             return False
     else:
         kw = r.word()
@@ -362,7 +370,7 @@ def classify(line: str) -> str:
     if r.punct('#', '%:'):  # `%:` is the alternative token for `#`
         r.skip()
         kw = r.word()
-        return f'#{kw}' if kw in ('include', 'import') else ''
+        return f'#{kw}' if kw in _HEADER_DIRECTIVES else ''
     kw = r.word()
     if kw == 'export':
         r.skip()
@@ -467,18 +475,20 @@ def _code_only(src: str, origin: list, raw: str) -> str:
             else:
                 end = src.find('*/', i + 2)
                 end = n if end < 0 else end + 2
+        elif c in '"<' and _at_operand(''.join(out[_line_start(out, i):i])):
+            # `#include "x.h"` and `import <x.h>` name a header, which is one token and not a
+            # literal, so no comment opens inside it and no backslash escapes anything
+            end = _header_name_end(src, i, '>' if c == '<' else '"')
+            if end < 0:  # no closing character on the line, so it is not a header name
+                if c == '<':
+                    i += 1
+                    continue
+                end = _skip_quoted(src, i, '"')
+            i = end
+            continue
         elif c == '"':
             end = (_skip_raw(src, i, origin, raw) if _opens_raw_string(src, i)
                    else _skip_quoted(src, i, '"'))
-            # `#include "x.h"` and `import "x.h"` name a header, so that operand is not a literal.
-            # the line reads back from `out`, where a comment before the operand is already gone.
-            if _at_operand(''.join(out[_line_start(out, i):i])):
-                i = end
-                continue
-        # a header name is one token, so `import <foo//bar>;` opens no comment inside it
-        elif c == '<' and _at_operand(''.join(out[_line_start(out, i):i])) and _header_name_end(src, i) > 0:
-            i = _header_name_end(src, i)
-            continue
         elif c == "'" and _opens_char_literal(src, i):
             end = _skip_quoted(src, i, "'")
         else:
@@ -597,6 +607,8 @@ SELFTEST = [
                                  b'import m;\nconst char* s = \\u{e9}R"(a";\n#include <string>\n', 3),
     ('multiline_comment_operand.cppm', b'import/* x\ny */"foo.h";\n#include <string>\n', 3),
     ('angled_across_lines.cppm',  b'import a;\nimport <\n/*\n#include "x.h"\n*/ >;\n', 0),
+    ('include_next.cppm',         b'import m;\n#include_next <string>\n', 2),
+    ('backslash_header_name.cppm', b'import "foo\\"; /*\n#include "x.h"\n*/\nint z;\n', 0),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
