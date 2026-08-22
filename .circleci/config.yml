@@ -2,6 +2,32 @@ version: 2.1
 orbs:
   win: circleci/windows@5.0 # VS2022
 
+parameters:
+  mama_branch:
+    type: string
+    # TEMPORARY: every job installs mama from this Mama branch instead of the released one.
+    # Empty the string to go back to the mama on PyPI. Nothing else changes.
+    default: "feature/support-module-cppm"
+
+commands:
+  install_mama:
+    description: >
+      Replaces the released mama with a build of pipeline.parameters.mama_branch.
+      The released install stays, so pip resolves the dependencies from PyPI and this
+      overwrites the mama package alone. It does nothing when the parameter is empty.
+    parameters:
+      pip:
+        type: string
+        default: "pipenv run pip"
+        description: "the pip that writes to the same environment as the mama on PATH"
+    steps:
+      - when:
+          condition: << pipeline.parameters.mama_branch >>
+          steps:
+            - run:
+                name: Install mama from << pipeline.parameters.mama_branch >>
+                command: << parameters.pip >> install --no-deps --force-reinstall "git+https://github.com/RedFox20/Mama.git@<< pipeline.parameters.mama_branch >>"
+
 jobs:
   ubuntu-build:
     parameters:
@@ -75,6 +101,7 @@ jobs:
                   # clang-tools. Without it a modules build configures and then fails.
                   sudo apt-get install -y clang-tools-$LLVM_VER
       - run: pipenv install mama
+      - install_mama
       - run: pipenv run mama install-<< parameters.cc_version >>
       - when:
           condition: << parameters.check_includes >>
@@ -124,6 +151,8 @@ jobs:
     steps:
       - checkout
       - run: pip3 install mama
+      - install_mama:
+          pip: "pip3"
       - run: choco install cmake -y
       - run:
           name: Build
@@ -151,6 +180,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install gcc-mipsel-linux-gnu g++-mipsel-linux-gnu
       - run: pipenv install mama
+      - install_mama
       - run: make configure-cmake
       - run: CXX20=1 pipenv run mama mips verbose build jobs=3
   consumer-integration:
@@ -181,6 +211,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt -y --allow-unauthenticated install libdw-dev libunwind-dev ninja-build
       - run: pipenv install mama
+      - install_mama
       - when:
           condition: << parameters.llvm_apt >>
           steps:
@@ -235,6 +266,8 @@ jobs:
     steps:
       - checkout
       - run: pip3 install mama
+      - install_mama:
+          pip: "pip3"
       - run: choco install cmake -y
       - run:
           name: Build and run the consumer
@@ -296,6 +329,8 @@ jobs:
       - run: sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED || true
       - run: make configure-pip3
       - run: pip3 install mama
+      - install_mama:
+          pip: "pip3"
       - run:
           name: Build Android NDK << parameters.toolchain >>
           command: |
