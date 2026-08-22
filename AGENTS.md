@@ -39,6 +39,7 @@ shapes what fits inside it.** These gates are not negotiable for brevity:
 - the Linux GCC, Linux Clang, Android, and Windows builds
 - the full test suite run
 - the README.md line-reference update
+- the import-order gate, `tools/check_includes.py import-order --check`
 
 A TSAN run is a suggestion, not a gate. TSAN reports false positives, so a report
 goes to `BUGS.md` for later analysis. See `recpp-review` R10 and R11.
@@ -106,7 +107,15 @@ are available.
 
 ### Includes come before imports. Always.
 
+This is a hard rule, and a gate holds it:
+
+```bash
+tools/check_includes.py import-order --check
+```
+
 In any file that mixes both, put every `#include` first and every `import` last.
+There is no exception. A file that needs one is a file that needs a different
+split, not a different order.
 
 ```cpp
 #include <rpp/tests.h>   // 1. rpp headers
@@ -137,13 +146,14 @@ A header does not control where a consumer includes it, so it cannot keep the
 order above. An `import` in a header also removes every transitive std include
 from each consumer, which breaks files that never mentioned modules.
 
-Only a `.cpp`, a test, or a `.cppm` carries an `import`.
+Only a `.cpp`, a test, or a `.cppm` carries an `import`. The same gate reports a
+header that carries one.
 
 ### Include what you use
 
 Every file includes the headers for the names it uses. Do not rely on a
 transitive include. Run `tools/check_includes.py all` before you commit a header
-change. The migration plan is in [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md).
+change, which runs the import-order gate too. The migration plan is in [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md).
 
 A header that re-exports another one for its consumers names nothing from it, so
 the scan reads it as stale. Mark the line `#include "x.h" // re-export` and no

@@ -6,24 +6,6 @@ lines.
 
 ## Open
 
-### B11. mama's compiler-seed cache drops clang-scan-deps, so a dependency build loses modules
-Not a ReCpp defect. `consumer-clang21` builds ReCpp as a dependency, and it reported
-`the Clang toolchain ships no clang-scan-deps` while all three copies of the binary sat
-on the box, one of them beside the compiler. `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` was
-absent from `CMakeCache.txt`, not `NOTFOUND`, so the `find_program` never ran.
-`Compiler/Clang-FindBinUtils.cmake` runs only from `CMakeDetermineCXXCompiler.cmake:203`,
-which CMake skips when `CMakeCXXCompiler.cmake` already exists. mama seeds that exact
-file, and the log shows `seed[RppConsumer] ... hit -> use` with `Configuring done (0.0s)`.
-The seed replays 5 cache keys and none of the 3 that module scanning needs.
-The job passes `nocache` until mama replays them. Reported to mamabuild.
-
-### B6. A consumer builds modules that no consumer can import
-`package()` exports `.h` and `.natvis` only, so a downstream project compiles two
-BMIs and then cannot `import` either one. See B3. AUTO still turns modules on in
-a dependency build, which is where C11 broke KrattGCS.
-The owner chose to keep AUTO as the default, so this stays open until B3 lands and
-makes the modules reachable. Until then a consumer pays the build cost for nothing.
-
 ### B10. A test handed the event_loop a pool that dies before the loop
 `test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
 the loop a raw pointer to it. The case returns, the local pool dies, and only then
@@ -136,20 +118,27 @@ The tail reproduces locally, which the entry above assumed it did not. A
 `pollin`. Three plain runs of the same binary passed 501/501. So the slack policy
 can prove itself on a loaded machine, without waiting for CI.
 
-### B3. mamabuild cannot export C++20 modules
-`mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
-a consumer. `CMakeLists.txt` has no `install(TARGETS ... FILE_SET CXX_MODULES)`.
-Nobody outside ReCpp can import `rpp.strview` or `rpp.debugging` yet.
-A binary module interface is not portable, so a consumer must compile the
-producer's `.cppm` inside its own target. mama has no way to express that.
-Tracked upstream: https://github.com/RedFox20/Mama/issues/41
-
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C18. A consumer can import the exported modules (was B3 and B6)
+mama exports every module interface unit under an exported include dir, and
+`mama_target_modules()` compiles them into the consumer. `tests/module_consumer`
+imports `rpp.strview` on gcc 14.2 and reports the same result as the header path.
+The packaged library drops both module initializers, so a whole-archive link finds
+one of each. This needs a mama that carries `export_modules`, which PyPI does not
+ship yet, so `.circleci/config.yml` pins the branch until it releases.
+
+### C17. The compiler-seed cache dropped clang-scan-deps (was B11)
+Not a ReCpp defect. `consumer-clang21` reported `the Clang toolchain ships no
+clang-scan-deps` while three copies sat on the box, because mama seeded
+`CMakeCXXCompiler.cmake` and CMake then skipped the `find_program` that fills
+`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS`. The job carried `nocache` to work around it.
+mama fixed the seed in `a8112be`, so the flag is gone.
 
 ### C16. The 52 missing std includes were not a defect (was B4)
 B4 claimed each of the 52 files breaks when its provider chain becomes an `import`.

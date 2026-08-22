@@ -4,6 +4,7 @@
 Three checks, each with a --check gate for CI:
 
   self-contained  every header compiles alone, twice, with nothing included before it
+  import-order    an #include that follows an import, or an import inside a header
   unused          an #include that the header still compiles without
   missing         a file that uses a std facility it does not include itself
 
@@ -18,6 +19,7 @@ the deletion test cannot tell that apart from a stale include. Mark the line
 
 Usage:
   tools/check_includes.py self-contained [--check]
+  tools/check_includes.py import-order [--check]
   tools/check_includes.py unused [--check] [--only strview.h]
   tools/check_includes.py missing [--check]
 """
@@ -199,17 +201,121 @@ def check_missing() -> list[str]:
     return bad
 
 
+# translation splices a backslash-newline away before it reads a directive, so both count
+_WS = r'(?:[ \t]|\\\n)'
+# a named module needs whitespace after the keyword, or `important` reads as an import.
+# a header unit in <> or "" and a partition starting with : may sit against the keyword.
+IMPORT_RE = re.compile(rf'^[ \t]*(?:export{_WS}+)?import(?:{_WS}+[A-Za-z_]|{_WS}*[<":])', re.M)
+# the ordering scan needs the directive, not its operand, so a macro form still counts
+ANY_INCLUDE_RE = re.compile(rf'^[ \t]*#{_WS}*include\b', re.M)
+
+
+_DIRECTIVE_RE = re.compile(rf'[ \t]*(?:#{_WS}*include\b|(?:export{_WS}+)?import\b)')
+
+# the longest raw-string delimiter C++ allows
+_MAX_RAW_DELIM = 16
+
+
+def _skip_quoted(src: str, i: int, quote: str) -> int:
+    """The index past the literal that opens at `i`, or the newline that leaves it unterminated."""
+    j, n = i + 1, len(src)
+    while j < n:
+        c = src[j]
+        if c == '\\':   j += 2       # an escape hides the next character, a splice included
+        elif c == '\n':  return j     # a literal does not cross a raw newline
+        elif c == quote: return j + 1
+        else:            j += 1
+    return n
+
+
+def _skip_raw(src: str, i: int) -> int:
+    """The index past the raw string whose quote sits at `i`. Only its own delimiter closes it."""
+    open_paren = src.find('(', i + 1)
+    if open_paren < 0 or open_paren - (i + 1) > _MAX_RAW_DELIM:
+        return _skip_quoted(src, i, '"')  # no delimiter, so read it as an ordinary string
+    close = src.find(')' + src[i + 1:open_paren] + '"', open_paren)
+    return len(src) if close < 0 else close + (open_paren - i) + 1
+
+
+def _code_only(src: str) -> str:
+    """The source with every comment and literal blanked, and every newline kept.
+
+    A regex cannot decide which construct opens first, so this reads the file once and
+    tracks what it is inside. A quote inside a comment opens no string, a `/*` inside any
+    literal opens no comment, and a raw string ends only at its own delimiter. A directive
+    keeps its operand, because `#include "x.h"` carries a path the scan must still read.
+    Blanking keeps the line count, so a reported line number matches the file on disk.
+    """
+    out, i, n = list(src), 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == '/' and i + 1 < n and src[i + 1] in '/*':
+            if src[i + 1] == '/':
+                end = src.find('\n', i)
+                end = n if end < 0 else end
+            else:
+                end = src.find('*/', i + 2)
+                end = n if end < 0 else end + 2
+        elif c == '"':
+            end = _skip_raw(src, i) if i and src[i - 1] == 'R' else _skip_quoted(src, i, '"')
+            # `#include "x.h"` and `import "x.h"` name a header, so the operand is not a literal
+            if _DIRECTIVE_RE.match(src, src.rfind('\n', 0, i) + 1):
+                i = end
+                continue
+        elif c == "'" and not (i and (src[i - 1].isalnum() or src[i - 1] == '_')):
+            end = _skip_quoted(src, i, "'")  # a quote after a digit separates digits, see 1'000
+        else:
+            i += 1
+            continue
+        for k in range(i, end):
+            if out[k] != '\n':
+                out[k] = ' '
+        i = end
+    return ''.join(out)
+
+
+def check_import_order() -> list[str]:
+    """Every #include must come before every import, and a header carries no import.
+
+    A module makes the declarations of its own included headers reachable in the importing
+    file. A std header parsed after the import re-declares them, and GCC 14 stops with about
+    a thousand redefinition errors. Clang accepts the same file, so only GCC catches it.
+    """
+    # a header under tests/ carries the same rule, so the walk reads every source extension
+    sources = ('.h', '.cpp', '.cppm')
+    files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(sources)]
+             + sorted(f'{r}/{f}' for r, _, fs in os.walk('tests') for f in fs
+                      if f.endswith(sources)))
+    bad = []
+    for f in sorted(set(files)):
+        code = _code_only(open(f, encoding='utf-8', errors='replace').read())
+        imports = [m.start() for m in IMPORT_RE.finditer(code)]
+        if not imports:
+            continue
+        line_of = lambda pos: code.count('\n', 0, pos) + 1
+        if f.endswith('.h'):
+            bad.append(f'{f}:{line_of(imports[0])}: a header carries an import, which every '
+                       'consumer inherits and cannot reorder')
+            continue
+        late = [m.start() for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
+        if late:
+            bad.append(f'{f}:{line_of(late[0])}: this #include follows the import on line '
+                       f'{line_of(imports[0])}, move every include above it')
+    return bad
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'all'])
+    ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'import-order', 'all'])
     ap.add_argument('--check', action='store_true', help='exit 1 when a finding remains')
     ap.add_argument('--only', help='limit the unused scan to one header')
     a = ap.parse_args()
 
-    modes = ['self-contained', 'missing', 'unused'] if a.mode == 'all' else [a.mode]
+    modes = ['self-contained', 'import-order', 'missing', 'unused'] if a.mode == 'all' else [a.mode]
     gated = 0
     for mode in modes:
         if mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
+        elif mode == 'import-order': found, gate = (lambda r: (r, len(r)))(check_import_order())
         elif mode == 'missing':      found, gate = (lambda r: (r, len(r)))(check_missing())
         else:                        found, gate = check_unused(a.only)
         noun, verb = ('finding', 'fails') if gate == 1 else ('findings', 'fail')
