@@ -5,11 +5,11 @@ orbs:
 parameters:
   mama_ref:
     type: string
-    # TEMPORARY: every job installs mama from this Mama commit instead of the released one.
+    # TEMPORARY: every job installs mama from this Mama branch instead of the released one.
     # Empty the string to go back to the mama on PyPI. Nothing else changes.
-    # Pin a commit, not a branch. A branch moves under CI, and a broken tip then fails
-    # every job here for a reason that is not in this repository.
-    default: "c893dfa33437c1dfe5cbf12a0356173e4d39e161"
+    # Track the branch, not a commit. A pin hides a broken tip, and this CI is where a
+    # mama defect must surface.
+    default: "feature/support-module-cppm"
 
 commands:
   install_mama:
