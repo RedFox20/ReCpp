@@ -28,10 +28,10 @@ commands:
           steps:
             - run:
                 name: Install mama << pipeline.parameters.mama_ref >>
+                # one line per command: PowerShell runs this block on the windows jobs, and it
+                # reads a trailing backslash as an argument instead of a line continuation
                 command: |
-                  << parameters.pip >> install --no-deps --force-reinstall \
-                      "git+https://github.com/RedFox20/Mama.git@<< pipeline.parameters.mama_ref >>"
-                  # name the commit the job actually got, so a mama defect is attributable
+                  << parameters.pip >> install --no-deps --force-reinstall "git+https://github.com/RedFox20/Mama.git@<< pipeline.parameters.mama_ref >>"
                   << parameters.pip >> show mama
 
 jobs:

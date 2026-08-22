@@ -205,6 +205,24 @@ def check_missing() -> list[str]:
 IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import[ \t]*[<":A-Za-z_]', re.M)
 
 
+_COMMENT_RE = re.compile(r'//[^\n]*|/\*.*?\*/', re.S)
+_STRING_RE = re.compile(r'"(?:[^"\\\n]|\\.)*"')
+_DIRECTIVE_RE = re.compile(r'^[ \t]*(?:#[ \t]*include\b|(?:export[ \t]+)?import\b)')
+
+
+def _code_only(src: str) -> str:
+    """The source with comments and string literals blanked, and every newline kept.
+
+    A directive keeps its operand. `#include "x.h"` and `import "x.h"` carry a quoted path,
+    and blanking that would hide the line from the scan. Blanking keeps the line count, so a
+    reported line number still matches the file on disk.
+    """
+    blank = lambda m: re.sub(r'[^\n]', ' ', m.group())
+    code = _COMMENT_RE.sub(blank, src)
+    return '\n'.join(line if _DIRECTIVE_RE.match(line) else _STRING_RE.sub(blank, line)
+                      for line in code.split('\n'))
+
+
 def check_import_order() -> list[str]:
     """Every #include must come before every import, and a header carries no import.
 
@@ -212,17 +230,14 @@ def check_import_order() -> list[str]:
     file. A std header parsed after the import re-declares them, and GCC 14 stops with about
     a thousand redefinition errors. Clang accepts the same file, so only GCC catches it.
     """
-    files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(('.h', '.cpp', '.cppm'))]
-             + [f'tests/{f}' for f in sorted(os.listdir('tests')) if f.endswith(('.cpp', '.cppm'))]
+    # a header under tests/ carries the same rule, so the walk reads every source extension
+    sources = ('.h', '.cpp', '.cppm')
+    files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(sources)]
              + sorted(f'{r}/{f}' for r, _, fs in os.walk('tests') for f in fs
-                      if f.endswith(('.cpp', '.cppm')) and r != 'tests'))
+                      if f.endswith(sources)))
     bad = []
     for f in sorted(set(files)):
-        # a comment or a string may hold either word, so scan the code alone. Blanking keeps
-        # every newline, so a reported line number still matches the file on disk.
-        src = open(f, encoding='utf-8', errors='replace').read()
-        code = re.sub(r'//[^\n]*|/\*.*?\*/|"(?:[^"\\\n]|\\.)*"',
-                      lambda m: re.sub(r'[^\n]', ' ', m.group()), src, flags=re.S)
+        code = _code_only(open(f, encoding='utf-8', errors='replace').read())
         imports = [m.start() for m in IMPORT_RE.finditer(code)]
         if not imports:
             continue
