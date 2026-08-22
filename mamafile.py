@@ -36,10 +36,7 @@ class ReCpp(mama.BuildTarget):
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
-        # the floors match RPP_MODULES_MIN_* in CMakeLists.txt, so a consumer and ReCpp
-        # itself agree on which toolchain builds a module and which keeps the header
-        self.export_modules('src/rpp', ['rpp-strview.cppm', 'rpp-debugging.cppm'],
-                            min_gnu='14', min_clang='21', min_msvc='19.34')
+        self.export_modules('src/rpp', ['rpp-strview.cppm', 'rpp-debugging.cppm'])
         if self.windows:
             self.export_lib(f'{self.cmake_build_type}/ReCpp.lib')
         else:
