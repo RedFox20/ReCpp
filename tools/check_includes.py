@@ -210,12 +210,16 @@ def check_missing() -> list[str]:
 _HASH = r'(?:\#|%:)'
 # a directive takes any whitespace that is not a newline, form feed and vertical tab included
 _SP = r'[^\S\n]'
-# every operand takes its whole shape, so a name that is only `import` stays an identifier.
-# `[^\W\d]` is a C++ identifier start, which `[A-Za-z_]` is not, see module `éclair`.
-_NAME = r'[^\W\d][\w.]*'
+# `[^\W\d]` is a C++ identifier start, which `[A-Za-z_]` is not, see module `éclair`. A name
+# may also carry a universal-character-name, which is how `import éclair;` spells the same.
+_UCN = r'\\[uU][0-9a-fA-F]+'
+_NAME = rf'(?:[^\W\d]|{_UCN})(?:[\w.]|{_UCN})*'
+# a declaration ends on the same line, at `;` or at the `[` of an attribute. Every operand
+# takes that whole shape, so an expression opening with `import` stays an expression.
+_END = rf'{_SP}*[;\[]'
 IMPORT_RE = re.compile(rf'^{_SP}*(?:export{_SP}+)?import'
-                       rf'(?:{_SP}+[^\W\d]|{_SP}*<[^>\s]+>|{_SP}*"[^"\n]+"'
-                       rf'|{_SP}*:{_SP}*{_NAME}{_SP}*[;\[])', re.M)
+                       rf'(?:{_SP}+{_NAME}{_END}|{_SP}*<[^>\n]+>{_END}'
+                       rf'|{_SP}*"[^"\n]+"{_END}|{_SP}*:{_SP}*{_NAME}{_END})', re.M)
 # `#import` is the Objective-C include-once, and file_io.mm carries no other form
 _HEADER_KW = r'(?P<kw>include|import)'
 # the ordering scan needs the directive, not its operand, so a macro form still counts
@@ -394,7 +398,12 @@ SELFTEST = [
     ('label_named_import.h',     b'inline int f(int x){ if(x) goto import;\nimport: return 1;\n}\n', 0),
     ('important.cppm',           b'import m;\nint important = 1;\n', 0),
     ('compare_named_import.h',   b'inline bool f(int import) {\n  return\nimport < 5;\n}\n', 0),
+    ('compare_chain.h',          b'inline bool f(int import) {\n  return\nimport < 5 > 0;\n}\n', 0),
+    ('operator_named_import.h',  b'inline int f(int import,int x) {\n  return\nimport xor x;\n}\n', 0),
     ('unicode_module.cppm',      b'import \xc3\xa9clair;\n#include <string>\n', 2),
+    ('ucn_module.cppm',          b'import \\u00e9clair;\n#include <string>\n', 2),
+    ('unit_angled_space.cppm',   b'import <foo bar>;\n#include <string>\n', 2),
+    ('unit_attribute.cppm',      b'import m [[deprecated]];\n#include <string>\n', 2),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
@@ -402,6 +411,9 @@ SELFTEST = [
     ('keyword_splice.cppm',      b'imp\\\nort m;\n#include <string>\n', 3),
     ('comment_splice.cppm',      b'import m;\n// note \\\n#include <string>\n', 0),
     ('double_backslash.cppm',    b'import m;\n// note \\\\\n', 0),
+    # the reader decodes in text mode, so a CRLF file reaches the scan as LF
+    ('crlf_keyword.cppm',        b'imp\\\r\nort m;\r\n#include <string>\r\n', 3),
+    ('crlf_comment.cppm',        b'import m;\r\n// note \\\r\n#include <string>\r\n', 0),
     # phase 3, the comment and the literal
     ('comment_in_import.cppm',   b'import/* split\n*/m;\n#include <string>\n', 3),
     ('joined_comment.cppm',      b'import m; /* multi\nline */ #include <string>\n', 0),
