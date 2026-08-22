@@ -241,6 +241,22 @@ def _skip_raw(src: str, i: int) -> int:
 # a character literal may carry one of these, and u8 is tried first so u does not win
 _CHAR_PREFIXES = ('u8', 'L', 'u', 'U')
 
+# the raw-string prefixes, longest first so u8R wins over R
+_RAW_PREFIXES = ('u8R', 'LR', 'uR', 'UR', 'R')
+
+
+def _opens_raw_string(src: str, i: int) -> bool:
+    """True when the quote at `i` carries a raw-string prefix, and not the tail of a name.
+
+    A prefix opens its own token, so `fooR"(a"` holds an ordinary string. A raw read runs to
+    the next `)"`, which can blank every include after it.
+    """
+    for prefix in _RAW_PREFIXES:
+        if i >= len(prefix) and src.startswith(prefix, i - len(prefix)):
+            start = i - len(prefix)
+            return start == 0 or not (src[start - 1].isalnum() or src[start - 1] == '_')
+    return False
+
 
 def _opens_char_literal(src: str, i: int) -> bool:
     """True when the quote at `i` opens a literal, and False when it separates digits, see 1'000."""
@@ -280,11 +296,12 @@ def _code_only(src: str) -> str:
                 end = src.find('*/', i + 2)
                 end = n if end < 0 else end + 2
         elif c == '"':
-            end = _skip_raw(src, i) if i and src[i - 1] == 'R' else _skip_quoted(src, i, '"')
+            end = _skip_raw(src, i) if _opens_raw_string(src, i) else _skip_quoted(src, i, '"')
             # `#include "x.h"` and `import "x.h"` name a header, so that operand is not a literal.
-            # only the operand, so a literal later on the same line still blanks.
-            directive = _DIRECTIVE_RE.match(src, src.rfind('\n', 0, i) + 1)
-            if directive and not src[directive.end():i].strip():
+            # the line reads back from `out`, where a comment before the operand is already gone.
+            line = ''.join(out[src.rfind('\n', 0, i) + 1:i])
+            directive = _DIRECTIVE_RE.match(line)
+            if directive and not line[directive.end():].strip():
                 i = end
                 continue
         elif c == "'" and _opens_char_literal(src, i):
