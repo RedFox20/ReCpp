@@ -306,7 +306,11 @@ jobs:
               $env:Path+=";$Env:ProgramFiles\CMake\bin";
               $env:CXX20="1";
               cd tests/module_consumer
-              python run_test.py --compiler windows --expect modules --compare-paths --jobs 4
+              # cmake and mama write to stderr, and Continue keeps those lines from aborting
+              # the step, the same reason the consumer build above sets it
+              $ErrorActionPreference = 'Continue'
+              python run_test.py --compiler windows --expect modules --compare-paths --jobs 4 2>&1 | Tee-Object -FilePath module_consumer.log
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   android-build:
     parameters:
       docker_image:

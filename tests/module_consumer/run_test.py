@@ -8,6 +8,7 @@ graph. A toolchain that misses one compiles the header instead, and the app must
 import argparse
 import os
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -28,10 +29,16 @@ def find_exe() -> str:
     raise SystemExit('FAILED: no RppModuleConsumer executable under packages/RppModuleConsumer')
 
 
+def _drop_readonly(func, path, _exc):
+    """Windows refuses to unlink a read-only file, which a build tree leaves behind."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
 def build_and_run(compiler, jobs, env=None) -> str:
     """Build this consumer and return what it printed. Raises SystemExit when either step fails."""
     if os.path.isdir(os.path.join(HERE, 'packages')):
-        shutil.rmtree(os.path.join(HERE, 'packages'))
+        shutil.rmtree(os.path.join(HERE, 'packages'), onerror=_drop_readonly)
     build = ['mama'] + ([compiler] if compiler else []) + ['build', f'jobs={jobs}']
     if run(build, env=env).returncode != 0: raise SystemExit('FAILED: mama build')
     result = run([find_exe()], capture_output=True, env=env)
