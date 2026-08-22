@@ -201,26 +201,30 @@ def check_missing() -> list[str]:
     return bad
 
 
-# the operand is a module name, a header unit in <> or "", or a partition starting with :
-IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import[ \t]*[<":A-Za-z_]', re.M)
+# a named module needs whitespace after the keyword, or `important` reads as an import.
+# a header unit in <> or "" and a partition starting with : may sit against the keyword.
+IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import(?:[ \t]+[A-Za-z_]|[ \t]*[<":])', re.M)
 
 
-_COMMENT_RE = re.compile(r'//[^\n]*|/\*.*?\*/', re.S)
-_STRING_RE = re.compile(r'"(?:[^"\\\n]|\\.)*"')
-_DIRECTIVE_RE = re.compile(r'^[ \t]*(?:#[ \t]*include\b|(?:export[ \t]+)?import\b)')
+# one alternation, so the leftmost span wins and a string that holds /* opens no comment
+_SPAN_RE = re.compile(r'(?P<str>"(?:[^"\\\n]|\\.)*")|//[^\n]*|/\*.*?\*/', re.S)
+_DIRECTIVE_RE = re.compile(r'[ \t]*(?:#[ \t]*include\b|(?:export[ \t]+)?import\b)')
 
 
 def _code_only(src: str) -> str:
     """The source with comments and string literals blanked, and every newline kept.
 
-    A directive keeps its operand. `#include "x.h"` and `import "x.h"` carry a quoted path,
-    and blanking that would hide the line from the scan. Blanking keeps the line count, so a
-    reported line number still matches the file on disk.
+    The scan reads left to right in one pass, so a string that holds `/*` cannot open a
+    comment and a comment that holds a quote cannot open a string. A directive keeps its
+    operand, because `#include "x.h"` carries a quoted path the scan must still read.
+    Blanking keeps the line count, so a reported line number matches the file on disk.
     """
-    blank = lambda m: re.sub(r'[^\n]', ' ', m.group())
-    code = _COMMENT_RE.sub(blank, src)
-    return '\n'.join(line if _DIRECTIVE_RE.match(line) else _STRING_RE.sub(blank, line)
-                      for line in code.split('\n'))
+    def blank(m):
+        line_start = src.rfind('\n', 0, m.start()) + 1
+        if m.lastgroup == 'str' and _DIRECTIVE_RE.match(src, line_start):
+            return m.group()
+        return re.sub(r'[^\n]', ' ', m.group())
+    return _SPAN_RE.sub(blank, src)
 
 
 def check_import_order() -> list[str]:

@@ -299,7 +299,7 @@ Gates: gcc PASS 512/512 5.5s | clang PASS | clang-tidy PASS | android NOT RUN | 
 Verdict: BLOCK, 2 findings
 ```
 
-- `BLOCK` breaks R1, R2, R3, R8, or R9.
+- `BLOCK` breaks R1, R2, R3, R8, R9, or R12.
 - `WARN` breaks R4, R5, R6, or R7.
 - `NOTE` records a TSAN report or deferred work.
 - A clean review says `Verdict: PASS` and lists the gates.
