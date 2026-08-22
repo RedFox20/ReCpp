@@ -203,9 +203,10 @@ def check_missing() -> list[str]:
 
 # `%:` is the alternative token for `#`, and a compiler reads a directive written either way
 _HASH = r'(?:\#|%:)'
-# a named module needs whitespace after the keyword, or `important` reads as an import.
-# a header unit in <> or "" and a partition starting with : may sit against the keyword.
-IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import(?:[ \t]+[A-Za-z_]|[ \t]*[<":])', re.M)
+# a named module needs whitespace after the keyword, or `important` reads as an import. a
+# header unit sits against <> or "". a partition needs `: name ;`, so `import:` stays a label.
+IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import'
+                       r'(?:[ \t]+[A-Za-z_]|[ \t]*[<"]|[ \t]*:[ \t]*[A-Za-z_][\w.]*[ \t]*[;\[])', re.M)
 # the ordering scan needs the directive, not its operand, so a macro form still counts
 ANY_INCLUDE_RE = re.compile(rf'^[ \t]*{_HASH}[ \t]*include\b', re.M)
 
@@ -259,13 +260,14 @@ def _opens_char_literal(src: str, i: int) -> bool:
 
 
 def _code_only(src: str) -> str:
-    """The source with every comment and literal blanked, and every newline kept.
+    """The source with every comment and literal blanked, the newlines inside them included.
 
     A regex cannot decide which construct opens first, so this reads the file once and
     tracks what it is inside. A quote inside a comment opens no string, a `/*` inside any
     literal opens no comment, and a raw string ends only at its own delimiter. A directive
     keeps its operand, because `#include "x.h"` carries a path the scan must still read.
-    Blanking keeps the line count, so a reported line number matches the file on disk.
+    A comment and a raw string are single tokens, so a newline inside one starts no line.
+    A `#` that follows one is a stray token, not a directive.
     """
     out, i, n = list(src), 0, len(src)
     while i < n:
@@ -291,8 +293,7 @@ def _code_only(src: str) -> str:
             i += 1
             continue
         for k in range(i, end):
-            if out[k] != '\n':
-                out[k] = ' '
+            out[k] = ' '
         i = end
     return ''.join(out)
 
