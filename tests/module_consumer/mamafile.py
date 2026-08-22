@@ -14,8 +14,9 @@ class RppModuleConsumer(mama.BuildTarget):
     def settings(self):
         # a host with no libc++ links clang against libstdc++ instead
         if os.getenv('USE_GCC_STDLIB'): self.config.use_gcc_stdlib_for_clang()
-        # forces the header fallback on a module-capable compiler, so one toolchain builds both paths
-        if os.getenv('NO_MODULES'): self.disable_ninja_build()
+        # forces the header fallback on a module-capable compiler, so one toolchain builds both
+        # paths. The cmake option covers every generator, and Visual Studio scans modules too
+        if os.getenv('NO_MODULES'): self.add_cmake_options('MAMA_ENABLE_MODULES=OFF')
 
     def configure(self):
         self.enable_cxx20()

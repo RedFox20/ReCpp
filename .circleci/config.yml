@@ -240,8 +240,6 @@ jobs:
             CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> verbose build test jobs=3 2>&1 | tee build.log
             # AUTO turns modules off and keeps going, so without this the job would still pass
             # if ReCpp stopped enabling modules when another project builds it
-            # AUTO turns modules off and keeps going, so without this the job would still pass
-            # if ReCpp stopped enabling modules when another project builds it
             if ! grep -q "C++20 Modules enabled" build.log; then
               echo "FAIL: ReCpp built no modules as a dependency"
               grep -i "MODULES" build.log
@@ -254,6 +252,15 @@ jobs:
                    -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
               exit 1
             fi
+      - run:
+          name: Import the exported modules with << parameters.cc_version >>
+          command: |
+            # this job clears the modules minimum, so the consumer must take the module path.
+            # --compare-paths builds the same source through the headers and compares the report
+            export PIPENV_PIPFILE=$(pwd)/Pipfile
+            cd tests/module_consumer
+            CXX20=1 taskset -c 0-2 pipenv run python3 run_test.py \
+                --compiler << parameters.compiler >> --expect modules --compare-paths --jobs 3
   consumer-integration-msvc:
     description: Build ReCpp with MSVC as another project builds it, as a dependency and not the root
     executor:
@@ -284,6 +291,13 @@ jobs:
                   Select-String -Path build.log -Pattern 'MODULES'
                   exit 1
               }
+      - run:
+          name: Import the exported modules
+          command: |
+              $env:Path+=";$Env:ProgramFiles\CMake\bin";
+              $env:CXX20="1";
+              cd tests/module_consumer
+              python run_test.py --compiler windows --expect modules --compare-paths --jobs 4
   android-build:
     parameters:
       docker_image:

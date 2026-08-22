@@ -83,9 +83,12 @@ export namespace rpp {
     // strview.h UTF-8 detection
     using rpp::is_likely_utf8;
 
+    // strview.h declares the numeric to_string overloads outside the unicode guard, and one
+    // using-declaration carries the whole overload set, so this cannot sit inside the guard
+    using rpp::to_string;
+
 #if RPP_ENABLE_UNICODE
     // strview.h unicode conversion
-    using rpp::to_string;
     using rpp::to_ustring;
 #endif
 
