@@ -64,6 +64,11 @@ def main() -> int:
     if args.compare_paths and took == 'modules':
         print('--- rebuilding through the header fallback to compare ---')
         other = build_and_run(args.compiler, args.jobs, env={**os.environ, 'NO_MODULES': '1'})
+        # the comparison drops the build-mode line, so without this it can compare modules
+        # with modules and report parity it never tested
+        if 'built with HEADERS' not in other:
+            print('FAILED: NO_MODULES still built the module path, so the two paths never differed')
+            return 1
         if other.splitlines()[1:] != out.splitlines()[1:]:
             print('FAILED: the module path and the header path disagree')
             return 1

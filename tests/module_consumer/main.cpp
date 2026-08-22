@@ -1,21 +1,19 @@
-// Exercises the re-exported rpp.strview surface: types, parsers, operators and the _sv literal.
-// The same source builds through the module and through the header, and both must print the same
-// report. A facade that re-exports through using-declarations is where a compiler tends to differ.
-// A module exports no macro, so RPP_ENABLE_UNICODE and friends come from the header either way.
-// The module interface unit documents this rule for its own importers.
-// every #include comes first: GCC 14 re-parses a std header that follows an import, and its
-// templates then collide with what the module already made reachable, see AGENTS.md
+// Builds one source through the exported modules and through the headers, and both must agree.
+// Every #include comes first: GCC 14 re-parses a std header that follows an import, see AGENTS.md.
 #include <rpp/config.h>
+#include <rpp/debugging.macros.h> // a module exports no macro, so LogInfo comes from the header
 #include <cstdio>
 #include <string>
 #include <vector>
 #ifndef MAMA_HAS_MODULES
 #  include <rpp/strview.h>
+#  include <rpp/debugging.h>
 #  define BUILT_WITH "HEADERS"
 #endif
 
 #ifdef MAMA_HAS_MODULES
 import rpp.strview;
+import rpp.debugging;
 #  define BUILT_WITH "MODULES"
 #endif
 
@@ -76,6 +74,21 @@ int main()
     { rpp::string s = "abc"; check("to_upper", rpp::to_upper(s) == "ABC"); }
     check("concat",             rpp::concat(rpp::strview{"a"}, rpp::strview{"b"}) == "ab");
     check("type aliases",       sizeof(rpp::int64) == 8 && sizeof(rpp::uint) == 4);
+
+    { // the numeric to_string overloads: strview.h declares them outside the unicode guard
+        char buffer[32];
+        int written = rpp::to_string(buffer, 42);
+        check("to_string int", rpp::strview(buffer, written) == "42");
+    }
+    { // rpp.debugging, the second exported module. A misspelled export fails to import
+        LogSeverity previous = GetLogSeverityFilter();
+        SetLogSeverityFilter(LogSeverityError);
+        check("rpp.debugging filter", GetLogSeverityFilter() == LogSeverityError);
+        SetLogSeverityFilter(previous);
+        // the macros expand to the exported _LogInfo, so this proves both halves reach a consumer
+        LogInfo("consumer imported rpp.debugging");
+        check("rpp.debugging shorten", rpp::strview{rpp::shorten_filename("a/b/c.cpp")} != "");
+    }
 
     { // line_parser walks a multi-line buffer
         rpp::line_parser parser{"first\nsecond\nthird"};
