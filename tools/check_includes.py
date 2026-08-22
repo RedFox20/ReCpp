@@ -216,11 +216,13 @@ _NAME = r'[^\W\d][\w.]*'
 IMPORT_RE = re.compile(rf'^{_SP}*(?:export{_SP}+)?import'
                        rf'(?:{_SP}+[^\W\d]|{_SP}*<[^>\s]+>|{_SP}*"[^"\n]+"'
                        rf'|{_SP}*:{_SP}*{_NAME}{_SP}*[;\[])', re.M)
+# `#import` is the Objective-C include-once, and file_io.mm carries no other form
+_HEADER_KW = r'(?P<kw>include|import)'
 # the ordering scan needs the directive, not its operand, so a macro form still counts
-ANY_INCLUDE_RE = re.compile(rf'^{_SP}*{_HASH}{_SP}*include\b', re.M)
+ANY_INCLUDE_RE = re.compile(rf'^{_SP}*{_HASH}{_SP}*{_HEADER_KW}\b', re.M)
 
 
-_DIRECTIVE_RE = re.compile(rf'{_SP}*(?:{_HASH}{_SP}*include\b|(?:export{_SP}+)?import\b)')
+_DIRECTIVE_RE = re.compile(rf'{_SP}*(?:{_HASH}{_SP}*(?:include|import)\b|(?:export{_SP}+)?import\b)')
 
 # the longest raw-string delimiter C++ allows
 _MAX_RAW_DELIM = 16
@@ -352,11 +354,11 @@ def scan_import_order(name: str, src: str) -> str:
     if name.endswith(('.h', '.inl')):  # a .inl is header content, so a consumer inherits its import
         return (f'{name}:{line_of(imports[0])}: a header carries an import, which every '
                 'consumer inherits and cannot reorder')
-    late = [m.start() for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
+    late = [m for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
     if not late:
         return ''
-    return (f'{name}:{line_of(late[0])}: this #include follows the import on line '
-            f'{line_of(imports[0])}, move every include above it')
+    return (f'{name}:{line_of(late[0].start())}: this #{late[0].group("kw")} follows the import '
+            f'on line {line_of(imports[0])}, move every #include and #import above it')
 
 
 def check_import_order() -> list[str]:
@@ -394,6 +396,8 @@ SELFTEST = [
     ('compare_named_import.h',   b'inline bool f(int import) {\n  return\nimport < 5;\n}\n', 0),
     ('unicode_module.cppm',      b'import \xc3\xa9clair;\n#include <string>\n', 2),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
+    ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
+    ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
     # phase 2, the line splice
     ('keyword_splice.cppm',      b'imp\\\nort m;\n#include <string>\n', 3),
     ('comment_splice.cppm',      b'import m;\n// note \\\n#include <string>\n', 0),
