@@ -68,7 +68,7 @@ jobs:
       check_includes:
         type: boolean
         default: false
-        description: "Run the header self-containment gate. One job is enough, so it is opt-in"
+        description: "Run the header and import-order gates. One job is enough, so it is opt-in"
     description: "Ubuntu << parameters.cc_version >> C++<< parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -107,12 +107,15 @@ jobs:
           condition: << parameters.check_includes >>
           steps:
             - run:
-                name: Header self-containment gate
+                name: Header and import-order gates
                 command: |
                   # every header must compile alone, so a consumer may include any one first
                   export CXX=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
                   export CXXSTD=c++<< parameters.cpp_version >>
                   python3 tools/check_includes.py self-contained --check
+                  # an #include after an import gives GCC a thousand redefinitions, and clang
+                  # accepts the same file, so only this gate stops it reaching a GCC build
+                  python3 tools/check_includes.py import-order --check
       - run: make configure-cmake
       - run:
           name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>
