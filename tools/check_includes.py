@@ -201,14 +201,20 @@ def check_missing() -> list[str]:
     return bad
 
 
+# translation splices a backslash-newline away before it reads a directive, so both count
+_WS = r'(?:[ \t]|\\\n)'
 # a named module needs whitespace after the keyword, or `important` reads as an import.
 # a header unit in <> or "" and a partition starting with : may sit against the keyword.
-IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import(?:[ \t]+[A-Za-z_]|[ \t]*[<":])', re.M)
+IMPORT_RE = re.compile(rf'^[ \t]*(?:export{_WS}+)?import(?:{_WS}+[A-Za-z_]|{_WS}*[<":])', re.M)
+# the ordering scan needs the directive, not its operand, so a macro form still counts
+ANY_INCLUDE_RE = re.compile(rf'^[ \t]*#{_WS}*include\b', re.M)
 
 
+# a raw string ends at its own delimiter, so an embedded quote cannot close it early
+_RAW = r'(?:u8|[uUL])?R"(?P<raw>[^()\\ \t\n]{0,16})\(.*?\)(?P=raw)"'
 # one alternation, so the leftmost span wins and a string that holds /* opens no comment
-_SPAN_RE = re.compile(r'(?P<str>"(?:[^"\\\n]|\\.)*")|//[^\n]*|/\*.*?\*/', re.S)
-_DIRECTIVE_RE = re.compile(r'[ \t]*(?:#[ \t]*include\b|(?:export[ \t]+)?import\b)')
+_SPAN_RE = re.compile(_RAW + r'|(?P<str>"(?:[^"\\\n]|\\.)*")|//[^\n]*|/\*.*?\*/', re.S)
+_DIRECTIVE_RE = re.compile(rf'[ \t]*(?:#{_WS}*include\b|(?:export{_WS}+)?import\b)')
 
 
 def _code_only(src: str) -> str:
@@ -250,7 +256,7 @@ def check_import_order() -> list[str]:
             bad.append(f'{f}:{line_of(imports[0])}: a header carries an import, which every '
                        'consumer inherits and cannot reorder')
             continue
-        late = [m.start() for m in INCLUDE_RE.finditer(code) if m.start() > imports[0]]
+        late = [m.start() for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
         if late:
             bad.append(f'{f}:{line_of(late[0])}: this #include follows the import on line '
                        f'{line_of(imports[0])}, move every include above it')
