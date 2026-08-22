@@ -23,7 +23,7 @@ Usage:
   tools/check_includes.py unused [--check] [--only strview.h]
   tools/check_includes.py missing [--check]
 """
-import argparse, os, re, shutil, subprocess, sys, tempfile
+import argparse, bisect, os, re, shutil, subprocess, sys, tempfile
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 
@@ -206,10 +206,8 @@ def check_missing() -> list[str]:
     return bad
 
 
-# an identifier, which may spell a character as a universal-character-name. `[^\W\d]` is the
-# C++ identifier start, so a name in any script reads as one token, see module `éclair`.
-_UCN = r'\\[uU][0-9a-fA-F]+'
-_IDENT_RE = re.compile(rf'(?:[^\W\d]|{_UCN})(?:\w|{_UCN})*')
+# a universal-character-name spells one identifier character, as `éclair` spells `éclair`
+_UCN_RE = re.compile(r'\\[uU][0-9a-fA-F]+')
 
 
 class _Reader:
@@ -230,12 +228,22 @@ class _Reader:
             self.i += 1
 
     def word(self) -> str:
-        """The identifier at the cursor, or an empty string. Never a prefix of a longer one."""
-        m = _IDENT_RE.match(self.s, self.i)
-        if not m:
-            return ''
-        self.i = m.end()
-        return m.group()
+        """The identifier at the cursor, or an empty string. Never a prefix of a longer one.
+
+        C++ takes its identifier characters from XID_Start and XID_Continue, and so does
+        `str.isidentifier`. A combining mark continues a name here as it does there.
+        """
+        start = self.i
+        while self.i < len(self.s):
+            ucn = _UCN_RE.match(self.s, self.i)
+            if ucn:
+                self.i = ucn.end()
+                continue
+            c = self.s[self.i]
+            if not (('_' + c) if self.i > start else c).isidentifier():
+                break
+            self.i += 1
+        return self.s[start:self.i]
 
     def punct(self, *options: str) -> str:
         """The first of `options` at the cursor, or an empty string."""
@@ -342,13 +350,20 @@ def _skip_quoted(src: str, i: int, quote: str) -> int:
     return n
 
 
-def _skip_raw(src: str, i: int) -> int:
-    """The index past the raw string whose quote sits at `i`. Only its own delimiter closes it."""
-    open_paren = src.find('(', i + 1)
-    if open_paren < 0 or open_paren - (i + 1) > _MAX_RAW_DELIM:
+def _skip_raw(src: str, i: int, origin: list, raw: str) -> int:
+    """The index past the raw string whose quote sits at `i`. Only its own delimiter closes it.
+
+    C++ reverts a splice inside the body, so this searches `raw`, the text before phase 2.
+    A splice there spells two characters and closes nothing.
+    """
+    o = origin[i]
+    open_paren = raw.find('(', o + 1)
+    if open_paren < 0 or open_paren - (o + 1) > _MAX_RAW_DELIM:
         return _skip_quoted(src, i, '"')  # no delimiter, so read it as an ordinary string
-    close = src.find(')' + src[i + 1:open_paren] + '"', open_paren)
-    return len(src) if close < 0 else close + (open_paren - i) + 1
+    close = raw.find(')' + raw[o + 1:open_paren] + '"', open_paren)
+    if close < 0:
+        return len(src)
+    return bisect.bisect_left(origin, close + (open_paren - o) + 1)
 
 
 # a character literal may carry one of these, and u8 is tried first so u does not win
@@ -388,7 +403,7 @@ def _opens_char_literal(src: str, i: int) -> bool:
     return not src[j].isdigit()
 
 
-def _code_only(src: str) -> str:
+def _code_only(src: str, origin: list, raw: str) -> str:
     """The source with every comment and literal blanked, the newlines inside them included.
 
     A regex cannot decide which construct opens first, so this reads the file once and
@@ -409,12 +424,18 @@ def _code_only(src: str) -> str:
                 end = src.find('*/', i + 2)
                 end = n if end < 0 else end + 2
         elif c == '"':
-            end = _skip_raw(src, i) if _opens_raw_string(src, i) else _skip_quoted(src, i, '"')
+            end = (_skip_raw(src, i, origin, raw) if _opens_raw_string(src, i)
+                   else _skip_quoted(src, i, '"'))
             # `#include "x.h"` and `import "x.h"` name a header, so that operand is not a literal.
             # the line reads back from `out`, where a comment before the operand is already gone.
             if _at_operand(''.join(out[src.rfind('\n', 0, i) + 1:i])):
                 i = end
                 continue
+        elif c == '<' and _at_operand(''.join(out[src.rfind('\n', 0, i) + 1:i])):
+            # a header name is one token, so `import <foo//bar>;` opens no comment inside it
+            close = src.find('>', i + 1)
+            i = n if close < 0 else close + 1
+            continue
         elif c == "'" and _opens_char_literal(src, i):
             end = _skip_quoted(src, i, "'")
         else:
@@ -435,13 +456,19 @@ def _translate(src: str) -> tuple:
     """
     spliced, origin, i, n = [], [], 0, len(src)
     while i < n:
-        if src[i] == '\\' and src.startswith('\n', i + 1):
-            i += 2
-            continue
+        if src[i] == '\\':
+            # GCC and Clang both splice when whitespace separates the two, and only Clang
+            # warns. Trailing whitespace after a continuation is common enough to matter.
+            j = i + 1
+            while j < n and src[j] in ' \t\f\v':
+                j += 1
+            if j < n and src[j] == '\n':
+                i = j + 1
+                continue
         spliced.append(src[i])
         origin.append(i)
         i += 1
-    return _code_only(''.join(spliced)), origin
+    return _code_only(''.join(spliced), origin, src), origin
 
 
 def scan_import_order(name: str, src: str) -> str:
@@ -510,6 +537,13 @@ SELFTEST = [
     ('name_starts_with_import.cppm', b'import m;\nint importx = 1;\n', 0),
     ('module_named_important.cppm',  b'import important;\n#include <string>\n', 2),
     ('directive_spaced.cppm',    b'import m;\n#  include <string>\n', 2),
+    ('header_name_slashes.cppm', b'import <foo//bar>;\n#include <string>\n', 2),
+    ('combining_mark.cppm',      b'import e\xcc\xb8x;\n#include <string>\n', 2),
+    ('splice_trailing_space.cppm', b'imp\\ \nort m;\n#include <string>\n', 3),
+    # C++ reverts a splice inside a raw string, so `)\` and a newline close nothing
+    ('raw_string_splice.cppm',   b'import m;\nconst char* s = R"(\n)\\\n";\n'
+                                 b'#include <string>\n)";\nint x;\n', 0),
+    ('include_after_raw.cppm',   b'import m;\nconst char* s = R"(x)";\n#include <string>\n', 3),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
