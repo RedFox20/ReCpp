@@ -210,27 +210,68 @@ IMPORT_RE = re.compile(rf'^[ \t]*(?:export{_WS}+)?import(?:{_WS}+[A-Za-z_]|{_WS}
 ANY_INCLUDE_RE = re.compile(rf'^[ \t]*#{_WS}*include\b', re.M)
 
 
-# a raw string ends at its own delimiter, so an embedded quote cannot close it early
-_RAW = r'(?:u8|[uUL])?R"(?P<raw>[^()\\ \t\n]{0,16})\(.*?\)(?P=raw)"'
-# one alternation, so the leftmost span wins and a string that holds /* opens no comment
-_SPAN_RE = re.compile(_RAW + r'|(?P<str>"(?:[^"\\\n]|\\.)*")|//[^\n]*|/\*.*?\*/', re.S)
 _DIRECTIVE_RE = re.compile(rf'[ \t]*(?:#{_WS}*include\b|(?:export{_WS}+)?import\b)')
+
+# the longest raw-string delimiter C++ allows
+_MAX_RAW_DELIM = 16
+
+
+def _skip_quoted(src: str, i: int, quote: str) -> int:
+    """The index past the literal that opens at `i`, or the newline that leaves it unterminated."""
+    j, n = i + 1, len(src)
+    while j < n:
+        c = src[j]
+        if c == '\\':   j += 2       # an escape hides the next character, a splice included
+        elif c == '\n':  return j     # a literal does not cross a raw newline
+        elif c == quote: return j + 1
+        else:            j += 1
+    return n
+
+
+def _skip_raw(src: str, i: int) -> int:
+    """The index past the raw string whose quote sits at `i`. Only its own delimiter closes it."""
+    open_paren = src.find('(', i + 1)
+    if open_paren < 0 or open_paren - (i + 1) > _MAX_RAW_DELIM:
+        return _skip_quoted(src, i, '"')  # no delimiter, so read it as an ordinary string
+    close = src.find(')' + src[i + 1:open_paren] + '"', open_paren)
+    return len(src) if close < 0 else close + (open_paren - i) + 1
 
 
 def _code_only(src: str) -> str:
-    """The source with comments and string literals blanked, and every newline kept.
+    """The source with every comment and literal blanked, and every newline kept.
 
-    The scan reads left to right in one pass, so a string that holds `/*` cannot open a
-    comment and a comment that holds a quote cannot open a string. A directive keeps its
-    operand, because `#include "x.h"` carries a quoted path the scan must still read.
+    A regex cannot decide which construct opens first, so this reads the file once and
+    tracks what it is inside. A quote inside a comment opens no string, a `/*` inside any
+    literal opens no comment, and a raw string ends only at its own delimiter. A directive
+    keeps its operand, because `#include "x.h"` carries a path the scan must still read.
     Blanking keeps the line count, so a reported line number matches the file on disk.
     """
-    def blank(m):
-        line_start = src.rfind('\n', 0, m.start()) + 1
-        if m.lastgroup == 'str' and _DIRECTIVE_RE.match(src, line_start):
-            return m.group()
-        return re.sub(r'[^\n]', ' ', m.group())
-    return _SPAN_RE.sub(blank, src)
+    out, i, n = list(src), 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == '/' and i + 1 < n and src[i + 1] in '/*':
+            if src[i + 1] == '/':
+                end = src.find('\n', i)
+                end = n if end < 0 else end
+            else:
+                end = src.find('*/', i + 2)
+                end = n if end < 0 else end + 2
+        elif c == '"':
+            end = _skip_raw(src, i) if i and src[i - 1] == 'R' else _skip_quoted(src, i, '"')
+            # `#include "x.h"` and `import "x.h"` name a header, so the operand is not a literal
+            if _DIRECTIVE_RE.match(src, src.rfind('\n', 0, i) + 1):
+                i = end
+                continue
+        elif c == "'" and not (i and (src[i - 1].isalnum() or src[i - 1] == '_')):
+            end = _skip_quoted(src, i, "'")  # a quote after a digit separates digits, see 1'000
+        else:
+            i += 1
+            continue
+        for k in range(i, end):
+            if out[k] != '\n':
+                out[k] = ' '
+        i = end
+    return ''.join(out)
 
 
 def check_import_order() -> list[str]:
