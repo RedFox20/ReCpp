@@ -210,6 +210,15 @@ def check_missing() -> list[str]:
 _UCN_RE = re.compile(r'\\[uU][0-9a-fA-F]+')
 
 
+def _name_char(c: str, first: bool = False) -> bool:
+    """True when `c` may sit in an identifier, at its start when `first`.
+
+    C++ takes these from XID_Start and XID_Continue, and `str.isidentifier` answers both.
+    GCC and Clang also accept `$` anywhere in a name, and a module may carry that name.
+    """
+    return c == '$' or (c if first else '_' + c).isidentifier()
+
+
 class _Reader:
     """A cursor over one masked line, with the C++ lexing a directive needs and no more.
 
@@ -230,8 +239,8 @@ class _Reader:
     def word(self) -> str:
         """The identifier at the cursor, or an empty string. Never a prefix of a longer one.
 
-        C++ takes its identifier characters from XID_Start and XID_Continue, and so does
-        `str.isidentifier`. A combining mark continues a name here as it does there.
+        `_name_char` decides what belongs in one, so the reader and the literal boundaries
+        below all ask the same question.
         """
         start = self.i
         while self.i < len(self.s):
@@ -239,8 +248,7 @@ class _Reader:
             if ucn:
                 self.i = ucn.end()
                 continue
-            c = self.s[self.i]
-            if not (('_' + c) if self.i > start else c).isidentifier():
+            if not _name_char(self.s[self.i], first=self.i == start):
                 break
             self.i += 1
         return self.s[start:self.i]
@@ -382,7 +390,7 @@ def _opens_raw_string(src: str, i: int) -> bool:
     for prefix in _RAW_PREFIXES:
         if i >= len(prefix) and src.startswith(prefix, i - len(prefix)):
             start = i - len(prefix)
-            return start == 0 or not (src[start - 1].isalnum() or src[start - 1] == '_')
+            return start == 0 or not _name_char(src[start - 1])
     return False
 
 
@@ -393,12 +401,12 @@ def _opens_char_literal(src: str, i: int) -> bool:
         if i >= len(prefix) and src.startswith(prefix, i - len(prefix)):
             start = i - len(prefix)
             break
-    if start == 0 or not (src[start - 1].isalnum() or src[start - 1] == '_'):
+    if start == 0 or not _name_char(src[start - 1]):
         return True
     # walk to the start of the token before the quote. A token that opens with a digit is a
     # number, so the quote separates digits. Anything else is a name, as in `return'x'`.
     j = start - 1
-    while j > 0 and (src[j - 1].isalnum() or src[j - 1] in "_'"):
+    while j > 0 and (_name_char(src[j - 1]) or src[j - 1] == "'"):
         j -= 1
     return not src[j].isdigit()
 
@@ -544,6 +552,10 @@ SELFTEST = [
     ('raw_string_splice.cppm',   b'import m;\nconst char* s = R"(\n)\\\n";\n'
                                  b'#include <string>\n)";\nint x;\n', 0),
     ('include_after_raw.cppm',   b'import m;\nconst char* s = R"(x)";\n#include <string>\n', 3),
+    ('dollar_module.cppm',       b'import $m;\n#include <string>\n', 2),
+    ('unicode_name_before_string.cppm',
+                                 b'import m;\nconst char* s = e\xcc\xb8R"(a";\n#include <string>\n', 3),
+    ('named_partition.cppm',     b'import m:p;\n#include <string>\n', 0),  # g++-14 rejects this form
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
