@@ -201,16 +201,16 @@ def check_missing() -> list[str]:
     return bad
 
 
-# translation splices a backslash-newline away before it reads a directive, so both count
-_WS = r'(?:[ \t]|\\\n)'
+# `%:` is the alternative token for `#`, and a compiler reads a directive written either way
+_HASH = r'(?:\#|%:)'
 # a named module needs whitespace after the keyword, or `important` reads as an import.
 # a header unit in <> or "" and a partition starting with : may sit against the keyword.
-IMPORT_RE = re.compile(rf'^[ \t]*(?:export{_WS}+)?import(?:{_WS}+[A-Za-z_]|{_WS}*[<":])', re.M)
+IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import(?:[ \t]+[A-Za-z_]|[ \t]*[<":])', re.M)
 # the ordering scan needs the directive, not its operand, so a macro form still counts
-ANY_INCLUDE_RE = re.compile(rf'^[ \t]*#{_WS}*include\b', re.M)
+ANY_INCLUDE_RE = re.compile(rf'^[ \t]*{_HASH}[ \t]*include\b', re.M)
 
 
-_DIRECTIVE_RE = re.compile(rf'[ \t]*(?:#{_WS}*include\b|(?:export{_WS}+)?import\b)')
+_DIRECTIVE_RE = re.compile(rf'[ \t]*(?:{_HASH}[ \t]*include\b|(?:export[ \t]+)?import\b)')
 
 # the longest raw-string delimiter C++ allows
 _MAX_RAW_DELIM = 16
@@ -248,7 +248,14 @@ def _opens_char_literal(src: str, i: int) -> bool:
         if i >= len(prefix) and src.startswith(prefix, i - len(prefix)):
             start = i - len(prefix)
             break
-    return start == 0 or not (src[start - 1].isalnum() or src[start - 1] == '_')
+    if start == 0 or not (src[start - 1].isalnum() or src[start - 1] == '_'):
+        return True
+    # walk to the start of the token before the quote. A token that opens with a digit is a
+    # number, so the quote separates digits. Anything else is a name, as in `return'x'`.
+    j = start - 1
+    while j > 0 and (src[j - 1].isalnum() or src[j - 1] in "_'"):
+        j -= 1
+    return not src[j].isdigit()
 
 
 def _code_only(src: str) -> str:
@@ -290,6 +297,24 @@ def _code_only(src: str) -> str:
     return ''.join(out)
 
 
+def _translate(src: str) -> tuple:
+    """Phase 2 and phase 3 of translation: splice, then blank every comment and literal.
+
+    A compiler joins a backslash-newline before it reads anything else, so `// note \\` keeps
+    the next line inside the comment and a keyword may be split across two lines. The returned
+    list gives each character its index in `src`, so a finding still names the line it came from.
+    """
+    spliced, origin, i, n = [], [], 0, len(src)
+    while i < n:
+        if src[i] == '\\' and src.startswith('\n', i + 1):
+            i += 2
+            continue
+        spliced.append(src[i])
+        origin.append(i)
+        i += 1
+    return _code_only(''.join(spliced)), origin
+
+
 def check_import_order() -> list[str]:
     """Every #include must come before every import, and a header carries no import.
 
@@ -304,11 +329,12 @@ def check_import_order() -> list[str]:
                       if f.endswith(sources)))
     bad = []
     for f in sorted(set(files)):
-        code = _code_only(open(f, encoding='utf-8', errors='replace').read())
+        src = open(f, encoding='utf-8', errors='replace').read()
+        code, origin = _translate(src)
         imports = [m.start() for m in IMPORT_RE.finditer(code)]
         if not imports:
             continue
-        line_of = lambda pos: code.count('\n', 0, pos) + 1
+        line_of = lambda k: src.count('\n', 0, origin[k]) + 1
         if f.endswith('.h'):
             bad.append(f'{f}:{line_of(imports[0])}: a header carries an import, which every '
                        'consumer inherits and cannot reorder')
