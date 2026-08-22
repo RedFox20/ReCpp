@@ -11,6 +11,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -49,6 +50,30 @@ def build_and_run(compiler, jobs, env=None) -> str:
     return result.stdout
 
 
+def check_unicode_off(cxx: str) -> str:
+    """Compiles the exported module with `RPP_ENABLE_UNICODE=0` and uses a numeric `to_string`.
+
+    Every consumer job runs on Linux or MSVC, where `config.h` turns unicode on, so no build
+    reaches the guarded half of the module surface. `strview.h` declares the numeric overloads
+    outside that guard, and one using-declaration carries a whole overload set, so a guarded
+    `using rpp::to_string;` would drop them on Yocto, MIPS and Raspberry Pi.
+    """
+    root = os.path.dirname(os.path.dirname(HERE))
+    with tempfile.TemporaryDirectory() as d:
+        use = os.path.join(d, 'use.cpp')
+        with open(use, 'w') as f:
+            f.write('import rpp.strview;\n'
+                    'int main() { char b[32]; return rpp::to_string(b, 42) == 2 ? 0 : 1; }\n')
+        flags = [cxx, '-std=c++20', '-fmodules-ts', '-DRPP_ENABLE_UNICODE=0', '-I', 'src']
+        mapper = f'-fmodule-mapper=|@g++-mapper-server -r {d}'
+        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-strview.cppm', '-o', f'{d}/m.o'],
+                     [*flags, mapper, '-c', use, '-o', f'{d}/u.o']):
+            p = subprocess.run(step, cwd=root, capture_output=True, text=True)
+            if p.returncode != 0:
+                return next((l for l in p.stderr.splitlines() if 'error:' in l), p.stderr[:200])
+    return ''
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--compiler', default='', help='mama compiler arg, eg clang, gcc or windows')
@@ -56,7 +81,17 @@ def main() -> int:
     ap.add_argument('--jobs', default='3')
     ap.add_argument('--compare-paths', action='store_true',
                     help='also build through the header fallback and compare the two reports')
+    ap.add_argument('--unicode-off', default='',
+                    help='g++ binary that compiles the module with RPP_ENABLE_UNICODE=0')
     args = ap.parse_args()
+
+    if args.unicode_off:
+        print(f'--- compiling the module with RPP_ENABLE_UNICODE=0 using {args.unicode_off} ---')
+        err = check_unicode_off(args.unicode_off)
+        if err:
+            print(f'FAILED: the module drops a name when unicode is off: {err}')
+            return 1
+        print('the unicode-disabled module still exports the numeric to_string')
 
     out = build_and_run(args.compiler, args.jobs)
 

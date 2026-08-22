@@ -609,6 +609,8 @@ SELFTEST = [
     ('angled_across_lines.cppm',  b'import a;\nimport <\n/*\n#include "x.h"\n*/ >;\n', 0),
     ('include_next.cppm',         b'import m;\n#include_next <string>\n', 2),
     ('backslash_header_name.cppm', b'import "foo\\"; /*\n#include "x.h"\n*/\nint z;\n', 0),
+    # clang takes a split import declaration and g++-14 refuses it, so the scan stays line-based
+    ('split_import.cppm',        b'import\nm;\n#include <string>\n', 0),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),

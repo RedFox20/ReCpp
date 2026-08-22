@@ -268,11 +268,14 @@ jobs:
           name: Import the exported modules with << parameters.cc_version >>
           command: |
             # this job clears the modules minimum, so the consumer must take the module path.
-            # --compare-paths builds the same source through the headers and compares the report
+            # --compare-paths builds the same source through the headers and compares the report.
+            # --unicode-off reaches the half of the module surface no consumer job builds, because
+            # config.h turns unicode on for every one of them
             export PIPENV_PIPFILE=$(pwd)/Pipfile
+            UNICODE_OFF=$([[ << parameters.compiler >> == "gcc" ]] && echo "--unicode-off g++-14" || echo "")
             cd tests/module_consumer
             CXX20=1 taskset -c 0-2 pipenv run python3 run_test.py \
-                --compiler << parameters.compiler >> --expect modules --compare-paths --jobs 3
+                --compiler << parameters.compiler >> --expect modules --compare-paths --jobs 3 $UNICODE_OFF
   consumer-integration-msvc:
     description: Build ReCpp with MSVC as another project builds it, as a dependency and not the root
     executor:
