@@ -28,8 +28,8 @@ The script's own docstring already warns that it has mistakes.
 
 ### C20. A seeded compiler cache hid clang-scan-deps from CMake (was B11)
 `consumer-clang21` reported no `clang-scan-deps` while three copies sat on the box,
-because a seeded `CMakeCXXCompiler.cmake` made CMake skip the `find_program` that
-fills it. mama fixed the seed, so the job no longer carries `nocache`.
+because a seeded `CMakeCXXCompiler.cmake` made CMake skip the `find_program`. mama
+fixed the seed, so the job no longer carries `nocache`.
 
 ### C19. mamabuild cannot export C++20 modules (was B3)
 `package()` exported `.h` and `.natvis` only, so no `.cppm` reached a consumer and

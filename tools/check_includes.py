@@ -33,6 +33,12 @@ SKIP = {'jni_cpp.h'}
 CXX = os.environ.get('CXX', 'clang++')
 STD = os.environ.get('CXXSTD', 'c++20')
 
+
+def _read(path: str) -> str:
+    """The file as text. A kept UTF-8 BOM hides the import on line 1, so this drops it."""
+    return open(path, encoding='utf-8-sig', errors='replace').read()
+
+
 # a std facility, the symbols that need it, and the headers that provide it
 RULES = [
     (r'\b(memcpy|memmove|memset|memcmp|strlen|strcmp|strncmp|strcpy|strstr)\s*\(', ('cstring', 'string.h')),
@@ -106,7 +112,7 @@ DECL_RES = [
 @lru_cache(maxsize=None)
 def own_names(path: str) -> frozenset:
     """Returns the names one file declares itself."""
-    src = strip_comments(open(path, encoding='utf-8', errors='replace').read())
+    src = strip_comments(_read(path))
     names = set()
     for r in DECL_RES:
         names |= set(r.findall(src))
@@ -127,7 +133,7 @@ def declared_names(path: str) -> set[str]:
             continue
         seen.add(f)
         names |= own_names(f)
-        src = open(f, encoding='utf-8', errors='replace').read()
+        src = _read(f)
         todo += [os.path.join(SRC, i) for i in QUOTED_RE.findall(src)]
     return names
 
@@ -136,7 +142,7 @@ def _probe_unused(args) -> list[tuple[str, str]]:
     """Returns the includes of one header that the header compiles without."""
     header, worktree = args
     path = os.path.join(worktree, 'rpp', header)
-    original = open(path, encoding='utf-8', errors='replace').read()
+    original = open(path, encoding='utf-8', errors='replace').read()  # written back, so keep the BOM
     found = []
     quoted_spans = {m.start() for m in QUOTED_RE.finditer(original)}
     reexports = {m.start() for m in REEXPORT_RE.finditer(original)}
@@ -176,8 +182,7 @@ def check_unused(only: str | None) -> list[str]:
         if not (quoted and os.path.isfile(provider)):
             std.append(line)  # this scan cannot enumerate what a std header declares
             continue
-        body = INCLUDE_RE.sub('', strip_comments(open(f'{SRC}/{header}', encoding='utf-8',
-                                                      errors='replace').read()))
+        body = INCLUDE_RE.sub('', strip_comments(_read(f'{SRC}/{header}')))
         used = any(re.search(rf'\b{re.escape(n)}\b', body) for n in declared_names(provider))
         (redundant if used else unused).append(line)
 
@@ -192,7 +197,7 @@ def check_missing() -> list[str]:
              + [f'tests/{f}' for f in sorted(os.listdir('tests')) if f.endswith('.cpp')])
     bad = []
     for f in files:
-        src = open(f, encoding='utf-8', errors='replace').read()
+        src = _read(f)
         body = strip_comments(src)
         incs = set(INCLUDE_RE.findall(src))
         need = {p[0] for pat, p in RULES if re.search(pat, body) and not set(p) & incs}
@@ -203,15 +208,17 @@ def check_missing() -> list[str]:
 
 # `%:` is the alternative token for `#`, and a compiler reads a directive written either way
 _HASH = r'(?:\#|%:)'
+# a directive takes any whitespace that is not a newline, form feed and vertical tab included
+_SP = r'[^\S\n]'
 # a named module needs whitespace after the keyword, or `important` reads as an import. a
 # header unit sits against <> or "". a partition needs `: name ;`, so `import:` stays a label.
-IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import'
-                       r'(?:[ \t]+[A-Za-z_]|[ \t]*[<"]|[ \t]*:[ \t]*[A-Za-z_][\w.]*[ \t]*[;\[])', re.M)
+IMPORT_RE = re.compile(rf'^{_SP}*(?:export{_SP}+)?import'
+                       rf'(?:{_SP}+[A-Za-z_]|{_SP}*[<"]|{_SP}*:{_SP}*[A-Za-z_][\w.]*{_SP}*[;\[])', re.M)
 # the ordering scan needs the directive, not its operand, so a macro form still counts
-ANY_INCLUDE_RE = re.compile(rf'^[ \t]*{_HASH}[ \t]*include\b', re.M)
+ANY_INCLUDE_RE = re.compile(rf'^{_SP}*{_HASH}{_SP}*include\b', re.M)
 
 
-_DIRECTIVE_RE = re.compile(rf'[ \t]*(?:{_HASH}[ \t]*include\b|(?:export[ \t]+)?import\b)')
+_DIRECTIVE_RE = re.compile(rf'{_SP}*(?:{_HASH}{_SP}*include\b|(?:export{_SP}+)?import\b)')
 
 # the longest raw-string delimiter C++ allows
 _MAX_RAW_DELIM = 16
@@ -333,6 +340,23 @@ def _translate(src: str) -> tuple:
     return _code_only(''.join(spliced)), origin
 
 
+def scan_import_order(name: str, src: str) -> str:
+    """The finding for one file, or an empty string. Takes the text, so a case needs no tree."""
+    code, origin = _translate(src)
+    imports = [m.start() for m in IMPORT_RE.finditer(code)]
+    if not imports:
+        return ''
+    line_of = lambda k: src.count('\n', 0, origin[k]) + 1
+    if name.endswith(('.h', '.inl')):  # a .inl is header content, so a consumer inherits its import
+        return (f'{name}:{line_of(imports[0])}: a header carries an import, which every '
+                'consumer inherits and cannot reorder')
+    late = [m.start() for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
+    if not late:
+        return ''
+    return (f'{name}:{line_of(late[0])}: this #include follows the import on line '
+            f'{line_of(imports[0])}, move every include above it')
+
+
 def check_import_order() -> list[str]:
     """Every #include must come before every import, and a header carries no import.
 
@@ -341,40 +365,86 @@ def check_import_order() -> list[str]:
     a thousand redefinition errors. Clang accepts the same file, so only GCC catches it.
     """
     # a header under tests/ carries the same rule, so the walk reads every source extension
-    sources = ('.h', '.cpp', '.cppm')
+    sources = ('.h', '.inl', '.cpp', '.cppm')
     files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(sources)]
              + sorted(f'{r}/{f}' for r, _, fs in os.walk('tests') for f in fs
                       if f.endswith(sources)))
+    return [f for f in (scan_import_order(p, _read(p)) for p in sorted(set(files))) if f]
+
+
+# Each case is a file name, its exact bytes, and the line a finding must name. 0 means the
+# scan must stay silent. The name carries the extension, because the header rule reads it.
+SELFTEST = [
+    ('late_include.cppm',        b'import m;\n#include <string>\n', 2),
+    ('includes_first.cppm',      b'#include <string>\nimport m;\n', 0),
+    ('header_import.h',          b'import m;\n', 1),
+    ('inline_import.inl',        b'import m;\n', 1),
+    ('digraph.cppm',             b'import m;\n%:include <string>\n', 2),
+    ('export_import.cppm',       b'export import m;\n#include <string>\n', 2),
+    ('unit_angled.cppm',         b'import <string>;\n#include <vector>\n', 2),
+    ('unit_quoted.cppm',         b'import "x.h";\n#include <vector>\n', 2),
+    ('partition.cppm',           b'import :part;\n#include <string>\n', 2),
+    ('partition_tight.cppm',     b'import:part;\n#include <string>\n', 2),
+    ('label_named_import.h',     b'inline int f(int x){ if(x) goto import;\nimport: return 1;\n}\n', 0),
+    ('important.cppm',           b'import m;\nint important = 1;\n', 0),
+    # phase 2, the line splice
+    ('keyword_splice.cppm',      b'imp\\\nort m;\n#include <string>\n', 3),
+    ('comment_splice.cppm',      b'import m;\n// note \\\n#include <string>\n', 0),
+    ('double_backslash.cppm',    b'import m;\n// note \\\\\n', 0),
+    # phase 3, the comment and the literal
+    ('comment_in_import.cppm',   b'import/* split\n*/m;\n#include <string>\n', 3),
+    ('joined_comment.cppm',      b'import m; /* multi\nline */ #include <string>\n', 0),
+    ('comment_before_operand.cppm', b'import/**/"foo.h";\n#include <string>\n', 2),
+    ('comment_before_keyword.cppm', b'/*c*/import "x.h";\n#include <vector>\n', 2),
+    ('include_in_comment.cppm',  b'import m;\n/* #include <string> */\n', 0),
+    ('include_in_raw.cppm',      b'import m;\nconst char* s = R"(\n#include <string>\n)";\n', 0),
+    ('include_in_lr_raw.cppm',   b'import m;\nconst char* s = LR"d(\n#include <string>\n)d";\n', 0),
+    ('name_ends_in_r.cppm',      b'import m;\nconst char* s = fooR"(a";\n#include <string>\n', 3),
+    ('char_after_keyword.cppm',  b"int g(){ return'/*'; }\nimport m;\n#include <string>\n", 3),
+    ('char_prefixed.cppm',       b"int g(){ return L'/*'; }\nimport m;\n#include <string>\n", 3),
+    ('digit_separator.cppm',     b"import m;\nint g(){ return 1'000'000; }\n", 0),
+    ('quote_in_char.cppm',       b'import m;\nchar g(){ return \'"\'; }\n', 0),
+    # whitespace and encoding
+    ('form_feed.cppm',           b'import m;\n\f#include <string>\n', 2),
+    ('form_feed_in_import.cppm', b'import\fm;\n#include <string>\n', 2),
+    ('vertical_tab.cppm',        b'import m;\n\v#include <string>\n', 2),
+    ('utf8_bom.cppm',            b'\xef\xbb\xbfimport m;\n#include <string>\n', 2),
+]
+
+
+def check_selftest() -> list[str]:
+    """Runs the scan over crafted sources, so a regression in the scan fails the gate.
+
+    The import-order gate only reads a conforming tree, where a scan that finds nothing still
+    passes. Each case names one construct the scan has to report, or one it must not, and it
+    pins the reported line so a splice or a comment cannot shift it.
+    """
     bad = []
-    for f in sorted(set(files)):
-        src = open(f, encoding='utf-8', errors='replace').read()
-        code, origin = _translate(src)
-        imports = [m.start() for m in IMPORT_RE.finditer(code)]
-        if not imports:
-            continue
-        line_of = lambda k: src.count('\n', 0, origin[k]) + 1
-        if f.endswith('.h'):
-            bad.append(f'{f}:{line_of(imports[0])}: a header carries an import, which every '
-                       'consumer inherits and cannot reorder')
-            continue
-        late = [m.start() for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
-        if late:
-            bad.append(f'{f}:{line_of(late[0])}: this #include follows the import on line '
-                       f'{line_of(imports[0])}, move every include above it')
+    with tempfile.TemporaryDirectory() as d:
+        for name, body, want in SELFTEST:
+            path = os.path.join(d, name)
+            open(path, 'wb').write(body)
+            found = scan_import_order(name, _read(path))
+            got = int(found.split(':')[1]) if found else 0
+            if got != want:
+                bad.append(f'{name}: the scan named line {got}, not {want}')
     return bad
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'import-order', 'all'])
+    ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'import-order',
+                                 'selftest', 'all'])
     ap.add_argument('--check', action='store_true', help='exit 1 when a finding remains')
     ap.add_argument('--only', help='limit the unused scan to one header')
     a = ap.parse_args()
 
-    modes = ['self-contained', 'import-order', 'missing', 'unused'] if a.mode == 'all' else [a.mode]
+    every = ['selftest', 'self-contained', 'import-order', 'missing', 'unused']
+    modes = every if a.mode == 'all' else [a.mode]
     gated = 0
     for mode in modes:
-        if mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
+        if mode == 'selftest':       found, gate = (lambda r: (r, len(r)))(check_selftest())
+        elif mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
         elif mode == 'import-order': found, gate = (lambda r: (r, len(r)))(check_import_order())
         elif mode == 'missing':      found, gate = (lambda r: (r, len(r)))(check_missing())
         else:                        found, gate = check_unused(a.only)
