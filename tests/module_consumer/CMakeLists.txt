@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.28) # a module file set needs this cmake version
+# mama.cmake already needs 3.28 for a module file set, and it keeps the headers below that.
+# A 3.28 minimum here stops cmake before it can take the header path.
+cmake_minimum_required(VERSION 3.25)
 project(RppModuleConsumer CXX)
 include(${CMAKE_CURRENT_SOURCE_DIR}/mama.cmake)
 

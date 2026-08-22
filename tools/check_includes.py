@@ -210,10 +210,12 @@ def check_missing() -> list[str]:
 _HASH = r'(?:\#|%:)'
 # a directive takes any whitespace that is not a newline, form feed and vertical tab included
 _SP = r'[^\S\n]'
-# a named module needs whitespace after the keyword, or `important` reads as an import. a
-# header unit sits against <> or "". a partition needs `: name ;`, so `import:` stays a label.
+# every operand takes its whole shape, so a name that is only `import` stays an identifier.
+# `[^\W\d]` is a C++ identifier start, which `[A-Za-z_]` is not, see module `éclair`.
+_NAME = r'[^\W\d][\w.]*'
 IMPORT_RE = re.compile(rf'^{_SP}*(?:export{_SP}+)?import'
-                       rf'(?:{_SP}+[A-Za-z_]|{_SP}*[<"]|{_SP}*:{_SP}*[A-Za-z_][\w.]*{_SP}*[;\[])', re.M)
+                       rf'(?:{_SP}+[^\W\d]|{_SP}*<[^>\s]+>|{_SP}*"[^"\n]+"'
+                       rf'|{_SP}*:{_SP}*{_NAME}{_SP}*[;\[])', re.M)
 # the ordering scan needs the directive, not its operand, so a macro form still counts
 ANY_INCLUDE_RE = re.compile(rf'^{_SP}*{_HASH}{_SP}*include\b', re.M)
 
@@ -365,12 +367,14 @@ def check_import_order() -> list[str]:
     a thousand redefinition errors. Clang accepts the same file, so only GCC catches it.
     """
     # a header under tests/ carries the same rule, so the walk reads every source extension
-    sources = ('.h', '.inl', '.cpp', '.cppm')
-    files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(sources)]
+    files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(SOURCES)]
              + sorted(f'{r}/{f}' for r, _, fs in os.walk('tests') for f in fs
-                      if f.endswith(sources)))
+                      if f.endswith(SOURCES)))
     return [f for f in (scan_import_order(p, _read(p)) for p in sorted(set(files))) if f]
 
+
+# every extension the walk reads. A case below names one, so the table drives this list.
+SOURCES = ('.h', '.inl', '.cpp', '.cppm', '.mm')
 
 # Each case is a file name, its exact bytes, and the line a finding must name. 0 means the
 # scan must stay silent. The name carries the extension, because the header rule reads it.
@@ -387,6 +391,9 @@ SELFTEST = [
     ('partition_tight.cppm',     b'import:part;\n#include <string>\n', 2),
     ('label_named_import.h',     b'inline int f(int x){ if(x) goto import;\nimport: return 1;\n}\n', 0),
     ('important.cppm',           b'import m;\nint important = 1;\n', 0),
+    ('compare_named_import.h',   b'inline bool f(int import) {\n  return\nimport < 5;\n}\n', 0),
+    ('unicode_module.cppm',      b'import \xc3\xa9clair;\n#include <string>\n', 2),
+    ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     # phase 2, the line splice
     ('keyword_splice.cppm',      b'imp\\\nort m;\n#include <string>\n', 3),
     ('comment_splice.cppm',      b'import m;\n// note \\\n#include <string>\n', 0),
@@ -422,6 +429,9 @@ def check_selftest() -> list[str]:
     bad = []
     with tempfile.TemporaryDirectory() as d:
         for name, body, want in SELFTEST:
+            # the scan reads the text, so only this check sees an extension the walk skips
+            if not name.endswith(SOURCES):
+                bad.append(f'{name}: the walk reads no {os.path.splitext(name)[1]} file')
             path = os.path.join(d, name)
             open(path, 'wb').write(body)
             found = scan_import_order(name, _read(path))
