@@ -371,19 +371,21 @@ TestImpl(test_concurrent_queue)
         });
         scope_guard([&]{ slow_producer.get(); });
 
-        queue.barrier_consumer_ready(); // item1 is coming after 10ms
         PopResult r;
+        // the producer still waits at the barrier, so no push can race these two waits
         AssertWaitPopTimed(Millis(3), false, /*item*/"", /*elapsed ms:*/ 2.0, 8.0);
         AssertWaitPopTimed(Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.5);
-        AssertWaitPopTimed(Millis(15), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 15.0); // this should not timeout
+
+        // a late consumer can find the item already pushed, see BUGS.md B2
+        // each upper bound sits under its timeout, to prove the pop woke on the push
+        queue.barrier_consumer_ready(); // item1 is coming after 10ms
+        AssertWaitPopTimed(Millis(50), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 45.0);
 
         queue.barrier_consumer_ready(); // item2 is coming after 10ms
-        // the upper bound only has to prove the pop woke on the push and not on its
-        // timeout, so it sits under the timeout. ASAN stretches the 10 ms producer delay.
-        AssertWaitPopTimed(Millis(50), true, /*item*/"item2", /*elapsed ms:*/ 3.0, 45.0);
+        AssertWaitPopTimed(Millis(50), true, /*item*/"item2", /*elapsed ms:*/ 0.0, 45.0);
 
         queue.barrier_consumer_ready(); // item3 is coming after 10ms
-        AssertWaitPopTimed(Millis(50), true, /*item*/"item3", /*elapsed ms:*/ 3.0, 45.0);
+        AssertWaitPopTimed(Millis(50), true, /*item*/"item3", /*elapsed ms:*/ 0.0, 45.0);
 
         // now we enter a long wait, but we should be notified by the producer
         queue.barrier_consumer_ready(); // item4 is coming after 10ms
@@ -443,11 +445,12 @@ TestImpl(test_concurrent_queue)
         PopResult r;
 
         // we should only have time to receive item1 and item2
+        // a late consumer can find the item already pushed, see BUGS.md B2
         auto until = Now() + Millis(28);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 3.0, 18.0);
+        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 18.0);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 3.0, 18.0);
+        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 0.0, 18.0);
         queue.barrier_consumer_ready();
         AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 0.0, 18.0);
     }

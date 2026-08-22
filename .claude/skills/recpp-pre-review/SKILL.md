@@ -10,6 +10,40 @@ almost never carries the STE rules. A model writes the code, then pads the prose
 around it. This pass removes that padding, in the same session, with no subagent
 and no wait.
 
+## Run it BEFORE the write, not after
+
+The first draft never carries the STE rules, and editing a draft is weaker than
+composing under the constraint. Check the sentence before you splice it in.
+
+A `PreToolUse` hook on `Edit` and `Write` enforces this. It lints only the lines an
+edit introduces, and it blocks the write when one breaks a rule. A blocked write is
+not a failure. Fix the line and retry.
+
+The checks it runs mechanically:
+
+| Check | Applies to |
+|-------|------------|
+| sentence over 25 words | markdown prose, comments |
+| contraction, semicolon | markdown prose, comments |
+| comment block over 2 lines | `.h`, `.cpp`, `.cppm` |
+| comment ending on a dangling comma | `.h`, `.cpp`, `.cppm` |
+| `sleep_ms(N)` with N over 10 | `.h`, `.cpp`, `.cppm` |
+
+Tables, code fences, and headings are exempt, because they carry reference data.
+
+## Prose never goes in through the shell
+
+A second hook refuses a Bash command which writes a `.md`, `.h`, `.cpp`, or `.cppm`
+file. Reading, building, and restoring stay allowed, and a scratch path under
+`/tmp` is never project prose.
+
+It reads shell lines and heredoc bodies apart, so text which quotes a redirect is
+documentation, not an edit. A markdown code span is stripped for the same reason.
+
+Three layers cover the whole path. The Bash hook pushes an edit to the right tool,
+the Edit hook lints the text before it lands, and the Stop hook re-lints the
+markdown diff at the end of the turn.
+
 ## When to run
 
 Run it in every one of these cases:

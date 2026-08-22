@@ -1142,6 +1142,31 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // ─── wait_on_all honors its timeout on a warped clock ───────
+    // wait_on_all builds its deadline from the loop clock it polls with. A deadline
+    // from a different clock expires at once and gives a background task no grace.
+    TestCase(wait_on_all_waits_for_background_task_on_warped_clock)
+    {
+        std::atomic_bool bg_started { false };
+        std::atomic_bool bg_finished { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]
+            {
+                bg_started = true;
+                rpp::sleep_ms(10);
+                bg_finished = true;
+            });
+        });
+
+        while (!bg_started.load()) // the task must own the counter before we wait
+            rpp::sleep_ms(1);
+        clock.warp_forward(rpp::seconds(10));
+
+        AssertTrue(loop->wait_on_all(rpp::seconds(1)));
+        AssertThat(bg_finished.load(), true);
+    }
+
     // ─── loop hook: fires on every run_once() ───────────────────
     // run_once() always invokes the hook, whether or not an event was processed.
     TestCase(loop_hook_invoked_by_run_once)

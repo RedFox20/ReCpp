@@ -216,6 +216,8 @@ and includes no rpp header except a macro header, so a missing export fails the 
 | [Concurrent Queue](#rppconcurrent_queueh) | [`concurrent_queue.h`](src/rpp/concurrent_queue.h) | Thread-safe FIFO queue |
 | [Debugging](#rppdebugging) | [`debugging.h`](src/rpp/debugging.h) | Cross-platform logging, assertions, and log handlers |
 | [Stack Trace](#rppstack_traceh) | [`stack_trace.h`](src/rpp/stack_trace.h) | Stack tracing and traced exceptions |
+| [Predicates](#rpppredicatesh) | [`predicates.h`](src/rpp/predicates.h) | Portable callable and predicate concepts |
+| [Source Location](#rppsource_loch) | [`source_loc.h`](src/rpp/source_loc.h) | Portable call site capture for assert and log messages |
 | [Bit Utils](#rppbitutilsh) | [`bitutils.h`](src/rpp/bitutils.h) | Fixed-length bit array |
 | [Close Sync](#rppclose_synch) | [`close_sync.h`](src/rpp/close_sync.h) | Read-write synchronization for safe async destruction |
 | [Endian](#rppendianh) | [`endian.h`](src/rpp/endian.h) | Endian byte-swap read/write utilities |
@@ -281,6 +283,8 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | [`RPP_BARE_METAL`](src/rpp/config.h#L204) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
 | [`RPP_FREERTOS`](src/rpp/config.h#L192) | `1` if targeting FreeRTOS |
 | [`RPP_STM32_HAL`](src/rpp/config.h#L196) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
+| [`RPP_ANDROID`](src/rpp/config.h#L38) | `1` if targeting Android, with any compiler |
+| [`RPP_ANDROID_CLANG`](src/rpp/config.h#L47) | `1` if targeting Android with Clang |
 | [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L210) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
 | [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L215) | `1` if targeting ARM Cortex-M architecture |
 | [`RPP_ARM_ARCH`](src/rpp/config.h#L231) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
@@ -1060,6 +1064,7 @@ Cross-platform path manipulation, directory listing, and filesystem utilities.
 | Function | Description |
 |----------|-------------|
 | [`delete_file(path)`](src/rpp/paths.h#L141) | Delete a single file |
+| [`rename_file(oldPath, newPath)`](src/rpp/paths.h#L151) | Rename a file, overwriting the destination, and fall back to copy and delete across filesystems |
 | [`copy_file(sourceFile, destinationFile)`](src/rpp/paths.h#L166) | Copy file, overwriting destination |
 | [`copy_file_if_needed(sourceFile, destinationFile)`](src/rpp/paths.h#L184) | Copy only if destination doesn't exist |
 | [`copy_file_into_folder(sourceFile, destinationFolder)`](src/rpp/paths.h#L193) | Copy file into a folder |
@@ -1336,6 +1341,13 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 | [`promise_type`](src/rpp/future.h#L507) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`RPP_HAS_COROUTINES`](src/rpp/future_types.h#L12) | Detects whether C++20 coroutine headers are available |
 | [`RPP_CORO_STD`](src/rpp/future_types.h#L13) | Namespace alias for coroutine types (std or std::experimental) |
+| [`coro_handle<T>`](src/rpp/future_types.h#L46) | Alias for the standard coroutine handle, which follows `RPP_CORO_STD` |
+| [`suspend_never`](src/rpp/future_types.h#L47) | Alias for the standard never-suspend awaiter |
+| [`suspend_always`](src/rpp/future_types.h#L48) | Alias for the standard always-suspend awaiter |
+| [`IsFuture`](src/rpp/future_types.h#L55) | Concept which matches `rpp::cfuture<T>` and `std::future<T>` |
+| [`NotFuture`](src/rpp/future_types.h#L61) | Concept which matches any type `IsFuture` rejects |
+| [`IsFunction`](src/rpp/future_types.h#L64) | Concept which matches a callable taking no argument |
+| [`IsFunctionReturningFuture`](src/rpp/future_types.h#L67) | Concept which matches a callable returning a future |
 
 ### Example: Composable Futures
 
@@ -1656,6 +1668,12 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 | [`thread_pool`](src/rpp/thread_pool.h#L399) | Thread pool manager with auto-scaling workers |
 | [`pool_task_handle`](src/rpp/thread_pool.h#L144) | Waitable, reference-counted handle for pool tasks |
 | [`pool_worker`](src/rpp/thread_pool.h#L118) | Individual worker thread in the pool |
+
+### Configuration
+
+| Macro | Description |
+|-------|-------------|
+| [`RPP_POOL_TASK_USE_ATOMIC_SP`](src/rpp/thread_pool.h#L26) | `1` makes `pool_task_handle` use `rpp::atomic_shared_ptr`. `0` selects the older raw atomic pointer with a manual refcount |
 
 ### thread_pool Methods
 
@@ -2696,6 +2714,12 @@ Portable atomic `shared_ptr` and `weak_ptr` wrappers. Uses native `std::atomic<s
 |------|-------------|
 | [`atomic_shared_ptr<T>`](src/rpp/atomic_shared_ptr.h#L49) | Thread-safe atomic shared_ptr with load/store/exchange |
 | [`atomic_weak_ptr<T>`](src/rpp/atomic_shared_ptr.h#L109) | Thread-safe atomic weak_ptr with load/store/exchange |
+
+### Configuration
+
+| Macro | Description |
+|-------|-------------|
+| [`RPP_USE_STD_ATOMIC_SHARED_PTR`](src/rpp/atomic_shared_ptr.h#L22) | `1` when the standard library provides `std::atomic<shared_ptr<T>>`, otherwise `0` and the mutex fallback is used. Define it yourself to override the choice |
 
 ### atomic_shared_ptr Methods
 
@@ -3848,6 +3872,42 @@ try {
 
 ---
 
+## rpp/predicates.h
+
+Portable replacements for `std::invocable` and `std::predicate`. Those need
+`<concepts>`, which some toolchains do not ship. On C++17 both names fall back to
+`typename`, so the same declaration compiles everywhere.
+
+### Concepts
+
+| Concept | Description |
+|---------|-------------|
+| [`IsCallable`](src/rpp/predicates.h#L15) | Matches a type which can be called with no argument |
+| [`IsPredicate`](src/rpp/predicates.h#L20) | Matches a callable whose result converts to `bool` |
+
+---
+
+## rpp/source_loc.h
+
+Portable call site capture. `std::source_location` is missing on some older
+platforms, so this header gives the same shape everywhere.
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| [`source_loc`](src/rpp/source_loc.h#L27) | Holds the file, the function, and the line number of a call site |
+
+### Macros
+
+| Macro | Description |
+|-------|-------------|
+| [`RPP_HAS_SOURCE_LOCATION`](src/rpp/source_loc.h#L11) | `1` when `std::source_location` is available, otherwise `0` |
+| [`RPP_SOURCE_LOC`](src/rpp/source_loc.h#L12) | Declares a defaulted `rpp::source_loc loc` parameter which captures the caller |
+| [`RPP_SOURCE_LOC_CURRENT`](src/rpp/source_loc.h#L13) | Initializer which captures the current call site |
+
+---
+
 ## rpp/stack_trace.h
 
 Cross-platform stack tracing and traced exceptions.
@@ -4074,6 +4134,7 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 | [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L18) | Platform-specific 16-bit byte swap |
 | [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L19) | Platform-specific 32-bit byte swap |
 | [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L20) | Platform-specific 64-bit byte swap |
+| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/endian.h#L21) | Platform-specific memcpy used by the endian read and write helpers |
 | [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L30) | Convert 16-bit value to big-endian byte order |
 | [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L31) | Convert 32-bit value to big-endian byte order |
 | [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L32) | Convert 64-bit value to big-endian byte order |

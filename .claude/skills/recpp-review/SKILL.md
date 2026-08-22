@@ -60,8 +60,17 @@ Protect that number.
   `task.wait()`, `pool.wait_until_idle()`. Each one returns as soon as the work
   ends.
 - A timeout is an upper bound, not a cost, but it is also the price of a hang.
-  One second is the cap for every wait in a test. A slower bound only makes a
-  broken case take longer to fail.
+  One second is the cap for a synchronization wait, which is a hard cap on a
+  thread or a task which must finish. Keep every timing wait as small as it can be.
+- A deadline under test is not a synchronization wait. When the case exists to
+  prove the work lands inside the deadline, a widened bound hides the defect and
+  the case passes in silence. Such a bound only shrinks.
+- Reuse a timing value the file already uses. Do not invent one. When three
+  sibling rounds wait 50 ms, the fourth waits 50 ms.
+- Never widen a bound to make a case pass. First show the measurement which
+  proves the old value is wrong. A load you invented is not that measurement.
+- Rank the fix: remove the race first, correct an unprovable assertion second,
+  change a number last.
 - Use the ReCpp timing API. Do not add `std::chrono`, `std::this_thread::sleep_for`,
   or `std::this_thread::yield` to source or tests.
 
@@ -222,6 +231,18 @@ The Windows checkout is a separate clone. Treat it as somebody else's tree.
    ```
 6. Forbidden in the mirror: `rm -rf`, `cp -r` over it, `git checkout -f`,
    `git reset --hard`, `git clean`.
+
+### R9b. A closed BUGS.md entry is two sentences
+
+`BUGS.md` loads into every session, so every extra line costs every agent.
+
+- An entry you close shrinks to exactly two sentences. The first names the bug.
+  The second names the fix. Each one stays under the 25 word cap in R5.
+- Two long sentences are not compliance. A comma splice which piles four clauses
+  into one sentence carries the same noise the rule removes.
+- Git holds the investigation, the disproved theories, and the measurements. Do
+  not carry them forward.
+- An open entry keeps what an investigation needs, and no more.
 
 ### R10. TSAN is a suggestion, not a gate
 

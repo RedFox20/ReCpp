@@ -1,148 +1,23 @@
 # ReCpp Bugs
 
-Open issues first, then closed. Keep every entry terse: enough to start an
-investigation, no more. A closed entry states the bug and the fix in one or two
-lines.
+Open issues first, then closed. An open entry carries enough to start an
+investigation, no more.
+
+**A closed entry is exactly two sentences.** The first names the bug. The second
+names the fix. Git holds the story, and a longer entry is noise every agent reads.
 
 ## Open
 
-### B11. mama's compiler-seed cache drops clang-scan-deps, so a dependency build loses modules
-Not a ReCpp defect. `consumer-clang21` builds ReCpp as a dependency, and it reported
-`the Clang toolchain ships no clang-scan-deps` while all three copies of the binary sat
-on the box, one of them beside the compiler. `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` was
-absent from `CMakeCache.txt`, not `NOTFOUND`, so the `find_program` never ran.
-`Compiler/Clang-FindBinUtils.cmake` runs only from `CMakeDetermineCXXCompiler.cmake:203`,
-which CMake skips when `CMakeCXXCompiler.cmake` already exists. mama seeds that exact
-file, and the log shows `seed[RppConsumer] ... hit -> use` with `Configuring done (0.0s)`.
-The seed replays 5 cache keys and none of the 3 that module scanning needs.
-The job passes `nocache` until mama replays them. Reported to mamabuild.
+### B2. Timing bounds have no slack for a loaded machine
+Nearly every timing assertion sets its bound just above the delay it measures. A
+sanitizer, an emulator, or a busy CI runner erases that margin.
+Reproduce it without CI. Pin CPU hogs to the test core:
+```bash
+for h in 1 2; do taskset -c 0 bash -c 'while :; do :; done' & done
+taskset -c 0 ./bin/RppTests nogdb test_concurrent_queue
+kill %1 %2
+```
 
-### B6. A consumer builds modules that no consumer can import
-`package()` exports `.h` and `.natvis` only, so a downstream project compiles two
-BMIs and then cannot `import` either one. See B3. AUTO still turns modules on in
-a dependency build, which is where C11 broke KrattGCS.
-The owner chose to keep AUTO as the default, so this stays open until B3 lands and
-makes the modules reachable. Until then a consumer pays the build cost for nothing.
-
-### B10. A test handed the event_loop a pool that dies before the loop
-`test_event_loop::custom_thread_pool` built a **local** `rpp::thread_pool` and gave
-the loop a raw pointer to it. The case returns, the local pool dies, and only then
-does `TestCaseCleanup()` destroy the loop, so the loop outlives the pool it points
-at. Android caught it in CI:
-`FORTIFY: pthread_mutex_trylock called on a destroyed mutex`, then `SIGABRT` on
-`rpp_task_13`, during the next case.
-Fixed: the pool is a fixture member now, and cleanup destroys the loop first.
-The constructor now marks each borrowed pointer `RPP_LIFETIMEBOUND`. Clang
-rejects this annotation on the void `set_time_source()` function. Its doxygen
-states that the loop must not outlive the pool or the clock.
-The annotation does not catch the shape that caused it. Measured on clang-18:
-`lifetimebound` warns when a reference parameter binds a temporary, which is what
-`strview.h` uses it for. It stays silent when a pointer parameter takes a local
-that a longer-lived object then stores. A reference overload would make the
-compiler help, but the constructor has two optional pointers, so that needs a
-combination of overloads for every case.
-The owner closed this: the documented contract plus the annotation is the
-practical limit, and no further work is planned.
-
-### B1. TSAN races reproduce only under CPU load, cause unknown
-Two sites, both seen in one loaded sweep of 33 sequential runs, 4 reports:
-- `thread_pool.cpp:351`, a pool worker writing in the `catch` handler against a
-  main-thread read at `tests.cpp:723`, which is `typeid(e).hash_code()`.
-- `semaphore.h:99`, heap-use-after-free in `rpp::semaphore::spin_lock`.
-
-**Measurement state, stated plainly.** The 4 of 33 came from a machine that was
-also building and running other suites. Two later sweeps on an idle machine, 67
-runs in total, reported nothing. A before-and-after comparison was attempted and
-failed: the `git stash` had nothing to stash, because the test fixes were already
-committed, so both sweeps measured the same tree. **There is no evidence either
-way about whether the B2 fixes changed this.**
-
-So the only positive signal needs CPU contention. CI cannot supply the evidence
-either. TSAN aborted at startup on those runners until C9 fixed it, so no TSAN job
-before that says anything about races. Reproduce it locally on purpose: run one suite while a
-separate load generator saturates the cores, and count over 50 runs. Do not run
-several suites at once, because ReCpp does not support that and the result means
-nothing.
-
-**A review of `pool_worker::run` found the code correct.** The task moves to a
-local that outlives the try block, the handler destroys it before
-`unhandled_exception` runs, and that call cleans up the worker state. Do not add a
-lock. A wrong fix here is worse than the report.
-
-**Disproved.** Concurrent throw and catch on two threads with nothing shared
-produces no TSAN report, over 6 runs of 60 rounds each. libstdc++ exception
-storage is not the explanation.
-
-### B2. Timing bounds flake sequential ASAN, now 1 run in 30
-Measured on an idle machine, gcc-14 ASAN, one suite at a time.
-Before: 3 of 44 runs. After the six fixes below: 1 of 30.
-The rate fell but did not reach zero, and the survivors are at new sites
-(`test_concurrent_queue.cpp:443` and `test_sockets.cpp:398`), so this is a long
-tail and not six isolated defects. Nearly every timing assertion in the suite sets
-its bound just above the delay it measures, and a sanitizer erases that margin.
-A per-assertion widening will keep finding new sites. The suite needs one slack
-policy for sanitizer builds, for example a multiplier applied to every upper
-bound when `RPP_ASAN` or the TSAN equivalent is set.
-Six causes fixed so far:
-- `test_sockets.cpp:425`, elapsed 9.9 and 12.8 ms against a 9 ms bound.
-- `test_concurrent_queue.cpp:376`, elapsed 30.4 ms against a 15 ms bound.
-- `test_concurrent_queue.cpp:569`, a 15 ms `wait_pop` timed out and shifted every
-  later item, so one miss cascaded into four failed assertions.
-- `test_coroutines.cpp:49` and `:56`, a 50 ms sleep measured 56.5 ms against a
-  56 ms bound, and a 15 ms sleep measured 28.3 ms against a 20 ms bound.
-- `test_semaphore.cpp:132`, 4 notifies counted of 10 sent.
-Every timing bound sat just below the delay it measured, so a sanitizer erased the
-margin. Each bound now sits just under its own timeout, which is the only property
-the assertion needs. The semaphore one was different: the producer set
-`working = false` while the worker still had notifies to drain, so it now waits for
-the count first.
-
-The tail also reaches CI, and it hides behind a code change. Commit `3f6457d`
-failed `ubuntu-cpp20-tsan-clang18`, `ubuntu-cpp20-asan-gcc13` and
-`android-cpp20-r29-ninja`, while the parent commit passed all 27 jobs. The commit
-changed no machine code: an `-O2` disassembly of `sprint.cpp` from each commit
-differs in 0 instructions, because the edit only moves a declaration behind
-`#if RPP_WCHAR_IS_UTF32`, which stays 1 on both platforms.
-
-The next commit settled it. `b82a690` edits this file and nothing else, and it
-failed `mipsel-cpp20-gcc12`, `ubuntu-cpp26-asan-gcc14` and
-`android-cpp20-r27-clang-tidy-clang18`. All three passed on `3f6457d`, and all
-three earlier failures passed here. A markdown edit cannot break a mipsel build,
-so the failing set is random and it does not depend on the code. Two runs each
-lost 3 jobs of 27. That sample is small, but at that rate an all-green board is
-rare, near 1 run in 20. A PR that cannot show green teaches the reader to ignore
-a red job, which is the real cost and the argument for the slack policy above.
-
-Two CI logs name the assertions, and both belong to this tail:
-
-- `test_concurrent_queue.cpp:411`, `wait_pop_until`, elapsed 12.56 ms against a
-  10.0 ms upper bound, on an Android job.
-- `test_semaphore.cpp:184`, `can_notify_worker_thread_sub_millisecond`, 465
-  notifies counted of 500 sent, on gcc-14.
-
-The semaphore one was not a bound at all. It repeats the defect this list already
-fixed at `test_semaphore.cpp:132`, because the sibling test never got that fix. It
-waited a fixed 5000 us instead of waiting for the count, so a slow worker lost
-whatever it had not drained. Both tests call `drain_notifies()` now.
-
-The Android job also narrows the open item. That job runs clang-tidy, not a
-sanitizer, so a multiplier keyed on `RPP_ASAN` or the TSAN equivalent would not
-have caught it. A loaded machine is enough. The policy has to widen an upper bound
-by load, not by sanitizer.
-
-The tail reproduces locally, which the entry above assumed it did not. A
-`clang-tidy` build lost `test_concurrent_queue.cpp:447` at 18.196 ms against an
-18.0 ms bound, and `test_sockets.cpp:398` cascaded 8 assertions from one missed
-`pollin`. Three plain runs of the same binary passed 501/501. So the slack policy
-can prove itself on a loaded machine, without waiting for CI.
-
-### B3. mamabuild cannot export C++20 modules
-`mamafile.py` `package()` exports `.h` and `.natvis` only, so no `.cppm` reaches
-a consumer. `CMakeLists.txt` has no `install(TARGETS ... FILE_SET CXX_MODULES)`.
-Nobody outside ReCpp can import `rpp.strview` or `rpp.debugging` yet.
-A binary module interface is not portable, so a consumer must compile the
-producer's `.cppm` inside its own target. mama has no way to express that.
-Tracked upstream: https://github.com/RedFox20/Mama/issues/41
 
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
@@ -151,183 +26,95 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C19. mamabuild cannot export C++20 modules (was B3)
+`package()` exported `.h` and `.natvis` only, so no `.cppm` reached a consumer and
+nobody outside ReCpp could import `rpp.strview`. The latest mama release and the
+ReCpp pull request beside it make the module sources reachable.
+
+### C18. TSAN races under CPU load never reproduced again (was B1)
+TSAN reported 4 races in 33 loaded runs, at `thread_pool.cpp:351` and
+`semaphore.h:99`. 120 runs on 32 saturated cores reported nothing, so both sites
+are closed as unreproducible.
+
+### C17. An event_loop outliving a borrowed pool is an API limit, not a defect (was B10)
+`test_event_loop::custom_thread_pool` gave the loop a pointer to a local pool, so
+Android aborted on a destroyed mutex. Not a defect, because an `event_loop` never
+outlives what it borrows, so the contract is documented and the pool is a fixture
+member.
+
 ### C16. The 52 missing std includes were not a defect (was B4)
-B4 claimed each of the 52 files breaks when its provider chain becomes an `import`.
-Negative control on GCC 14.2: delete `#include <string>` from
-`tests/test_modules.cpp`, keep `import rpp.strview;`, and the modules build passes.
-A facade includes its header in the global module fragment, so those declarations
-stay reachable to an importer.
-The 1603-error incident was an `import` inside a header, a different failure that
-AGENTS.md now forbids. Changeset 1a is dropped from the migration plan.
-An rpp include is not the same: finding 6 in that plan proves a missing
-`export import` breaks the consumer, so changeset 2 keeps the rpp-header check.
+B4 claimed 52 files break when a provider chain becomes an `import`. A negative
+control on GCC 14.2 disproved it, so changeset 1a left the migration plan.
 
 ### C15. TSAN blamed a pool worker for freeing a promise the waiter still used (was B9)
-Three CI reports on clang, all one shape: `operator delete` from `~promise()` on a
-pool worker, against a main thread `pthread_mutex_lock` or `pthread_cond_wait`
-inside `run_test_func`:
-- a task from `test_close_sync.cpp:29` freed during `test_concurrent_queue`
-- a task from `test_future.cpp:103` freed during a later `test_future` case
-- a task from `test_threadpool.cpp:435` freed during
-  `async_task_throwing_task_destroyed_before_future_ready`
-
-Not a lifetime defect, and not a detached-task defect. libc++ keeps the future
-shared state and its acquire-release refcount inside `libc++.so`, and the build
-does not instrument that library. TSAN sees the mutex traffic and it sees the
-`delete`, but never the order between them. Whoever drops the last reference runs
-the `delete`, and the worker wins that race whenever `get()` returns and the waiter
-releases first. 20 lines with one `std::promise` and one thread reproduce the
-report with no ReCpp code. The same program is clean under libstdc++, which keeps
-that refcount in an instrumented header.
-Fixed: `tests/main.cpp` returns `race:std::__1::promise` from
-`__tsan_default_suppressions()`, beside the libc++ ASAN workaround that was already
-there. `test_threadpool::pool_task_frees_the_promise_after_the_waiter_released`
-forces the order on demand.
+TSAN reported `operator delete` in `~promise()` on a pool worker against main
+thread mutex traffic, three times on clang. libc++ keeps the future refcount
+inside an uninstrumented `libc++.so`, so `tests/main.cpp` suppresses
+`race:std::__1::promise` and a regression test forces the order on demand.
 
 ### C14. `num_physical_cores()` reported host cores inside a container
-`std::thread::hardware_concurrency()` answers for the host, not for the cores a
-container may use, so the thread pool oversubscribes. On a 3 CPU CircleCI
-container it sized the pool to 8, and `parallel_for` ran 1.46x slower than the
-serial loop, which failed `test_threadpool.cpp:239`.
-`threads.cpp:169` already carries a `CIRCLECI` mitigation, and it sits inside the
-`MIPS || RASPI || YOCTO_LINUX || RPP_ANDROID` branch, so no x86 build reaches it.
-Fixed: `max_usable_cores()` in `threads.cpp` reads the cgroup quota, v2 `cpu.max`
-then v1 `cpu.cfs_quota_us`, and falls back to the affinity mask.
-`num_physical_cores()` never reports more than that. Linux covers Android and
-Yocto. Windows reads the process affinity mask. macOS and iOS cap nothing.
-The `CIRCLECI` guess that divided by 4 is gone.
-Verified: `taskset -c 0` gives 1 core where the machine reports 4.
-The test also skips the parallel-against-serial bound when `CIRCLECI` is set,
-because a shared runner cannot measure that ratio.
-Tracked: https://github.com/RedFox20/ReCpp/issues/60
+`std::thread::hardware_concurrency()` answers for the host, so a 3 CPU CircleCI
+container sized the pool to 8 and `parallel_for` ran 1.46x slower than serial.
+`max_usable_cores()` now reads the cgroup quota and the affinity mask, and
+`num_physical_cores()` never reports more than that.
 
 ### C13. `pump_until_ready_times_out_without_blocking` aborted on Windows
-The job printed the test name and `Exited with code exit status 1`, with no
-assertion text, so the process died instead of failing an assertion. Not
-reproduced on Linux, and CircleCI logs are not reachable from the dev container.
-Cause unknown. `~event_loop()` calls `std::terminate()` when a thread other than
-the owner destroys it, which matches an exit with no output, but nothing proves
-that path ran.
-Hardened, not fixed: the test prints `ready` and the elapsed before it asserts,
-drains with the non-throwing `pump_until_ready` instead of `run_until_ready`, and
-waits for `has_background_tasks()` to clear. The old drain threw on timeout, and
-unwinding left a pool task mid-sleep with a continuation into a loop that the next
-`TestCaseSetup()` destroys.
-Next Windows failure should print the diagnostic line first. That names which half
-of the test died.
-All 27 CI jobs pass on the merge, Windows included, so the abort is gone.
-The root cause was never proven. Reopen with the printed diagnostic if it returns.
+The job died with no assertion text, and the cause was never proven. The test now
+prints a diagnostic before it asserts and drains with the non-throwing
+`pump_until_ready`, and every CI job passes.
 
 ### C12. Every Windows thread name read back as "true"
-`get_thread_name()` passed a `PWSTR` to `rpp::to_string()`. MSVC keeps `wchar_t`
-distinct from `char16_t`, and `ustring` is `std::u16string`, so no UTF-16 overload
-matched. A pointer converts to `bool`, so `to_string(bool)` won and every thread
-reported "true".
-It predates this branch. It surfaced only after the B8 fix stopped Windows from
-aborting in `test_event_loop`, which used to end the run before `test_threadpool`.
-Fixed at the root: `strview.h` gains `to_string(const wchar_t*, int)` under
-`_WIN32`, matching the `_MSC_VER` guard on `ustrview(const wchar_t*)`. A wide
-string can no longer bind to the bool overload.
-Verified with `-fshort-wchar`, which gives Linux a 16 bit `wchar_t`: the overload
-returns "TestThread", not "true". `test_strview` covers it.
+`get_thread_name()` passed a `PWSTR` to `rpp::to_string()`, no UTF-16 overload
+matched under MSVC, so the pointer bound to `to_string(bool)`. `strview.h` gained
+`to_string(const wchar_t*, int)` under `_WIN32`.
 
 ### C11. A modules build broke every consumer on a toolchain without clang-scan-deps
-KrattGCS failed its Android build: `"" -format=p1689 --`, then
-`sh: line 1: : command not found`, exit 127, on every `.cppm` scan.
-Clang scans module dependencies with a separate `clang-scan-deps` binary, and the
-Android NDK ships none. CMake's `find_program` leaves
-`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` empty and still writes the scan rule, so the
-configure passes and every ninja scan runs an empty command. AUTO checked the CMake
-version, the C++ standard, the generator and the compiler version, but never the
-scanner.
-Fixed: AUTO also requires an existing `clang-scan-deps` when the compiler is Clang.
-Reproduced and verified on one tree: the old CMakeLists printed `Modules enabled`
-and failed the build, the new one prints
-`RPP MODULES: off, the Clang toolchain ships no clang-scan-deps` and builds clean.
-
-CI missed it for two reasons, and both now have a job:
-- Every Android job forced `NO_NINJA=1`, so CI never ran the NDK under the one
-  generator that scans modules. `android-cpp20-r29-ninja` runs it.
-- CI only ever built ReCpp as the root target. `consumer-integration` builds
-  `tests/consumer`, which declares ReCpp through `add_local` and links the exported
-  package, on gcc-14 with Ninja so modules turn on inside a dependency build.
-
-Both modules jobs now pass `BUILD_WITH_MODULES=ON` instead of trusting AUTO. AUTO
-turns modules off and keeps going, so a job named modules could pass while it built
-headers only. `ubuntu-cpp20-modules-clang21` also installs `clang-tools-21`, because
-that package, not `clang-21`, carries `clang-scan-deps`.
+The Android NDK ships no `clang-scan-deps`, so CMake wrote a scan rule with an
+empty command and every `.cppm` scan exited 127. AUTO now demands an existing
+`clang-scan-deps` on Clang, and the `android-cpp20-r29-ninja` and
+`consumer-integration` jobs cover the gap CI had.
 
 ### C9. CI was red in 5 job classes, and all 24 jobs pass now
-The baseline is PR #56, the last merge into master. Five separate causes:
-- 4 TSAN jobs. TSAN aborted before the first test:
-  `FATAL: ThreadSanitizer: unexpected memory mapping`, exit 66. The runner kernel
-  hands out a mapping outside the layout TSAN needs. **This was never B1.**
-  Fixed: the test step runs under `setarch $(uname -m) -R`, which turns off
-  address space randomization without a privilege.
-- 5 clang-21 jobs. `mama install-clang-21` runs `apt-get install clang-21`, and the
-  image carries no such package. Fixed: the matrix uses clang-20. `CMakeLists.txt`
-  needs Clang 21 for modules, so clang-20 falls back to headers by itself.
-- 2 clang-tidy jobs: `packages/ReCpp/linux/compile_commands.json not found`. A
-  clang build lands in `linux-clang`. Fixed: `run_clang_tidy` falls back to the
-  newest `linux*/compile_commands.json`.
-- `ubuntu-cpp20-modules-gcc14` died during BUILD with no output. Modules need
-  Ninja, and mama passes `jobs=` to make and msbuild but never to ninja, so ninja
-  sized itself from the host core count and the 6 GB box ran out of memory. Fixed:
-  the build step prefixes `taskset -c 0-2`, because ninja reads the affinity mask.
-  Reported upstream.
-- `win64-cpp20-msvc2022`: `test_timer.cpp:540 clock_type_monotonic_coarse` measured
-  0 ms against a 10 ms bound. `GetTickCount64` ticks every ~15.6 ms, so a 20 ms
-  spin can land inside one tick. Fixed: both coarse-clock tests spin 80 ms.
-
-`ubuntu-cpp23-asan-gcc13` never reproduced and is green. B2 is the first suspect
-if it flakes again.
+Five unrelated causes: a TSAN memory-mapping abort, a missing `clang-21` package, a
+clang-tidy build-directory mismatch, a ninja out-of-memory, and a coarse-clock
+bound on MSVC. Each got its own fix, in order `setarch -R`, clang-20, a
+`linux*/compile_commands.json` fallback, `taskset` for ninja, and an 80 ms spin.
 
 ### C8. MSVC failed the modules build with C7684 ambiguous IFC resolution
 `RppModuleChecks` carried its own copy of the module file set and also linked
-`ReCpp`, which carries the same one. MSVC 14.44 then saw two IFCs for
-`rpp.strview` and `rpp.debugging` and refused both.
-Fixed: the module-only checks join `RppTests` instead of a target of their own,
-and the separate executable is gone. A `.cppm` must not reach two targets that
-link each other.
+`ReCpp`, so MSVC saw two IFCs for the same module. The module-only checks joined
+`RppTests`, because a `.cppm` must not reach two targets which link each other.
 
 ### C1. The modules build did not compile
-`sprint.h` swapped `#include "strview.h"` for `import rpp.strview;` under
-`RPP_BUILD_WITH_MODULES`. That dropped the transitive `<cstring>`, `<string>` and
-`<concepts>` from every consumer, and `test_strview.cpp` lost `strlen`.
-Fixed: headers never import. `sprint.h` includes again, and three missing std
-includes went in.
+`sprint.h` swapped `#include "strview.h"` for `import rpp.strview;`, which dropped
+the transitive std includes from every consumer. Headers never import now, and
+three missing std includes went in.
 
 ### C2. The dual-mode test preamble put the import first
-`test_strview.cpp` had `import rpp.strview;` above `#include <rpp/tests.h>`.
-gcc-14 re-parses a std header that follows an import and gave 1603 redefinition
-errors.
-Fixed: includes first, import last. The rule is now a style rule in AGENTS.md.
+`test_strview.cpp` placed `import rpp.strview;` above `#include <rpp/tests.h>`, and
+gcc-14 gave 1603 redefinition errors. Includes come first and imports last, now a
+style rule in AGENTS.md.
 
 ### C3. clang-21 refused `tests/test_event_loop.cpp`
 `start_coro_on_background_thread` returned `rpp::cfuture<void>` out of
-`rpp::async_task`, which instantiates `std::future<cfuture<void>>::get()`. That
-returns a `[[clang::coro_return_type]]` without being a coroutine. The
-headers-only build failed the same way, so modules were never the cause.
-Fixed: a raw `std::thread` plus `join()`, the pattern the same file already used.
+`rpp::async_task`, which instantiates a `[[clang::coro_return_type]]` getter that is
+not a coroutine. A raw `std::thread` plus `join()` replaced it.
 
 ### C4. `traits.h` did not compile on its own
-It used `std::tuple` without including `<tuple>`.
-Fixed: added the include. `tools/check_includes.py self-contained` now reports 0.
+It used `std::tuple` without including `<tuple>`. The include went in, and
+`tools/check_includes.py self-contained` reports 0.
 
 ### C5. `BUILD_WITH_MODULES` failed with an unreadable error on an old compiler
 clang-18 reported an ambiguity between `rpp::ustring` and `ustring`, and gcc-13
-failed inside a dyndep scan.
-Fixed: `CMakeLists.txt` rejects anything below GCC 14 or Clang 21 at configure
-time with a message that names the compiler.
+failed inside a dyndep scan. `CMakeLists.txt` now rejects anything below GCC 14 or
+Clang 21 at configure time, with a message which names the compiler.
 
 ### C7. `BUILD_WITH_MODULES` needed a manual flag on every build
-A CI job had to know which compilers support modules.
-Fixed: `BUILD_WITH_MODULES` now defaults to `AUTO`. `CMakeLists.txt` hardcodes the
-first supported version per family (GCC 14, Clang 21, MSVC 19.34), also checks
-CMake 3.28+, C++20 and a Ninja or Visual Studio generator, and turns modules on by
-itself. `ON` still demands them and names the exact reason when it cannot.
+A CI job had to know which compilers support modules. `BUILD_WITH_MODULES` defaults
+to `AUTO`, which checks the compiler family version, CMake 3.28+, C++20, and the
+generator, then turns modules on by itself.
 
 ### C6. The `RppTests` source glob was recursive
 `file(GLOB_RECURSE RPP_TESTS tests/*.cpp)` pulled `tests/modulecheck/` in and gave
-the binary two `main` functions.
-Fixed: non-recursive glob. `tests/modulecheck/` is its own target.
+the binary two `main` functions. The glob is non-recursive, and
+`tests/modulecheck/` is its own target.

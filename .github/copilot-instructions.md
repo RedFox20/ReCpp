@@ -1,61 +1,12 @@
 # ReCpp Copilot Instructions
 
-## Testing changes
-This project uses mama build tool, and a custom RppTest framework for unit tests.
+Read [`AGENTS.md`](../AGENTS.md) in the repo root. It is the single source of
+instructions for every coding agent, and it governs this file.
 
-1. **Compile and run all tests**: After modifying any code, ensure that the project compiles and that all tests pass. The build picks C++23 on gcc 13, clang 16, Apple clang 15, and MSVC 19.35 or newer, and C++20 on anything older. Set `CXX20=1` to pin the older standard. If you minimize output with `tail`, then include at least 50-80 lines of output. Make sure you don't accidentally confuse a random warning with the actual error.
-```bash
-# build without reconfigure (faster if you do not need to fully reconfigure)
-# -vv means extra verbose, -v means medium verbose
-mama gcc build test="-vv"
+Do not duplicate a rule here. A rule lives in `AGENTS.md`, and the detail lives in
+the files it points to:
 
-# reconfigure CMake and build everything
-mama gcc rebuild test="-vv"
-```
-2. **Run specific unit test suite**: If you modified a specific module, you can run only the relevant unit tests to save time. For example, if you modified `concurrent_queue.h`, you can run find the matching `TestImpl(test_concurrent_queue)` in `test_concurrent_queue.cpp` and run that test file:
-```bash
-mama gcc build test="-vv test_concurrent_queue"
-```
-3. **Run a specific failing test**: If you have a specific test that is failing, you can run just that test using the following command. You can find the test name in the test output, it will be something like `test_concurrent_queue::push_and_pop`:
-```bash
-mama gcc build test="-vv test_concurrent_queue::push_and_pop"
-```
-4. **Run tests with sanitizers**: If you want to check for memory or threading errors, you can build and run the tests with sanitizers enabled. mama gives each sanitizer its own build directory, such as `packages/ReCpp/linux-tsan`, so a switch back to the regular build rebuilds nothing and never mixes sanitized objects with regular ones.
-```bash
-# run AddressSanitizer, by default it runs with gdb
-mama gcc asan build test="-vv"
-
-# run with AddressSanitizer until failure
-mama gcc asan build test="-vv test_event_loop::ui_simulation_message_and_video_pipelines" test_until_failure=20
-
-# run ThreadSanitizer
-mama gcc tsan build test="nogdb -vv"
-
-# run a specific test with ThreadSanitizer until failure:
-mama gcc tsan build test="nogdb -vv test_concurrent_queue::push_and_pop" test_until_failure=20
-```
-5. **You can choose between gcc or clang**: By default, the build uses gcc, but you can switch to clang by replacing `gcc` with `clang` in the above commands. Each compiler keeps its own build directory, `linux` and `linux-clang`, so a switch rebuilds nothing in the other one.
-```bash
-# build with clang
-mama clang build test="-vv"
-```
-6. **Run tests on windows**: If you are running on Windows, then MSVC++ is the default compiler. The run command does not specify a compiler and doesn't specify nogdb. You can still enable sanitizers with asan/tsan options.
-```cmd
-mama build test="-vv"
-```
-7. **Running clang-tidy for static analysis**: You can run clang-tidy to check for common C++ issues and enforce coding standards. This is especially useful for catching potential bugs or issues in the code. There is a .clang-tidy config file in the project root.
-```bash
-mama gcc build clang-tidy test
-```
-
-## After modifying any header file in `src/rpp/`
-
-1. **Update line references**: Run `python3 update_doc_linerefs.py --dry-run` from the repo root to check if any README.md source line references need updating. If updates are needed, run `python3 update_doc_linerefs.py` (without `--dry-run`) to apply them.
-
-2. **Document new public API**: If a new public function, method, struct, enum, or constant was added to a header, add a corresponding entry to the relevant section in `README.md`. Use the format:
-   ```markdown
-   | [`function_name(type param, type param)`](src/rpp/header.h#L123) | Brief description |
-   ```
-   The display text in backticks should match the actual declaration signature closely enough that `update_doc_linerefs.py` can find and track it. Use the same parameter type names and argument names as in the source.
-
-3. **Check for undocumented API**: Run `python3 update_doc_linerefs.py --check-undocumented` to find public declarations in headers that are missing from README.md. Any reported items should be added to the appropriate section in README.md.
+- Build, test, sanitizer, and clang-tidy commands: [`docs/BUILD.md`](../docs/BUILD.md)
+- Code style examples and rationale: [`docs/CODE_STYLE.md`](../docs/CODE_STYLE.md)
+- Header index: [`docs/HEADERS.md`](../docs/HEADERS.md)
+- Known defects and open flakes: [`BUGS.md`](../BUGS.md)

@@ -630,6 +630,8 @@ def extract_public_decls(filepath: str) -> list[tuple[int, str]]:
         'if', 'for', 'while', 'switch', 'return', 'RPPAPI', 'NOINLINE', 'FINLINE',
         'RPP_CONCAT', 'RPP_CONCAT1', 'RPP_BASIC_INTEGER_TYPEDEFS',
         'RPP_DELEGATE_DEBUGGING', 'RPP_DELEGATE_DEBUG',
+        # attribute macro used inside a declaration, like RPPAPI, never a declaration itself
+        'RPP_CORO_RETURN_TYPE',
     }
 
     decls = []
@@ -774,6 +776,16 @@ def check_undocumented(readme_path: str, src_dir: str = 'src/rpp') -> int:
     # Scan all headers
     headers = sorted(glob.glob(os.path.join(src_dir, '*.h')))
     total_undocumented = 0
+
+    # A header which README.md never mentions is a blind spot: the per-symbol scan
+    # below cannot report it, because it only compares names inside a known header.
+    uncovered = [os.path.basename(h) for h in headers
+                 if f'src/rpp/{os.path.basename(h)}' not in readme_text]
+    if uncovered:
+        cprint(f"\n  {len(uncovered)} header(s) README.md never mentions:", color='yellow')
+        for header in uncovered:
+            cprint(f"    {header}", color='yellow')
+        total_undocumented += len(uncovered)
 
     for header_path in headers:
         header = os.path.basename(header_path)

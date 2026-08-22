@@ -58,7 +58,8 @@ namespace rpp
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
     {
         // drain any remaining events to avoid leaking coroutine frames
-        rpp::TimePoint end = rpp::TimePoint::monotonic_now() + timeout;
+        // the deadline must use the same clock wait_pop_until() polls, or it expires at once
+        rpp::TimePoint end = current_time() + timeout;
         resume_event event;
         while (resume_queue.try_pop(event))
         {
