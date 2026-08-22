@@ -206,8 +206,44 @@ def check_missing() -> list[str]:
     return bad
 
 
-# a universal-character-name spells one identifier character, as `éclair` spells `éclair`
-_UCN_RE = re.compile(r'\\[uU][0-9a-fA-F]+')
+# an escape spells one identifier character, as `éclair` spells `éclair`. C++23 added the
+# delimited forms and Clang takes them in C++20, so a name may carry `\u{e9}` or `\N{...}`.
+_UCN_RE = re.compile(r'\\(?:[uU][0-9a-fA-F]+|[uUN]\{[^}\n]*\})')
+
+
+def _line_start(out: list, i: int) -> int:
+    """The start of the line holding `i`, read from the masked text.
+
+    A block comment is one token, so its newlines are already blank here. The original
+    text still carries them, and reading it would cut the line at a comment instead.
+    """
+    j = i
+    while j > 0 and out[j - 1] != '\n':
+        j -= 1
+    return j
+
+
+def _header_name_end(src: str, i: int) -> int:
+    """The index past the `<name>` at `i`, or -1. A header name never crosses a newline."""
+    close = src.find('>', i + 1)
+    newline = src.find('\n', i + 1)
+    return close + 1 if close >= 0 and (newline < 0 or close < newline) else -1
+
+
+def _ends_name(src: str, at: int) -> bool:
+    """True when an identifier ends just before `at`, so a quote there opens no raw string.
+
+    A delimited escape closes on `}`, which is no name character, so the brace needs its
+    opener checked. `\\u{e9}R"(a"` is a name and an ordinary string, not a raw one.
+    """
+    if at <= 0:
+        return False
+    if _name_char(src[at - 1]):
+        return True
+    if src[at - 1] != '}':
+        return False
+    open_brace = src.rfind('{', 0, at - 1)
+    return open_brace >= 2 and src[open_brace - 1] in 'uUN' and src[open_brace - 2] == '\\'
 
 
 def _name_char(c: str, first: bool = False) -> bool:
@@ -390,7 +426,7 @@ def _opens_raw_string(src: str, i: int) -> bool:
     for prefix in _RAW_PREFIXES:
         if i >= len(prefix) and src.startswith(prefix, i - len(prefix)):
             start = i - len(prefix)
-            return start == 0 or not _name_char(src[start - 1])
+            return not _ends_name(src, start)
     return False
 
 
@@ -401,7 +437,7 @@ def _opens_char_literal(src: str, i: int) -> bool:
         if i >= len(prefix) and src.startswith(prefix, i - len(prefix)):
             start = i - len(prefix)
             break
-    if start == 0 or not _name_char(src[start - 1]):
+    if not _ends_name(src, start):
         return True
     # walk to the start of the token before the quote. A token that opens with a digit is a
     # number, so the quote separates digits. Anything else is a name, as in `return'x'`.
@@ -436,13 +472,12 @@ def _code_only(src: str, origin: list, raw: str) -> str:
                    else _skip_quoted(src, i, '"'))
             # `#include "x.h"` and `import "x.h"` name a header, so that operand is not a literal.
             # the line reads back from `out`, where a comment before the operand is already gone.
-            if _at_operand(''.join(out[src.rfind('\n', 0, i) + 1:i])):
+            if _at_operand(''.join(out[_line_start(out, i):i])):
                 i = end
                 continue
-        elif c == '<' and _at_operand(''.join(out[src.rfind('\n', 0, i) + 1:i])):
-            # a header name is one token, so `import <foo//bar>;` opens no comment inside it
-            close = src.find('>', i + 1)
-            i = n if close < 0 else close + 1
+        # a header name is one token, so `import <foo//bar>;` opens no comment inside it
+        elif c == '<' and _at_operand(''.join(out[_line_start(out, i):i])) and _header_name_end(src, i) > 0:
+            i = _header_name_end(src, i)
             continue
         elif c == "'" and _opens_char_literal(src, i):
             end = _skip_quoted(src, i, "'")
@@ -556,6 +591,12 @@ SELFTEST = [
     ('unicode_name_before_string.cppm',
                                  b'import m;\nconst char* s = e\xcc\xb8R"(a";\n#include <string>\n', 3),
     ('named_partition.cppm',     b'import m:p;\n#include <string>\n', 0),  # g++-14 rejects this form
+    ('delimited_escape.cppm',    b'import \\u{e9}clair;\n#include <string>\n', 2),
+    ('named_escape.cppm',        b'import \\N{LATIN SMALL LETTER E}c;\n#include <string>\n', 2),
+    ('escape_name_before_string.cppm',
+                                 b'import m;\nconst char* s = \\u{e9}R"(a";\n#include <string>\n', 3),
+    ('multiline_comment_operand.cppm', b'import/* x\ny */"foo.h";\n#include <string>\n', 3),
+    ('angled_across_lines.cppm',  b'import a;\nimport <\n/*\n#include "x.h"\n*/ >;\n', 0),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
