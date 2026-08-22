@@ -206,27 +206,125 @@ def check_missing() -> list[str]:
     return bad
 
 
-# `%:` is the alternative token for `#`, and a compiler reads a directive written either way
-_HASH = r'(?:\#|%:)'
-# a directive takes any whitespace that is not a newline, form feed and vertical tab included
-_SP = r'[^\S\n]'
-# `[^\W\d]` is a C++ identifier start, which `[A-Za-z_]` is not, see module `éclair`. A name
-# may also carry a universal-character-name, which is how `import éclair;` spells the same.
+# an identifier, which may spell a character as a universal-character-name. `[^\W\d]` is the
+# C++ identifier start, so a name in any script reads as one token, see module `éclair`.
 _UCN = r'\\[uU][0-9a-fA-F]+'
-_NAME = rf'(?:[^\W\d]|{_UCN})(?:[\w.]|{_UCN})*'
-# a declaration ends on the same line, at `;` or at the `[` of an attribute. Every operand
-# takes that whole shape, so an expression opening with `import` stays an expression.
-_END = rf'{_SP}*[;\[]'
-IMPORT_RE = re.compile(rf'^{_SP}*(?:export{_SP}+)?import'
-                       rf'(?:{_SP}+{_NAME}{_END}|{_SP}*<[^>\n]+>{_END}'
-                       rf'|{_SP}*"[^"\n]+"{_END}|{_SP}*:{_SP}*{_NAME}{_END})', re.M)
-# `#import` is the Objective-C include-once, and file_io.mm carries no other form
-_HEADER_KW = r'(?P<kw>include|import)'
-# the ordering scan needs the directive, not its operand, so a macro form still counts
-ANY_INCLUDE_RE = re.compile(rf'^{_SP}*{_HASH}{_SP}*{_HEADER_KW}\b', re.M)
+_IDENT_RE = re.compile(rf'(?:[^\W\d]|{_UCN})(?:\w|{_UCN})*')
 
 
-_DIRECTIVE_RE = re.compile(rf'{_SP}*(?:{_HASH}{_SP}*(?:include|import)\b|(?:export{_SP}+)?import\b)')
+class _Reader:
+    """A cursor over one masked line, with the C++ lexing a directive needs and no more.
+
+    A pattern reads characters, so it cannot tell `import` from the front of `important`,
+    nor a header name from a comparison. This reads tokens, where both questions answer
+    themselves. `_translate` already blanked every comment and literal, so whitespace here
+    is whitespace and a quote opens the operand of a directive.
+    """
+
+    def __init__(self, line: str):
+        self.s, self.i = line, 0
+
+    def skip(self) -> None:
+        """Steps over whitespace. A newline never reaches this, because a line holds none."""
+        while self.i < len(self.s) and self.s[self.i].isspace():
+            self.i += 1
+
+    def word(self) -> str:
+        """The identifier at the cursor, or an empty string. Never a prefix of a longer one."""
+        m = _IDENT_RE.match(self.s, self.i)
+        if not m:
+            return ''
+        self.i = m.end()
+        return m.group()
+
+    def punct(self, *options: str) -> str:
+        """The first of `options` at the cursor, or an empty string."""
+        for p in options:
+            if self.s.startswith(p, self.i):
+                self.i += len(p)
+                return p
+        return ''
+
+    def header_name(self) -> bool:
+        """Reads `<name>` or `"name"` as one token. Its content takes any character but the
+        closing one, so `<foo bar>` is a header name. The caller rejects `< 5 >` by its end."""
+        start = self.i
+        close = {'<': '>', '"': '"'}.get(self.s[self.i:self.i + 1])
+        if not close:
+            return False
+        end = self.s.find(close, self.i + 1)
+        if end < 0:
+            self.i = start
+            return False
+        self.i = end + 1
+        return True
+
+    def ends_declaration(self) -> bool:
+        """True at the `;` that closes the declaration, or at the `[` that opens an attribute."""
+        self.skip()
+        return bool(self.punct(';', '['))
+
+def _at_operand(before: str) -> bool:
+    """True when `before` is a directive keyword and nothing else, so a quote after it opens
+    a header name rather than a string literal."""
+    r = _Reader(before)
+    r.skip()
+    if r.punct('#', '%:'):
+        r.skip()
+        if r.word() not in ('include', 'import'):
+            return False
+    else:
+        kw = r.word()
+        if kw == 'export':
+            r.skip()
+            kw = r.word()
+        if kw != 'import':
+            return False
+    r.skip()
+    return r.i == len(before)
+
+
+def _module_name(r: _Reader) -> bool:
+    """Reads a dotted module name. Each part is one identifier, so `xor` reads as a name here.
+    The caller rejects it at the end of the declaration."""
+    if not r.word():
+        return False
+    r.skip()  # each dot is its own token, so `import m . n;` names the same module as `m.n`
+    while r.punct('.'):
+        r.skip()
+        if not r.word():
+            return False
+        r.skip()
+    return True
+
+
+def classify(line: str) -> str:
+    """What one masked line declares: `#include`, `#import`, `import`, or an empty string.
+
+    `#import` is the Objective-C include-once, and `file_io.mm` carries no other form.
+    A module import must reach the end of its declaration. So `import xor x;` and
+    `import < 5 > 0;` stay expressions here, which is what a compiler makes of them.
+    """
+    r = _Reader(line)
+    r.skip()
+    if r.punct('#', '%:'):  # `%:` is the alternative token for `#`
+        r.skip()
+        kw = r.word()
+        return f'#{kw}' if kw in ('include', 'import') else ''
+    kw = r.word()
+    if kw == 'export':
+        r.skip()
+        kw = r.word()
+    if kw != 'import':
+        return ''
+    r.skip()
+    if r.punct(':'):  # a module partition
+        r.skip()
+        ok = _module_name(r)
+    else:
+        ok = r.header_name() or _module_name(r)
+    return 'import' if ok and r.ends_declaration() else ''
+
 
 # the longest raw-string delimiter C++ allows
 _MAX_RAW_DELIM = 16
@@ -314,9 +412,7 @@ def _code_only(src: str) -> str:
             end = _skip_raw(src, i) if _opens_raw_string(src, i) else _skip_quoted(src, i, '"')
             # `#include "x.h"` and `import "x.h"` name a header, so that operand is not a literal.
             # the line reads back from `out`, where a comment before the operand is already gone.
-            line = ''.join(out[src.rfind('\n', 0, i) + 1:i])
-            directive = _DIRECTIVE_RE.match(line)
-            if directive and not line[directive.end():].strip():
+            if _at_operand(''.join(out[src.rfind('\n', 0, i) + 1:i])):
                 i = end
                 continue
         elif c == "'" and _opens_char_literal(src, i):
@@ -351,18 +447,24 @@ def _translate(src: str) -> tuple:
 def scan_import_order(name: str, src: str) -> str:
     """The finding for one file, or an empty string. Takes the text, so a case needs no tree."""
     code, origin = _translate(src)
-    imports = [m.start() for m in IMPORT_RE.finditer(code)]
-    if not imports:
-        return ''
-    line_of = lambda k: src.count('\n', 0, origin[k]) + 1
-    if name.endswith(('.h', '.inl')):  # a .inl is header content, so a consumer inherits its import
-        return (f'{name}:{line_of(imports[0])}: a header carries an import, which every '
-                'consumer inherits and cannot reorder')
-    late = [m for m in ANY_INCLUDE_RE.finditer(code) if m.start() > imports[0]]
-    if not late:
-        return ''
-    return (f'{name}:{line_of(late[0].start())}: this #{late[0].group("kw")} follows the import '
-            f'on line {line_of(imports[0])}, move every #include and #import above it')
+    line_of = lambda k: src.count('\n', 0, origin[min(k, len(origin) - 1)]) + 1
+    import_line, offset = 0, 0
+    for line in code.split('\n'):
+        kind = classify(line)
+        start = offset + len(line) - len(line.lstrip())
+        offset += len(line) + 1
+        if not kind:
+            continue
+        if kind != 'import':
+            if import_line:
+                return (f'{name}:{line_of(start)}: this {kind} follows the import on line '
+                        f'{import_line}, move every #include and #import above it')
+        elif not import_line:
+            import_line = line_of(start)
+            if name.endswith(('.h', '.inl')):  # a consumer inherits the import of header content
+                return (f'{name}:{import_line}: a header carries an import, which every '
+                        'consumer inherits and cannot reorder')
+    return ''
 
 
 def check_import_order() -> list[str]:
@@ -404,6 +506,10 @@ SELFTEST = [
     ('ucn_module.cppm',          b'import \\u00e9clair;\n#include <string>\n', 2),
     ('unit_angled_space.cppm',   b'import <foo bar>;\n#include <string>\n', 2),
     ('unit_attribute.cppm',      b'import m [[deprecated]];\n#include <string>\n', 2),
+    ('dotted_spaced.cppm',       b'import m . n;\n#include <string>\n', 2),
+    ('name_starts_with_import.cppm', b'import m;\nint importx = 1;\n', 0),
+    ('module_named_important.cppm',  b'import important;\n#include <string>\n', 2),
+    ('directive_spaced.cppm',    b'import m;\n#  include <string>\n', 2),
     ('objective_cpp.mm',         b'import m;\n#include <string>\n', 2),
     ('objc_import.mm',           b'import m;\n#import <Foundation/Foundation.h>\n', 2),
     ('objc_import_first.mm',     b'#import <Foundation/Foundation.h>\nimport m;\n', 0),
