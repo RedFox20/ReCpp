@@ -177,6 +177,8 @@ Run every gate which the change can reach. Report the exact command and the
 result. A gate which does not run is a gate which failed.
 
 ```bash
+# 0. the import-order gate, first, because it costs a second and it stops a GCC build
+tools/check_includes.py import-order --check
 # 1. Linux GCC
 CXX23=1 mama gcc build test="nogdb -vv"
 # 2. Linux Clang, plus the clang-tidy pass which AGENTS.md requires
@@ -240,6 +242,27 @@ A TSAN run is welcome. A TSAN report never blocks the change on its own.
 4. Then fix it in 3 to 5 lines. A larger fix needs the owner to agree first.
 5. A rewrite of the pool, the future, the delegate, or the test framework is
    forbidden as a race fix.
+
+### R12. Every `#include` comes before every `import`
+
+A hard rule with no exception. Report a violation as blocking, whatever else the
+change does well.
+
+```bash
+tools/check_includes.py import-order --check
+```
+
+Two shapes fail it:
+
+1. An `#include` after an `import`, in any `.cpp`, test or `.cppm`. A module makes
+   the declarations of its own included headers reachable in the importing file. A
+   std header parsed after the import re-declares them, and GCC 14 stops with about
+   a thousand redefinition errors.
+2. An `import` inside a header. A header cannot control where a consumer includes
+   it, so it cannot hold the order. Only a `.cpp`, a test or a `.cppm` imports.
+
+Clang accepts both shapes, so a clang-only run proves nothing here. Read the gate
+output, and never conclude from a green clang build.
 
 ## Report format
 

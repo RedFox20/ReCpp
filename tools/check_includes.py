@@ -4,6 +4,7 @@
 Three checks, each with a --check gate for CI:
 
   self-contained  every header compiles alone, twice, with nothing included before it
+  import-order    an #include that follows an import, or an import inside a header
   unused          an #include that the header still compiles without
   missing         a file that uses a std facility it does not include itself
 
@@ -18,6 +19,7 @@ the deletion test cannot tell that apart from a stale include. Mark the line
 
 Usage:
   tools/check_includes.py self-contained [--check]
+  tools/check_includes.py import-order [--check]
   tools/check_includes.py unused [--check] [--only strview.h]
   tools/check_includes.py missing [--check]
 """
@@ -199,17 +201,54 @@ def check_missing() -> list[str]:
     return bad
 
 
+IMPORT_RE = re.compile(r'^[ \t]*(?:export[ \t]+)?import[ \t]+[<"A-Za-z_]', re.M)
+
+
+def check_import_order() -> list[str]:
+    """Every #include must come before every import, and a header carries no import.
+
+    A module makes the declarations of its own included headers reachable in the importing
+    file. A std header parsed after the import re-declares them, and GCC 14 stops with about
+    a thousand redefinition errors. Clang accepts the same file, so only GCC catches it.
+    """
+    files = ([f'{SRC}/{f}' for f in sorted(os.listdir(SRC)) if f.endswith(('.h', '.cpp', '.cppm'))]
+             + [f'tests/{f}' for f in sorted(os.listdir('tests')) if f.endswith(('.cpp', '.cppm'))]
+             + sorted(f'{r}/{f}' for r, _, fs in os.walk('tests') for f in fs
+                      if f.endswith(('.cpp', '.cppm')) and r != 'tests'))
+    bad = []
+    for f in sorted(set(files)):
+        # a comment or a string may hold either word, so scan the code alone. Blanking keeps
+        # every newline, so a reported line number still matches the file on disk.
+        src = open(f, encoding='utf-8', errors='replace').read()
+        code = re.sub(r'//[^\n]*|/\*.*?\*/|"(?:[^"\\\n]|\\.)*"',
+                      lambda m: re.sub(r'[^\n]', ' ', m.group()), src, flags=re.S)
+        imports = [m.start() for m in IMPORT_RE.finditer(code)]
+        if not imports:
+            continue
+        line_of = lambda pos: code.count('\n', 0, pos) + 1
+        if f.endswith('.h'):
+            bad.append(f'{f}:{line_of(imports[0])}: a header carries an import, which every '
+                       'consumer inherits and cannot reorder')
+            continue
+        late = [m.start() for m in INCLUDE_RE.finditer(code) if m.start() > imports[0]]
+        if late:
+            bad.append(f'{f}:{line_of(late[0])}: this #include follows the import on line '
+                       f'{line_of(imports[0])}, move every include above it')
+    return bad
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'all'])
+    ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'import-order', 'all'])
     ap.add_argument('--check', action='store_true', help='exit 1 when a finding remains')
     ap.add_argument('--only', help='limit the unused scan to one header')
     a = ap.parse_args()
 
-    modes = ['self-contained', 'missing', 'unused'] if a.mode == 'all' else [a.mode]
+    modes = ['self-contained', 'import-order', 'missing', 'unused'] if a.mode == 'all' else [a.mode]
     gated = 0
     for mode in modes:
         if mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
+        elif mode == 'import-order': found, gate = (lambda r: (r, len(r)))(check_import_order())
         elif mode == 'missing':      found, gate = (lambda r: (r, len(r)))(check_missing())
         else:                        found, gate = check_unused(a.only)
         noun, verb = ('finding', 'fails') if gate == 1 else ('findings', 'fail')
