@@ -18,6 +18,9 @@ mama\.cmake
 process.yml
 __pycache__/
 
+# GCC writes the module cache beside the source it compiles
+gcm.cache/
+
 # local sanitizer and compiler-matrix build dirs
 asan/
 tsan/
