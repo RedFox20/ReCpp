@@ -1,30 +1,35 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 3. Two modules exist: `rpp.strview` and `rpp.debugging`.
+Revision 4. Two modules exist: `rpp.strview` and `rpp.debugging`.
 
 This document explains the pattern, records what real builds prove about it, and
 gives the phased plan for the remaining 41 headers.
 
 ## Handover state
 
-**Landed on `claude/cpp-modules-migration-3d1pu3`, PR #57.**
+**Landed:** PR #57 the two modules, #63 changeset 1b, #64 the self-contained
+gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
 | `rpp.strview`, `rpp.debugging` | build and pass on gcc-14, clang-21, MSVC 14.44 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
-| Include-order style rule | in AGENTS.md |
-| `tools/check_includes.py` | 3 checks, 0 self-contained failures left |
+| Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
+| `tools/check_includes.py` | 5 checks. 4 gate CI, and `missing` stays ungated |
 | `tests/test_modules.cpp` | module consumer test, 3 cases |
-| CI | green, all 24 jobs. 5 causes fixed, see `BUGS.md` C9 |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC |
+| mama | 0.14.0 exports the `.cppm` files and strips the module objects |
+| CI | green, all 29 jobs, and no job pins a mama branch |
 
-**Not started:** changesets 1b through 7 below. Changeset 1a is dropped, see
-section 4. Turning on the `self-contained` gate is the next action, and it blocks
-nothing.
+**Changeset state:** 1a is dropped, see section 4. 1b and 6 landed. 2, 3 and 5
+remain, and 4 waits for 3. Section 11 lists what 7 still owes.
 
-**Open questions carried into the next session:** `BUGS.md` B1 through B5. B1 and
-B2 are the two that can bite this work.
+**Next action:** changeset 2, then changeset 3. Section 5 states why 2 comes
+first.
+
+**Open questions:** `BUGS.md` B2 and B5. B2 reaches this work through CI, and the
+owner rules it test construction rather than a defect.
 
 ---
 
@@ -345,9 +350,12 @@ tools/check_includes.py self-contained --check  # CI gate, exit 1 on a finding
 | `unused` | comment out one include, the header still compiles, **and** the header names nothing the include declares | **0**: this branch removed 3 and marked 2 re-exports |
 | `redundant` | same, but the header does name something the include declares, so a sibling include leaks it | **49** |
 | `std` | same, for a std header, where the scan cannot enumerate the declared names | **60** |
+| `import-order` | an `#include` after an `import`, or an `import` in a header | **0**, and the CI gate holds it there |
+| `selftest` | runs the scan over 65 crafted sources and pins the line each one names | **0**, and the CI gate holds it there |
 
-`self-contained` protects a consumer that includes one header first. It reports 0
-today, so the gate costs nothing and it stops a regression. Turn that one on alone.
+`self-contained` protects a consumer that includes one header first. CI runs it
+beside `import-order` and `selftest`, so a regression in any of the three fails a
+build rather than a review.
 
 The `unused` and `redundant` split is the important part of what remains. Both compile without
 the line. Only the first is safe to delete. Removing a `redundant` line trades a
@@ -716,18 +724,22 @@ declarations), `future.h`, `concurrent_queue.h`, `event_loop.h` and
 
 ## 10. Changeset 6: make other projects able to consume this
 
-This is the point of the migration, and it is unwired today. `mamafile.py`
-exports only `.h` and `.natvis`, and `CMakeLists.txt` installs no file set.
+**Landed for a mama consumer, PR #65.** mama 0.14.0 collects every `.cppm` under
+an exported include dir, so `package()` needs no new call. `mama_target_modules()`
+adds them to the consumer target and defines `MAMA_HAS_MODULES`, and the deployed
+archive drops the module objects, so a whole-archive link finds no duplicate
+initializer. `tests/module_consumer/` builds through mama on gcc, clang and MSVC,
+and `run_test.py` compares the module path against the header path.
+
+**Still open for a plain CMake consumer.** `CMakeLists.txt` names the file set on
+the target, and it installs no file set, so `find_package(ReCpp)` reaches the
+headers alone. Deliverable 2 below is what remains of this changeset.
 
 Three deliverables:
 
-1. **mama.** Extend `package()` to export `.cppm` next to the headers:
-   ```python
-   self.export_include('src/rpp', build_dir=False,
-                       includes_filter=['.h','.cppm','.natvis'], as_includes_root=True)
-   ```
-   Keep the module objects out of the exported archive (D6). Add a
-   `BUILD_WITH_MODULES` passthrough that downstream mamafiles can set.
+1. ~~**mama.** Export the `.cppm` files and keep the module objects out of the
+   exported archive (D6).~~ **Done.** mama collects them on its own, and
+   `no_export_modules()` opts out. See the two paragraphs above.
 
 2. **CMake.** Install the file set so a consumer can rebuild the binary module
    interfaces from source:
@@ -739,9 +751,8 @@ Three deliverables:
    ```
    This needs CMake 3.28 on the consumer, the same floor ReCpp already sets.
 
-3. **A consumer example and a documented contract.** Add
-   `examples/module_consumer/` with its own `CMakeLists.txt`. State the contract
-   in README.md:
+3. **A consumer example and a documented contract.** `tests/module_consumer/`
+   covers the example half. The contract half remains. State it in README.md:
    - The consumer compiles ReCpp's `.cppm` files. ReCpp ships no binary module
      interface.
    - The consumer must use the same C++ standard level and the same
@@ -766,15 +777,15 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
    `clang-scan-deps` ships in `clang-tools-N` and not in `clang-N`, and a modules
    job must pass `BUILD_WITH_MODULES=ON` so a silent AUTO fallback fails it.
    See `BUGS.md` C9 and C11.
-2. Wire `tools/check_includes.py self-contained --check` and
-   `tools/gen_module_exports.py --check` as gates.
-3. Rewrite the README modules section. It is already stale: it names a test
-   suite `test_strview_module` that does not exist.
-4. Publish a compile-time measurement from `examples/module_consumer/`, not from
+2. ~~Wire `check_includes.py self-contained --check` as a gate.~~ **Done.** CI runs
+   `selftest`, `self-contained` and `import-order`. `gen_module_exports.py --check`
+   joins them with changeset 3.
+3. ~~Rewrite the README modules section.~~ **Done.** It now points here.
+4. Publish a compile-time measurement from `tests/module_consumer/`, not from
    ReCpp's own build. ReCpp's own build gains nothing, because its `.cpp` files
    keep using headers (D4).
 
-**Estimate: 1 day.**
+**Estimate: half a day, because only item 4 and the CI gate of item 2 remain.**
 
 ---
 
@@ -809,16 +820,15 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ## 14. Schedule
 
-| Changeset | Work | Days | Blocks |
-|---|---|---|---|
-| 1b | remove 3 unused, review 49 redundant and 60 std | 1 | D5 |
-| 2 | add the rpp-header include check | 0.5 | changeset 3 |
-| 3 | generate the export lists | 1.5 | changeset 5 |
-| 4 | dual-mode test harness | 0.5 | changeset 5 |
-| 5 | 42 modules plus the umbrella | 2.5 | changeset 6 |
-| 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 |
-| 7 | CI, docs, measurement | 1 | none |
+| Changeset | Work | Days | Blocks | State |
+|---|---|---|---|---|
+| 1b | remove 3 unused, review 49 redundant and 60 std | 1 | D5 | done, PR #63 |
+| 2 | add the rpp-header include check | 0.5 | changeset 3 | next |
+| 3 | generate the export lists | 1.5 | changeset 5 | after 2 |
+| 4 | dual-mode test harness | 0.5 | changeset 5 | waits for 3 |
+| 5 | 41 modules plus the umbrella | 2.5 | changeset 6 | 2 of 43 written |
+| 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
+| 7 | CI, docs, measurement | 0.5 | none | gates done |
 
-**Total: about 8.5 working days.** Changesets 1b and 2 are 1.5 of them, and they
-stand on their own value even if the module work stops. Every decision in
+**About 5 working days remain.** Changeset 5 is half of that. Every decision in
 sections 3 and 6 is settled, and nothing blocks the start.
