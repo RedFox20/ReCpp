@@ -322,11 +322,11 @@ class _Reader:
     def ends_declaration(self) -> bool:
         """True at the `;` that closes the declaration, or at an attribute ahead of it.
 
-        C++ spells an attribute `[[...]]`, and GCC takes `__attribute__((...))` in the same
-        place. A late include after either one gives the same 960 redefinition errors.
+        C++ spells an attribute `[[...]]`, and GCC takes `__attribute((...))` in the same
+        place, with or without the trailing underscores. Each one gives the same 960 errors.
         """
         self.skip()
-        return bool(self.punct(';', '[', '__attribute__'))
+        return bool(self.punct(';', '[', '__attribute'))
 
 def _at_operand(before: str) -> bool:
     """True when `before` is a directive keyword and nothing else, so a quote after it opens
@@ -591,6 +591,7 @@ SELFTEST = [
     ('unit_angled_space.cppm',   b'import <foo bar>;\n#include <string>\n', 2),
     ('unit_attribute.cppm',      b'import m [[deprecated]];\n#include <string>\n', 2),
     ('gnu_attribute.cppm',       b'import m __attribute__((deprecated));\n#include <string>\n', 2),
+    ('gnu_attribute_short.cppm', b'import m __attribute((deprecated));\n#include <string>\n', 2),
     ('dotted_spaced.cppm',       b'import m . n;\n#include <string>\n', 2),
     ('name_starts_with_import.cppm', b'import m;\nint importx = 1;\n', 0),
     ('module_named_important.cppm',  b'import important;\n#include <string>\n', 2),
