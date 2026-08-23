@@ -27,10 +27,9 @@ The script's own docstring already warns that it has mistakes.
 ## Closed
 
 ### C21. A local dependency never shipped its module objects (was B12)
-The report read `packages/ReCpp/linux/libReCpp.a`, which is the build tree archive
-and not an export. mama exports `mama-nomodules/libReCpp.a`, which holds no
-`.cppm.o`, and `mama-dependencies.cmake` names that copy. A whole-archive link
-against it succeeds. `export_stripped_module_libs` did the work all along.
+The report read the build tree archive `libReCpp.a`, which no consumer links.
+mama exports a stripped `mama-nomodules/libReCpp.a`, so a whole-archive link
+finds no duplicate initializer.
 
 ### C20. A seeded compiler cache hid clang-scan-deps from CMake (was B11)
 `consumer-clang21` reported no `clang-scan-deps` while three copies sat on the box,

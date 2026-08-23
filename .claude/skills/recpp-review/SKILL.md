@@ -186,7 +186,10 @@ Run every gate which the change can reach. Report the exact command and the
 result. A gate which does not run is a gate which failed.
 
 ```bash
-# 0. the import-order gate, first, because it costs a second and it stops a GCC build
+# 0. the check_includes gates, first, because they cost a second and stop a GCC build.
+#    selftest runs the scan over crafted sources. The tree conforms, so a scan which
+#    reports nothing passes import-order whether or not it still detects anything.
+tools/check_includes.py selftest --check
 tools/check_includes.py import-order --check
 # 1. Linux GCC
 CXX23=1 mama gcc build test="nogdb -vv"

@@ -41,13 +41,13 @@ int main()
     printf("consumer built with %s\n", BUILT_WITH);
 
     // the core use: split a few strings into tokens
-    struct Case { const char* input; std::vector<std::string> expect; };
-    const Case cases[] = {
+    struct test_case { const char* input; std::vector<std::string> expect; };
+    const test_case cases[] = {
         { "alpha,beta,gamma", { "alpha", "beta", "gamma" } },
         { "one,,three",       { "one", "", "three" } },   // strview::next keeps an empty field
         { "single",           { "single" } },
     };
-    for (const Case& c : cases)
+    for (const test_case& c : cases)
     {
         std::vector<std::string> tokens = tokenize(rpp::strview{c.input}, ',');
         printf("  %-18s ->", c.input);
