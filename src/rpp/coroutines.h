@@ -6,6 +6,10 @@
 #include "config.h"
 #include "future.h"
 #include "timer.h" // rpp::Duration
+#include "timepoint.h" // rpp::Duration
+#include "delegate.h" // rpp::delegate
+#include "future_types.h" // rpp::IsFunctionNotReturningFuture
+#include "thread_pool.h" // rpp::parallel_task_detached
 
 #if RPP_HAS_COROUTINES
 

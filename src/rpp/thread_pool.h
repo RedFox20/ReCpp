@@ -12,6 +12,7 @@
 #include "delegate.h"
 #include "strview.h"
 #include "mutex.h"
+#include "timepoint.h" // rpp::Duration
 #include <vector>
 #if RPP_TSAN
 #  include <sanitizer/tsan_interface.h>

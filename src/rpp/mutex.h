@@ -3,6 +3,7 @@
 #include "type_traits.h"
 #include "timer.h" // rpp:Timer
 #include "threads.h" // rpp::yield
+#include "timepoint.h" // rpp::Duration
 #include <mutex> // lock_guard etc
 
 namespace rpp

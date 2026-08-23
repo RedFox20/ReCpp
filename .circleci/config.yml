@@ -92,6 +92,10 @@ jobs:
                   # an #include after an import gives GCC a thousand redefinitions, and clang
                   # accepts the same file, so only this gate stops it reaching a GCC build
                   python3 tools/check_includes.py import-order --check
+                  # a module exports one import per rpp include, so a name that arrives through
+                  # a sibling include yields no import line and every importer then fails
+                  pip3 install --quiet libclang
+                  python3 tools/check_includes.py rpp-includes --check
       - run: make configure-cmake
       - run:
           name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>

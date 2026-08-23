@@ -18,6 +18,7 @@
 #endif
 
 #include "timer.h" // rpp::Duration, rpp::TimePoint
+#include "timepoint.h" // rpp::Duration
 #include "predicates.h" // rpp::IsPredicate
 #include "debugging.h" // LogError
 #include <condition_variable> // std::cv_status

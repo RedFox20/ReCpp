@@ -8,6 +8,9 @@
 #include "condition_variable.h" // rpp::condition_variable
 #include "mutex.h" // rpp::mutex, rpp::spin_lock, rpp::yield
 #include "atomic_timepoint.h" // rpp::AtomicTimeSource
+#include "timepoint.h" // rpp::Duration
+#include "threads.h" // rpp::yield
+#include "predicates.h" // rpp::IsPredicate
 #include <vector>
 #include <type_traits> // std::is_trivially_destructible_v
 #include <optional> // std::optional

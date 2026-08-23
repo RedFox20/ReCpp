@@ -1,6 +1,7 @@
 #pragma once
 #include "config.h"
 #include "timer.h" // rpp::TimePoint
+#include "timepoint.h" // rpp::TimePoint
 
 namespace rpp
 {

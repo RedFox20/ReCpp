@@ -2,6 +2,8 @@
 #include "condition_variable.h"
 #include "debugging.h"
 #include "mutex.h"
+#include "timepoint.h" // rpp::Duration
+#include "predicates.h" // rpp::IsCallable
 #include <atomic>
 
 #if RPP_HAS_CXX20

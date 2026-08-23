@@ -7,6 +7,8 @@
 #define RPP_BINARY_SERIALIZER_H 1
 #endif
 #include "binary_stream.h"
+#include "sprint.h" // rpp::string_buffer
+#include "strview.h" // rpp::strview
 
 namespace rpp
 {

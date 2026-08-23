@@ -9,6 +9,8 @@
 #include "./math.h" // rpp::min, rpp::max
 #include "future_types.h" // RPP_HAS_COROUTINES and to support TestCaseCoro()
 #include "source_loc.h" // rpp::source_loc
+#include "minmax.h" // rpp::max
+#include "strview.h" // rpp::strview
 
 // most of these includes are for convenience in TestImpl's not for tests.cpp
 #include <cstdio>  // some basic printf etc.
