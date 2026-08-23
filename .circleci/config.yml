@@ -42,7 +42,7 @@ jobs:
       check_includes:
         type: boolean
         default: false
-        description: "Run the header self-containment gate. One job is enough, so it is opt-in"
+        description: "Run the header and import-order gates. One job is enough, so it is opt-in"
     description: "Ubuntu << parameters.cc_version >> C++<< parameters.cpp_version >> build with << parameters.sanitizer >> sanitizer"
     #resource_class: large # 4 CPU-s, 8GB RAM (more needed when using NINJA)
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
@@ -80,12 +80,18 @@ jobs:
           condition: << parameters.check_includes >>
           steps:
             - run:
-                name: Header self-containment gate
+                name: Header and import-order gates
                 command: |
+                  # the tree conforms, so a scan that reports nothing passes the gate below.
+                  # this runs the scan over crafted sources and pins the line each one names
+                  python3 tools/check_includes.py selftest --check
                   # every header must compile alone, so a consumer may include any one first
                   export CXX=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
                   export CXXSTD=c++<< parameters.cpp_version >>
                   python3 tools/check_includes.py self-contained --check
+                  # an #include after an import gives GCC a thousand redefinitions, and clang
+                  # accepts the same file, so only this gate stops it reaching a GCC build
+                  python3 tools/check_includes.py import-order --check
       - run: make configure-cmake
       - run:
           name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>
@@ -168,10 +174,6 @@ jobs:
         type: boolean
         default: false
         description: "Register apt.llvm.org, for a clang release the CI image does not carry"
-      mama_flags:
-        type: string
-        default: ""
-        description: "Extra mama flags. clang needs nocache, see BUGS.md B11"
     description: Build ReCpp with << parameters.cc_version >> as another project builds it, as a dependency and not the root
     resource_class: medium+ # medium+: 3 CPU-s, 6GB RAM, large: 4 CPU-s, 8GB RAM
     docker:
@@ -210,9 +212,7 @@ jobs:
             export PIPENV_PIPFILE=$(pwd)/Pipfile
             cd tests/consumer
             # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
-            CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> << parameters.mama_flags >> verbose build test jobs=3 2>&1 | tee build.log
-            # AUTO turns modules off and keeps going, so without this the job would still pass
-            # if ReCpp stopped enabling modules when another project builds it
+            CXX20=1 taskset -c 0-2 pipenv run mama << parameters.compiler >> verbose build test jobs=3 2>&1 | tee build.log
             # AUTO turns modules off and keeps going, so without this the job would still pass
             # if ReCpp stopped enabling modules when another project builds it
             if ! grep -q "C++20 Modules enabled" build.log; then
@@ -227,6 +227,18 @@ jobs:
                    -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
               exit 1
             fi
+      - run:
+          name: Import the exported modules with << parameters.cc_version >>
+          command: |
+            # this job clears the modules minimum, so the consumer must take the module path.
+            # --compare-paths builds the same source through the headers and compares the report.
+            # --unicode-off reaches the half of the module surface no consumer job builds, because
+            # config.h turns unicode on for every one of them
+            export PIPENV_PIPFILE=$(pwd)/Pipfile
+            UNICODE_OFF=$([[ << parameters.compiler >> == "gcc" ]] && echo "--unicode-off g++-14" || echo "")
+            cd tests/module_consumer
+            CXX20=1 taskset -c 0-2 pipenv run python3 run_test.py \
+                --compiler << parameters.compiler >> --expect modules --compare-paths --jobs 3 $UNICODE_OFF
   consumer-integration-msvc:
     description: Build ReCpp with MSVC as another project builds it, as a dependency and not the root
     executor:
@@ -255,6 +267,17 @@ jobs:
                   Select-String -Path build.log -Pattern 'MODULES'
                   exit 1
               }
+      - run:
+          name: Import the exported modules
+          command: |
+              $env:Path+=";$Env:ProgramFiles\CMake\bin";
+              $env:CXX20="1";
+              cd tests/module_consumer
+              # cmake and mama write to stderr, and Continue keeps those lines from aborting
+              # the step, the same reason the consumer build above sets it
+              $ErrorActionPreference = 'Continue'
+              python run_test.py --compiler windows --expect modules --compare-paths --jobs 4 2>&1 | Tee-Object -FilePath module_consumer.log
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   android-build:
     parameters:
       docker_image:
@@ -394,9 +417,6 @@ workflows:
           compiler: clang
           cc_version: clang-21
           llvm_apt: true
-          # the compiler-seed cache skips the step that finds clang-scan-deps, so a
-          # dependency build reports no scan-deps and drops modules. BUGS.md B11
-          mama_flags: "nocache"
       - consumer-integration-msvc:
           name: consumer-msvc2022
       # Other platform builds

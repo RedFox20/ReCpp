@@ -26,6 +26,16 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C21. A local dependency never shipped its module objects (was B12)
+The report read the build tree archive `libReCpp.a`, which no consumer links.
+mama exports a stripped `mama-nomodules/libReCpp.a`, so a whole-archive link
+finds no duplicate initializer.
+
+### C20. A seeded compiler cache hid clang-scan-deps from CMake (was B11)
+`consumer-clang21` reported no `clang-scan-deps` while three copies sat on the box,
+because a seeded `CMakeCXXCompiler.cmake` made CMake skip the `find_program`. mama
+fixed the seed, so the job no longer carries `nocache`.
+
 ### C19. mamabuild cannot export C++20 modules (was B3)
 `package()` exported `.h` and `.natvis` only, so no `.cppm` reached a consumer and
 nobody outside ReCpp could import `rpp.strview`. The latest mama release and the

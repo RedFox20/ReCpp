@@ -76,8 +76,8 @@ class ReCpp(mama.BuildTarget):
 
 
     def deploy(self):
-        # deploy directly to build directory
-        self.papa_deploy(f'.', src_dir=False)
+        # a subdir of the build dir, because the module strip cannot edit the build dir in place
+        self.papa_deploy('ReCpp', src_dir=False)
 
 
     # The whole suite runs in ~5 seconds, so this limit only ever triggers on a deadlock.
