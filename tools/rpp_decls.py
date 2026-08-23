@@ -16,7 +16,7 @@ SRC = 'src/rpp'
 
 # rule 1 of MODULES_MIGRATION.md section 6.3: every rpp header includes config.h to drive the
 # compiler feature probes, and log_colors.h rides along with it. jni_cpp.h is Android glue.
-NO_MODULE = frozenset({'config.h', 'log_colors.h', 'jni_cpp.h'})
+NO_MODULE = frozenset({'config.h', 'log_colors.h', 'jni_cpp.h', 'debugging.macros.h'})
 
 
 class ClangMissing(Exception):
@@ -68,6 +68,41 @@ def _cursors_in(tu, path: str):
         f = c.location.file
         if f and os.path.abspath(f.name) == me: yield c
         stack += list(c.get_children())
+
+
+def declarations(header: str, defines: tuple = ()) -> list:
+    """The declarations this header makes, as `(namespace, kind, name)`, in source order.
+
+    A name reaches an importer only through a using-declaration, and one declaration carries
+    every overload of that name, so the caller deduplicates.
+    """
+    import clang.cindex as cindex
+    path = os.path.join(SRC, header)
+    me = os.path.abspath(path)
+    out = []
+
+    def walk(cursor, ns):
+        for k in cursor.get_children():
+            if k.kind == cindex.CursorKind.NAMESPACE:
+                walk(k, ns + [k.spelling] if k.spelling else ns)
+                continue
+            f = k.location.file
+            if f and os.path.abspath(f.name) == me and k.spelling:
+                out.append(('::'.join(ns), k.kind.name, k.spelling))
+
+    walk(parse(header, defines).cursor, [])
+    return out
+
+
+def names_from(header: str, other: str, defines: tuple = ()) -> set:
+    """The names `header` references which `other` declares. Used for a header carrying no module."""
+    target = os.path.abspath(os.path.join(SRC, other))
+    found = set()
+    for c in _cursors_in(parse(header, defines), os.path.join(SRC, header)):
+        r = c.referenced
+        if r is None or not r.location.file or not r.spelling: continue
+        if os.path.abspath(r.location.file.name) == target: found.add(r.spelling)
+    return found
 
 
 def referenced_rpp_headers(header: str, defines: tuple = ()) -> dict:
