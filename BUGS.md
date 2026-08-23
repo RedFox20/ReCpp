@@ -24,20 +24,13 @@ It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
-### B12. A local ReCpp dependency ships the module objects the consumer also compiles
-`tests/module_consumer` links the ReCpp build archive, which carries both `.cppm.o`
-members and both module initializers. The consumer compiles the same two `.cppm`
-files, so a whole-archive link reports a duplicate initializer for each module. An
-ordinary link never extracts those members, so the test passes and hides it.
-`papa_deploy` strips them, so the deployed package links clean either way.
-```bash
-A=tests/module_consumer/packages/ReCpp/linux/libReCpp.a
-g++-14 m.o s.o d.o -Wl,--whole-archive $A -Wl,--no-whole-archive -ldl -ldw -lrt -o wa
-# multiple definition of `initializer for module rpp.strview'
-```
-The strip belongs to mama, which owns the local dependency link.
-
 ## Closed
+
+### C21. A local dependency never shipped its module objects (was B12)
+The report read `packages/ReCpp/linux/libReCpp.a`, which is the build tree archive
+and not an export. mama exports `mama-nomodules/libReCpp.a`, which holds no
+`.cppm.o`, and `mama-dependencies.cmake` names that copy. A whole-archive link
+against it succeeds. `export_stripped_module_libs` did the work all along.
 
 ### C20. A seeded compiler cache hid clang-scan-deps from CMake (was B11)
 `consumer-clang21` reported no `clang-scan-deps` while three copies sat on the box,
