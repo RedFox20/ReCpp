@@ -86,9 +86,19 @@ def declarations(header: str, defines: tuple = ()) -> list:
             if k.kind == cindex.CursorKind.NAMESPACE:
                 walk(k, ns + [k.spelling] if k.spelling else ns)
                 continue
+            # RPPCAPI is `extern "C"`, so the C logging API sits one linkage spec deep
+            if k.kind == cindex.CursorKind.LINKAGE_SPEC:
+                walk(k, ns)
+                continue
             f = k.location.file
-            if f and os.path.abspath(f.name) == me and k.spelling:
-                out.append(('::'.join(ns), k.kind.name, k.spelling))
+            if not (f and os.path.abspath(f.name) == me and k.spelling): continue
+            out.append(('::'.join(ns), k.kind.name, k.spelling))
+            # an unscoped enum puts its enumerators at namespace scope, and a using of the
+            # enum type does not carry them, so each one needs its own using-declaration
+            if k.kind == cindex.CursorKind.ENUM_DECL and not k.is_scoped_enum():
+                for e in k.get_children():
+                    if e.kind == cindex.CursorKind.ENUM_CONSTANT_DECL and e.spelling:
+                        out.append(('::'.join(ns), e.kind.name, e.spelling))
 
     walk(parse(header, defines).cursor, [])
     return out

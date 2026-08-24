@@ -96,6 +96,9 @@ jobs:
                   # a sibling include yields no import line and every importer then fails
                   pip3 install --quiet libclang
                   python3 tools/check_includes.py rpp-includes --check
+                  # a hand-written export list rots, so this fails when a .cppm no longer
+                  # matches the header it wraps
+                  python3 tools/gen_module_exports.py --all --check
       - run: make configure-cmake
       - run:
           name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>

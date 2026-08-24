@@ -31,6 +31,11 @@ SKIP_KINDS = frozenset({'MACRO_DEFINITION', 'MACRO_INSTANTIATION', 'INCLUSION_DI
                         'STATIC_ASSERT', 'NAMESPACE_ALIAS', 'USING_DIRECTIVE',
                         'USING_DECLARATION', 'FRIEND_DECL', 'UNEXPOSED_DECL'})
 
+# `__wrap` and `__clean_type` unwrap a macro argument, so `debugging.macros.h` carries them to
+# the call site. A double-underscore name is reserved, so a module never exports one.
+def _is_private(name: str) -> bool:
+    return name.startswith('__')
+
 
 def module_name(header: str) -> str:
     """`strview.h` names module `rpp.strview`."""
@@ -46,8 +51,7 @@ def _exported(header: str, defines: tuple) -> dict:
     """Namespace to ordered names, for one macro configuration."""
     out = {}
     for ns, kind, name in rd.declarations(header, defines):
-        # `rpp::__wrap` carries the debugging macros, so a leading underscore hides nothing here
-        if kind in SKIP_KINDS or (ns and not ns.startswith('rpp')): continue
+        if kind in SKIP_KINDS or _is_private(name) or (ns and not ns.startswith('rpp')): continue
         names = out.setdefault(ns, [])
         if name not in names: names.append(name)
     return out
