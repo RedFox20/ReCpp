@@ -1,10 +1,22 @@
 #pragma once
 /**
  * Integer type aliases for rpp, split from config.h so a module can export them.
- * config.h holds the macros, which a module cannot export, and includes this file.
+ * This header stays self-contained, so config.h includes it one way.
  * Distributed under MIT Software License
  */
-#include "config.h" // RPP_INT_SIZE, and the platform probes it rests on
+
+// integer-size macros from compiler builtins, so this header needs no include
+#if _MSC_VER
+#  define RPP_SHORT_SIZE     2
+#  define RPP_INT_SIZE       4
+#  define RPP_LONG_SIZE      4
+#  define RPP_LONG_LONG_SIZE 8
+#else // GCC/Clang
+#  define RPP_SHORT_SIZE     __SIZEOF_SHORT__
+#  define RPP_INT_SIZE       __SIZEOF_INT__
+#  define RPP_LONG_SIZE      __SIZEOF_LONG__
+#  define RPP_LONG_LONG_SIZE __SIZEOF_LONG_LONG__
+#endif // _MSC_VER
 
 namespace rpp
 {

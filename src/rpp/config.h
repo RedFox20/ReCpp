@@ -380,19 +380,6 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif // RPP_CORO_RETURN_TYPE
 
 
-// Define the basic size of integer types
-#if _MSC_VER
-#  define RPP_SHORT_SIZE     2
-#  define RPP_INT_SIZE       4
-#  define RPP_LONG_SIZE      4
-#  define RPP_LONG_LONG_SIZE 8
-#else // GCC/Clang
-#  define RPP_SHORT_SIZE     __SIZEOF_SHORT__
-#  define RPP_INT_SIZE       __SIZEOF_INT__
-#  define RPP_LONG_SIZE      __SIZEOF_LONG__
-#  define RPP_LONG_LONG_SIZE __SIZEOF_LONG_LONG__
-#endif // _MSC_VER
-
 #define RPP_INT64_MAX     0x7FFFFFFFFFFFFFFFLL
 #define RPP_INT64_MIN     0x8000000000000000LL
 #define RPP_UINT64_MAX    0xFFFFFFFFFFFFFFFFULL
@@ -439,8 +426,7 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif
 
 #ifdef __cplusplus
-// the integer aliases live in config.types.h, which a module can export. This include sits
-// after the macros above, because config.types.h reads RPP_INT_SIZE from them.
+// the integer aliases and size macros live in config.types.h, which a module can export
 #include "config.types.h"
 
 namespace rpp
