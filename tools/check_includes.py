@@ -222,17 +222,11 @@ def check_rpp_includes() -> list[str]:
     D5 gives each module one `export import rpp.X` per rpp include, so a name which arrives
     through a sibling include yields no import line, and every importer of that module fails.
     """
-    try:
-        import rpp_decls
-    except ImportError:
-        return ['tools/rpp_decls.py is missing beside this script']
+    import rpp_decls  # raises ImportError without the sibling script, which is a real setup fault
     bad = []
     for h in headers():
         if h in rpp_decls.NO_MODULE: continue
-        try:
-            used = rpp_decls.referenced_rpp_headers(h)
-        except rpp_decls.ClangMissing as e:
-            return [f'cannot run: {e}']
+        used = rpp_decls.referenced_rpp_headers(h)  # ClangMissing propagates, main decides soft or hard
         direct = set(QUOTED_RE.findall(_read(os.path.join(SRC, h))))
         # config.h includes config.types.h, so a header including config.h already has it
         if 'config.h' in direct: direct.add('config.types.h')
@@ -717,7 +711,14 @@ def main() -> int:
         if mode == 'selftest':       found, gate = (lambda r: (r, len(r)))(check_selftest())
         elif mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
         elif mode == 'import-order': found, gate = (lambda r: (r, len(r)))(check_import_order())
-        elif mode == 'rpp-includes': found, gate = (lambda r: (r, len(r)))(check_rpp_includes())
+        elif mode == 'rpp-includes':
+            import rpp_decls
+            try:
+                found, gate = (lambda r: (r, len(r)))(check_rpp_includes())
+            except rpp_decls.ClangMissing as e:
+                # `all` is the local pre-commit convenience, so a missing libclang skips this
+                # check there. The CI gate runs `rpp-includes --check`, which still fails.
+                found, gate = ([f'{e}'], 1) if a.check else ([f'skipped, install libclang: {e}'], 0)
         elif mode == 'missing':      found, gate = (lambda r: (r, len(r)))(check_missing())
         else:                        found, gate = check_unused(a.only)
         noun, verb = ('finding', 'fails') if gate == 1 else ('findings', 'fail')

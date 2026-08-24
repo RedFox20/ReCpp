@@ -37,6 +37,8 @@ export using ::_LogFuncname;
 
 export namespace rpp {
     using rpp::shorten_filename;
+    using rpp::__wrap;
+    using rpp::__clean_type;
     using rpp::LogMsgHandler;
     using rpp::add_log_handler;
     using rpp::remove_log_handler;

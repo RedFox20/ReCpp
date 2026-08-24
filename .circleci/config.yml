@@ -98,6 +98,8 @@ jobs:
                   # SIMD header names a __builtin_ia32 that clang does not define.
                   sudo apt-get install -y libclang-common-18-dev || sudo apt-get install -y clang
                   pip3 install --quiet libclang
+                  # the libclang traversal decides a real module surface, so a crafted header pins it
+                  python3 tools/rpp_decls.py selftest
                   python3 tools/check_includes.py rpp-includes --check
                   # a hand-written export list rots, so this fails when a .cppm no longer
                   # matches the header it wraps

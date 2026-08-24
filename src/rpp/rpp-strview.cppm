@@ -46,6 +46,7 @@ export namespace rpp {
     using rpp::line_parser;
     using rpp::keyval_parser;
     using rpp::bracket_parser;
+    using rpp::__wrap;
 #if RPP_ENABLE_UNICODE
     using rpp::ustrview;
     using rpp::to_ustring;

@@ -60,14 +60,18 @@ def flags(defines: tuple = ()) -> list:
             *(f'-D{d}' for d in defines)]
 
 
+def _resolve(header: str) -> str:
+    """The full path of a header. An absolute path, from the selftest, passes through."""
+    return header if os.path.isabs(header) else os.path.join(SRC, header)
+
+
 def parse(header: str, defines: tuple = ()):
     """Parses one header alone. Returns the translation unit, or raises on a fatal diagnostic.
 
     The `self-contained` gate already proves every header compiles alone, so a failure here
     means a flag is wrong rather than the header.
     """
-    path = os.path.join(SRC, header)
-    tu = _index().parse(path, args=flags(defines))
+    tu = _index().parse(_resolve(header), args=flags(defines))
     fatal = [d for d in tu.diagnostics if d.severity >= 3]
     if fatal: raise RuntimeError(f'{header}: {fatal[0]}')
     return tu
@@ -91,8 +95,7 @@ def declarations(header: str, defines: tuple = ()) -> list:
     every overload of that name, so the caller deduplicates.
     """
     import clang.cindex as cindex
-    path = os.path.join(SRC, header)
-    me = os.path.abspath(path)
+    me = os.path.abspath(_resolve(header))
     out = []
 
     def walk(cursor, ns):
@@ -129,6 +132,40 @@ def names_from(header: str, other: str, defines: tuple = ()) -> set:
     return found
 
 
+_SELFTEST_HEADER = '''#pragma once
+namespace rpp {
+    enum Sev { SevInfo, SevWarn };                 // unscoped, its enumerators sit at rpp scope
+    enum class Scoped { A, B };                    // scoped, its enumerators do not
+    template<class T> struct __wrap {};            // a macro helper, exported by allowlist
+    template<class T> struct __hidden {};          // a private double-underscore name
+    struct Public {};
+}
+extern "C" { void c_api(); }                       // one linkage spec deep, like RPPCAPI
+'''
+
+
+def selftest() -> list:
+    """Crafts a header and checks the four extraction rules the module surface depends on.
+
+    A regression in the linkage-spec walk, the enum-constant walk, or the name filters changes a
+    real module surface, so this fails before that reaches a `.cppm`.
+    """
+    import tempfile
+    bad = []
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, 'probe.h')
+        open(path, 'w').write(_SELFTEST_HEADER)
+        got = {(ns, name) for ns, kind, name in declarations(path)}
+        want = {('rpp', 'Sev'), ('rpp', 'SevInfo'), ('rpp', 'SevWarn'),  # unscoped enum + members
+                ('rpp', 'Scoped'), ('rpp', '__wrap'), ('rpp', '__hidden'),
+                ('rpp', 'Public'), ('', 'c_api')}                        # extern "C" reaches c_api
+        missing = want - got
+        if missing: bad.append(f'declarations dropped {sorted(missing)}')
+        # a scoped enum keeps its members out of the namespace
+        if ('rpp', 'A') in got: bad.append('a scoped enum leaked its enumerator A')
+    return bad
+
+
 def referenced_rpp_headers(header: str, defines: tuple = ()) -> dict:
     """The rpp headers this header names, mapped to the names it takes from each.
 
@@ -147,3 +184,17 @@ def referenced_rpp_headers(header: str, defines: tuple = ()) -> dict:
             continue
         if r.spelling: out.setdefault(name, set()).add(r.spelling)
     return out
+
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) == 2 and sys.argv[1] == 'selftest':
+        try:
+            findings = selftest()
+        except ClangMissing as e:
+            print(f'rpp_decls selftest skipped, install libclang: {e}')
+            sys.exit(0)
+        for f in findings: print(f'  {f}')
+        print(f'== rpp_decls selftest: {len(findings)} finding(s) ==')
+        sys.exit(1 if findings else 0)
+    sys.exit('usage: rpp_decls.py selftest')

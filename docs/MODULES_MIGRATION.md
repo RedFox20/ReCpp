@@ -22,11 +22,11 @@ gate, #65 changeset 6.
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | green, all 29 jobs, and no job pins a mama branch |
 
-**Changeset state:** 1a is dropped, see section 4. 1b and 6 landed. 2, 3 and 5
-remain, and 4 waits for 3. Section 11 lists what 7 still owes.
+**Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
+6 landed. The generator drives `rpp.config`, `rpp.strview` and `rpp.debugging`.
+5 remains, and 4 rides on the generator `--check`. Section 11 lists what 7 owes.
 
-**Next action:** changeset 2, then changeset 3. Section 5 states why 2 comes
-first.
+**Next action:** changeset 5, the L0 layer first. Section 9 has the layers.
 
 **Open questions:** `BUGS.md` B2 and B5. B2 reaches this work through CI, and the
 owner rules it test construction rather than a defect.
@@ -824,8 +824,8 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | Changeset | Work | Days | Blocks | State |
 |---|---|---|---|---|
 | 1b | remove 3 unused, review 49 redundant and 60 std | 1 | D5 | done, PR #63 |
-| 2 | add the rpp-header include check | 0.5 | changeset 3 | next |
-| 3 | generate the export lists | 1.5 | changeset 5 | after 2 |
+| 2 | add the rpp-header include check | 0.5 | changeset 3 | done |
+| 3 | generate the export lists | 1.5 | changeset 5 | done |
 | 4 | dual-mode test harness | 0.5 | changeset 5 | waits for 3 |
 | 5 | 41 modules plus the umbrella | 2.5 | changeset 6 | 2 of 43 written |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |

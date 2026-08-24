@@ -31,10 +31,12 @@ SKIP_KINDS = frozenset({'MACRO_DEFINITION', 'MACRO_INSTANTIATION', 'INCLUSION_DI
                         'STATIC_ASSERT', 'NAMESPACE_ALIAS', 'USING_DIRECTIVE',
                         'USING_DECLARATION', 'FRIEND_DECL', 'UNEXPOSED_DECL'})
 
-# `__wrap` and `__clean_type` unwrap a macro argument, so `debugging.macros.h` carries them to
-# the call site. A double-underscore name is reserved, so a module never exports one.
+# the logging macros expand to `rpp::__wrap<rpp::__clean_type<T>>`, and debugging.macros.h only
+# names them, so a module-only consumer needs the module to export them. Every other reserved
+# double-underscore name stays private.
+_MACRO_HELPERS = frozenset({'__wrap', '__clean_type'})
 def _is_private(name: str) -> bool:
-    return name.startswith('__')
+    return name.startswith('__') and name not in _MACRO_HELPERS
 
 
 # config.types.h carries the integer aliases, and config.h delivers it to every header
@@ -74,7 +76,8 @@ def export_block(header: str) -> str:
     import re
     included = re.findall(r'^\s*#\s*include\s*"([^"]+)"', src, re.M)
     imports = set()
-    for inc in included:
+    for path in included:
+        inc = os.path.basename(path)  # a `./math.h` or `sub/x.h` include still names module rpp.math
         if not inc.endswith('.h'): continue
         if inc == 'config.h': imports.add(CONFIG_MODULE)
         elif inc not in rd.NO_MODULE: imports.add(module_name(inc))
@@ -141,7 +144,8 @@ def main() -> int:
         return 1
     for f in bad: print(f'  {f}')
     print(f'== gen_module_exports: {len(bad)} finding(s) over {len(targets)} module(s) ==')
-    return 1 if (a.check and bad) else 0
+    # a finding in write mode is a missing .cppm or marker, so fail there too, not only under --check
+    return 1 if bad else 0
 
 
 if __name__ == '__main__':
