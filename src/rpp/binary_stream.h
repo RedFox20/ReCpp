@@ -3,6 +3,7 @@
  * Efficient binary streams, Copyright (c) 2017-2018, Jorma Rebane
  * Distributed under MIT Software License
  */
+#include "config.types.h" // rpp::int64, rpp::byte
 #include "strview.h"
 #include "minmax.h"
 #ifndef RPP_BINARY_READWRITE_NO_SOCKETS

@@ -8,19 +8,7 @@ module;
 export module rpp.strview;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-
-export namespace rpp { // from config.h, which carries no module
-    using rpp::byte;
-    using rpp::int16;
-    using rpp::int32;
-    using rpp::int64;
-    using rpp::uint;
-    using rpp::uint16;
-    using rpp::uint32;
-    using rpp::uint64;
-    using rpp::ulong;
-    using rpp::ushort;
-}
+export import rpp.config;
 
 export namespace rpp {
     using rpp::strcontains;

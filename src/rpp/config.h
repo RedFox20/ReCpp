@@ -439,31 +439,12 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif
 
 #ifdef __cplusplus
+// the integer aliases live in config.types.h, which a module can export. This include sits
+// after the macros above, because config.types.h reads RPP_INT_SIZE from them.
+#include "config.types.h"
+
 namespace rpp
 {
-    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
-    #define RPP_BASIC_INTEGER_TYPEDEFS
-        using byte   = unsigned char;
-        using ushort = unsigned short;
-        using uint   = unsigned int;
-        using ulong  = unsigned long;
-
-        using int16 = short;
-        using uint16 = unsigned short;
-
-    #if RPP_INT_SIZE == 4
-        using int32  = int;
-        using uint32 = unsigned int;
-    #else
-        using int32  = long;
-        using uint32 = unsigned long;
-    #endif
-
-        using int64  = long long;
-        using uint64 = unsigned long long;
-
-    #endif // RPP_BASIC_INTEGER_TYPEDEFS
-
     /**
      * @brief Common base type for wrapping arguments in <rpp/debugging.h>
      *        Helps us to efficiently convert custom argument types to strings.

@@ -37,14 +37,20 @@ def _is_private(name: str) -> bool:
     return name.startswith('__')
 
 
+# config.types.h carries the integer aliases, and config.h delivers it to every header
+CONFIG_MODULE = 'rpp.config'
+
+
 def module_name(header: str) -> str:
-    """`strview.h` names module `rpp.strview`."""
+    """`strview.h` names module `rpp.strview`, and `config.types.h` names `rpp.config`."""
+    if header == 'config.types.h': return CONFIG_MODULE
     return 'rpp.' + os.path.splitext(header)[0].replace('.', '_')
 
 
 def cppm_path(header: str) -> str:
-    """`strview.h` writes `src/rpp/rpp-strview.cppm`."""
-    return os.path.join(rd.SRC, 'rpp-' + os.path.splitext(header)[0] + '.cppm')
+    """`strview.h` writes `src/rpp/rpp-strview.cppm`, and `config.types.h` writes `rpp-config.cppm`."""
+    stem = 'config' if header == 'config.types.h' else os.path.splitext(header)[0]
+    return os.path.join(rd.SRC, 'rpp-' + stem + '.cppm')
 
 
 def _exported(header: str, defines: tuple) -> dict:
@@ -62,22 +68,18 @@ def export_block(header: str) -> str:
     on, off = (_exported(header, d) for d in CONFIGS)
     lines = [BEGIN]
 
-    # D5: one import per rpp include, so an importer sees the names this header takes from it
+    # D5: one import per rpp include, so an importer sees the names this header takes from it.
+    # config.h delivers rpp.config, and a header never imports its own module.
     src = open(os.path.join(rd.SRC, header), encoding='utf-8-sig', errors='replace').read()
     import re
     included = re.findall(r'^\s*#\s*include\s*"([^"]+)"', src, re.M)
-    for inc in sorted({i for i in included if i not in rd.NO_MODULE and i.endswith('.h')}):
-        lines.append(f'export import {module_name(inc)};')
-
-    # a header carrying no module reaches an importer only through this re-export. It ships its
-    # whole rpp surface, because a consumer names an alias this header happens not to use.
-    for plain in sorted(rd.NO_MODULE):
-        if plain not in included: continue
-        taken = sorted({n for names in _exported(plain, CONFIGS[0]).values() for n in names})
-        if not taken: continue
-        lines += ['', f'export namespace rpp {{ // from {plain}, which carries no module']
-        lines += [f'    using rpp::{n};' for n in taken]
-        lines.append('}')
+    imports = set()
+    for inc in included:
+        if not inc.endswith('.h'): continue
+        if inc == 'config.h': imports.add(CONFIG_MODULE)
+        elif inc not in rd.NO_MODULE: imports.add(module_name(inc))
+    imports.discard(module_name(header))
+    lines += [f'export import {imp};' for imp in sorted(imports)]
 
     for ns in sorted(set(on) | set(off)):
         both = [n for n in on.get(ns, []) if n in off.get(ns, [])]
@@ -117,9 +119,10 @@ def rewrite(header: str, check: bool) -> str:
 
 
 def with_modules() -> list:
-    """Every header which already carries a module interface unit."""
+    """Every header which owns a module interface unit. config.h shares config.types.h's path,
+    so the NO_MODULE filter keeps the pair from naming the same .cppm twice."""
     return [h for h in sorted(os.listdir(rd.SRC))
-            if h.endswith('.h') and os.path.exists(cppm_path(h))]
+            if h.endswith('.h') and h not in rd.NO_MODULE and os.path.exists(cppm_path(h))]
 
 
 def main() -> int:

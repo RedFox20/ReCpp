@@ -234,6 +234,8 @@ def check_rpp_includes() -> list[str]:
         except rpp_decls.ClangMissing as e:
             return [f'cannot run: {e}']
         direct = set(QUOTED_RE.findall(_read(os.path.join(SRC, h))))
+        # config.h includes config.types.h, so a header including config.h already has it
+        if 'config.h' in direct: direct.add('config.types.h')
         need = sorted(k for k in used if k not in direct)
         if need:
             names = ', '.join(f'{k} for {sorted(used[k])[0]}' for k in need)

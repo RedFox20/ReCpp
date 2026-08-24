@@ -513,7 +513,8 @@ the macro header stays free of includes.
 | Header | Module? | Split macros? | Why |
 |---|---|---|---|
 | `log_colors.h` | no | no | 114 macros, 0 declarations. Rule 1. |
-| `config.h` | **no** | **no** | Rule 1. Every rpp header includes it to drive the compiler feature probes, so a consumer already has it. Its integer aliases (`rpp::byte`, `rpp::uint`, `rpp::int64`) reach importers anyway, because every module that includes `config.h` re-exports them. `rpp.strview` does this today. |
+| `config.h` | **no** | **the types split out** | Rule 1 for the macros. The integer aliases moved to `config.types.h`, which module `rpp.config` exports. `config.h` includes `config.types.h`, so header-mode consumers keep the aliases, and a module writes one `export import rpp.config` rather than re-listing ten. `rpp.strview`, `rpp.debugging` and `rpp.config` prove the pattern. |
+| `config.types.h` | **yes, `rpp.config`** | n/a | The ten integer aliases, split from `config.h` so a module can export them. A macro cannot be exported, so the macros stay in `config.h`. |
 | `debugging.h` | yes | **yes, and it pays** | The split is done and measured. `debugging.macros.h` costs 50 preprocessed lines, `debugging.h` costs 32893. Section 6.4 has the numbers. |
 | `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
 | `tests.h` | **yes** | **yes** | The only clear win. 41 macros against 45 declarations, so the module carries real weight, and `tests_macros.h` needs no include of its own. |

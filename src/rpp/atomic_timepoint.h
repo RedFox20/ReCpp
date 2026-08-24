@@ -7,6 +7,7 @@
  * inheriting from std::atomic<Duration> and std::atomic<TimePoint>.
  * Both types are 8 bytes (int64 nsec) and lock-free on 64-bit platforms.
  */
+#include "config.types.h" // rpp::int64, rpp::byte
 #include "timepoint.h"
 #include <atomic>
 

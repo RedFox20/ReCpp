@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 /**
  * This implementation is based on the C++ standard std::condition_variable,
  * and implements Spin-wait timeouts in wait_for() and wait_until(),
@@ -17,6 +17,7 @@
 #  include "debugging.h"
 #endif
 
+#include "config.types.h" // rpp::int64, rpp::byte
 #include "timer.h" // rpp::Duration, rpp::TimePoint
 #include "timepoint.h" // rpp::Duration
 #include "predicates.h" // rpp::IsPredicate
