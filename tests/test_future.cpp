@@ -3,6 +3,7 @@
 using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
+using namespace std::string_literals;
 
 // NOLINTBEGIN(performance-*)
 

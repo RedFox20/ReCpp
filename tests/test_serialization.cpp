@@ -1,6 +1,7 @@
 #include <rpp/tests.h>
 #include <rpp/binary_serializer.h>
 using namespace rpp;
+using namespace std::string_literals;
 
 struct Struct1 : serializable<Struct1>
 {

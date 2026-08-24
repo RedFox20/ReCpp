@@ -6,6 +6,7 @@
 #include <rpp/tests.h>
 #include <barrier>
 using namespace rpp;
+using namespace std::string_literals;
 
 TestImpl(test_concurrent_queue)
 {

@@ -6,6 +6,7 @@
 #include <rpp/tests.h>
 using namespace rpp;
 using namespace std::this_thread;
+using namespace std::string_literals;
 
 TestImpl(test_coroutines)
 {

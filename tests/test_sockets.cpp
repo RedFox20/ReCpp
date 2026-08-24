@@ -8,6 +8,7 @@
 #include <future> // std::async
 
 using namespace rpp;
+using namespace std::string_literals;
 
 TestImpl(test_sockets)
 {

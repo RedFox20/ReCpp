@@ -2,6 +2,7 @@
 #include <rpp/stack_trace.h>
 #include <rpp/tests.h>
 using namespace rpp;
+using namespace std::string_literals;
 using std::unordered_map;
 
 TestImpl(test_collections)
