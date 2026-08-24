@@ -20,5 +20,6 @@ export namespace rpp {
     using rpp::uint32;
     using rpp::int64;
     using rpp::uint64;
+    using rpp::__wrap;
 }
 // GENERATED EXPORTS END

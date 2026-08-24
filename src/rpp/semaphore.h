@@ -1,6 +1,7 @@
 #pragma once
 #include "condition_variable.h"
 #include "debugging.h"
+#include "config.types.h" // rpp::__wrap
 #include "mutex.h"
 #include "timepoint.h" // rpp::Duration
 #include "predicates.h" // rpp::IsCallable

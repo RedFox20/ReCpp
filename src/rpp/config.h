@@ -428,17 +428,4 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #ifdef __cplusplus
 // the integer aliases and size macros live in config.types.h, which a module can export
 #include "config.types.h"
-
-namespace rpp
-{
-    /**
-     * @brief Common base type for wrapping arguments in <rpp/debugging.h>
-     *        Helps us to efficiently convert custom argument types to strings.
-     */
-    template<class T>
-    struct __wrap
-    {
-        FINLINE static constexpr const T& w(const T& arg) noexcept { return arg; }
-    };
-}
 #endif

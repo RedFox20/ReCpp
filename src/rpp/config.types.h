@@ -42,4 +42,11 @@ namespace rpp
         using uint64 = unsigned long long;
 
     #endif // RPP_BASIC_INTEGER_TYPEDEFS
+
+    /// wraps a log argument for the formatting macros in <rpp/debugging.h>, returns it unchanged
+    template<class T>
+    struct __wrap
+    {
+        static constexpr const T& w(const T& arg) noexcept { return arg; }
+    };
 }

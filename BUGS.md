@@ -24,15 +24,12 @@ It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
-### B13. A module-only formatted log macro redefines `__wrap`
-`import rpp.debugging` plus `#include <rpp/debugging.macros.h>` and a formatted
-`LogWarning("%d", x)` fails. The macro expands to `rpp::__wrap`, and macros.h
-includes config.h, which defines `__wrap` a second time next to the module copy.
-A consumer that includes `debugging.h` first has no clash. The fix moves the
-macro helpers out of the global module fragment, which is a config.h and
-debugging.h split beyond this changeset.
-
 ## Closed
+
+### C22. A module-only formatted log macro was reported to redefine `__wrap` (was B13)
+A finding claimed a module-only formatted log macro redefines the exported `__wrap`
+against the textual config.h copy. The consumer test now formats int, string and
+strview on the module path on gcc and clang, and `__wrap` moved to config.types.h.
 
 ### C21. A local dependency never shipped its module objects (was B12)
 The report read the build tree archive `libReCpp.a`, which no consumer links.
