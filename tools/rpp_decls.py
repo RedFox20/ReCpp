@@ -34,10 +34,24 @@ def _index():
 
 @functools.lru_cache(maxsize=1)
 def _builtin_include() -> str:
-    """The clang builtin include dir. Without it every parse fails on `stddef.h`."""
+    """A compiler builtin include dir holding `stddef.h`, which every parse needs.
+
+    A clang resource dir is first choice. A gcc-only image carries none, so this asks the
+    compilers for their own builtin dir, which libclang reads too.
+    """
+    import subprocess
     found = sorted(glob.glob('/usr/lib/llvm-*/lib/clang/*/include'))
-    if not found: raise ClangMissing('no clang builtin include dir under /usr/lib/llvm-*')
-    return found[-1]
+    for cc in ('clang++', 'g++', 'cc', os.environ.get('CXX', '')):
+        if not cc: continue
+        try:
+            out = subprocess.run([cc, '-print-file-name=include'], capture_output=True, text=True)
+        except OSError:
+            continue
+        d = out.stdout.strip()
+        if d and os.path.isabs(d): found.append(d)
+    for d in found:
+        if os.path.exists(os.path.join(d, 'stddef.h')): return d
+    raise ClangMissing('no compiler builtin include dir with stddef.h, install clang or gcc')
 
 
 def flags(defines: tuple = ()) -> list:
