@@ -7,6 +7,7 @@
 #include <cfloat> // DBL_MAX
 #include "TempFILE.h"
 #include <rpp/tests.h>
+#include <string> // std::string
 
 using namespace rpp;
 using namespace std::string_literals;

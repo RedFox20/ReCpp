@@ -1,5 +1,6 @@
 #include <rpp/tests.h>
 #include <rpp/binary_serializer.h>
+#include <string> // std::string
 using namespace rpp;
 using namespace std::string_literals;
 

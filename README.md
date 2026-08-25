@@ -150,6 +150,7 @@ preprocessed lines and needs no split.
 |--------|--------|----------------|
 | `rpp.strview` | [`strview.h`](src/rpp/strview.h) | `strview`, `ustrview`, `line_parser`, `keyval_parser`, `bracket_parser`, `concat`, `to_lower`, `to_upper`, `replace`, `_sv` literal, and more |
 | `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
+| `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | `byte`, `ushort`, `uint`, `ulong`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64` |
 
 ### How it works
 
@@ -348,16 +349,16 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Type | Description |
 |------|-------------|
-| [`byte`](src/rpp/config.types.h#L25) | `unsigned char` |
-| [`ushort`](src/rpp/config.types.h#L26) | `unsigned short` |
-| [`uint`](src/rpp/config.types.h#L27) | `unsigned int` |
-| [`ulong`](src/rpp/config.types.h#L28) | `unsigned long` |
-| [`int16`](src/rpp/config.types.h#L30) | `short` (16-bit signed) |
-| [`uint16`](src/rpp/config.types.h#L31) | `unsigned short` (16-bit unsigned) |
-| [`int32`](src/rpp/config.types.h#L34) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.types.h#L35) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.types.h#L41) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.types.h#L42) | `unsigned long long` (64-bit unsigned) |
+| [`byte`](src/rpp/config.types.h#L26) | `unsigned char` |
+| [`ushort`](src/rpp/config.types.h#L27) | `unsigned short` |
+| [`uint`](src/rpp/config.types.h#L28) | `unsigned int` |
+| [`ulong`](src/rpp/config.types.h#L29) | `unsigned long` |
+| [`int16`](src/rpp/config.types.h#L31) | `short` (16-bit signed) |
+| [`uint16`](src/rpp/config.types.h#L32) | `unsigned short` (16-bit unsigned) |
+| [`int32`](src/rpp/config.types.h#L35) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
+| [`uint32`](src/rpp/config.types.h#L36) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.types.h#L42) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.types.h#L43) | `unsigned long long` (64-bit unsigned) |
 
 ---
 

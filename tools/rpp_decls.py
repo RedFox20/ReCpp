@@ -24,12 +24,18 @@ class ClangMissing(Exception):
 
 
 @functools.lru_cache(maxsize=1)
-def _index():
+def _cindex():
+    """The clang.cindex module, or ClangMissing when the bindings are absent."""
     try:
         import clang.cindex
     except ImportError as e:
         raise ClangMissing('the libclang bindings are missing, run `pip install libclang`') from e
-    return clang.cindex.Index.create()
+    return clang.cindex
+
+
+@functools.lru_cache(maxsize=1)
+def _index():
+    return _cindex().Index.create()
 
 
 @functools.lru_cache(maxsize=1)
@@ -94,7 +100,7 @@ def declarations(header: str, defines: tuple = ()) -> list:
     A name reaches an importer only through a using-declaration, and one declaration carries
     every overload of that name, so the caller deduplicates.
     """
-    import clang.cindex as cindex
+    cindex = _cindex()
     me = os.path.abspath(_resolve(header))
     out = []
 

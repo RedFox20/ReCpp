@@ -1,6 +1,6 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 4. Two modules exist: `rpp.strview` and `rpp.debugging`.
+Revision 5. Three modules exist: `rpp.strview`, `rpp.debugging` and `rpp.config`.
 
 This document explains the pattern, records what real builds prove about it, and
 gives the phased plan for the remaining 41 headers.
@@ -12,7 +12,7 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| `rpp.strview`, `rpp.debugging` | build and pass on gcc-14, clang-21, MSVC 14.44 |
+| `rpp.strview`, `rpp.debugging`, `rpp.config` | build and pass on gcc-14, clang-21, MSVC 14.44 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
@@ -519,8 +519,8 @@ the macro header stays free of includes.
 | `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
 | `tests.h` | **yes** | **yes** | The only clear win. 41 macros against 45 declarations, so the module carries real weight, and `tests_macros.h` needs no include of its own. |
 
-Net effect on the module count: `config.h` leaves and `tests.h` joins, so the
-total holds at 43.
+Net effect on the module count: `config.h` leaves, and `config.types.h` and
+`tests.h` join, so the total is 44.
 
 **`tests.h`, the one split.** `TestImpl` expands to a class that derives from
 `rpp::test`, so the type has to be visible where the macro expands. The consumer
@@ -687,7 +687,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 
 | Layer | Modules | Count |
 |---|---|---|
-| L0 | minmax, obfuscated_string, scope_guard | 3 |
+| L0 | **config.types** ✓, minmax, obfuscated_string, scope_guard | 4 |
 | L1 | bitutils, **debugging** ✓, delegate, endian, future_types, math, predicates, proc_utils, sort, source_loc, **strview** ✓, timepoint, traits, type_traits | 14 |
 | L2 | atomic_timepoint, collections, sprint, stack_trace, task, threads, timer, vec | 8 |
 | L3 | load_balancer, memory_pool, mutex, paths, tests | 5 |
@@ -698,7 +698,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-43 modules and one umbrella. `rpp.strview` and `rpp.debugging` exist, so 41 remain. Excluded:
+44 modules and one umbrella. `rpp.strview`, `rpp.debugging` and `rpp.config` exist, so 41 remain. Excluded:
 `config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
 it is Android glue. `tests.h` is in, and it is the one header whose macros split
 into `tests_macros.h`.
@@ -811,7 +811,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests` and
    `RppModuleTests`, and both pass every test, on gcc-14 and clang-21. Every
    tier 2 compiler still passes the headers-only build.
-3. Every one of the 43 headers has a `.cppm`, and `gen_module_exports.py
+3. Every one of the 44 headers has a `.cppm`, and `gen_module_exports.py
    --check` reports no difference.
 4. `examples/module_consumer/` builds against an installed ReCpp using only
    `import rpp;`, and links.
@@ -827,7 +827,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | 2 | add the rpp-header include check | 0.5 | changeset 3 | done |
 | 3 | generate the export lists | 1.5 | changeset 5 | done |
 | 4 | dual-mode test harness | 0.5 | changeset 5 | waits for 3 |
-| 5 | 41 modules plus the umbrella | 2.5 | changeset 6 | 2 of 43 written |
+| 5 | 41 modules plus the umbrella | 2.5 | changeset 6 | 3 of 44 written |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 

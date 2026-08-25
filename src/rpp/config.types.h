@@ -18,6 +18,7 @@
 #  define RPP_LONG_LONG_SIZE __SIZEOF_LONG_LONG__
 #endif // _MSC_VER
 
+#ifdef __cplusplus
 namespace rpp
 {
     #ifndef RPP_BASIC_INTEGER_TYPEDEFS
@@ -50,3 +51,4 @@ namespace rpp
         static constexpr const T& w(const T& arg) noexcept { return arg; }
     };
 }
+#endif // __cplusplus

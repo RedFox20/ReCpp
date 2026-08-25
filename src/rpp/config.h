@@ -425,7 +425,6 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  endif
 #endif
 
-#ifdef __cplusplus
-// the integer aliases and size macros live in config.types.h, which a module can export
+// config.types.h holds the integer aliases and the size macros. The include stays
+// unconditional, so a C translation unit still gets the RPP_*_SIZE macros.
 #include "config.types.h"
-#endif
