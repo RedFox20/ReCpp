@@ -4,7 +4,8 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 
 | Header | Purpose |
 |--------|---------|
-| `config.h` | Platform detection, compiler macros, base types |
+| `config.h` | Platform detection and compiler macros |
+| `config.types.h` | Base integer type aliases and size macros, exported by module rpp.config |
 | `strview.h` | Non-owning string view with tokenization and search |
 | `sprint.h` | String builder, type-safe formatting, to_string |
 | `file_io.h` | Cross-platform file read and write, RAII file handles |
