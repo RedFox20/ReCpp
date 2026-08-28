@@ -436,23 +436,25 @@ TestImpl(test_concurrent_queue)
     {
         producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
-            queue.barrier_push_after_delay_ms("item1", 10);
-            queue.barrier_push_after_delay_ms("item2", 10);
-            queue.barrier_push_after_delay_ms("item3", 10);
+            queue.barrier_push_after_delay_ms("item1", 5);
+            queue.barrier_push_after_delay_ms("item2", 5);
+            queue.barrier_push_after_delay_ms("item3", 5);
         });
         scope_guard([&]{ slow_producer.get(); });
 
         PopResult r;
 
-        // we should only have time to receive item1 and item2
-        // a late consumer can find the item already pushed, see BUGS.md B2
-        auto until = Now() + Millis(28);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, true, /*item*/"item1", /*elapsed ms:*/ 0.0, 18.0);
+        // elapsed check is intentionally shorter, because we should receive the item
+        // before full timeout, otherwise we have a blocking wait() bug
+        AssertWaitPopUntil(Now()+Millis(25), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 18.0);
+
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, true, /*item*/"item2", /*elapsed ms*/ 0.0, 18.0);
+        AssertWaitPopUntil(Now()+Millis(25), true, /*item*/"item2", /*elapsed ms*/ 0.0, 18.0);
+
+        // stops on timeout: item3 is parked at the barrier, so nothing can arrive
+        AssertWaitPopUntil(Now()+Millis(5), false, /*item*/"", /*elapsed ms*/ 2.0, 18.0);
         queue.barrier_consumer_ready();
-        AssertWaitPopUntil(until, false, /*item*/"", /*elapsed ms*/ 0.0, 18.0);
     }
 
     // test that fast-forwarding a time source causes wait_pop to return early
