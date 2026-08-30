@@ -3,6 +3,7 @@
  * Simple performance Timers and high performance Duration/TimePoint, Copyright (c) 2016-2025, Jorma Rebane
  * Distributed under MIT Software License
  */
+#include "config.types.h" // rpp::int64, rpp::byte
 #include "timepoint.h" // Duration, TimePoint, sleep functions, time constants, duration literals
 
 #if __cplusplus

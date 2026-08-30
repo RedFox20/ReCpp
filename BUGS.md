@@ -26,6 +26,11 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C22. A module-only formatted log macro was reported to redefine `__wrap` (was B13)
+A finding claimed a module-only formatted log macro redefines the exported `__wrap`
+against the textual config.h copy. The consumer test now formats int, string and
+strview on the module path on gcc and clang, and `__wrap` moved to config.types.h.
+
 ### C21. A local dependency never shipped its module objects (was B12)
 The report read the build tree archive `libReCpp.a`, which no consumer links.
 mama exports a stripped `mama-nomodules/libReCpp.a`, so a whole-archive link

@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Include hygiene checker for src/rpp.
 
-Three checks, each with a --check gate for CI:
+Five checks and a selftest, each with a --check gate for CI:
 
+  selftest        runs the import-order scan over crafted sources, and pins what each names
   self-contained  every header compiles alone, twice, with nothing included before it
   import-order    an #include that follows an import, or an import inside a header
+  rpp-includes    an rpp name a header uses without including the header that declares it
   unused          an #include that the header still compiles without
   missing         a file that uses a std facility it does not include itself
+
+`rpp-includes` needs libclang, which `pip install libclang` provides. The others need none.
 
 The `unused` check works by deletion. It copies the tree, comments out one
 #include, and recompiles that header alone. A header that still compiles did not
@@ -20,6 +24,7 @@ the deletion test cannot tell that apart from a stale include. Mark the line
 Usage:
   tools/check_includes.py self-contained [--check]
   tools/check_includes.py import-order [--check]
+  tools/check_includes.py rpp-includes [--check]
   tools/check_includes.py unused [--check] [--only strview.h]
   tools/check_includes.py missing [--check]
 """
@@ -209,6 +214,26 @@ def check_missing() -> list[str]:
 # an escape spells one identifier character, as `éclair` spells `éclair`. C++23 added the
 # delimited forms and Clang takes them in C++20, so a name may carry `\u{e9}` or `\N{...}`.
 _UCN_RE = re.compile(r'\\(?:[uU][0-9a-fA-F]+|[uUN]\{[^}\n]*\})')
+
+
+def check_rpp_includes() -> list[str]:
+    """Reports an rpp header whose names a header uses without including that header itself.
+
+    D5 emits one `export import` per rpp include, so a name from a sibling include breaks importers.
+    """
+    import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
+    bad = []
+    for h in headers():
+        if h in rpp_decls.NO_MODULE: continue
+        used = rpp_decls.referenced_rpp_headers(h)  # ClangMissing propagates, main decides soft or hard
+        direct = set(QUOTED_RE.findall(_read(os.path.join(SRC, h))))
+        # config.h includes config.types.h, so a header including config.h already has it
+        if 'config.h' in direct: direct.add('config.types.h')
+        need = sorted(k for k in used if k not in direct)
+        if need:
+            names = ', '.join(f'{k} for {sorted(used[k])[0]}' for k in need)
+            bad.append(f'{SRC}/{h}: add {names}')
+    return bad
 
 
 def _line_start(out: list, i: int) -> int:
@@ -673,18 +698,26 @@ def check_selftest() -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('mode', choices=['self-contained', 'unused', 'missing', 'import-order',
-                                 'selftest', 'all'])
+                                 'rpp-includes', 'selftest', 'all'])
     ap.add_argument('--check', action='store_true', help='exit 1 when a finding remains')
     ap.add_argument('--only', help='limit the unused scan to one header')
     a = ap.parse_args()
 
-    every = ['selftest', 'self-contained', 'import-order', 'missing', 'unused']
+    every = ['selftest', 'self-contained', 'import-order', 'rpp-includes', 'missing', 'unused']
     modes = every if a.mode == 'all' else [a.mode]
     gated = 0
     for mode in modes:
         if mode == 'selftest':       found, gate = (lambda r: (r, len(r)))(check_selftest())
         elif mode == 'self-contained': found, gate = (lambda r: (r, len(r)))(check_self_contained())
         elif mode == 'import-order': found, gate = (lambda r: (r, len(r)))(check_import_order())
+        elif mode == 'rpp-includes':
+            import rpp_decls
+            try:
+                found, gate = (lambda r: (r, len(r)))(check_rpp_includes())
+            except rpp_decls.ClangMissing as e:
+                # `all` is the local pre-commit convenience, so a missing libclang skips this
+                # check there. The CI gate runs `rpp-includes --check`, which still fails.
+                found, gate = ([f'{e}'], 1) if a.check else ([f'skipped, install libclang: {e}'], 0)
         elif mode == 'missing':      found, gate = (lambda r: (r, len(r)))(check_missing())
         else:                        found, gate = check_unused(a.only)
         noun, verb = ('finding', 'fails') if gate == 1 else ('findings', 'fail')

@@ -66,7 +66,9 @@ def check_unicode_off(cxx: str) -> str:
                     'int main() { char b[32]; return rpp::to_string(b, 42) == 2 ? 0 : 1; }\n')
         flags = [cxx, '-std=c++20', '-fmodules-ts', '-DRPP_ENABLE_UNICODE=0', '-I', 'src']
         mapper = f'-fmodule-mapper=|@g++-mapper-server -r {d}'
-        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-strview.cppm', '-o', f'{d}/m.o'],
+        # rpp.strview imports rpp.config, so the config module compiles first
+        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-config.cppm', '-o', f'{d}/c.o'],
+                     [*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-strview.cppm', '-o', f'{d}/m.o'],
                      [*flags, mapper, '-c', use, '-o', f'{d}/u.o']):
             p = subprocess.run(step, cwd=root, capture_output=True, text=True)
             if p.returncode != 0:

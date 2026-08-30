@@ -6,7 +6,10 @@
 #ifndef RPP_BINARY_SERIALIZER_H
 #define RPP_BINARY_SERIALIZER_H 1
 #endif
+#include "config.types.h" // rpp::int64, rpp::byte
 #include "binary_stream.h"
+#include "sprint.h" // rpp::string_buffer
+#include "strview.h" // rpp::strview
 
 namespace rpp
 {

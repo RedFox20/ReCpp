@@ -7,8 +7,10 @@
 #include <cfloat> // DBL_MAX
 #include "TempFILE.h"
 #include <rpp/tests.h>
+#include <string> // std::string
 
 using namespace rpp;
+using namespace std::string_literals;
 
 struct external_to_string { };
 std::string to_string([[maybe_unused]] external_to_string to_str) { return "external_to_string"; }

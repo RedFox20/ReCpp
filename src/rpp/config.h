@@ -380,19 +380,6 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif // RPP_CORO_RETURN_TYPE
 
 
-// Define the basic size of integer types
-#if _MSC_VER
-#  define RPP_SHORT_SIZE     2
-#  define RPP_INT_SIZE       4
-#  define RPP_LONG_SIZE      4
-#  define RPP_LONG_LONG_SIZE 8
-#else // GCC/Clang
-#  define RPP_SHORT_SIZE     __SIZEOF_SHORT__
-#  define RPP_INT_SIZE       __SIZEOF_INT__
-#  define RPP_LONG_SIZE      __SIZEOF_LONG__
-#  define RPP_LONG_LONG_SIZE __SIZEOF_LONG_LONG__
-#endif // _MSC_VER
-
 #define RPP_INT64_MAX     0x7FFFFFFFFFFFFFFFLL
 #define RPP_INT64_MIN     0x8000000000000000LL
 #define RPP_UINT64_MAX    0xFFFFFFFFFFFFFFFFULL
@@ -438,40 +425,6 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  endif
 #endif
 
-#ifdef __cplusplus
-namespace rpp
-{
-    #ifndef RPP_BASIC_INTEGER_TYPEDEFS
-    #define RPP_BASIC_INTEGER_TYPEDEFS
-        using byte   = unsigned char;
-        using ushort = unsigned short;
-        using uint   = unsigned int;
-        using ulong  = unsigned long;
-
-        using int16 = short;
-        using uint16 = unsigned short;
-
-    #if RPP_INT_SIZE == 4
-        using int32  = int;
-        using uint32 = unsigned int;
-    #else
-        using int32  = long;
-        using uint32 = unsigned long;
-    #endif
-
-        using int64  = long long;
-        using uint64 = unsigned long long;
-
-    #endif // RPP_BASIC_INTEGER_TYPEDEFS
-
-    /**
-     * @brief Common base type for wrapping arguments in <rpp/debugging.h>
-     *        Helps us to efficiently convert custom argument types to strings.
-     */
-    template<class T>
-    struct __wrap
-    {
-        FINLINE static constexpr const T& w(const T& arg) noexcept { return arg; }
-    };
-}
-#endif
+// config.types.h holds the integer aliases and the size macros. The include stays
+// unconditional, so a C translation unit still gets the RPP_*_SIZE macros.
+#include "config.types.h"

@@ -92,6 +92,18 @@ jobs:
                   # an #include after an import gives GCC a thousand redefinitions, and clang
                   # accepts the same file, so only this gate stops it reaching a GCC build
                   python3 tools/check_includes.py import-order --check
+                  # a module exports one import per rpp include, so a name that arrives through
+                  # a sibling include yields no import line and every importer then fails.
+                  # libclang parses the headers, and it reads clang builtin headers, because a gcc
+                  # SIMD header names a __builtin_ia32 that clang does not define.
+                  sudo apt-get install -y libclang-common-18-dev || sudo apt-get install -y clang
+                  pip3 install --quiet libclang
+                  # the libclang traversal decides a real module surface, so a crafted header pins it
+                  python3 tools/rpp_decls.py selftest
+                  python3 tools/check_includes.py rpp-includes --check
+                  # a hand-written export list rots, so this fails when a .cppm no longer
+                  # matches the header it wraps
+                  python3 tools/gen_module_exports.py --all --check
       - run: make configure-cmake
       - run:
           name: Build << parameters.cc_version >> C++<< parameters.cpp_version >> << parameters.sanitizer >>

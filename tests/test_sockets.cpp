@@ -6,8 +6,10 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <future> // std::async
+#include <string> // std::string
 
 using namespace rpp;
+using namespace std::string_literals;
 
 TestImpl(test_sockets)
 {

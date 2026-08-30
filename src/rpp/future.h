@@ -8,6 +8,9 @@
 #include "future_types.h"
 #include "traits.h"
 #include "debugging.h" // __assertion_failure
+#include "config.types.h" // rpp::__wrap
+#include "timepoint.h" // rpp::Duration
+#include "delegate.h" // rpp::delegate
 #include <optional> // for async_task() deterministic task cleanup
 
 namespace rpp

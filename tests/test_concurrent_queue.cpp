@@ -5,7 +5,9 @@
 #include <rpp/scope_guard.h>
 #include <rpp/tests.h>
 #include <barrier>
+#include <string> // std::string
 using namespace rpp;
+using namespace std::string_literals;
 
 TestImpl(test_concurrent_queue)
 {

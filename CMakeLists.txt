@@ -344,6 +344,7 @@ if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 
     set(RPP_MODULES_SRC
+        src/rpp/rpp-config.cppm
         src/rpp/rpp-strview.cppm
         src/rpp/rpp-debugging.cppm
     )

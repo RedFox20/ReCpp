@@ -4,8 +4,10 @@
 #include <rpp/timer.h>
 
 #include <rpp/tests.h>
+#include <string> // std::string
 using namespace rpp;
 using namespace std::this_thread;
+using namespace std::string_literals;
 
 TestImpl(test_coroutines)
 {

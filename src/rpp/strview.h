@@ -1291,9 +1291,6 @@ namespace rpp
 
     inline namespace literals
     {
-        // DEPRECATED: this will be removed in future versions of strview.h
-        using namespace std::string_literals;
-
         inline constexpr strview operator ""_sv(const char* str, std::size_t len) noexcept
         {
             return strview{ str, (int)len };

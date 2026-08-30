@@ -16,8 +16,10 @@
 #include "future_types.h"
 #include "task.h" // rpp::task<T> (driven to completion by run_until_done)
 #include "thread_pool.h" // parallel_task, pool_task_handle
+#include "timepoint.h" // rpp::Duration
+#include "delegate.h" // rpp::delegate
+#include "semaphore.h" // rpp::semaphore
 #include "threads.h"
-#include "timer.h"
 #include "source_loc.h" // rpp::source_loc
 #include <atomic>
 #include <memory>

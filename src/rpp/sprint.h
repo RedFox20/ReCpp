@@ -5,6 +5,7 @@
  */
 // A header never imports a module. An `import` is illegal inside a global module
 // fragment, so it would block every rpp-*.cppm that includes this header.
+#include "config.types.h" // rpp::int64, rpp::byte
 #include "strview.h"
 #include "debugging.h"
 #include "type_traits.h"

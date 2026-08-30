@@ -20,6 +20,7 @@ import rpp.debugging;
 using namespace rpp::literals;
 
 static int failed = 0;
+static std::string g_log_captured; // the module-only formatted-log check captures into this
 
 static void check(const char* what, bool ok)
 {
@@ -88,6 +89,18 @@ int main()
         // the macros expand to the exported _LogInfo, so this proves both halves reach a consumer
         LogInfo("consumer imported rpp.debugging");
         check("rpp.debugging shorten", rpp::strview{rpp::shorten_filename("a/b/c.cpp")} != "");
+    }
+    { // a formatted log macro expands to rpp::__wrap<rpp::__clean_type<T>>, the module-only helper path
+        SetLogHandler([](LogSeverity, const char* msg, int len) { g_log_captured.assign(msg, (size_t)len); });
+        LogSeverity previous = GetLogSeverityFilter();
+        SetLogSeverityFilter(LogSeverityInfo);
+        std::string name = "wrapped";
+        const char* tag = "tag";
+        rpp::strview view = "view";
+        LogError("i=%d s=%s c=%s v=%s", 7, name, tag, view); // wraps int, std::string, const char*, strview
+        SetLogSeverityFilter(previous);
+        SetLogHandler(nullptr);
+        check("formatted log macro", g_log_captured.find("i=7 s=wrapped c=tag v=view") != std::string::npos);
     }
 
     { // line_parser walks a multi-line buffer
