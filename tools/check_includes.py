@@ -219,10 +219,9 @@ _UCN_RE = re.compile(r'\\(?:[uU][0-9a-fA-F]+|[uUN]\{[^}\n]*\})')
 def check_rpp_includes() -> list[str]:
     """Reports an rpp header whose names a header uses without including that header itself.
 
-    D5 gives each module one `export import rpp.X` per rpp include, so a name which arrives
-    through a sibling include yields no import line, and every importer of that module fails.
+    D5 emits one `export import` per rpp include, so a name from a sibling include breaks importers.
     """
-    import rpp_decls  # raises ImportError without the sibling script, which is a real setup fault
+    import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
     bad = []
     for h in headers():
         if h in rpp_decls.NO_MODULE: continue

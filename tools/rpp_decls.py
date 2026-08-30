@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """Reads the rpp declarations of a header through libclang.
 
-Two module tools share this layer. `check_includes.py rpp-includes` asks which rpp headers a
-header references, and the export generator asks which names a header declares. A regex cannot
-answer either one: it reports `size` and `operator` as declarations, and it cannot tell the
-`strview` a header names from the `strview` a sibling include leaked to it.
-
-Install the bindings with `pip install libclang`.
+`check_includes.py rpp-includes` asks which rpp headers a header references, and the export
+generator asks which names a header declares. A regex cannot resolve a name to its declaring
+header, so both use libclang. Install the bindings with `pip install libclang`.
 """
 import functools
 import glob
@@ -14,8 +11,7 @@ import os
 
 SRC = 'src/rpp'
 
-# rule 1 of MODULES_MIGRATION.md section 6.3: every rpp header includes config.h to drive the
-# compiler feature probes, and log_colors.h rides along with it. jni_cpp.h is Android glue.
+# excluded from module conversion, see MODULES_MIGRATION.md section 6.3
 NO_MODULE = frozenset({'config.h', 'log_colors.h', 'jni_cpp.h', 'debugging.macros.h'})
 
 
@@ -42,8 +38,7 @@ def _index():
 def _builtin_include() -> str:
     """A compiler builtin include dir holding `stddef.h`, which every parse needs.
 
-    A clang resource dir is first choice. A gcc-only image carries none, so this asks the
-    compilers for their own builtin dir, which libclang reads too.
+    A gcc-only image carries no clang resource dir, so this also asks each compiler for its own.
     """
     import subprocess
     found = sorted(glob.glob('/usr/lib/llvm-*/lib/clang/*/include'))
@@ -72,11 +67,7 @@ def _resolve(header: str) -> str:
 
 
 def parse(header: str, defines: tuple = ()):
-    """Parses one header alone. Returns the translation unit, or raises on a fatal diagnostic.
-
-    The `self-contained` gate already proves every header compiles alone, so a failure here
-    means a flag is wrong rather than the header.
-    """
+    """Parses one header alone. Returns the translation unit, or raises on a fatal diagnostic."""
     tu = _index().parse(_resolve(header), args=flags(defines))
     fatal = [d for d in tu.diagnostics if d.severity >= 3]
     if fatal: raise RuntimeError(f'{header}: {fatal[0]}')
@@ -97,8 +88,7 @@ def _cursors_in(tu, path: str):
 def declarations(header: str, defines: tuple = ()) -> list:
     """The declarations this header makes, as `(namespace, kind, name)`, in source order.
 
-    A name reaches an importer only through a using-declaration, and one declaration carries
-    every overload of that name, so the caller deduplicates.
+    One declaration carries every overload of a name, so the caller deduplicates.
     """
     cindex = _cindex()
     me = os.path.abspath(_resolve(header))
@@ -116,8 +106,7 @@ def declarations(header: str, defines: tuple = ()) -> list:
             f = k.location.file
             if not (f and os.path.abspath(f.name) == me and k.spelling): continue
             out.append(('::'.join(ns), k.kind.name, k.spelling))
-            # an unscoped enum puts its enumerators at namespace scope, and a using of the
-            # enum type does not carry them, so each one needs its own using-declaration
+            # an unscoped enum needs one using-declaration per enumerator, the enum type does not carry them
             if k.kind == cindex.CursorKind.ENUM_DECL and not k.is_scoped_enum():
                 for e in k.get_children():
                     if e.kind == cindex.CursorKind.ENUM_CONSTANT_DECL and e.spelling:
@@ -125,17 +114,6 @@ def declarations(header: str, defines: tuple = ()) -> list:
 
     walk(parse(header, defines).cursor, [])
     return out
-
-
-def names_from(header: str, other: str, defines: tuple = ()) -> set:
-    """The names `header` references which `other` declares. Used for a header carrying no module."""
-    target = os.path.abspath(os.path.join(SRC, other))
-    found = set()
-    for c in _cursors_in(parse(header, defines), os.path.join(SRC, header)):
-        r = c.referenced
-        if r is None or not r.location.file or not r.spelling: continue
-        if os.path.abspath(r.location.file.name) == target: found.add(r.spelling)
-    return found
 
 
 _SELFTEST_HEADER = '''#pragma once
@@ -151,11 +129,7 @@ extern "C" { void c_api(); }                       // one linkage spec deep, lik
 
 
 def selftest() -> list:
-    """Crafts a header and checks the four extraction rules the module surface depends on.
-
-    A regression in the linkage-spec walk, the enum-constant walk, or the name filters changes a
-    real module surface, so this fails before that reaches a `.cppm`.
-    """
+    """Crafts a header and checks the four extraction rules the module surface depends on."""
     import tempfile
     bad = []
     with tempfile.TemporaryDirectory() as d:
@@ -175,8 +149,7 @@ def selftest() -> list:
 def referenced_rpp_headers(header: str, defines: tuple = ()) -> dict:
     """The rpp headers this header names, mapped to the names it takes from each.
 
-    libclang resolves each reference to its declaration, so this reports the header that really
-    declares the name. A `config.h` style header carries no module and never appears here.
+    A `config.h` style header carries no module and never appears here.
     """
     path = os.path.join(SRC, header)
     src_root = os.path.abspath(SRC)

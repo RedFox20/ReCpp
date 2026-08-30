@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 """Writes the export list of a module interface unit from the header it wraps.
 
-A hand-written export list rots. `rpp-strview.cppm` proved it: a second
-`using rpp::literals::operator""_sv;` sat under the unicode guard, where it did nothing,
-because the first using-declaration already carried every overload of that name.
-
-The generator owns one block between two markers. Everything outside stays, so a comment or a
-deduction guide a person wrote survives a regeneration.
+The generator owns one block between two markers, so a hand-written export list cannot drift.
+Everything outside the markers survives a regeneration.
 
   tools/gen_module_exports.py strview.h            # write the block
   tools/gen_module_exports.py --all                # every header carrying a .cppm
@@ -14,6 +10,7 @@ deduction guide a person wrote survives a regeneration.
 """
 import argparse
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -31,15 +28,12 @@ SKIP_KINDS = frozenset({'MACRO_DEFINITION', 'MACRO_INSTANTIATION', 'INCLUSION_DI
                         'STATIC_ASSERT', 'NAMESPACE_ALIAS', 'USING_DIRECTIVE',
                         'USING_DECLARATION', 'FRIEND_DECL', 'UNEXPOSED_DECL'})
 
-# the logging macros expand to `rpp::__wrap<rpp::__clean_type<T>>`, and debugging.macros.h only
-# names them, so a module-only consumer needs the module to export them. Every other reserved
-# double-underscore name stays private.
+# the logging macros need these two, so they export despite the __ prefix
 _MACRO_HELPERS = frozenset({'__wrap', '__clean_type'})
 def _is_private(name: str) -> bool:
     return name.startswith('__') and name not in _MACRO_HELPERS
 
 
-# config.types.h carries the integer aliases, and config.h delivers it to every header
 CONFIG_MODULE = 'rpp.config'
 
 
@@ -70,10 +64,8 @@ def export_block(header: str) -> str:
     on, off = (_exported(header, d) for d in CONFIGS)
     lines = [BEGIN]
 
-    # D5: one import per rpp include, so an importer sees the names this header takes from it.
-    # config.h delivers rpp.config, and a header never imports its own module.
+    # one export import per rpp include. config.h maps to rpp.config, and a header never imports itself
     src = open(os.path.join(rd.SRC, header), encoding='utf-8-sig', errors='replace').read()
-    import re
     included = re.findall(r'^\s*#\s*include\s*"([^"]+)"', src, re.M)
     imports = set()
     for path in included:
@@ -122,8 +114,8 @@ def rewrite(header: str, check: bool) -> str:
 
 
 def with_modules() -> list:
-    """Every header which owns a module interface unit. config.h shares config.types.h's path,
-    so the NO_MODULE filter keeps the pair from naming the same .cppm twice."""
+    """Every header which owns a module interface unit. The NO_MODULE filter drops config.h,
+    which shares config.types.h's .cppm path."""
     return [h for h in sorted(os.listdir(rd.SRC))
             if h.endswith('.h') and h not in rd.NO_MODULE and os.path.exists(cppm_path(h))]
 
@@ -144,8 +136,7 @@ def main() -> int:
         return 1
     for f in bad: print(f'  {f}')
     print(f'== gen_module_exports: {len(bad)} finding(s) over {len(targets)} module(s) ==')
-    # a finding in write mode is a missing .cppm or marker, so fail there too, not only under --check
-    return 1 if bad else 0
+    return 1 if bad else 0  # write mode still fails on a missing .cppm or marker
 
 
 if __name__ == '__main__':
