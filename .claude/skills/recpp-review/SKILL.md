@@ -103,6 +103,8 @@ clang++ 14 to 20, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 - No constants in a comment. A `10s`, a `50ms`, or a `4096` in prose goes stale on
   the first tune. The code holds the value, and the comment holds the reason.
 - Do not paraphrase the code below the comment.
+- No defense. Never defend, justify or overexplain a design decision. State the
+  reason in one short sentence.
 - A lock-free or memory-order line needs the race it stops, in one line.
 - Never delete a comment which carries a why. Rewrite it.
 

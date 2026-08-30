@@ -76,6 +76,8 @@ deletes a comment that carries a WHY.
   the race the barrier stops.
 - Consolidate an existing comment instead of appending a second one.
 - Never delete an existing comment. If it goes stale, rewrite it.
+- Never defend, justify or overexplain a design decision. State the reason in one
+  short sentence.
 
 Comment slop — prose that paraphrases the code below it — is the failure mode
 this skill removes. STE sharpens the surviving line. It never licenses more

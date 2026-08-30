@@ -93,11 +93,14 @@ Work through this list once per added line. Each check has a mechanical fix.
 | 11 | Marketing word: seamless, robust, powerful, blazing | Delete it, or give the number |
 | 12 | The same thing under two names | Pick one name and use it everywhere |
 | 13 | A public declaration with no doxygen | Add a one-line `///` |
+| 14 | Comment defends, justifies or overexplains a design decision | Cut to one sentence that states the reason |
 
 ## The comment budget
 
 One line is the target. Two lines is the limit. The line says WHAT the code wants
-to do, or WHY a subtle line exists. It never says who found the bug or when.
+to do, or WHY a subtle line exists. It never says who found the bug or when. It
+never defends, justifies or overexplains a design decision. It states the reason
+in one short sentence.
 
 ```cpp
 // bad
