@@ -5,7 +5,6 @@
 #include <rpp/timer.h> // performance measurement
 #include <rpp/threads.h> // thread naming
 #include <atomic>
-#include <cstdlib> // getenv
 #include <memory> // shared_ptr
 #include <thread>  // hardware_concurrency
 #include <latch>
@@ -362,7 +361,7 @@ TestImpl(test_threadpool)
             #if !RPP_SANITIZERS
                 // num_physical_cores() reports the host cores, not the cores a container gets,
                 // so the pool oversubscribes and parallel_for loses to serial. See issue #60.
-                if (std::getenv("CIRCLECI") == nullptr)
+                if (!is_ci_machine())
                     AssertLessOrEqual(parallel_elapsed, serial_elapsed + 0.001);
                 else
                     print_info("CI machine: skipped the parallel-against-serial bound\n");

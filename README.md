@@ -4456,23 +4456,24 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L695) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L710) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L727) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L567) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L583) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L619) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L688) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L558) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L592) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.h#L701) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.h#L716) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.h#L733) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.h#L573) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.h#L589) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L625) | Assert inequality |
+| [`AssertTrue(expr)`](src/rpp/tests.h#L694) | Assert expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.h#L564) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.h#L598) | Assert expression throws |
 
 ### Running Tests
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(patterns)`](src/rpp/tests.h#L281) | Run tests matching patterns |
-| [`test::run_tests(argc, argv)`](src/rpp/tests.h#L276) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L281) | Run all registered tests |
+| [`test::run_tests(strview testNamePatterns)`](src/rpp/tests.h#L271) | Run tests matching patterns |
+| [`test::run_tests(int argc, char* argv[])`](src/rpp/tests.h#L282) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L287) | Run all registered tests |
+| [`test::is_ci_machine()`](src/rpp/tests.h#L210) | Returns TRUE if the tests run on a CI machine, which shares its CPU time |
 | [`register_test(name, factory, autorun)`](src/rpp/tests.h#L47) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase

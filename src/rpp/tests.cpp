@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <chrono> // high_resolution_clock
 #include <cstdarg>
+#include <cstdlib> // getenv
 #include <cassert>
 #include <thread>
 
@@ -779,6 +780,13 @@ namespace rpp
 #else
         usleep(millis * 1000);
 #endif
+    }
+
+    bool test::is_ci_machine() noexcept
+    {
+        static const bool ci = std::getenv("CIRCLECI") != nullptr
+                            || std::getenv("CI") != nullptr;
+        return ci;
     }
 
     void test::spin_sleep_for(double seconds, bool full_spin) noexcept

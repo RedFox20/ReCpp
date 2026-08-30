@@ -26,6 +26,11 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
+### C23. `udp_poll_multi_stress_test` never sized its receive queue (CI flake)
+The default 208 KB queue holds only 270 of the 500 datagrams, so a pre-empted CI
+receiver dropped packets. Both sockets now take a 512 KB buffer, and `available()`
+separates a kernel drop from a `poll()` defect.
+
 ### C22. A module-only formatted log macro was reported to redefine `__wrap` (was B13)
 A finding claimed a module-only formatted log macro redefines the exported `__wrap`
 against the textual config.h copy. The consumer test now formats int, string and

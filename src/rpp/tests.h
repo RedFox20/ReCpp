@@ -204,6 +204,12 @@ namespace rpp
         static void sleep(int millis);
 
         /**
+         * @brief A CI machine shares its CPU time, so a timing bound can need more slack there
+         * @return TRUE if the tests run on a CI machine
+         */
+        static bool is_ci_machine() noexcept;
+
+        /**
          * Spin sleep is more accurate than std::this_thread::sleep_for
          * which can be seriously bad on windows (+- 15ms)
          * @note Does not rely on timer.h implementation

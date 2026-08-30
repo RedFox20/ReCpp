@@ -676,6 +676,12 @@ TestImpl(test_sockets)
         socket send = create_udp_listener();
         socket recv1 = create_udp_listener();
         socket recv2 = create_udp_listener();
+        // the default 208 KB queue holds only ~270 of the 500 datagrams, so give the burst room
+        send.set_snd_buf_size(512*1024);
+        recv1.set_rcv_buf_size(512*1024);
+        recv2.set_rcv_buf_size(512*1024);
+        print_info("Send buffer size: %d bytes\n", send.get_snd_buf_size());
+        print_info("Recv buffer size: %d bytes\n", recv1.get_rcv_buf_size());
         send.set_blocking(true);
         recv1.set_blocking(false);
         recv2.set_blocking(false);
@@ -693,14 +699,19 @@ TestImpl(test_sockets)
         });
 
         rpp::Timer t;
+        double elapsed_ms = 0;
+        int idle_polls = 0;
         std::vector<int> num_received = { 0, 0 };
         std::vector<socket*> sockets = { &recv1, &recv2 };
         std::vector<int> ready;
-        while ((num_received[0] < NUM_MESSAGES || num_received[1] < NUM_MESSAGES) && t.elapsed_ms() < 5000)
+        constexpr int FAILSAFE_TIMEOUT_MS = 5000; // avoid test running infinitely if packets get dropped
+        while ((num_received[0] < NUM_MESSAGES || num_received[1] < NUM_MESSAGES)
+               && t.elapsed_ms() < FAILSAFE_TIMEOUT_MS)
         {
             // intentionally use a large timeout here
             if (socket::poll(sockets, ready, /*timeout*/50, socket::PF_Read) > 0)
             {
+                idle_polls = 0;
                 for (int i : ready)
                 {
                     while (true)
@@ -711,14 +722,52 @@ TestImpl(test_sockets)
                             break;
                     }
                 }
+                elapsed_ms = t.elapsed_millis(); // the last packet stops the clock
             }
+            // the sender finished and nothing arrived twice, so the kernel dropped the rest
+            else if (task.await_ready() && ++idle_polls >= 2)
+                break;
         }
-        double elapsed_ms = t.elapsed_millis();
-        task.get();
+        task.get(); // no packet is in flight after this, loopback sendto delivers synchronously
 
-        AssertEqual(num_received[0], NUM_MESSAGES);
-        AssertEqual(num_received[1], NUM_MESSAGES);
+        // data left in the queue means poll() never reported the socket readable
+        int left1 = recv1.available(), left2 = recv2.available();
+        AssertMsg(left1 == 0 && left2 == 0,
+                  "poll() missed readable data: recv1 %d bytes, recv2 %d bytes", left1, left2);
+        AssertMsg(num_received[0] == NUM_MESSAGES, "recv1 got %d of %d packets, lost %d",
+                  num_received[0], NUM_MESSAGES, NUM_MESSAGES - num_received[0]);
+        AssertMsg(num_received[1] == NUM_MESSAGES, "recv2 got %d of %d packets, lost %d",
+                  num_received[1], NUM_MESSAGES, NUM_MESSAGES - num_received[1]);
         AssertLess(elapsed_ms, 200.0);
+    }
+
+    // a deliberately small receive queue proves that lost packets are kernel side, not a poll() miss
+    TestCase(udp_recvbuf_overflow_is_kernel_side)
+    {
+        const int NUM_MESSAGES = 500;
+        const int MSG_SIZE = 200;
+        socket send = create_udp_listener(rpp::SO_Blocking);
+        socket recv = create_udp_listener(rpp::SO_NonBlock);
+        recv.set_rcv_buf_size(32*1024); // holds ~42 datagrams, so the rest must drop
+        print_info("Recv buffer size: %d bytes\n", recv.get_rcv_buf_size());
+        auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
+
+        for (int i = 0; i < NUM_MESSAGES; ++i)
+            send.sendto(recv_addr, std::string(MSG_SIZE, 'x'));
+
+        int num_received = 0;
+        while (recv.poll(/*timeout*/0, socket::PF_Read))
+        {
+            if (pop_udp_packet(recv, MSG_SIZE, RPP_SOURCE_LOC_CURRENT) > 0)
+                ++num_received;
+            else
+                break;
+        }
+        print_info("Received %d of %d packets\n", num_received, NUM_MESSAGES);
+
+        AssertGreater(num_received, 0);
+        AssertLess(num_received, NUM_MESSAGES);
+        AssertEqual(recv.available(), 0); // a drained queue proves poll() missed nothing
     }
 
     // in this case we stress test the UDP socket without using poll

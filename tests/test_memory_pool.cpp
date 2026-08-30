@@ -196,8 +196,8 @@ TestImpl(memory_pool)
         print_info("#2 Virtual Size: %llu KB\n", info2.virtual_size / 1000);
         print_info("#2 Physical Mem: %llu KB\n", info2.physical_mem / 1000);
 
-        // this doesn't work on CircleCI for some reason :shrug:
-        if (getenv("CIRCLECI"))
+        // a CI container reports the host memory, so these bounds never hold there
+        if (is_ci_machine())
             return;
 
         AssertGreaterOrEqual(info2.virtual_size, info.virtual_size);
