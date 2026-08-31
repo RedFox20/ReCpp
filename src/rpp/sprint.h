@@ -141,6 +141,14 @@ namespace rpp
         void write(float  value) noexcept;
         void write(double value) noexcept;
 
+        /**
+         * @brief Appends a float or double with a chosen number of decimals.
+         *        The write(float) and write(double) overloads are limited to 6 decimals.
+         * @param value Float or double value to append
+         * @param maxDecimals Maximum decimal digits to write, clamped to [0, 1074]
+         */
+        void write_real(double value, int maxDecimals) noexcept;
+
 #if RPP_ENABLE_UNICODE
         // input as UTF-16 string, converted directly to UTF-8
         void write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept;

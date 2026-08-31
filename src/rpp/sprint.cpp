@@ -145,6 +145,17 @@ namespace rpp
     void string_buffer::write(float value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(double value) noexcept { reserve(48); len += _tostring(&ptr[len], value); }
 
+    // a denormal double needs at most 1074 decimals, so nothing above that adds a digit
+    static constexpr int MaxRealDecimals = 1074;
+
+    void string_buffer::write_real(double value, int maxDecimals) noexcept
+    {
+        if (maxDecimals < 0) maxDecimals = 0;
+        else if (maxDecimals > MaxRealDecimals) maxDecimals = MaxRealDecimals;
+        reserve(32 + maxDecimals); // 32 covers the sign, the integral digits and the decimal point
+        len += _tostring(&ptr[len], value, maxDecimals);
+    }
+
 #if RPP_ENABLE_UNICODE
     void string_buffer::write_codepoint(char32_t codepoint) noexcept
     {

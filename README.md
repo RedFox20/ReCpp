@@ -711,11 +711,12 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | Method | Description |
 |--------|-------------|
 | [`write(const T& v)`](src/rpp/sprint.h#L125) | Write a value (auto-converts most types) |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L356) | Write values followed by newline |
+| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L150) | Write a float or double with a chosen number of decimals, instead of the default 6 |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L364) | Write values followed by newline |
 | [`writef(const char* format, ...)`](src/rpp/sprint.h#L123) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L302) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L259) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L364) | Pretty-print a value |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L310) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L267) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L372) | Pretty-print a value |
 | [`clear()`](src/rpp/sprint.h#L114) | Clear the buffer |
 | [`reserve(int capacity)`](src/rpp/sprint.h#L115) | Reserve capacity |
 | [`resize(int size)`](src/rpp/sprint.h#L116) | Resize buffer |
@@ -732,8 +733,8 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
 | [`print(args...)`](src/rpp/sprint.h#L486) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L507) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L424) | Converts string bytes to hexadecimal representation |
+| [`println(args...)`](src/rpp/sprint.h#L506) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L432) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 

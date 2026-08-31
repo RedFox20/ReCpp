@@ -200,6 +200,37 @@ TestImpl(test_sprint)
     #endif
     }
 
+    TestCase(write_real_precision)
+    {
+        rpp::string_buffer sb;
+        sb.write(1e-9); // write(double) is limited to 6 decimals
+        AssertThat(sb.view(), "0.000000");
+
+        sb.clear();
+        sb.write_real(1e-9, 9);
+        AssertThat(sb.view(), "0.000000001");
+
+        sb.clear();
+        sb.write_real(0.0009765625, 10); // exactly representable, so every platform agrees
+        AssertThat(sb.view(), "0.0009765625");
+
+        sb.clear();
+        sb.write_real(3.14159265358979, 14);
+        AssertThat(sb.view(), "3.14159265358979");
+
+        sb.clear();
+        sb.write_real(-59.43696123456789, 12);
+        AssertThat(sb.view(), "-59.436961234567");
+
+        sb.clear();
+        sb.write_real(1.5, 0); // 0 decimals rounds the value
+        AssertThat(sb.view(), "2");
+
+        sb.clear();
+        sb.write_real(1.5, -1); // a negative count is clamped to 0
+        AssertThat(sb.view(), "2");
+    }
+
     TestCase(write_hex)
     {
         auto referenceHex = [](strview in) {
