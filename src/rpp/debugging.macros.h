@@ -28,23 +28,32 @@
 #define _rpp_get_nth_wrap_arg(zero, _12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
 #define _rpp_wrap(x) x
 
-// _va_comma(__VA_ARGS__): expands to `,` if __VA_ARGS__ is non-empty, nothing if empty.
-// C++20 __VA_OPT__ is preferred because the fallback (_spaces_on_empty_token trick)
-// breaks when __VA_ARGS__ starts with a C-style cast like (long long)(expr) --
-// the function-like _spaces_on_empty_token macro greedily consumes (long long) as its argument.
-// MSVC requires /Zc:preprocessor for __VA_OPT__; _MSVC_TRADITIONAL==0 confirms it is active.
-// Library consumers without /Zc:preprocessor will use the fallback automatically.
+// _rpp_is_empty(__VA_ARGS__) gives 1 for an empty list and 0 otherwise, from 4 probes.
+// Probe 2 keeps a leading `(` out of the empty case, see BUGS.md C24.
+#define _rpp_arg16(_0,_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,...) _15
+#define _rpp_has_comma(...) _rpp_wrap(_rpp_arg16(__VA_ARGS__, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,0))
+#define _rpp_trigger_paren(...) ,
+#define _rpp_paste5(_0,_1,_2,_3,_4) _0##_1##_2##_3##_4
+#define _rpp_is_empty_case_0001 ,
+#define _rpp_is_empty_impl(_0,_1,_2,_3) _rpp_has_comma(_rpp_paste5(_rpp_is_empty_case_,_0,_1,_2,_3))
+#define _rpp_is_empty(...) _rpp_wrap(_rpp_is_empty_impl(_rpp_has_comma(__VA_ARGS__), \
+    _rpp_has_comma(_rpp_trigger_paren __VA_ARGS__), _rpp_has_comma(__VA_ARGS__ (/*empty*/)), \
+    _rpp_has_comma(_rpp_trigger_paren __VA_ARGS__ (/*empty*/))))
+#define _rpp_comma_if_0 ,
+#define _rpp_comma_if_1
+#define _rpp_cat2(a,b) a##b
+#define _rpp_cat(a,b) _rpp_cat2(a,b)
+
+// _va_comma(__VA_ARGS__) and its fallback give `,` for a non-empty list, nothing for an empty one.
+// The fallback expands the list first, so an argument which expands to nothing also reads as empty.
+#define _rpp_va_comma_fallback(...) _rpp_wrap(_rpp_cat(_rpp_comma_if_, _rpp_is_empty(__VA_ARGS__)))
+
+// MSVC needs /Zc:preprocessor for __VA_OPT__, and _MSVC_TRADITIONAL==0 confirms it is active.
 #if (!defined(_MSC_VER) && __cplusplus >= 202002L) \
  || (defined(_MSVC_TRADITIONAL) && _MSVC_TRADITIONAL == 0)
 #define _va_comma(...) __VA_OPT__(,)
 #else
-#define _rpp_z
-#define _rpp_c ,
-#define _spaces_on_empty_token(...) ,,,, ,,,, ,,,,
-#define _get_nth_comma(_12,_11,_10,_9,  _8,_7,_6,_5,  _4,_3,_2,_1,  N_0, ...) N_0
-#define _va_comma2(...) _rpp_wrap(_get_nth_comma(__VA_ARGS__,  _rpp_c,_rpp_c,_rpp_c,_rpp_c, \
-                                  _rpp_c,_rpp_c,_rpp_c,_rpp_c, _rpp_c,_rpp_c,_rpp_c,_rpp_c, _rpp_z) )
-#define _va_comma(...) _va_comma2(_spaces_on_empty_token __VA_ARGS__ (/*empty*/))
+#define _va_comma(...) _rpp_va_comma_fallback(__VA_ARGS__)
 #endif
 
 #define _wa0(...)
@@ -64,6 +73,8 @@
 #define _rpp_wrap_args_2(...) _rpp_wrap( _rpp_get_nth_wrap_arg(__VA_ARGS__,  _wa12,_wa11,_wa10,_wa9, \
                                                        _wa8,_wa7,_wa6,_wa5,  _wa4,_wa3,_wa2,_wa1,  _wa0)(__VA_ARGS__) )
 #define _rpp_wrap_args(...) _rpp_wrap( _rpp_wrap_args_2(0 _va_comma(__VA_ARGS__) __VA_ARGS__) )
+// the tests reach the fallback path through this, which __VA_OPT__ hides on a conforming preprocessor
+#define _rpp_wrap_args_fallback(...) _rpp_wrap( _rpp_wrap_args_2(0 _rpp_va_comma_fallback(__VA_ARGS__) __VA_ARGS__) )
 
 #else // C:
   #define _rpp_wrap_args(...) , ##__VA_ARGS__

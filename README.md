@@ -3778,10 +3778,10 @@ Cross-platform logging with severity filtering, log handlers, timestamps, and as
 
 | Macro | Description |
 |-------|-------------|
-| [`LogInfo(format, ...)`](src/rpp/debugging.macros.h#L116) | Log informational message |
-| [`LogWarning(format, ...)`](src/rpp/debugging.macros.h#L122) | Log warning |
-| [`LogError(format, ...)`](src/rpp/debugging.macros.h#L128) | Log error (debug assert) |
-| [`Assert(expression, format, ...)`](src/rpp/debugging.macros.h#L142) | Conditional error log |
+| [`LogInfo(format, ...)`](src/rpp/debugging.macros.h#L127) | Log informational message |
+| [`LogWarning(format, ...)`](src/rpp/debugging.macros.h#L133) | Log warning |
+| [`LogError(format, ...)`](src/rpp/debugging.macros.h#L139) | Log error (debug assert) |
+| [`Assert(expression, format, ...)`](src/rpp/debugging.macros.h#L153) | Conditional error log |
 
 ### Configuration Functions
 

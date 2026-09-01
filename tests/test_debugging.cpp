@@ -9,6 +9,19 @@ static std::string log_output;
 #define STRINGIZE2(x) #x
 #define LINE_STR STRINGIZE(__LINE__)
 
+// _va_comma picks __VA_OPT__ where the preprocessor has it, so this reaches the fallback everywhere
+#define LogInfoFallback(format, ...) _LogInfo("$ " format _rpp_wrap_args_fallback(__VA_ARGS__))
+
+template<class...T> static constexpr int va_count(T... args) { return sizeof...(args); }
+#define VaCount(...) va_count(0 _rpp_va_comma_fallback(__VA_ARGS__) __VA_ARGS__)
+
+static_assert(VaCount() == 1, "an empty list must not gain a comma");
+static_assert(VaCount(1) == 2, "one argument must gain a comma");
+static_assert(VaCount(1, 2) == 3, "two arguments must gain one comma");
+static_assert(VaCount((true) ? 1 : 2) == 2, "a leading ( must not read as an empty list");
+static_assert(VaCount((long long)(1)) == 2, "a C-style cast must not read as an empty list");
+static_assert(VaCount((true) ? 1 : 2, 3) == 3, "a leading ( must keep the arguments after it");
+
 TestImpl(test_debugging)
 {
     TestInit(test_debugging)
@@ -72,6 +85,48 @@ TestImpl(test_debugging)
         LogWarning("Warn(6): '%s', '%s', %d, %.1f, `%c`, '%s'", a, b, c, d, e, a); AssertThat(log_output, "test_debugging.cpp:" LINE_STR " test_debug_api $ Warn(6): 'string', 'strview', 42, 42.0, `4`, 'string'");
         LogWarning("Warn(7): '%s', '%s', %d, %.1f, `%c`, '%s', '%s'", a, b, c, d, e, a, b); AssertThat(log_output, "test_debugging.cpp:" LINE_STR " test_debug_api $ Warn(7): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview'");
         LogWarning("Warn(8): '%s', '%s', %d, %.1f, `%c`, '%s', '%s', %d", a, b, c, d, e, a, b, c); AssertThat(log_output, "test_debugging.cpp:" LINE_STR " test_debug_api $ Warn(8): 'string', 'strview', 42, 42.0, `4`, 'string', 'strview', 42");
+    }
+
+    TestCase(paren_first_arg)
+    {
+        bool flyView = false;
+        long long v = 42;
+        log_output.clear();
+
+        LogInfo("flyView %s", (flyView) ? "true" : "false");
+        AssertThat(log_output, "$ flyView false");
+
+        LogInfo("cast %lld", (long long)(v));
+        AssertThat(log_output, "$ cast 42");
+
+        LogInfo("mixed %s %lld %d", (flyView) ? "true" : "false", (long long)(v), 7);
+        AssertThat(log_output, "$ mixed false 42 7");
+
+        LogWarning("warn %s", (flyView) ? "t" : "f"); AssertThat(log_output, "test_debugging.cpp:" LINE_STR " test_paren_first_arg $ warn f");
+
+        std::string thrown;
+        try { ThrowErr("throw %s", (flyView) ? "t" : "f"); } catch (const std::runtime_error& e) { thrown = e.what(); }
+        AssertThat(thrown, "throw f");
+    }
+
+    TestCase(paren_first_arg_va_comma_fallback)
+    {
+        log_output.clear();
+
+        LogInfoFallback("no args");
+        AssertThat(log_output, "$ no args");
+
+        LogInfoFallback("flyView %s", (false) ? "true" : "false");
+        AssertThat(log_output, "$ flyView false");
+
+        LogInfoFallback("cast %lld", (long long)(42));
+        AssertThat(log_output, "$ cast 42");
+
+        LogInfoFallback("mixed %s %lld %d", (false) ? "true" : "false", (long long)(42), 7);
+        AssertThat(log_output, "$ mixed false 42 7");
+
+        LogInfoFallback("plain %s %lld", "str", 42LL);
+        AssertThat(log_output, "$ plain str 42");
     }
 
     //TestCase(log_except)
