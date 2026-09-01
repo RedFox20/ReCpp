@@ -105,6 +105,8 @@ def declarations(header: str, defines: tuple = ()) -> list:
                 continue
             f = k.location.file
             if not (f and os.path.abspath(f.name) == me and k.spelling): continue
+            # clang rejects a using-declaration which exports an internal-linkage name
+            if k.linkage == cindex.LinkageKind.INTERNAL: continue
             out.append(('::'.join(ns), k.kind.name, k.spelling))
             # an unscoped enum needs one using-declaration per enumerator, the enum type does not carry them
             if k.kind == cindex.CursorKind.ENUM_DECL and not k.is_scoped_enum():
@@ -122,6 +124,7 @@ namespace rpp {
     enum class Scoped { A, B };                    // scoped, its enumerators do not
     template<class T> struct __wrap {};            // a macro helper, exported by allowlist
     template<class T> struct __hidden {};          // a private double-underscore name
+    static constexpr int internal_fn(int i) { return i; } // internal linkage, never exportable
     struct Public {};
 }
 extern "C" { void c_api(); }                       // one linkage spec deep, like RPPCAPI
@@ -129,7 +132,7 @@ extern "C" { void c_api(); }                       // one linkage spec deep, lik
 
 
 def selftest() -> list:
-    """Crafts a header and checks the four extraction rules the module surface depends on."""
+    """Crafts a header and checks the five extraction rules the module surface depends on."""
     import tempfile
     bad = []
     with tempfile.TemporaryDirectory() as d:
@@ -143,6 +146,8 @@ def selftest() -> list:
         if missing: bad.append(f'declarations dropped {sorted(missing)}')
         # a scoped enum keeps its members out of the namespace
         if ('rpp', 'A') in got: bad.append('a scoped enum leaked its enumerator A')
+        # clang rejects an exported using-declaration which names an internal-linkage entity
+        if ('rpp', 'internal_fn') in got: bad.append('a static function reached the export list')
     return bad
 
 

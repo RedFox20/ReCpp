@@ -9,8 +9,6 @@ export module rpp.obfuscated_string;
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
 export namespace rpp {
-    using rpp::obfuscate;
-    using rpp::deobfuscate;
     using rpp::int32_sequence;
     using rpp::int32_indices;
     using rpp::obfuscated_string;

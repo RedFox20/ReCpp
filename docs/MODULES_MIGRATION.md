@@ -637,6 +637,8 @@ The tool, as built:
    using-declaration covers every overload. `__wrap` and `__clean_type` are
    allowlisted, because the logging macros expand to them. A single leading
    underscore stays, because `_LogInfo` and `_FmtString` are part of that surface.
+   It also drops an internal-linkage name, because clang rejects a using-declaration
+   which exports a `static` function. gcc accepts one, so only clang-21 caught it.
 4. Reads the include list of the header and emits one `export import rpp.X;` per
    rpp include (D5).
 5. Writes the `.cppm` between two marker comments, so hand-written parts survive.

@@ -152,7 +152,7 @@ preprocessed lines and needs no split.
 | `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
 | `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | `byte`, `ushort`, `uint`, `ulong`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64` |
 | `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | `min`, `max`, `abs`, `sqrt`, `min3`, `max3` |
-| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `make_obfuscated`, `obfuscated_string`, `macro_obfuscated_string`, `obfuscate`, `deobfuscate` |
+| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `make_obfuscated`, `obfuscated_string`, `macro_obfuscated_string`. `obfuscate` and `deobfuscate` are static, so no module can export them |
 | `rpp.scope_guard` | [`scope_guard.h`](src/rpp/scope_guard.h) | `scope_finalizer`, `make_scope_guard`. The `scope_guard()` macro needs the header |
 
 ### How it works
