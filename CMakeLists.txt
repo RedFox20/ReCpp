@@ -351,6 +351,9 @@ if(RPP_BUILD_MODULES)
 
     set(RPP_MODULES_SRC
         src/rpp/rpp-config.cppm
+        src/rpp/rpp-minmax.cppm
+        src/rpp/rpp-obfuscated_string.cppm
+        src/rpp/rpp-scope_guard.cppm
         src/rpp/rpp-strview.cppm
         src/rpp/rpp-debugging.cppm
     )

@@ -68,12 +68,11 @@ namespace rpp
     };
 
     /**
-     * @brief Since MSVC++ does not implement 'template<class T, T... chars>' special
-     * literal extension, we need another type to expand from macros.
-     * So if you need cross-platform support, please use the below syntax:
-     * 
+     * @brief The cross-platform obfuscated string, built by rpp::make_obfuscated().
+     * MSVC++ does not implement the 'template<class T, T... chars>' literal extension.
+     *
      * Usage:
-     *   constexpr auto email = make_obfuscated("super@secret.com");
+     *   constexpr auto email = rpp::make_obfuscated("super@secret.com");
      *   
      *   cout << "Obfuscated:   '" << email.obfuscated() << "'\n";
      *   cout << "Deobfuscated: '" << email.to_string()  << "'\n";
@@ -104,28 +103,19 @@ namespace rpp
 
 
 
-#if __clang__ || __GNUC__
+    /// Creates a compile-time obfuscated string from a string literal.
+    /// The array reference deduces the length, so this needs no macro.
+    template<int N>
+    constexpr macro_obfuscated_string<int32_indices<N-1>> make_obfuscated(const char (&str)[N])
+    {
+        return macro_obfuscated_string<int32_indices<N-1>>{ str };
+    }
 
 #if __GNUC__ && !__clang__
     template<class T, T... chars> constexpr auto operator ""_obfuscated()
     {
         return obfuscated_string<std::integer_sequence<char, chars...>>{};
     }
-#endif
-
-    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>(str)
-
-#elif _MSC_VER
-
-    //template<char... chars> constexpr auto operator"" _obfuscated()
-    //{
-    //    return rpp::obfuscated_string<std::integer_sequence<char, chars...>>{};
-    //}
-
-    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>{str}
-
-#else
-    static_assert(false, "obfuscated_string not yet supported on this compiler");
 #endif
 
 }
