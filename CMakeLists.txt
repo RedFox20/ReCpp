@@ -285,6 +285,12 @@ if (BUILD_TESTS)
         ${TRACE_LIBRARY}
         Threads::Threads
     )
+    if (MSVC AND NOT CLANG) # clang-cl keeps MSVC true and drops the flag unused
+        # this TU is the only gate on the _va_comma fallback a consumer without /Zc:preprocessor compiles
+        # the D9025 override warning is expected, never delete this block to silence it
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tests/test_debugging.cpp
+                                    PROPERTIES COMPILE_OPTIONS "/Zc:preprocessor-")
+    endif()
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 endif()
 

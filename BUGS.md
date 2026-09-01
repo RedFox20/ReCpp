@@ -20,11 +20,16 @@ kill %1 %2
 
 
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
-It pointed `LogError` at `debugging.macros.h:151`, which is the `LogError` call
-inside `DbgAssert`, not the `#define LogError` at line 128. Corrected by hand.
+It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
+inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C24. `_va_comma` dropped the argument list when the first argument started with `(`
+The one-probe fallback let `_spaces_on_empty_token` consume that leading paren, so the
+list read as empty and printf then read an unwritten stack slot. The 4-probe emptiness
+test replaces it, and `test_debugging` pins the fallback on every compiler.
 
 ### C23. `udp_poll_multi_stress_test` never sized its receive queue (CI flake)
 The default 208 KB queue holds only 270 of the 500 datagrams, so a pre-empted CI
