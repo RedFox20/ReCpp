@@ -151,6 +151,9 @@ preprocessed lines and needs no split.
 | `rpp.strview` | [`strview.h`](src/rpp/strview.h) | `strview`, `ustrview`, `line_parser`, `keyval_parser`, `bracket_parser`, `concat`, `to_lower`, `to_upper`, `replace`, `_sv` literal, and more |
 | `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
 | `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | `byte`, `ushort`, `uint`, `ulong`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64` |
+| `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | `min`, `max`, `abs`, `sqrt`, `min3`, `max3` |
+| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `make_obfuscated`, `obfuscated_string`, `macro_obfuscated_string`, `obfuscate`, `deobfuscate` |
+| `rpp.scope_guard` | [`scope_guard.h`](src/rpp/scope_guard.h) | `scope_finalizer`, `make_scope_guard`. The `scope_guard()` macro needs the header |
 
 ### How it works
 
@@ -4378,16 +4381,16 @@ Compile-time string obfuscation to prevent strings from appearing in binaries.
 |------|-------------|
 | [`obfuscated_string<chars...>`](src/rpp/obfuscated_string.h#L19) | Compile-time obfuscated string (GCC/Clang) |
 | [`macro_obfuscated_string<indices...>`](src/rpp/obfuscated_string.h#L66) | Cross-platform obfuscated string |
-| [`make_obfuscated("str")`](src/rpp/obfuscated_string.h#L116) | Macro to create obfuscated string |
-| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L110) | String literal operator (GCC only) |
+| [`make_obfuscated(const char (&str)[N])`](src/rpp/obfuscated_string.h#L109) | Creates a compile-time obfuscated string from a string literal |
+| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L115) | String literal operator (GCC only) |
 
 ### Example: Compile-Time String Obfuscation
 
 ```cpp
 #include <rpp/obfuscated_string.h>
 
-// cross-platform macro (works on GCC, Clang, MSVC)
-constexpr auto apiKey = make_obfuscated("sk-live-abc123secret");
+// cross-platform, works on GCC, Clang and MSVC
+constexpr auto apiKey = rpp::make_obfuscated("sk-live-abc123secret");
 
 // the string is stored obfuscated in the binary
 std::string garbled  = apiKey.obfuscated();  // unreadable bytes
