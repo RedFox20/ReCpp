@@ -35,8 +35,9 @@ def _is_private(name: str) -> bool:
     return name.startswith('__') and name not in _MACRO_HELPERS
 
 
-# clang exports neither, and these two are helpers no importer calls
-INTERNAL_OK = frozenset({'obfuscate', 'deobfuscate'})
+# a private helper no importer needs. Empty, because every module gives its public names
+# external linkage instead, which is what MSVC needs to define one in an importing TU
+INTERNAL_OK = frozenset()
 
 
 CONFIG_MODULE = 'rpp.config'
@@ -94,16 +95,17 @@ def _exported(header: str, defines: tuple) -> dict:
     return out
 
 
-def internal_names(header: str) -> list:
+def internal_names(header: str, allow: frozenset = None) -> list:
     """The public names this header hides behind internal linkage, in source order.
 
     A `static constexpr` function and a namespace-scope `constexpr` both land here, and no
-    module can export either. `INTERNAL_OK` names the helpers whose loss is intended.
+    module can export either. `allow` names the helpers whose loss is intended.
     """
+    allow = INTERNAL_OK if allow is None else allow
     out = []
     for ns, kind, name, internal in rd.declarations(header, CONFIGS[0]):
         if kind in SKIP_KINDS or _is_private(name) or (ns and not ns.startswith('rpp')): continue
-        if internal and name not in INTERNAL_OK and name not in out: out.append(name)
+        if internal and name not in allow and name not in out: out.append(name)
     return out
 
 
@@ -208,10 +210,12 @@ def selftest() -> list:
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
-        hidden, shown = internal_names(path), _exported(path, CONFIGS[0]).get('rpp', [])
-        for name in ('PI', 'radf'):
+        hidden = internal_names(path, frozenset())
+        shown = _exported(path, CONFIGS[0]).get('rpp', [])
+        for name in ('PI', 'radf', 'obfuscate'):
             if name not in hidden: bad.append(f'{name} hides from the module and the gate stayed quiet')
-        if 'obfuscate' in hidden: bad.append('INTERNAL_OK did not silence obfuscate')
+        if 'obfuscate' in internal_names(path, frozenset({'obfuscate'})):
+            bad.append('the allowlist did not silence obfuscate')
         for name in ('PI', 'radf', 'obfuscate'):
             if name in shown: bad.append(f'{name} has internal linkage and reached the export list')
         for name in ('TAU', 'Public'):

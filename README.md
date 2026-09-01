@@ -152,7 +152,7 @@ preprocessed lines and needs no split.
 | `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
 | `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | `byte`, `ushort`, `uint`, `ulong`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64` |
 | `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | `min`, `max`, `abs`, `sqrt`, `min3`, `max3`. The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
-| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `make_obfuscated`, `obfuscated_string`, `macro_obfuscated_string`, and the `_obfuscated` literal on GCC. `obfuscate` and `deobfuscate` are static, so no module can export them |
+| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `make_obfuscated`, `obfuscated_string`, `macro_obfuscated_string`, `obfuscate`, `deobfuscate`, and the `_obfuscated` literal on GCC |
 | `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | `scope_finalizer`, `make_scope_guard`. The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
 
 ### How it works
@@ -4379,10 +4379,10 @@ Compile-time string obfuscation to prevent strings from appearing in binaries.
 
 | Item | Description |
 |------|-------------|
-| [`obfuscated_string<chars...>`](src/rpp/obfuscated_string.h#L19) | Compile-time obfuscated string (GCC/Clang) |
-| [`macro_obfuscated_string<indices...>`](src/rpp/obfuscated_string.h#L66) | Cross-platform obfuscated string |
-| [`make_obfuscated(const char (&str)[N])`](src/rpp/obfuscated_string.h#L109) | Creates a compile-time obfuscated string from a string literal |
-| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L115) | String literal operator (GCC only) |
+| [`obfuscated_string<chars...>`](src/rpp/obfuscated_string.h#L20) | Compile-time obfuscated string (GCC/Clang) |
+| [`macro_obfuscated_string<indices...>`](src/rpp/obfuscated_string.h#L67) | Cross-platform obfuscated string |
+| [`make_obfuscated(const char (&str)[N])`](src/rpp/obfuscated_string.h#L110) | Creates a compile-time obfuscated string from a string literal |
+| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L116) | String literal operator (GCC only) |
 
 ### Example: Compile-Time String Obfuscation
 

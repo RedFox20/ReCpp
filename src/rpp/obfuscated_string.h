@@ -8,8 +8,9 @@
 
 namespace rpp
 {
-    static constexpr char obfuscate  (char ch, int i) { return char((ch + i) ^ 0x55); }
-    static constexpr char deobfuscate(char ch, int i) { return char((ch ^ 0x55) - i); }
+    // not static: an importer instantiates to_string(), which cannot reach internal linkage
+    constexpr char obfuscate  (char ch, int i) { return char((ch + i) ^ 0x55); }
+    constexpr char deobfuscate(char ch, int i) { return char((ch ^ 0x55) - i); }
 
     template<int... i>  using int32_sequence = std::integer_sequence<int, i...>;
     template<int count> using int32_indices  = std::make_integer_sequence<int, count>;

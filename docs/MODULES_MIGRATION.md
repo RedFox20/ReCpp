@@ -649,11 +649,17 @@ The tool, as built:
    `scope_guard.h` names module `rpp.scopeguard` for that reason.
 8. Reports a public name which internal linkage hides. clang refuses to export one, so
    the generator drops it, and a silent drop would let `--check` approve an empty facade.
-   `INTERNAL_OK` names the helpers whose loss is intended.
+   `INTERNAL_OK` names the helpers whose loss is intended, and it is empty.
+
+**Internal linkage is a defect in a header a module wraps, not a case to work around.**
+MSVC gave `obfuscated_string.h` C2129 when a module-only test instantiated `to_string()`,
+because an importing TU cannot reach a `static` helper the header only declares to it. The
+two helpers dropped `static`, which a `constexpr` function needs for external linkage, and
+they export like every other name.
 
 **L1 starts with `math.h`.** All 12 of its public names are `static constexpr` or a
 namespace-scope `constexpr`, so every one has internal linkage and the gate reports it.
-Give each one `inline` before you write `rpp-math.cppm`.
+Give each one external linkage before you write `rpp-math.cppm`.
 
 It runs under `RPP_ENABLE_UNICODE` on and off, and guards the difference with that
 `#if`. **The Windows and POSIX axis is not implemented.** A declaration which exists
