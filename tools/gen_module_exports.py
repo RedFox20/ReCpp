@@ -35,6 +35,10 @@ def _is_private(name: str) -> bool:
     return name.startswith('__') and name not in _MACRO_HELPERS
 
 
+# clang exports neither, and these two are helpers no importer calls
+INTERNAL_OK = frozenset({'obfuscate', 'deobfuscate'})
+
+
 CONFIG_MODULE = 'rpp.config'
 
 
@@ -76,10 +80,24 @@ def macro_collision(name: str, cppm_src: str) -> bool:
 def _exported(header: str, defines: tuple) -> dict:
     """Namespace to ordered names, for one macro configuration."""
     out = {}
-    for ns, kind, name in rd.declarations(header, defines):
+    for ns, kind, name, internal in rd.declarations(header, defines):
         if kind in SKIP_KINDS or _is_private(name) or (ns and not ns.startswith('rpp')): continue
+        if internal: continue  # clang rejects a using-declaration which exports one
         names = out.setdefault(ns, [])
         if name not in names: names.append(name)
+    return out
+
+
+def internal_names(header: str) -> list:
+    """The public names this header hides behind internal linkage, in source order.
+
+    A `static constexpr` function and a namespace-scope `constexpr` both land here, and no
+    module can export either. `INTERNAL_OK` names the helpers whose loss is intended.
+    """
+    out = []
+    for ns, kind, name, internal in rd.declarations(header, CONFIGS[0]):
+        if kind in SKIP_KINDS or _is_private(name) or (ns and not ns.startswith('rpp')): continue
+        if internal and name not in INTERNAL_OK and name not in out: out.append(name)
     return out
 
 
@@ -129,6 +147,10 @@ def rewrite(header: str, check: bool) -> str:
     name = module_name(header).rsplit('.', 1)[-1]
     if name in _macro_names() and macro_collision(name, old):
         return f'{path}: the module directive names macro {name}, add `#undef {name}` after the include'
+    hidden = internal_names(header)
+    if hidden:
+        return (f'{header}: internal linkage hides {hidden} from the module. Make each one `inline`, '
+                f'or name it in INTERNAL_OK when no importer needs it')
     head, _, rest = old.partition(BEGIN)
     _, _, tail = rest.partition(END)
     new = head + export_block(header).rstrip('\n') + tail
@@ -148,9 +170,20 @@ def with_modules() -> list:
 
 _GMF = 'module;\n#include "scope_guard.h"\n{}export module rpp.scope_guard;\n'
 
+_SELFTEST_HEADER = '''#pragma once
+namespace rpp {
+    constexpr double PI = 3.14159;                 // const at namespace scope, so internal
+    static constexpr float radf(float d);          // static, so internal
+    static constexpr char obfuscate(char c);       // internal, and INTERNAL_OK covers it
+    inline constexpr double TAU = 6.28318;         // inline, so external
+    struct Public {};
+}
+'''
+
 
 def selftest() -> list:
-    """Crafts three module fragments and pins where an `#undef` counts."""
+    """Crafts three module fragments and one header, then pins both gates."""
+    import tempfile
     bad = []
     if not macro_collision('scope_guard', _GMF.format('')):
         bad.append('a fragment with no #undef passed the module directive guard')
@@ -159,6 +192,18 @@ def selftest() -> list:
     # the include redefines the macro, so an #undef above it does nothing
     if not macro_collision('scope_guard', '#undef scope_guard\n' + _GMF.format('')):
         bad.append('an #undef before the include passed the guard')
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, 'probe.h')
+        open(path, 'w').write(_SELFTEST_HEADER)
+        hidden, shown = internal_names(path), _exported(path, CONFIGS[0]).get('rpp', [])
+        for name in ('PI', 'radf'):
+            if name not in hidden: bad.append(f'{name} hides from the module and the gate stayed quiet')
+        if 'obfuscate' in hidden: bad.append('INTERNAL_OK did not silence obfuscate')
+        for name in ('PI', 'radf', 'obfuscate'):
+            if name in shown: bad.append(f'{name} has internal linkage and reached the export list')
+        for name in ('TAU', 'Public'):
+            if name not in shown: bad.append(f'{name} has external linkage and left the export list')
     return bad
 
 

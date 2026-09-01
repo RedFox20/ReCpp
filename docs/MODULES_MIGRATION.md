@@ -646,6 +646,13 @@ The tool, as built:
 7. Reports a module whose name repeats a macro any rpp header defines. MSVC expands
    that name inside the module directive, so the fragment must `#undef` it after the
    include. `rpp.scope_guard` is the one module which needs that line.
+8. Reports a public name which internal linkage hides. clang refuses to export one, so
+   the generator drops it, and a silent drop would let `--check` approve an empty facade.
+   `INTERNAL_OK` names the helpers whose loss is intended.
+
+**L1 starts with `math.h`.** All 12 of its public names are `static constexpr` or a
+namespace-scope `constexpr`, so every one has internal linkage and the gate reports it.
+Give each one `inline` before you write `rpp-math.cppm`.
 
 It runs under `RPP_ENABLE_UNICODE` on and off, and guards the difference with that
 `#if`. **The Windows and POSIX axis is not implemented.** A declaration which exists
