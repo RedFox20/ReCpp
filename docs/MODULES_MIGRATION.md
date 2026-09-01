@@ -643,6 +643,9 @@ The tool, as built:
    rpp include (D5).
 5. Writes the `.cppm` between two marker comments, so hand-written parts survive.
 6. `--check` mode re-generates into memory and diffs. A difference fails CI.
+7. Reports a module whose name repeats a macro any rpp header defines. MSVC expands
+   that name inside the module directive, so the fragment must `#undef` it after the
+   include. `rpp.scope_guard` is the one module which needs that line.
 
 It runs under `RPP_ENABLE_UNICODE` on and off, and guards the difference with that
 `#if`. **The Windows and POSIX axis is not implemented.** A declaration which exists

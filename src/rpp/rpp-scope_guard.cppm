@@ -4,6 +4,8 @@ module;
 
 // global module fragment: the header stays here, so an importer and an includer share one entity
 #include "scope_guard.h"
+// MSVC expands a macro named inside the module directive, and scope_guard is one
+#undef scope_guard
 
 export module rpp.scope_guard;
 

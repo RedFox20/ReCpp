@@ -101,6 +101,9 @@ jobs:
                   # the libclang traversal decides a real module surface, so a crafted header pins it
                   python3 tools/rpp_decls.py selftest
                   python3 tools/check_includes.py rpp-includes --check
+                  # MSVC expands a macro named inside the module directive, so a crafted
+                  # fragment pins where the global module fragment must undefine it
+                  python3 tools/gen_module_exports.py --selftest
                   # a hand-written export list rots, so this fails when a .cppm no longer
                   # matches the header it wraps
                   python3 tools/gen_module_exports.py --all --check

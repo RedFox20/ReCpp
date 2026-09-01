@@ -9,6 +9,7 @@ Everything outside the markers survives a regeneration.
   tools/gen_module_exports.py --all --check        # exit 1 when a block is stale
 """
 import argparse
+import functools
 import os
 import re
 import sys
@@ -49,6 +50,29 @@ def cppm_path(header: str) -> str:
     return os.path.join(rd.SRC, 'rpp-' + stem + '.cppm')
 
 
+def _read(header: str) -> str:
+    return open(os.path.join(rd.SRC, header), encoding='utf-8-sig', errors='replace').read()
+
+
+@functools.lru_cache(maxsize=1)
+def _macro_names() -> frozenset:
+    """Every macro the rpp headers define, so a transitive include cannot hide one."""
+    out = set()
+    for h in sorted(os.listdir(rd.SRC)):
+        if h.endswith('.h'): out |= set(re.findall(r'^\s*#\s*define\s+(\w+)', _read(h), re.M))
+    return frozenset(out)
+
+
+def macro_collision(name: str, cppm_src: str) -> bool:
+    """True when the global module fragment leaves a macro named `name` defined.
+
+    MSVC expands that name inside the module directive, so the fragment must undefine it.
+    """
+    gmf = cppm_src.partition('export module')[0]
+    inc = gmf.rfind('#include')
+    return inc < 0 or not re.search(rf'^\s*#\s*undef\s+{re.escape(name)}\s*$', gmf[inc:], re.M)
+
+
 def _exported(header: str, defines: tuple) -> dict:
     """Namespace to ordered names, for one macro configuration."""
     out = {}
@@ -65,8 +89,7 @@ def export_block(header: str) -> str:
     lines = [BEGIN]
 
     # one export import per rpp include. config.h maps to rpp.config, and a header never imports itself
-    src = open(os.path.join(rd.SRC, header), encoding='utf-8-sig', errors='replace').read()
-    included = re.findall(r'^\s*#\s*include\s*"([^"]+)"', src, re.M)
+    included = re.findall(r'^\s*#\s*include\s*"([^"]+)"', _read(header), re.M)
     imports = set()
     for path in included:
         inc = os.path.basename(path)  # a `./math.h` or `sub/x.h` include still names module rpp.math
@@ -103,6 +126,9 @@ def rewrite(header: str, check: bool) -> str:
     old = open(path, encoding='utf-8-sig', errors='replace').read()
     if BEGIN not in old or END not in old:
         return f'{path}: carries no generated block, add the two markers first'
+    name = module_name(header).rsplit('.', 1)[-1]
+    if name in _macro_names() and macro_collision(name, old):
+        return f'{path}: the module directive names macro {name}, add `#undef {name}` after the include'
     head, _, rest = old.partition(BEGIN)
     _, _, tail = rest.partition(END)
     new = head + export_block(header).rstrip('\n') + tail
@@ -120,12 +146,34 @@ def with_modules() -> list:
             if h.endswith('.h') and h not in rd.NO_MODULE and os.path.exists(cppm_path(h))]
 
 
+_GMF = 'module;\n#include "scope_guard.h"\n{}export module rpp.scope_guard;\n'
+
+
+def selftest() -> list:
+    """Crafts three module fragments and pins where an `#undef` counts."""
+    bad = []
+    if not macro_collision('scope_guard', _GMF.format('')):
+        bad.append('a fragment with no #undef passed the module directive guard')
+    if macro_collision('scope_guard', _GMF.format('#undef scope_guard\n')):
+        bad.append('an #undef after the include reported a finding')
+    # the include redefines the macro, so an #undef above it does nothing
+    if not macro_collision('scope_guard', '#undef scope_guard\n' + _GMF.format('')):
+        bad.append('an #undef before the include passed the guard')
+    return bad
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('header', nargs='?', help='one header under src/rpp, such as strview.h')
     ap.add_argument('--all', action='store_true', help='every header carrying a .cppm')
     ap.add_argument('--check', action='store_true', help='exit 1 when a block is stale')
+    ap.add_argument('--selftest', action='store_true', help='pin the module directive macro guard')
     a = ap.parse_args()
+    if a.selftest:
+        findings = selftest()
+        for f in findings: print(f'  {f}')
+        print(f'== gen_module_exports selftest: {len(findings)} finding(s) ==')
+        return 1 if findings else 0
     if not a.header and not a.all: ap.error('name a header, or pass --all')
 
     try:
