@@ -16,3 +16,8 @@ export namespace rpp {
     using rpp::make_obfuscated;
 }
 // GENERATED EXPORTS END
+
+// the generator parses with libclang, which defines __clang__, so it never sees this operator
+#if __GNUC__ && !__clang__
+export namespace rpp { using rpp::operator ""_obfuscated; }
+#endif

@@ -649,7 +649,14 @@ The tool, as built:
 
 It runs under `RPP_ENABLE_UNICODE` on and off, and guards the difference with that
 `#if`. **The Windows and POSIX axis is not implemented.** A declaration which exists
-on one platform only is missed when the generator runs on the other.
+on one platform only is missed when the generator runs on the other. The compiler axis
+has the same hole: libclang defines `__clang__`, so the generator never sees the GCC
+`_obfuscated` literal operator. `rpp-obfuscated_string.cppm` exports it by hand, below
+the markers, and `test_modules` covers it.
+
+**A module carries no preprocessor state.** `minmax.h` undefines the Windows `min` and
+`max` macros, and an `import` cannot repeat that. A Windows importer needs `NOMINMAX`
+or the header. No export list closes this, so the README states it per module.
 
 **Estimate: 1.5 days**, including the `--check` CI gate.
 

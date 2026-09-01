@@ -55,7 +55,7 @@ namespace rpp
         std::string to_string() const
         {
             std::string result = obfuscated();
-            for (int i = 0; i < sizeof...(chars); ++i)
+            for (int i = 0; i < length; ++i)
                 result[i] = deobfuscate(result[i], i);
             return result;
         }

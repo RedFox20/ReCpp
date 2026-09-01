@@ -12,6 +12,7 @@
 
 import rpp.strview;   // includes come first, the import goes last
 import rpp.debugging;
+import rpp.obfuscated_string;
 
 TestImpl(test_modules)
 {
@@ -63,6 +64,19 @@ TestImpl(test_modules)
         AssertThat(rpp::concat(sv, "!"), "hello world!");
         AssertThat(sv.next(' '), "hello"); // next() consumes the token from sv
         AssertThat(sv, "world");
+    }
+
+    // this file includes no obfuscated_string.h, so the module alone carries the surface
+    TestCase(obfuscated_string_module_carries_the_whole_surface)
+    {
+        constexpr auto email = rpp::make_obfuscated("super@secret.com");
+        AssertNotEqual(email.obfuscated(), std::string{"super@secret.com"});
+        AssertThat(email.to_string(), std::string{"super@secret.com"});
+    #if __GNUC__ && !__clang__
+        using rpp::operator ""_obfuscated; // GCC only, the header guards it the same way
+        auto literal = "super@secret.com"_obfuscated;
+        AssertThat(literal.to_string(), std::string{"super@secret.com"});
+    #endif
     }
 };
 
