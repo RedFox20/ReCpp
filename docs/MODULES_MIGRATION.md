@@ -1,7 +1,7 @@
 # ReCpp C++20 Modules Migration Plan
 
 Revision 6. Six modules exist: `rpp.config`, `rpp.minmax`, `rpp.obfuscated_string`,
-`rpp.scope_guard`, `rpp.strview` and `rpp.debugging`.
+`rpp.scopeguard`, `rpp.strview` and `rpp.debugging`.
 
 This document explains the pattern, records what real builds prove about it, and
 gives the phased plan for the remaining 38 headers.
@@ -643,9 +643,10 @@ The tool, as built:
    rpp include (D5).
 5. Writes the `.cppm` between two marker comments, so hand-written parts survive.
 6. `--check` mode re-generates into memory and diffs. A difference fails CI.
-7. Reports a module whose name repeats a macro any rpp header defines. MSVC expands
-   that name inside the module directive, so the fragment must `#undef` it after the
-   include. `rpp.scope_guard` is the one module which needs that line.
+7. Reports a module whose name repeats a macro any rpp header defines, and `STEMS` holds
+   the rename. MSVC expands that name inside `export module` and inside `import`, so an
+   `#undef` in the fragment fixes the producer and leaves every importer broken.
+   `scope_guard.h` names module `rpp.scopeguard` for that reason.
 8. Reports a public name which internal linkage hides. clang refuses to export one, so
    the generator drops it, and a silent drop would let `--check` approve an empty facade.
    `INTERNAL_OK` names the helpers whose loss is intended.

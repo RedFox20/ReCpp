@@ -41,17 +41,24 @@ INTERNAL_OK = frozenset({'obfuscate', 'deobfuscate'})
 
 CONFIG_MODULE = 'rpp.config'
 
+# a header whose module name is not its stem. scope_guard.h drops the underscore, because
+# MSVC expands the scope_guard macro inside a module directive
+STEMS = {'config.types.h': 'config', 'scope_guard.h': 'scopeguard'}
+
+
+def module_stem(header: str) -> str:
+    """The last component of the module name, which is the `.cppm` stem too."""
+    return STEMS.get(header) or os.path.splitext(header)[0].replace('.', '_')
+
 
 def module_name(header: str) -> str:
     """`strview.h` names module `rpp.strview`, and `config.types.h` names `rpp.config`."""
-    if header == 'config.types.h': return CONFIG_MODULE
-    return 'rpp.' + os.path.splitext(header)[0].replace('.', '_')
+    return 'rpp.' + module_stem(header)
 
 
 def cppm_path(header: str) -> str:
     """`strview.h` writes `src/rpp/rpp-strview.cppm`, and `config.types.h` writes `rpp-config.cppm`."""
-    stem = 'config' if header == 'config.types.h' else os.path.splitext(header)[0]
-    return os.path.join(rd.SRC, 'rpp-' + stem + '.cppm')
+    return os.path.join(rd.SRC, 'rpp-' + module_stem(header) + '.cppm')
 
 
 def _read(header: str) -> str:
@@ -67,14 +74,13 @@ def _macro_names() -> frozenset:
     return frozenset(out)
 
 
-def macro_collision(name: str, cppm_src: str) -> bool:
-    """True when the global module fragment leaves a macro named `name` defined.
+def macro_collision(name: str) -> bool:
+    """True when a module named `name` repeats a macro an rpp header defines.
 
-    MSVC expands that name inside the module directive, so the fragment must undefine it.
+    MSVC expands that name inside `export module` and inside `import`, so an importer which
+    included the header breaks too. Only a rename fixes both sides.
     """
-    gmf = cppm_src.partition('export module')[0]
-    inc = gmf.rfind('#include')
-    return inc < 0 or not re.search(rf'^\s*#\s*undef\s+{re.escape(name)}\s*$', gmf[inc:], re.M)
+    return name in _macro_names()
 
 
 def _exported(header: str, defines: tuple) -> dict:
@@ -144,9 +150,9 @@ def rewrite(header: str, check: bool) -> str:
     old = open(path, encoding='utf-8-sig', errors='replace').read()
     if BEGIN not in old or END not in old:
         return f'{path}: carries no generated block, add the two markers first'
-    name = module_name(header).rsplit('.', 1)[-1]
-    if name in _macro_names() and macro_collision(name, old):
-        return f'{path}: the module directive names macro {name}, add `#undef {name}` after the include'
+    name = module_stem(header)
+    if macro_collision(name):
+        return f'{header}: module rpp.{name} repeats a macro, so rename it in STEMS'
     hidden = internal_names(header)
     if hidden:
         return (f'{header}: internal linkage hides {hidden} from the module. Make each one `inline`, '
@@ -161,14 +167,23 @@ def rewrite(header: str, check: bool) -> str:
     return ''
 
 
+def name_collisions() -> list:
+    """Every rpp header whose module name would repeat a macro, so `STEMS` must rename it.
+
+    This reads the headers, not the `.cppm` files. A wrong `STEMS` entry drops a module from
+    `with_modules`, and a check which only walks those would go quiet instead of reporting.
+    """
+    return [f'{h}: module {module_name(h)} repeats a macro, so rename it in STEMS'
+            for h in sorted(os.listdir(rd.SRC))
+            if h.endswith('.h') and h not in rd.NO_MODULE and macro_collision(module_stem(h))]
+
+
 def with_modules() -> list:
     """Every header which owns a module interface unit. The NO_MODULE filter drops config.h,
     which shares config.types.h's .cppm path."""
     return [h for h in sorted(os.listdir(rd.SRC))
             if h.endswith('.h') and h not in rd.NO_MODULE and os.path.exists(cppm_path(h))]
 
-
-_GMF = 'module;\n#include "scope_guard.h"\n{}export module rpp.scope_guard;\n'
 
 _SELFTEST_HEADER = '''#pragma once
 namespace rpp {
@@ -182,16 +197,13 @@ namespace rpp {
 
 
 def selftest() -> list:
-    """Crafts three module fragments and one header, then pins both gates."""
+    """Crafts a header and pins both gates, the macro name and the linkage."""
     import tempfile
     bad = []
-    if not macro_collision('scope_guard', _GMF.format('')):
-        bad.append('a fragment with no #undef passed the module directive guard')
-    if macro_collision('scope_guard', _GMF.format('#undef scope_guard\n')):
-        bad.append('an #undef after the include reported a finding')
-    # the include redefines the macro, so an #undef above it does nothing
-    if not macro_collision('scope_guard', '#undef scope_guard\n' + _GMF.format('')):
-        bad.append('an #undef before the include passed the guard')
+    # scope_guard.h defines the macro, and the rename to rpp.scopeguard is what clears it
+    if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
+    if macro_collision('scopeguard'): bad.append('the renamed module still reports a macro')
+    if macro_collision('strview'): bad.append('a module which repeats no macro reported one')
 
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, 'probe.h')
@@ -224,6 +236,7 @@ def main() -> int:
     try:
         targets = with_modules() if a.all else [a.header]
         bad = [f for f in (rewrite(h, a.check) for h in targets) if f]
+        if a.all: bad += name_collisions()
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1
