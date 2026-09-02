@@ -553,43 +553,27 @@ def _translate(src: str) -> tuple:
     return _code_only(''.join(spliced), origin, src), origin
 
 
-def _exclusive(a: tuple, b: tuple) -> bool:
-    """True when two branch paths name different branches of one conditional, so both never run."""
-    for (cond_a, branch_a), (cond_b, branch_b) in zip(a, b):
-        if cond_a != cond_b: return False  # the nesting diverged, so no shared conditional remains
-        if branch_a != branch_b: return True
-    return False
-
-
 def scan_import_order(name: str, src: str) -> str:
-    """The finding for one file, or an empty string. Takes the text, so a case needs no tree."""
+    """The finding for one file, or an empty string. Takes the text, so a case needs no tree.
+
+    The rule reads the text, not the branches. A file which picks the module or the header
+    writes `#if !RPP_BUILD_WITH_MODULES` first, so the #include still stands above the import.
+    """
     code, origin = _translate(src)
     line_of = lambda k: src.count('\n', 0, origin[min(k, len(origin) - 1)]) + 1
-    import_line, import_path, offset = 0, (), 0
-    stack, conds = [], 0
+    import_line, offset = 0, 0
     for line in code.split('\n'):
-        bare = line.lstrip()
-        if bare.startswith('#'):  # track the branch, so an #else never collides with its #if
-            directive = bare[1:].lstrip()
-            if directive.startswith(('ifdef', 'ifndef', 'if')):
-                conds += 1
-                stack.append([conds, 0])
-            elif directive.startswith(('elif', 'else')) and stack:
-                stack[-1][1] += 1
-            elif directive.startswith('endif') and stack:
-                stack.pop()
         kind = classify(line)
         start = offset + len(line) - len(line.lstrip())
         offset += len(line) + 1
         if not kind:
             continue
-        path = tuple(tuple(frame) for frame in stack)
         if kind != 'import':
-            if import_line and not _exclusive(path, import_path):
+            if import_line:
                 return (f'{name}:{line_of(start)}: this {kind} follows the import on line '
                         f'{import_line}, move every #include and #import above it')
         elif not import_line:
-            import_line, import_path = line_of(start), path
+            import_line = line_of(start)
             if name.endswith(('.h', '.inl')):  # a consumer inherits the import of header content
                 return (f'{name}:{import_line}: a header carries an import, which every '
                         'consumer inherits and cannot reorder')
@@ -618,10 +602,11 @@ SOURCES = ('.h', '.inl', '.cpp', '.cppm', '.mm')
 SELFTEST = [
     ('late_include.cppm',        b'import m;\n#include <string>\n', 2),
     ('includes_first.cppm',      b'#include <string>\nimport m;\n', 0),
-    # a test picks the module or the header, and the two branches never both compile
-    ('import_or_include.cpp',    b'#if M\nimport m;\n#else\n#include <string>\n#endif\n', 0),
+    # a test picks the module or the header, and the #include still goes above the import
+    ('include_or_import.cpp',    b'#if !M\n#include <string>\n#else\nimport m;\n#endif\n', 0),
+    # the same pair the other way round. The branches exclude each other, and the rule still holds
+    ('import_or_include.cpp',    b'#if M\nimport m;\n#else\n#include <string>\n#endif\n', 4),
     ('include_after_endif.cpp',  b'#if M\nimport m;\n#endif\n#include <string>\n', 4),
-    ('nested_else.cpp',          b'#if A\n#if B\nimport m;\n#else\n#include <string>\n#endif\n#endif\n', 0),
     ('sibling_conditionals.cpp', b'#if A\nimport m;\n#endif\n#if B\n#include <string>\n#endif\n', 5),
     ('header_import.h',          b'import m;\n', 1),
     ('inline_import.inl',        b'import m;\n', 1),
