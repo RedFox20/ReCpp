@@ -84,6 +84,16 @@ TestImpl(test_obfuscated_string)
         AssertFalse(views_a_temporary<Obfuscated>);
     }
 
+    // the global macro this replaced let a caller in any namespace write it unqualified
+    TestCase(an_unqualified_call_still_resolves)
+    {
+    #if !RPP_BUILD_WITH_MODULES
+        constexpr auto str = make_obfuscated("super@secret.com");
+        AssertEqual(str.to_string(), std::string{"super@secret.com"});
+        AssertEqual(str.length, rpp::make_obfuscated("super@secret.com").length);
+    #endif
+    }
+
     TestCase(deduces_the_literal_length)
     {
         constexpr auto str = rpp::make_obfuscated("hello");

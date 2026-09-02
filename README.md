@@ -4404,6 +4404,10 @@ The constructor is `consteval`, so the plaintext never becomes static data, and 
 reads through a `volatile` pointer, so no optimizer folds the plaintext back into the binary.
 This defeats a strings dump. It is not encryption, and a debugger still reads the result.
 
+`make_obfuscated` was a global macro before, so the header keeps a global using-declaration and
+an existing unqualified call needs no edit. An importer writes `rpp::make_obfuscated`, because
+a module exports no using-declaration.
+
 ---
 
 ## rpp/proc_utils.h

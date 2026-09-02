@@ -68,3 +68,7 @@ namespace rpp
         template<obfuscated_string S> constexpr auto operator ""_obfuscated() noexcept { return S; }
     }
 }
+
+// make_obfuscated was a global macro, so an existing unqualified call still resolves.
+// A module exports no using-declaration, so an importer writes rpp::make_obfuscated
+using rpp::make_obfuscated;
