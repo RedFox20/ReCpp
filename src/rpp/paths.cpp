@@ -1416,13 +1416,15 @@ namespace rpp /* ReCpp */
     }
 
 #if __linux__ || __ANDROID__
-    // /proc names the running executable, and it answers for the process, not for a shared object
+    // /proc names the running executable, and it answers for the process, not for a shared object.
+    // realpath allocates the exact size, so no buffer length can truncate the path
     static string proc_self_exe() noexcept
     {
-        char path[512];
-        ssize_t len = ::readlink("/proc/self/exe", path, sizeof(path) - 1);
-        if (len <= 0) return {};
-        return { path, path + len };
+        char* resolved = ::realpath("/proc/self/exe", nullptr);
+        if (!resolved) return {};
+        string path = resolved;
+        ::free(resolved);
+        return path;
     }
 #endif
 
