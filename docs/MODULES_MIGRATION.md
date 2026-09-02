@@ -191,9 +191,8 @@ the global module fragment, behind an `RPP_EXPORT` macro, as fmt does.
 
 Both alternatives attach `rpp::strview` to the module. That creates a second,
 distinct entity next to the one inside `libReCpp.a`. Every consumer of ReCpp
-would then have to switch at the same time, and C++17 support would end. A
-program that mixes an `#include` and an `import` would violate the
-one-definition rule.
+would then have to switch at the same time. A program that mixes an `#include`
+and an `import` would violate the one-definition rule.
 
 Reject both. Keep the facade. The cost is the hand-maintained export list, and
 section 7 automates it away.
@@ -450,13 +449,13 @@ Cross-referencing every `#define` against README gives:
 
 | Header | Public macros | What they are |
 |---|---|---|
-| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX17`, and the platform probes |
+| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX20`, and the platform probes |
 | `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
 | `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
 | `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |
 | `future_types.h` | 2 | `RPP_CORO_STD`, `RPP_HAS_COROUTINES` |
 | `mutex.h` | 2 | `RPP_HAS_CRITICAL_SECTION_MUTEX`, `RPP_SYNC_T` |
-| `close_sync.h`, `minmax.h`, `scope_guard.h`, `strview.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `scope_guard`, `RPP_CONSTEXPR_STRLEN` |
+| `close_sync.h`, `minmax.h`, `scope_guard.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `scope_guard` |
 
 Everything else is an implementation macro (`DELEGATE_FINLINE`, `_rpp_wrap_args`,
 `__log_format`) and needs no plan.

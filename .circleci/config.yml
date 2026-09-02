@@ -439,10 +439,6 @@ workflows:
       - mipsel-cpp20-gcc12
       # Android NDK builds
       - android-build:
-          name: android-cpp20-r25b-clang-tidy-clang14
-          docker_image: "cimg/android:2023.08.1-ndk"
-          toolchain: "ndk-r25b-clang++14"
-      - android-build:
           name: android-cpp20-r27-clang-tidy-clang18
           docker_image: "cimg/android:2024.11.1-ndk"
           toolchain: "ndk-r27-clang++18"

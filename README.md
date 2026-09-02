@@ -256,12 +256,13 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_CXX17`](src/rpp/config.h#L75) | `1` if C++17 or later is available |
-| [`RPP_HAS_CXX20`](src/rpp/config.h#L83) | `1` if C++20 or later is available |
-| [`RPP_HAS_CXX23`](src/rpp/config.h#L91) | `1` if C++23 or later is available |
-| [`RPP_HAS_CXX26`](src/rpp/config.h#L99) | `1` if C++26 or later is available |
-| [`RPP_INLINE_STATIC`](src/rpp/config.h#L107) | `inline static` on C++17+, `static` otherwise |
-| [`RPP_CXX17_IF_CONSTEXPR`](src/rpp/config.h#L115) | `if constexpr` when available, falls back to `if` |
+| [`RPP_HAS_CXX20`](src/rpp/config.h#L75) | `1` if C++20 or later is available |
+| [`RPP_HAS_CXX23`](src/rpp/config.h#L85) | `1` if C++23 or later is available |
+| [`RPP_HAS_CXX26`](src/rpp/config.h#L93) | `1` if C++26 or later is available |
+
+C++20 is the floor. The library uses `consteval`, concepts and coroutines, so no
+`RPP_HAS_CXX17` macro exists and no header carries a C++17 path. `RPP_INLINE_STATIC`
+and `RPP_CONSTEXPR_STRLEN` are gone with it. Write `inline static` and `constexpr`.
 
 ### API Export / Linkage
 
@@ -275,61 +276,61 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_ASAN`](src/rpp/config.h#L123) | `1` if AddressSanitizer is enabled |
-| [`RPP_TSAN`](src/rpp/config.h#L132) | `1` if ThreadSanitizer is enabled |
-| [`RPP_UBSAN`](src/rpp/config.h#L142) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
-| [`RPP_SANITIZERS`](src/rpp/config.h#L150) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
+| [`RPP_ASAN`](src/rpp/config.h#L104) | `1` if AddressSanitizer is enabled |
+| [`RPP_TSAN`](src/rpp/config.h#L113) | `1` if ThreadSanitizer is enabled |
+| [`RPP_UBSAN`](src/rpp/config.h#L120) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
+| [`RPP_SANITIZERS`](src/rpp/config.h#L130) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
 
 ### Platform & Architecture
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_BARE_METAL`](src/rpp/config.h#L204) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
-| [`RPP_FREERTOS`](src/rpp/config.h#L192) | `1` if targeting FreeRTOS |
-| [`RPP_STM32_HAL`](src/rpp/config.h#L196) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
+| [`RPP_BARE_METAL`](src/rpp/config.h#L184) | `1` if targeting a bare-metal/embedded platform (FreeRTOS or STM32 HAL) |
+| [`RPP_FREERTOS`](src/rpp/config.h#L170) | `1` if targeting FreeRTOS |
+| [`RPP_STM32_HAL`](src/rpp/config.h#L174) | `1` if targeting STM32 HAL (requires `RPP_STM32_HAL_H` path) |
 | [`RPP_ANDROID`](src/rpp/config.h#L38) | `1` if targeting Android, with any compiler |
 | [`RPP_ANDROID_CLANG`](src/rpp/config.h#L47) | `1` if targeting Android with Clang |
-| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L210) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
-| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L215) | `1` if targeting ARM Cortex-M architecture |
-| [`RPP_ARM_ARCH`](src/rpp/config.h#L231) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
-| [`RPP_64BIT`](src/rpp/config.h#L256) | `1` if compiling for a 64-bit target |
-| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L401) | `1` if target is little-endian |
-| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L403) | `1` if target is big-endian |
-| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L424) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
+| [`RPP_USE_EYALROZ_PRINTF`](src/rpp/config.h#L188) | `1` to use [eyalroz/printf](https://github.com/eyalroz/printf) (`printf_`/`snprintf_`) on bare-metal instead of standard `printf` |
+| [`RPP_CORTEX_M_ARCH`](src/rpp/config.h#L195) | `1` if targeting ARM Cortex-M architecture |
+| [`RPP_ARM_ARCH`](src/rpp/config.h#L211) | `1` if compiling for ARM (`__thumb__` or `__arm__`) |
+| [`RPP_64BIT`](src/rpp/config.h#L234) | `1` if compiling for a 64-bit target |
+| [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L379) | `1` if target is little-endian |
+| [`RPP_BIG_ENDIAN`](src/rpp/config.h#L381) | `1` if target is big-endian |
+| [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L402) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
 
 ### Feature Detection
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_HAS_QT`](src/rpp/config.h#L159) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
-| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L169) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
-| [`RPP_WCHAR_IS_UTF32`](src/rpp/config.h#L180) | `1` if a `wchar_t` holds a whole UTF-32 code point, `0` if it holds UTF-16 (Windows) |
+| [`RPP_HAS_QT`](src/rpp/config.h#L139) | `1` if Qt framework is detected (`QT_VERSION` or `QT_CORE_LIB`) |
+| [`RPP_ENABLE_UNICODE`](src/rpp/config.h#L151) | `1` if UTF-16/wstring support is enabled (auto-detected per platform) |
+| [`RPP_WCHAR_IS_UTF32`](src/rpp/config.h#L165) | `1` if a `wchar_t` holds a whole UTF-32 code point, `0` if it holds UTF-16 (Windows) |
 
 ### Function Attributes
 
 | Macro | Description |
 |-------|-------------|
-| [`FINLINE`](src/rpp/config.h#L249) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
-| [`NOINLINE`](src/rpp/config.h#L240) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
-| [`NODISCARD`](src/rpp/config.h#L282) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
-| [`RPP_NORETURN`](src/rpp/config.h#L341) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
-| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L273) | Delete copy and move constructors and assignment operators |
+| [`FINLINE`](src/rpp/config.h#L229) | Force inline: `__forceinline` on MSVC, `__attribute__((always_inline))` on GCC/Clang |
+| [`NOINLINE`](src/rpp/config.h#L220) | Prevent inlining: `__declspec(noinline)` on MSVC, `__attribute__((noinline))` on GCC/Clang |
+| [`NODISCARD`](src/rpp/config.h#L271) | Portable `[[nodiscard]]` with fallback to empty on older compilers |
+| [`RPP_NORETURN`](src/rpp/config.h#L325) | Portable `[[noreturn]]` / `__declspec(noreturn)` / `__attribute__((noreturn))` |
+| [`NOCOPY_NOMOVE(T)`](src/rpp/config.h#L251) | Delete copy and move constructors and assignment operators |
 
 ### Printf Format Validation
 
 | Macro | Description |
 |-------|-------------|
-| [`PRINTF_FMTSTR`](src/rpp/config.h#L305) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
-| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L316) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
+| [`PRINTF_FMTSTR`](src/rpp/config.h#L285) | MSVC `_Printf_format_string_` annotation (empty on GCC/Clang) |
+| [`PRINTF_CHECKFMT1..8`](src/rpp/config.h#L303) | GCC/Clang `__format__(__printf__)` attribute for validating printf args at compile time. Number indicates format string argument position |
 
 ### Lifetime & Coroutine Annotations
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L356) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
-| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L372) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
-| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L373) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
-| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L374) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
+| [`RPP_LIFETIMEBOUND`](src/rpp/config.h#L341) | Annotates parameters whose lifetime must outlive the return value. `[[msvc::lifetimebound]]` / `[[clang::lifetimebound]]` |
+| [`RPP_CORO_RETURN_TYPE`](src/rpp/config.h#L354) | Marks a type as a coroutine return type (`[[clang::coro_return_type]]`) |
+| [`RPP_CORO_WRAPPER`](src/rpp/config.h#L355) | Marks a non-coroutine function that returns a CRT (`[[clang::coro_wrapper]]`) |
+| [`RPP_CORO_LIFETIMEBOUND`](src/rpp/config.h#L356) | Coroutine-specific lifetime annotation (`[[clang::coro_lifetimebound]]`) |
 
 ### Integer Size Constants
 
@@ -339,14 +340,14 @@ Platform detection, compiler macros, and base type definitions. This is the foun
 | [`RPP_INT_SIZE`](src/rpp/config.types.h#L11) | Size of `int` in bytes |
 | [`RPP_LONG_SIZE`](src/rpp/config.types.h#L12) | Size of `long` in bytes |
 | [`RPP_LONG_LONG_SIZE`](src/rpp/config.types.h#L13) | Size of `long long` in bytes |
-| [`RPP_INT64_MIN`](src/rpp/config.h#L384) | 64-bit signed integer limits |
-| [`RPP_INT64_MAX`](src/rpp/config.h#L383) | 64-bit signed integer limits |
-| [`RPP_UINT64_MIN`](src/rpp/config.h#L386) | 64-bit unsigned integer limits |
-| [`RPP_UINT64_MAX`](src/rpp/config.h#L385) | 64-bit unsigned integer limits |
-| [`RPP_INT32_MIN`](src/rpp/config.h#L388) | 32-bit signed integer limits |
-| [`RPP_INT32_MAX`](src/rpp/config.h#L387) | 32-bit signed integer limits |
-| [`RPP_UINT32_MIN`](src/rpp/config.h#L390) | 32-bit unsigned integer limits |
-| [`RPP_UINT32_MAX`](src/rpp/config.h#L389) | 32-bit unsigned integer limits |
+| [`RPP_INT64_MIN`](src/rpp/config.h#L362) | 64-bit signed integer limits |
+| [`RPP_INT64_MAX`](src/rpp/config.h#L361) | 64-bit signed integer limits |
+| [`RPP_UINT64_MIN`](src/rpp/config.h#L364) | 64-bit unsigned integer limits |
+| [`RPP_UINT64_MAX`](src/rpp/config.h#L363) | 64-bit unsigned integer limits |
+| [`RPP_INT32_MIN`](src/rpp/config.h#L366) | 32-bit signed integer limits |
+| [`RPP_INT32_MAX`](src/rpp/config.h#L365) | 32-bit signed integer limits |
+| [`RPP_UINT32_MIN`](src/rpp/config.h#L368) | 32-bit unsigned integer limits |
+| [`RPP_UINT32_MAX`](src/rpp/config.h#L367) | 32-bit unsigned integer limits |
 
 ### C++ Type Aliases (namespace `rpp`)
 
@@ -404,88 +405,87 @@ while (text.next(line, '\n'))
 | [`to_int(str, len, end)`](src/rpp/strview.h#L123) | Fast locale-agnostic atoi |
 | [`to_inthx(str, len, end)`](src/rpp/strview.h#L144) | Fast locale-agnostic atoi for HEX strings |
 | [`_tostring(buffer, value)`](src/rpp/strview.h#L165) | Fast locale-agnostic itoa/ftoa for int, float, double |
-| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1541) | Replaces characters in a string buffer |
-| [`concat(a, b, ...)`](src/rpp/strview.h#L1403) | Concatenates multiple strviews into std::string |
-| [`to_lower(str, len)`](src/rpp/strview.h#L1521) | Converts string to lowercase |
-| [`to_upper(str, len)`](src/rpp/strview.h#L1526) | Converts string to uppercase |
-| [`operator""_sv`](src/rpp/strview.h#L1299) | String literal for creating `strview` |
+| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1531) | Replaces characters in a string buffer |
+| [`concat(a, b, ...)`](src/rpp/strview.h#L1399) | Concatenates multiple strviews into std::string |
+| [`to_lower(str, len)`](src/rpp/strview.h#L1511) | Converts string to lowercase |
+| [`to_upper(str, len)`](src/rpp/strview.h#L1516) | Converts string to uppercase |
+| [`operator""_sv`](src/rpp/strview.h#L1289) | String literal for creating `strview` |
 | [`strcontains(str, len, ch)`](src/rpp/strview.h#L78) | Checks if character is found within a string |
 | [`strcontainsi(str, len, ch)`](src/rpp/strview.h#L79) | Case-insensitive character search |
 | [`strequals(s1, s2, len)`](src/rpp/strview.h#L85) | Case-sensitive string equality for given length |
 | [`strequalsi(s1, s2, len)`](src/rpp/strview.h#L86) | Case-insensitive string equality for given length |
 | [`to_int64(str, len, end)`](src/rpp/strview.h#L133) | Fast locale-agnostic string to 64-bit integer |
-| [`RPP_CONSTEXPR_STRLEN`](src/rpp/strview.h#L220) | Marks strlen as constexpr when compiler supports it |
-| [`utf8len(c_str)`](src/rpp/strview.h#L231) | Returns int length of a UTF-8 C-string |
-| [`utf16len(u_str)`](src/rpp/strview.h#L237) | Returns int length of a UTF-16 C-string |
+| [`utf8len(c_str)`](src/rpp/strview.h#L224) | Returns int length of a UTF-8 C-string |
+| [`utf16len(u_str)`](src/rpp/strview.h#L230) | Returns int length of a UTF-16 C-string |
 
 ### Utility Parsers
 
 | Class | Description |
 |-------|-------------|
-| [`line_parser`](src/rpp/strview.h#L1558) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
-| [`keyval_parser`](src/rpp/strview.h#L1596) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
-| [`bracket_parser`](src/rpp/strview.h#L1645) | Parses a buffer for balanced-parentheses structures |
+| [`line_parser`](src/rpp/strview.h#L1548) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
+| [`keyval_parser`](src/rpp/strview.h#L1586) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
+| [`bracket_parser`](src/rpp/strview.h#L1635) | Parses a buffer for balanced-parentheses structures |
 
 ### strview Class
 
-[`struct strview`](src/rpp/strview.h#L254) — Non-owning string token for efficient parsing. Represents a weak reference string with start pointer and length.
+[`struct strview`](src/rpp/strview.h#L244) — Non-owning string token for efficient parsing. Represents a weak reference string with start pointer and length.
 
 | Method | Description |
 |--------|-------------|
-| [`to_int()`](src/rpp/strview.h#L340) | Parses this strview as an integer |
-| [`to_int_hex()`](src/rpp/strview.h#L342) | Parses this strview as a HEX integer (`0xff` or `0ff` or `ff`) |
-| [`to_long()`](src/rpp/strview.h#L346) | Parse as long |
-| [`to_float()`](src/rpp/strview.h#L348) | Parses as a float |
-| [`to_double()`](src/rpp/strview.h#L348) | Parses as a double |
-| [`to_bool()`](src/rpp/strview.h#L357) | Relaxed parsing as boolean: `"true"`, `"yes"`, `"on"`, `"1"` |
-| [`clear()`](src/rpp/strview.h#L307) | Clears the strview |
-| [`size()`](src/rpp/strview.h#L310) | Returns the length |
-| [`empty()`](src/rpp/strview.h#L312) | True if empty |
-| [`is_whitespace()`](src/rpp/strview.h#L360) | True if all whitespace |
-| [`is_nullterm()`](src/rpp/strview.h#L362) | True if the referenced string is null-terminated |
-| [`trim_start()`](src/rpp/strview.h#L368) | Trims whitespace (or given char/chars) from the start |
-| [`trim_end()`](src/rpp/strview.h#L384) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](src/rpp/strview.h#L400) | Trims both start and end |
+| [`to_int()`](src/rpp/strview.h#L336) | Parses this strview as an integer |
+| [`to_int_hex()`](src/rpp/strview.h#L332) | Parses this strview as a HEX integer (`0xff` or `0ff` or `ff`) |
+| [`to_long()`](src/rpp/strview.h#L336) | Parse as long |
+| [`to_float()`](src/rpp/strview.h#L338) | Parses as a float |
+| [`to_double()`](src/rpp/strview.h#L340) | Parses as a double |
+| [`to_bool()`](src/rpp/strview.h#L347) | Relaxed parsing as boolean: `"true"`, `"yes"`, `"on"`, `"1"` |
+| [`clear()`](src/rpp/strview.h#L297) | Clears the strview |
+| [`size()`](src/rpp/strview.h#L300) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L302) | True if empty |
+| [`is_whitespace()`](src/rpp/strview.h#L350) | True if all whitespace |
+| [`is_nullterm()`](src/rpp/strview.h#L352) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L371) | Trims whitespace (or given char/chars) from the start |
+| [`trim_end()`](src/rpp/strview.h#L387) | Trims whitespace (or given char/chars) from the end |
+| [`trim()`](src/rpp/strview.h#L398) | Trims both start and end |
 | [`chomp_first()`](src/rpp/strview.h#L411) | Consumes the first character if possible |
-| [`chomp_last()`](src/rpp/strview.h#L413) | Consumes the last character if possible |
-| [`pop_front()`](src/rpp/strview.h#L416) | Pops and returns the first character |
-| [`pop_back()`](src/rpp/strview.h#L418) | Pops and returns the last character |
-| [`contains(char c)`](src/rpp/strview.h#L445) | True if contains a char or substring |
-| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L455) | True if contains any of the given chars |
-| [`find(char c)`](src/rpp/strview.h#L463) | Pointer to start of substring if found, NULL otherwise |
-| [`rfind(char c)`](src/rpp/strview.h#L493) | Reverse search for a character |
-| [`findany(const char* chars, int n)`](src/rpp/strview.h#L499) | Forward search for any of the specified chars |
-| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L508) | Reverse search for any of the specified chars |
-| [`count(char ch)`](src/rpp/strview.h#L517) | Count occurrences of a character |
-| [`indexof(char ch)`](src/rpp/strview.h#L520) | Index of character, or -1 |
-| [`rindexof(char ch)`](src/rpp/strview.h#L525) | Reverse iterating index of character |
-| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L528) | First index of any matching char |
-| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L534) | True if starts with the string |
-| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L545) | Case-insensitive starts_with |
-| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L556) | True if ends with the string |
-| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L567) | Case-insensitive ends_with |
-| [`equals(const char* s, int len)`](src/rpp/strview.h#L578) | Exact equality |
-| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L584) | Case-insensitive equality |
-| [`compare(const char* s, int n)`](src/rpp/strview.h#L605) | Compare to another string |
-| [`split_first(char delim)`](src/rpp/strview.h#L627) | Split into two, return the first part |
-| [`split_second(char delim)`](src/rpp/strview.h#L643) | Split into two, return the second part |
-| [`next(strview& out, char delim)`](src/rpp/strview.h#L651) | Gets next token; advances ptr to next delimiter |
-| [`next(char delim)`](src/rpp/strview.h#L674) | Returns next token directly |
-| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L718) | Gets next token without trimming; stops on delimiter |
-| [`substr(int index, int length)`](src/rpp/strview.h#L849) | Creates a substring from index with given length |
-| [`substr(int index)`](src/rpp/strview.h#L849) | Creates a substring from index to end |
-| [`next_double()`](src/rpp/strview.h#L862) | Parses next double from current position |
-| [`next_float()`](src/rpp/strview.h#L863) | Parses next float from current position |
-| [`next_int()`](src/rpp/strview.h#L869) | Parses next int from current position |
-| [`skip(int nchars)`](src/rpp/strview.h#L880) | Safely skips N characters |
-| [`skip_until(char ch)`](src/rpp/strview.h#L886) | Skips until the specified char is found |
-| [`skip_after(char ch)`](src/rpp/strview.h#L910) | Skips past the specified char |
-| [`to_lower()`](src/rpp/strview.h#L934) | Modifies the referenced string to lowercase |
-| [`as_lower()`](src/rpp/strview.h#L939) | Returns a lowercase copy as std::string |
-| [`to_upper()`](src/rpp/strview.h#L950) | Modifies the referenced string to uppercase |
-| [`as_upper()`](src/rpp/strview.h#L955) | Returns an uppercase copy as std::string |
-| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L969) | Replaces all occurrences of chOld with chNew |
-| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L831) | Decomposes strview into multiple typed outputs |
+| [`chomp_last()`](src/rpp/strview.h#L417) | Consumes the last character if possible |
+| [`pop_front()`](src/rpp/strview.h#L406) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L408) | Pops and returns the last character |
+| [`contains(char c)`](src/rpp/strview.h#L435) | True if contains a char or substring |
+| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L445) | True if contains any of the given chars |
+| [`find(char c)`](src/rpp/strview.h#L462) | Pointer to start of substring if found, NULL otherwise |
+| [`rfind(char c)`](src/rpp/strview.h#L483) | Reverse search for a character |
+| [`findany(const char* chars, int n)`](src/rpp/strview.h#L489) | Forward search for any of the specified chars |
+| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L498) | Reverse search for any of the specified chars |
+| [`count(char ch)`](src/rpp/strview.h#L507) | Count occurrences of a character |
+| [`indexof(char ch)`](src/rpp/strview.h#L512) | Index of character, or -1 |
+| [`rindexof(char ch)`](src/rpp/strview.h#L515) | Reverse iterating index of character |
+| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L518) | First index of any matching char |
+| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L527) | True if starts with the string |
+| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L538) | Case-insensitive starts_with |
+| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L546) | True if ends with the string |
+| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L557) | Case-insensitive ends_with |
+| [`equals(const char* s, int len)`](src/rpp/strview.h#L568) | Exact equality |
+| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L574) | Case-insensitive equality |
+| [`compare(const char* s, int n)`](src/rpp/strview.h#L608) | Compare to another string |
+| [`split_first(char delim)`](src/rpp/strview.h#L617) | Split into two, return the first part |
+| [`split_second(char delim)`](src/rpp/strview.h#L633) | Split into two, return the second part |
+| [`next(strview& out, char delim)`](src/rpp/strview.h#L641) | Gets next token; advances ptr to next delimiter |
+| [`next(char delim)`](src/rpp/strview.h#L667) | Returns next token directly |
+| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L708) | Gets next token without trimming; stops on delimiter |
+| [`substr(int index, int length)`](src/rpp/strview.h#L839) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L845) | Creates a substring from index to end |
+| [`next_double()`](src/rpp/strview.h#L853) | Parses next double from current position |
+| [`next_float()`](src/rpp/strview.h#L853) | Parses next float from current position |
+| [`next_int()`](src/rpp/strview.h#L859) | Parses next int from current position |
+| [`skip(int nchars)`](src/rpp/strview.h#L870) | Safely skips N characters |
+| [`skip_until(char ch)`](src/rpp/strview.h#L876) | Skips until the specified char is found |
+| [`skip_after(char ch)`](src/rpp/strview.h#L900) | Skips past the specified char |
+| [`to_lower()`](src/rpp/strview.h#L924) | Modifies the referenced string to lowercase |
+| [`as_lower()`](src/rpp/strview.h#L934) | Returns a lowercase copy as std::string |
+| [`to_upper()`](src/rpp/strview.h#L940) | Modifies the referenced string to uppercase |
+| [`as_upper()`](src/rpp/strview.h#L950) | Returns an uppercase copy as std::string |
+| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L959) | Replaces all occurrences of chOld with chNew |
+| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L821) | Decomposes strview into multiple typed outputs |
 
 ### Example: Splitting Paths and URLs
 
@@ -638,37 +638,37 @@ if (a < b) // true — lexicographic ordering via compare()
 
 ### ustrview Class
 
-[`struct ustrview`](src/rpp/strview.h#L980) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
+[`struct ustrview`](src/rpp/strview.h#L970) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
 
 | Method | Description |
 |--------|-------------|
-| [`size()`](src/rpp/strview.h#L1013) | Returns the length |
-| [`empty()`](src/rpp/strview.h#L1015) | True if empty |
-| [`clear()`](src/rpp/strview.h#L1010) | Clears the ustrview |
-| [`is_nullterm()`](src/rpp/strview.h#L1033) | True if the referenced string is null-terminated |
-| [`trim_start()`](src/rpp/strview.h#L1037) | Trims whitespace (or given char/chars) from the start |
+| [`size()`](src/rpp/strview.h#L1003) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L1005) | True if empty |
+| [`clear()`](src/rpp/strview.h#L1000) | Clears the ustrview |
+| [`is_nullterm()`](src/rpp/strview.h#L1023) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L1041) | Trims whitespace (or given char/chars) from the start |
 | [`trim_end()`](src/rpp/strview.h#L1044) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](src/rpp/strview.h#L1051) | Trims both start and end |
+| [`trim()`](src/rpp/strview.h#L1045) | Trims both start and end |
 | [`chomp_first()`](src/rpp/strview.h#L1058) | Consumes the first character |
-| [`chomp_last()`](src/rpp/strview.h#L1060) | Consumes the last character |
-| [`pop_front()`](src/rpp/strview.h#L1063) | Pops and returns the first character |
-| [`pop_back()`](src/rpp/strview.h#L1065) | Pops and returns the last character |
-| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1090) | True if starts with the string |
-| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1101) | Case-insensitive starts_with |
-| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1112) | True if ends with the string |
-| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1123) | Case-insensitive ends_with |
-| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1133) | Exact equality |
-| [`compare(const char16_t* s, int n)`](src/rpp/strview.h#L1150) | Compare to another string |
-| [`rfind(char16_t c)`](src/rpp/strview.h#L1169) | Reverse search for a character |
-| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1175) | Forward search for any of the specified chars |
-| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1184) | Reverse search for any of the specified chars |
-| [`substr(int index, int length)`](src/rpp/strview.h#L1193) | Creates a substring from index with given length |
-| [`substr(int index)`](src/rpp/strview.h#L1193) | Creates a substring from index to end |
-| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1207) | Gets next token; advances ptr to next delimiter |
-| [`next(char16_t delim)`](src/rpp/strview.h#L1230) | Returns next token directly |
-| [`to_string()`](src/rpp/strview.h#L1003) | Convert to `std::u16string` |
-| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1084) | Copy to null-terminated C-string buffer |
-| [`to_string(const wchar_t* wstr, int wstrlen)`](src/rpp/strview.h#L1485) | Converts a UTF-16 wide string to UTF-8, Windows only |
+| [`chomp_last()`](src/rpp/strview.h#L1064) | Consumes the last character |
+| [`pop_front()`](src/rpp/strview.h#L1053) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L1055) | Pops and returns the last character |
+| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1080) | True if starts with the string |
+| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1091) | Case-insensitive starts_with |
+| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1102) | True if ends with the string |
+| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1113) | Case-insensitive ends_with |
+| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1123) | Exact equality |
+| [`compare(const char16_t* s, int n)`](src/rpp/strview.h#L1153) | Compare to another string |
+| [`rfind(char16_t c)`](src/rpp/strview.h#L1159) | Reverse search for a character |
+| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1165) | Forward search for any of the specified chars |
+| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1174) | Reverse search for any of the specified chars |
+| [`substr(int index, int length)`](src/rpp/strview.h#L1183) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L1189) | Creates a substring from index to end |
+| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1197) | Gets next token; advances ptr to next delimiter |
+| [`next(char16_t delim)`](src/rpp/strview.h#L1223) | Returns next token directly |
+| [`to_string()`](src/rpp/strview.h#L993) | Convert to `std::u16string` |
+| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1074) | Copy to null-terminated C-string buffer |
+| [`to_string(const wchar_t* wstr, int wstrlen)`](src/rpp/strview.h#L1475) | Converts a UTF-16 wide string to UTF-8, Windows only |
 
 ```cpp
 #define RPP_ENABLE_UNICODE 1
@@ -715,11 +715,11 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 |--------|-------------|
 | [`write(const T& v)`](src/rpp/sprint.h#L125) | Write a value (auto-converts most types) |
 | [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L150) | Write a float or double with a chosen number of decimals, instead of the default 6 |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L364) | Write values followed by newline |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L360) | Write values followed by newline |
 | [`writef(const char* format, ...)`](src/rpp/sprint.h#L123) | Printf-style formatted write |
 | [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L310) | Write data as hex string |
 | [`write_cont(const Container& c)`](src/rpp/sprint.h#L267) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L372) | Pretty-print a value |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L368) | Pretty-print a value |
 | [`clear()`](src/rpp/sprint.h#L114) | Clear the buffer |
 | [`reserve(int capacity)`](src/rpp/sprint.h#L115) | Reserve capacity |
 | [`resize(int size)`](src/rpp/sprint.h#L116) | Resize buffer |
@@ -735,9 +735,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L486) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L506) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L432) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L482) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L502) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L428) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -1276,27 +1276,27 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 
 | Class | Description |
 |-------|-------------|
-| [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L170) | Single-target function delegate |
+| [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L168) | Single-target function delegate |
 | [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L746) | Multi-target event delegate (`event<>` alias) |
 
 ### delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`operator()(Args... args)`](src/rpp/delegate.h#L687) | Invoke the delegate |
-| [`operator bool()`](src/rpp/delegate.h#L648) | True if delegate is bound |
-| [`reset()`](src/rpp/delegate.h#L593) | Unbind the delegate |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L685) | Invoke the delegate |
+| [`operator bool()`](src/rpp/delegate.h#L640) | True if delegate is bound |
+| [`reset()`](src/rpp/delegate.h#L585) | Unbind the delegate |
 
 ### multicast_delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L831) / [`operator+=`](src/rpp/delegate.h#L892) | Register a callback |
-| [`operator-=`](src/rpp/delegate.h#L902) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L912) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L751) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L799) | Number of registered callbacks |
-| [`multicast_fwd<T>`](src/rpp/delegate.h#L916) | Trait to deduce forwarding reference type for multicast args |
+| [`add(delegate)`](src/rpp/delegate.h#L829) / [`operator+=`](src/rpp/delegate.h#L889) | Register a callback |
+| [`operator-=`](src/rpp/delegate.h#L894) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L914) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L743) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L791) | Number of registered callbacks |
+| [`multicast_fwd<T>`](src/rpp/delegate.h#L910) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
 
@@ -3880,15 +3880,15 @@ try {
 ## rpp/predicates.h
 
 Portable replacements for `std::invocable` and `std::predicate`. Those need
-`<concepts>`, which some toolchains do not ship. On C++17 both names fall back to
-`typename`, so the same declaration compiles everywhere.
+`<concepts>`, which some toolchains do not ship. A requires-expression carries the
+same meaning and needs no header.
 
 ### Concepts
 
 | Concept | Description |
 |---------|-------------|
-| [`IsCallable`](src/rpp/predicates.h#L15) | Matches a type which can be called with no argument |
-| [`IsPredicate`](src/rpp/predicates.h#L20) | Matches a callable whose result converts to `bool` |
+| [`IsCallable`](src/rpp/predicates.h#L12) | Matches a type which can be called with no argument |
+| [`IsPredicate`](src/rpp/predicates.h#L16) | Matches a callable whose result converts to `bool` |
 
 ---
 

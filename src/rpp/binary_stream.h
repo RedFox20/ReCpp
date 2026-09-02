@@ -294,7 +294,7 @@ namespace rpp
             int cap = min(4 + n * (int)sizeof(T), 1024 * 1024); // fuzzy capacity
             ensure_space(cap);
 
-            RPP_CXX17_IF_CONSTEXPR(is_trivial_type<T>)
+            if constexpr (is_trivial_type<T>)
             {
                 unsafe_write<rpp::int32>(n);
                 unsafe_write(v.data(), n * (int)sizeof(T));
@@ -486,7 +486,7 @@ namespace rpp
         {
             int n = read_int32();
             out.clear();
-            RPP_CXX17_IF_CONSTEXPR(is_trivial_type<T>)
+            if constexpr (is_trivial_type<T>)
             {
                 out.resize(size_t(n));
                 read(out.data(), n * (int)sizeof(T));

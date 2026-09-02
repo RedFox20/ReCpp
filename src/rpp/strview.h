@@ -215,29 +215,19 @@ namespace rpp
     #endif
 
 
-    #ifndef RPP_CONSTEXPR_STRLEN
-    #  if _MSC_VER && _MSVC_LANG >= 201703L
-    #    define RPP_CONSTEXPR_STRLEN constexpr
-    #  elif __GNUG__ && __cplusplus >= 201703L
-    #    define RPP_CONSTEXPR_STRLEN constexpr
-    #  else
-    #    define RPP_CONSTEXPR_STRLEN
-    #  endif
-    #endif
-
     using string = std::string;
     using ustring = std::u16string;
 
-    inline RPP_CONSTEXPR_STRLEN int utf8len(const char* c_str) {
+    inline constexpr int utf8len(const char* c_str) {
         return static_cast<int>(std::char_traits<char>::length(c_str));
     }
-    inline RPP_CONSTEXPR_STRLEN int utf8len(const char8_t* c_str) {
+    inline constexpr int utf8len(const char8_t* c_str) {
         return static_cast<int>(std::char_traits<char8_t>::length(c_str));
     }
-    inline RPP_CONSTEXPR_STRLEN int utf16len(const char16_t* u_str) {
+    inline constexpr int utf16len(const char16_t* u_str) {
         return static_cast<int>(std::char_traits<char16_t>::length(u_str));
     }
-    inline RPP_CONSTEXPR_STRLEN int utf16len(const wchar_t* u_str) {
+    inline constexpr int utf16len(const wchar_t* u_str) {
         return static_cast<int>(std::char_traits<wchar_t>::length(u_str));
     }
 
@@ -261,8 +251,8 @@ namespace rpp
         int len;         // length of string
 
         FINLINE constexpr strview()                            noexcept : str{""},  len{0} {}
-        FINLINE RPP_CONSTEXPR_STRLEN strview(char* str)        noexcept : str{str}, len{utf8len(str)} {}
-        FINLINE RPP_CONSTEXPR_STRLEN strview(const char* str)  noexcept : str{str}, len{utf8len(str)} {}
+        FINLINE constexpr strview(char* str)        noexcept : str{str}, len{utf8len(str)} {}
+        FINLINE constexpr strview(const char* str)  noexcept : str{str}, len{utf8len(str)} {}
         FINLINE constexpr strview(const char* str, int len)    noexcept : str{str}, len{len} {}
         FINLINE constexpr strview(const char* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)} {}
         FINLINE constexpr strview(const char* str, const char* end) noexcept : str{str}, len{static_cast<int>(end - str)} {}
@@ -284,7 +274,7 @@ namespace rpp
         // however strview(std::string&&) is allowed because it allows passing temporaries as arguments to functions
         strview& operator=(string_t&&) = delete;
 
-        FINLINE RPP_CONSTEXPR_STRLEN strview& operator=(const char* s) noexcept {
+        FINLINE constexpr strview& operator=(const char* s) noexcept {
             this->str = s ? s : "";
             this->len = s ? utf8len(str) : 0;
             return *this;
@@ -987,8 +977,8 @@ namespace rpp
         int len;
 
         FINLINE constexpr ustrview()                                noexcept : str{u""}, len{0} {}
-        FINLINE RPP_CONSTEXPR_STRLEN ustrview(char16_t* str)        noexcept : str{str}, len{utf16len(str) } {}
-        FINLINE RPP_CONSTEXPR_STRLEN ustrview(const char16_t* str)  noexcept : str{str}, len{utf16len(str) } {}
+        FINLINE constexpr ustrview(char16_t* str)        noexcept : str{str}, len{utf16len(str) } {}
+        FINLINE constexpr ustrview(const char16_t* str)  noexcept : str{str}, len{utf16len(str) } {}
         FINLINE constexpr ustrview(const char16_t* str, int len)    noexcept : str{str}, len{len} {}
         FINLINE constexpr ustrview(const char16_t* str, size_t len) noexcept : str{str}, len{static_cast<int>(len)} {}
         FINLINE constexpr ustrview(const char16_t* str, const char16_t* end) noexcept : str{str}, len{static_cast<int>(end - str)} {}

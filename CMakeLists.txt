@@ -81,8 +81,6 @@ elseif(CXX23)
     set(RPP_CXX_STANDARD 23)
 elseif(CXX20)
     set(RPP_CXX_STANDARD 20)
-elseif(CXX17)
-    set(RPP_CXX_STANDARD 17)
 endif()
 message("RPP ENABLE C++${RPP_CXX_STANDARD}")
 if((CLANG OR GCC) AND RPP_CXX_STANDARD EQUAL 26 AND CMAKE_VERSION VERSION_LESS "3.30")  # CMake < 3.30 lacks compiler tables for C++26 on newer GCC/Clang

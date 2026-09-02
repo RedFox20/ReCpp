@@ -348,11 +348,7 @@ namespace rpp
         {
             write(first);
             write_with_separator(second);
-            #if RPP_HAS_CXX17
-                (..., write_with_separator(args)); // C++17 Fold Expressions
-            #else
-                write_separator(); write(args...);
-            #endif
+            (..., write_with_separator(args)); // fold expression
         }
 
         template<class T> FINLINE void writeln(const T& value) noexcept

@@ -704,7 +704,7 @@ namespace rpp
     explicit testclass(rpp::strview name) : rpp::test{name} {}        \
     static std::unique_ptr<test> __create(rpp::strview name)          \
     { return std::unique_ptr<test>{ new testclass{name} }; }          \
-    RPP_INLINE_STATIC bool __registered = [] {                        \
+    inline static bool __registered = [] {                            \
         rpp::register_test(#testclass, &__create, autorun);           \
         return true;                                                  \
     }();                                                              \

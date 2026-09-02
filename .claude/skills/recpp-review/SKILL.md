@@ -87,8 +87,8 @@ clang++ 14 to 20, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 - Prefer the ReCpp abstraction over the platform call: `rpp::TimePoint`,
   `rpp::Duration`, `rpp::mutex`, `rpp::semaphore`, `rpp::file_io`, `rpp::paths`,
   `rpp::threads`.
-- A C++20 or C++23 feature in a header which C++17 consumers include needs an
-  `RPP_HAS_CXX20` guard.
+- C++20 is the floor, so a C++20 feature needs no guard. A C++23 or C++26 feature
+  in a header needs an `RPP_HAS_CXX23` or `RPP_HAS_CXX26` guard.
 - The old targets have a small libc. Check every new libc call against Bionic,
   Yocto, and MIPSEL. Unicode paths are off on macOS, MIPSEL, Yocto, and Raspberry Pi.
 - No new third party dependency.

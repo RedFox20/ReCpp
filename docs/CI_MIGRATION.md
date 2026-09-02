@@ -17,18 +17,18 @@ single exception, and section 6 names the risk.
 
 ## 2. What exists today
 
-`.circleci/config.yml` is 469 lines. It defines 6 job templates and starts 29 jobs.
+`.circleci/config.yml` defines 6 job templates and starts 28 jobs.
 
 | Template | Executor | Jobs | What it does |
 |---|---|---|---|
 | `ubuntu-build` | docker `cimg/python:3.14` | 19 | compiler and sanitizer matrix, and the header gates |
-| `android-build` | docker `cimg/android:*-ndk` | 5 | NDK r25b, r27, r28b, r29, and one Ninja run |
+| `android-build` | docker `cimg/android:*-ndk` | 4 | NDK r27, r28b, r29, and one Ninja run |
 | `consumer-integration` | docker `cimg/python:3.14` | 2 | builds ReCpp as a dependency, not as the root |
 | `consumer-integration-msvc` | `win/default` | 1 | the same, on Windows |
 | `win64-cpp20-msvc2022` | `win/default` | 1 | the Windows build and test |
 | `mipsel-cpp20-gcc12` | docker `cimg/python:3.14` | 1 | a cross build with no tests |
 
-The 29 jobs, by group:
+The 28 jobs, by group:
 
 | Group | Count | Names |
 |---|---|---|
@@ -40,7 +40,7 @@ The 29 jobs, by group:
 | consumer | 3 | `consumer-integration`, `consumer-clang21`, `consumer-msvc2022` |
 | windows | 1 | `win64-cpp20-msvc2022` |
 | cross | 1 | `mipsel-cpp20-gcc12` |
-| android | 5 | `android-cpp20-r{25b,27,28b,29}-clang-tidy-clang*`, `android-cpp20-r29-ninja` |
+| android | 4 | `android-cpp20-r{27,28b,29}-clang-tidy-clang*`, `android-cpp20-r29-ninja` |
 
 Two details carry the build and must survive the move:
 
@@ -102,9 +102,9 @@ built the run.
 **Verify:** both jobs pass, and the log shows MSVC 14.5x. Section 6 covers a failure here.
 
 ### Phase 4: Android
-Move the 5 NDK jobs. Pin the same NDK versions the config names now.
+Move the 4 NDK jobs. Pin the same NDK versions the config names now.
 
-**Verify:** 29 jobs pass on GitHub Actions.
+**Verify:** 28 jobs pass on GitHub Actions.
 
 ### Phase 5: cut over
 Delete `.circleci/config.yml`. Point branch protection at the new check names.
