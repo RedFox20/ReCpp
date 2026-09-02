@@ -13,6 +13,7 @@
 import rpp.strview;   // includes come first, the import goes last
 import rpp.debugging;
 import rpp.obfuscated_string;
+import rpp.scopeguard;
 
 TestImpl(test_modules)
 {
@@ -75,6 +76,18 @@ TestImpl(test_modules)
         AssertThat(email.to_string(), std::string{"super@secret.com"});
         constexpr auto literal = "super@secret.com"_obfuscated;
         AssertThat(literal.to_string(), std::string{"super@secret.com"});
+    }
+
+    // this file includes no scope_guard.h, so the module alone carries the surface
+    TestCase(scopeguard_module_carries_the_whole_surface)
+    {
+        static_assert(sizeof(rpp::scope_finalizer<void(*)()>) > 0, "the module must export scope_finalizer");
+        int calls = 0;
+        {
+            auto guard = rpp::make_scope_guard([&]{ ++calls; });
+            AssertThat(calls, 0);
+        }
+        AssertThat(calls, 1); // the guard ran when it left the scope
     }
 };
 
