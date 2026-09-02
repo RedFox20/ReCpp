@@ -69,14 +69,12 @@ TestImpl(test_modules)
     // this file includes no obfuscated_string.h, so the module alone carries the surface
     TestCase(obfuscated_string_module_carries_the_whole_surface)
     {
+        using namespace rpp::literals;
         constexpr auto email = rpp::make_obfuscated("super@secret.com");
-        AssertNotEqual(email.obfuscated(), std::string{"super@secret.com"});
+        AssertNotEqual(std::string{email.obfuscated()}, std::string{"super@secret.com"});
         AssertThat(email.to_string(), std::string{"super@secret.com"});
-    #if __GNUC__ && !__clang__
-        using rpp::operator ""_obfuscated; // GCC only, the header guards it the same way
-        auto literal = "super@secret.com"_obfuscated;
+        constexpr auto literal = "super@secret.com"_obfuscated;
         AssertThat(literal.to_string(), std::string{"super@secret.com"});
-    #endif
     }
 };
 

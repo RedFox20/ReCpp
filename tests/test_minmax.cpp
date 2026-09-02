@@ -1,3 +1,4 @@
+// <rpp/tests.h> includes minmax.h, so this test cannot import alone until rpp.tests exists
 #include <rpp/minmax.h>
 #include <cfloat>  // FLT_MIN
 #include <climits> // INT_MIN

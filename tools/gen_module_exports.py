@@ -35,6 +35,13 @@ def _is_private(name: str) -> bool:
     return name.startswith('__') and name not in _MACRO_HELPERS
 
 
+def _skip(ns: str, kind: str, name: str) -> bool:
+    """True for a declaration no using-declaration can name, or which stays private."""
+    # a deduction guide spells as `<deduction guide for X>`, which no using-declaration names
+    return kind in SKIP_KINDS or name.startswith('<') or _is_private(name) \
+        or (ns and not ns.startswith('rpp'))
+
+
 # a private helper no importer needs. Empty, because every module gives its public names
 # external linkage instead, which is what MSVC needs to define one in an importing TU
 INTERNAL_OK = frozenset()
@@ -88,7 +95,7 @@ def _exported(header: str, defines: tuple) -> dict:
     """Namespace to ordered names, for one macro configuration."""
     out = {}
     for ns, kind, name, internal in rd.declarations(header, defines):
-        if kind in SKIP_KINDS or _is_private(name) or (ns and not ns.startswith('rpp')): continue
+        if _skip(ns, kind, name): continue
         if internal: continue  # clang rejects a using-declaration which exports one
         names = out.setdefault(ns, [])
         if name not in names: names.append(name)
@@ -104,7 +111,7 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     allow = INTERNAL_OK if allow is None else allow
     out = []
     for ns, kind, name, internal in rd.declarations(header, CONFIGS[0]):
-        if kind in SKIP_KINDS or _is_private(name) or (ns and not ns.startswith('rpp')): continue
+        if _skip(ns, kind, name): continue
         if internal and name not in allow and name not in out: out.append(name)
     return out
 
@@ -194,6 +201,8 @@ namespace rpp {
     static constexpr char obfuscate(char c);       // internal, and INTERNAL_OK covers it
     inline constexpr double TAU = 6.28318;         // inline, so external
     struct Public {};
+    template<int N> struct Sized { char c[N]; };
+    template<int N> Sized(const char (&)[N]) -> Sized<N>;   // a deduction guide has no name
 }
 '''
 
@@ -220,6 +229,7 @@ def selftest() -> list:
             if name in shown: bad.append(f'{name} has internal linkage and reached the export list')
         for name in ('TAU', 'Public'):
             if name not in shown: bad.append(f'{name} has external linkage and left the export list')
+        if any(n.startswith('<') for n in shown): bad.append('a deduction guide reached the export list')
     return bad
 
 

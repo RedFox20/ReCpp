@@ -1,7 +1,8 @@
 #include <rpp/tests.h>
-#include <rpp/obfuscated_string.h>
 #if RPP_BUILD_WITH_MODULES
-import rpp.obfuscated_string; // includes come first, the import goes last
+import rpp.obfuscated_string; // the module alone must carry the whole surface
+#else
+#include <rpp/obfuscated_string.h>
 #endif
 
 TestImpl(test_obfuscated_string)
@@ -10,29 +11,71 @@ TestImpl(test_obfuscated_string)
     {
     }
 
-    TestCase(cross_platform)
+    // scans the bytes of the object itself, which is where the plaintext would sit if it survived
+    static bool holds_plaintext(const void* object, size_t size, const std::string& plaintext)
     {
-        using namespace std::string_literals;
-        constexpr auto str = rpp::make_obfuscated("test!1234!õäöü");
-        std::string decrypted = str.to_string();
-        AssertThat(decrypted, "test!1234!õäöü"s);
+        std::string_view image { static_cast<const char*>(object), size };
+        return image.find(plaintext) != std::string_view::npos;
     }
 
-    // the template deduces the literal length, so this API needs no macro
-    TestCase(deduces_literal_length)
+    TestCase(round_trips_through_the_scrambled_bytes)
+    {
+        constexpr auto str = rpp::make_obfuscated("test!1234!õäöü");
+        AssertEqual(str.to_string(), std::string{"test!1234!õäöü"});
+    }
+
+    TestCase(the_object_holds_no_plaintext)
+    {
+        static constexpr auto secret = rpp::make_obfuscated("super@secret.com");
+        AssertFalse(holds_plaintext(&secret, sizeof(secret), "super@secret.com"));
+        AssertEqual(secret.to_string(), std::string{"super@secret.com"});
+    }
+
+    TestCase(scrambled_bytes_differ_from_the_plaintext)
+    {
+        constexpr auto str = rpp::make_obfuscated("super@secret.com");
+        AssertNotEqual(std::string{str.obfuscated()}, std::string{"super@secret.com"});
+        AssertEqual((int)str.obfuscated().size(), 16);
+    }
+
+    // the index mixes in, so a repeated character must not repeat in the output
+    TestCase(a_repeated_character_scrambles_differently)
+    {
+        constexpr auto str = rpp::make_obfuscated("aaaa");
+        std::string_view out = str.obfuscated();
+        AssertNotEqual(out[0], out[1]);
+        AssertNotEqual(out[1], out[2]);
+        AssertEqual(str.to_string(), std::string{"aaaa"});
+    }
+
+    TestCase(deduces_the_literal_length)
     {
         constexpr auto str = rpp::make_obfuscated("hello");
         static_assert(decltype(str)::length == 5, "make_obfuscated must deduce the literal length");
         AssertEqual(decltype(str)::length, 5);
-        AssertEqual((int)str.obfuscated().size(), 5);
     }
 
-    TestCase(obfuscated_text_differs_from_plaintext)
+    TestCase(handles_the_empty_and_single_character_edges)
     {
-        using namespace std::string_literals;
-        constexpr auto str = rpp::make_obfuscated("super@secret.com");
-        AssertNotEqual(str.obfuscated(), "super@secret.com"s);
-        AssertEqual(str.to_string(), "super@secret.com"s);
+        AssertEqual(rpp::make_obfuscated("").to_string(), std::string{});
+        AssertEqual(rpp::make_obfuscated("x").to_string(), std::string{"x"});
+        AssertEqual(rpp::make_obfuscated("").length, 0);
     }
 
+    TestCase(the_literal_operator_matches_make_obfuscated)
+    {
+        using namespace rpp::literals;
+        constexpr auto literal = "super@secret.com"_obfuscated;
+        constexpr auto made = rpp::make_obfuscated("super@secret.com");
+        AssertEqual(std::string{literal.obfuscated()}, std::string{made.obfuscated()});
+        AssertEqual(literal.to_string(), made.to_string());
+    }
+
+    // CTAD gives the same object, so a caller needs no factory function
+    TestCase(class_template_argument_deduction_works)
+    {
+        constexpr rpp::obfuscated_string str{"super@secret.com"};
+        AssertEqual(str.length, 16);
+        AssertEqual(str.to_string(), std::string{"super@secret.com"});
+    }
 };
