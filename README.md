@@ -16,7 +16,7 @@ All of the modules are heavily performance oriented and provide the least amount
 | Platform | Compilers | Notes |
 |----------|-----------|-------|
 | **Windows** | MSVC++ 2019, 2022, 2026 | x64 |
-| **Ubuntu Linux** | clang++ 14–20, g++ 11–15 | x86_64, ASan/TSan/clang-tidy CI |
+| **Ubuntu Linux** | clang++ 18–21, g++ 13–15 | x86_64, ASan/TSan/clang-tidy CI |
 | **Android** | NDK r27–r29 (clang++ 18–20) | arm64-v8a, armeabi-v7a, QEMU aarch64 CI tests |
 | **iOS / macOS** | Apple Clang | arm64, x86_64 |
 | **AArch64 Embedded** | g++ 11–15 | i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25 |

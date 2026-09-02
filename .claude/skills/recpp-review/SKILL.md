@@ -77,8 +77,8 @@ Protect that number.
 ### R3. Every change works on every target
 
 Targets: Windows MSVC 2019 to 2026, Android NDK r27 to r29, Yocto AArch64
-(i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25), Ubuntu g++ 11 to 15 and
-clang++ 14 to 20, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
+(i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25), Ubuntu g++ 13 to 15 and
+clang++ 18 to 21, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 `config.h` also carries `RPP_FREERTOS`, `RPP_BARE_METAL`, and `RPP_CORTEX_M_ARCH`.
 
 - A platform API needs a guard from `config.h`: `_MSC_VER`, `RPP_MSVC_WIN`,

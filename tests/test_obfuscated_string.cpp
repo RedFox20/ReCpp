@@ -1,4 +1,6 @@
 #include <rpp/tests.h>
+#include <rpp/file_io.h> // rpp::file, to scan the binary for plaintext
+#include <rpp/paths.h>   // rpp::module_path
 #if !RPP_BUILD_WITH_MODULES
 #include <rpp/obfuscated_string.h>
 #else
@@ -16,6 +18,26 @@ TestImpl(test_obfuscated_string)
     {
         std::string_view image { static_cast<const char*>(object), size };
         return image.find(plaintext) != std::string_view::npos;
+    }
+
+    // reads the running executable, so the needle must never appear as a literal in this file
+    static bool binary_holds(const std::string& needle)
+    {
+        std::string exe = rpp::module_path();
+        std::string image = rpp::file::read_all_text(exe);
+        AssertMsg(!image.empty(), "could not read the executable at %s", exe.c_str());
+        return image.find(needle) != std::string::npos;
+    }
+
+    // the plaintext of this literal must not survive into the binary. to_string() reads the
+    // scrambled bytes through a volatile pointer, which stops clang -O2 folding the round trip
+    TestCase(the_binary_holds_no_plaintext)
+    {
+        // this asserts the end result. It does not pin the volatile read, see BUGS.md B7
+        constexpr auto probe = rpp::make_obfuscated("kratt-plaintext-probe-9f3a");
+        std::string secret = probe.to_string(); // built at runtime, so it is no literal here
+        AssertEqual((int)secret.size(), 26);
+        AssertFalse(binary_holds(secret));
     }
 
     TestCase(round_trips_through_the_scrambled_bytes)

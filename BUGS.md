@@ -25,6 +25,18 @@ kill %1 %2
 ```
 
 
+### B7. No test pins the volatile read in obfuscated_string::to_string()
+The read is load-bearing, and a small translation unit proves it. Build a `main` which
+decodes five obfuscated strings straight into one `printf`, and `clang++ -O2` folds the
+round trip and writes the plaintext into the binary. The volatile read stops that on
+gcc and clang at `-O0` through `-O3`.
+`test_obfuscated_string::the_binary_holds_no_plaintext` scans the running executable
+and asserts the end result, which is worth having. It stays green when the volatile
+goes, because the shape inside a large test binary does not fold. Three caller shapes
+were tried, including a block-scope object feeding a printf sink.
+A fix needs a translation unit which folds on demand, so a separate tiny target under
+`tests/` is the likely answer.
+
 ### B6. The C15 TSAN suppression covers libc++ only, so gcc still reports the future race
 C15 closed the same false positive on clang. `tests/main.cpp` guards
 `__tsan_default_suppressions` with `#if defined(__clang__)`, and the pattern it returns

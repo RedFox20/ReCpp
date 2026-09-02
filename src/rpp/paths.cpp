@@ -1415,6 +1415,17 @@ namespace rpp /* ReCpp */
         return {};
     }
 
+#if __linux__ || __ANDROID__
+    // /proc names the running executable, and it answers for the process, not for a shared object
+    static string proc_self_exe() noexcept
+    {
+        char path[512];
+        ssize_t len = ::readlink("/proc/self/exe", path, sizeof(path) - 1);
+        if (len <= 0) return {};
+        return { path, path + len };
+    }
+#endif
+
     string module_dir(void* moduleObject) noexcept
     {
         (void)moduleObject;
@@ -1426,8 +1437,13 @@ namespace rpp /* ReCpp */
         #elif __APPLE__
             extern string apple_module_dir(void* moduleObject) noexcept;
             return apple_module_dir(moduleObject);
+        #elif __linux__ || __ANDROID__
+            // a named shared object needs dladdr, which this build does not link everywhere
+            if (moduleObject) return working_dir();
+            if (string exe = proc_self_exe(); !exe.empty()) return folder_path(strview{exe});
+            return working_dir();
         #else
-            // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
+            // @todo Implement missing platforms: RASPI
             return working_dir();
         #endif
     }
@@ -1443,8 +1459,13 @@ namespace rpp /* ReCpp */
         #elif __APPLE__
             extern string apple_module_path(void* moduleObject) noexcept;
             return apple_module_path(moduleObject);
+        #elif __linux__ || __ANDROID__
+            // a named shared object needs dladdr, which this build does not link everywhere
+            if (moduleObject) return working_dir();
+            if (string exe = proc_self_exe(); !exe.empty()) return exe;
+            return working_dir();
         #else
-            // @todo Implement missing platforms: __linux__, __ANDROID__, RASPI
+            // @todo Implement missing platforms: RASPI
             return working_dir();
         #endif
     }
