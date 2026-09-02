@@ -8,9 +8,15 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B2. Timing bounds have no slack for a loaded machine
+### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
+This has two shapes. A bound too tight reports the overrun, as
+`test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
+sleep used to order two threads reports a wrong result instead, as
+`test_close_sync::basic_close_prevention` did on MSVC with
+`~ImportantState: data != "aaaabbbbcccc"`. AGENTS.md R2 already says to wait on an
+event, not on the clock.
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
 for h in 1 2; do taskset -c 0 bash -c 'while :; do :; done' & done
