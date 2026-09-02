@@ -131,9 +131,8 @@ These three steps need repository admin rights, and no agent can do them.
 | Check names change | pull requests block on missing required checks | do section 5 step 1 during phase 5, not after |
 | A test that passes on 3 cores fails on 4 | a timing test turns flaky | run phase 2 three times before phase 3 |
 
-## 7. Open question
+## 7. A question the current CI already answered
 
 `_obfuscated` uses a class type as a non-type template parameter, which is standard C++20.
-GCC 14 and Clang 18 both compile it. Whether MSVC 14.44 compiles it is unknown, and the
-current CI answers that before phase 3 lands. If MSVC 14.44 rejects it, the choice is a
-temporary guard or a faster migration. MSVC 14.5x is expected to accept it.
+GCC 14, Clang 18 and MSVC 14.44 all compile it, so `win64-cpp20-msvc2022` passes today. The
+code needs no guard, and phase 3 moves the toolset forward from a green build.
