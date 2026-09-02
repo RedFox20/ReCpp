@@ -18,5 +18,10 @@ mama_target_modules(RppModuleConsumer)
 add_executable(RppConfigModuleOnly config_module_only.cpp)
 target_include_directories(RppConfigModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppConfigModuleOnly)
+
+# <rpp/tests.h> includes minmax.h, so only a module-only source proves that export list
+add_executable(RppMinmaxModuleOnly minmax_module_only.cpp)
+target_include_directories(RppMinmaxModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppMinmaxModuleOnly)
 target_link_libraries(RppModuleConsumer PRIVATE ${MAMA_LIBS})
 install(TARGETS RppModuleConsumer RUNTIME DESTINATION bin)
