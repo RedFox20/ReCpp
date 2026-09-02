@@ -4380,8 +4380,8 @@ Compile-time string obfuscation to prevent strings from appearing in binaries.
 | Item | Description |
 |------|-------------|
 | [`obfuscated_string<N>`](src/rpp/obfuscated_string.h#L28) | Holds a string literal scrambled at compile time |
-| [`make_obfuscated(const char (&str)[N])`](src/rpp/obfuscated_string.h#L61) | Creates a compile-time obfuscated string from a string literal |
-| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L66) | String literal operator, in `rpp::literals` |
+| [`make_obfuscated(const char (&str)[N])`](src/rpp/obfuscated_string.h#L64) | Creates a compile-time obfuscated string from a string literal |
+| [`operator ""_obfuscated`](src/rpp/obfuscated_string.h#L69) | String literal operator, in `rpp::literals` |
 
 ### Example: Compile-Time String Obfuscation
 

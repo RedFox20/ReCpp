@@ -48,6 +48,20 @@ TestImpl(test_obfuscated_string)
         AssertEqual(str.to_string(), std::string{"aaaa"});
     }
 
+    // a view into a temporary dangles, and ASAN reported stack-use-after-scope before the delete
+    template<class T> static constexpr bool views_an_lvalue = requires(T t) { t.obfuscated(); };
+    template<class T> static constexpr bool views_a_temporary
+        = requires(T t) { static_cast<T&&>(t).obfuscated(); };
+
+    TestCase(a_view_into_a_temporary_does_not_compile)
+    {
+        using Obfuscated = rpp::obfuscated_string<5>;
+        static_assert(views_an_lvalue<Obfuscated>, "a named object must still give a view");
+        static_assert(!views_a_temporary<Obfuscated>, "a temporary must not give a view");
+        AssertTrue(views_an_lvalue<Obfuscated>);
+        AssertFalse(views_a_temporary<Obfuscated>);
+    }
+
     TestCase(deduces_the_literal_length)
     {
         constexpr auto str = rpp::make_obfuscated("hello");

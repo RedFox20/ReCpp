@@ -43,7 +43,10 @@ namespace rpp
         }
 
         /// @returns the scrambled bytes, which never match the plaintext
-        constexpr std::string_view obfuscated() const noexcept { return { chars, length }; }
+        constexpr std::string_view obfuscated() const & noexcept { return { chars, length }; }
+
+        /// The view would outlive a temporary, so this call does not compile. Name the object first.
+        void obfuscated() const && = delete;
 
         /// @returns the plaintext, restored into a fresh string
         std::string to_string() const
