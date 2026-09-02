@@ -297,7 +297,7 @@ jobs:
     parameters:
       docker_image:
         type: enum
-        enum: ["cimg/android:2023.08.1-ndk", "cimg/android:2024.11.1-ndk", "cimg/android:2025.12.1-ndk", "cimg/android:2026.03.1-ndk"]
+        enum: ["cimg/android:2024.11.1-ndk", "cimg/android:2025.12.1-ndk", "cimg/android:2026.03.1-ndk"]
         description: "Android NDK docker image"
       toolchain:
         type: string
