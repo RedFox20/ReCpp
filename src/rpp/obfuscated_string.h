@@ -31,12 +31,6 @@ namespace rpp
 
         char chars[N]; // public, so a test can read the object representation
 
-        /// Scrambles one character. The index makes a repeated character differ each time.
-        static constexpr char scramble(char ch, int i) noexcept { return char((ch + i) ^ 0x55); }
-
-        /// Restores one character that scramble() produced.
-        static constexpr char unscramble(char ch, int i) noexcept { return char((ch ^ 0x55) - i); }
-
         consteval obfuscated_string(const char (&str)[N]) noexcept : chars{}
         {
             for (int i = 0; i < length; ++i) chars[i] = scramble(str[i], i);
@@ -57,6 +51,11 @@ namespace rpp
             for (int i = 0; i < length; ++i) out[i] = unscramble(src[i], i);
             return out;
         }
+
+    private:
+        // the index mixes in, so a repeated character does not repeat in the output
+        static constexpr char scramble(char ch, int i) noexcept { return char((ch + i) ^ 0x55); }
+        static constexpr char unscramble(char ch, int i) noexcept { return char((ch ^ 0x55) - i); }
     };
 
     /// Creates a compile-time obfuscated string from a string literal.
