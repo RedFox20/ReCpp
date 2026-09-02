@@ -76,7 +76,7 @@ Protect that number.
 
 ### R3. Every change works on every target
 
-Targets: Windows MSVC 2019 to 2026, Android NDK r25b to r29, Yocto AArch64
+Targets: Windows MSVC 2019 to 2026, Android NDK r27 to r29, Yocto AArch64
 (i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25), Ubuntu g++ 11 to 15 and
 clang++ 14 to 20, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 `config.h` also carries `RPP_FREERTOS`, `RPP_BARE_METAL`, and `RPP_CORTEX_M_ARCH`.

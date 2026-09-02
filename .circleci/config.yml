@@ -301,7 +301,7 @@ jobs:
         description: "Android NDK docker image"
       toolchain:
         type: string
-        description: "Informational toolchain description, e.g. ndk-r25b-clang++14"
+        description: "Informational toolchain description, e.g. ndk-r27-clang++18"
       ndk_version:
         type: string
         default: ""
