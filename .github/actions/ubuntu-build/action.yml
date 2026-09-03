@@ -36,6 +36,20 @@ inputs:
 runs:
   using: composite
   steps:
+    # a composite action has no job-level env, so this writes one for every step below,
+    # the way the CircleCI template does with its environment block
+    - name: Set the build environment
+      shell: bash
+      run: |
+        {
+          echo "COMPILER=${{ inputs.compiler }}"
+          echo "SANITIZE=${{ inputs.sanitizer }}"
+          echo "COV_PARAM=${{ inputs.coverage }}"
+          echo "NO_NINJA=${{ inputs.no_ninja }}"
+          echo "BUILD_WITH_MODULES=${{ inputs.build_with_modules }}"
+          echo "CXX${{ inputs.cpp_version }}=1"
+        } >> "$GITHUB_ENV"
+
     - name: Install build dependencies
       shell: bash
       run: |
@@ -68,8 +82,6 @@ runs:
     - name: Header and import-order gates
       if: inputs.check_includes == 'true'
       shell: bash
-      env:
-        COMPILER: ${{ inputs.compiler }}
       run: |
         # the tree conforms, so a scan that reports nothing passes the gate below.
         # this runs the scan over crafted sources and pins the line each one names
@@ -103,33 +115,19 @@ runs:
 
     - name: Build ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
       shell: bash
-      env:
-        COMPILER: ${{ inputs.compiler }}
-        SANITIZE: ${{ inputs.sanitizer }}
-        COV_PARAM: ${{ inputs.coverage }}
-        # Ninja detects more cores than the runner has and the machines OOM, so it is off by
-        # default. A modules build needs it: CMake scans module dependencies only under Ninja.
-        NO_NINJA: ${{ inputs.no_ninja }}
-        BUILD_WITH_MODULES: ${{ inputs.build_with_modules }}
       run: |
-        export CXX${{ inputs.cpp_version }}=1
         COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage=src" || echo "")
         # clang-tidy runs as its own step for clang, so this build passes no sanitizer
         SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
         JOBS=$(nproc)
-        # mama passes jobs= to make and msbuild but never to ninja, and ninja sizes itself
-        # from the core count. taskset pins the affinity, which is what ninja reads.
+        # NO_NINJA=1 is the default: ninja reads more cores than the runner has and OOMs.
+        # A modules build clears it, and taskset then pins the count ninja reads.
         NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
         $NINJA_CAP mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=$JOBS
 
     - name: Test ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
       shell: bash
-      env:
-        COMPILER: ${{ inputs.compiler }}
-        SANITIZE: ${{ inputs.sanitizer }}
-        COV_PARAM: ${{ inputs.coverage }}
       run: |
-        export CXX${{ inputs.cpp_version }}=1
         COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
         # setarch -R turns off address space randomization. Without it TSAN aborts on
         # these runners with "FATAL: ThreadSanitizer: unexpected memory mapping".
