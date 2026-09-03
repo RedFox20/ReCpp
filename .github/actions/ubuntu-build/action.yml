@@ -109,10 +109,6 @@ runs:
         # matches the header it wraps
         python3 tools/gen_module_exports.py --all --check
 
-    - name: Install CMake
-      shell: bash
-      run: make configure-cmake
-
     - name: Print the toolchain versions
       shell: bash
       run: |
