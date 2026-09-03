@@ -68,7 +68,8 @@ namespace
             // that only destroys a moved-to temporary and leaves the original husk alive.
             if (owns_cleanup)
                 other.owns_cleanup = false;
-        }
+        // the analyzer cannot follow the promise state across this deliberate half-move
+        } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
         ~worker_cleanup_marker_task() noexcept
         {
