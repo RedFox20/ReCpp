@@ -113,6 +113,15 @@ runs:
       shell: bash
       run: make configure-cmake
 
+    - name: Print the toolchain versions
+      shell: bash
+      run: |
+        # the log names the toolchain that built the run, so a failure needs no guess
+        echo "cmake:  $(command -v cmake) $(cmake --version | head -1)"
+        echo "mama:   $(mama --version)"
+        CXX_BIN=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
+        echo "$CXX_BIN: $(command -v $CXX_BIN) $($CXX_BIN --version | head -1)"
+
     - name: Build ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
       shell: bash
       run: |
