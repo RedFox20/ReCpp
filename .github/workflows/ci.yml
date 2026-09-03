@@ -1,10 +1,12 @@
-# Phase 1 of docs/CI_MIGRATION.md. CircleCI still runs the whole matrix, and this
-# workflow proves one job end to end before phase 2 expands it.
+# The first step of the move from CircleCI to GitHub Actions. CircleCI still runs
+# the whole matrix, and this workflow proves one job before it takes the rest.
 name: CI
 
+# a branch push and its pull request both match, so push stays on master alone.
+# Otherwise every push to an open pull request starts the same job twice
 on:
   push:
-    branches: ["master", "ci/**", "claude/**"]
+    branches: ["master"]
   pull_request:
   workflow_dispatch:
 
