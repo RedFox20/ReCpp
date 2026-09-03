@@ -15,7 +15,7 @@ BUILD_DIR="$SCRIPT_DIR/packages/ReCpp/android"
 TEST_BIN="$BUILD_DIR/RppTests"
 
 # pre-built sysroot with bionic API 29 (jemalloc, compatible with QEMU user-mode)
-QEMU_SYSROOT="$SCRIPT_DIR/.circleci/android-qemu-sysroot-api29"
+QEMU_SYSROOT="$SCRIPT_DIR/.github/android-qemu-sysroot-api29"
 
 # parse args
 DO_BUILD=false

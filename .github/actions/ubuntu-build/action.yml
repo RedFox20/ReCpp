@@ -20,9 +20,9 @@ inputs:
   coverage:
     description: true adds a coverage report. Only gcc with asan supports it
     default: "false"
-  no_ninja:
-    description: 1 turns Ninja off to save memory. A modules build passes an empty string
-    default: "1"
+  use_ninja:
+    description: true builds under Ninja, which CMake needs to scan module dependencies
+    default: "false"
   build_with_modules:
     description: ON demands modules, so a toolchain that cannot build them fails the configure
     default: ""
@@ -36,12 +36,13 @@ inputs:
 runs:
   using: composite
   steps:
-    # a composite action has no job-level env, so this writes one for every step below,
-    # the way the CircleCI template does with its environment block
+    # a composite action has no job-level env, so this writes one for every step below
     - name: Set the build environment
       shell: bash
       run: |
         # only a gcc asan build makes coverage data, so one place decides it
+        # Ninja reads more cores than the runner has and OOMs, so NO_NINJA=1 is the default
+        NO_NINJA_VALUE=$([[ "${{ inputs.use_ninja }}" == "true" ]] && echo "" || echo "1")
         COVERAGE_ON=0
         if [[ "${{ inputs.coverage }}" == "true" && "${{ inputs.compiler }}" == "gcc" &&
               "${{ inputs.sanitizer }}" == "asan" ]]; then COVERAGE_ON=1; fi
@@ -49,7 +50,7 @@ runs:
           echo "COMPILER=${{ inputs.compiler }}"
           echo "SANITIZE=${{ inputs.sanitizer }}"
           echo "COVERAGE_ON=$COVERAGE_ON"
-          echo "NO_NINJA=${{ inputs.no_ninja }}"
+          echo "NO_NINJA=$NO_NINJA_VALUE"
           echo "BUILD_WITH_MODULES=${{ inputs.build_with_modules }}"
           echo "CXX${{ inputs.cpp_version }}=1"
         } >> "$GITHUB_ENV"
@@ -129,8 +130,7 @@ runs:
         # clang-tidy runs as its own step for clang, so this build passes no sanitizer
         SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
         JOBS=$(nproc)
-        # NO_NINJA=1 is the default: ninja reads more cores than the runner has and OOMs.
-        # A modules build clears it, and taskset then pins the count ninja reads.
+        # a modules build clears NO_NINJA, and taskset then pins the count ninja reads
         NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
         $NINJA_CAP mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=$JOBS
 
@@ -147,8 +147,8 @@ runs:
       if: always()
       shell: bash
       run: |
-        # the run summary carries the count, so a reader compares it against CircleCI
-        # without a scroll through the whole build log
+        # the run summary carries the count, so a reader reads it without a scroll
+        # through the whole build log
         LINE=""
         if [ -f "$RUNNER_TEMP/test_output.txt" ]; then
           LINE=$(sed -e 's/\x1b\[[0-9;]*m//g' -e 's/\r//g' "$RUNNER_TEMP/test_output.txt" \

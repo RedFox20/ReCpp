@@ -20,10 +20,10 @@ works correctly.
 
 ## Rebuilding liblog.so
 
-Source is at `.circleci/liblog_stderr.c`. Rebuild with:
+Source is at `.github/liblog_stderr.c`. Rebuild with:
 
 ```bash
-.circleci/build_liblog.sh
+.github/build_liblog.sh
 ```
 
 ## Extracting bionic libs from a system image

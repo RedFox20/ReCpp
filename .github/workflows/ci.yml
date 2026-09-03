@@ -1,5 +1,4 @@
-# The first step of the move from CircleCI to GitHub Actions. CircleCI still runs
-# the whole matrix, and this workflow proves one job before it takes the rest.
+# The build matrix: 28 jobs over Linux, Android, MIPS and Windows.
 name: CI
 
 # a branch push and its pull request both match, so push stays on master alone.
@@ -15,16 +14,181 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu-cpp20-asan-gcc13:
-    name: ubuntu-cpp20-asan-gcc13
+  ubuntu:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false # one red job must never cancel the other twenty-seven
+      matrix:
+        include:
+          # clang-18, C++20 and C++23
+          - { name: ubuntu-cpp20-asan-clang18,       compiler: clang, cc: clang-18, std: "20", san: asan,       cov: "true" }
+          - { name: ubuntu-cpp20-clang-tidy-clang18, compiler: clang, cc: clang-18, std: "20", san: clang-tidy, cov: "true" }
+          - { name: ubuntu-cpp20-tsan-clang18,       compiler: clang, cc: clang-18, std: "20", san: tsan,       cov: "true" }
+          - { name: ubuntu-cpp23-asan-clang18,       compiler: clang, cc: clang-18, std: "23", san: asan,       cov: "true" }
+          - { name: ubuntu-cpp23-clang-tidy-clang18, compiler: clang, cc: clang-18, std: "23", san: clang-tidy, cov: "true" }
+          - { name: ubuntu-cpp23-tsan-clang18,       compiler: clang, cc: clang-18, std: "23", san: tsan,       cov: "true" }
+          # gcc-13, C++20 and C++23
+          - { name: ubuntu-cpp20-asan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "20", san: asan,       cov: "true" }
+          - { name: ubuntu-cpp20-clang-tidy-gcc13,   compiler: gcc,   cc: gcc-13,   std: "20", san: clang-tidy, cov: "true" }
+          - { name: ubuntu-cpp20-tsan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "20", san: tsan,       cov: "true" }
+          - { name: ubuntu-cpp23-asan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "23", san: asan,       cov: "true" }
+          - { name: ubuntu-cpp23-clang-tidy-gcc13,   compiler: gcc,   cc: gcc-13,   std: "23", san: clang-tidy, cov: "true" }
+          - { name: ubuntu-cpp23-tsan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "23", san: tsan,       cov: "true" }
+          # gcc-14 on C++26. Coverage stays off, because it runs the runner out of memory
+          - { name: ubuntu-cpp26-asan-gcc14,         compiler: gcc,   cc: gcc-14,   std: "26", san: asan,       cov: "false" }
+          - { name: ubuntu-cpp26-clang-tidy-gcc14,   compiler: gcc,   cc: gcc-14,   std: "26", san: clang-tidy, cov: "false" }
+          - { name: ubuntu-cpp26-tsan-gcc14,         compiler: gcc,   cc: gcc-14,   std: "26", san: tsan,       cov: "false" }
+          # clang-20. Modules stay off: CMakeLists.txt needs Clang 21 and falls back to headers
+          - { name: ubuntu-cpp20-asan-clang20,       compiler: clang, cc: clang-20, std: "20", san: asan,       cov: "false",
+              llvm_apt: "true" }
+          - { name: ubuntu-cpp23-asan-clang20,       compiler: clang, cc: clang-20, std: "23", san: asan,       cov: "false",
+              llvm_apt: "true" }
+          # C++20 modules. These need Ninja, so they set it. They also pass
+          # BUILD_WITH_MODULES=ON, not AUTO: AUTO turns modules off and keeps going, so a job
+          # named modules would pass while it tested only headers
+          - { name: ubuntu-cpp20-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "20", san: asan,       cov: "false",
+              ninja: "true", modules: "ON", check_includes: "true" }
+          - { name: ubuntu-cpp20-modules-clang21,    compiler: clang, cc: clang-21, std: "20", san: asan,       cov: "false",
+              ninja: "true", modules: "ON", llvm_apt: "true" }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ubuntu-build
         with:
-          job_name: ubuntu-cpp20-asan-gcc13
-          compiler: gcc
-          cc_version: gcc-13
-          cpp_version: "20"
-          sanitizer: asan
-          coverage: "true"
+          job_name: ${{ matrix.name }}
+          compiler: ${{ matrix.compiler }}
+          cc_version: ${{ matrix.cc }}
+          cpp_version: ${{ matrix.std }}
+          sanitizer: ${{ matrix.san }}
+          coverage: ${{ matrix.cov }}
+          use_ninja: ${{ matrix.ninja || 'false' }}
+          build_with_modules: ${{ matrix.modules }}
+          llvm_apt: ${{ matrix.llvm_apt || 'false' }}
+          check_includes: ${{ matrix.check_includes || 'false' }}
+
+  mipsel-cpp20-gcc12:
+    name: mipsel-cpp20-gcc12
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the mipsel cross toolchain
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get -y --allow-unauthenticated install gcc-mipsel-linux-gnu g++-mipsel-linux-gnu
+          pip install --upgrade mama
+      - name: Cross build for mipsel
+        shell: bash
+        env:
+          NO_NINJA: 1
+        run: CXX20=1 mama mips verbose build jobs=$(nproc) # this target builds, it runs no tests
+
+  consumer:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: consumer-integration, compiler: gcc,   cc: gcc-14,   llvm_apt: "false" }
+          - { name: consumer-clang21,     compiler: clang, cc: clang-21, llvm_apt: "true" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/consumer-build
+        with:
+          compiler: ${{ matrix.compiler }}
+          cc_version: ${{ matrix.cc }}
+          llvm_apt: ${{ matrix.llvm_apt }}
+
+  android:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: android-cpp20-r27-clang-tidy-clang18,  ndk: "27.2.12479018" }
+          - { name: android-cpp20-r28b-clang-tidy-clang19, ndk: "28.2.13676358" }
+          - { name: android-cpp20-r29-clang-tidy-clang20,  ndk: "29.0.14206865" }
+          # every other Android job forces NO_NINJA=1, so CI never ran the NDK under Ninja.
+          # That is the generator a consumer picks, and the only one that scans modules
+          - { name: android-cpp20-r29-ninja,               ndk: "29.0.14206865", ninja: "true" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/android-build
+        with:
+          job_name: ${{ matrix.name }}
+          ndk_version: ${{ matrix.ndk }}
+          use_ninja: ${{ matrix.ninja || 'false' }}
+
+  win64-cpp20-msvc:
+    name: win64-cpp20-msvc
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mama
+        run: pip install --upgrade mama
+      - name: Print the toolset version
+        shell: pwsh
+        run: |
+          # the log names the toolset that built the run, so a failure needs no guess
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          & $vswhere -latest -products * -property catalog_productDisplayVersion
+          & $vswhere -latest -products * -property installationPath
+          cmake --version
+      - name: Build
+        shell: pwsh
+        env:
+          BUILD_WITH_MEM_SAFETY: "ON"
+          CXX20: "1"
+        run: mama windows verbose build with_tests jobs=4
+      - name: Tests
+        shell: pwsh
+        env:
+          CXX20: "1"
+        run: mama windows verbose test="-vv" jobs=4
+
+  consumer-msvc:
+    name: consumer-msvc
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mama
+        run: pip install --upgrade mama
+      - name: Build and run the consumer
+        shell: pwsh
+        env:
+          CXX20: "1"
+        run: |
+          cd tests/consumer
+          # a bare cmake message() writes to stderr, so the log needs 2>&1 to catch the
+          # modules line, and Continue keeps those lines from aborting the step
+          $ErrorActionPreference = 'Continue'
+          mama windows verbose build test jobs=4 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # AUTO turns modules off and keeps going, so without this the job would still pass
+          # if ReCpp stopped enabling modules when another project builds it
+          if (-not (Select-String -Path build.log -Pattern 'C\+\+20 Modules enabled' -Quiet)) {
+              Write-Host "FAIL: ReCpp built no modules as a dependency"
+              Select-String -Path build.log -Pattern 'MODULES'
+              exit 1
+          }
+      - name: Import the exported modules
+        shell: pwsh
+        env:
+          CXX20: "1"
+        run: |
+          cd tests/module_consumer
+          $ErrorActionPreference = 'Continue'
+          python run_test.py --compiler windows --expect modules --compare-paths --jobs 4 2>&1 |
+              Tee-Object -FilePath module_consumer.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

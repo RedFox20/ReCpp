@@ -1,11 +1,11 @@
 # ReCpp
 
-[![CircleCI](https://circleci.com/gh/RedFox20/ReCpp.svg?style=shield)](https://circleci.com/gh/RedFox20/ReCpp)
-[![Linux GCC](https://img.shields.io/badge/Linux-GCC_13--14-blue?logo=linux)](https://circleci.com/gh/RedFox20/ReCpp)
-[![Linux Clang](https://img.shields.io/badge/Linux-Clang_18-blue?logo=llvm)](https://circleci.com/gh/RedFox20/ReCpp)
-[![Windows MSVC](https://img.shields.io/badge/Windows-MSVC_2022-blue?logo=windows)](https://circleci.com/gh/RedFox20/ReCpp)
-[![Android Clang](https://img.shields.io/badge/Android-NDK_r29b_Clang_18-blue?logo=android)](https://circleci.com/gh/RedFox20/ReCpp)
-[![MIPS GCC](https://img.shields.io/badge/MIPS-GCC_12-blue)](https://circleci.com/gh/RedFox20/ReCpp)
+[![CI](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml/badge.svg)](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml)
+[![Linux GCC](https://img.shields.io/badge/Linux-GCC_13--14-blue?logo=linux)](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml)
+[![Linux Clang](https://img.shields.io/badge/Linux-Clang_18--21-blue?logo=llvm)](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml)
+[![Windows MSVC](https://img.shields.io/badge/Windows-MSVC_2026-blue?logo=windows)](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml)
+[![Android Clang](https://img.shields.io/badge/Android-NDK_r27--r29-blue?logo=android)](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml)
+[![MIPS GCC](https://img.shields.io/badge/MIPS-GCC_12-blue)](https://github.com/RedFox20/ReCpp/actions/workflows/ci.yml)
 ## Reusable Standalone C++ Libraries and Modules
 
 The goal of this project is to provide C++20 and C++23 developers with convenient and minimal cross-platform C++ utility libraries.
@@ -68,7 +68,7 @@ Requires `ANDROID_NDK_HOME` to be set. Installs `qemu-user` automatically on fir
 ./run_android_tests -vv test_delegate::virtuals   # run specific test case
 ```
 
-Uses a pre-built bionic sysroot from Android API 29 ([`.circleci/android-qemu-sysroot-api29/`](.circleci/android-qemu-sysroot-api29/))
+Uses a pre-built bionic sysroot from Android API 29 ([`.github/android-qemu-sysroot-api29/`](.github/android-qemu-sysroot-api29/))
 with a custom `liblog.so` that redirects `__android_log_*` to stdout/stderr with colored priority labels.
 
 
@@ -4857,18 +4857,24 @@ JArray bytes = getData.arrayF(JniType::Byte, instance);
 ```
 ---
 
-## Development > CircleCI Local
-Running CircleCI locally on WSL/Ubuntu. 
-If running on WSL, you need Docker Desktop with WSL2 integration enabled.
+## Development > CI
 
-You will need to configure a personal API token to use the CircleCI CLI.
-Read more at: https://circleci.com/docs/local-cli/#configure-the-cli
+GitHub Actions runs the build matrix from [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Four composite actions under [`.github/actions/`](.github/actions/) carry the shared steps:
+
+| Action | Jobs |
+|---|---|
+| `ubuntu-build` | the 19 compiler, standard and sanitizer combinations |
+| `consumer-build` | ReCpp built as a dependency, on gcc-14 and clang-21 |
+| `android-build` | the NDK builds, the QEMU tests and clang-tidy |
+
+A job runs plain `mama` commands, so any one reproduces locally. The C++20 gcc-13 ASAN job
+is this pair:
+
+```bash
+CXX20=1 mama gcc verbose asan build with_tests jobs=$(nproc)
+CXX20=1 mama gcc verbose test="nogdb -vv" jobs=$(nproc)
 ```
-curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | sudo bash
-circleci update && circleci setup
-```
-Executing the build locally, targeting the `clang-android-cpp20` Job:
-```
-circleci config process .circleci/config.yml > process.yml && \
-circleci local execute -c process.yml clang-android-cpp20
-```
+
+Read the matrix entry for the job you want, then map `compiler`, `std` and `san` onto those
+two commands.

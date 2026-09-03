@@ -800,8 +800,8 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ## 11. Changeset 7: CI, docs and measurement
 
-1. Both modules jobs are in `.circleci/config.yml`, gcc-14 and clang-21. The
-   clang-21 one registers apt.llvm.org itself, because the CI image carries no
+1. Both modules jobs are in `.github/workflows/ci.yml`, gcc-14 and clang-21. The
+   clang-21 one registers apt.llvm.org itself, because the runner image carries no
    such package. Five CI traps are handled and worth keeping: TSAN needs
    `setarch -R` to start, ninja ignores `jobs=` so a Ninja job needs `taskset`,
    `run_clang_tidy` has to find the compile database under `linux-clang`,
