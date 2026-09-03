@@ -43,7 +43,7 @@ fi
 echo "Using compile database: $COMPILE_DB"
 
 # deduplicate compile_commands.json (tests recompile sources with RPP_DEBUG=1)
-"$SCRIPT_DIR/.circleci/dedup_compile_commands.py" "$COMPILE_DB" > /dev/null
+"$SCRIPT_DIR/.github/dedup_compile_commands.py" "$COMPILE_DB" > /dev/null
 
 # use NDK clang-tidy for android builds
 CLANG_TIDY_ARGS=()
@@ -51,7 +51,7 @@ if [[ "$PLATFORM" == "android" ]]; then
     NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
     if [[ -z "$NDK_HOME" ]]; then
         echo "ERROR: ANDROID_NDK_HOME or ANDROID_NDK_ROOT must be set for --android" >&2
-        ls /home/circleci/android-sdk/ndk/
+        ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}/ndk/" 2>&1 || true
         exit 1
     fi
     NDK_CLANG_TIDY="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang-tidy"

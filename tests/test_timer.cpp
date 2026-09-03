@@ -608,9 +608,11 @@ TestImpl(test_timer)
 
         // rate sync: synced-monotonic and realtime must advance together over a short window (wall-clock
         // steps are negligible across a few ms), which is the precise synchronization timestamps rely on.
-        rpp::TimePoint r1 = rpp::TimePoint::now(), m1 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+        rpp::TimePoint r1 = rpp::TimePoint::now();
+        rpp::TimePoint m1 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
         spin_sleep_for_us(20'000, /*full_spin*/true);
-        rpp::TimePoint r2 = rpp::TimePoint::now(), m2 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
+        rpp::TimePoint r2 = rpp::TimePoint::now();
+        rpp::TimePoint m2 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
         rpp::int64 skew_us = ((m2 - m1) - (r2 - r1)).abs().micros();
         print_info("Monotonic vs Realtime rate skew over 20ms: %lldus\n", skew_us);
         AssertLess(skew_us, 2'000);

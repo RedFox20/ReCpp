@@ -601,6 +601,8 @@ namespace rpp
         }
     }
 
+    // the spawn loop and the reuse loop share the task array, so splitting them hides the lifetime
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     void thread_pool::parallel_for(int range_start, int range_end, int max_range_size,
                                    const action<int, int>& range_task)
     {

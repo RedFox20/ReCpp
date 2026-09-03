@@ -1,0 +1,76 @@
+name: Android NDK build and test
+description: Builds for Android with a pinned NDK, runs the tests under QEMU, then runs clang-tidy
+
+inputs:
+  job_name:
+    description: The name this job reports into the run summary
+    required: true
+  ndk_version:
+    description: The exact NDK version to install, for example 29.0.14206865
+    required: true
+  use_ninja:
+    description: true builds under Ninja, the generator a consumer picks
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install the NDK and the test tools
+      shell: bash
+      run: |
+        sudo apt-get update
+        # qemu-user runs the aarch64 test binary, and clang-tidy runs the analysis step
+        sudo apt-get install -y clang-tidy qemu-user
+        # the runner image carries other NDK releases, so pin the one this job names
+        "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;${{ inputs.ndk_version }}"
+        NDK_PATH="$ANDROID_HOME/ndk/${{ inputs.ndk_version }}"
+        test -d "$NDK_PATH" || { echo "NDK ${{ inputs.ndk_version }} did not install"; exit 1; }
+        {
+          # mama reads ANDROID_NDK_LATEST_HOME before ANDROID_NDK_HOME, and the runner image
+          # points it at its own NDK, so every job built with that one until this line
+          echo "ANDROID_NDK_LATEST_HOME=$NDK_PATH"
+          echo "ANDROID_NDK_HOME=$NDK_PATH"
+          echo "ANDROID_NDK_ROOT=$NDK_PATH"
+          echo "NO_NINJA=$([[ '${{ inputs.use_ninja }}' == 'true' ]] && echo '' || echo '1')"
+        } >> "$GITHUB_ENV"
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install mama
+      shell: bash
+      run: pip install --upgrade mama
+
+    - name: Build Android NDK ${{ inputs.ndk_version }}
+      shell: bash
+      run: |
+        echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+        JOBS=$(nproc)
+        # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
+        NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
+        $NINJA_CAP env CXX20=1 mama android verbose build with_tests jobs=$JOBS
+
+    - name: Run the tests under QEMU aarch64
+      shell: bash
+      run: ./run_android_tests -vv | tee "$RUNNER_TEMP/test_output.txt"
+
+    - name: Report the test count
+      if: always()
+      shell: bash
+      run: |
+        # the run summary carries the count, so a reader compares it without a scroll
+        LINE=""
+        if [ -f "$RUNNER_TEMP/test_output.txt" ]; then
+          LINE=$(sed -e 's/\x1b\[[0-9;]*m//g' -e 's/\r//g' "$RUNNER_TEMP/test_output.txt" \
+                 | grep -a -m1 "SUCCESS: " || true)
+        fi
+        [ -n "$LINE" ] || LINE="no SUCCESS line: the tests failed, or the run stopped before them"
+        { echo "### ${{ inputs.job_name }}"; echo; echo '```'; echo "$LINE"; echo '```'; } \
+          >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Clang Tidy Analysis
+      # clang-tidy is slow during a build, so it runs as its own step
+      shell: bash
+      run: ./run_clang_tidy --android -j 5

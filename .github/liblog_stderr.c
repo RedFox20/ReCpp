@@ -4,7 +4,7 @@
  * ERROR/FATAL go to stderr, everything else to stdout.
  * Each log call is a separate line (matching real Android logcat behavior).
  *
- * Build: .circleci/build_liblog.sh
+ * Build: .github/build_liblog.sh
  */
 #include <stdio.h>
 #include <stdarg.h>

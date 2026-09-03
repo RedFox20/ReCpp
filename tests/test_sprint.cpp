@@ -215,6 +215,8 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "0.0009765625");
 
         sb.clear();
+        // the assert below pins this exact text, and std::numbers::pi does not print it
+        // NOLINTNEXTLINE(modernize-use-std-numbers)
         sb.write_real(3.14159265358979, 14);
         AssertThat(sb.view(), "3.14159265358979");
 

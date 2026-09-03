@@ -15,7 +15,8 @@ using namespace rpp;
 
 #if RPP_HAS_COROUTINES
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+// the loop outlives every coroutine below, so a reference parameter cannot dangle
+// NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines,cppcoreguidelines-avoid-reference-coroutine-parameters)
 namespace
 {
     rpp::task<int> task_leaf(rpp::event_loop& loop)
@@ -278,7 +279,7 @@ TestImpl(test_task)
         AssertThat(result, 7);
     }
 
-    // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+    // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines,cppcoreguidelines-avoid-reference-coroutine-parameters)
 
 #endif // RPP_HAS_COROUTINES
 };

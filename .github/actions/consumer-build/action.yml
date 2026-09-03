@@ -1,0 +1,88 @@
+name: Consumer integration build
+description: Builds ReCpp the way another project builds it, as a dependency and not the root
+
+inputs:
+  compiler:
+    description: gcc or clang
+    required: true
+  cc_version:
+    description: The compiler package. It must clear the modules minimum, gcc-14 or clang-21
+    required: true
+  llvm_apt:
+    description: true registers apt.llvm.org, for a clang release the runner image does not carry
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get -y --allow-unauthenticated install libdw-dev libunwind-dev ninja-build
+
+    - name: Register apt.llvm.org for ${{ inputs.cc_version }}
+      if: inputs.llvm_apt == 'true'
+      shell: bash
+      run: |
+        LLVM_VER=$(echo "${{ inputs.cc_version }}" | cut -d- -f2)
+        wget -qO "$RUNNER_TEMP/llvm.sh" https://apt.llvm.org/llvm.sh
+        chmod +x "$RUNNER_TEMP/llvm.sh"
+        sudo "$RUNNER_TEMP/llvm.sh" $LLVM_VER
+        # CMake scans module dependencies with clang-scan-deps, which ships in
+        # clang-tools. Without it a modules build configures and then fails.
+        sudo apt-get install -y clang-tools-$LLVM_VER
+        # CMake also accepts the unversioned name, so alias it the way mama aliases clang
+        sudo update-alternatives --install /usr/bin/clang-scan-deps clang-scan-deps \
+                                 /usr/bin/clang-scan-deps-$LLVM_VER 100
+        # fail here, where the cause is obvious, instead of at the modules check later
+        clang-scan-deps --version
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install mama and ${{ inputs.cc_version }}
+      shell: bash
+      run: |
+        pip install --upgrade mama
+        mama install-${{ inputs.cc_version }}
+
+    # Ninja plus a compiler over the modules minimum turns modules on by itself, so this
+    # job builds ReCpp with modules the way a downstream project builds it.
+    - name: Build and run the consumer with ${{ inputs.cc_version }}
+      shell: bash
+      run: |
+        JOBS=$(nproc)
+        cd tests/consumer
+        # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
+        CXX20=1 taskset -c 0-$((JOBS - 1)) mama ${{ inputs.compiler }} verbose build test jobs=$JOBS 2>&1 \
+          | tee build.log
+        # AUTO turns modules off and keeps going, so without this the job would still pass
+        # if ReCpp stopped enabling modules when another project builds it
+        if ! grep -q "C++20 Modules enabled" build.log; then
+          echo "FAIL: ReCpp built no modules as a dependency"
+          grep -i "MODULES" build.log
+          # a missing binary blames this job, a set binary with an empty cache entry blames
+          # the build tool, which configures a dependency differently from a root target
+          echo "--- clang-scan-deps on this box ---"
+          ls -la /usr/bin/clang-scan-deps* /usr/lib/llvm-*/bin/clang-scan-deps 2>&1 | head
+          echo "--- what cmake resolved for the ReCpp dependency ---"
+          find .. -name CMakeCache.txt -path "*ReCpp*" \
+               -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
+          exit 1
+        fi
+
+    - name: Import the exported modules with ${{ inputs.cc_version }}
+      shell: bash
+      run: |
+        # this job clears the modules minimum, so the consumer must take the module path.
+        # --compare-paths builds the same source through the headers and compares the report.
+        # --unicode-off reaches the half of the module surface no consumer job builds, because
+        # config.h turns unicode on for every one of them
+        JOBS=$(nproc)
+        UNICODE_OFF=$([[ ${{ inputs.compiler }} == "gcc" ]] && echo "--unicode-off g++-14" || echo "")
+        cd tests/module_consumer
+        CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
+            --compiler ${{ inputs.compiler }} --expect modules --compare-paths --jobs $JOBS $UNICODE_OFF
