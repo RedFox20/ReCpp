@@ -786,7 +786,7 @@ TestImpl(test_event_loop)
         bg_may_finish.store(true);
         rpp::Timer drain;
         while ((loop->pending_completions() == 0 || loop->background_tasks() != 0)
-               && drain.elapsed_ms() < 1000.0)
+               && drain.elapsed_ms() < 1000)
             rpp::sleep_ms(1);
 
         AssertThat(loop->background_tasks(), 0);

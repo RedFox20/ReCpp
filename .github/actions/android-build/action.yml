@@ -26,6 +26,9 @@ runs:
         NDK_PATH="$ANDROID_HOME/ndk/${{ inputs.ndk_version }}"
         test -d "$NDK_PATH" || { echo "NDK ${{ inputs.ndk_version }} did not install"; exit 1; }
         {
+          # mama reads ANDROID_NDK_LATEST_HOME before ANDROID_NDK_HOME, and the runner image
+          # points it at its own NDK, so every job built with that one until this line
+          echo "ANDROID_NDK_LATEST_HOME=$NDK_PATH"
           echo "ANDROID_NDK_HOME=$NDK_PATH"
           echo "ANDROID_NDK_ROOT=$NDK_PATH"
           echo "NO_NINJA=$([[ '${{ inputs.use_ninja }}' == 'true' ]] && echo '' || echo '1')"
