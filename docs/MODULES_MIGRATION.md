@@ -1,9 +1,10 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 5. Three modules exist: `rpp.strview`, `rpp.debugging` and `rpp.config`.
+Revision 6. Six modules exist: `rpp.config`, `rpp.minmax`, `rpp.obfuscated_string`,
+`rpp.scopeguard`, `rpp.strview` and `rpp.debugging`.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 41 headers.
+gives the phased plan for the remaining 38 headers.
 
 ## Handover state
 
@@ -12,21 +13,21 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| `rpp.strview`, `rpp.debugging`, `rpp.config` | build and pass on gcc-14, clang-21, MSVC 14.44 |
+| the six modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.44 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
-| `tools/check_includes.py` | 5 checks. 4 gate CI, and `missing` stays ungated |
+| `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test, 3 cases |
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | green, all 29 jobs, and no job pins a mama branch |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives `rpp.config`, `rpp.strview` and `rpp.debugging`.
-5 remains, and 4 rides on the generator `--check`. Section 11 lists what 7 owes.
+6 landed. The generator drives all six modules. 4 is done through the generator
+`--check`. 5 is in progress, with the L0 layer complete. Section 11 lists what 7 owes.
 
-**Next action:** changeset 5, the L0 layer first. Section 9 has the layers.
+**Next action:** changeset 5, the L1 layer. Section 9 has the layers.
 
 **Open questions:** `BUGS.md` B2 and B5. B2 reaches this work through CI, and the
 owner rules it test construction rather than a defect.
@@ -190,9 +191,8 @@ the global module fragment, behind an `RPP_EXPORT` macro, as fmt does.
 
 Both alternatives attach `rpp::strview` to the module. That creates a second,
 distinct entity next to the one inside `libReCpp.a`. Every consumer of ReCpp
-would then have to switch at the same time, and C++17 support would end. A
-program that mixes an `#include` and an `import` would violate the
-one-definition rule.
+would then have to switch at the same time. A program that mixes an `#include`
+and an `import` would violate the one-definition rule.
 
 Reject both. Keep the facade. The cost is the hand-maintained export list, and
 section 7 automates it away.
@@ -449,13 +449,13 @@ Cross-referencing every `#define` against README gives:
 
 | Header | Public macros | What they are |
 |---|---|---|
-| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX17`, and the platform probes |
+| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX20`, and the platform probes |
 | `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
 | `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
 | `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |
 | `future_types.h` | 2 | `RPP_CORO_STD`, `RPP_HAS_COROUTINES` |
 | `mutex.h` | 2 | `RPP_HAS_CRITICAL_SECTION_MUTEX`, `RPP_SYNC_T` |
-| `close_sync.h`, `minmax.h`, `obfuscated_string.h`, `scope_guard.h`, `strview.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `make_obfuscated`, `scope_guard`, `RPP_CONSTEXPR_STRLEN` |
+| `close_sync.h`, `minmax.h`, `scope_guard.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `scope_guard` |
 
 Everything else is an implementation macro (`DELEGATE_FINLINE`, `_rpp_wrap_args`,
 `__log_format`) and needs no plan.
@@ -625,21 +625,51 @@ Build `tools/gen_module_exports.py` on libclang. `libclang-18.so` is present on
 this machine, and `update_doc_linerefs.py` already proves the repo accepts a
 Python declaration scanner.
 
-The tool:
+The tool, as built:
 
-1. Reads the compile flags for the header from `compile_commands.json`.
-2. Parses the header and keeps every top-level declaration in namespace `rpp`
-   and its nested namespaces, whose source location is that header.
-3. Drops names that start with `_`, and deduplicates by name, because one
-   using-declaration covers every overload.
+1. Parses the header with fixed flags, `-x c++ -std=c++20 -I src` plus a compiler
+   builtin include dir. It reads no `compile_commands.json`, so it needs no build dir.
+2. Keeps every top-level declaration in namespace `rpp` and its nested namespaces,
+   whose source location is that header. It also walks one `extern "C"` linkage
+   spec, which is how the `RPPCAPI` logging names reach the list.
+3. Drops a name which starts with `__`, and deduplicates by name, because one
+   using-declaration covers every overload. `__wrap` and `__clean_type` are
+   allowlisted, because the logging macros expand to them. A single leading
+   underscore stays, because `_LogInfo` and `_FmtString` are part of that surface.
+   It also drops an internal-linkage name, because clang rejects a using-declaration
+   which exports a `static` function. gcc accepts one, so only clang-21 caught it.
 4. Reads the include list of the header and emits one `export import rpp.X;` per
    rpp include (D5).
 5. Writes the `.cppm` between two marker comments, so hand-written parts survive.
 6. `--check` mode re-generates into memory and diffs. A difference fails CI.
+7. Reports a module whose name repeats a macro any rpp header defines, and `STEMS` holds
+   the rename. MSVC expands that name inside `export module` and inside `import`, so an
+   `#undef` in the fragment fixes the producer and leaves every importer broken.
+   `scope_guard.h` names module `rpp.scopeguard` for that reason.
+8. Reports a public name which internal linkage hides. clang refuses to export one, so
+   the generator drops it, and a silent drop would let `--check` approve an empty facade.
+   `INTERNAL_OK` names the helpers whose loss is intended, and it is empty.
 
-Run it under each macro configuration that changes the surface
-(`RPP_ENABLE_UNICODE` on and off, Windows and POSIX) and emit the union under
-the matching `#if`.
+**Internal linkage is a defect in a header a module wraps, not a case to work around.**
+MSVC gave `obfuscated_string.h` C2129 when a module-only test instantiated `to_string()`,
+because an importing TU cannot reach a `static` helper the header only declares to it. The
+two helpers dropped `static`, which a `constexpr` function needs for external linkage, and
+they export like every other name.
+
+**L1 starts with `math.h`.** All 12 of its public names are `static constexpr` or a
+namespace-scope `constexpr`, so every one has internal linkage and the gate reports it.
+Give each one external linkage before you write `rpp-math.cppm`.
+
+It runs under `RPP_ENABLE_UNICODE` on and off, and guards the difference with that
+`#if`. **The Windows and POSIX axis is not implemented.** A declaration which exists
+on one platform only is missed when the generator runs on the other. The compiler axis
+has the same hole: libclang defines `__clang__`, so the generator never sees the GCC
+`_obfuscated` literal operator. `rpp-obfuscated_string.cppm` exports it by hand, below
+the markers, and `test_modules` covers it.
+
+**A module carries no preprocessor state.** `minmax.h` undefines the Windows `min` and
+`max` macros, and an `import` cannot repeat that. A Windows importer needs `NOMINMAX`
+or the header. No export list closes this, so the README states it per module.
 
 **Estimate: 1.5 days**, including the `--check` CI gate.
 
@@ -658,9 +688,9 @@ module and the header both name.
 
 **What it does not prove.** The file includes `<rpp/tests.h>` for `TestImpl`, which
 pulls in `<rpp/debugging.h>`. So a name the module forgets can still resolve through
-the header, and the test passes anyway. An earlier revision kept a separate
-translation unit that included no rpp header to close that hole. That file was an
-outlier, and it is gone.
+the header, and the test passes anyway. `tests/module_consumer/` closes that hole
+from the other side. `config_module_only.cpp` imports `rpp.config` and includes no
+header, and `c_visibility.c` includes `config.h` from C.
 
 **Where the real gate belongs: changeset 3.** `gen_module_exports.py --check`
 compares the generated export list against the header's declarations statically. It
@@ -687,7 +717,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 
 | Layer | Modules | Count |
 |---|---|---|
-| L0 | **config.types** ✓, minmax, obfuscated_string, scope_guard | 4 |
+| L0 | **config.types** ✓, **minmax** ✓, **obfuscated_string** ✓, **scope_guard** ✓ | 4 |
 | L1 | bitutils, **debugging** ✓, delegate, endian, future_types, math, predicates, proc_utils, sort, source_loc, **strview** ✓, timepoint, traits, type_traits | 14 |
 | L2 | atomic_timepoint, collections, sprint, stack_trace, task, threads, timer, vec | 8 |
 | L3 | load_balancer, memory_pool, mutex, paths, tests | 5 |
@@ -698,7 +728,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-44 modules and one umbrella. `rpp.strview`, `rpp.debugging` and `rpp.config` exist, so 41 remain. Excluded:
+44 modules and one umbrella. The L0 layer, `rpp.strview` and `rpp.debugging` exist, so 38 remain. Excluded:
 `config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
 it is Android glue. `tests.h` is in, and it is the one header whose macros split
 into `tests_macros.h`.
@@ -808,12 +838,12 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 ## 13. Acceptance criteria
 
 1. `tools/check_includes.py self-contained --check` exits 0.
-2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests` and
-   `RppModuleTests`, and both pass every test, on gcc-14 and clang-21. Every
+2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests`, which carries
+   the module checks, and it passes every test on gcc-14 and clang-21. Every
    tier 2 compiler still passes the headers-only build.
 3. Every one of the 44 headers has a `.cppm`, and `gen_module_exports.py
    --check` reports no difference.
-4. `examples/module_consumer/` builds against an installed ReCpp using only
+4. `tests/module_consumer/` builds against an installed ReCpp using only
    `import rpp;`, and links.
 5. The mixed-mode link check passes.
 6. README.md documents the contract of section 10 and carries a measured
@@ -826,8 +856,8 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | 1b | remove 3 unused, review 49 redundant and 60 std | 1 | D5 | done, PR #63 |
 | 2 | add the rpp-header include check | 0.5 | changeset 3 | done |
 | 3 | generate the export lists | 1.5 | changeset 5 | done |
-| 4 | dual-mode test harness | 0.5 | changeset 5 | waits for 3 |
-| 5 | 41 modules plus the umbrella | 2.5 | changeset 6 | 3 of 44 written |
+| 4 | dual-mode test harness | 0.5 | changeset 5 | done, the generator --check is the gate |
+| 5 | 38 modules plus the umbrella | 2.5 | changeset 6 | 6 of 44 written |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 

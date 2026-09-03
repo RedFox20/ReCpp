@@ -1,5 +1,9 @@
+// the scope_guard() macro comes only from the header, so this test cannot import alone
 #include <rpp/scope_guard.h>
 #include <rpp/tests.h>
+#if RPP_BUILD_WITH_MODULES
+import rpp.scopeguard; // includes come first, the import goes last
+#endif
 using namespace rpp;
 
 

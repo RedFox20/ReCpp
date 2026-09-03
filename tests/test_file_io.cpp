@@ -625,6 +625,16 @@ TestImpl(test_file_io)
         AssertThat(last(home_dir()), '/');
     }
 
+    // test_obfuscated_string scans this file for plaintext, so it must name a real executable
+    TestCase(module_path_names_the_running_executable)
+    {
+        std::string exe = module_path();
+        AssertNotEqual(exe, std::string{});
+        AssertTrue(file_exists(exe));
+        AssertGreater(file_size(exe), 0);
+        AssertThat(module_dir(), folder_path(strview{exe}));
+    }
+
     // validate that UTF16 file paths work correctly
     TestCase(can_handle_utf8_file_paths)
     {

@@ -3,129 +3,72 @@
  * Compile-time string obfuscation, Copyright (c) 2017, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include <string>
-#include <utility>
+#include <string>      // std::string
+#include <string_view> // std::string_view
 
 namespace rpp
 {
-    static constexpr char obfuscate  (char ch, int i) { return char((ch + i) ^ 0x55); }
-    static constexpr char deobfuscate(char ch, int i) { return char((ch ^ 0x55) - i); }
-
-    template<int... i>  using int32_sequence = std::integer_sequence<int, i...>;
-    template<int count> using int32_indices  = std::make_integer_sequence<int, count>;
-
-
-
-    template<class T> struct obfuscated_string // unspecialized dummy
-    {
-    };
-
     /**
-     * Compile-time obfuscated string to prevent easy decompilation of app strings
-     * This will greatly reduce the possibility of reverse engineering stored URL's
+     * @brief A string literal scrambled at compile time, so the plaintext never becomes static data.
      *
-     * Note:
-     *   Works in both Debug and Release builds
-     *   This is a C++14 GNU extension available with GCC and clang
+     * The constructor is consteval, so only the scrambled bytes reach the binary. Each byte mixes in
+     * its own index, so a repeated character does not repeat in the output.
      *
      * Usage:
+     *   using namespace rpp::literals;
      *   constexpr auto email = "super@secret.com"_obfuscated;
-     *   
-     *   cout << "Obfuscated:   '" << email.obfuscated() << "'\n";
-     *   cout << "Deobfuscated: '" << email.to_string()  << "'\n";
+     *   std::string plain = email.to_string();
      *
-     * Result:
-     *   Obfuscated:   '&#'=#,9>.:*o%()'
-     *   Deobfuscated: 'super@secret.com'
+     * @warning This defeats a strings dump of the binary. It is not encryption, and anyone who
+     *          runs the program under a debugger reads the plaintext out of to_string().
      */
-    template<char... chars>
-    struct obfuscated_string<std::integer_sequence<char, chars...>> // specialize for tstring
+    // N is the array size of the literal, so the constructor deduces it with no deduction guide,
+    // which a module cannot export
+    template<int N>
+    struct obfuscated_string
     {
-        static constexpr int length = sizeof...(chars);
-        template<int... index> static std::string create_obfuscated_string(int32_sequence<index...>)
+        static constexpr int length = N - 1;
+
+        char chars[N]; // public, so a test can read the object representation
+
+        consteval obfuscated_string(const char (&str)[N]) noexcept : chars{}
         {
-            static constexpr char str[length] = { obfuscate(chars, index)... };
-            return {str, str + length };
+            for (int i = 0; i < length; ++i) chars[i] = scramble(str[i], i);
         }
-        const std::string& obfuscated() const
-        {
-            static const std::string str = create_obfuscated_string(int32_indices<sizeof...(chars)>{});
-            return str;
-        }
+
+        /// @returns the scrambled bytes, which never match the plaintext
+        constexpr std::string_view obfuscated() const & noexcept { return { chars, length }; }
+
+        /// The view would outlive a temporary, so this call does not compile. Name the object first.
+        void obfuscated() const && = delete;
+
+        /// @returns the plaintext, restored into a fresh string
         std::string to_string() const
         {
-            std::string result = obfuscated();
-            for (int i = 0; i < sizeof...(chars); ++i)
-                result[i] = deobfuscate(result[i], i);
-            return result;
+            // volatile forces a real load, so the optimizer cannot fold the plaintext back into the binary
+            const volatile char* src = chars;
+            std::string out(length, '\0');
+            for (int i = 0; i < length; ++i) out[i] = unscramble(src[i], i);
+            return out;
         }
+
+    private:
+        // the index mixes in, so a repeated character does not repeat in the output
+        static constexpr char scramble(char ch, int i) noexcept { return char((ch + i) ^ 0x55); }
+        static constexpr char unscramble(char ch, int i) noexcept { return char((ch ^ 0x55) - i); }
     };
 
+    /// Creates a compile-time obfuscated string from a string literal.
+    template<int N>
+    consteval obfuscated_string<N> make_obfuscated(const char (&str)[N]) noexcept { return { str }; }
 
-
-    template<class T> struct macro_obfuscated_string // unspecialized dummy
+    inline namespace literals
     {
-    };
-
-    /**
-     * @brief Since MSVC++ does not implement 'template<class T, T... chars>' special
-     * literal extension, we need another type to expand from macros.
-     * So if you need cross-platform support, please use the below syntax:
-     * 
-     * Usage:
-     *   constexpr auto email = make_obfuscated("super@secret.com");
-     *   
-     *   cout << "Obfuscated:   '" << email.obfuscated() << "'\n";
-     *   cout << "Deobfuscated: '" << email.to_string()  << "'\n";
-     * 
-     * Result:
-     *   Obfuscated:   '&#'=#,9>.:*o%()'
-     *   Deobfuscated: 'super@secret.com'
-     */
-    template<int... index>
-    struct macro_obfuscated_string<int32_sequence<index...>> 
-    {
-        static constexpr int length = sizeof...(index);
-        char chars[length];
-        constexpr macro_obfuscated_string(const char* const str) 
-            : chars{ obfuscate(str[index], index)... } {}
-        std::string obfuscated() const
-        {
-            return { chars, chars + length };
-        }
-        std::string to_string() const
-        {
-            std::string result = obfuscated();
-            for (int i = 0; i < length; ++i)
-                result[i] = deobfuscate(result[i], i);
-            return result;
-        }
-    };
-
-
-
-#if __clang__ || __GNUC__
-
-#if __GNUC__ && !__clang__
-    template<class T, T... chars> constexpr auto operator ""_obfuscated()
-    {
-        return obfuscated_string<std::integer_sequence<char, chars...>>{};
+        /// Creates a compile-time obfuscated string: `constexpr auto s = "text"_obfuscated;`
+        template<obfuscated_string S> constexpr auto operator ""_obfuscated() noexcept { return S; }
     }
-#endif
-
-    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>(str)
-
-#elif _MSC_VER
-
-    //template<char... chars> constexpr auto operator"" _obfuscated()
-    //{
-    //    return rpp::obfuscated_string<std::integer_sequence<char, chars...>>{};
-    //}
-
-    #define make_obfuscated(str) rpp::macro_obfuscated_string<rpp::int32_indices<sizeof(str)-1>>{str}
-
-#else
-    static_assert(false, "obfuscated_string not yet supported on this compiler");
-#endif
-
 }
+
+// make_obfuscated was a global macro, so an existing unqualified call still resolves.
+// A module exports no using-declaration, so an importer writes rpp::make_obfuscated
+using rpp::make_obfuscated;

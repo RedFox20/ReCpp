@@ -1,7 +1,11 @@
+// <rpp/tests.h> includes minmax.h, so this test cannot import alone until rpp.tests exists
 #include <rpp/minmax.h>
 #include <cfloat>  // FLT_MIN
 #include <climits> // INT_MIN
 #include <rpp/tests.h>
+#if RPP_BUILD_WITH_MODULES
+import rpp.minmax; // includes come first, the import goes last
+#endif
 using namespace std::literals;
 
 TestImpl(test_minmax)

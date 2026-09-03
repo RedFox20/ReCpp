@@ -86,9 +86,10 @@ def _cursors_in(tu, path: str):
 
 
 def declarations(header: str, defines: tuple = ()) -> list:
-    """The declarations this header makes, as `(namespace, kind, name)`, in source order.
+    """The declarations this header makes, as `(namespace, kind, name, internal)`, in source order.
 
-    One declaration carries every overload of a name, so the caller deduplicates.
+    One declaration carries every overload of a name, so the caller deduplicates. `internal`
+    marks internal linkage, which clang refuses to export. The caller decides what to do.
     """
     cindex = _cindex()
     me = os.path.abspath(_resolve(header))
@@ -105,12 +106,13 @@ def declarations(header: str, defines: tuple = ()) -> list:
                 continue
             f = k.location.file
             if not (f and os.path.abspath(f.name) == me and k.spelling): continue
-            out.append(('::'.join(ns), k.kind.name, k.spelling))
+            internal = k.linkage == cindex.LinkageKind.INTERNAL
+            out.append(('::'.join(ns), k.kind.name, k.spelling, internal))
             # an unscoped enum needs one using-declaration per enumerator, the enum type does not carry them
             if k.kind == cindex.CursorKind.ENUM_DECL and not k.is_scoped_enum():
                 for e in k.get_children():
                     if e.kind == cindex.CursorKind.ENUM_CONSTANT_DECL and e.spelling:
-                        out.append(('::'.join(ns), e.kind.name, e.spelling))
+                        out.append(('::'.join(ns), e.kind.name, e.spelling, False))
 
     walk(parse(header, defines).cursor, [])
     return out
@@ -122,6 +124,7 @@ namespace rpp {
     enum class Scoped { A, B };                    // scoped, its enumerators do not
     template<class T> struct __wrap {};            // a macro helper, exported by allowlist
     template<class T> struct __hidden {};          // a private double-underscore name
+    static constexpr int internal_fn(int i) { return i; } // internal linkage, never exportable
     struct Public {};
 }
 extern "C" { void c_api(); }                       // one linkage spec deep, like RPPCAPI
@@ -129,20 +132,25 @@ extern "C" { void c_api(); }                       // one linkage spec deep, lik
 
 
 def selftest() -> list:
-    """Crafts a header and checks the four extraction rules the module surface depends on."""
+    """Crafts a header and checks the five extraction rules the module surface depends on."""
     import tempfile
     bad = []
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
-        got = {(ns, name) for ns, kind, name in declarations(path)}
+        decls = declarations(path)
+        got = {(ns, name) for ns, kind, name, internal in decls}
         want = {('rpp', 'Sev'), ('rpp', 'SevInfo'), ('rpp', 'SevWarn'),  # unscoped enum + members
                 ('rpp', 'Scoped'), ('rpp', '__wrap'), ('rpp', '__hidden'),
-                ('rpp', 'Public'), ('', 'c_api')}                        # extern "C" reaches c_api
+                ('rpp', 'Public'), ('rpp', 'internal_fn'), ('', 'c_api')}  # extern "C" reaches c_api
         missing = want - got
         if missing: bad.append(f'declarations dropped {sorted(missing)}')
         # a scoped enum keeps its members out of the namespace
         if ('rpp', 'A') in got: bad.append('a scoped enum leaked its enumerator A')
+        # clang refuses to export an internal-linkage name, so the caller needs to see the flag
+        flags = {name: internal for ns, kind, name, internal in decls}
+        if not flags.get('internal_fn'): bad.append('a static function is not marked internal')
+        if flags.get('Public'): bad.append('an external-linkage struct is marked internal')
     return bad
 
 

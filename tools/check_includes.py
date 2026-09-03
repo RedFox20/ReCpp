@@ -554,7 +554,11 @@ def _translate(src: str) -> tuple:
 
 
 def scan_import_order(name: str, src: str) -> str:
-    """The finding for one file, or an empty string. Takes the text, so a case needs no tree."""
+    """The finding for one file, or an empty string. Takes the text, so a case needs no tree.
+
+    The rule reads the text, not the branches. A file which picks the module or the header
+    writes `#if !RPP_BUILD_WITH_MODULES` first, so the #include still stands above the import.
+    """
     code, origin = _translate(src)
     line_of = lambda k: src.count('\n', 0, origin[min(k, len(origin) - 1)]) + 1
     import_line, offset = 0, 0
@@ -598,6 +602,12 @@ SOURCES = ('.h', '.inl', '.cpp', '.cppm', '.mm')
 SELFTEST = [
     ('late_include.cppm',        b'import m;\n#include <string>\n', 2),
     ('includes_first.cppm',      b'#include <string>\nimport m;\n', 0),
+    # a test picks the module or the header, and the #include still goes above the import
+    ('include_or_import.cpp',    b'#if !M\n#include <string>\n#else\nimport m;\n#endif\n', 0),
+    # the same pair the other way round. The branches exclude each other, and the rule still holds
+    ('import_or_include.cpp',    b'#if M\nimport m;\n#else\n#include <string>\n#endif\n', 4),
+    ('include_after_endif.cpp',  b'#if M\nimport m;\n#endif\n#include <string>\n', 4),
+    ('sibling_conditionals.cpp', b'#if A\nimport m;\n#endif\n#if B\n#include <string>\n#endif\n', 5),
     ('header_import.h',          b'import m;\n', 1),
     ('inline_import.inl',        b'import m;\n', 1),
     ('digraph.cppm',             b'import m;\n%:include <string>\n', 2),

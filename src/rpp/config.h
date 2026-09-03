@@ -72,18 +72,12 @@
 
 #if __cplusplus
 #  if _MSC_VER
-#    define RPP_HAS_CXX17 (_MSVC_LANG > 201402)
-#  else
-#    define RPP_HAS_CXX17 (__cplusplus >= 201703L)
-#  endif
-#endif
-
-#if __cplusplus
-#  if _MSC_VER
 #    define RPP_HAS_CXX20 (_MSVC_LANG >= 202002L)
 #  else
 #    define RPP_HAS_CXX20 (__cplusplus >= 202002L)
 #  endif
+   // C++20 is the floor, so a wrong -std stops here instead of deep inside a header
+   static_assert(RPP_HAS_CXX20, "ReCpp requires C++20 or higher");
 #endif
 
 #if __cplusplus
@@ -99,22 +93,6 @@
 #    define RPP_HAS_CXX26 (_MSVC_LANG > 202302L)
 #  else
 #    define RPP_HAS_CXX26 (__cplusplus > 202302L)
-#  endif
-#endif
-
-#if __cplusplus
-#  if RPP_HAS_CXX17
-#    define RPP_INLINE_STATIC inline static
-#  else
-#    define RPP_INLINE_STATIC static
-#  endif
-#endif
-
-#if __cplusplus
-#  if __cpp_if_constexpr
-#    define RPP_CXX17_IF_CONSTEXPR if constexpr
-#  else
-#    define RPP_CXX17_IF_CONSTEXPR if
 #  endif
 #endif
 

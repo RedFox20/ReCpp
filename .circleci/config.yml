@@ -101,6 +101,9 @@ jobs:
                   # the libclang traversal decides a real module surface, so a crafted header pins it
                   python3 tools/rpp_decls.py selftest
                   python3 tools/check_includes.py rpp-includes --check
+                  # MSVC expands a macro named inside the module directive, so a crafted
+                  # fragment pins where the global module fragment must undefine it
+                  python3 tools/gen_module_exports.py --selftest
                   # a hand-written export list rots, so this fails when a .cppm no longer
                   # matches the header it wraps
                   python3 tools/gen_module_exports.py --all --check
@@ -294,11 +297,11 @@ jobs:
     parameters:
       docker_image:
         type: enum
-        enum: ["cimg/android:2023.08.1-ndk", "cimg/android:2024.11.1-ndk", "cimg/android:2025.12.1-ndk", "cimg/android:2026.03.1-ndk"]
+        enum: ["cimg/android:2024.11.1-ndk", "cimg/android:2025.12.1-ndk", "cimg/android:2026.03.1-ndk"]
         description: "Android NDK docker image"
       toolchain:
         type: string
-        description: "Informational toolchain description, e.g. ndk-r25b-clang++14"
+        description: "Informational toolchain description, e.g. ndk-r27-clang++18"
       ndk_version:
         type: string
         default: ""
@@ -435,10 +438,6 @@ workflows:
       - win64-cpp20-msvc2022
       - mipsel-cpp20-gcc12
       # Android NDK builds
-      - android-build:
-          name: android-cpp20-r25b-clang-tidy-clang14
-          docker_image: "cimg/android:2023.08.1-ndk"
-          toolchain: "ndk-r25b-clang++14"
       - android-build:
           name: android-cpp20-r27-clang-tidy-clang18
           docker_image: "cimg/android:2024.11.1-ndk"

@@ -8,9 +8,15 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B2. Timing bounds have no slack for a loaded machine
+### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
+This has two shapes. A bound too tight reports the overrun, as
+`test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
+sleep used to order two threads reports a wrong result instead, as
+`test_close_sync::basic_close_prevention` did on MSVC with
+`~ImportantState: data != "aaaabbbbcccc"`. AGENTS.md R2 already says to wait on an
+event, not on the clock.
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
 for h in 1 2; do taskset -c 0 bash -c 'while :; do :; done' & done
@@ -18,6 +24,28 @@ taskset -c 0 ./bin/RppTests nogdb test_concurrent_queue
 kill %1 %2
 ```
 
+
+### B7. No test pins the volatile read in obfuscated_string::to_string()
+The read is load-bearing, and a small translation unit proves it. Build a `main` which
+decodes five obfuscated strings straight into one `printf`, and `clang++ -O2` folds the
+round trip and writes the plaintext into the binary. The volatile read stops that on
+gcc and clang at `-O0` through `-O3`.
+`test_obfuscated_string::the_binary_holds_no_plaintext` scans the running executable
+and asserts the end result, which is worth having. It stays green when the volatile
+goes, because the shape inside a large test binary does not fold. Three caller shapes
+were tried, including a block-scope object feeding a printf sink.
+A fix needs a translation unit which folds on demand, so a separate tiny target under
+`tests/` is the likely answer.
+
+### B6. The C15 TSAN suppression covers libc++ only, so gcc still reports the future race
+C15 closed the same false positive on clang. `tests/main.cpp` guards
+`__tsan_default_suppressions` with `#if defined(__clang__)`, and the pattern it returns
+is `race:std::__1::promise`, which is the libc++ spelling. Under gcc the entity is
+`std::__future_base::_State_baseV2`, so no pattern matches and no suppression compiles.
+`ubuntu-cpp20-tsan-gcc13` reports it intermittently, in `~_State_baseV2` and in
+`exception_ptr::_M_release`, both inside an uninstrumented `libstdc++.so`.
+Read C15 first. A fix adds the gcc branch and a libstdc++ pattern, and it needs a run
+which proves the suppression hides this race and hides no other.
 
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call

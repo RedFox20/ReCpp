@@ -63,14 +63,6 @@
 
 namespace rpp
 {
-    #ifndef DELEGATE_HAS_CXX17
-    #  if _MSC_VER
-    #    define DELEGATE_HAS_CXX17 (_MSVC_LANG > 201402)
-    #  else
-    #    define DELEGATE_HAS_CXX17 (__cplusplus >= 201703L)
-    #  endif
-    #endif
-
     #ifdef _MSC_VER
     #  ifndef DELEGATE_32_BIT
     #    if INTPTR_MAX != INT64_MAX
