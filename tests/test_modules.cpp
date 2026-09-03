@@ -21,7 +21,8 @@ TestImpl(test_modules)
     {
     }
 
-    static void log_handler(void*, LogSeverity, const char*, int) noexcept {}
+    static void log_handler(void* /*user*/, LogSeverity /*severity*/,
+                            const char* /*msg*/, int /*len*/) noexcept {}
 
     // The macros expand to _LogInfo, _LogWarning, _FmtString and rpp::__wrap, so this
     // fails to build if rpp.debugging stops exporting any of them.

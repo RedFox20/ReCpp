@@ -731,8 +731,10 @@ TestImpl(test_sockets)
         task.get(); // no packet is in flight after this, loopback sendto delivers synchronously
 
         // data left in the queue means poll() never reported the socket readable
-        int left1 = recv1.available(), left2 = recv2.available();
-        AssertMsg(left1 == 0 && left2 == 0,
+        int left1 = recv1.available();
+        int left2 = recv2.available();
+        bool queues_drained = left1 == 0 && left2 == 0;
+        AssertMsg(queues_drained,
                   "poll() missed readable data: recv1 %d bytes, recv2 %d bytes", left1, left2);
         AssertMsg(num_received[0] == NUM_MESSAGES, "recv1 got %d of %d packets, lost %d",
                   num_received[0], NUM_MESSAGES, NUM_MESSAGES - num_received[0]);
