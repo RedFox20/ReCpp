@@ -1,0 +1,158 @@
+name: Ubuntu build and test
+description: Installs mama and the toolchain, then builds ReCpp and runs the test suite
+
+inputs:
+  job_name:
+    description: The name this job reports into the run summary
+    required: true
+  compiler:
+    description: gcc or clang
+    required: true
+  cc_version:
+    description: The compiler package, for example gcc-13 or clang-18
+    required: true
+  cpp_version:
+    description: The C++ standard, 20, 23 or 26
+    default: "20"
+  sanitizer:
+    description: asan, clang-tidy or tsan
+    default: "asan"
+  coverage:
+    description: true adds a coverage report. Only gcc with asan supports it
+    default: "false"
+  no_ninja:
+    description: 1 turns Ninja off to save memory. A modules build passes an empty string
+    default: "1"
+  build_with_modules:
+    description: ON demands modules, so a toolchain that cannot build them fails the configure
+    default: ""
+  llvm_apt:
+    description: true registers apt.llvm.org, for a clang release the runner image does not carry
+    default: "false"
+  check_includes:
+    description: true runs the header and import-order gates. One job is enough, so it stays opt-in
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr ninja-build
+
+    - name: Register apt.llvm.org for ${{ inputs.cc_version }}
+      if: inputs.llvm_apt == 'true'
+      shell: bash
+      run: |
+        LLVM_VER=$(echo "${{ inputs.cc_version }}" | cut -d- -f2)
+        wget -qO "$RUNNER_TEMP/llvm.sh" https://apt.llvm.org/llvm.sh
+        chmod +x "$RUNNER_TEMP/llvm.sh"
+        sudo "$RUNNER_TEMP/llvm.sh" $LLVM_VER
+        # CMake scans module dependencies with clang-scan-deps, which ships in
+        # clang-tools. Without it a modules build configures and then fails.
+        sudo apt-get install -y clang-tools-$LLVM_VER
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install mama and ${{ inputs.cc_version }}
+      shell: bash
+      run: |
+        pip install --upgrade mama
+        mama install-${{ inputs.cc_version }}
+
+    - name: Header and import-order gates
+      if: inputs.check_includes == 'true'
+      shell: bash
+      env:
+        COMPILER: ${{ inputs.compiler }}
+      run: |
+        # the tree conforms, so a scan that reports nothing passes the gate below.
+        # this runs the scan over crafted sources and pins the line each one names
+        python3 tools/check_includes.py selftest --check
+        # every header must compile alone, so a consumer may include any one first
+        export CXX=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
+        export CXXSTD=c++${{ inputs.cpp_version }}
+        python3 tools/check_includes.py self-contained --check
+        # an #include after an import gives GCC a thousand redefinitions, and clang
+        # accepts the same file, so only this gate stops it reaching a GCC build
+        python3 tools/check_includes.py import-order --check
+        # a module exports one import per rpp include, so a name that arrives through
+        # a sibling include yields no import line and every importer then fails.
+        # libclang parses the headers, and it reads clang builtin headers, because a gcc
+        # SIMD header names a __builtin_ia32 that clang does not define.
+        sudo apt-get install -y libclang-common-18-dev || sudo apt-get install -y clang
+        pip3 install --quiet libclang
+        # the libclang traversal decides a real module surface, so a crafted header pins it
+        python3 tools/rpp_decls.py selftest
+        python3 tools/check_includes.py rpp-includes --check
+        # MSVC expands a macro named inside the module directive, so a crafted
+        # fragment pins where the global module fragment must undefine it
+        python3 tools/gen_module_exports.py --selftest
+        # a hand-written export list rots, so this fails when a .cppm no longer
+        # matches the header it wraps
+        python3 tools/gen_module_exports.py --all --check
+
+    - name: Install CMake
+      shell: bash
+      run: make configure-cmake
+
+    - name: Build ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
+      shell: bash
+      env:
+        COMPILER: ${{ inputs.compiler }}
+        SANITIZE: ${{ inputs.sanitizer }}
+        COV_PARAM: ${{ inputs.coverage }}
+        # Ninja detects more cores than the runner has and the machines OOM, so it is off by
+        # default. A modules build needs it: CMake scans module dependencies only under Ninja.
+        NO_NINJA: ${{ inputs.no_ninja }}
+        BUILD_WITH_MODULES: ${{ inputs.build_with_modules }}
+      run: |
+        export CXX${{ inputs.cpp_version }}=1
+        COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage=src" || echo "")
+        # clang-tidy runs as its own step for clang, so this build passes no sanitizer
+        SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
+        JOBS=$(nproc)
+        # mama passes jobs= to make and msbuild but never to ninja, and ninja sizes itself
+        # from the core count. taskset pins the affinity, which is what ninja reads.
+        NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
+        $NINJA_CAP mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=$JOBS
+
+    - name: Test ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
+      shell: bash
+      env:
+        COMPILER: ${{ inputs.compiler }}
+        SANITIZE: ${{ inputs.sanitizer }}
+        COV_PARAM: ${{ inputs.coverage }}
+      run: |
+        export CXX${{ inputs.cpp_version }}=1
+        COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
+        # setarch -R turns off address space randomization. Without it TSAN aborts on
+        # these runners with "FATAL: ThreadSanitizer: unexpected memory mapping".
+        setarch $(uname -m) -R mama $COMPILER verbose $COV_FLAGS test="nogdb -vv" jobs=$(nproc) \
+          | tee "$RUNNER_TEMP/test_output.txt"
+
+    - name: Report the test count
+      if: always()
+      shell: bash
+      run: |
+        # the run summary carries the count, so a reader compares it against CircleCI
+        # without a scroll through the whole build log
+        LINE=""
+        if [ -f "$RUNNER_TEMP/test_output.txt" ]; then
+          LINE=$(sed -e 's/\x1b\[[0-9;]*m//g' -e 's/\r//g' "$RUNNER_TEMP/test_output.txt" \
+                 | grep -a -m1 "SUCCESS: " || true)
+        fi
+        [ -n "$LINE" ] || LINE="no SUCCESS line: the tests failed, or the run stopped before them"
+        { echo "### ${{ inputs.job_name }}"; echo; echo '```'; echo "$LINE"; echo '```'; } \
+          >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Clang Tidy Analysis
+      # clang-tidy is slow during a clang build, so it runs as its own step
+      if: inputs.sanitizer == 'clang-tidy' && inputs.compiler == 'clang'
+      shell: bash
+      run: ./run_clang_tidy -j 5

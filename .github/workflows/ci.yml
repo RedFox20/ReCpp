@@ -1,0 +1,28 @@
+# Phase 1 of docs/CI_MIGRATION.md. CircleCI still runs the whole matrix, and this
+# workflow proves one job end to end before phase 2 expands it.
+name: CI
+
+on:
+  push:
+    branches: ["master", "ci/**", "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ubuntu-cpp20-asan-gcc13:
+    name: ubuntu-cpp20-asan-gcc13
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ubuntu-build
+        with:
+          job_name: ubuntu-cpp20-asan-gcc13
+          compiler: gcc
+          cc_version: gcc-13
+          cpp_version: "20"
+          sanitizer: asan
+          coverage: "true"
