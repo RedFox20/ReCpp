@@ -41,10 +41,14 @@ runs:
     - name: Set the build environment
       shell: bash
       run: |
+        # only a gcc asan build makes coverage data, so one place decides it
+        COVERAGE_ON=0
+        if [[ "${{ inputs.coverage }}" == "true" && "${{ inputs.compiler }}" == "gcc" &&
+              "${{ inputs.sanitizer }}" == "asan" ]]; then COVERAGE_ON=1; fi
         {
           echo "COMPILER=${{ inputs.compiler }}"
           echo "SANITIZE=${{ inputs.sanitizer }}"
-          echo "COV_PARAM=${{ inputs.coverage }}"
+          echo "COVERAGE_ON=$COVERAGE_ON"
           echo "NO_NINJA=${{ inputs.no_ninja }}"
           echo "BUILD_WITH_MODULES=${{ inputs.build_with_modules }}"
           echo "CXX${{ inputs.cpp_version }}=1"
@@ -121,7 +125,7 @@ runs:
     - name: Build ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
       shell: bash
       run: |
-        COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage=src" || echo "")
+        COV_FLAGS=$([[ $COVERAGE_ON == 1 ]] && echo "coverage=src" || echo "")
         # clang-tidy runs as its own step for clang, so this build passes no sanitizer
         SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
         JOBS=$(nproc)
@@ -133,7 +137,7 @@ runs:
     - name: Test ${{ inputs.cc_version }} C++${{ inputs.cpp_version }} ${{ inputs.sanitizer }}
       shell: bash
       run: |
-        COV_FLAGS=$([[ $COV_PARAM == "true" && $COMPILER == "gcc" && $SANITIZE == "asan" ]] && echo "coverage-report=src" || echo "")
+        COV_FLAGS=$([[ $COVERAGE_ON == 1 ]] && echo "coverage-report=src" || echo "")
         # setarch -R turns off address space randomization. Without it TSAN aborts on
         # these runners with "FATAL: ThreadSanitizer: unexpected memory mapping".
         setarch $(uname -m) -R mama $COMPILER verbose $COV_FLAGS test="nogdb -vv" jobs=$(nproc) \
