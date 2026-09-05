@@ -354,6 +354,19 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-scopeguard.cppm
         src/rpp/rpp-strview.cppm
         src/rpp/rpp-debugging.cppm
+        # L1
+        src/rpp/rpp-bitutils.cppm
+        src/rpp/rpp-traits.cppm
+        src/rpp/rpp-type_traits.cppm
+        src/rpp/rpp-source_loc.cppm
+        src/rpp/rpp-endian.cppm
+        src/rpp/rpp-predicates.cppm
+        src/rpp/rpp-sort.cppm
+        src/rpp/rpp-proc_utils.cppm
+        src/rpp/rpp-future_types.cppm
+        src/rpp/rpp-math.cppm
+        src/rpp/rpp-timepoint.cppm
+        src/rpp/rpp-delegate.cppm
     )
 
     # Add module interface to the library target

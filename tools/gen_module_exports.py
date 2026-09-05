@@ -25,9 +25,11 @@ CONFIGS = (('RPP_ENABLE_UNICODE=1',), ('RPP_ENABLE_UNICODE=0',))
 GUARD = 'RPP_ENABLE_UNICODE'
 
 # a using-declaration cannot name these, and an importer never needs them
+# this set omits UNEXPOSED_DECL, because libclang reports a variable template under that
+# kind and a using-declaration names one. The filters below drop the unnamed and private
 SKIP_KINDS = frozenset({'MACRO_DEFINITION', 'MACRO_INSTANTIATION', 'INCLUSION_DIRECTIVE',
                         'STATIC_ASSERT', 'NAMESPACE_ALIAS', 'USING_DIRECTIVE',
-                        'USING_DECLARATION', 'FRIEND_DECL', 'UNEXPOSED_DECL'})
+                        'USING_DECLARATION', 'FRIEND_DECL'})
 
 # the logging macros need these two, so they export despite the __ prefix
 _MACRO_HELPERS = frozenset({'__wrap', '__clean_type'})

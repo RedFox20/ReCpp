@@ -1,10 +1,9 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 6. Six modules exist: `rpp.config`, `rpp.minmax`, `rpp.obfuscated_string`,
-`rpp.scopeguard`, `rpp.strview` and `rpp.debugging`.
+Revision 7. Eighteen modules exist, which is the whole L0 and L1 layer.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 38 headers.
+gives the phased plan for the remaining 26 headers.
 
 ## Handover state
 
@@ -13,21 +12,29 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the six modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.44 |
+| the eighteen modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 3 cases |
+| `tests/test_modules.cpp` | module consumer test, 12 cases |
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
-| CI | green, all 29 jobs, and no job pins a mama branch |
+| CI | green, 28 jobs on GitHub Actions, and CircleCI is gone |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all six modules. 4 is done through the generator
-`--check`. 5 is in progress, with the L0 layer complete. Section 11 lists what 7 owes.
+6 landed. The generator drives all eighteen modules. 4 is done through the generator
+`--check`. 5 is in progress, with L0 and L1 complete. Section 11 lists what 7 owes.
 
-**Next action:** changeset 5, the L1 layer. Section 9 has the layers.
+**Next action:** changeset 5, the L2 layer. Section 9 has the layers.
+
+**What L1 exposed.** Four headers declared public API the compiler could not export, and
+each one is fixed in the same change. `math.h` marked every function `static` and left its
+constants without `inline`. `traits.h` wrapped `function_traits` in an anonymous namespace,
+so every translation unit held a different type. `timepoint.h` left nine constants without
+`inline`. The generator itself mishandled two kinds of declaration. An out-of-line member
+definition reached the export list and broke the build. A blanket skip of `UNEXPOSED_DECL`
+hid every variable template. Both tools now carry a selftest case for the shape they missed.
 
 **Open questions:** `BUGS.md` B2 and B5. B2 reaches this work through CI, and the
 owner rules it test construction rather than a defect.
@@ -718,7 +725,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | Layer | Modules | Count |
 |---|---|---|
 | L0 | **config.types** ✓, **minmax** ✓, **obfuscated_string** ✓, **scope_guard** ✓ | 4 |
-| L1 | bitutils, **debugging** ✓, delegate, endian, future_types, math, predicates, proc_utils, sort, source_loc, **strview** ✓, timepoint, traits, type_traits | 14 |
+| L1 | **bitutils** ✓, **debugging** ✓, **delegate** ✓, **endian** ✓, **future_types** ✓, **math** ✓, **predicates** ✓, **proc_utils** ✓, **sort** ✓, **source_loc** ✓, **strview** ✓, **timepoint** ✓, **traits** ✓, **type_traits** ✓ | 14 |
 | L2 | atomic_timepoint, collections, sprint, stack_trace, task, threads, timer, vec | 8 |
 | L3 | load_balancer, memory_pool, mutex, paths, tests | 5 |
 | L4 | atomic_shared_ptr, close_sync, condition_variable, file_io, sockets | 5 |
@@ -728,7 +735,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-44 modules and one umbrella. The L0 layer, `rpp.strview` and `rpp.debugging` exist, so 38 remain. Excluded:
+44 modules and one umbrella. The L0 and L1 layers exist, so 26 remain. Excluded:
 `config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
 it is Android glue. `tests.h` is in, and it is the one header whose macros split
 into `tests_macros.h`.
