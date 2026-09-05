@@ -1,9 +1,9 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 7. Eighteen modules exist, which is the whole L0 and L1 layer.
+Revision 8. Twenty-four modules exist: all of L0 and L1, and six of the eight in L2.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 26 headers.
+gives the phased plan for the remaining 20 headers.
 
 ## Handover state
 
@@ -12,21 +12,38 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the eighteen modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
+| the twenty-four modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 12 cases |
+| `tests/test_modules.cpp` | module consumer test, 18 cases |
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | green, 28 jobs on GitHub Actions, and CircleCI is gone |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all eighteen modules. 4 is done through the generator
-`--check`. 5 is in progress, with L0 and L1 complete. Section 11 lists what 7 owes.
+6 landed. The generator drives all twenty-four modules. 4 is done through the generator
+`--check`. 5 is in progress, with L0, L1 and most of L2 complete. Section 11 lists what 7 owes.
 
-**Next action:** changeset 5, the L2 layer. Section 9 has the layers.
+**Next action, and it outranks the remaining layers: land `rpp.sprint`.** `sprint.h` carries
+`string_buffer`, `format` and every `to_string` overload, so more code depends on it than on
+any other L2 header. gcc-14 writes its module and no importer reads it back, which `BUGS.md`
+**B8** records with a reproducer. Answer three questions in order.
+
+1. Does clang-21 import `rpp.sprint`? CI runs that toolchain, and this machine carries
+   clang-18, which cannot build modules at all. A green clang-21 import makes B8 a gcc bug
+   and nothing more.
+2. Does a gcc newer than 14.2 import it? The failure names `std::_Mutex_base`, so a
+   libstdc++ or module-writer fix may already exist upstream.
+3. If both fail, cut the module surface until it reads back. `sprint.h` re-exports four
+   modules, which is more than any other L2 header, and a smaller export set narrows the
+   BMI that gcc cannot write.
+
+`rpp.task` fails the same way and waits behind the same three questions. It blocks less,
+because only the coroutine headers name it.
+
+**Then:** changeset 5, the L3 layer. Section 9 has the layers.
 
 **What L1 exposed.** Four headers declared public API the compiler could not export, and
 each one is fixed in the same change. `math.h` marked every function `static` and left its
@@ -36,7 +53,7 @@ so every translation unit held a different type. `timepoint.h` left nine constan
 definition reached the export list and broke the build. A blanket skip of `UNEXPOSED_DECL`
 hid every variable template. Both tools now carry a selftest case for the shape they missed.
 
-**Open questions:** `BUGS.md` B2 and B5. B2 reaches this work through CI, and the
+**Open questions:** `BUGS.md` B2, B5 and B8. B2 reaches this work through CI, and the
 owner rules it test construction rather than a defect.
 
 ---
@@ -726,7 +743,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 |---|---|---|
 | L0 | **config.types** ✓, **minmax** ✓, **obfuscated_string** ✓, **scope_guard** ✓ | 4 |
 | L1 | **bitutils** ✓, **debugging** ✓, **delegate** ✓, **endian** ✓, **future_types** ✓, **math** ✓, **predicates** ✓, **proc_utils** ✓, **sort** ✓, **source_loc** ✓, **strview** ✓, **timepoint** ✓, **traits** ✓, **type_traits** ✓ | 14 |
-| L2 | atomic_timepoint, collections, sprint, stack_trace, task, threads, timer, vec | 8 |
+| L2 | **atomic_timepoint** ✓, **collections** ✓, sprint ⚠, **stack_trace** ✓, task ⚠, **threads** ✓, **timer** ✓, **vec** ✓ | 8 |
 | L3 | load_balancer, memory_pool, mutex, paths, tests | 5 |
 | L4 | atomic_shared_ptr, close_sync, condition_variable, file_io, sockets | 5 |
 | L5 | binary_stream, concurrent_queue, semaphore | 3 |
@@ -735,7 +752,9 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-44 modules and one umbrella. The L0 and L1 layers exist, so 26 remain. Excluded:
+A ⚠ marks a module gcc-14 writes but no importer reads, which `BUGS.md` **B8** tracks.
+
+44 modules and one umbrella. L0, L1 and six of L2 exist, so 20 remain. Excluded:
 `config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
 it is Android glue. `tests.h` is in, and it is the one header whose macros split
 into `tests_macros.h`.

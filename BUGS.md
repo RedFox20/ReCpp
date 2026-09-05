@@ -49,6 +49,23 @@ inside an uninstrumented `libstdc++.so`.
 Read C15 first. A fix adds the gcc branch and a libstdc++ pattern, and it needs a run
 which proves the suppression hides this race and hides no other.
 
+### B8. gcc-14 writes a module for sprint.h and task.h that no importer can read
+Both `.cppm` files compile, and the `.gcm` lands. An importer then stops with
+`failed to read compiled module cluster N: Bad file data`, followed by
+`fatal error: failed to load pendings for 'std::_Mutex_base'`. The message names a
+libstdc++ internal, so this is a compiler defect and not an export list mistake.
+Neither module ships until a toolchain reads them back.
+
+Each one fails alone, so no pair of modules causes it. A consumer that includes
+`<mutex>` before the import fails the same way. The other eighteen modules import.
+
+Reproduce it. Add `src/rpp/rpp-sprint.cppm` back to `RPP_MODULES_SRC`, then:
+```bash
+cd tests/module_consumer   # add `import rpp.sprint;` to masked_module_only.cpp first
+CXX20=1 python3 run_test.py --compiler gcc --expect modules --jobs 4
+```
+Retry it on clang-21 and on a gcc newer than 14.2. Only gcc 14.2 ran this check.
+
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.

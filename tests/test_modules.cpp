@@ -23,6 +23,12 @@ import rpp.proc_utils;
 import rpp.math;
 import rpp.timepoint;
 import rpp.delegate;
+import rpp.atomic_timepoint;
+import rpp.collections;
+import rpp.stack_trace;
+import rpp.threads;
+import rpp.timer;
+import rpp.vec;
 
 TestImpl(test_modules)
 {
@@ -187,6 +193,68 @@ TestImpl(test_modules)
         m += [&](int n) { calls += n; };
         m(3);
         AssertThat(calls, 5);
+    }
+
+    // L2. <rpp/tests.h> masks sprint, so masked_module_only.cpp covers that one.
+
+    TestCase(atomic_timepoint_module_carries_the_whole_surface)
+    {
+        rpp::AtomicDuration d;
+        d.store(rpp::millis(40));
+        AssertThat(d.load().millis(), 40);
+        rpp::AtomicTimePoint t;
+        t.store(rpp::TimePoint::now());
+        AssertThat(t.load().is_valid(), true);
+    }
+
+    TestCase(collections_module_carries_the_whole_surface)
+    {
+        std::vector<int> v { 4, 1, 3 };
+        AssertThat(rpp::contains(v, 3), true);
+        AssertThat(rpp::index_of(v, 1), 1);
+        AssertThat(rpp::sum_all(v), 8);
+        AssertThat(rpp::any_of(v, [](int n) { return n > 3; }), true);
+        rpp::element_range<int> r = rpp::range(v);
+        AssertThat(int(r.size()), 3);
+    }
+
+    TestCase(stack_trace_module_carries_the_whole_surface)
+    {
+        static_assert(rpp::CALLSTACK_MAX_DEPTH == 256u);
+        std::vector<uint64_t> frames = rpp::get_callstack(8);
+        AssertGreater(frames.size(), 0u);
+        AssertGreater(rpp::format_trace("probe", frames.data(), frames.size()).size(), 0u);
+    }
+
+    TestCase(threads_module_carries_the_whole_surface)
+    {
+        AssertGreater(rpp::num_physical_cores(), 0);
+        AssertGreater(rpp::get_thread_id(), 0u);
+        rpp::set_this_thread_name("module_probe");
+        AssertThat(rpp::get_this_thread_name(), std::string{"module_probe"});
+        rpp::yield();
+    }
+
+    TestCase(timer_module_carries_the_whole_surface)
+    {
+        rpp::Timer t;
+        rpp::sleep_ms(1);
+        AssertGreater(t.elapsed_millis(), 0.0);
+        rpp::StopWatch sw;
+        sw.start();
+        sw.stop();
+        AssertGreaterOrEqual(sw.elapsed(), 0.0);
+    }
+
+    TestCase(vec_module_carries_the_whole_surface)
+    {
+        rpp::Vector3 a { 1.0f, 2.0f, 3.0f };
+        rpp::Vector3 b = rpp::Vector3::One();
+        rpp::Vector3 sum = a + b;
+        AssertThat(sum.x, 2.0f);
+        AssertThat(sum.z, 4.0f);
+        rpp::Vector2 p { 3.0f, 4.0f };
+        AssertThat(p.length(), 5.0f);
     }
 };
 

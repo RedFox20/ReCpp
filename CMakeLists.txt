@@ -367,6 +367,13 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-math.cppm
         src/rpp/rpp-timepoint.cppm
         src/rpp/rpp-delegate.cppm
+        # L2
+        src/rpp/rpp-atomic_timepoint.cppm
+        src/rpp/rpp-collections.cppm
+        src/rpp/rpp-stack_trace.cppm
+        src/rpp/rpp-threads.cppm
+        src/rpp/rpp-timer.cppm
+        src/rpp/rpp-vec.cppm
     )
 
     # Add module interface to the library target
