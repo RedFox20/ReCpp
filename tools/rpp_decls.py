@@ -86,10 +86,11 @@ def _cursors_in(tu, path: str):
 
 
 def declarations(header: str, defines: tuple = ()) -> list:
-    """The declarations this header makes, as `(namespace, kind, name, internal)`, in source order.
+    """The declarations this header makes, as `(namespace, kind, name, internal, line)`, in source order.
 
     One declaration carries every overload of a name, so the caller deduplicates. `internal`
-    marks internal linkage, which clang refuses to export. The caller decides what to do.
+    marks internal linkage, which clang refuses to export. `line` locates the declaration, so a
+    caller can tell a name declared inside a `#if` from one the block only mentions.
     """
     cindex = _cindex()
     me = os.path.abspath(_resolve(header))
@@ -111,12 +112,12 @@ def declarations(header: str, defines: tuple = ()) -> list:
             sp = k.semantic_parent
             if sp is not None and sp.kind.name in _MEMBER_PARENTS: continue
             internal = k.linkage == cindex.LinkageKind.INTERNAL
-            out.append(('::'.join(ns), k.kind.name, k.spelling, internal))
+            out.append(('::'.join(ns), k.kind.name, k.spelling, internal, k.location.line))
             # an unscoped enum needs one using-declaration per enumerator, the enum type does not carry them
             if k.kind == cindex.CursorKind.ENUM_DECL and not k.is_scoped_enum():
                 for e in k.get_children():
                     if e.kind == cindex.CursorKind.ENUM_CONSTANT_DECL and e.spelling:
-                        out.append(('::'.join(ns), e.kind.name, e.spelling, False))
+                        out.append(('::'.join(ns), e.kind.name, e.spelling, False, e.location.line))
 
     walk(parse(header, defines).cursor, [])
     return out
@@ -151,7 +152,7 @@ def selftest() -> list:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
         decls = declarations(path)
-        got = {(ns, name) for ns, kind, name, internal in decls}
+        got = {(ns, name) for ns, kind, name, internal, line in decls}
         want = {('rpp', 'Sev'), ('rpp', 'SevInfo'), ('rpp', 'SevWarn'),  # unscoped enum + members
                 ('rpp', 'Scoped'), ('rpp', '__wrap'), ('rpp', '__hidden'),
                 ('rpp', 'Public'), ('rpp', 'internal_fn'), ('', 'c_api'),  # extern "C" reaches c_api
@@ -161,7 +162,7 @@ def selftest() -> list:
         # a scoped enum keeps its members out of the namespace
         if ('rpp', 'A') in got: bad.append('a scoped enum leaked its enumerator A')
         # clang refuses to export an internal-linkage name, so the caller needs to see the flag
-        flags = {name: internal for ns, kind, name, internal in decls}
+        flags = {name: internal for ns, kind, name, internal, line in decls}
         if not flags.get('internal_fn'): bad.append('a static function is not marked internal')
         if flags.get('Public'): bad.append('an external-linkage struct is marked internal')
         # an out-of-line member body would export a name no namespace holds, and the module fails to build

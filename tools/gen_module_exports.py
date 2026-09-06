@@ -100,13 +100,12 @@ def macro_collision(name: str) -> bool:
 
 
 def _exported(header: str, defines: tuple) -> dict:
-    """Namespace to ordered names, for one macro configuration."""
+    """Namespace to name to declaration line, for one macro configuration, in source order."""
     out = {}
-    for ns, kind, name, internal in rd.declarations(header, defines):
+    for ns, kind, name, internal, line in rd.declarations(header, defines):
         if _skip(ns, kind, name): continue
         if internal: continue  # clang rejects a using-declaration which exports one
-        names = out.setdefault(ns, [])
-        if name not in names: names.append(name)
+        out.setdefault(ns, {}).setdefault(name, line)
     return out
 
 
@@ -118,19 +117,23 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     """
     allow = INTERNAL_OK if allow is None else allow
     out = []
-    for ns, kind, name, internal in rd.declarations(header, BASE):
+    for ns, kind, name, internal, line in rd.declarations(header, BASE):
         if _skip(ns, kind, name): continue
         if internal and name not in allow and name not in out: out.append(name)
     return out
 
 
-def _guarded_text(header: str) -> dict:
-    """Macro to the header text its `#if` blocks enclose, for every macro in TEXT_GUARDS."""
+def _guarded_spans(header: str) -> dict:
+    """Macro to the line spans its `#if` blocks cover, for every macro in TEXT_GUARDS.
+
+    A span holds line numbers, not text. A block which only mentions an unconditional class
+    would otherwise guard that whole class, and hide its API wherever the macro is 0.
+    """
     lines = _read(header).split('\n')
     out = {}
     for macro in TEXT_GUARDS:
-        body, depth, start = [], 0, None
-        for i, line in enumerate(lines):
+        spans, depth, start = [], 0, None
+        for i, line in enumerate(lines, 1):
             s = line.strip()
             if start is None:
                 if re.match(rf'#\s*if\s+{macro}\s*$', s): start, depth = i, 1
@@ -138,15 +141,25 @@ def _guarded_text(header: str) -> dict:
             if s.startswith('#if'): depth += 1
             elif s.startswith('#endif'):
                 depth -= 1
-                if depth == 0: body += lines[start + 1:i]; start = None
-        if body: out[macro] = '\n'.join(body)
+                if depth == 0: spans.append((start, i)); start = None
+        if spans: out[macro] = spans
     return out
 
 
-def _condition(ns: str, name: str, reduced: dict, guarded: dict) -> str:
+def _open_namespace(header: str, ns: str) -> str:
+    """`ns` with each component the header declares inline marked inline.
+
+    A literal operator lives in an inline namespace, so `using namespace rpp` reaches it. The
+    module has to reopen that namespace inline too, or the importer loses the lookup.
+    """
+    inlines = set(re.findall(r'^\s*inline\s+namespace\s+(\w+)', _read(header), re.M))
+    return '::'.join(f'inline {p}' if p in inlines else p for p in ns.split('::'))
+
+
+def _condition(ns: str, name: str, line: int, reduced: dict, spans: dict) -> str:
     """The `#if` this name needs, or '' when every configuration declares it."""
-    needs = [g for g, names in reduced.items() if name not in names.get(ns, [])]
-    needs += [m for m, body in guarded.items() if re.search(rf'\b{re.escape(name)}\b', body)]
+    needs = [g for g, names in reduced.items() if name not in names.get(ns, {})]
+    needs += [m for m, sp in spans.items() if any(a < line < b for a, b in sp)]
     return ' && '.join(needs)
 
 
@@ -154,7 +167,7 @@ def export_block(header: str) -> str:
     """The generated block for one header, markers included."""
     base = _exported(header, BASE)
     reduced = {g: _exported(header, BASE + off) for g, off in GUARDS}
-    guarded = _guarded_text(header)
+    spans = _guarded_spans(header)
     lines = [BEGIN]
 
     # one export import per rpp include. config.h maps to rpp.config, and a header never imports itself
@@ -170,13 +183,13 @@ def export_block(header: str) -> str:
 
     for ns in sorted(base):
         groups = {}  # condition to the names it guards. '' sorts first, so the guards follow it
-        for name in base[ns]: groups.setdefault(_condition(ns, name, reduced, guarded), []).append(name)
+        for name, line in base[ns].items():
+            groups.setdefault(_condition(ns, name, line, reduced, spans), []).append(name)
         if not groups: continue
         if not ns:  # a C API keeps global scope, so a call site needs no change
             lines += [''] + [f'export using ::{n};' for n in groups.get('', [])]
             continue
-        # a literal operator lives in an inline namespace, so `using namespace` reaches it
-        lines += ['', f'export namespace {ns.replace("::literals", "::inline literals")} {{']
+        lines += ['', f'export namespace {_open_namespace(header, ns)} {{']
         for cond, names in sorted(groups.items()):
             if cond: lines.append(f'#if {cond}')
             lines += [f'    using {ns}::{n};' for n in names]
@@ -230,6 +243,7 @@ def with_modules() -> list:
 
 
 _SELFTEST_HEADER = '''#pragma once
+#define RPP_HAS_COROUTINES 1                       // the real header derives this from __has_include
 namespace rpp {
     constexpr double PI = 3.14159;                 // const at namespace scope, so internal
     static constexpr float radf(float d);          // static, so internal
@@ -239,8 +253,14 @@ namespace rpp {
     template<int N> struct Sized { char c[N]; };
     template<int N> Sized(const char (&)[N]) -> Sized<N>;   // a deduction guide has no name
 #if RPP_HAS_COROUTINES
-    struct Awaited {};                             // a text guard reaches this one
+    struct Awaited {};                             // a guard span covers this declaration
 #endif
+    class Unconditional {                          // the span below names it, and must not guard it
+    public:
+#if RPP_HAS_COROUTINES
+        void await(Unconditional& u);
+#endif
+    };
 }
 '''
 
@@ -258,7 +278,8 @@ def selftest() -> list:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
         hidden = internal_names(path, frozenset())
-        shown = _exported(path, BASE).get('rpp', [])
+        rpp_ns = _exported(path, BASE).get('rpp', {})
+        shown = list(rpp_ns)
         for name in ('PI', 'radf', 'obfuscate'):
             if name not in hidden: bad.append(f'{name} hides from the module and the gate stayed quiet')
         if 'obfuscate' in internal_names(path, frozenset({'obfuscate'})):
@@ -268,11 +289,14 @@ def selftest() -> list:
         for name in ('TAU', 'Public'):
             if name not in shown: bad.append(f'{name} has external linkage and left the export list')
         if any(n.startswith('<') for n in shown): bad.append('a deduction guide reached the export list')
-        guarded = _guarded_text(path)
-        if _condition('rpp', 'Awaited', {}, guarded) != 'RPP_HAS_COROUTINES':
-            bad.append('a name inside a text-guarded block took no #if')
-        if _condition('rpp', 'Public', {}, guarded):
-            bad.append('a name outside every text-guarded block took an #if')
+        spans = _guarded_spans(path)
+        if _condition('rpp', 'Awaited', rpp_ns['Awaited'], {}, spans) != 'RPP_HAS_COROUTINES':
+            bad.append('a declaration inside a guard span took no #if')
+        if _condition('rpp', 'Public', rpp_ns['Public'], {}, spans):
+            bad.append('a declaration outside every guard span took an #if')
+        # the guarded member names its own class, and a text search would guard the class too
+        if _condition('rpp', 'Unconditional', rpp_ns['Unconditional'], {}, spans):
+            bad.append('a class a guarded member names took an #if')
     return bad
 
 

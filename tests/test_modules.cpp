@@ -182,14 +182,16 @@ TestImpl(test_modules)
 
     TestCase(timepoint_module_carries_the_whole_surface)
     {
-        using namespace rpp::duration_literals;
+        using namespace rpp; // duration_literals is inline, so this alone reaches the operator
         rpp::Duration d = rpp::millis(250);
         AssertThat(d.millis(), 250);
         AssertThat((1_s).seconds(), 1);
+        AssertThat((250_ms).millis(), 250);
         AssertThat(rpp::NANOS_PER_SEC, 1'000'000'000LL);
-        rpp::TimePoint start = rpp::TimePoint::now();
+        // Monotonic never steps back, and TimePoint::now() reads the adjustable realtime clock
+        rpp::TimePoint start = rpp::TimePoint::now(rpp::ClockType::Monotonic);
         rpp::sleep_ms(1);
-        AssertGreaterOrEqual((rpp::TimePoint::now() - start).nsec, 0);
+        AssertGreaterOrEqual((rpp::TimePoint::now(rpp::ClockType::Monotonic) - start).nsec, 0);
     }
 
     TestCase(delegate_module_carries_the_whole_surface)
@@ -238,10 +240,13 @@ TestImpl(test_modules)
 
     TestCase(threads_module_carries_the_whole_surface)
     {
+        // the module hides the six host-only names on bare metal, so the test follows it
+#if !RPP_BARE_METAL
         AssertGreater(rpp::num_physical_cores(), 0);
         AssertGreater(rpp::get_thread_id(), 0u);
         rpp::set_this_thread_name("module_probe");
         AssertThat(rpp::get_this_thread_name(), std::string{"module_probe"});
+#endif
         rpp::yield();
     }
 
