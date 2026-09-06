@@ -11,12 +11,14 @@ export import rpp.config;
 export import rpp.strview;
 
 export namespace rpp {
+    using rpp::yield;
+#if !RPP_BARE_METAL
     using rpp::set_this_thread_name;
     using rpp::get_this_thread_name;
     using rpp::get_thread_name;
     using rpp::get_thread_id;
     using rpp::get_process_id;
     using rpp::num_physical_cores;
-    using rpp::yield;
+#endif
 }
 // GENERATED EXPORTS END

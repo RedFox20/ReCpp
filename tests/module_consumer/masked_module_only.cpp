@@ -1,5 +1,5 @@
 // Imports the modules that <rpp/tests.h> masks, with no header, so the build fails if any
-// of them drops an export. tests/test_modules.cpp cannot prove these three.
+// of them drops an export. tests/test_modules.cpp cannot prove these four.
 #ifdef MAMA_HAS_MODULES
 #include <string>
 #include <vector>
@@ -7,6 +7,7 @@
 import rpp.type_traits; // includes come first, the imports go last
 import rpp.source_loc;
 import rpp.future_types;
+import rpp.math;
 
 int main()
 {
@@ -24,7 +25,11 @@ int main()
     auto plain = [] { return 1; };
     bool typed = rpp::IsFunction<decltype(plain)> && rpp::NotFuture<int>;
 
-    return (detected && located && typed) ? 0 : 1;
+    // math: the constants and the functions both come from the module
+    bool numeric = rpp::clamp(5, 0, 3) == 3 && rpp::lerp(0.5, 30.0, 60.0) == 45.0
+                && rpp::nearlyZero(0.0001) && rpp::PI > 3.14;
+
+    return (detected && located && typed && numeric) ? 0 : 1;
 }
 #else
 int main() { return 0; } // the header build does not exercise the module

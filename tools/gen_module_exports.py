@@ -20,9 +20,11 @@ import rpp_decls as rd
 BEGIN = '// GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block'
 END = '// GENERATED EXPORTS END'
 
-# the surface changes with this macro, so the generator reads both and guards the difference
-CONFIGS = (('RPP_ENABLE_UNICODE=1',), ('RPP_ENABLE_UNICODE=0',))
-GUARD = 'RPP_ENABLE_UNICODE'
+# BASE declares the widest surface. Each guard names the condition and the defines which
+# turn it off, so the generator reads every configuration and guards what only BASE declares
+BASE = ('RPP_ENABLE_UNICODE=1',)
+GUARDS = (('RPP_ENABLE_UNICODE', ('RPP_ENABLE_UNICODE=0',)),
+          ('!RPP_BARE_METAL', ('RPP_FREERTOS=1',)))
 
 # a using-declaration cannot name these, and an importer never needs them
 # this set omits UNEXPOSED_DECL, because libclang reports a variable template under that
@@ -112,15 +114,22 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     """
     allow = INTERNAL_OK if allow is None else allow
     out = []
-    for ns, kind, name, internal in rd.declarations(header, CONFIGS[0]):
+    for ns, kind, name, internal in rd.declarations(header, BASE):
         if _skip(ns, kind, name): continue
         if internal and name not in allow and name not in out: out.append(name)
     return out
 
 
+def _condition(ns: str, name: str, reduced: dict) -> str:
+    """The `#if` this name needs, or '' when every configuration declares it."""
+    needs = [g for g, names in reduced.items() if name not in names.get(ns, [])]
+    return ' && '.join(needs)
+
+
 def export_block(header: str) -> str:
     """The generated block for one header, markers included."""
-    on, off = (_exported(header, d) for d in CONFIGS)
+    base = _exported(header, BASE)
+    reduced = {g: _exported(header, BASE + off) for g, off in GUARDS}
     lines = [BEGIN]
 
     # one export import per rpp include. config.h maps to rpp.config, and a header never imports itself
@@ -134,20 +143,19 @@ def export_block(header: str) -> str:
     imports.discard(module_name(header))
     lines += [f'export import {imp};' for imp in sorted(imports)]
 
-    for ns in sorted(set(on) | set(off)):
-        both = [n for n in on.get(ns, []) if n in off.get(ns, [])]
-        only = [n for n in on.get(ns, []) if n not in off.get(ns, [])]
-        if not both and not only: continue
+    for ns in sorted(base):
+        groups = {}  # condition to the names it guards. '' sorts first, so the guards follow it
+        for name in base[ns]: groups.setdefault(_condition(ns, name, reduced), []).append(name)
+        if not groups: continue
         if not ns:  # a C API keeps global scope, so a call site needs no change
-            lines += [''] + [f'export using ::{n};' for n in both]
+            lines += [''] + [f'export using ::{n};' for n in groups.get('', [])]
             continue
         # a literal operator lives in an inline namespace, so `using namespace` reaches it
         lines += ['', f'export namespace {ns.replace("::literals", "::inline literals")} {{']
-        lines += [f'    using {ns}::{n};' for n in both]
-        if only:
-            lines.append(f'#if {GUARD}')
-            lines += [f'    using {ns}::{n};' for n in only]
-            lines.append('#endif')
+        for cond, names in sorted(groups.items()):
+            if cond: lines.append(f'#if {cond}')
+            lines += [f'    using {ns}::{n};' for n in names]
+            if cond: lines.append('#endif')
         lines.append('}')
 
     lines.append(END)
@@ -222,7 +230,7 @@ def selftest() -> list:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
         hidden = internal_names(path, frozenset())
-        shown = _exported(path, CONFIGS[0]).get('rpp', [])
+        shown = _exported(path, BASE).get('rpp', [])
         for name in ('PI', 'radf', 'obfuscate'):
             if name not in hidden: bad.append(f'{name} hides from the module and the gate stayed quiet')
         if 'obfuscate' in internal_names(path, frozenset({'obfuscate'})):

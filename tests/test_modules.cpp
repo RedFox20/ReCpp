@@ -30,6 +30,9 @@ import rpp.threads;
 import rpp.timer;
 import rpp.vec;
 
+// test_modules_identity.cpp takes this address through the module and includes no rpp header
+const void* module_is_container_addr() noexcept;
+
 TestImpl(test_modules)
 {
     TestInit(test_modules)
@@ -115,6 +118,13 @@ TestImpl(test_modules)
         bits.set(3);
         AssertThat(bits.isSet(3), true);
         AssertThat(bits.isSet(4), false);
+    }
+
+    // a variable template needs `inline`, or gcc gives the module and the header one copy each
+    TestCase(type_traits_variable_template_is_one_entity)
+    {
+        const void* header = &rpp::is_container<std::vector<int>>;
+        AssertThat(module_is_container_addr() == header, true);
     }
 
     TestCase(traits_module_carries_the_whole_surface)
