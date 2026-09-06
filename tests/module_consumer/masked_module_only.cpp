@@ -2,6 +2,7 @@
 // of them drops an export. tests/test_modules.cpp cannot prove these four.
 #ifdef MAMA_HAS_MODULES
 #include <string>
+#include <utility> // std::declval
 #include <vector>
 
 import rpp.type_traits; // includes come first, the imports go last

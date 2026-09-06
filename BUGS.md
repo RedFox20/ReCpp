@@ -61,8 +61,16 @@ inside `rpp::semaphore::spin_lock()` at `semaphore.h:102`. A second report reads
 `pool_task_state` shared pointer the same way.
 
 This is a lifecycle order defect, not a refcount TSAN cannot see, so C25 does not cover it
-and no suppression should. Reproduce it with the C25 loop below, and read the
-`heap-use-after-free` reports instead of the races.
+and no suppression should. Two pinned cores reproduce it, and the `race:` patterns never hide
+a `heap-use-after-free`:
+```bash
+CXX20=1 mama gcc tsan build
+for i in $(seq 1 40); do for j in 1 2; do
+  taskset -c 0,1 env TSAN_OPTIONS="halt_on_error=0" \
+    packages/ReCpp/linux-tsan/RppTests test_future > /tmp/b10_${i}_$j.log 2>&1 &
+done; wait; done
+grep -l 'heap-use-after-free' /tmp/b10_*.log
+```
 
 ### B8. gcc-14 writes an unreadable module for two shapes, and both have a workaround
 `tools/gen_module_exports.py` carries `NO_EXPORT` and `NO_IMPORT`, one entry each. Both
