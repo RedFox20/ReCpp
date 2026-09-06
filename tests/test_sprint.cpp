@@ -15,7 +15,7 @@ using namespace rpp;
 namespace adl_probe
 {
     struct printable {};
-    inline std::string to_string(const printable&) noexcept { return "printable"; }
+    inline std::string to_string(const printable& /*value*/) noexcept { return "printable"; }
 }
 using namespace std::string_literals;
 
@@ -74,7 +74,7 @@ TestImpl(test_sprint)
     {
         struct converts_to_int { operator int() const { return 1; } };
         struct converts_when_mutable { operator int() { return 1; } };
-        enum unscoped_enum { unscoped_value };
+        enum unscoped_enum : uint8_t { unscoped_value }; // it still promotes to int, so to_string takes it
         enum class scoped_enum : uint8_t { value };
 
         static_assert(rpp::has_std_to_string<int>);
