@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <rpp/sort.h>
+#include <rpp/collections.h> // element_range, and the two overloads only this header offers
 #include <rpp/sprint.h>
 
 // return -1 if sorted, else index where sorting breaks
@@ -168,6 +169,37 @@ TestImpl(test_sort)
         AssertFalse(is_sorted(array.data(), array.size()));
 
         rpp::insertion_sort(array, [](const std::string& a, const std::string& b) { return a < b; });
+        AssertEqual(first_unsorted_index(array.data(), array.size()), -1);
+    }
+
+    // sort.h carries the generic overloads, so <rpp/sort.h> alone sorts a vector
+    TestCase(sort_container_overload)
+    {
+        std::vector<int> array = array_random_int(32);
+        AssertFalse(is_sorted(array.data(), array.size()));
+
+        rpp::sort(array);
+        AssertEqual(first_unsorted_index(array.data(), array.size()), -1);
+
+        rpp::sort(array, [](const int& a, const int& b) { return a > b; });
+        AssertGreaterOrEqual(array[0], array[31]);
+    }
+
+    // an explicit element type names the vector overload, which collections.h keeps
+    TestCase(sort_takes_an_explicit_element_type)
+    {
+        std::vector<int> array = array_random_int(32);
+        rpp::sort<int>(array);
+        AssertEqual(first_unsorted_index(array.data(), array.size()), -1);
+    }
+
+    // a const range still sorts, because the by-value parameter copies the view, not the elements
+    TestCase(sort_const_element_range_sorts_its_elements)
+    {
+        std::vector<int> array = array_random_int(32);
+        const rpp::element_range<int> view = rpp::range(array);
+
+        rpp::sort(view, [](const int& a, const int& b) { return a < b; });
         AssertEqual(first_unsorted_index(array.data(), array.size()), -1);
     }
 

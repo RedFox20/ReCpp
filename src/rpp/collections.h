@@ -529,7 +529,28 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    // rpp::sort moved to sort.h, so `import rpp.sort;` alone reaches it. This header includes it.
+    // rpp::sort moved to sort.h, so `import rpp.sort;` alone reaches it. These two keep the
+    // shapes only this header could offer: `sort<T>(v)`, and a const view over mutable elements
+
+    /**
+     * @brief Sorts a vector in ascending order
+     * @param v The vector to sort, whose element type an explicit `rpp::sort<T>(v)` may name
+     */
+    template<class T, class A> FINLINE void sort(std::vector<T, A>& v)
+    {
+        rpp::insertion_sort(v.data(), v.size(), [](const T& a, const T& b) { return a < b; });
+    }
+
+    /**
+     * @brief Sorts the elements an element_range views, with a custom comparison
+     * @param v The range, taken by value, so a const range still sorts its mutable elements
+     * @param comparison bool(T a, T b), true when a < b
+     */
+    template<typename T, typename Comparison>
+    FINLINE void sort(element_range<T> v, const Comparison& comparison)
+    {
+        rpp::insertion_sort(v.data(), v.size(), comparison);
+    }
 
     /////////////////////////////////////////////////////////////////////////////////////
 

@@ -41,6 +41,7 @@ export namespace rpp {
     using rpp::none_of;
     using rpp::sum_all;
     using rpp::transform;
+    using rpp::sort;
     using rpp::operator==;
     using rpp::operator!=;
 }
