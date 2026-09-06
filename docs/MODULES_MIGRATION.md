@@ -1,6 +1,6 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 8. Twenty-four modules exist: all of L0 and L1, and six of the eight in L2.
+Revision 9. Twenty-four modules exist: all of L0 and L1, and six of the eight in L2.
 
 This document explains the pattern, records what real builds prove about it, and
 gives the phased plan for the remaining 20 headers.
@@ -17,14 +17,15 @@ gate, #65 changeset 6.
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 18 cases |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC |
+| `tests/test_modules.cpp` | module consumer test, 21 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 4 module-only targets |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
-| CI | green, 28 jobs on GitHub Actions, and CircleCI is gone |
+| CI | 28 jobs on GitHub Actions, and CircleCI is gone |
+| test counts | 552/552 on the modules build, 531/531 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
 6 landed. The generator drives all twenty-four modules. 4 is done through the generator
-`--check`. 5 is in progress, with L0, L1 and most of L2 complete. Section 11 lists what 7 owes.
+`--check`. 5 has L0 and L1 finished, and L2 ships six of eight. Section 11 lists what 7 owes.
 
 **Next action, and it outranks the remaining layers: land `rpp.sprint`.** `sprint.h` carries
 `string_buffer`, `format` and every `to_string` overload, so more code depends on it than on
@@ -45,16 +46,46 @@ because only the coroutine headers name it.
 
 **Then:** changeset 5, the L3 layer. Section 9 has the layers.
 
-**What L1 exposed.** Four headers declared public API the compiler could not export, and
-each one is fixed in the same change. `math.h` marked every function `static` and left its
+**What L1 and L2 exposed.** Six headers declared public API the compiler could not export,
+and each fix landed with the layer. `math.h` marked every function `static` and left its
 constants without `inline`. `traits.h` wrapped `function_traits` in an anonymous namespace,
 so every translation unit held a different type. `timepoint.h` left nine constants without
-`inline`. The generator itself mishandled two kinds of declaration. An out-of-line member
-definition reached the export list and broke the build. A blanket skip of `UNEXPOSED_DECL`
-hid every variable template. Both tools now carry a selftest case for the shape they missed.
+`inline`, and `stack_trace.h` marked `CALLSTACK_MAX_DEPTH` static beside inline.
+`type_traits.h` left nine variable templates without `inline`, which gcc gives one copy per
+translation unit, so a module importer and a header includer read different addresses for
+the same trait. `tests/test_modules_identity.cpp` takes that address through the module
+alone, and `test_modules.cpp` compares it against the header address.
 
-**Open questions:** `BUGS.md` B2, B5 and B8. B2 reaches this work through CI, and the
-owner rules it test construction rather than a defect.
+**The generator learned three configuration rules.** It used to emit an export list for the
+configuration it happened to parse in, so any declaration a header hides under another
+configuration became an unguarded export. Each rule carries a selftest.
+
+| Rule | Reaches | Mechanism |
+|---|---|---|
+| a macro a define can toggle | `RPP_ENABLE_UNICODE`, `!RPP_BARE_METAL` | parse each configuration, guard the difference |
+| a macro no define reaches | `RPP_HAS_COROUTINES` | read the `#if` span the header brackets, and match a declaration by line |
+| an inline namespace | `rpp::literals`, `rpp::duration_literals` | read the `inline` keyword from the header |
+
+The second rule matches by declaration location, not by name text. A text search also
+matched a name a guarded block only mentions, which would have hidden the whole
+`rpp::semaphore` and `rpp::concurrent_queue` classes wherever the macro is 0. Neither
+header carries a module yet, so the L3 layer would have been the first to hit it.
+
+The generator also mishandled two kinds of declaration. An out-of-line member definition
+reached the export list and broke the build. A blanket skip of `UNEXPOSED_DECL` hid every
+variable template. Both tools carry a selftest case for the shape they missed.
+
+**A module can move a declaration.** `rpp::sort` lived in `collections.h`, so `rpp.collections`
+carried it and an importer of `rpp.sort` could not call it. The generic overloads moved to
+`sort.h`, which already declared `contiguous_container`. `collections.h` keeps the two shapes
+only it can offer, the vector overload an explicit `rpp::sort<T>(v)` names, and the
+`element_range` overload whose by-value parameter lets a const view sort its mutable
+elements. Asking which module should carry a name is worth doing per layer.
+
+**Open questions:** `BUGS.md` B2, B5, B6 and B8. B2 and B6 reach this work through CI only.
+B6 costs the most. It failed 6 of the 40 TSAN jobs this branch ran, which is 15 percent per
+job, and 5 TSAN jobs per run puts a red job in more than half of all runs. Every one passed
+every test and failed on the sanitizer exit code alone.
 
 ---
 
