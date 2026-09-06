@@ -26,6 +26,10 @@ BASE = ('RPP_ENABLE_UNICODE=1',)
 GUARDS = (('RPP_ENABLE_UNICODE', ('RPP_ENABLE_UNICODE=0',)),
           ('!RPP_BARE_METAL', ('RPP_FREERTOS=1',)))
 
+# a macro no define reaches, because the header derives it from __has_include. The generator
+# reads the region the header guards with it instead of parsing a second configuration
+TEXT_GUARDS = ('RPP_HAS_COROUTINES',)
+
 # a using-declaration cannot name these, and an importer never needs them
 # this set omits UNEXPOSED_DECL, because libclang reports a variable template under that
 # kind and a using-declaration names one. The filters below drop the unnamed and private
@@ -120,9 +124,29 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     return out
 
 
-def _condition(ns: str, name: str, reduced: dict) -> str:
+def _guarded_text(header: str) -> dict:
+    """Macro to the header text its `#if` blocks enclose, for every macro in TEXT_GUARDS."""
+    lines = _read(header).split('\n')
+    out = {}
+    for macro in TEXT_GUARDS:
+        body, depth, start = [], 0, None
+        for i, line in enumerate(lines):
+            s = line.strip()
+            if start is None:
+                if re.match(rf'#\s*if\s+{macro}\s*$', s): start, depth = i, 1
+                continue
+            if s.startswith('#if'): depth += 1
+            elif s.startswith('#endif'):
+                depth -= 1
+                if depth == 0: body += lines[start + 1:i]; start = None
+        if body: out[macro] = '\n'.join(body)
+    return out
+
+
+def _condition(ns: str, name: str, reduced: dict, guarded: dict) -> str:
     """The `#if` this name needs, or '' when every configuration declares it."""
     needs = [g for g, names in reduced.items() if name not in names.get(ns, [])]
+    needs += [m for m, body in guarded.items() if re.search(rf'\b{re.escape(name)}\b', body)]
     return ' && '.join(needs)
 
 
@@ -130,6 +154,7 @@ def export_block(header: str) -> str:
     """The generated block for one header, markers included."""
     base = _exported(header, BASE)
     reduced = {g: _exported(header, BASE + off) for g, off in GUARDS}
+    guarded = _guarded_text(header)
     lines = [BEGIN]
 
     # one export import per rpp include. config.h maps to rpp.config, and a header never imports itself
@@ -145,7 +170,7 @@ def export_block(header: str) -> str:
 
     for ns in sorted(base):
         groups = {}  # condition to the names it guards. '' sorts first, so the guards follow it
-        for name in base[ns]: groups.setdefault(_condition(ns, name, reduced), []).append(name)
+        for name in base[ns]: groups.setdefault(_condition(ns, name, reduced, guarded), []).append(name)
         if not groups: continue
         if not ns:  # a C API keeps global scope, so a call site needs no change
             lines += [''] + [f'export using ::{n};' for n in groups.get('', [])]
@@ -213,6 +238,9 @@ namespace rpp {
     struct Public {};
     template<int N> struct Sized { char c[N]; };
     template<int N> Sized(const char (&)[N]) -> Sized<N>;   // a deduction guide has no name
+#if RPP_HAS_COROUTINES
+    struct Awaited {};                             // a text guard reaches this one
+#endif
 }
 '''
 
@@ -240,6 +268,11 @@ def selftest() -> list:
         for name in ('TAU', 'Public'):
             if name not in shown: bad.append(f'{name} has external linkage and left the export list')
         if any(n.startswith('<') for n in shown): bad.append('a deduction guide reached the export list')
+        guarded = _guarded_text(path)
+        if _condition('rpp', 'Awaited', {}, guarded) != 'RPP_HAS_COROUTINES':
+            bad.append('a name inside a text-guarded block took no #if')
+        if _condition('rpp', 'Public', {}, guarded):
+            bad.append('a name outside every text-guarded block took an #if')
     return bad
 
 
