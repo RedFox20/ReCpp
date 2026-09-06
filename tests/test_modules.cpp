@@ -228,6 +228,13 @@ TestImpl(test_modules)
         AssertThat(rpp::any_of(v, [](int n) { return n > 3; }), true);
         rpp::element_range<int> r = rpp::range(v);
         AssertThat(int(r.size()), 3);
+
+        // collections.h declares rpp::sort, not sort.h, so rpp.collections carries it
+        rpp::sort(v);
+        AssertThat(v[0], 1);
+        AssertThat(v[2], 4);
+        rpp::sort(v, [](int a, int b) { return a > b; });
+        AssertThat(v[0], 4);
     }
 
     TestCase(stack_trace_module_carries_the_whole_surface)
