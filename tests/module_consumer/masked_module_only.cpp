@@ -10,10 +10,13 @@ import rpp.future_types;
 import rpp.math;
 import rpp.sprint;
 
+// is_detected takes the alias of whoever calls it, so this proves the idiom, not one alias
+template<class T> using has_size = decltype(std::declval<T>().size());
+
 int main()
 {
-    // type_traits: the alias templates and the variable templates that read them
-    bool detected = rpp::is_detected_v<rpp::has_size_expression, std::string>
+    // type_traits: the concepts, and the detection idiom a consumer drives with its own alias
+    bool detected = rpp::is_detected_v<has_size, std::string>
                  && rpp::is_stringlike<std::string>
                  && rpp::is_container<std::vector<int>>
                  && rpp::is_iterable<std::vector<int>>;

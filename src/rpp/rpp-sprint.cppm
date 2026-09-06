@@ -14,6 +14,8 @@ export namespace rpp {
     using rpp::lowercase;
     using rpp::uppercase;
     using rpp::string_buffer;
+    using rpp::has_ostream_op;
+    using rpp::has_member_sbuf_op;
     using rpp::operator<<;
     using rpp::to_hex_string;
     using rpp::print;

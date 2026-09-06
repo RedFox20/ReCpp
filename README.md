@@ -706,25 +706,27 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Item | Description |
 |------|-------------|
-| [`string_buffer`](src/rpp/sprint.h#L77) | Fast, always-null-terminated string builder |
+| [`string_buffer`](src/rpp/sprint.h#L73) | Fast, always-null-terminated string builder |
 | [`format_opt`](src/rpp/sprint.h#L66) | Format options enum: `none`, `lowercase`, `uppercase` |
+| [`has_ostream_op<T>`](src/rpp/sprint.h#L76) | True if `std::ostream << T` is valid |
+| [`has_member_sbuf_op<T>`](src/rpp/sprint.h#L79) | True if `T::operator<<(string_buffer&)` exists |
 
 ### string_buffer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`write(const T& v)`](src/rpp/sprint.h#L125) | Write a value (auto-converts most types) |
-| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L150) | Write a float or double with a chosen number of decimals, instead of the default 6 |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L360) | Write values followed by newline |
-| [`writef(const char* format, ...)`](src/rpp/sprint.h#L123) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L310) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L267) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L368) | Pretty-print a value |
-| [`clear()`](src/rpp/sprint.h#L114) | Clear the buffer |
-| [`reserve(int capacity)`](src/rpp/sprint.h#L115) | Reserve capacity |
-| [`resize(int size)`](src/rpp/sprint.h#L116) | Resize buffer |
-| [`append(const char* data, int len)`](src/rpp/sprint.h#L119) | Append raw data |
-| [`emplace_buffer(int n)`](src/rpp/sprint.h#L122) | Get writable buffer of N bytes |
+| [`write(const T& v)`](src/rpp/sprint.h#L133) | Write a value (auto-converts most types) |
+| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L158) | Write a float or double with a chosen number of decimals, instead of the default 6 |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L359) | Write values followed by newline |
+| [`writef(const char* format, ...)`](src/rpp/sprint.h#L131) | Printf-style formatted write |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L309) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L266) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L367) | Pretty-print a value |
+| [`clear()`](src/rpp/sprint.h#L122) | Clear the buffer |
+| [`reserve(int capacity)`](src/rpp/sprint.h#L123) | Reserve capacity |
+| [`resize(int size)`](src/rpp/sprint.h#L124) | Resize buffer |
+| [`append(const char* data, int len)`](src/rpp/sprint.h#L127) | Append raw data |
+| [`emplace_buffer(int n)`](src/rpp/sprint.h#L130) | Get writable buffer of N bytes |
 
 ### Free Functions
 
@@ -735,9 +737,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L482) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L502) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L428) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L481) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L501) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L427) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -1791,7 +1793,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L411) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L410) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -4682,18 +4684,20 @@ See [`log_colors.h`](https://github.com/RedFox20/ReCpp/blob/master/src/rpp/log_c
 
 ## rpp/type_traits.h
 
-Detection idiom and type trait helpers for SFINAE.
+C++20 concepts, and the detection idiom for a caller which brings its own expression alias.
 
 | Trait | Description |
 |-------|-------------|
-| [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L26) | Detection idiom |
-| [`has_to_string<T>`](src/rpp/type_traits.h#L40) | True if `to_string(T)` is valid |
+| [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L27) | Detection idiom, for an alias the caller writes |
+| [`has_to_string<T>`](src/rpp/type_traits.h#L38) | True if `to_string(T)` is valid |
 | [`has_to_string_memb<T>`](src/rpp/type_traits.h#L41) | True if `T::to_string()` exists |
-| [`has_std_to_string<T>`](src/rpp/type_traits.h#L38) | True if `std::to_string(T)` is valid |
+| [`has_std_to_string<T>`](src/rpp/type_traits.h#L34) | True if `std::to_string(T)` is valid |
+| [`has_get_memb<T>`](src/rpp/type_traits.h#L44) | True if `T::get()` exists |
+| [`has_set_memb<T, U>`](src/rpp/type_traits.h#L47) | True if `T::set(U)` exists |
 | [`is_iterable<T>`](src/rpp/type_traits.h#L50) | True if T supports range-for |
-| [`is_container<T>`](src/rpp/type_traits.h#L55) | True if T is a container with `size()` |
+| [`is_container<T>`](src/rpp/type_traits.h#L56) | True if T is a container with `size()` |
 | [`is_stringlike<T>`](src/rpp/type_traits.h#L53) | True if T is string-like |
-| [`Operation`](src/rpp/type_traits.h#L25) | Template alias used with `is_detected` for expression validity checks |
+| [`Operation`](src/rpp/type_traits.h#L26) | The expression alias a caller passes to `is_detected` |
 
 ---
 

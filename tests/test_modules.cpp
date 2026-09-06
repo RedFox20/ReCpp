@@ -33,7 +33,7 @@ import rpp.task;
 import rpp.vec;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
-const void* module_is_container_addr() noexcept;
+const void* module_pi_addr() noexcept;
 
 TestImpl(test_modules)
 {
@@ -122,11 +122,11 @@ TestImpl(test_modules)
         AssertThat(bits.isSet(4), false);
     }
 
-    // a variable template needs `inline`, or gcc gives the module and the header one copy each
-    TestCase(type_traits_variable_template_is_one_entity)
+    // a namespace-scope constant needs `inline`, or the module and the header get one copy each
+    TestCase(math_constant_is_one_entity)
     {
-        const void* header = &rpp::is_container<std::vector<int>>;
-        AssertThat(module_is_container_addr() == header, true);
+        const void* header = &rpp::PI;
+        AssertThat(module_pi_addr() == header, true);
     }
 
     TestCase(traits_module_carries_the_whole_surface)

@@ -224,7 +224,7 @@ namespace rpp
                                              && std::is_trivially_destructible<T>::value;
 
         /** @brief Writes object of type T into the buffer */
-        template<class T, typename = std::enable_if_t<is_trivial_type<T>>> 
+        template<class T> requires is_trivial_type<T>
         binary_stream& write(const T& data) noexcept
         {
             ensure_space((int)sizeof(T));

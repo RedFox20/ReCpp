@@ -10,6 +10,13 @@
 #include <string> // std::string
 
 using namespace rpp;
+
+// rpp::has_to_string finds a free to_string through ADL only, so the probe needs its own namespace
+namespace adl_probe
+{
+    struct printable {};
+    inline std::string to_string(const printable&) noexcept { return "printable"; }
+}
 using namespace std::string_literals;
 
 struct external_to_string { };
@@ -78,6 +85,38 @@ TestImpl(test_sprint)
         static_assert(!rpp::has_std_to_string<scoped_enum>);
         static_assert(!rpp::has_std_to_string<std::string>);
         static_assert(!rpp::has_std_to_string<rpp::strview>);
+    }
+
+    // every trait below became a concept, and each one keeps the expression it detected before
+    TestCase(detection_traits_match_the_expressions_they_name)
+    {
+        struct has_all {
+            int size() const;
+            const char* begin() const;
+            const char* end() const;
+            std::string to_string() const;
+            int get() const;
+            void set(int);
+        };
+
+        static_assert(rpp::has_to_string_memb<has_all> && !rpp::has_to_string_memb<int>);
+        static_assert(rpp::has_get_memb<has_all> && !rpp::has_get_memb<int>);
+        static_assert(rpp::has_set_memb<has_all, int> && !rpp::has_set_memb<has_all, std::string>);
+        static_assert(rpp::is_iterable<has_all> && rpp::is_iterable<std::vector<int>>);
+        static_assert(!rpp::is_iterable<int>);
+        static_assert(rpp::is_stringlike<std::string> && !rpp::is_stringlike<std::vector<int>>);
+        static_assert(rpp::is_container<std::vector<int>> && rpp::is_container<has_all>);
+        static_assert(!rpp::is_container<std::string>); // string-like wins over container
+        static_assert(!rpp::is_container<int>);
+
+        // only ADL reaches the trait, because rpp::to_string is not declared where it is defined
+        static_assert(rpp::has_to_string<adl_probe::printable>);
+        static_assert(!rpp::has_to_string<int> && !rpp::has_to_string<std::string>);
+
+        // sprint dispatches the generic write() on these two
+        struct writes_itself { void operator<<(rpp::string_buffer&) const; };
+        static_assert(rpp::has_member_sbuf_op<writes_itself> && !rpp::has_member_sbuf_op<int>);
+        static_assert(rpp::has_ostream_op<int> && !rpp::has_ostream_op<writes_itself>);
     }
 
     TestCase(string_buf)

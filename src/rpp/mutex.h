@@ -331,32 +331,31 @@ namespace rpp
             return instance->get_ref() != other;
         }
 
-        template<typename U = value_type>
-        std::enable_if_t<is_iterable<U>, decltype(std::declval<U>().begin())>
+        template<typename U = value_type> requires is_iterable<U>
+        decltype(std::declval<U>().begin())
         begin() {
             return instance->get_ref().begin();
         }
 
-        template<typename U = value_type>
-        std::enable_if_t<is_iterable<U>, decltype(std::declval<U>().end())>
+        template<typename U = value_type> requires is_iterable<U>
+        decltype(std::declval<U>().end())
         end() {
             return instance->get_ref().end();
         }
 
-        template<typename U = value_type>
-        std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().begin())>
+        template<typename U = value_type> requires is_iterable<U>
+        decltype(std::declval<const U>().begin())
         begin() const {
             return static_cast<const U&>(instance->get_ref()).begin();
         }
 
-        template<typename U = value_type>
-        std::enable_if_t<is_iterable<U>, decltype(std::declval<const U>().end())>
+        template<typename U = value_type> requires is_iterable<U>
+        decltype(std::declval<const U>().end())
         end() const {
             return static_cast<const U&>(instance->get_ref()).end(); 
         }
 
-        template<class U = value_type, class V,
-                 std::enable_if_t<rpp::is_iterable<U>, int> = 0>
+        template<class U = value_type, class V> requires rpp::is_iterable<U>
         FINLINE void operator=(std::initializer_list<V> value)
         {
             this->operator=(U{value});
