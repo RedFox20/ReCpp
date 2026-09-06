@@ -75,7 +75,7 @@ TestImpl(test_sprint)
         struct converts_to_int { operator int() const { return 1; } };
         struct converts_when_mutable { operator int() { return 1; } };
         enum unscoped_enum { unscoped_value };
-        enum class scoped_enum { value };
+        enum class scoped_enum : uint8_t { value };
 
         static_assert(rpp::has_std_to_string<int>);
         static_assert(rpp::has_std_to_string<double>);

@@ -51,6 +51,10 @@ and no suppression should. Reproduce it with the C25 loop below, and read the
 `tools/gen_module_exports.py` carries `NO_EXPORT` and `NO_IMPORT`, one entry each. Both
 modules ship now. Delete an entry when a newer gcc reads the module back.
 
+`NO_CONFIG` is a third list, and it is not a gcc defect. `sprint.h` needs `std::to_string`,
+which bare metal drops, so the header does not compile in that configuration at all. Any
+parse failure the list does not name reaches the caller and fails the run.
+
 The importer stops with `failed to read compiled module cluster N: Bad file data`, then
 `failed to load pendings for` a libstdc++ internal. That name changes per run, and the
 cluster number does too, so neither one identifies the shape.
@@ -115,29 +119,9 @@ The script's own docstring already warns that it has mistakes.
 ## Closed
 
 ### C25. libtsan.so never read the suppression hook, because it was hidden (was B6)
-B6 blamed the libc++ spelling of the C15 pattern. The real cause is one attribute. gcc links
-`libtsan.so`, which reads `__tsan_default_suppressions` through the global dynamic symbol
-table, and `-fvisibility=hidden` kept the definition out of it. `dlsym` then answered with the
-weak hook inside `libtsan.so`, which returns null, so every pattern was dead. clang links its
-runtime statically, which is why C15 worked there.
-
-The hook and its patterns moved to `tests/test_sanitizers.cpp`, beside the test which calls
-`dlsym(RTLD_DEFAULT, ...)` and reads the string back. That test fails without the attribute.
-
-Both reports name `test_future::test_except_handler_chaining`, which shares one exception
-object between two pool workers. The refcount which orders them sits in an uninstrumented
-`libstdc++.so`, so TSAN sees no edge.
-
-Measured on 2 pinned cores: 3 reports in 120 runs before, 0 in 120 after, and the two patterns
-matched 3 times each. Ten full-suite runs matched no suppression at all and passed every case.
-```bash
-CXX20=1 mama gcc tsan build
-for i in $(seq 1 60); do for j in 1 2; do
-  taskset -c 0,1 env TSAN_OPTIONS="halt_on_error=0 print_suppressions=1" \
-    packages/ReCpp/linux-tsan/RppTests test_future > /tmp/w_${i}_$j.log 2>&1 &
-done; wait; done
-grep -l 'WARNING: ThreadSanitizer' /tmp/w_*.log | wc -l
-```
+`-fvisibility=hidden` kept `__tsan_default_suppressions` out of the dynamic symbol table gcc's
+`libtsan.so` reads, so every pattern was dead. The hook took a default-visibility attribute and
+moved to `tests/test_sanitizers.cpp`, beside a `dlsym` test which fails without it.
 
 ### C24. `_va_comma` dropped the argument list when the first argument started with `(`
 The one-probe fallback let `_spaces_on_empty_token` consume that leading paren, so the

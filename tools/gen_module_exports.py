@@ -62,6 +62,10 @@ NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 # global module fragment and the module imports it back, see BUGS.md B8
 NO_IMPORT = {'task.h': frozenset({'rpp.future_types'})}
 
+# a header which does not compile in a guard configuration, so no export list exists to reduce
+# against. Every other parse error is a real one, and the generator reports it
+NO_CONFIG = {'sprint.h': frozenset({'!RPP_BARE_METAL'})}
+
 
 CONFIG_MODULE = 'rpp.config'
 
@@ -118,16 +122,17 @@ def _exported(header: str, defines: tuple) -> dict:
     return out
 
 
-def _configuration(header: str, defines: tuple):
-    """The export map for one guard configuration, or None when the header rejects it.
+def _configuration(header: str, guard: str, defines: tuple):
+    """The export map for one guard configuration, or None when `NO_CONFIG` allows the failure.
 
-    sprint.h needs `std::to_string`, which bare metal drops, so the header does not compile
-    there at all. No guard per name saves a header a whole configuration rejects.
+    A header the allowlist names does not compile in that configuration, so no export list
+    exists to reduce against. Any other parse error reaches the caller and fails the run.
     """
     try:
         return _exported(header, defines)
     except RuntimeError:
-        return None
+        if guard in NO_CONFIG.get(os.path.basename(header), frozenset()): return None
+        raise
 
 
 def internal_names(header: str, allow: frozenset = None) -> list:
@@ -187,7 +192,7 @@ def _condition(ns: str, name: str, line: int, reduced: dict, spans: dict) -> str
 def export_block(header: str) -> str:
     """The generated block for one header, markers included."""
     base = _exported(header, BASE)
-    reduced = {g: n for g, off in GUARDS if (n := _configuration(header, BASE + off)) is not None}
+    reduced = {g: n for g, off in GUARDS if (n := _configuration(header, g, BASE + off)) is not None}
     spans = _guarded_spans(header)
     lines = [BEGIN]
 
@@ -331,6 +336,20 @@ def selftest() -> list:
             if 'export import rpp.minmax;' in block: bad.append('a NO_IMPORT module reached the block')
         finally:
             del NO_EXPORT[probe], NO_IMPORT[probe]
+        # a header the allowlist does not name must report its parse error, never drop the guard
+        broken = os.path.join(d, 'broken.h')
+        open(broken, 'w').write('#pragma once\n#if RPP_FREERTOS\n#error this header needs a host\n#endif\n')
+        try:
+            _configuration(broken, '!RPP_BARE_METAL', BASE + ('RPP_FREERTOS=1',))
+            bad.append('an unlisted parse failure returned instead of raising')
+        except RuntimeError:
+            pass
+        NO_CONFIG['broken.h'] = frozenset({'!RPP_BARE_METAL'})
+        try:
+            if _configuration(broken, '!RPP_BARE_METAL', BASE + ('RPP_FREERTOS=1',)) is not None:
+                bad.append('an allowlisted parse failure did not drop the guard')
+        finally:
+            del NO_CONFIG['broken.h']
     return bad
 
 

@@ -3,7 +3,7 @@
 Revision 10. Twenty-six modules exist: all of L0, L1 and L2.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 20 headers.
+gives the phased plan for the remaining 18 headers.
 
 ## Handover state
 
@@ -21,7 +21,7 @@ gate, #65 changeset 6.
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 4 module-only targets |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 28 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 556/556 on the modules build, 533/533 on the header build |
+| test counts | 557/557 on the modules build, 534/534 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
 6 landed. The generator drives all twenty-six modules. 4 is done through the generator
@@ -31,7 +31,8 @@ gate, #65 changeset 6.
 
 **`rpp.sprint` and `rpp.task` ship, and each cost one workaround.** The generator carries
 `NO_EXPORT` and `NO_IMPORT`, one entry each, and `BUGS.md` **B8** names the two shapes gcc-14
-cannot write. Neither one is a wrong export list, and the generator selftest pins both knobs.
+cannot write. `NO_CONFIG` names the third case, a header which does not compile bare metal at
+all. Neither shape is a wrong export list, and the generator selftest pins all three knobs.
 
 An `is_detected_v` alias which names `std::to_string` was the first shape, so the C++20
 concept replaced it. That did not help. A plain alias, a concept, and a concept which calls an
@@ -780,7 +781,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 
 Every L2 module ships. `BUILD_WITH_MODULES` builds all twenty-six.
 
-44 modules and one umbrella. L0, L1 and six of L2 exist, so 20 remain. Excluded:
+44 modules and one umbrella. L0, L1 and L2 exist, so 18 remain. Excluded:
 `config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
 it is Android glue. `tests.h` is in, and it is the one header whose macros split
 into `tests_macros.h`.

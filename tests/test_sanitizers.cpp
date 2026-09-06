@@ -37,7 +37,7 @@ TestImpl(test_sanitizers)
     // A hidden or unexported symbol leaves every suppression dead. See BUGS.md C25.
     TestCase(tsan_suppression_hook_is_reachable)
     {
-    #if RPP_TSAN_BUILD && !_WIN32
+    #if RPP_TSAN_BUILD && !_WIN32 && defined(__GNUC__) && !defined(__clang__)
         // libtsan.so carries its own weak hook, so the address alone proves nothing
         using hook = const char* (*)();
         hook global = reinterpret_cast<hook>(dlsym(RTLD_DEFAULT, "__tsan_default_suppressions"));
@@ -45,6 +45,9 @@ TestImpl(test_sanitizers)
         const char* patterns = global();
         AssertNotEqual(patterns, nullptr);
         AssertNotEqual(strstr(patterns, "race:std::__future_base"), nullptr);
+    #elif RPP_TSAN_BUILD
+        // clang links its runtime statically, so the linker binds the hook and dlsym never sees it
+        AssertNotEqual(strstr(__tsan_default_suppressions(), "race:std::__future_base"), nullptr);
     #else
         AssertTrue(true); // only a TSAN build carries the hook
     #endif
