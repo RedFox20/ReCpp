@@ -28,6 +28,8 @@ mama_target_modules(RppMinmaxModuleOnly)
 add_executable(RppMaskedModuleOnly masked_module_only.cpp)
 target_include_directories(RppMaskedModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppMaskedModuleOnly)
+# sprint.cpp holds the out-of-line half of rpp.sprint, so this target links the library
+target_link_libraries(RppMaskedModuleOnly PRIVATE ${MAMA_LIBS})
 
 # rpp::sort has to reach an importer of rpp.sort, without rpp.collections beside it
 add_executable(RppSortModuleOnly sort_module_only.cpp)

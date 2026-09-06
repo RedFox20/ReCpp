@@ -54,6 +54,14 @@ def _skip(ns: str, kind: str, name: str) -> bool:
 # external linkage instead, which is what MSVC needs to define one in an importing TU
 INTERNAL_OK = frozenset()
 
+# a declaration a toolchain cannot carry across a module boundary. gcc-14 writes a .gcm no
+# importer can read when an export names a std::__cxx11 function, see BUGS.md B8
+NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
+
+# a re-export the same defect blocks. gcc-14 writes an unreadable .gcm when task.h sits in the
+# global module fragment and the module imports it back, see BUGS.md B8
+NO_IMPORT = {'task.h': frozenset({'rpp.future_types'})}
+
 
 CONFIG_MODULE = 'rpp.config'
 
@@ -102,11 +110,24 @@ def macro_collision(name: str) -> bool:
 def _exported(header: str, defines: tuple) -> dict:
     """Namespace to name to declaration line, for one macro configuration, in source order."""
     out = {}
+    blocked = NO_EXPORT.get(os.path.basename(header), frozenset())
     for ns, kind, name, internal, line in rd.declarations(header, defines):
-        if _skip(ns, kind, name): continue
+        if _skip(ns, kind, name) or name in blocked: continue
         if internal: continue  # clang rejects a using-declaration which exports one
         out.setdefault(ns, {}).setdefault(name, line)
     return out
+
+
+def _configuration(header: str, defines: tuple):
+    """The export map for one guard configuration, or None when the header rejects it.
+
+    sprint.h needs `std::to_string`, which bare metal drops, so the header does not compile
+    there at all. No guard per name saves a header a whole configuration rejects.
+    """
+    try:
+        return _exported(header, defines)
+    except RuntimeError:
+        return None
 
 
 def internal_names(header: str, allow: frozenset = None) -> list:
@@ -166,7 +187,7 @@ def _condition(ns: str, name: str, line: int, reduced: dict, spans: dict) -> str
 def export_block(header: str) -> str:
     """The generated block for one header, markers included."""
     base = _exported(header, BASE)
-    reduced = {g: _exported(header, BASE + off) for g, off in GUARDS}
+    reduced = {g: n for g, off in GUARDS if (n := _configuration(header, BASE + off)) is not None}
     spans = _guarded_spans(header)
     lines = [BEGIN]
 
@@ -179,6 +200,7 @@ def export_block(header: str) -> str:
         if inc == 'config.h': imports.add(CONFIG_MODULE)
         elif inc not in rd.NO_MODULE: imports.add(module_name(inc))
     imports.discard(module_name(header))
+    imports -= NO_IMPORT.get(os.path.basename(header), frozenset())
     lines += [f'export import {imp};' for imp in sorted(imports)]
 
     for ns in sorted(base):
@@ -244,6 +266,7 @@ def with_modules() -> list:
 
 _SELFTEST_HEADER = '''#pragma once
 #define RPP_HAS_COROUTINES 1                       // the real header derives this from __has_include
+#include "rpp/minmax.h"                            // an rpp include, so the block names rpp.minmax
 namespace rpp {
     constexpr double PI = 3.14159;                 // const at namespace scope, so internal
     static constexpr float radf(float d);          // static, so internal
@@ -297,6 +320,17 @@ def selftest() -> list:
         # the guarded member names its own class, and a text search would guard the class too
         if _condition('rpp', 'Unconditional', rpp_ns['Unconditional'], {}, spans):
             bad.append('a class a guarded member names took an #if')
+        # both defect workarounds drop something a working toolchain would carry
+        probe = os.path.basename(path)
+        if 'export import rpp.minmax;' not in export_block(path):
+            bad.append('an rpp include did not become an export import')
+        NO_EXPORT[probe], NO_IMPORT[probe] = frozenset({'Public'}), frozenset({'rpp.minmax'})
+        try:
+            block = export_block(path)
+            if 'using rpp::Public;' in block: bad.append('a NO_EXPORT name reached the export list')
+            if 'export import rpp.minmax;' in block: bad.append('a NO_IMPORT module reached the block')
+        finally:
+            del NO_EXPORT[probe], NO_IMPORT[probe]
     return bad
 
 

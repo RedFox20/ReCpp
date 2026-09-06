@@ -27,10 +27,6 @@ export namespace rpp {
     using rpp::is_iterable;
     using rpp::is_stringlike;
     using rpp::is_container;
-#if !RPP_BARE_METAL
-    using rpp::std_to_string_expression;
-    using rpp::has_std_to_string;
-#endif
 }
 
 export namespace rpp::detail {

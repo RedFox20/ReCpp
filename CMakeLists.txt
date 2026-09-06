@@ -374,6 +374,8 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-threads.cppm
         src/rpp/rpp-timer.cppm
         src/rpp/rpp-vec.cppm
+        src/rpp/rpp-sprint.cppm
+        src/rpp/rpp-task.cppm
     )
 
     # Add module interface to the library target

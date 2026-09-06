@@ -62,6 +62,24 @@ TestImpl(test_sprint)
     {
     }
 
+    // the trait drives the write(const T&) fallback, and it became a concept for BUGS.md B8
+    TestCase(has_std_to_string_matches_what_std_to_string_takes)
+    {
+        struct converts_to_int { operator int() const { return 1; } };
+        struct converts_when_mutable { operator int() { return 1; } };
+        enum unscoped_enum { unscoped_value };
+        enum class scoped_enum { value };
+
+        static_assert(rpp::has_std_to_string<int>);
+        static_assert(rpp::has_std_to_string<double>);
+        static_assert(rpp::has_std_to_string<unscoped_enum>);
+        static_assert(rpp::has_std_to_string<converts_to_int>);
+        static_assert(rpp::has_std_to_string<converts_when_mutable>); // declval gives an rvalue
+        static_assert(!rpp::has_std_to_string<scoped_enum>);
+        static_assert(!rpp::has_std_to_string<std::string>);
+        static_assert(!rpp::has_std_to_string<rpp::strview>);
+    }
+
     TestCase(string_buf)
     {
         string_buffer buf; buf.writeln("str", 10, 20.1, "2132"_sv, "abcd"s);

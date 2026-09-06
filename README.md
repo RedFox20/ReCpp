@@ -4687,12 +4687,12 @@ Detection idiom and type trait helpers for SFINAE.
 | Trait | Description |
 |-------|-------------|
 | [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L26) | Detection idiom |
-| [`has_to_string<T>`](src/rpp/type_traits.h#L42) | True if `to_string(T)` is valid |
-| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L43) | True if `T::to_string()` exists |
-| [`has_std_to_string<T>`](src/rpp/type_traits.h#L40) | True if `std::to_string(T)` is valid |
-| [`is_iterable<T>`](src/rpp/type_traits.h#L52) | True if T supports range-for |
-| [`is_container<T>`](src/rpp/type_traits.h#L57) | True if T is a container with `size()` |
-| [`is_stringlike<T>`](src/rpp/type_traits.h#L55) | True if T is string-like |
+| [`has_to_string<T>`](src/rpp/type_traits.h#L40) | True if `to_string(T)` is valid |
+| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L41) | True if `T::to_string()` exists |
+| [`has_std_to_string<T>`](src/rpp/type_traits.h#L38) | True if `std::to_string(T)` is valid |
+| [`is_iterable<T>`](src/rpp/type_traits.h#L50) | True if T supports range-for |
+| [`is_container<T>`](src/rpp/type_traits.h#L55) | True if T is a container with `size()` |
+| [`is_stringlike<T>`](src/rpp/type_traits.h#L53) | True if T is string-like |
 | [`Operation`](src/rpp/type_traits.h#L25) | Template alias used with `is_detected` for expression validity checks |
 
 ---

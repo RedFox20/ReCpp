@@ -28,16 +28,14 @@ namespace rpp
     template<template<class...> class Operation, typename... Arguments>
     inline constexpr bool is_detected_v = detail::is_detected<detail::void_t<>, Operation, Arguments...>::value;
 
-#if !RPP_BARE_METAL
-    template<class T> using std_to_string_expression  = decltype(std::to_string(std::declval<T>()));
-#endif
     template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
     template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
     template<class T> using get_memb_expression       = decltype(std::declval<T>().get());
     template<class T, class U> using set_memb_expression = decltype(std::declval<T>().set(std::declval<U>()));
 
 #if !RPP_BARE_METAL
-    template<class T> inline constexpr bool has_std_to_string  = is_detected_v<std_to_string_expression, T>;
+    /// True when `std::to_string(T)` compiles
+    template<class T> concept has_std_to_string = requires { std::to_string(std::declval<T>()); };
 #endif
     template<class T> inline constexpr bool has_to_string      = is_detected_v<to_string_expression, T>;
     template<class T> inline constexpr bool has_to_string_memb = is_detected_v<to_string_memb_expression, T>;

@@ -47,33 +47,39 @@ This is a lifecycle order defect, not a refcount TSAN cannot see, so C25 does no
 and no suppression should. Reproduce it with the C25 loop below, and read the
 `heap-use-after-free` reports instead of the races.
 
-### B8. gcc-14 writes a module for sprint.h and task.h that no importer can read
-Both `.cppm` files compile, and the `.gcm` lands. An importer then stops with
-`failed to read compiled module cluster N: Bad file data`, followed by
-`fatal error: failed to load pendings for 'std::_Mutex_base'`. The message names a
-libstdc++ internal, so this is a compiler defect and not an export list mistake.
-Neither module ships until a toolchain reads them back.
+### B8. gcc-14 writes an unreadable module for two shapes, and both have a workaround
+`tools/gen_module_exports.py` carries `NO_EXPORT` and `NO_IMPORT`, one entry each. Both
+modules ship now. Delete an entry when a newer gcc reads the module back.
 
-Each one fails alone, so no pair of modules causes it. A consumer that includes
-`<mutex>` before the import fails the same way. The other eighteen modules import.
+The importer stops with `failed to read compiled module cluster N: Bad file data`, then
+`failed to load pendings for` a libstdc++ internal. That name changes per run, and the
+cluster number does too, so neither one identifies the shape.
 
-Reproduce it. No `rpp-sprint.cppm` ever landed, so write the skeleton first. The generator
-fills the block, and it refuses a file which carries no markers.
+Shape 1, in `rpp.sprint`. An export naming a function in the `std::__cxx11` inline namespace
+makes the module unreadable. `std::to_string` and `std::stoi` both do it, and `std::swap`
+does not. The form does not matter. An `is_detected_v` alias, a plain alias template and a
+C++20 concept all fail the same way. So does a concept which calls an unexported helper that
+names it. `NO_EXPORT` drops `has_std_to_string` from `rpp.type_traits`, which is what
+`rpp.sprint` imports. A header includer still gets the trait.
+
+Shape 2, in `rpp.task`. A module which includes `future_types.h` in its global module
+fragment and also imports `rpp.future_types` writes an unreadable `.gcm`. Either half alone
+is fine. The importer only fails when it also includes `<rpp/tests.h>`. `NO_IMPORT` drops that
+one re-export, so an importer of `rpp.task` which needs `rpp::coro_handle` imports
+`rpp.future_types` itself.
+
+Reproduce either shape in seconds, outside cmake. Build every `.cppm` in the
+`RPP_MODULES_SRC` order into one `gcm.cache`, then compile a consumer:
 ```bash
-cat > src/rpp/rpp-sprint.cppm <<'EOF'
-module;
-#include "sprint.h"
-export module rpp.sprint;
-// GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-// GENERATED EXPORTS END
-EOF
-python3 tools/gen_module_exports.py sprint.h
-# add src/rpp/rpp-sprint.cppm to RPP_MODULES_SRC in CMakeLists.txt
-# add `import rpp.sprint;` to tests/module_consumer/masked_module_only.cpp
-cd tests/module_consumer
-CXX20=1 python3 run_test.py --compiler gcc --expect modules --jobs 4
+cd $(mktemp -d)
+for f in $(sed -n '/set(RPP_MODULES_SRC/,/^    )/p' ~/ReCpp/CMakeLists.txt | grep -o 'src/rpp/rpp-[a-z_]*\.cppm'); do
+  g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c -x c++ ~/ReCpp/$f -o $(basename $f .cppm).o
+done
+printf '#include <rpp/tests.h>\nimport rpp.task;\nint main(){return 0;}\n' > u.cpp
+g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c u.cpp -o u.o    # 0 errors with NO_IMPORT
 ```
-Retry it on clang-21 and on a gcc newer than 14.2. Only gcc 14.2 ran this check.
+Put the offending line back into the generated block by hand to watch it fail. Only gcc 14.2
+ran this check, so retry on clang-21 and on a newer gcc.
 
 ### B9. `--check-undocumented` reads 29 of the 48 headers and reports the rest as clean
 `extract_public_decls` returns nothing for 19 headers, so the gate never asks whether
