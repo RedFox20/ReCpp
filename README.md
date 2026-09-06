@@ -4272,6 +4272,14 @@ Minimal insertion sort for smaller binary sizes compared to `std::sort`. The ins
 | Function | Description |
 |----------|-------------|
 | [`insertion_sort(data, count, comparison)`](src/rpp/sort.h#L59) | In-place insertion sort with comparator |
+| [`insertion_sort(container, comparison)`](src/rpp/sort.h#L82) | Sorts any contiguous container with a comparator |
+| [`sort(container)`](src/rpp/sort.h#L97) | Sorts any contiguous container in ascending order |
+| [`sort(container, comparison)`](src/rpp/sort.h#L112) | Sorts any contiguous container with a comparator |
+
+A contiguous container has `data()`, `size()` and `operator[]`, which `std::vector` and
+`rpp::element_range` both answer. `collections.h` adds two more overloads. One takes an
+explicit element type, as `rpp::sort<int>(v)`. The other takes an `element_range` by value,
+so a const range still sorts the elements it views.
 
 ### Example: Insertion Sort
 
@@ -4695,8 +4703,8 @@ Function type traits for extracting return types and argument types from callabl
 
 | Trait | Description |
 |-------|-------------|
-| [`function_traits<T>`](src/rpp/traits.h#L16) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
-| [`first_arg_type<T>`](src/rpp/traits.h#L50) | First argument type of a callable |
+| [`function_traits<T>`](src/rpp/traits.h#L14) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
+| [`first_arg_type<T>`](src/rpp/traits.h#L48) | First argument type of a callable |
 
 ---
 

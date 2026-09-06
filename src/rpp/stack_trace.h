@@ -46,7 +46,7 @@ namespace rpp
     RPPAPI CallstackEntry get_address_info(uint64_t addr) noexcept;
 
     // absolute limit for callstack depth
-    static inline constexpr size_t CALLSTACK_MAX_DEPTH = 256u;
+    inline constexpr size_t CALLSTACK_MAX_DEPTH = 256u;
 
     /**
      * @brief Walks the stack and returns a list of callstack addresses.

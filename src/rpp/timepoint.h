@@ -91,15 +91,15 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static constexpr int64 MILLIS_PER_SEC = 1'000LL;
-    static constexpr int64 MICROS_PER_SEC = 1'000'000LL;
-    static constexpr int64 NANOS_PER_SEC  = 1'000'000'000LL;
-    static constexpr int64 NANOS_PER_MILLI = 1'000'000LL;
-    static constexpr int64 NANOS_PER_MICRO = 1'000LL;
-    static constexpr int64 NANOS_PER_YEAR   = 31'557'600'000'000'000LL;
-    static constexpr int64 NANOS_PER_DAY    = 86'400'000'000'000LL;
-    static constexpr int64 NANOS_PER_HOUR   = 3'600'000'000'000LL;
-    static constexpr int64 NANOS_PER_MINUTE = 60'000'000'000LL;
+    inline constexpr int64 MILLIS_PER_SEC = 1'000LL;
+    inline constexpr int64 MICROS_PER_SEC = 1'000'000LL;
+    inline constexpr int64 NANOS_PER_SEC  = 1'000'000'000LL;
+    inline constexpr int64 NANOS_PER_MILLI = 1'000'000LL;
+    inline constexpr int64 NANOS_PER_MICRO = 1'000LL;
+    inline constexpr int64 NANOS_PER_YEAR   = 31'557'600'000'000'000LL;
+    inline constexpr int64 NANOS_PER_DAY    = 86'400'000'000'000LL;
+    inline constexpr int64 NANOS_PER_HOUR   = 3'600'000'000'000LL;
+    inline constexpr int64 NANOS_PER_MINUTE = 60'000'000'000LL;
 
     /**
      * @brief New Duration API for TimePoint arithmetics

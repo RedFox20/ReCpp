@@ -86,10 +86,11 @@ def _cursors_in(tu, path: str):
 
 
 def declarations(header: str, defines: tuple = ()) -> list:
-    """The declarations this header makes, as `(namespace, kind, name, internal)`, in source order.
+    """The declarations this header makes, as `(namespace, kind, name, internal, line)`, in source order.
 
     One declaration carries every overload of a name, so the caller deduplicates. `internal`
-    marks internal linkage, which clang refuses to export. The caller decides what to do.
+    marks internal linkage, which clang refuses to export. `line` locates the declaration, so a
+    caller can tell a name declared inside a `#if` from one the block only mentions.
     """
     cindex = _cindex()
     me = os.path.abspath(_resolve(header))
@@ -106,16 +107,25 @@ def declarations(header: str, defines: tuple = ()) -> list:
                 continue
             f = k.location.file
             if not (f and os.path.abspath(f.name) == me and k.spelling): continue
+            # an out-of-line member definition sits at namespace scope but declares nothing new,
+            # so its class semantic parent tells it apart from a real namespace declaration
+            sp = k.semantic_parent
+            if sp is not None and sp.kind.name in _MEMBER_PARENTS: continue
             internal = k.linkage == cindex.LinkageKind.INTERNAL
-            out.append(('::'.join(ns), k.kind.name, k.spelling, internal))
+            out.append(('::'.join(ns), k.kind.name, k.spelling, internal, k.location.line))
             # an unscoped enum needs one using-declaration per enumerator, the enum type does not carry them
             if k.kind == cindex.CursorKind.ENUM_DECL and not k.is_scoped_enum():
                 for e in k.get_children():
                     if e.kind == cindex.CursorKind.ENUM_CONSTANT_DECL and e.spelling:
-                        out.append(('::'.join(ns), e.kind.name, e.spelling, False))
+                        out.append(('::'.join(ns), e.kind.name, e.spelling, False, e.location.line))
 
     walk(parse(header, defines).cursor, [])
     return out
+
+
+# the module imports cindex lazily, so this names the kinds instead of holding the enum values
+_MEMBER_PARENTS = frozenset({'CLASS_DECL', 'STRUCT_DECL', 'UNION_DECL', 'CLASS_TEMPLATE',
+                             'CLASS_TEMPLATE_PARTIAL_SPECIALIZATION'})
 
 
 _SELFTEST_HEADER = '''#pragma once
@@ -126,6 +136,9 @@ namespace rpp {
     template<class T> struct __hidden {};          // a private double-underscore name
     static constexpr int internal_fn(int i) { return i; } // internal linkage, never exportable
     struct Public {};
+    template<class T> constexpr bool var_tmpl = true;    // libclang calls this UNEXPOSED_DECL
+    template<class T> struct Holder { void method(); };  // its out-of-line body sits at namespace scope
+    template<class T> void Holder<T>::method() {}        // declares nothing new, so it never exports
 }
 extern "C" { void c_api(); }                       // one linkage spec deep, like RPPCAPI
 '''
@@ -139,18 +152,21 @@ def selftest() -> list:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
         decls = declarations(path)
-        got = {(ns, name) for ns, kind, name, internal in decls}
+        got = {(ns, name) for ns, kind, name, internal, line in decls}
         want = {('rpp', 'Sev'), ('rpp', 'SevInfo'), ('rpp', 'SevWarn'),  # unscoped enum + members
                 ('rpp', 'Scoped'), ('rpp', '__wrap'), ('rpp', '__hidden'),
-                ('rpp', 'Public'), ('rpp', 'internal_fn'), ('', 'c_api')}  # extern "C" reaches c_api
+                ('rpp', 'Public'), ('rpp', 'internal_fn'), ('', 'c_api'),  # extern "C" reaches c_api
+                ('rpp', 'var_tmpl')}  # a variable template is public API, so it must export
         missing = want - got
         if missing: bad.append(f'declarations dropped {sorted(missing)}')
         # a scoped enum keeps its members out of the namespace
         if ('rpp', 'A') in got: bad.append('a scoped enum leaked its enumerator A')
         # clang refuses to export an internal-linkage name, so the caller needs to see the flag
-        flags = {name: internal for ns, kind, name, internal in decls}
+        flags = {name: internal for ns, kind, name, internal, line in decls}
         if not flags.get('internal_fn'): bad.append('a static function is not marked internal')
         if flags.get('Public'): bad.append('an external-linkage struct is marked internal')
+        # an out-of-line member body would export a name no namespace holds, and the module fails to build
+        if ('rpp', 'method') in got: bad.append('an out-of-line member definition reached the namespace')
     return bad
 
 

@@ -10,50 +10,47 @@
 
 namespace rpp
 {
-    namespace
-    {
-        template<typename T>
-        struct function_traits : function_traits<decltype(&T::operator())> {
-        };
+    template<typename T>
+    struct function_traits : function_traits<decltype(&T::operator())> {
+    };
 
-        template<typename R, typename... Args>
-        struct function_traits<R(Args...)> { // function type
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-        
-        template<typename R, typename... Args>
-        struct function_traits<R (*)(Args...)> { // function pointer
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-
-        // template<typename R, typename... Args>
-        // struct function_traits<std::function<R(Args...)>> {
-        //     using ret_type  = R;
-        //     using arg_types = std::tuple<Args...>;
-        // };
-
-        template<typename T, typename R, typename... Args>
-        struct function_traits<R (T::*)(Args...)> { // member func ptr
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-
-        template<typename T, typename R, typename... Args>
-        struct function_traits<R (T::*)(Args...) const> {  // const member func ptr
-            using ret_type  = R;
-            using arg_types = std::tuple<Args...>;
-        };
-
-        template<typename T>
-        using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
+    template<typename R, typename... Args>
+    struct function_traits<R(Args...)> { // function type
+        using ret_type  = R;
+        using arg_types = std::tuple<Args...>;
+    };
     
-        // return type of a continuation Task functor which takes argument T
-        template<typename Task, typename T>
-        using cont_return_t = std::decay_t<decltype(std::declval<Task>()(std::declval<T>()))>;
+    template<typename R, typename... Args>
+    struct function_traits<R (*)(Args...)> { // function pointer
+        using ret_type  = R;
+        using arg_types = std::tuple<Args...>;
+    };
 
-        template<typename Task>
-        using task_return_t = std::decay_t<decltype(std::declval<Task>()())>;
-    }
+    // template<typename R, typename... Args>
+    // struct function_traits<std::function<R(Args...)>> {
+    //     using ret_type  = R;
+    //     using arg_types = std::tuple<Args...>;
+    // };
+
+    template<typename T, typename R, typename... Args>
+    struct function_traits<R (T::*)(Args...)> { // member func ptr
+        using ret_type  = R;
+        using arg_types = std::tuple<Args...>;
+    };
+
+    template<typename T, typename R, typename... Args>
+    struct function_traits<R (T::*)(Args...) const> {  // const member func ptr
+        using ret_type  = R;
+        using arg_types = std::tuple<Args...>;
+    };
+
+    template<typename T>
+    using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
+    
+    // return type of a continuation Task functor which takes argument T
+    template<typename Task, typename T>
+    using cont_return_t = std::decay_t<decltype(std::declval<Task>()(std::declval<T>()))>;
+
+    template<typename Task>
+    using task_return_t = std::decay_t<decltype(std::declval<Task>()())>;
 }
