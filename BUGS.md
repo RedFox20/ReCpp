@@ -37,17 +37,15 @@ were tried, including a block-scope object feeding a printf sink.
 A fix needs a translation unit which folds on demand, so a separate tiny target under
 `tests/` is the likely answer.
 
-### B6. The C15 TSAN suppression covers libc++ only, so gcc still reports the future race
-C15 closed the same false positive on clang. `tests/main.cpp` guards
-`__tsan_default_suppressions` with `#if defined(__clang__)`, and the pattern it returns
-is `race:std::__1::promise`, which is the libc++ spelling. Under gcc the entity is
-`std::__future_base::_State_baseV2`, so no pattern matches and no suppression compiles.
-The gcc TSAN jobs report it intermittently, in `~_State_baseV2`, in
-`exception_ptr::_M_release`, and in `~runtime_error` freeing the string that
-`test_future::test_except_handler_chaining` reads on another worker. All of them sit
-inside an uninstrumented `libstdc++.so`.
-Read C15 first. A fix adds the gcc branch and a libstdc++ pattern, and it needs a run
-which proves the suppression hides this race and hides no other.
+### B10. A pool worker reads its semaphore after the pool destroyed it
+TSAN reports `heap-use-after-free` at shutdown, 1 run in 80. The main thread runs
+`~unique_ptr<pool_worker>` out of the worker vector, while `pool_worker::run()` is still
+inside `rpp::semaphore::spin_lock()` at `semaphore.h:102`. A second report reads the
+`pool_task_state` shared pointer the same way.
+
+This is a lifecycle order defect, not a refcount TSAN cannot see, so C25 does not cover it
+and no suppression should. Reproduce it with the C25 loop below, and read the
+`heap-use-after-free` reports instead of the races.
 
 ### B8. gcc-14 writes a module for sprint.h and task.h that no importer can read
 Both `.cppm` files compile, and the `.gcm` lands. An importer then stops with
@@ -109,6 +107,31 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C25. libtsan.so never read the suppression hook, because it was hidden (was B6)
+B6 blamed the libc++ spelling of the C15 pattern. The real cause is one attribute. gcc links
+`libtsan.so`, which reads `__tsan_default_suppressions` through the global dynamic symbol
+table, and `-fvisibility=hidden` kept the definition out of it. `dlsym` then answered with the
+weak hook inside `libtsan.so`, which returns null, so every pattern was dead. clang links its
+runtime statically, which is why C15 worked there.
+
+The hook and its patterns moved to `tests/test_sanitizers.cpp`, beside the test which calls
+`dlsym(RTLD_DEFAULT, ...)` and reads the string back. That test fails without the attribute.
+
+Both reports name `test_future::test_except_handler_chaining`, which shares one exception
+object between two pool workers. The refcount which orders them sits in an uninstrumented
+`libstdc++.so`, so TSAN sees no edge.
+
+Measured on 2 pinned cores: 3 reports in 120 runs before, 0 in 120 after, and the two patterns
+matched 3 times each. Ten full-suite runs matched no suppression at all and passed every case.
+```bash
+CXX20=1 mama gcc tsan build
+for i in $(seq 1 60); do for j in 1 2; do
+  taskset -c 0,1 env TSAN_OPTIONS="halt_on_error=0 print_suppressions=1" \
+    packages/ReCpp/linux-tsan/RppTests test_future > /tmp/w_${i}_$j.log 2>&1 &
+done; wait; done
+grep -l 'WARNING: ThreadSanitizer' /tmp/w_*.log | wc -l
+```
 
 ### C24. `_va_comma` dropped the argument list when the first argument started with `(`
 The one-probe fallback let `_spaces_on_empty_token` consume that leading paren, so the
