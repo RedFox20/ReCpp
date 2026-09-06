@@ -37,6 +37,23 @@ were tried, including a block-scope object feeding a printf sink.
 A fix needs a translation unit which folds on demand, so a separate tiny target under
 `tests/` is the likely answer.
 
+### B11. The documented clang-tidy gate analyzes nothing on a warm build tree
+`CXX20=1 mama gcc build clang-tidy test="nogdb -vv"` exits 0 and reports no finding, while the
+CI job of the same name fails. AGENTS.md names that command as the gate, so a session which
+trusts it pushes a red build. Two rounds on PR #73 went red this way.
+
+`packages/ReCpp/linux/CMakeCache.txt` carries no `CMAKE_CXX_CLANG_TIDY` after that command.
+mama reuses the build directory a plain build configured, so the analysis never turns on.
+Adding `configure` sets the variable, and then a gcc-14 build stops instead, because
+clang-tidy is clang and cannot parse `-fmodules-ts`, `-fmodule-mapper=` or `-fdeps-format=`.
+The CI gcc-13 jobs never hit that, because gcc-13 builds no modules.
+
+Until this is fixed, check one finding against clang-tidy directly:
+```bash
+clang-tidy-18 --checks='-*,performance-enum-size' tests/test_sprint.cpp -- -std=c++23 -Isrc
+```
+A fix makes the documented command reconfigure, and turns modules off for the analysis.
+
 ### B10. A pool worker reads its semaphore after the pool destroyed it
 TSAN reports `heap-use-after-free` at shutdown, 1 run in 80. The main thread runs
 `~unique_ptr<pool_worker>` out of the worker vector, while `pool_worker::run()` is still
