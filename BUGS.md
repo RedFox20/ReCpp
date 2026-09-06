@@ -77,6 +77,32 @@ CXX20=1 python3 run_test.py --compiler gcc --expect modules --jobs 4
 ```
 Retry it on clang-21 and on a gcc newer than 14.2. Only gcc 14.2 ran this check.
 
+### B9. `--check-undocumented` reads 29 of the 48 headers and reports the rest as clean
+`extract_public_decls` returns nothing for 19 headers, so the gate never asks whether
+README.md documents them. It reported "All public declarations are documented" while the
+`sort.h` table listed 1 of its 4 functions.
+
+```
+headers the extractor reads: 29
+headers it returns nothing for: 19
+  bitutils.h close_sync.h concurrent_queue.h condition_variable.h coroutines.h debugging.h
+  debugging.macros.h future.h jni_cpp.h log_colors.h math.h memory_pool.h obfuscated_string.h
+  predicates.h proc_utils.h semaphore.h sort.h task.h traits.h
+```
+
+Reproduce it with the loop which produced that count:
+```bash
+python3 -c "
+import importlib.util, os
+spec = importlib.util.spec_from_file_location('u','update_doc_linerefs.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+for h in sorted(os.listdir('src/rpp')):
+    if h.endswith('.h') and not m.extract_public_decls(f'src/rpp/{h}'): print(h)
+"
+```
+A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
+the 19 headers then owe README.md. The count decides whether the gate can stay green.
+
 ### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
