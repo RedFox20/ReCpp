@@ -28,5 +28,10 @@ mama_target_modules(RppMinmaxModuleOnly)
 add_executable(RppMaskedModuleOnly masked_module_only.cpp)
 target_include_directories(RppMaskedModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppMaskedModuleOnly)
+
+# rpp::sort has to reach an importer of rpp.sort, without rpp.collections beside it
+add_executable(RppSortModuleOnly sort_module_only.cpp)
+target_include_directories(RppSortModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppSortModuleOnly)
 target_link_libraries(RppModuleConsumer PRIVATE ${MAMA_LIBS})
 install(TARGETS RppModuleConsumer RUNTIME DESTINATION bin)

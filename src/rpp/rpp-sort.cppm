@@ -14,5 +14,6 @@ export namespace rpp {
     using rpp::contiguous_container;
     using rpp::container_element_t;
     using rpp::insertion_sort;
+    using rpp::sort;
 }
 // GENERATED EXPORTS END

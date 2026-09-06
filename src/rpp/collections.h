@@ -529,22 +529,7 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    template<class T, class A> void sort(std::vector<T, A>& v)
-    {
-        rpp::insertion_sort(v.data(), v.size(), [](const T& a, const T& b) { return a < b; });
-    }
-
-    template<typename T, typename Comparison>
-    void sort(std::vector<T>& v, const Comparison& comparison)
-    {
-        rpp::insertion_sort(v.data(), v.size(), comparison);
-    }
-
-    template<typename T, typename Comparison>
-    void sort(element_range<T> v, const Comparison& comparison)
-    {
-        rpp::insertion_sort(v.data(), v.size(), comparison);
-    }
+    // rpp::sort moved to sort.h, so `import rpp.sort;` alone reaches it. This header includes it.
 
     /////////////////////////////////////////////////////////////////////////////////////
 

@@ -88,4 +88,33 @@ namespace rpp
     {
         insertion_sort(container.data(), container.size(), comparison);
     }
+
+    /**
+     * @brief Sorts a contiguous container in ascending order
+     * @param container Any container with data(), size() and operator[], such as std::vector
+     */
+    template<typename Container>
+    FINLINE void sort(Container&& container)
+        #if RPP_HAS_CXX20
+            requires contiguous_container<Container>
+        #endif
+    {
+        insertion_sort(container.data(), container.size(),
+                       [](const auto& a, const auto& b) { return a < b; });
+    }
+
+    /**
+     * @brief Sorts a contiguous container with a custom comparison
+     * @param container Any container with data(), size() and operator[], such as std::vector
+     * @param comparison bool(T a, T b), true when a < b
+     */
+    template<typename Container, typename Comparison>
+    FINLINE void sort(Container&& container, const Comparison& comparison)
+        #if RPP_HAS_CXX20
+            requires contiguous_container<Container> &&
+                     sort_comparison<container_element_t<Container>, Comparison>
+        #endif
+    {
+        insertion_sort(container.data(), container.size(), comparison);
+    }
 }
