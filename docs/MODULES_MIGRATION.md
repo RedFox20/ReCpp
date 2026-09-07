@@ -1,9 +1,9 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 10. Twenty-six modules exist: all of L0, L1 and L2.
+Revision 11. Thirty-one modules exist: all of L0, L1, L2 and L3.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 18 headers.
+gives the phased plan for the remaining 13 headers.
 
 ## Handover state
 
@@ -60,7 +60,7 @@ configuration became an unguarded export. Each rule carries a selftest.
 
 | Rule | Reaches | Mechanism |
 |---|---|---|
-| a macro a define can toggle | `RPP_ENABLE_UNICODE`, `!RPP_BARE_METAL` | parse each configuration, guard the difference |
+| a macro a define can toggle | `RPP_ENABLE_UNICODE`, `!RPP_BARE_METAL` | parse each configuration, union the names, guard the difference |
 | a macro no define reaches | `RPP_HAS_COROUTINES` | read the `#if` span the header brackets, and match a declaration by line |
 | an inline namespace | `rpp::literals`, `rpp::duration_literals` | read the `inline` keyword from the header |
 
@@ -68,6 +68,14 @@ The second rule matches by declaration location, not by name text. A text search
 matched a name a guarded block only mentions, which would have hidden the whole
 `rpp::semaphore` and `rpp::concurrent_queue` classes wherever the macro is 0. Neither
 header carries a module yet, so the L3 layer would have been the first to hit it.
+
+The first rule used to subtract from the host configuration alone, so a name only another
+configuration declares reached no export list. `mutex.h` declares `critical_section` and
+`synchronized_critical` on FreeRTOS and on Cortex-M, and a sweep over all 31 headers names
+it as the only one. The rule unions the configurations now, and it negates the guard for a
+name the host build lacks. `ALT_GUARD` replaces that negation where the header states a
+tighter condition, which for `mutex.h` is `RPP_HAS_CRITICAL_SECTION_MUTEX`, because a
+Cortex-M build is not always a bare metal build.
 
 The generator also mishandled two kinds of declaration. An out-of-line member definition
 reached the export list and broke the build. A blanket skip of `UNEXPOSED_DECL` hid every

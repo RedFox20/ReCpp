@@ -148,16 +148,17 @@ preprocessed lines and needs no split.
 
 Thirty-one modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
 [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
-with the ones still to come. A module exports every name its header declares, so read the
-header for the list.
+with the ones still to come. Each `.cppm` carries the export list its header earned, so read
+that file for the names a module gives you.
 
-Three of them carry a limit the export list cannot state:
+Four of them carry a limit the export list cannot state:
 
 | Module | Header | The limit |
 |--------|--------|-----------|
 | `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | Carries the ten integer aliases only. The macros of `config.h` need the header |
 | `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
 | `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
+| `rpp.type_traits` | [`type_traits.h`](src/rpp/type_traits.h) | Drops `has_std_to_string`, which gcc-14 cannot write into a readable module. The header still declares it, see `BUGS.md` B8 |
 
 ### How it works
 

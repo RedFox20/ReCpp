@@ -23,5 +23,9 @@ export namespace rpp {
     using rpp::synchronize_guard;
     using rpp::synchronizable;
     using rpp::synchronized;
+#if RPP_HAS_CRITICAL_SECTION_MUTEX
+    using rpp::critical_section;
+    using rpp::synchronized_critical;
+#endif
 }
 // GENERATED EXPORTS END
