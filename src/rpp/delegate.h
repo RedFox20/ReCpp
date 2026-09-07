@@ -238,7 +238,11 @@ namespace rpp
 
         // not const delegate& or delegate&&
         template<class FunctionType>
-        using enable_if_not_copy_ctor_t = std::enable_if_t< !std::is_same_v<std::decay_t<FunctionType>, delegate> >;
+        static constexpr bool not_copy_ctor = !std::is_same_v<std::decay_t<FunctionType>, delegate>;
+
+        // the member constructors take the method arguments verbatim, and the adapters take the rest
+        template<class...TArgs>
+        static constexpr bool args_match = std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>;
 
         template<class Function>
         static constexpr bool is_func_type = std::is_same_v<Function, func_type>;
@@ -253,7 +257,7 @@ namespace rpp
          * @brief Master constructor for most delegate types
          *        Matches: functors, lambdas, global functions
          */
-        template<class FunctionType, typename = enable_if_not_copy_ctor_t<FunctionType>>
+        template<class FunctionType> requires not_copy_ctor<FunctionType>
         delegate(FunctionType&& function) noexcept
         {
             using Function = typename std::decay_t<FunctionType>;
@@ -275,7 +279,7 @@ namespace rpp
         }
 
         /** @brief Basic operator= shortcut for reset() */
-        template<class FunctionType, typename = enable_if_not_copy_ctor_t<FunctionType>>
+        template<class FunctionType> requires not_copy_ctor<FunctionType>
         DELEGATE_FINLINE delegate& operator=(FunctionType&& function) noexcept
         {
             reset(std::forward<FunctionType>(function));
@@ -283,7 +287,7 @@ namespace rpp
         }
 
         /** @brief Generic init which catches: functors, lambdas, global funcs */
-        template<class FunctionType, typename = enable_if_not_copy_ctor_t<FunctionType>>
+        template<class FunctionType> requires not_copy_ctor<FunctionType>
         void reset(FunctionType&& function) noexcept
         {
             reset();
@@ -470,8 +474,7 @@ namespace rpp
          *   delegate<void(int)> d(&myClass, &MyClass::method);
          * @endcode
          */
-        template<class IClass, class FClass, class...TArgs,
-                 std::enable_if_t<std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        template<class IClass, class FClass, class...TArgs> requires args_match<TArgs...>
         delegate(IClass* inst, Ret (FClass::*method)(TArgs...))
         {
             if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
@@ -484,8 +487,7 @@ namespace rpp
          *   delegate<void(int)> d(&myClass, &MyClass::method);
          * @endcode
          */
-        template<class IClass, class FClass, class...TArgs,
-                 std::enable_if_t<std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        template<class IClass, class FClass, class...TArgs> requires args_match<TArgs...>
         delegate(const IClass* inst, Ret (FClass::*method)(TArgs...) const)
         {
             if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
@@ -513,8 +515,7 @@ namespace rpp
          *   delegate<void(int)> d(&myClass, &MyClass::method);
          * @endcode
          */
-        template<class IClass, class FClass, class...TArgs,
-                 std::enable_if_t<!std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        template<class IClass, class FClass, class...TArgs> requires (!args_match<TArgs...>)
         delegate(IClass* inst, Ret (FClass::*method)(TArgs...)) : delegate{}
         {
             if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
@@ -527,8 +528,7 @@ namespace rpp
          *   delegate<void(int)> d(&myClass, &MyClass::method);
          * @endcode
          */
-        template<class IClass, class FClass, class...TArgs,
-                 std::enable_if_t<!std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>, int> = 0>
+        template<class IClass, class FClass, class...TArgs> requires (!args_match<TArgs...>)
         delegate(const IClass* inst, Ret (FClass::*method)(TArgs...) const) : delegate{}
         {
             if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};

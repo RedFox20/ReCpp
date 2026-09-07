@@ -70,6 +70,14 @@ namespace rpp
         uppercase,
     };
 
+    struct string_buffer;
+
+    /// True when `std::ostream << T` compiles
+    template<class T> concept has_ostream_op = requires(std::ostream& os) { os << std::declval<T>(); };
+
+    /// True when `T::operator<<(string_buffer&)` compiles
+    template<class T> concept has_member_sbuf_op = requires(string_buffer& sb) { std::declval<const T&>().operator<<(sb); };
+
     /**
      * Always null terminated version of stringstream, which is compatible with strview
      * Not intended for moving or copying
@@ -223,15 +231,6 @@ namespace rpp
         // needs to be duplicated due to operator<< not being able to detect the correct overload
         template<class T> FINLINE void write(T* ptr) noexcept { write_ptr_type(ptr); }
 
-        // For: std::ostream& operator<<(std::ostream& os, const T& value);
-        template<class T> using ostrm_op = decltype(std::declval<std::ostream&>() << std::declval<T>());
-        
-        // For: string_buffer& operator<<(string_buffer& sb, const T& value);
-        // template<class T> using sbuf_op = decltype(std::declval<string_buffer&>() << std::declval<T>());
-
-        // For: T::operator<<(rpp::string_buffer&) const;
-        template<class T> using member_sbuf_op = decltype(std::declval<const T&>().operator<<(std::declval<string_buffer&>()));
-
         /**
          * @brief Generic fallback for unknown types. Tries different ways to convert T to string
          */
@@ -240,7 +239,7 @@ namespace rpp
             // this part is a bit dangerous, there is a possibility for cyclic recursion
             // if we call *this << value, which calls write(value)
             // so only value.operator<< is allowed
-            if constexpr (is_detected_v<member_sbuf_op, T>)
+            if constexpr (has_member_sbuf_op<T>)
             {
                 value.operator<<(*this); // member operator<<
             }
@@ -256,7 +255,7 @@ namespace rpp
             {
                 this->write(std::to_string(value));
             }
-            else if constexpr (is_detected_v<ostrm_op, T>)
+            else if constexpr (has_ostream_op<T>)
             {
                 std::ostringstream oss;
                 oss << value;
@@ -587,7 +586,7 @@ namespace rpp
      *  [2] = { "key": "value", "name": "john" }
      *  @endcode
      */
-    template<typename C, std::enable_if_t<is_container<C>, int> = 0>
+    template<is_container C>
     NOINLINE std::string to_string(const C& container, bool newlines = true) noexcept
     {
         rpp::string_buffer sb; sb.write_cont(container, newlines); return sb.str();

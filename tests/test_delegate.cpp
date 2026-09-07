@@ -186,6 +186,81 @@ namespace rpp
             AssertThat(func2(data), "const_method");
         }
 
+        // reset() shares the not_copy_ctor constraint with the master constructor,
+        // and it dispatches the same three ways
+        TestCase(reset_takes_every_callable_shape)
+        {
+            Data (*function)(Data a) = [](Data a) { return validate("function", a); };
+
+            DataDelegate func;
+            func.reset(function); // function pointer
+            AssertThat(func(data), "function");
+
+            func.reset([](Data a) { return validate("lambda", a); }); // functor
+            AssertThat(func(data), "lambda");
+
+            Derived inst;
+            func.reset(&inst, &Derived::method); // member overload, not the template
+            AssertThat(func(data), "method");
+            func.reset(&inst, &Derived::const_method);
+            AssertThat(func(data), "const_method");
+
+            func.reset(nullptr);
+            AssertThat(func.good(), false);
+        }
+
+        // not_copy_ctor keeps a delegate argument out of the master constructor, which would
+        // otherwise beat the copy constructor for a non-const lvalue
+        TestCase(copy_construction_prefers_the_copy_constructor)
+        {
+            DataDelegate original = [](Data a) { return validate("original", a); };
+
+            DataDelegate from_lvalue { original };
+            AssertThat(from_lvalue(data), "original");
+            AssertThat(original.good(), true); // the copy left the source intact
+
+            const DataDelegate& cref = original;
+            DataDelegate from_const_lvalue { cref };
+            AssertThat(from_const_lvalue(data), "original");
+
+            DataDelegate from_rvalue { std::move(original) };
+            AssertThat(from_rvalue(data), "original");
+        }
+
+        // the same constraint on operator=, driven from the callable side
+        TestCase(assignment_takes_every_callable_shape)
+        {
+            Data (*function)(Data a) = [](Data a) { return validate("function", a); };
+
+            DataDelegate func;
+            func = function;
+            AssertThat(func(data), "function");
+
+            func = [](Data a) { return validate("lambda", a); };
+            AssertThat(func(data), "lambda");
+
+            func = nullptr;
+            AssertThat(func.good(), false);
+        }
+
+        // only the const-instance constructors accept a const object, and args_match picks
+        // the direct call or the adapter between them
+        TestCase(const_instance_binds_the_const_method_constructors)
+        {
+            const Derived inst;
+            DataDelegate direct { &inst, &Derived::const_method }; // args match exactly
+            AssertThat(direct(data), "const_method");
+
+            const ConstRefAdapterClass obj;
+            rpp::delegate<void(int val)> adapted { &obj, &ConstRefAdapterClass::cref_const_method };
+            adapted(42); // const int& against int, so this one takes the adapter
+            AssertThat(obj.result, 42);
+
+            rpp::delegate<void(int val)> exact { &obj, &ConstRefAdapterClass::byval_const_method };
+            exact(89);
+            AssertThat(obj.result, 89);
+        }
+
         TestCase(virtuals)
         {
             Base    base;

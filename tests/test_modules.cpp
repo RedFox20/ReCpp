@@ -28,10 +28,12 @@ import rpp.collections;
 import rpp.stack_trace;
 import rpp.threads;
 import rpp.timer;
+import rpp.sprint;
+import rpp.task;
 import rpp.vec;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
-const void* module_is_container_addr() noexcept;
+const void* module_pi_addr() noexcept;
 
 TestImpl(test_modules)
 {
@@ -120,11 +122,11 @@ TestImpl(test_modules)
         AssertThat(bits.isSet(4), false);
     }
 
-    // a variable template needs `inline`, or gcc gives the module and the header one copy each
-    TestCase(type_traits_variable_template_is_one_entity)
+    // a namespace-scope constant needs `inline`, or the module and the header get one copy each
+    TestCase(math_constant_is_one_entity)
     {
-        const void* header = &rpp::is_container<std::vector<int>>;
-        AssertThat(module_is_container_addr() == header, true);
+        const void* header = &rpp::PI;
+        AssertThat(module_pi_addr() == header, true);
     }
 
     TestCase(traits_module_carries_the_whole_surface)
@@ -278,6 +280,31 @@ TestImpl(test_modules)
         rpp::Vector2 p { 3.0f, 4.0f };
         AssertThat(p.length(), 5.0f);
     }
+
+    TestCase(sprint_module_carries_the_whole_surface)
+    {
+        AssertThat(rpp::sprint(1, "and", 2.5), "1 and 2.5"); // sprint separates the arguments
+        AssertThat(rpp::to_string('x'), "x");
+        AssertThat(rpp::to_hex_string(rpp::strview{"AB"}), "4142");
+
+        rpp::string_buffer sb;
+        sb << "n=" << 42 << " v=" << std::vector<int>{ 1, 2 };
+        AssertThat(sb.view(), "n=42 v={ 1, 2 }");
+        AssertThat(rpp::format("%d-%s", 7, "x"), "7-x");
+    }
+
+#if RPP_HAS_COROUTINES
+    // an eager task runs to completion at construction, so this needs no event loop
+    static rpp::task<int> module_task() { co_return 99; }
+
+    TestCase(task_module_carries_the_whole_surface)
+    {
+        rpp::task<int> t = module_task();
+        AssertThat(t.valid(), true);
+        AssertThat(t.done(), true);
+        AssertThat(t.await_ready(), true);
+    }
+#endif
 };
 
 #endif // RPP_BUILD_WITH_MODULES

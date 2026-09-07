@@ -22,6 +22,7 @@ namespace rpp
         struct is_detected<void_t<Operation<Arguments...>>, Operation, Arguments...> : std::true_type {};
     }
 
+    // the traits below are concepts. This stays for a consumer which brings its own alias
     template<template<class...> class Operation, typename... Arguments>
     using is_detected = detail::is_detected<detail::void_t<>, Operation, Arguments...>;
 
@@ -29,34 +30,31 @@ namespace rpp
     inline constexpr bool is_detected_v = detail::is_detected<detail::void_t<>, Operation, Arguments...>::value;
 
 #if !RPP_BARE_METAL
-    template<class T> using std_to_string_expression  = decltype(std::to_string(std::declval<T>()));
+    /// True when `std::to_string(T)` compiles
+    template<class T> concept has_std_to_string = requires { std::to_string(std::declval<T>()); };
 #endif
-    template<class T> using to_string_expression      = decltype(to_string(std::declval<T>()));
-    template<class T> using to_string_memb_expression = decltype(std::declval<T>().to_string());
-    template<class T> using get_memb_expression       = decltype(std::declval<T>().get());
-    template<class T, class U> using set_memb_expression = decltype(std::declval<T>().set(std::declval<U>()));
 
-#if !RPP_BARE_METAL
-    template<class T> inline constexpr bool has_std_to_string  = is_detected_v<std_to_string_expression, T>;
-#endif
-    template<class T> inline constexpr bool has_to_string      = is_detected_v<to_string_expression, T>;
-    template<class T> inline constexpr bool has_to_string_memb = is_detected_v<to_string_memb_expression, T>;
-    template<class T> inline constexpr bool has_get_memb       = is_detected_v<get_memb_expression, T>;
-    template<class T, class U> inline constexpr bool has_set_memb = is_detected_v<set_memb_expression, T, U>;
+    /// True when an ADL `to_string(T)` compiles
+    template<class T> concept has_to_string = requires { to_string(std::declval<T>()); };
 
-    template<class T> using has_begin_expression  = decltype(std::declval<T>().begin());
-    template<class T> using has_end_expression    = decltype(std::declval<T>().end());
-    template<class T> using has_size_expression   = decltype(std::declval<T>().size());
-    template<class T> using has_c_str_expression  = decltype(std::declval<T>().c_str());
+    /// True when `T::to_string()` compiles
+    template<class T> concept has_to_string_memb = requires { std::declval<T>().to_string(); };
 
-    template<class T> inline constexpr bool is_iterable = is_detected_v<has_begin_expression, T>
-                                                && is_detected_v<has_end_expression, T>;
+    /// True when `T::get()` compiles
+    template<class T> concept has_get_memb = requires { std::declval<T>().get(); };
 
-    template<class T> inline constexpr bool is_stringlike = is_detected_v<has_c_str_expression, T>;
+    /// True when `T::set(U)` compiles
+    template<class T, class U> concept has_set_memb = requires { std::declval<T>().set(std::declval<U>()); };
 
-    template<class T> inline constexpr bool is_container = is_iterable<T>
-                                                 && is_detected_v<has_size_expression, T>
-                                                 && !is_stringlike<T>;
+    /// True when T supports range-for
+    template<class T> concept is_iterable = requires { std::declval<T>().begin(); std::declval<T>().end(); };
+
+    /// True when `T::c_str()` compiles
+    template<class T> concept is_stringlike = requires { std::declval<T>().c_str(); };
+
+    /// True when T iterates and reports a size, and does not look like a string
+    template<class T> concept is_container = is_iterable<T> && !is_stringlike<T>
+                                          && requires { std::declval<T>().size(); };
 
     // ------------------------------------------------------------------------------------ //
 }

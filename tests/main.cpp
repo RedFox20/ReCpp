@@ -13,15 +13,8 @@
     #endif
 #endif
 
-// TSAN cannot see the future refcount inside the uninstrumented libc++.so, so a promise
-// destroyed after the waiter released looks like a race. See BUGS.md C15.
-#if defined(__clang__) && defined(__has_feature)
-    #if __has_feature(thread_sanitizer)
-        extern "C" const char* __tsan_default_suppressions() { // NOLINT(bugprone-reserved-identifier)
-            return "race:std::__1::promise\n"; // libc++ puts every promise in namespace __1
-        }
-    #endif
-#endif
+// tests/test_sanitizers.cpp owns __tsan_default_suppressions, beside the test which proves
+// libtsan.so can reach it
 
 static bool is_verbose(int argc, char** argv)
 {
