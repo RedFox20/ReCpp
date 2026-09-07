@@ -9,6 +9,8 @@
 #include <rpp/debugging.macros.h> // LogInfo, LogWarning, Assert, ThrowErr
 #include <stdexcept>              // ThrowErr throws std::runtime_error
 #include <string>
+#include <vector>
+#include <mutex>                  // std::unique_lock, which rpp::spin_lock returns
 
 import rpp.strview;   // includes come first, the import goes last
 import rpp.debugging;

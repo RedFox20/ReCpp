@@ -146,14 +146,18 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-| Module | Header | Exported names |
-|--------|--------|----------------|
-| `rpp.strview` | [`strview.h`](src/rpp/strview.h) | `strview`, `ustrview`, `line_parser`, `keyval_parser`, `bracket_parser`, `concat`, `to_lower`, `to_upper`, `replace`, `_sv` literal, and more |
-| `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
-| `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | `byte`, `ushort`, `uint`, `ulong`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64` |
-| `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | `min`, `max`, `abs`, `sqrt`, `min3`, `max3`. The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
-| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `obfuscated_string`, `make_obfuscated`, and the `_obfuscated` literal |
-| `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | `scope_finalizer`, `make_scope_guard`. The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
+Thirty modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
+[`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
+with the ones still to come. A module exports every name its header declares, so read the
+header for the list.
+
+Three of them carry a limit the export list cannot state:
+
+| Module | Header | The limit |
+|--------|--------|-----------|
+| `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | Carries the ten integer aliases only. The macros of `config.h` need the header |
+| `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
+| `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
 
 ### How it works
 
@@ -183,8 +187,10 @@ export using ::SetLogSeverityFilter;
 export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumerators
 ```
 
-`BUILD_WITH_MODULES=ON` also builds `RppModuleChecks`. Each file there imports one module
-and includes no rpp header except a macro header, so a missing export fails the build.
+`BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
+`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds four
+module-only targets. Each of those imports one module and includes no rpp header, so a
+missing export fails the build.
 
 ---
 

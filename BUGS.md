@@ -86,9 +86,9 @@ grep -l 'heap-use-after-free' /tmp/b10_*.log
 `tools/gen_module_exports.py` carries `NO_EXPORT` and `NO_IMPORT`, one entry each. Both
 modules ship now. Delete an entry when a newer gcc reads the module back.
 
-`NO_CONFIG` is a third list, and it is not a gcc defect. `sprint.h` needs `std::to_string`,
-which bare metal drops, so the header does not compile in that configuration at all. Any
-parse failure the list does not name reaches the caller and fails the run.
+`NO_CONFIG` is a third list, and it is not a gcc defect. It is empty, because `sprint.h`
+now guards its `std::to_string` branch the way `type_traits.h` guards the trait. Any parse
+failure the list does not name reaches the caller and fails the run.
 
 The importer stops with `failed to read compiled module cluster N: Bad file data`, then
 `failed to load pendings for` a libstdc++ internal. That name changes per run, and the
