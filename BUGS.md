@@ -82,9 +82,9 @@ done; wait; done
 grep -l 'heap-use-after-free' /tmp/b10_*.log
 ```
 
-### B8. gcc-14 writes an unreadable module for two shapes, and both have a workaround
-`tools/gen_module_exports.py` carries `NO_EXPORT` and `NO_IMPORT`, one entry each. Both
-modules ship now. Delete an entry when a newer gcc reads the module back.
+### B8. gcc-14 breaks a module for three shapes, and each one has a workaround
+`tools/gen_module_exports.py` carries `NO_EXPORT` with one entry and `NO_IMPORT` with two.
+Every module ships now. Delete an entry when a newer gcc reads the module back.
 
 `NO_CONFIG` is a third list, and it is not a gcc defect. It is empty, because `sprint.h`
 now guards its `std::to_string` branch the way `type_traits.h` guards the trait. Any parse
@@ -101,11 +101,19 @@ C++20 concept all fail the same way. So does a concept which calls an unexported
 names it. `NO_EXPORT` drops `has_std_to_string` from `rpp.type_traits`, which is what
 `rpp.sprint` imports. A header includer still gets the trait.
 
-Shape 2, in `rpp.task`. A module which includes `future_types.h` in its global module
-fragment and also imports `rpp.future_types` writes an unreadable `.gcm`. Either half alone
-is fine. The importer only fails when it also includes `<rpp/tests.h>`. `NO_IMPORT` drops that
-one re-export, so an importer of `rpp.task` which needs `rpp::coro_handle` imports
+Shape 2, in `rpp.task` and `rpp.tests`. A module which includes `future_types.h` in its
+global module fragment and also imports `rpp.future_types` writes an unreadable `.gcm`.
+Either half alone is fine. The importer only fails when it also includes `<rpp/tests.h>`.
+`NO_IMPORT` drops that one re-export, so an importer which needs `rpp::coro_handle` imports
 `rpp.future_types` itself.
+
+Shape 3, in `rpp.tests`. gcc runs out of imported source locations and stops with
+`internal compiler error: in write_location, at cp/module.cc:16271`. It prints
+`unable to represent further imported source locations` first. The count is what matters,
+not one module. Seven re-exports pass, and `rpp.sprint` as the eighth crashes it, while
+`rpp.sprint` alone passes. The dependency `.gcm` files have to come from an `-O2` build to
+reach the limit, so a `-O0` bisect hides it. `NO_IMPORT` drops `rpp.sprint`, and an importer
+of `rpp.tests` which needs `rpp::string_buffer` imports `rpp.sprint` itself.
 
 Reproduce either shape in seconds, outside cmake. Build every `.cppm` in the
 `RPP_MODULES_SRC` order into one `gcm.cache`, then compile a consumer:

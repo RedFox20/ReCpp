@@ -12,27 +12,28 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the thirty modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
+| the thirty-one modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 27 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 4 module-only targets |
+| `tests/test_modules.cpp` | module consumer test, 28 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 5 module-only targets |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 28 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 565/565 on the modules build, 538/538 on the header build |
+| test counts | 566/566 on the modules build, 538/538 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all thirty modules. 4 is done through the generator
-`--check`. 5 has L0, L1 and L2 finished, and L3 has 4 of its 5. Section 11 lists what 7 owes.
+6 landed. The generator drives all thirty-one modules. 4 is done through the generator
+`--check`. 5 has L0 to L3 finished. Section 11 lists what 7 owes.
 
-**Next:** `rpp.tests`, the last L3 module. Section 9 has the layers.
+**Next:** changeset 5, the L4 layer. Section 9 has the layers.
 
-**`rpp.sprint` and `rpp.task` ship, and each cost one workaround.** The generator carries
-`NO_EXPORT` and `NO_IMPORT`, one entry each, and `BUGS.md` **B8** names the two shapes gcc-14
-cannot write. `NO_CONFIG` is empty, because `sprint.h` now guards its `std::to_string` branch
-the way `type_traits.h` guards the trait. The generator selftest still pins all three knobs.
+**`rpp.sprint`, `rpp.task` and `rpp.tests` ship, and each cost a workaround.** The generator
+carries `NO_EXPORT` with one entry and `NO_IMPORT` with two, and `BUGS.md` **B8** names the
+three shapes gcc-14 breaks. `NO_CONFIG` is empty, because `sprint.h` now guards its
+`std::to_string` branch the way `type_traits.h` guards the trait. The generator selftest
+still pins all three knobs.
 
 An `is_detected_v` alias which names `std::to_string` was the first shape, so the C++20
 concept replaced it. That did not help. A plain alias, a concept, and a concept which calls an
@@ -568,7 +569,7 @@ the macro header stays free of includes.
 | `config.types.h` | **yes, `rpp.config`** | n/a | The ten integer aliases, split from `config.h` so a module can export them. A macro cannot be exported, so the macros stay in `config.h`. |
 | `debugging.h` | yes | **yes, and it pays** | The split is done and measured. `debugging.macros.h` costs 50 preprocessed lines, `debugging.h` costs 32893. Section 6.4 has the numbers. |
 | `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
-| `tests.h` | **yes** | **yes** | The only clear win. 41 macros against 45 declarations, so the module carries real weight, and `tests_macros.h` needs no include of its own. |
+| `tests.h` | **yes** | **yes** | The only clear win, and the split is done. 41 macros against 45 declarations, so the module carries real weight. `tests.macros.h` carries five includes, because two of the names it expands to are macros an import cannot bring. |
 
 Net effect on the module count: `config.h` leaves, and `config.types.h` and
 `tests.h` join, so the total is 44.
@@ -578,13 +579,22 @@ Net effect on the module count: `config.h` leaves, and `config.types.h` and
 writes:
 
 ```cpp
-#include <rpp/tests_macros.h>   // TestImpl, TestCase, AssertThat: no includes of its own
+#include <rpp/tests.macros.h>   // TestImpl, TestCase, AssertThat
 import rpp.tests;               // rpp::test and the rest of the framework
 ```
 
-`tests_macros.h` includes nothing and declares nothing. It only needs the names
-that `import rpp.tests;` already brings, and macro expansion happens later, at
-the use site.
+`tests.macros.h` declares nothing, and it includes five headers. `RPP_SOURCE_LOC_CURRENT`
+and `RPP_HAS_COROUTINES` are macros, so no import can carry them, and `source_loc.h` and
+`future_types.h` bring them. `<memory>`, `<typeinfo>` and `<exception>` carry the three
+std names the macros expand to. Every other name comes from `import rpp.tests`, and macro
+expansion happens later, at the use site.
+
+`tests/module_consumer/tests_module_only.cpp` writes a suite from that pair alone, with no
+`<rpp/tests.h>`, so the build fails when the split stops paying. Dropping either macro
+header from `tests.macros.h` fails that target, and dropping any of the three std headers
+does not. gcc reaches those three through the global module fragment of the module, so no
+gcc build can pin them. They stay, because AGENTS.md asks a header to include what it uses,
+and no other toolchain promises that reach.
 
 **M4, header units, stays rejected for now.** It is the only mechanism that
 carries macros and declarations together, and finding 11 shows it works. CMake
@@ -771,7 +781,7 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L0 | **config.types** ✓, **minmax** ✓, **obfuscated_string** ✓, **scope_guard** ✓ | 4 |
 | L1 | **bitutils** ✓, **debugging** ✓, **delegate** ✓, **endian** ✓, **future_types** ✓, **math** ✓, **predicates** ✓, **proc_utils** ✓, **sort** ✓, **source_loc** ✓, **strview** ✓, **timepoint** ✓, **traits** ✓, **type_traits** ✓ | 14 |
 | L2 | **atomic_timepoint** ✓, **collections** ✓, **sprint** ✓, **stack_trace** ✓, **task** ✓, **threads** ✓, **timer** ✓, **vec** ✓ | 8 |
-| L3 | **load_balancer** ✓, **memory_pool** ✓, **mutex** ✓, **paths** ✓, tests | 5 |
+| L3 | **load_balancer** ✓, **memory_pool** ✓, **mutex** ✓, **paths** ✓, **tests** ✓ | 5 |
 | L4 | atomic_shared_ptr, close_sync, condition_variable, file_io, sockets | 5 |
 | L5 | binary_stream, concurrent_queue, semaphore | 3 |
 | L6 | binary_serializer, thread_pool | 2 |
@@ -779,12 +789,12 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-Every L2 module ships. `BUILD_WITH_MODULES` builds all thirty.
+Every L3 module ships. `BUILD_WITH_MODULES` builds all thirty-one.
 
-44 modules and one umbrella. L0 to L2 exist, and L3 needs `tests`, so 14 remain. Excluded:
-`config.h` and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because
-it is Android glue. `tests.h` is in, and it is the one header whose macros split
-into `tests_macros.h`.
+44 modules and one umbrella. L0 to L3 exist, so 13 remain. Excluded: `config.h`
+and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because it is
+Android glue. `tests.h` is in, and it is the one header whose macros split into
+`tests.macros.h`.
 
 Per module, the loop is: generate the `.cppm`, add it to `RPP_MODULES_SRC`, add
 the import preamble to its test, build `RppModuleTests`, fix what the compiler

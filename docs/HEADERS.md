@@ -47,6 +47,7 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `obfuscated_string.h` | Compile-time string obfuscation |
 | `proc_utils.h` | Process memory and CPU usage info |
 | `tests.h` | Minimal unit testing framework |
+| `tests.macros.h` | The test and assertion macros, which a C++20 module cannot export |
 | `log_colors.h` | ANSI terminal color macros |
 | `predicates.h` | C++20 predicate and invocable concepts |
 | `type_traits.h` | Detection idiom and type trait helpers |

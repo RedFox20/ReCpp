@@ -146,7 +146,7 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Thirty modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
+Thirty-one modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
 [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
 with the ones still to come. A module exports every name its header declares, so read the
 header for the list.
@@ -188,9 +188,9 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 ```
 
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
-`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds four
-module-only targets. Each of those imports one module and includes no rpp header, so a
-missing export fails the build.
+`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds five
+module-only targets. Each of those imports one module and includes no rpp header except a
+macro header, so a missing export fails the build.
 
 ---
 
@@ -4480,15 +4480,18 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L701) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L716) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L733) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L573) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L589) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L625) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L694) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L564) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L598) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.macros.h#L193) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.macros.h#L208) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.macros.h#L225) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.macros.h#L65) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.macros.h#L81) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.macros.h#L117) | Assert inequality |
+| [`AssertTrue`](src/rpp/tests.macros.h#L55) | Alias of `Assert`, which asserts the expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.macros.h#L56) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.macros.h#L90) | Assert expression throws |
+
+`<rpp/tests.h>` gives both the framework and these macros. An importer of `rpp.tests`
+adds `#include <rpp/tests.macros.h>` for them, because a module cannot export a macro.
 
 ### Running Tests
 

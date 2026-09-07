@@ -37,6 +37,7 @@ import rpp.load_balancer;
 import rpp.memory_pool;
 import rpp.mutex;
 import rpp.paths;
+import rpp.tests;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
@@ -341,6 +342,20 @@ TestImpl(test_modules)
         AssertThat(rpp::folder_name("dir/file.txt"), "dir");
         AssertThat(rpp::file_exists("this_file_does_not_exist.txt"), false);
         AssertNotEqual(rpp::working_dir(), std::string{});
+    }
+
+    TestCase(tests_module_carries_the_whole_surface)
+    {
+        // this suite runs through rpp::test, so the module names the type the suite already is
+        AssertThat(rpp::Compare::eq(name, name), true);
+        AssertThat(rpp::Compare::lt(1, 2), true);
+        AssertThat(int(rpp::TestVerbosity::Summary), 1);
+
+        rpp::test_info info { rpp::strview{"probe"}, nullptr };
+        AssertThat(info.test_enabled, true);
+        AssertThat(info.auto_run, true);
+        rpp::test_factory factory = info.factory;
+        AssertThat(factory == nullptr, true);
     }
 
 #if RPP_HAS_COROUTINES

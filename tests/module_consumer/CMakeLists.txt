@@ -35,5 +35,12 @@ target_link_libraries(RppMaskedModuleOnly PRIVATE ${MAMA_LIBS})
 add_executable(RppSortModuleOnly sort_module_only.cpp)
 target_include_directories(RppSortModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppSortModuleOnly)
+
+# the tests.h macro split only pays when tests.macros.h plus rpp.tests writes a suite
+add_executable(RppTestsModuleOnly tests_module_only.cpp)
+target_include_directories(RppTestsModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppTestsModuleOnly)
+# tests.cpp holds the out-of-line half of rpp.tests, so this target links the library
+target_link_libraries(RppTestsModuleOnly PRIVATE ${MAMA_LIBS})
 target_link_libraries(RppModuleConsumer PRIVATE ${MAMA_LIBS})
 install(TARGETS RppModuleConsumer RUNTIME DESTINATION bin)

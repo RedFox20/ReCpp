@@ -59,8 +59,10 @@ INTERNAL_OK = frozenset()
 NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 
 # a re-export the same defect blocks. gcc-14 writes an unreadable .gcm when task.h sits in the
-# global module fragment and the module imports it back, see BUGS.md B8
-NO_IMPORT = {'task.h': frozenset({'rpp.future_types'})}
+# global module fragment and the module imports it back. It runs out of imported source
+# locations on the eighth re-export of rpp.tests, see BUGS.md B8
+NO_IMPORT = {'task.h': frozenset({'rpp.future_types'}),
+             'tests.h': frozenset({'rpp.future_types', 'rpp.sprint'})}
 
 # a header which does not compile in a guard configuration, so no export list exists to reduce
 # against. Empty, because every header parses in both. A parse error reaches the caller

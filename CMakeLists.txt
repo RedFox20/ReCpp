@@ -381,6 +381,7 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-memory_pool.cppm
         src/rpp/rpp-mutex.cppm
         src/rpp/rpp-paths.cppm
+        src/rpp/rpp-tests.cppm
     )
 
     # Add module interface to the library target
