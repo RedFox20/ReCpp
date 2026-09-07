@@ -21,7 +21,7 @@ gate, #65 changeset 6.
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 4 module-only targets |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 28 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 557/557 on the modules build, 534/534 on the header build |
+| test counts | 561/561 on the modules build, 538/538 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
 6 landed. The generator drives all twenty-six modules. 4 is done through the generator
