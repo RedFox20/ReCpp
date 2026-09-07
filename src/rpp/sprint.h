@@ -251,10 +251,12 @@ namespace rpp
             {
                 this->write(to_string(value));
             }
+        #if !RPP_BARE_METAL // type_traits.h declares the trait under the same guard
             else if constexpr (has_std_to_string<T>)
             {
                 this->write(std::to_string(value));
             }
+        #endif
             else if constexpr (has_ostream_op<T>)
             {
                 std::ostringstream oss;

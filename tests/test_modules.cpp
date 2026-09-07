@@ -31,6 +31,10 @@ import rpp.timer;
 import rpp.sprint;
 import rpp.task;
 import rpp.vec;
+import rpp.load_balancer;
+import rpp.memory_pool;
+import rpp.mutex;
+import rpp.paths;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
@@ -291,6 +295,50 @@ TestImpl(test_modules)
         sb << "n=" << 42 << " v=" << std::vector<int>{ 1, 2 };
         AssertThat(sb.view(), "n=42 v={ 1, 2 }");
         AssertThat(rpp::format("%d-%s", 7, "x"), "7-x");
+    }
+
+    TestCase(load_balancer_module_carries_the_whole_surface)
+    {
+        rpp::load_balancer balancer { 1000 };
+        AssertThat(balancer.get_max_bytes_per_sec(), 1000u);
+        AssertGreater(balancer.avg_nanos_between_bytes(), 0u);
+        AssertThat(balancer.can_send(), true); // nothing sent yet, so the budget is open
+    }
+
+    TestCase(memory_pool_module_carries_the_whole_surface)
+    {
+        rpp::linear_static_pool pool { 4096 };
+        // the derived `allocate(int,int)` hides the base `allocate<T>()`, see BUGS.md B14
+        int* value = pool.construct<int>(7);
+        AssertThat(*value, 7);
+
+        int* array = pool.allocate_array<int>(4);
+        array[3] = 11;
+        AssertThat(array[3], 11);
+    }
+
+    TestCase(mutex_module_carries_the_whole_surface)
+    {
+        rpp::synchronized<std::string> guarded { "value" };
+        AssertThat(*guarded, "value");
+        *guarded = "changed";
+        AssertThat(*guarded, "changed");
+
+        rpp::mutex m;
+        AssertThat(m.try_lock(), true);
+        m.unlock();
+        std::unique_lock<rpp::mutex> held = rpp::spin_lock(m);
+        AssertThat(held.owns_lock(), true);
+    }
+
+    TestCase(paths_module_carries_the_whole_surface)
+    {
+        AssertThat(rpp::path_combine("dir", "file.txt"), "dir/file.txt");
+        AssertThat(rpp::file_ext("dir/file.txt"), "txt");
+        AssertThat(rpp::file_name("dir/file.txt"), "file");
+        AssertThat(rpp::folder_name("dir/file.txt"), "dir");
+        AssertThat(rpp::file_exists("this_file_does_not_exist.txt"), false);
+        AssertNotEqual(rpp::working_dir(), std::string{});
     }
 
 #if RPP_HAS_COROUTINES

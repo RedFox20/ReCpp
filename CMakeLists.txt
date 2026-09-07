@@ -376,6 +376,11 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-vec.cppm
         src/rpp/rpp-sprint.cppm
         src/rpp/rpp-task.cppm
+        # L3
+        src/rpp/rpp-load_balancer.cppm
+        src/rpp/rpp-memory_pool.cppm
+        src/rpp/rpp-mutex.cppm
+        src/rpp/rpp-paths.cppm
     )
 
     # Add module interface to the library target

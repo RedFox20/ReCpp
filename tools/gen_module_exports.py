@@ -63,8 +63,8 @@ NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 NO_IMPORT = {'task.h': frozenset({'rpp.future_types'})}
 
 # a header which does not compile in a guard configuration, so no export list exists to reduce
-# against. Every other parse error is a real one, and the generator reports it
-NO_CONFIG = {'sprint.h': frozenset({'!RPP_BARE_METAL'})}
+# against. Empty, because every header parses in both. A parse error reaches the caller
+NO_CONFIG = {}
 
 
 CONFIG_MODULE = 'rpp.config'

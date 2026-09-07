@@ -8,6 +8,16 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B14. No caller can reach `pool_types_constructor::allocate<T>()`
+Both pool classes declare their own `allocate(int size, int align)`, which hides the
+`allocate<T>()` of the base. `pool.allocate<int>()` reports `expected primary-expression
+before 'int'`, because the name resolves to the two-argument function. Every sibling
+(`construct`, `allocate_array`, `construct_array`) stays reachable, because no derived
+class reuses those names.
+
+A fix adds `using pool_types_constructor::allocate;` to each pool class. Nothing in the
+repository calls the template today, so the change breaks no caller.
+
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
