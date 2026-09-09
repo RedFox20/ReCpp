@@ -382,6 +382,12 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-mutex.cppm
         src/rpp/rpp-paths.cppm
         src/rpp/rpp-tests.cppm
+        # L4
+        src/rpp/rpp-atomic_shared_ptr.cppm
+        src/rpp/rpp-close_sync.cppm
+        src/rpp/rpp-condition_variable.cppm
+        src/rpp/rpp-file_io.cppm
+        src/rpp/rpp-sockets.cppm
     )
 
     # Add module interface to the library target

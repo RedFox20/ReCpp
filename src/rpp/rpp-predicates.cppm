@@ -7,7 +7,6 @@ module;
 export module rpp.predicates;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
 
 export namespace rpp {
     using rpp::IsCallable;

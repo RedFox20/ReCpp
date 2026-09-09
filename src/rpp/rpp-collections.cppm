@@ -7,7 +7,6 @@ module;
 export module rpp.collections;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.sort;
 
 export namespace rpp {
     using rpp::element_range;

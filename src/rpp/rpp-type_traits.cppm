@@ -7,7 +7,6 @@ module;
 export module rpp.type_traits;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
 
 export namespace rpp {
     using rpp::is_detected;

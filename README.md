@@ -122,6 +122,12 @@ compile errors.
 import rpp.strview;      // 3. imports, last
 ```
 
+**A module re-exports nothing.** `sprint.h` includes `strview.h`, and
+`import rpp.sprint;` still leaves `rpp::strview` invisible. Name that module too. A
+header leaks whatever its includes pull in, and a module hands over only what the
+importer asked for. `rpp.tests` is the one exception, and it re-exports
+`rpp.strview` for the `TestImpl` constructor.
+
 ### Macros need a header
 
 A C++20 module cannot export a macro. Where the macro surface is worth splitting, the
@@ -146,7 +152,7 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Thirty-one modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
+Thirty-six modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
 [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
 with the ones still to come. Each `.cppm` carries the export list its header earned, so read
 that file for the names a module gives you.
@@ -189,9 +195,11 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 ```
 
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
-`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds five
-module-only targets. Each of those imports one module and includes no rpp header except a
-macro header, so a missing export fails the build.
+`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds six
+module-only targets. Each one imports what it needs and includes no rpp header except a
+macro header, so a missing export fails the build. `RppStdStringModuleOnly` includes
+`<string>` first, because gcc-14 writes a module that only such an importer cannot read.
+See `BUGS.md` B8.
 
 ---
 

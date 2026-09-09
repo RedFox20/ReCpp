@@ -7,7 +7,6 @@ module;
 export module rpp.delegate;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
 
 export namespace rpp {
     using rpp::delegate;

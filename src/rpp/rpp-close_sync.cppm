@@ -1,16 +1,16 @@
-// C++20 module interface unit for <rpp/memory_pool.h>.
+// C++20 module interface unit for <rpp/close_sync.h>.
 module;
 
 // global module fragment: the header stays here, so an importer and an includer share one entity
-#include "memory_pool.h"
+#include "close_sync.h"
 
-export module rpp.memory_pool;
+export module rpp.close_sync;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
 export namespace rpp {
-    using rpp::pool_types_constructor;
-    using rpp::linear_static_pool;
-    using rpp::linear_dynamic_pool;
+    using rpp::readonly_lock;
+    using rpp::exclusive_lock;
+    using rpp::close_sync;
 }
 // GENERATED EXPORTS END
