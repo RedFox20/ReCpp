@@ -12,6 +12,7 @@
 #include <vector>
 #include <mutex>                  // std::unique_lock, which rpp::spin_lock returns
 #include <memory>                 // std::make_shared, which rpp::atomic_shared_ptr takes
+#include <type_traits>            // std::is_same_v, which pins an exported signature
 
 import rpp.strview;   // includes come first, the import goes last
 import rpp.debugging;

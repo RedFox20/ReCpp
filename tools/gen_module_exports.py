@@ -58,8 +58,7 @@ INTERNAL_OK = frozenset()
 # importer can read when an export names a std::__cxx11 function, see BUGS.md B8
 NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 
-# the modules a module re-exports. A header leaks whatever its includes pull in, and a module
-# owes an importer no such leak, so this list stays empty until a surface forces an entry.
+# the modules a module re-exports, empty until a surface forces an entry
 # tests.h earns the one: TestImpl expands to a constructor taking rpp::strview
 RE_EXPORT = {'tests.h': ('rpp.strview',)}
 
