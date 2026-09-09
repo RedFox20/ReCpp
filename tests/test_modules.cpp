@@ -45,6 +45,9 @@ import rpp.close_sync;
 import rpp.condition_variable;
 import rpp.file_io;
 import rpp.sockets;
+import rpp.binary_stream;
+import rpp.concurrent_queue;
+import rpp.semaphore;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
@@ -430,6 +433,52 @@ TestImpl(test_modules)
         rpp::socket s = rpp::make_udp_randomport();
         AssertThat(s.good(), true);
         AssertGreater(s.port(), 0);
+    }
+
+    TestCase(binary_stream_module_carries_the_whole_surface)
+    {
+        rpp::binary_buffer buf;
+        buf << rpp::int32{7} << rpp::strview{"seven"};
+        AssertThat(buf.size(), 4 + int(sizeof(rpp::binary_buffer::strlen_t)) + 5);
+
+        AssertThat(buf.read_int32(), 7);
+        AssertThat(buf.read_string(), "seven");
+        AssertThat(buf.available(), 0);
+    }
+
+    TestCase(concurrent_queue_module_carries_the_whole_surface)
+    {
+        rpp::concurrent_queue<int> queue;
+        AssertThat(queue.empty(), true);
+
+        queue.push(11);
+        queue.push(22);
+        AssertThat(queue.size(), 2);
+
+        int item = 0;
+        AssertThat(queue.try_pop(item), true);
+        AssertThat(item, 11);
+
+        queue.clear();
+        AssertThat(queue.empty(), true);
+    }
+
+    TestCase(semaphore_module_carries_the_whole_surface)
+    {
+        rpp::semaphore sem { 1 };
+        AssertThat(sem.count(), 1);
+        AssertThat(sem.try_wait(), true);
+        AssertThat(sem.try_wait(), false);
+
+        sem.notify();
+        AssertThat(sem.count(), 1);
+
+        rpp::semaphore_flag flag;
+        AssertThat(flag.is_set(), false);
+
+        std::atomic_bool running { true };
+        AssertThat(rpp::atomic_test_and_set(running), true);
+        AssertThat(running.load(), false);
     }
 
 #if RPP_HAS_COROUTINES

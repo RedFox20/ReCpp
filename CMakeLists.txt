@@ -388,6 +388,10 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-condition_variable.cppm
         src/rpp/rpp-file_io.cppm
         src/rpp/rpp-sockets.cppm
+        # L5
+        src/rpp/rpp-binary_stream.cppm
+        src/rpp/rpp-concurrent_queue.cppm
+        src/rpp/rpp-semaphore.cppm
     )
 
     # Add module interface to the library target

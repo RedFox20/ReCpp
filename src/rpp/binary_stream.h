@@ -28,7 +28,8 @@ namespace rpp
     struct RPPAPI stream_source
     {
         stream_source() = default;
-        virtual ~stream_source() noexcept = default;
+        // an inline `= default` here crashes gcc-14 in an importer, see BUGS.md B8
+        virtual ~stream_source() noexcept;
 
         /**
          * @return TRUE if stream is open, FALSE if the stream is closed
