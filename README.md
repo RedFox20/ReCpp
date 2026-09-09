@@ -152,7 +152,7 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Thirty-six modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
+Thirty-nine modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
 [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
 with the ones still to come. Each `.cppm` carries the export list its header earned, so read
 that file for the names a module gives you.
@@ -2221,33 +2221,33 @@ Buffered binary read/write stream with abstract source interface.
 | Class | Description |
 |-------|-------------|
 | [`stream_source`](src/rpp/binary_stream.h#L28) | Abstract stream interface (implement for custom sources) |
-| [`binary_stream`](src/rpp/binary_stream.h#L129) | Buffered binary stream with typed read/write |
-| [`file_writer`](src/rpp/binary_stream.h#L642) | File-backed stream_source |
-| [`binary_buffer`](src/rpp/binary_stream.h#L568) | Binary stream that doesn't flush data |
-| [`socket_writer`](src/rpp/binary_stream.h#L583) | Binary socket writer for UDP/TCP |
-| [`socket_reader`](src/rpp/binary_stream.h#L609) | Binary socket reader for UDP/TCP |
-| [`file_reader`](src/rpp/binary_stream.h#L709) | File-backed binary stream reader |
+| [`binary_stream`](src/rpp/binary_stream.h#L130) | Buffered binary stream with typed read/write |
+| [`file_writer`](src/rpp/binary_stream.h#L643) | File-backed stream_source |
+| [`binary_buffer`](src/rpp/binary_stream.h#L569) | Binary stream that doesn't flush data |
+| [`socket_writer`](src/rpp/binary_stream.h#L584) | Binary socket writer for UDP/TCP |
+| [`socket_reader`](src/rpp/binary_stream.h#L610) | Binary socket reader for UDP/TCP |
+| [`file_reader`](src/rpp/binary_stream.h#L710) | File-backed binary stream reader |
 
 ### binary_stream Methods
 
 | Method | Description |
 |--------|-------------|
-| [`write(const void* data, int numBytes)`](src/rpp/binary_stream.h#L220) | Write raw bytes |
-| [`write<T>(const T& value)`](src/rpp/binary_stream.h#L261) | Write a typed value |
-| [`write(strview s)`](src/rpp/binary_stream.h#L286) | Write a string |
-| [`read(void* dst, int max)`](src/rpp/binary_stream.h#L355) | Read raw bytes |
-| [`read<T>()`](src/rpp/binary_stream.h#L387) | Read a typed value |
-| [`write_byte()`](src/rpp/binary_stream.h#L261) / [`write_int16()`](src/rpp/binary_stream.h#L263) / [`write_int32()`](src/rpp/binary_stream.h#L267) / [`write_int64()`](src/rpp/binary_stream.h#L271) | Write specific integer sizes |
-| [`write_float()`](src/rpp/binary_stream.h#L275) / [`write_double()`](src/rpp/binary_stream.h#L277) | Write floating point |
-| [`read_byte()`](src/rpp/binary_stream.h#L392) / [`read_int16()`](src/rpp/binary_stream.h#L394) / [`read_int32()`](src/rpp/binary_stream.h#L398) / [`read_int64()`](src/rpp/binary_stream.h#L402) | Read specific integer sizes |
-| [`read_float()`](src/rpp/binary_stream.h#L406) / [`read_double()`](src/rpp/binary_stream.h#L408) | Read floating point |
-| [`read_string()`](src/rpp/binary_stream.h#L474) | Read a length-prefixed string |
-| [`peek(void* buf, int numBytes)`](src/rpp/binary_stream.h#L367) | Peek without consuming |
-| [`skip(int numBytes)`](src/rpp/binary_stream.h#L381) | Skip bytes |
-| [`flush()`](src/rpp/binary_stream.h#L206) | Flush write buffer |
-| [`good()`](src/rpp/binary_stream.h#L194) | True if stream is valid |
-| [`size()`](src/rpp/binary_stream.h#L171) / [`capacity()`](src/rpp/binary_stream.h#L172) | Buffer metrics |
-| [`data()`](src/rpp/binary_stream.h#L164) / [`view()`](src/rpp/binary_stream.h#L173) | Access buffer data |
+| [`write(const void* data, int numBytes)`](src/rpp/binary_stream.h#L221) | Write raw bytes |
+| [`write<T>(const T& value)`](src/rpp/binary_stream.h#L262) | Write a typed value |
+| [`write(strview s)`](src/rpp/binary_stream.h#L287) | Write a string |
+| [`read(void* dst, int max)`](src/rpp/binary_stream.h#L356) | Read raw bytes |
+| [`read<T>()`](src/rpp/binary_stream.h#L388) | Read a typed value |
+| [`write_byte()`](src/rpp/binary_stream.h#L262) / [`write_int16()`](src/rpp/binary_stream.h#L264) / [`write_int32()`](src/rpp/binary_stream.h#L268) / [`write_int64()`](src/rpp/binary_stream.h#L272) | Write specific integer sizes |
+| [`write_float()`](src/rpp/binary_stream.h#L276) / [`write_double()`](src/rpp/binary_stream.h#L278) | Write floating point |
+| [`read_byte()`](src/rpp/binary_stream.h#L393) / [`read_int16()`](src/rpp/binary_stream.h#L395) / [`read_int32()`](src/rpp/binary_stream.h#L399) / [`read_int64()`](src/rpp/binary_stream.h#L403) | Read specific integer sizes |
+| [`read_float()`](src/rpp/binary_stream.h#L407) / [`read_double()`](src/rpp/binary_stream.h#L409) | Read floating point |
+| [`read_string()`](src/rpp/binary_stream.h#L475) | Read a length-prefixed string |
+| [`peek(void* buf, int numBytes)`](src/rpp/binary_stream.h#L368) | Peek without consuming |
+| [`skip(int numBytes)`](src/rpp/binary_stream.h#L382) | Skip bytes |
+| [`flush()`](src/rpp/binary_stream.h#L207) | Flush write buffer |
+| [`good()`](src/rpp/binary_stream.h#L195) | True if stream is valid |
+| [`size()`](src/rpp/binary_stream.h#L172) / [`capacity()`](src/rpp/binary_stream.h#L173) | Buffer metrics |
+| [`data()`](src/rpp/binary_stream.h#L165) / [`view()`](src/rpp/binary_stream.h#L174) | Access buffer data |
 
 ### Example: In-Memory Binary Read/Write
 

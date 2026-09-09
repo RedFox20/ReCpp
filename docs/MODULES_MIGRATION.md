@@ -1,9 +1,9 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 13. Thirty-six modules exist: all of L0 to L4. Only `rpp.tests` re-exports another.
+Revision 14. Thirty-nine modules exist: all of L0 to L5. Only `rpp.tests` re-exports another.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 8 headers.
+gives the phased plan for the remaining 5 headers.
 
 ## Handover state
 
@@ -12,29 +12,29 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the thirty-six modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
+| the thirty-nine modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 33 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/test_modules.cpp` | module consumer test, 36 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 6 module-only targets |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 28 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 571/571 on the modules build, 538/538 on the header build |
+| test counts | 574/574 on the modules build, 538/538 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all thirty-six modules. 4 is done through the generator
-`--check`. 5 has L0 to L4 finished. Section 11 lists what 7 owes.
+6 landed. The generator drives all thirty-nine modules. 4 is done through the generator
+`--check`. 5 has L0 to L5 finished. Section 11 lists what 7 owes.
 
-**Next:** changeset 5, the L5 layer. Section 9 has the layers.
+**Next:** changeset 5, the L6 layer. Section 9 has the layers.
 
-**A module re-exports nothing, and `rpp.sprint` ships with a workaround.** The generator
+**A module re-exports nothing, and two headers ship with a workaround.** The generator
 carries `NO_EXPORT` with one entry and `RE_EXPORT` with one, and `BUGS.md` **B8** names the
-three shapes gcc-14 breaks. Shapes 2 and 3 both need a re-export, so neither can fire on one
-library-wide entry. `NO_CONFIG` is empty, because `sprint.h` now guards its `std::to_string`
-branch the way `type_traits.h` guards the trait. The generator selftest still pins all three
-knobs.
+four shapes gcc-14 breaks. Shapes 2 and 3 both need a re-export, so neither can fire on one
+library-wide entry. Shape 4 lives in `binary_stream.h`, whose destructor moved out of line.
+`NO_CONFIG` names `semaphore.h` and `concurrent_queue.h`, which do not compile on bare metal,
+see **B15**. The generator selftest still pins all three knobs.
 
 **An importer which includes `<string>` first reads a different module.** `rpp.file_io`
 passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the
@@ -71,8 +71,8 @@ configuration became an unguarded export. Each rule carries a selftest.
 
 The second rule matches by declaration location, not by name text. A text search also
 matched a name a guarded block only mentions, which would have hidden the whole
-`rpp::semaphore` and `rpp::concurrent_queue` classes wherever the macro is 0. Neither
-header carries a module yet, so the L3 layer would have been the first to hit it.
+`rpp::semaphore` and `rpp::concurrent_queue` classes wherever the macro is 0. Both headers
+became modules in L5, and their export lists prove the rule holds.
 
 The first rule used to subtract from the host configuration alone, so a name only another
 configuration declares reached no export list. `mutex.h` declares `critical_section` and
@@ -93,8 +93,8 @@ only it can offer, the vector overload an explicit `rpp::sort<T>(v)` names, and 
 `element_range` overload whose by-value parameter lets a const view sort its mutable
 elements. Asking which module should carry a name is worth doing per layer.
 
-**Open questions:** `BUGS.md` B2, B5, B9 and B10. B8 keeps its two workarounds open, and each
-one goes away when a newer gcc reads the module back. B6 closed as C25, so the TSAN jobs no
+**Open questions:** `BUGS.md` B2, B5, B9, B10, B14 and B15. B8 keeps three workarounds open,
+and each one goes away when a newer gcc reads the module back. B6 closed as C25, so the TSAN jobs no
 longer fail on the exception refcount race.
 
 ---
@@ -803,15 +803,15 @@ between layers.
 | L2 | **atomic_timepoint** ✓, **collections** ✓, **sprint** ✓, **stack_trace** ✓, **task** ✓, **threads** ✓, **timer** ✓, **vec** ✓ | 8 |
 | L3 | **load_balancer** ✓, **memory_pool** ✓, **mutex** ✓, **paths** ✓, **tests** ✓ | 5 |
 | L4 | **atomic_shared_ptr** ✓, **close_sync** ✓, **condition_variable** ✓, **file_io** ✓, **sockets** ✓ | 5 |
-| L5 | binary_stream, concurrent_queue, semaphore | 3 |
+| L5 | **binary_stream** ✓, **concurrent_queue** ✓, **semaphore** ✓ | 3 |
 | L6 | binary_serializer, thread_pool | 2 |
 | L7 | event_loop, future | 2 |
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-Every L4 module ships. `BUILD_WITH_MODULES` builds all thirty-six.
+Every L5 module ships. `BUILD_WITH_MODULES` builds all thirty-nine.
 
-44 modules and one umbrella. L0 to L4 exist, so 8 remain. Excluded: `config.h`
+44 modules and one umbrella. L0 to L5 exist, so 5 remain. Excluded: `config.h`
 and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because it is
 Android glue. `tests.h` is in, and it is the one header whose macros split into
 `tests.macros.h`.

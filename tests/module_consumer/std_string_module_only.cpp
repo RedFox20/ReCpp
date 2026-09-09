@@ -9,14 +9,18 @@ import rpp.paths;
 import rpp.file_io;
 import rpp.sockets;
 import rpp.tests;
+import rpp.binary_stream;
 
 int main()
 {
     std::string s = rpp::to_string(42);
+    rpp::binary_buffer buf;
+    buf << std::string{"nine"}; // the module names std::string on this operator
     bool ok = s == "42"
            && rpp::file_ext("a/b.txt") == "txt"
            && rpp::ipaddress{"127.0.0.1:80"}.port() == 80
-           && rpp::file{"this_file_does_not_exist"}.bad();
+           && rpp::file{"this_file_does_not_exist"}.bad()
+           && buf.read_string() == "nine";
     return ok ? 0 : 1;
 }
 #else

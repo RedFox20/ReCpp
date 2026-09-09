@@ -8,6 +8,20 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B15. `semaphore.h` and `concurrent_queue.h` do not compile on bare metal
+`condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
+inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
+only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
+`cv.wait(lock)` in the two headers reports `no matching member function for call to
+'wait'`.
+
+The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
+hand-rolled `condition_variable` templated on the mutex type. A fix widens the `#if` so
+bare metal takes that branch too, and it needs a target which can run the result.
+
+Both headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
+bare-metal build never reaches the module either, so the export list stays unguarded.
+
 ### B14. No caller can reach `pool_types_constructor::allocate<T>()`
 Both pool classes declare their own `allocate(int size, int align)`, which hides the
 `allocate<T>()` of the base. `pool.allocate<int>()` reports `expected primary-expression
@@ -82,16 +96,17 @@ done; wait; done
 grep -l 'heap-use-after-free' /tmp/b10_*.log
 ```
 
-### B8. gcc-14 breaks a module for three shapes, and each one has a workaround
+### B8. gcc-14 breaks a module for four shapes, and each one has a workaround
 `tools/gen_module_exports.py` carries `NO_EXPORT` with one entry. Every module ships now.
 Delete that entry when a newer gcc reads the module back.
 
 Shapes 2 and 3 both need a re-export, and `RE_EXPORT` holds one for the whole library, so
-neither can fire today. Read them before you add a second entry.
+neither can fire today. Read them before you add a second entry. Shape 4 lives in a header,
+not in a list.
 
-`NO_CONFIG` is a third list, and it is not a gcc defect. It is empty, because `sprint.h`
-now guards its `std::to_string` branch the way `type_traits.h` guards the trait. Any parse
-failure the list does not name reaches the caller and fails the run.
+`NO_CONFIG` is a third list, and it is not a gcc defect. It names the two headers which do
+not compile on bare metal, see B15. Any parse failure the list does not name reaches the
+caller and fails the run.
 
 The importer stops with `failed to read compiled module cluster N: Bad file data`, then
 `failed to load pendings for` a libstdc++ internal. That name changes per run, and the
@@ -124,7 +139,16 @@ not one module. Seven re-exports pass, and `rpp.sprint` as the eighth crashes it
 reach the limit, so a `-O0` bisect hides it. `rpp.tests` re-exports one module now, so the
 count sits six below the crash.
 
-Reproduce either shape in seconds, outside cmake. Build every `.cppm` in the
+Shape 4, in `rpp.binary_stream`. A defaulted virtual destructor crashes the importer with
+`internal compiler error: Segmentation fault`, and the message names it
+`constexpr rpp::stream_source@rpp.binary_stream::~stream_source()`. The importer only has
+to name `rpp::binary_buffer`, and a bare `import` passes. No export list reduces it, and
+`-O0` crashes the same as `-O2`. The destructor moved out of line, so `binary_stream.cpp`
+carries the `= default` and no importer reads one. An empty body in the header also works,
+and clang-tidy rejects that one with `modernize-use-equals-default`. An isolated struct of
+the same shape does not crash, so the reduced case is still open.
+
+Reproduce any of these shapes in seconds, outside cmake. Build every `.cppm` in the
 `RPP_MODULES_SRC` order into one `gcm.cache`, then compile a consumer:
 ```bash
 cd $(mktemp -d)

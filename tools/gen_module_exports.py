@@ -24,7 +24,9 @@ END = '// GENERATED EXPORTS END'
 # turn it off, so the generator reads every configuration and guards what only BASE declares
 BASE = ('RPP_ENABLE_UNICODE=1',)
 GUARDS = (('RPP_ENABLE_UNICODE', ('RPP_ENABLE_UNICODE=0',)),
-          ('!RPP_BARE_METAL', ('RPP_FREERTOS=1',)))
+          ('!RPP_BARE_METAL', ('RPP_FREERTOS=1',)),
+          ('!defined(RPP_BINARY_READWRITE_NO_SOCKETS)', ('RPP_BINARY_READWRITE_NO_SOCKETS=1',)),
+          ('!defined(RPP_BINARY_READWRITE_NO_FILE_IO)', ('RPP_BINARY_READWRITE_NO_FILE_IO=1',)))
 
 # a macro no define reaches, because the header derives it from __has_include. The generator
 # reads the region the header guards with it instead of parsing a second configuration
@@ -63,8 +65,9 @@ NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 RE_EXPORT = {'tests.h': ('rpp.strview',)}
 
 # a header which does not compile in a guard configuration, so no export list exists to reduce
-# against. Empty, because every header parses in both. A parse error reaches the caller
-NO_CONFIG = {}
+# against. Both wait on a std::mutex the bare-metal build does not have, see BUGS.md B15
+NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
+             'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'})}
 
 # the condition a header declares for the names only an alternate configuration has, when the
 # guard the generator would negate is wider. mutex.h also declares critical_section on Cortex-M,
