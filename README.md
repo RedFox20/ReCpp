@@ -146,14 +146,19 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-| Module | Header | Exported names |
-|--------|--------|----------------|
-| `rpp.strview` | [`strview.h`](src/rpp/strview.h) | `strview`, `ustrview`, `line_parser`, `keyval_parser`, `bracket_parser`, `concat`, `to_lower`, `to_upper`, `replace`, `_sv` literal, and more |
-| `rpp.debugging` | [`debugging.h`](src/rpp/debugging.h) | `SetLogSeverityFilter`, `GetLogSeverityFilter`, `SetLogHandler`, `LogSeverity`, `rpp::add_log_handler`, `rpp::QtPrintable`, and the helpers the macros call |
-| `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | `byte`, `ushort`, `uint`, `ulong`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64` |
-| `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | `min`, `max`, `abs`, `sqrt`, `min3`, `max3`. The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
-| `rpp.obfuscated_string` | [`obfuscated_string.h`](src/rpp/obfuscated_string.h) | `obfuscated_string`, `make_obfuscated`, and the `_obfuscated` literal |
-| `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | `scope_finalizer`, `make_scope_guard`. The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
+Thirty-one modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
+[`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
+with the ones still to come. Each `.cppm` carries the export list its header earned, so read
+that file for the names a module gives you.
+
+Four of them carry a limit the export list cannot state:
+
+| Module | Header | The limit |
+|--------|--------|-----------|
+| `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | Carries the ten integer aliases only. The macros of `config.h` need the header |
+| `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
+| `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
+| `rpp.type_traits` | [`type_traits.h`](src/rpp/type_traits.h) | Drops `has_std_to_string`, which gcc-14 cannot write into a readable module. The header still declares it, see `BUGS.md` B8 |
 
 ### How it works
 
@@ -183,8 +188,10 @@ export using ::SetLogSeverityFilter;
 export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumerators
 ```
 
-`BUILD_WITH_MODULES=ON` also builds `RppModuleChecks`. Each file there imports one module
-and includes no rpp header except a macro header, so a missing export fails the build.
+`BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
+`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds five
+module-only targets. Each of those imports one module and includes no rpp header except a
+macro header, so a missing export fails the build.
 
 ---
 
@@ -717,11 +724,11 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 |--------|-------------|
 | [`write(const T& v)`](src/rpp/sprint.h#L133) | Write a value (auto-converts most types) |
 | [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L158) | Write a float or double with a chosen number of decimals, instead of the default 6 |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L359) | Write values followed by newline |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L361) | Write values followed by newline |
 | [`writef(const char* format, ...)`](src/rpp/sprint.h#L131) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L309) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L266) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L367) | Pretty-print a value |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L311) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L268) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L369) | Pretty-print a value |
 | [`clear()`](src/rpp/sprint.h#L122) | Clear the buffer |
 | [`reserve(int capacity)`](src/rpp/sprint.h#L123) | Reserve capacity |
 | [`resize(int size)`](src/rpp/sprint.h#L124) | Resize buffer |
@@ -737,9 +744,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L481) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L501) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L427) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L483) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L503) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L429) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -4474,15 +4481,18 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 
 | Macro | Description |
 |-------|-------------|
-| [`TestImpl(ClassName)`](src/rpp/tests.h#L701) | Register a test class |
-| [`TestInit(...)`](src/rpp/tests.h#L716) | Test initialization method |
-| [`TestCase(name)`](src/rpp/tests.h#L733) | Define a test case |
-| [`AssertThat(expr, expected)`](src/rpp/tests.h#L573) | Assert equality |
-| [`AssertEqual(a, b)`](src/rpp/tests.h#L589) | Assert exact equality |
-| [`AssertNotEqual(a, b)`](src/rpp/tests.h#L625) | Assert inequality |
-| [`AssertTrue(expr)`](src/rpp/tests.h#L694) | Assert expression is true |
-| [`AssertFalse(expr)`](src/rpp/tests.h#L564) | Assert expression is false |
-| [`AssertThrows(expr)`](src/rpp/tests.h#L598) | Assert expression throws |
+| [`TestImpl(ClassName)`](src/rpp/tests.macros.h#L193) | Register a test class |
+| [`TestInit(...)`](src/rpp/tests.macros.h#L208) | Test initialization method |
+| [`TestCase(name)`](src/rpp/tests.macros.h#L225) | Define a test case |
+| [`AssertThat(expr, expected)`](src/rpp/tests.macros.h#L65) | Assert equality |
+| [`AssertEqual(a, b)`](src/rpp/tests.macros.h#L81) | Assert exact equality |
+| [`AssertNotEqual(a, b)`](src/rpp/tests.macros.h#L117) | Assert inequality |
+| [`AssertTrue`](src/rpp/tests.macros.h#L55) | Alias of `Assert`, which asserts the expression is true |
+| [`AssertFalse(expr)`](src/rpp/tests.macros.h#L56) | Assert expression is false |
+| [`AssertThrows(expr)`](src/rpp/tests.macros.h#L90) | Assert expression throws |
+
+`<rpp/tests.h>` gives both the framework and these macros. An importer of `rpp.tests`
+adds `#include <rpp/tests.macros.h>` for them, because a module cannot export a macro.
 
 ### Running Tests
 

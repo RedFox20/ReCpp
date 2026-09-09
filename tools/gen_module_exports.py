@@ -59,12 +59,19 @@ INTERNAL_OK = frozenset()
 NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 
 # a re-export the same defect blocks. gcc-14 writes an unreadable .gcm when task.h sits in the
-# global module fragment and the module imports it back, see BUGS.md B8
-NO_IMPORT = {'task.h': frozenset({'rpp.future_types'})}
+# global module fragment and the module imports it back. It runs out of imported source
+# locations on the eighth re-export of rpp.tests, see BUGS.md B8
+NO_IMPORT = {'task.h': frozenset({'rpp.future_types'}),
+             'tests.h': frozenset({'rpp.future_types', 'rpp.sprint'})}
 
 # a header which does not compile in a guard configuration, so no export list exists to reduce
-# against. Every other parse error is a real one, and the generator reports it
-NO_CONFIG = {'sprint.h': frozenset({'!RPP_BARE_METAL'})}
+# against. Empty, because every header parses in both. A parse error reaches the caller
+NO_CONFIG = {}
+
+# the condition a header declares for the names only an alternate configuration has, when the
+# guard the generator would negate is wider. mutex.h also declares critical_section on Cortex-M,
+# which RPP_BARE_METAL does not have to cover
+ALT_GUARD = {'mutex.h': 'RPP_HAS_CRITICAL_SECTION_MUTEX'}
 
 
 CONFIG_MODULE = 'rpp.config'
@@ -182,11 +189,33 @@ def _open_namespace(header: str, ns: str) -> str:
     return '::'.join(f'inline {p}' if p in inlines else p for p in ns.split('::'))
 
 
-def _condition(ns: str, name: str, line: int, reduced: dict, spans: dict) -> str:
+def _negate(guard: str) -> str:
+    """The condition which holds where `guard` does not."""
+    return guard[1:] if guard.startswith('!') else '!' + guard
+
+
+def _condition(ns: str, name: str, line: int, base: dict, reduced: dict, spans: dict,
+               alt_guard: str = '') -> str:
     """The `#if` this name needs, or '' when every configuration declares it."""
-    needs = [g for g, names in reduced.items() if name not in names.get(ns, {})]
+    in_base = name in base.get(ns, {})
+    needs = []
+    for g, names in reduced.items():
+        in_alt = name in names.get(ns, {})
+        # a guard label states the condition which holds in BASE, so an alternate-only name negates it
+        if in_base and not in_alt: needs.append(g)
+        elif in_alt and not in_base: needs.append(alt_guard or _negate(g))
     needs += [m for m, sp in spans.items() if any(a < line < b for a, b in sp)]
     return ' && '.join(needs)
+
+
+def _declared(base: dict, reduced: dict) -> dict:
+    """Every name any configuration declares, with the line of the first one which does."""
+    out = {ns: dict(names) for ns, names in base.items()}
+    for names in reduced.values():
+        for ns, m in names.items():
+            dst = out.setdefault(ns, {})
+            for name, line in m.items(): dst.setdefault(name, line)
+    return out
 
 
 def export_block(header: str) -> str:
@@ -208,10 +237,12 @@ def export_block(header: str) -> str:
     imports -= NO_IMPORT.get(os.path.basename(header), frozenset())
     lines += [f'export import {imp};' for imp in sorted(imports)]
 
-    for ns in sorted(base):
+    declared = _declared(base, reduced)
+    alt_guard = ALT_GUARD.get(os.path.basename(header), '')
+    for ns in sorted(declared):
         groups = {}  # condition to the names it guards. '' sorts first, so the guards follow it
-        for name, line in base[ns].items():
-            groups.setdefault(_condition(ns, name, line, reduced, spans), []).append(name)
+        for name, line in declared[ns].items():
+            groups.setdefault(_condition(ns, name, line, base, reduced, spans, alt_guard), []).append(name)
         if not groups: continue
         if not ns:  # a C API keeps global scope, so a call site needs no change
             lines += [''] + [f'export using ::{n};' for n in groups.get('', [])]
@@ -272,6 +303,7 @@ def with_modules() -> list:
 _SELFTEST_HEADER = '''#pragma once
 #define RPP_HAS_COROUTINES 1                       // the real header derives this from __has_include
 #include "rpp/minmax.h"                            // an rpp include, so the block names rpp.minmax
+#include "rpp/config.h"                            // RPP_BARE_METAL, which the guard below reads
 namespace rpp {
     constexpr double PI = 3.14159;                 // const at namespace scope, so internal
     static constexpr float radf(float d);          // static, so internal
@@ -289,6 +321,11 @@ namespace rpp {
         void await(Unconditional& u);
 #endif
     };
+#if RPP_BARE_METAL
+    struct BareOnly {};                            // only the alternate configuration declares it
+#else
+    struct HostOnly {};                            // only the base configuration declares it
+#endif
 }
 '''
 
@@ -318,13 +355,32 @@ def selftest() -> list:
             if name not in shown: bad.append(f'{name} has external linkage and left the export list')
         if any(n.startswith('<') for n in shown): bad.append('a deduction guide reached the export list')
         spans = _guarded_spans(path)
-        if _condition('rpp', 'Awaited', rpp_ns['Awaited'], {}, spans) != 'RPP_HAS_COROUTINES':
+        base = _exported(path, BASE)
+        if _condition('rpp', 'Awaited', rpp_ns['Awaited'], base, {}, spans) != 'RPP_HAS_COROUTINES':
             bad.append('a declaration inside a guard span took no #if')
-        if _condition('rpp', 'Public', rpp_ns['Public'], {}, spans):
+        if _condition('rpp', 'Public', rpp_ns['Public'], base, {}, spans):
             bad.append('a declaration outside every guard span took an #if')
         # the guarded member names its own class, and a text search would guard the class too
-        if _condition('rpp', 'Unconditional', rpp_ns['Unconditional'], {}, spans):
+        if _condition('rpp', 'Unconditional', rpp_ns['Unconditional'], base, {}, spans):
             bad.append('a class a guarded member names took an #if')
+
+        # a name only the alternate configuration declares still has to reach the export list
+        reduced = {g: _exported(path, BASE + off) for g, off in GUARDS}
+        declared = _declared(base, reduced)
+        block = export_block(path)
+        for name, cond in (('BareOnly', 'RPP_BARE_METAL'), ('HostOnly', '!RPP_BARE_METAL')):
+            if name not in declared.get('rpp', {}):
+                bad.append(f'{name} left the export list, so a configuration went unread')
+            elif _condition('rpp', name, declared['rpp'][name], base, reduced, spans) != cond:
+                bad.append(f'{name} took the wrong #if for the configuration which declares it')
+            if f'using rpp::{name};' not in block:
+                bad.append(f'{name} reached no using-declaration in the block')
+        ALT_GUARD[os.path.basename(path)] = 'RPP_PROBE_GUARD'
+        try:
+            if '#if RPP_PROBE_GUARD' not in export_block(path):
+                bad.append('ALT_GUARD did not replace the negated guard')
+        finally:
+            del ALT_GUARD[os.path.basename(path)]
         # both defect workarounds drop something a working toolchain would carry
         probe = os.path.basename(path)
         if 'export import rpp.minmax;' not in export_block(path):

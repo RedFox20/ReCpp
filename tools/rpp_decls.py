@@ -12,7 +12,8 @@ import os
 SRC = 'src/rpp'
 
 # excluded from module conversion, see MODULES_MIGRATION.md section 6.3
-NO_MODULE = frozenset({'config.h', 'log_colors.h', 'jni_cpp.h', 'debugging.macros.h'})
+NO_MODULE = frozenset({'config.h', 'log_colors.h', 'jni_cpp.h',
+                       'debugging.macros.h', 'tests.macros.h'})
 
 
 class ClangMissing(Exception):
