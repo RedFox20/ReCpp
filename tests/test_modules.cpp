@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <mutex>                  // std::unique_lock, which rpp::spin_lock returns
+#include <memory>                 // std::make_shared, which rpp::atomic_shared_ptr takes
 
 import rpp.strview;   // includes come first, the import goes last
 import rpp.debugging;
@@ -38,6 +39,11 @@ import rpp.memory_pool;
 import rpp.mutex;
 import rpp.paths;
 import rpp.tests;
+import rpp.atomic_shared_ptr;
+import rpp.close_sync;
+import rpp.condition_variable;
+import rpp.file_io;
+import rpp.sockets;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
@@ -356,6 +362,72 @@ TestImpl(test_modules)
         AssertThat(info.auto_run, true);
         rpp::test_factory factory = info.factory;
         AssertThat(factory == nullptr, true);
+    }
+
+    TestCase(atomic_shared_ptr_module_carries_the_whole_surface)
+    {
+        rpp::atomic_shared_ptr<int> p { std::make_shared<int>(7) };
+        AssertThat(*p.load(), 7);
+        AssertThat(p.is_lock_free(), false);
+
+        std::shared_ptr<int> old = p.exchange(std::make_shared<int>(9));
+        AssertThat(*old, 7);
+        AssertThat(*p.load(), 9);
+
+        rpp::atomic_weak_ptr<int> w { p.load() };
+        AssertThat(w.load().expired(), false);
+    }
+
+    TestCase(close_sync_module_carries_the_whole_surface)
+    {
+        rpp::close_sync sync;
+        AssertThat(sync.is_alive(), true);
+        AssertThat(sync.is_closing(), false);
+        AssertThat(sync.is_dead_or_closing(), false);
+
+        rpp::readonly_lock shared = sync.try_readonly_lock();
+        AssertThat(shared.owns_lock(), true);
+    }
+
+    TestCase(condition_variable_module_carries_the_whole_surface)
+    {
+        // the deadline already passed, so the helper reports no time left
+        rpp::TimePoint past = rpp::TimePoint::monotonic_now() - rpp::seconds_f(1.0);
+        AssertThat(rpp::_cv_remaining_duration(past).nsec, 0LL);
+
+        rpp::condition_variable cv;
+        rpp::mutex m;
+        std::unique_lock<rpp::mutex> lock { m };
+        AssertThat(cv.wait_for(lock, rpp::millis(1)) == std::cv_status::timeout, true);
+    }
+
+    TestCase(file_io_module_carries_the_whole_surface)
+    {
+        std::string path = rpp::path_combine(rpp::temp_dir(), "rpp_module_probe.txt");
+        AssertThat(rpp::file::write_new(path, "abc", 3), 3);
+
+        rpp::file f { path, rpp::file::READONLY };
+        AssertThat(f.good(), true);
+        AssertThat(f.size(), 3);
+
+        rpp::load_buffer buf = rpp::file::read_all(path);
+        AssertThat(rpp::strview(buf.str, buf.len), "abc");
+        f.close();
+        rpp::delete_file(path);
+    }
+
+    TestCase(sockets_module_carries_the_whole_surface)
+    {
+        rpp::ipaddress addr { rpp::AF_IPv4, "127.0.0.1", 1337 };
+        AssertThat(addr.port(), 1337);
+        AssertThat(addr.is_valid(), true);
+        AssertThat(addr.str(), "127.0.0.1:1337");
+
+        // the platform value differs per system, so the round trip is what the module owes
+        AssertThat(rpp::to_addrfamily(rpp::addrfamily_int(rpp::AF_IPv4)) == rpp::AF_IPv4, true);
+        rpp::socket s = rpp::make_udp_randomport();
+        AssertThat(s.good(), true);
+        AssertGreater(s.port(), 0);
     }
 
 #if RPP_HAS_COROUTINES

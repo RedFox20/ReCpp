@@ -36,6 +36,12 @@ add_executable(RppSortModuleOnly sort_module_only.cpp)
 target_include_directories(RppSortModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppSortModuleOnly)
 
+# gcc-14 breaks a module whose importer included <string> first, so this target holds that shape
+add_executable(RppStdStringModuleOnly std_string_module_only.cpp)
+target_include_directories(RppStdStringModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppStdStringModuleOnly)
+target_link_libraries(RppStdStringModuleOnly PRIVATE ${MAMA_LIBS})
+
 # the tests.h macro split only pays when tests.macros.h plus rpp.tests writes a suite
 add_executable(RppTestsModuleOnly tests_module_only.cpp)
 target_include_directories(RppTestsModuleOnly PRIVATE ${MAMA_INCLUDES})

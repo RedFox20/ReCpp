@@ -1,9 +1,9 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 11. Thirty-one modules exist: all of L0, L1, L2 and L3.
+Revision 12. Thirty-six modules exist: all of L0 to L4.
 
 This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the remaining 13 headers.
+gives the phased plan for the remaining 8 headers.
 
 ## Handover state
 
@@ -12,28 +12,32 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the thirty-one modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
+| the thirty-six modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 28 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 5 module-only targets |
+| `tests/test_modules.cpp` | module consumer test, 33 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 6 module-only targets |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 28 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 566/566 on the modules build, 538/538 on the header build |
+| test counts | 571/571 on the modules build, 538/538 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all thirty-one modules. 4 is done through the generator
-`--check`. 5 has L0 to L3 finished. Section 11 lists what 7 owes.
+6 landed. The generator drives all thirty-six modules. 4 is done through the generator
+`--check`. 5 has L0 to L4 finished. Section 11 lists what 7 owes.
 
-**Next:** changeset 5, the L4 layer. Section 9 has the layers.
+**Next:** changeset 5, the L5 layer. Section 9 has the layers.
 
-**`rpp.sprint`, `rpp.task` and `rpp.tests` ship, and each cost a workaround.** The generator
-carries `NO_EXPORT` with one entry and `NO_IMPORT` with two, and `BUGS.md` **B8** names the
-three shapes gcc-14 breaks. `NO_CONFIG` is empty, because `sprint.h` now guards its
-`std::to_string` branch the way `type_traits.h` guards the trait. The generator selftest
-still pins all three knobs.
+**Four modules ship with a workaround: `rpp.sprint`, `rpp.task`, `rpp.tests` and
+`rpp.file_io`.** The generator carries `NO_EXPORT` with one entry and `NO_IMPORT` with three,
+and `BUGS.md` **B8** names the three shapes gcc-14 breaks. `NO_CONFIG` is empty, because
+`sprint.h` now guards its `std::to_string` branch the way `type_traits.h` guards the trait.
+The generator selftest still pins all three knobs.
+
+**An importer which includes `<string>` first reads a different module.** `rpp.file_io`
+passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the
+shape now. Add a module which names `std::string` to that target when it lands.
 
 An `is_detected_v` alias which names `std::to_string` was the first shape, so the C++20
 concept replaced it. That did not help. A plain alias, a concept, and a concept which calls an
@@ -790,16 +794,16 @@ of `src/rpp/*.h`, so changeset 1b can move a header between layers.
 | L1 | **bitutils** ✓, **debugging** ✓, **delegate** ✓, **endian** ✓, **future_types** ✓, **math** ✓, **predicates** ✓, **proc_utils** ✓, **sort** ✓, **source_loc** ✓, **strview** ✓, **timepoint** ✓, **traits** ✓, **type_traits** ✓ | 14 |
 | L2 | **atomic_timepoint** ✓, **collections** ✓, **sprint** ✓, **stack_trace** ✓, **task** ✓, **threads** ✓, **timer** ✓, **vec** ✓ | 8 |
 | L3 | **load_balancer** ✓, **memory_pool** ✓, **mutex** ✓, **paths** ✓, **tests** ✓ | 5 |
-| L4 | atomic_shared_ptr, close_sync, condition_variable, file_io, sockets | 5 |
+| L4 | **atomic_shared_ptr** ✓, **close_sync** ✓, **condition_variable** ✓, **file_io** ✓, **sockets** ✓ | 5 |
 | L5 | binary_stream, concurrent_queue, semaphore | 3 |
 | L6 | binary_serializer, thread_pool | 2 |
 | L7 | event_loop, future | 2 |
 | L8 | coroutines | 1 |
 | top | umbrella `rpp` | 1 |
 
-Every L3 module ships. `BUILD_WITH_MODULES` builds all thirty-one.
+Every L4 module ships. `BUILD_WITH_MODULES` builds all thirty-six.
 
-44 modules and one umbrella. L0 to L3 exist, so 13 remain. Excluded: `config.h`
+44 modules and one umbrella. L0 to L4 exist, so 8 remain. Excluded: `config.h`
 and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because it is
 Android glue. `tests.h` is in, and it is the one header whose macros split into
 `tests.macros.h`.
