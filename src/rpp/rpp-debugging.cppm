@@ -9,7 +9,6 @@ module;
 export module rpp.debugging;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
 
 export using ::LogSeverity;
 export using ::LogSeverityInfo;

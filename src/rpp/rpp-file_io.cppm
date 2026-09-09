@@ -7,8 +7,6 @@ module;
 export module rpp.file_io;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
-export import rpp.strview;
 
 export namespace rpp {
     using rpp::load_buffer;

@@ -7,8 +7,6 @@ module;
 export module rpp.vec;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.math;
-export import rpp.strview;
 
 export namespace rpp {
     using rpp::Vector2;

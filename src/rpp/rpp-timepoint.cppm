@@ -7,7 +7,6 @@ module;
 export module rpp.timepoint;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
 
 export using ::time_now_seconds;
 

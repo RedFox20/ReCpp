@@ -7,8 +7,6 @@ module;
 export module rpp.close_sync;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.debugging;
-export import rpp.mutex;
 
 export namespace rpp {
     using rpp::readonly_lock;

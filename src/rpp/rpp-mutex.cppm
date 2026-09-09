@@ -7,11 +7,6 @@ module;
 export module rpp.mutex;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
-export import rpp.threads;
-export import rpp.timepoint;
-export import rpp.timer;
-export import rpp.type_traits;
 
 export namespace rpp {
     using rpp::mutex;

@@ -1,6 +1,6 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 12. Thirty-six modules exist: all of L0 to L4.
+Revision 13. Thirty-six modules exist: all of L0 to L4. Only `rpp.tests` re-exports another.
 
 This document explains the pattern, records what real builds prove about it, and
 gives the phased plan for the remaining 8 headers.
@@ -29,11 +29,12 @@ gate, #65 changeset 6.
 
 **Next:** changeset 5, the L5 layer. Section 9 has the layers.
 
-**Four modules ship with a workaround: `rpp.sprint`, `rpp.task`, `rpp.tests` and
-`rpp.file_io`.** The generator carries `NO_EXPORT` with one entry and `NO_IMPORT` with three,
-and `BUGS.md` **B8** names the three shapes gcc-14 breaks. `NO_CONFIG` is empty, because
-`sprint.h` now guards its `std::to_string` branch the way `type_traits.h` guards the trait.
-The generator selftest still pins all three knobs.
+**A module re-exports nothing, and `rpp.sprint` ships with a workaround.** The generator
+carries `NO_EXPORT` with one entry and `RE_EXPORT` with one, and `BUGS.md` **B8** names the
+three shapes gcc-14 breaks. Shapes 2 and 3 both need a re-export, so neither can fire on one
+library-wide entry. `NO_CONFIG` is empty, because `sprint.h` now guards its `std::to_string`
+branch the way `type_traits.h` guards the trait. The generator selftest still pins all three
+knobs.
 
 **An importer which includes `<string>` first reads a different module.** `rpp.file_io`
 passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the
@@ -45,8 +46,8 @@ unexported helper all fail the same way. The export reaches a `std::__cxx11` fun
 way. Only dropping the export works, so `has_std_to_string` left the module surface.
 The concept stayed, because it reads better and skips one `is_detected_v` instantiation.
 
-Delete a `NO_EXPORT` or `NO_IMPORT` entry when a newer gcc reads the module back. The B8
-reproducer builds every `.cppm` into one `gcm.cache` outside cmake, which answers in seconds.
+Delete the `NO_EXPORT` entry when a newer gcc reads the module back. The B8 reproducer builds
+every `.cppm` into one `gcm.cache` outside cmake, which answers in seconds.
 
 **What L1 and L2 exposed.** Six headers declared public API the compiler could not export,
 and each fix landed with the layer. `math.h` marked every function `static` and left its
@@ -302,15 +303,20 @@ ReCpp's own `.cpp` files keep using headers. The module facade exists for
 consumers, not for the library's own build. This mirrors libstdc++, whose own
 sources do not `import std`.
 
-### D5. Each module re-exports its header's rpp dependencies.
+### D5. A module re-exports nothing, and an importer names every module it uses.
 
-`sprint.h` includes `strview.h`, so `rpp.sprint` must give the importer
-`rpp::strview`. Otherwise `import rpp.sprint;` returns a `string_buffer` the
-caller cannot feed a `strview` into. Findings 5 and 6 confirm both directions.
+A header leaks whatever its includes pull in. A module owes an importer no such
+leak, so `RE_EXPORT` starts empty and a surface has to earn its entry.
 
-The rule: **for every `#include "X.h"` in `Y.h`, `rpp-Y.cppm` gets one
-`export import rpp.X;`.** The module graph then matches the include graph, and a
-script can check it. Changeset 2 is what makes that include graph honest.
+The first rule was the opposite one. Every `#include "X.h"` in `Y.h` gave
+`rpp-Y.cppm` an `export import rpp.X;`, so the module graph mirrored the include
+graph. That put 61 re-export lines in the library. With all 61 gone, the 571 case
+suite stayed green and five of the six module consumers passed.
+`RppTestsModuleOnly` was the sixth, and one line fixed it. `TestImpl` expands to a
+constructor which takes `rpp::strview`, so `rpp.tests` re-exports `rpp.strview`.
+
+A consumer which needs `rpp::strview` from `import rpp.sprint;` writes
+`import rpp.strview;` too. One line names what that consumer depends on.
 
 ### D6. Ship `.cppm` sources. Never ship a binary module interface.
 
@@ -380,9 +386,10 @@ distro-packaged clang does not need this.
 MSVC is tier 1. A local build on MSVC 14.44 compiles both modules. It exposed one
 rule the other compilers hide: **the same `.cppm` must not reach two targets that
 also link each other.** MSVC then finds two IFCs for one module name and fails with
-`C7684 module name 'rpp.strview' has an ambiguous resolution to IFC`. The
-module-only consumer checks live inside `RppTests` for that reason, not in a target
-of their own.
+`C7684 module name 'rpp.strview' has an ambiguous resolution to IFC`.
+`tests/test_modules.cpp` lives inside `RppTests` for that reason, not in a second
+in-tree target. `tests/module_consumer/` is a separate project which links the
+installed library, so each of its targets compiles the `.cppm` files once.
 
 ---
 
@@ -486,16 +493,16 @@ one-line note in the release text saves each team the bisect.
 The std half of this check went with changeset 1a. The rpp half is load-bearing
 for modules, and for a different reason.
 
-D5 gives each module one `export import rpp.X;` per rpp include, and changeset 3
-generates those lines from the include list. Finding 6 measured what a missing one
+D5 first gave each module one `export import rpp.X;` per rpp include, and changeset
+3 generated those lines from the include list. Finding 6 measured what a missing one
 costs: the consumer fails with
 `error: missing '#include'; 'strview' must be declared before it is used`.
 **Reachable is not visible for an rpp name, even though it is for a std name.**
 
-A header that names `rpp::strview` and does not include `strview.h` yields a
-`.cppm` with a missing `export import`. Every importer of it then breaks. Add this
-check before changeset 3 generates anything from the include graph. It also turns
-the 43 redundant findings into an exact list of the includes to add.
+D5 dropped that rule later, and the check still earns its place. The global module
+fragment of a `.cppm` includes one header, so a header which names `rpp::strview`
+and skips `strview.h` breaks its own module. The check also turns the 43 redundant
+findings into an exact list of the includes to add.
 
 **Estimate: half a day.**
 
@@ -577,7 +584,7 @@ the macro header stays free of includes.
 | Header | Module? | Split macros? | Why |
 |---|---|---|---|
 | `log_colors.h` | no | no | 114 macros, 0 declarations. Rule 1. |
-| `config.h` | **no** | **the types split out** | Rule 1 for the macros. The integer aliases moved to `config.types.h`, which module `rpp.config` exports. `config.h` includes `config.types.h`, so header-mode consumers keep the aliases, and a module writes one `export import rpp.config` rather than re-listing ten. `rpp.strview`, `rpp.debugging` and `rpp.config` prove the pattern. |
+| `config.h` | **no** | **the types split out** | Rule 1 for the macros. The integer aliases moved to `config.types.h`, which module `rpp.config` exports. `config.h` includes `config.types.h`, so header-mode consumers keep the aliases, and a module consumer writes one `import rpp.config` rather than re-listing ten. `rpp.strview`, `rpp.debugging` and `rpp.config` prove the pattern. |
 | `config.types.h` | **yes, `rpp.config`** | n/a | The ten integer aliases, split from `config.h` so a module can export them. A macro cannot be exported, so the macros stay in `config.h`. |
 | `debugging.h` | yes | **yes, and it pays** | The split is done and measured. `debugging.macros.h` costs 50 preprocessed lines, `debugging.h` costs 32893. Section 6.4 has the numbers. |
 | `endian.h` | yes | **no** | The 9 byte-swap macros would split cleanly into compiler builtins, but 9 macros do not pay for a new header and a new name to remember. |
@@ -711,8 +718,8 @@ The tool, as built:
    underscore stays, because `_LogInfo` and `_FmtString` are part of that surface.
    It also drops an internal-linkage name, because clang rejects a using-declaration
    which exports a `static` function. gcc accepts one, so only clang-21 caught it.
-4. Reads the include list of the header and emits one `export import rpp.X;` per
-   rpp include (D5).
+4. Emits an `export import rpp.X;` only where `RE_EXPORT` names one, because a
+   module re-exports nothing by default (D5).
 5. Writes the `.cppm` between two marker comments, so hand-written parts survive.
 6. `--check` mode re-generates into memory and diffs. A difference fails CI.
 7. Reports a module whose name repeats a macro any rpp header defines, and `STEMS` holds
@@ -785,8 +792,9 @@ Two smaller notes for whoever writes more of these tests:
 ## 9. Changeset 5: write the modules, in dependency layers
 
 Work the include graph bottom up. A module can only build after every module it
-`export import`s exists. The layers below come from the actual `#include` graph
-of `src/rpp/*.h`, so changeset 1b can move a header between layers.
+imports exists, and its export list follows its header. The layers below come from
+the actual `#include` graph of `src/rpp/*.h`, so changeset 1b can move a header
+between layers.
 
 | Layer | Modules | Count |
 |---|---|---|

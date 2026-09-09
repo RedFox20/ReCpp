@@ -58,12 +58,10 @@ INTERNAL_OK = frozenset()
 # importer can read when an export names a std::__cxx11 function, see BUGS.md B8
 NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
 
-# a re-export the same defect blocks. gcc-14 writes an unreadable .gcm when task.h sits in the
-# global module fragment and the module imports it back. It runs out of imported source
-# locations on the eighth re-export of rpp.tests, see BUGS.md B8
-NO_IMPORT = {'task.h': frozenset({'rpp.future_types'}),
-             'tests.h': frozenset({'rpp.future_types', 'rpp.sprint'}),
-             'file_io.h': frozenset({'rpp.sprint', 'rpp.paths'})}
+# the modules a module re-exports. A header leaks whatever its includes pull in, and a module
+# owes an importer no such leak, so this list stays empty until a surface forces an entry.
+# tests.h earns the one: TestImpl expands to a constructor taking rpp::strview
+RE_EXPORT = {'tests.h': ('rpp.strview',)}
 
 # a header which does not compile in a guard configuration, so no export list exists to reduce
 # against. Empty, because every header parses in both. A parse error reaches the caller
@@ -226,17 +224,8 @@ def export_block(header: str) -> str:
     spans = _guarded_spans(header)
     lines = [BEGIN]
 
-    # one export import per rpp include. config.h maps to rpp.config, and a header never imports itself
-    included = re.findall(r'^\s*#\s*include\s*"([^"]+)"', _read(header), re.M)
-    imports = set()
-    for path in included:
-        inc = os.path.basename(path)  # a `./math.h` or `sub/x.h` include still names module rpp.math
-        if not inc.endswith('.h'): continue
-        if inc == 'config.h': imports.add(CONFIG_MODULE)
-        elif inc not in rd.NO_MODULE: imports.add(module_name(inc))
-    imports.discard(module_name(header))
-    imports -= NO_IMPORT.get(os.path.basename(header), frozenset())
-    lines += [f'export import {imp};' for imp in sorted(imports)]
+    # a module re-exports only what RE_EXPORT names, so an importer spells the rest itself
+    lines += [f'export import {imp};' for imp in sorted(RE_EXPORT.get(os.path.basename(header), ()))]
 
     declared = _declared(base, reduced)
     alt_guard = ALT_GUARD.get(os.path.basename(header), '')
@@ -382,17 +371,17 @@ def selftest() -> list:
                 bad.append('ALT_GUARD did not replace the negated guard')
         finally:
             del ALT_GUARD[os.path.basename(path)]
-        # both defect workarounds drop something a working toolchain would carry
+        # an rpp include is not a re-export, and only RE_EXPORT puts one in the block
         probe = os.path.basename(path)
-        if 'export import rpp.minmax;' not in export_block(path):
-            bad.append('an rpp include did not become an export import')
-        NO_EXPORT[probe], NO_IMPORT[probe] = frozenset({'Public'}), frozenset({'rpp.minmax'})
+        if 'export import' in export_block(path):
+            bad.append('an rpp include became an export import on its own')
+        NO_EXPORT[probe], RE_EXPORT[probe] = frozenset({'Public'}), ('rpp.minmax',)
         try:
             block = export_block(path)
             if 'using rpp::Public;' in block: bad.append('a NO_EXPORT name reached the export list')
-            if 'export import rpp.minmax;' in block: bad.append('a NO_IMPORT module reached the block')
+            if 'export import rpp.minmax;' not in block: bad.append('a RE_EXPORT module left the block')
         finally:
-            del NO_EXPORT[probe], NO_IMPORT[probe]
+            del NO_EXPORT[probe], RE_EXPORT[probe]
         # a header the allowlist does not name must report its parse error, never drop the guard
         broken = os.path.join(d, 'broken.h')
         open(broken, 'w').write('#pragma once\n#if RPP_FREERTOS\n#error this header needs a host\n#endif\n')

@@ -7,8 +7,6 @@ module;
 export module rpp.timer;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
-export import rpp.timepoint;
 
 export namespace rpp {
     using rpp::Timer;

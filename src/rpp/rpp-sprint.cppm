@@ -2,10 +2,6 @@ module;
 #include "sprint.h"
 export module rpp.sprint;
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
-export import rpp.debugging;
-export import rpp.strview;
-export import rpp.type_traits;
 
 export namespace rpp {
     using rpp::to_string;

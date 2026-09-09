@@ -83,8 +83,11 @@ grep -l 'heap-use-after-free' /tmp/b10_*.log
 ```
 
 ### B8. gcc-14 breaks a module for three shapes, and each one has a workaround
-`tools/gen_module_exports.py` carries `NO_EXPORT` with one entry and `NO_IMPORT` with three.
-Every module ships now. Delete an entry when a newer gcc reads the module back.
+`tools/gen_module_exports.py` carries `NO_EXPORT` with one entry. Every module ships now.
+Delete that entry when a newer gcc reads the module back.
+
+Shapes 2 and 3 both need a re-export, and `RE_EXPORT` holds one for the whole library, so
+neither can fire today. Read them before you add a second entry.
 
 `NO_CONFIG` is a third list, and it is not a gcc defect. It is empty, because `sprint.h`
 now guards its `std::to_string` branch the way `type_traits.h` guards the trait. Any parse
@@ -101,26 +104,25 @@ C++20 concept all fail the same way. So does a concept which calls an unexported
 names it. `NO_EXPORT` drops `has_std_to_string` from `rpp.type_traits`, which is what
 `rpp.sprint` imports. A header includer still gets the trait.
 
-Shape 2, in `rpp.task`, `rpp.tests` and `rpp.file_io`. A re-export makes the `.gcm`
-unreadable, and only an importer which included `<string>` first sees it. `import rpp.file_io`
-alone passes, and `#include <string>` before it fails. Each half of the module is innocent.
-Dropping every `export import` fixes it with the whole export list in place, and dropping
-every export fixes it with all four re-exports in place. `rpp.sprint` is the re-export which
-carries it, and `rpp.paths` re-exports `rpp.sprint` in turn, so `NO_IMPORT` drops both.
-`task.h` takes `rpp.future_types` for the same reason. An importer which needs
-`rpp::string_buffer`, `rpp::coro_handle` or the path functions imports that module itself.
+Shape 2 reached `rpp.task`, `rpp.tests` and `rpp.file_io` while every rpp include became a
+re-export. A re-export makes the `.gcm` unreadable, and only an importer which included
+`<string>` first sees it. `import rpp.file_io` alone passed, and `#include <string>` before
+it failed. Each half of the module was innocent. Dropping every `export import` fixed it
+with the whole export list in place, and dropping every export fixed it with all four
+re-exports in place. `rpp.sprint` was the re-export which carried it.
 
 `tests/module_consumer/std_string_module_only.cpp` is the gate. It includes `<string>` and
 then imports the six modules which name `std::string`, so this shape fails the build instead
-of a downstream consumer. Reverting the `file_io.h` entry makes that target report 2 errors.
+of a downstream consumer. Giving `file_io.h` its old re-exports makes that target report 2
+errors.
 
 Shape 3, in `rpp.tests`. gcc runs out of imported source locations and stops with
 `internal compiler error: in write_location, at cp/module.cc:16271`. It prints
 `unable to represent further imported source locations` first. The count is what matters,
 not one module. Seven re-exports pass, and `rpp.sprint` as the eighth crashes it, while
 `rpp.sprint` alone passes. The dependency `.gcm` files have to come from an `-O2` build to
-reach the limit, so a `-O0` bisect hides it. `NO_IMPORT` drops `rpp.sprint`, and an importer
-of `rpp.tests` which needs `rpp::string_buffer` imports `rpp.sprint` itself.
+reach the limit, so a `-O0` bisect hides it. `rpp.tests` re-exports one module now, so the
+count sits six below the crash.
 
 Reproduce either shape in seconds, outside cmake. Build every `.cppm` in the
 `RPP_MODULES_SRC` order into one `gcm.cache`, then compile a consumer:
@@ -130,7 +132,7 @@ for f in $(sed -n '/set(RPP_MODULES_SRC/,/^    )/p' ~/ReCpp/CMakeLists.txt | gre
   g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c -x c++ ~/ReCpp/$f -o $(basename $f .cppm).o
 done
 printf '#include <rpp/tests.h>\nimport rpp.task;\nint main(){return 0;}\n' > u.cpp
-g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c u.cpp -o u.o    # 0 errors with NO_IMPORT
+g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c u.cpp -o u.o    # 0 errors under RE_EXPORT
 ```
 Put the offending line back into the generated block by hand to watch it fail. Only gcc 14.2
 ran this check, so retry on clang-21 and on a newer gcc.

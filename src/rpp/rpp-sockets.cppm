@@ -7,10 +7,6 @@ module;
 export module rpp.sockets;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
-export import rpp.load_balancer;
-export import rpp.mutex;
-export import rpp.strview;
 
 export namespace rpp {
     using rpp::address_family;

@@ -9,11 +9,6 @@ module;
 export module rpp.tests;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.config;
-export import rpp.debugging;
-export import rpp.math;
-export import rpp.minmax;
-export import rpp.source_loc;
 export import rpp.strview;
 
 export namespace rpp {
