@@ -13,6 +13,7 @@
 #include <mutex>                  // std::unique_lock, which rpp::spin_lock returns
 #include <memory>                 // std::make_shared, which rpp::atomic_shared_ptr takes
 #include <type_traits>            // std::is_same_v, which pins an exported signature
+#include <atomic>                 // std::atomic_bool, which rpp::atomic_test_and_set takes
 
 import rpp.strview;   // includes come first, the import goes last
 import rpp.debugging;
@@ -476,8 +477,16 @@ TestImpl(test_modules)
         rpp::semaphore_flag flag;
         AssertThat(flag.is_set(), false);
 
+        // a weak CAS fails spuriously only where it matches, so the mismatch is the stable case
+        std::atomic_bool idle { false };
+        AssertThat(rpp::atomic_test_and_set(idle), false);
+        AssertThat(idle.load(), false);
+
         std::atomic_bool running { true };
-        AssertThat(rpp::atomic_test_and_set(running), true);
+        bool acquired = false;
+        for (int i = 0; i < 100 && !acquired; ++i)
+            acquired = rpp::atomic_test_and_set(running);
+        AssertThat(acquired, true);
         AssertThat(running.load(), false);
     }
 

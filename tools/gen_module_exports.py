@@ -24,7 +24,9 @@ END = '// GENERATED EXPORTS END'
 # turn it off, so the generator reads every configuration and guards what only BASE declares
 BASE = ('RPP_ENABLE_UNICODE=1',)
 GUARDS = (('RPP_ENABLE_UNICODE', ('RPP_ENABLE_UNICODE=0',)),
-          ('!RPP_BARE_METAL', ('RPP_FREERTOS=1',)))
+          ('!RPP_BARE_METAL', ('RPP_FREERTOS=1',)),
+          ('!defined(RPP_BINARY_READWRITE_NO_SOCKETS)', ('RPP_BINARY_READWRITE_NO_SOCKETS=1',)),
+          ('!defined(RPP_BINARY_READWRITE_NO_FILE_IO)', ('RPP_BINARY_READWRITE_NO_FILE_IO=1',)))
 
 # a macro no define reaches, because the header derives it from __has_include. The generator
 # reads the region the header guards with it instead of parsing a second configuration

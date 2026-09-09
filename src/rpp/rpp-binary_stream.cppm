@@ -15,9 +15,13 @@ export namespace rpp {
     using rpp::endl;
     using rpp::operator>>;
     using rpp::binary_buffer;
-    using rpp::socket_writer;
-    using rpp::socket_reader;
+#if !defined(RPP_BINARY_READWRITE_NO_FILE_IO)
     using rpp::file_writer;
     using rpp::file_reader;
+#endif
+#if !defined(RPP_BINARY_READWRITE_NO_SOCKETS)
+    using rpp::socket_writer;
+    using rpp::socket_reader;
+#endif
 }
 // GENERATED EXPORTS END
