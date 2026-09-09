@@ -1,6 +1,5 @@
-// Includes <string> before importing every module which names std::string on its surface.
-// gcc-14 writes a .gcm no such importer can read for some of them, so this target is the gate.
-// test_modules.cpp cannot catch it, because it imports every module at once. See BUGS.md B8.
+// Includes <string> first, then imports every module which names std::string on its surface.
+// gcc-14 writes a .gcm no such importer can read, and test_modules.cpp misses it, see BUGS.md B8.
 #ifdef MAMA_HAS_MODULES
 #include <string> // the include which makes gcc reconcile std::__cxx11 against the module
 

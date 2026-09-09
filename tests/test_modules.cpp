@@ -368,7 +368,8 @@ TestImpl(test_modules)
     {
         rpp::atomic_shared_ptr<int> p { std::make_shared<int>(7) };
         AssertThat(*p.load(), 7);
-        AssertThat(p.is_lock_free(), false);
+        // the standard library picks the answer, so this pins the signature and not the value
+        static_assert(std::is_same_v<decltype(p.is_lock_free()), bool>);
 
         std::shared_ptr<int> old = p.exchange(std::make_shared<int>(9));
         AssertThat(*old, 7);
