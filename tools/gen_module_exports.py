@@ -56,8 +56,8 @@ def _skip(ns: str, kind: str, name: str) -> bool:
 # external linkage instead, which is what MSVC needs to define one in an importing TU
 INTERNAL_OK = frozenset()
 
-# a name a module keeps off its surface. gcc-14 writes a .gcm no importer can read when an
-# export names a std::__cxx11 function (BUGS.md B8), and a CRTP mixin is an internal detail
+# a name a module keeps off its surface. gcc-14 writes an unreadable .gcm for a std::__cxx11
+# export (BUGS.md B8), and the other two entries are internal names no importer needs
 NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'}),
              'memory_pool.h': frozenset({'pool_types_constructor'}),
              'thread_pool.h': frozenset({'test_threadpool'})}

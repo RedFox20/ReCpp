@@ -548,13 +548,13 @@ TestImpl(test_modules)
         AssertThat(summed.load(), 6);
 
         rpp::pool_task_handle handle = rpp::parallel_task([&] { counted += 1; });
-        rpp::wait_result waited = handle.wait(rpp::seconds(5));
+        rpp::wait_result waited = handle.wait(rpp::seconds(1));
         AssertThat(waited == rpp::wait_result::finished, true);
         AssertThat(counted.load(), 9);
 
         rpp::parallel_task_detached([&] { summed += 1; });
         rpp::thread_pool& shared = rpp::thread_pool::global();
-        AssertThat(shared.wait_until_idle(rpp::seconds(5)) == rpp::wait_result::finished, true);
+        AssertThat(shared.wait_until_idle(rpp::seconds(1)) == rpp::wait_result::finished, true);
         AssertThat(summed.load(), 7);
     }
 

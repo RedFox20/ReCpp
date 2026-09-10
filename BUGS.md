@@ -12,8 +12,8 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
 only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
-`cv.wait(lock)` in these headers reports `no matching member function for call to
-'wait'`. `thread_pool.h` includes `semaphore.h`, so it reports the same four errors.
+`cv.wait(lock)` in `semaphore.h` and `concurrent_queue.h` reports `no matching member
+function for call to 'wait'`. `thread_pool.h` includes `semaphore.h`, so it reports the same.
 
 The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
 hand-rolled `condition_variable` templated on the mutex type. A fix widens the `#if` so
