@@ -152,12 +152,12 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Thirty-nine modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
+Forty-one modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
 [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
 with the ones still to come. Each `.cppm` carries the export list its header earned, so read
 that file for the names a module gives you.
 
-Four of them carry a limit the export list cannot state:
+Six of them carry a limit the export list cannot state:
 
 | Module | Header | The limit |
 |--------|--------|-----------|
@@ -165,6 +165,8 @@ Four of them carry a limit the export list cannot state:
 | `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
 | `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
 | `rpp.type_traits` | [`type_traits.h`](src/rpp/type_traits.h) | Drops `has_std_to_string`, which gcc-14 cannot write into a readable module. The header still declares it, see `BUGS.md` B8 |
+| `rpp.memory_pool` | [`memory_pool.h`](src/rpp/memory_pool.h) | Drops `pool_types_constructor`, an internal mixin. Each pool still gives you `construct<T>()` and the array forms |
+| `rpp.thread_pool` | [`thread_pool.h`](src/rpp/thread_pool.h) | Drops `test_threadpool`, the forward declaration a unit test needs as a friend |
 
 ### How it works
 
@@ -4215,7 +4217,7 @@ Linear bump-allocator memory pools for arena-style allocation (no per-object dea
 |-------|-------------|
 | [`linear_static_pool`](src/rpp/memory_pool.h#L76) | Fixed-size bump allocator |
 | [`linear_dynamic_pool`](src/rpp/memory_pool.h#L158) | Growing bump allocator with configurable block growth |
-| [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | CRTP mixin adding typed `allocate<T>()` and `construct<T>(args...)` |
+| [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | Internal CRTP mixin giving each pool `construct<T>()`, `destruct<T>()` and the array and range forms. `rpp.memory_pool` does not export it |
 
 ### Common Methods
 

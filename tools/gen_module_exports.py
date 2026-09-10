@@ -56,18 +56,21 @@ def _skip(ns: str, kind: str, name: str) -> bool:
 # external linkage instead, which is what MSVC needs to define one in an importing TU
 INTERNAL_OK = frozenset()
 
-# a declaration a toolchain cannot carry across a module boundary. gcc-14 writes a .gcm no
-# importer can read when an export names a std::__cxx11 function, see BUGS.md B8
-NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'})}
+# a name a module keeps off its surface. gcc-14 writes a .gcm no importer can read when an
+# export names a std::__cxx11 function (BUGS.md B8), and a CRTP mixin is an internal detail
+NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'}),
+             'memory_pool.h': frozenset({'pool_types_constructor'}),
+             'thread_pool.h': frozenset({'test_threadpool'})}
 
 # the modules a module re-exports, empty until a surface forces an entry
 # tests.h earns the one: TestImpl expands to a constructor taking rpp::strview
 RE_EXPORT = {'tests.h': ('rpp.strview',)}
 
 # a header which does not compile in a guard configuration, so no export list exists to reduce
-# against. Both wait on a std::mutex the bare-metal build does not have, see BUGS.md B15
+# against. Each one waits on a std::mutex the bare-metal build does not have, see BUGS.md B15
 NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
-             'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'})}
+             'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'}),
+             'thread_pool.h': frozenset({'!RPP_BARE_METAL'})}
 
 # the condition a header declares for the names only an alternate configuration has, when the
 # guard the generator would negate is wider. mutex.h also declares critical_section on Cortex-M,

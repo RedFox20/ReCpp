@@ -10,17 +10,23 @@ import rpp.file_io;
 import rpp.sockets;
 import rpp.tests;
 import rpp.binary_stream;
+import rpp.binary_serializer;
+import rpp.thread_pool;
+
+static std::string module_trace() { return "trace"; }
 
 int main()
 {
     std::string s = rpp::to_string(42);
     rpp::binary_buffer buf;
     buf << std::string{"nine"}; // the module names std::string on this operator
+    rpp::pool_trace_provider trace = &module_trace; // and on this alias
     bool ok = s == "42"
            && rpp::file_ext("a/b.txt") == "txt"
            && rpp::ipaddress{"127.0.0.1:80"}.port() == 80
            && rpp::file{"this_file_does_not_exist"}.bad()
-           && buf.read_string() == "nine";
+           && buf.read_string() == "nine"
+           && trace() == "trace";
     return ok ? 0 : 1;
 }
 #else

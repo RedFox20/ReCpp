@@ -8,29 +8,19 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B15. `semaphore.h` and `concurrent_queue.h` do not compile on bare metal
+### B15. `semaphore.h`, `concurrent_queue.h` and `thread_pool.h` do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
 only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
-`cv.wait(lock)` in the two headers reports `no matching member function for call to
-'wait'`.
+`cv.wait(lock)` in these headers reports `no matching member function for call to
+'wait'`. `thread_pool.h` includes `semaphore.h`, so it reports the same four errors.
 
 The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
 hand-rolled `condition_variable` templated on the mutex type. A fix widens the `#if` so
 bare metal takes that branch too, and it needs a target which can run the result.
 
-Both headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
+All three headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
-
-### B14. No caller can reach `pool_types_constructor::allocate<T>()`
-Both pool classes declare their own `allocate(int size, int align)`, which hides the
-`allocate<T>()` of the base. `pool.allocate<int>()` reports `expected primary-expression
-before 'int'`, because the name resolves to the two-argument function. Every sibling
-(`construct`, `allocate_array`, `construct_array`) stays reachable, because no derived
-class reuses those names.
-
-A fix adds `using pool_types_constructor::allocate;` to each pool class. Nothing in the
-repository calls the template today, so the change breaks no caller.
 
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
@@ -193,6 +183,11 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C26. `pool_types_constructor::allocate<T>()` is unreachable, and that is intended (was B14)
+Each pool declares `allocate(int size, int align)`, which hides the template of the mixin and
+leaves `construct<T>()` and the array forms reachable. The mixin is internal, so `NO_EXPORT`
+drops it from `rpp.memory_pool`.
 
 ### C25. libtsan.so never read the suppression hook, because it was hidden (was B6)
 `-fvisibility=hidden` kept `__tsan_default_suppressions` out of the dynamic symbol table gcc's
