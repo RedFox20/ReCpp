@@ -61,7 +61,7 @@ namespace rpp
         /**
          * Simple coroutine return type for test cases.
          * Runs synchronously with suspend/resume points driven by the test runner.
-         * Use co_await std::suspend_always{} to create yield points.
+         * Use co_await rpp::suspend_always{} to create yield points.
          */
         struct RPP_CORO_RETURN_TYPE test_coro
         {
@@ -70,17 +70,17 @@ namespace rpp
                 std::exception_ptr exception;
                 test_coro get_return_object() noexcept
                 {
-                    return test_coro{std::coroutine_handle<promise_type>::from_promise(*this)};
+                    return test_coro{rpp::coro_handle<promise_type>::from_promise(*this)};
                 }
-                std::suspend_never initial_suspend() noexcept { return {}; }
-                std::suspend_always final_suspend() noexcept { return {}; }
+                rpp::suspend_never initial_suspend() noexcept { return {}; }
+                rpp::suspend_always final_suspend() noexcept { return {}; }
                 void return_void() noexcept {}
                 void unhandled_exception() noexcept { exception = std::current_exception(); }
             };
 
-            std::coroutine_handle<promise_type> handle;
+            rpp::coro_handle<promise_type> handle;
 
-            explicit test_coro(std::coroutine_handle<promise_type> h) noexcept : handle{h} {}
+            explicit test_coro(rpp::coro_handle<promise_type> h) noexcept : handle{h} {}
             test_coro(test_coro&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
             ~test_coro() { if (handle) handle.destroy(); }
             test_coro(const test_coro&) = delete;

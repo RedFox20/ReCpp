@@ -512,8 +512,8 @@ namespace rpp
              * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
              */
             RPP_CORO_WRAPPER rpp::cfuture<T> get_return_object() noexcept { return this->get_future(); }
-            std::suspend_never initial_suspend() const noexcept { return {}; }
-            std::suspend_never final_suspend() const noexcept { return {}; }
+            rpp::suspend_never initial_suspend() const noexcept { return {}; }
+            rpp::suspend_never final_suspend() const noexcept { return {}; }
 
             // Deferred return value and exception: stored here so the future is only
             // signalled in ~promise_type(), AFTER the coroutine frame (and all its local
@@ -915,8 +915,8 @@ namespace rpp
         struct promise_type : rpp::cpromise<void>
         {
             RPP_CORO_WRAPPER rpp::cfuture<void> get_return_object() noexcept { return this->get_future(); }
-            std::suspend_never initial_suspend() const noexcept { return {}; }
-            std::suspend_never final_suspend() const noexcept { return {}; }
+            rpp::suspend_never initial_suspend() const noexcept { return {}; }
+            rpp::suspend_never final_suspend() const noexcept { return {}; }
 
             // Same deferred-signal approach as cfuture<T>::promise_type.
             std::exception_ptr deferred_ex     {};
