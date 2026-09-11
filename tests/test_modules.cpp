@@ -566,20 +566,23 @@ TestImpl(test_modules)
 
     TestCase(future_module_carries_the_whole_surface)
     {
-        // every factory here builds a std::promise, which gcc-14 cannot compile in an
-        // importer, see BUGS.md B16. So this probe reaches the surface without one.
+        // gcc-14 crashes when an importer instantiates std::promise, so name these unevaluated, see BUGS.md B16
         static_assert(std::is_same_v<rpp::cpromise<int>, std::promise<int>>);
         static_assert(std::is_same_v<decltype(rpp::async_task(+[]{ return 1; })), rpp::cfuture<int>>);
         static_assert(std::is_same_v<decltype(rpp::make_ready_future(1)), rpp::cfuture<int>>);
+        static_assert(std::is_same_v<decltype(rpp::make_ready_future()), rpp::cfuture<void>>);
         static_assert(std::is_same_v<decltype(rpp::make_exceptional_future<int>(1)), rpp::cfuture<int>>);
 
-        std::vector<rpp::cfuture<int>> none;
-        rpp::wait_all(none);
-        AssertThat(int(rpp::get_all(none).size()), 0);
+        // a filled vector needs a real cfuture, and every way to build one runs a promise
+        std::vector<rpp::cfuture<int>> no_ints;
+        rpp::wait_all(no_ints);
+        AssertThat(int(rpp::get_all(no_ints).size()), 0);
+
+        std::vector<rpp::cfuture<void>> no_voids;
+        rpp::get_all(no_voids);
 
         std::vector<int> no_items;
         rpp::run_tasks(no_items, &module_launch);
-        AssertThat(int(no_items.size()), 0);
     }
 
 #if RPP_HAS_COROUTINES

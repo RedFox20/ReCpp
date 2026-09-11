@@ -66,8 +66,8 @@ NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'}),
 # tests.h earns the one: TestImpl expands to a constructor taking rpp::strview
 RE_EXPORT = {'tests.h': ('rpp.strview',)}
 
-# a header which does not compile in a guard configuration, so no export list exists to reduce
-# against. Each one waits on a std::mutex the bare-metal build does not have, see BUGS.md B15
+# a header which does not compile in a guard configuration, so no export list exists to
+# reduce against. Every entry below names a bare-metal gap, see BUGS.md B15
 NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
              'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'}),
              'thread_pool.h': frozenset({'!RPP_BARE_METAL'}),

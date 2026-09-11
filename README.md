@@ -168,12 +168,12 @@ Six of them carry a limit the export list cannot state:
 | `rpp.memory_pool` | [`memory_pool.h`](src/rpp/memory_pool.h) | Drops `pool_types_constructor`, an internal mixin. Each pool still gives you `construct<T>()` and the array forms |
 | `rpp.thread_pool` | [`thread_pool.h`](src/rpp/thread_pool.h) | Drops `test_threadpool`, the forward declaration a unit test needs as a friend |
 
-Eight headers reach `<future>`, so the modules which wrap them carry one more limit. On
+Eight modules wrap a header which reaches `<future>`, so each carries one more limit. On
 gcc-14 an importer of `rpp.concurrent_queue`, `rpp.event_loop`, `rpp.future`,
 `rpp.future_types`, `rpp.semaphore`, `rpp.task`, `rpp.tests` or `rpp.thread_pool` cannot
 instantiate `std::promise`. The compiler crashes, no export list changes it, and
-`BUGS.md` B16 holds the reproducer. Include the header on that path until a newer gcc
-lands.
+`BUGS.md` B16 holds the reproducer. Include the header in a translation unit which
+instantiates `std::promise`.
 
 ### How it works
 

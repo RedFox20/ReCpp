@@ -40,8 +40,8 @@ compile on bare metal, see **B15**. The generator selftest still pins all three 
 **gcc-14 cannot compile `std::promise` in an importer, and six modules carried that before
 L7.** Any module whose global module fragment includes `<future>` breaks such a consumer,
 and `rpp.task` alone reproduces it. No export list changes the crash, so the L7 tests name
-the `future.h` factories in an unevaluated context. **B16** holds the seven-line reproducer
-and the list of eight headers which reach `<future>`.
+the `future.h` factories in an unevaluated context. **B16** holds the reproducer and the
+list of ten headers which reach `<future>`. `coroutines.h` is one, so L8 inherits the limit.
 
 **An importer which includes `<string>` first reads a different module.** `rpp.file_io`
 passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the

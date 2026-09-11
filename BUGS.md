@@ -13,7 +13,7 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
 only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
 `cv.wait(lock)` in `semaphore.h` and `concurrent_queue.h` reports `no matching member
-function for call to 'wait'`. `thread_pool.h`, `future.h` and `event_loop.h` include one
+function for call to 'wait'`. `thread_pool.h`, `future.h` and `event_loop.h` reach one
 of those two, so they report the same.
 
 The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
@@ -21,7 +21,7 @@ hand-rolled `condition_variable` templated on the mutex type. A fix widens the `
 bare metal takes that branch too, and it needs a target which can run the result.
 
 `event_loop.h` carries a second gap of its own. It calls `rpp::get_thread_id()` at lines
-445 and 517, and `threads.h:11` declares that name only when `!RPP_BARE_METAL`.
+445 and 517, and `threads.h:31` declares that name only when `!RPP_BARE_METAL`.
 
 All five headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
@@ -44,12 +44,14 @@ import m;
 int main() { std::promise<int> p; p.set_value(7); return p.get_future().get() == 7 ? 0 : 1; }
 ```
 
-Eight headers reach `<future>`: `concurrent_queue.h`, `event_loop.h`, `future.h`,
-`future_types.h`, `semaphore.h`, `task.h`, `tests.h` and `thread_pool.h`. Six shipped
-before L7, so this predates the layer which found it. `rpp.task` alone reproduces it.
+Ten headers reach `<future>`, and `future_types.h` is the only direct includer:
+`concurrent_queue.h`, `coroutines.h`, `event_loop.h`, `future.h`, `future_types.h`,
+`semaphore.h`, `task.h`, `tests.h`, `tests.macros.h` and `thread_pool.h`. Eight of them
+ship as a module, six before L7, so this predates the layer which found it. `rpp.task`
+alone reproduces it, and `coroutines.h` inherits it the day L8 ships.
 
-No export list reduces the crash away, so `test_modules.cpp` names the `future.h` factories
-in an unevaluated context. Delete that workaround when a newer gcc compiles the reproducer.
+No export list removes the crash, so `test_modules.cpp` names the `future.h` factories in
+an unevaluated context. Delete that workaround when a newer gcc compiles the reproducer.
 
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
