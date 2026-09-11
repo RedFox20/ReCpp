@@ -1,0 +1,31 @@
+/**
+ * Imports one group umbrella and never the top one, so a group which drops a member fails
+ * to compile here. test_modules_umbrella.cpp covers `import rpp;` instead.
+ */
+#include <rpp/tests.h>
+
+#if RPP_BUILD_WITH_MODULES
+
+#include <rpp/tests.macros.h> // TestImpl, TestCase, AssertThat
+#include <vector>             // std::vector, which rpp::sort takes
+
+import rpp.numeric; // includes come first, the import goes last
+
+TestImpl(test_modules_group)
+{
+    TestInit(test_modules_group) {}
+
+    TestCase(a_group_umbrella_carries_every_member)
+    {
+        AssertThat(rpp::max(3, 7), 7);      // rpp.minmax
+        AssertThat(rpp::radf(0.0f), 0.0f);  // rpp.math
+
+        rpp::Vector2 v { 3.0f, 4.0f };      // rpp.vec
+        AssertThat(v.length(), 5.0f);
+
+        std::vector<int> items { 5, 1, 3 }; // rpp.sort
+        rpp::sort(items);
+        AssertThat(items[0], 1);
+    }
+};
+#endif

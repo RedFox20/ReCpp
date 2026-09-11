@@ -400,7 +400,16 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-event_loop.cppm
         # L8
         src/rpp/rpp-coroutines.cppm
-        # the umbrella, which imports every module above
+        # the group umbrellas, which partition every module above
+        src/rpp/rpp-core.cppm
+        src/rpp/rpp-text.cppm
+        src/rpp/rpp-numeric.cppm
+        src/rpp/rpp-time.cppm
+        src/rpp/rpp-containers.cppm
+        src/rpp/rpp-io.cppm
+        src/rpp/rpp-threading.cppm
+        src/rpp/rpp-testing.cppm
+        # the top umbrella, which imports the eight groups
         src/rpp/rpp.cppm
     )
 

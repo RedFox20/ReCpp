@@ -375,8 +375,8 @@ namespace rpp
      * };
      * @endcode
      */
-    // unconstrained for the same reason as synchronize_guard: CRTP names this base while
-    // SyncType is still incomplete
+    // SyncableType constrains the members below, not SyncType: CRTP names this base while
+    // SyncType is still incomplete, and only a call site sees the complete type
     template<class SyncType>
     class synchronizable
     {
@@ -391,12 +391,18 @@ namespace rpp
 
         using guard_type = rpp::synchronize_guard<SyncType>;
 
-        guard_type operator->() noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        guard_type operator*()  noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        guard_type guard()      noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        const guard_type operator->() const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
-        const guard_type operator*()  const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
-        const guard_type guard()      const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
+        /// Each one returns a guard which holds the lock until it dies. SyncableType gates
+        /// them, so a derived type missing get_mutex() or get_ref() loses these six and nothing else.
+        guard_type operator->() noexcept requires SyncableType<SyncType> { return make_guard(); }
+        guard_type operator*()  noexcept requires SyncableType<SyncType> { return make_guard(); }
+        guard_type guard()      noexcept requires SyncableType<SyncType> { return make_guard(); }
+        const guard_type operator->() const noexcept requires SyncableType<SyncType> { return make_guard(); }
+        const guard_type operator*()  const noexcept requires SyncableType<SyncType> { return make_guard(); }
+        const guard_type guard()      const noexcept requires SyncableType<SyncType> { return make_guard(); }
+
+    private:
+        guard_type make_guard() const noexcept
+        { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
     };
 
     /**

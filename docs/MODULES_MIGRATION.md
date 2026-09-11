@@ -1,7 +1,7 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 18. Forty-four modules exist, all of L0 to L8, plus the umbrella `rpp`. The
-migration is complete. Only `rpp.tests` re-exports another module.
+Revision 19. Forty-four modules exist, all of L0 to L8, plus eight group umbrellas and the
+top umbrella `rpp`. The migration is complete. Only `rpp.tests` re-exports another module.
 
 This document explains the pattern and records what real builds prove about it.
 
@@ -819,13 +819,17 @@ between layers.
 | L6 | **binary_serializer** ✓, **thread_pool** ✓ | 2 |
 | L7 | **event_loop** ✓, **future** ✓ | 2 |
 | L8 | **coroutines** ✓ | 1 |
+| groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **testing** ✓ | 8 |
 | top | umbrella **rpp** ✓ | 1 |
 
-Every module ships. `BUILD_WITH_MODULES` builds all forty-four plus the umbrella.
+Every module ships. `BUILD_WITH_MODULES` builds all forty-four plus the nine umbrellas.
 
-44 modules and one umbrella, all of them built. `gen_module_exports.py --all --check` compares
-the umbrella list against the modules on disk, so a new module which nobody adds to
-`rpp.cppm` fails the gate. Excluded: `config.h`
+The eight groups partition the 44, and `rpp` imports the groups rather than the modules. So a
+new module reaches an `import rpp;` consumer only by joining one group, and no module can sit
+in two. `gen_module_exports.py --all --check` reports each of those three ways to drift, and
+the selftest pins all three. The nine umbrellas cost about 245 ms of the 121 s module build.
+`rpp.numeric` carries the math group, because `rpp.math` is already the module for `math.h`.
+Excluded: `config.h`
 and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because it is
 Android glue. `tests.h` is in, and it is the one header whose macros split into
 `tests.macros.h`.

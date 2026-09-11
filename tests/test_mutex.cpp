@@ -17,8 +17,17 @@ TestImpl(test_mutex)
         auto& get_ref() { return value; }
     };
 
+    // a derived type which forgot the two accessors, so the constraint has something to reject
+    class MissingAccessors : public rpp::synchronizable<MissingAccessors>
+    {
+        std::string value;
+    };
+
     // RPP_SYNC_T was a C++17 bridge and downstream code still writes it, so it stays defined
     template<RPP_SYNC_T T> struct legacy_sync_user { T* instance; };
+
+    // whether guard() is callable, which is what SyncableType decides
+    template<class T> static constexpr bool has_guard = requires(T t) { t.guard(); };
 
     TestCase(syncable_type_answers_for_a_complete_type)
     {
@@ -26,9 +35,14 @@ TestImpl(test_mutex)
         static_assert(rpp::SyncableType<SimpleValue>);
         static_assert(rpp::SyncableType<rpp::synchronized<std::string>>);
         static_assert(!rpp::SyncableType<int>);
+        static_assert(!rpp::SyncableType<MissingAccessors>);
 
-        // CRTP names the base while the derived type is incomplete, so neither template
-        // carries the constraint. This pins that both still accept a syncable type.
+        // SyncableType constrains every synchronizable member, so a derived type which
+        // forgot the accessors still compiles and only loses guard()
+        static_assert(has_guard<SimpleValue>);
+        static_assert(has_guard<rpp::synchronized<std::string>>);
+        static_assert(!has_guard<MissingAccessors>);
+
         legacy_sync_user<SimpleValue> legacy {};
         AssertThat(legacy.instance == nullptr, true);
 

@@ -282,21 +282,44 @@ def rewrite(header: str, check: bool) -> str:
 
 
 UMBRELLA = 'rpp.cppm'
+# the group umbrellas, which partition every module. `import rpp;` imports these, never a
+# module directly, so a new module reaches a consumer only by joining one group
+GROUPS = ('core', 'text', 'numeric', 'time', 'containers', 'io', 'threading', 'testing')
+
+
+def _export_imports(cppm: str) -> set:
+    path = os.path.join(rd.SRC, cppm)
+    if not os.path.exists(path):
+        return set()
+    return set(re.findall(r'^export import\s+([\w.]+)\s*;', _read(cppm), re.M))
 
 
 def umbrella_drift() -> list:
-    """Every module the umbrella misses, and every name it imports which no module owns.
+    """Every module no group carries, every name no header owns, and every module in two groups.
 
-    The umbrella list is hand written, so a new module reaches no `import rpp;` consumer
-    until someone adds a line. This compares it against the modules on disk.
+    The lists are hand written, so a new module reaches no `import rpp;` consumer until
+    someone adds a line. This compares them against the modules on disk.
     """
-    path = os.path.join(rd.SRC, UMBRELLA)
-    if not os.path.exists(path):
-        return [f'{UMBRELLA}: missing, so `import rpp;` names nothing']
-    listed = set(re.findall(r'^export import\s+([\w.]+)\s*;', _read(UMBRELLA), re.M))
+    bad = []
+    for cppm in [UMBRELLA] + [f'rpp-{g}.cppm' for g in GROUPS]:
+        if not os.path.exists(os.path.join(rd.SRC, cppm)): bad.append(f'{cppm}: missing')
+    if bad:
+        return bad
+
+    want_groups = {f'rpp.{g}' for g in GROUPS}
+    top = _export_imports(UMBRELLA)
+    bad += [f'{UMBRELLA}: does not export import {m}' for m in sorted(want_groups - top)]
+    bad += [f'{UMBRELLA}: exports {m}, which is not a group' for m in sorted(top - want_groups)]
+
     owned = {module_name(h) for h in with_modules()}
-    return ([f'{UMBRELLA}: does not export import {m}' for m in sorted(owned - listed)] +
-            [f'{UMBRELLA}: exports {m}, which no header owns' for m in sorted(listed - owned)])
+    seen = {}
+    for g in GROUPS:
+        for m in sorted(_export_imports(f'rpp-{g}.cppm')):
+            if m in seen: bad.append(f'rpp.{g}: exports {m}, which rpp.{seen[m]} already carries')
+            else: seen[m] = g
+    bad += [f'no group exports {m}' for m in sorted(owned - set(seen))]
+    bad += [f'rpp.{seen[m]}: exports {m}, which no header owns' for m in sorted(set(seen) - owned)]
+    return bad
 
 
 def name_collisions() -> list:
@@ -356,18 +379,28 @@ def selftest() -> list:
     if macro_collision('scopeguard'): bad.append('the renamed module still reports a macro')
     if macro_collision('strview'): bad.append('a module which repeats no macro reported one')
 
-    # the umbrella list is hand written, so pin that the gate reports a drop and an unknown name
+    # the group lists are hand written, so pin every way one can go stale
     if umbrella_drift(): bad.append('the umbrella gate reports drift on a correct list')
-    dropped = sorted(module_name(h) for h in with_modules())[0]
     real_read = _read
+    first = f'rpp-{GROUPS[0]}.cppm'
+    dropped = sorted(_export_imports(first))[0]
+    def _patched(text: str):
+        globals()['_read'] = lambda h: text(real_read(h)) if h == first else real_read(h)
+        return umbrella_drift()
     try:
-        globals()['_read'] = lambda h: (real_read(h).replace(f'export import {dropped};\n', '')
-                                        + 'export import rpp.no_such_module;\n') if h == UMBRELLA else real_read(h)
-        drift = umbrella_drift()
-        if not any(f'does not export import {dropped}' in f for f in drift):
-            bad.append('a dropped export import passed the umbrella gate')
+        drift = _patched(lambda t: t.replace(f'export import {dropped};\n', ''))
+        if not any(f'no group exports {dropped}' in f for f in drift):
+            bad.append('a module no group carries passed the umbrella gate')
+
+        drift = _patched(lambda t: t + 'export import rpp.no_such_module;\n')
         if not any('rpp.no_such_module' in f for f in drift):
             bad.append('an unknown export import passed the umbrella gate')
+
+        # the same module in two groups makes `import rpp;` ambiguous about who owns it
+        twice = sorted(_export_imports(f'rpp-{GROUPS[1]}.cppm'))[0]
+        drift = _patched(lambda t: t + f'export import {twice};\n')
+        if not any('already carries' in f for f in drift):
+            bad.append('a module in two groups passed the umbrella gate')
     finally:
         globals()['_read'] = real_read
 

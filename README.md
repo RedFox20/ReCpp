@@ -128,19 +128,36 @@ header leaks whatever its includes pull in, and a module hands over only what th
 importer asked for. `rpp.tests` is the one exception, and it re-exports
 `rpp.strview` for the `TestImpl` constructor.
 
-### The umbrella module
+### The umbrella modules
 
 `import rpp;` reaches every module at once, which suits a file that would otherwise name
-a dozen. It costs about 50 ms to build and it imports the test framework too.
+a dozen. Eight group umbrellas sit between it and the 44, so a file can take one subject
+instead of everything:
+
+| Module | Carries |
+|---|---|
+| `rpp.core` | config, debugging, source_loc, traits, type_traits, predicates, scopeguard, delegate, proc_utils, stack_trace, endian, bitutils |
+| `rpp.text` | strview, sprint, obfuscated_string |
+| `rpp.numeric` | math, minmax, vec, sort |
+| `rpp.time` | timepoint, timer, atomic_timepoint |
+| `rpp.containers` | collections, memory_pool, load_balancer |
+| `rpp.io` | file_io, paths, sockets, binary_stream, binary_serializer |
+| `rpp.threading` | mutex, condition_variable, semaphore, concurrent_queue, thread_pool, threads, task, future, future_types, event_loop, coroutines, atomic_shared_ptr, close_sync |
+| `rpp.testing` | tests |
+
+The groups partition the 44, so every module sits in exactly one and
+`gen_module_exports.py --all --check` fails when that stops holding. `rpp.numeric` is
+named that way because `rpp.math` is already the module for `math.h`.
 
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module
-import rpp;                     // rpp::strview, rpp::cfuture, rpp::socket, ...
+import rpp.threading;           // rpp::mutex, rpp::cfuture, rpp::thread_pool, ...
+import rpp;                     // or everything, which imports the eight groups
 ```
 
-Name the modules you use when you want the narrower dependency. A file that imports
-`rpp.strview` alone rebuilds when `strview.h` changes, and a file that imports `rpp`
-rebuilds when any of the 44 headers changes.
+The nine umbrellas cost about 245 ms to build together. Name the modules you use when you
+want the narrowest dependency: a file that imports `rpp.strview` rebuilds when `strview.h`
+changes, and a file that imports `rpp` rebuilds when any of the 44 headers changes.
 
 ### Macros need a header
 
@@ -1829,7 +1846,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L411) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L417) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
