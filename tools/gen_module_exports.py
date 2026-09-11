@@ -70,7 +70,9 @@ RE_EXPORT = {'tests.h': ('rpp.strview',)}
 # against. Each one waits on a std::mutex the bare-metal build does not have, see BUGS.md B15
 NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
              'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'}),
-             'thread_pool.h': frozenset({'!RPP_BARE_METAL'})}
+             'thread_pool.h': frozenset({'!RPP_BARE_METAL'}),
+             'future.h': frozenset({'!RPP_BARE_METAL'}),
+             'event_loop.h': frozenset({'!RPP_BARE_METAL'})}
 
 # the condition a header declares for the names only an alternate configuration has, when the
 # guard the generator would negate is wider. mutex.h also declares critical_section on Cortex-M,
