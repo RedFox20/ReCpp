@@ -7,15 +7,11 @@
  */
 #include "config.h"
 #include <stddef.h> // size_t
-#if RPP_HAS_CXX20
-#  include <concepts> // std::same_as
-#  include <type_traits> // std::is_pointer
-#endif
+#include <concepts> // std::same_as
+#include <type_traits> // std::is_pointer
 
 namespace rpp
 {
-
-#if RPP_HAS_CXX20
     /**
      * @brief Concept for a comparison function used in sorting,
      *        which should be a callable with signature: bool(const T& a, const T& b)
@@ -46,7 +42,6 @@ namespace rpp
      */
     template<contiguous_container Container>
     using container_element_t = std::decay_t<decltype(std::declval<Container&>().data()[0])>;
-#endif
 
     /**
      * @brief A simple insertion sort algorithm
@@ -58,9 +53,7 @@ namespace rpp
     template<typename T, typename Comparison>
     NOINLINE void insertion_sort(T* data, size_t count, const Comparison& comparison)
         noexcept(noexcept(comparison(data[0], data[0])) && noexcept(std::swap(data[0], data[0])))
-        #if RPP_HAS_CXX20
-            requires sort_comparison<T, Comparison>
-        #endif
+        requires sort_comparison<T, Comparison>
     {
         for (size_t i = 1; i < count; ++i)
         {
@@ -81,10 +74,8 @@ namespace rpp
     template<typename Container, typename Comparison>
     FINLINE void insertion_sort(Container& container, const Comparison& comparison)
         noexcept(noexcept(insertion_sort(container.data(), container.size(), comparison)))
-        #if RPP_HAS_CXX20
-            requires contiguous_container<Container> &&
-                     sort_comparison<container_element_t<Container>, Comparison>
-        #endif
+        requires contiguous_container<Container> &&
+                 sort_comparison<container_element_t<Container>, Comparison>
     {
         insertion_sort(container.data(), container.size(), comparison);
     }
@@ -95,9 +86,7 @@ namespace rpp
      */
     template<typename Container>
     FINLINE void sort(Container&& container)
-        #if RPP_HAS_CXX20
-            requires contiguous_container<Container>
-        #endif
+        requires contiguous_container<Container>
     {
         insertion_sort(container.data(), container.size(),
                        [](const auto& a, const auto& b) { return a < b; });
@@ -110,10 +99,8 @@ namespace rpp
      */
     template<typename Container, typename Comparison>
     FINLINE void sort(Container&& container, const Comparison& comparison)
-        #if RPP_HAS_CXX20
-            requires contiguous_container<Container> &&
-                     sort_comparison<container_element_t<Container>, Comparison>
-        #endif
+        requires contiguous_container<Container> &&
+                 sort_comparison<container_element_t<Container>, Comparison>
     {
         insertion_sort(container.data(), container.size(), comparison);
     }

@@ -465,7 +465,6 @@ namespace rpp
             return true;
         }
 
-    #if RPP_HAS_COROUTINES // C++20 coro support
 
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -476,7 +475,7 @@ namespace rpp
                 cont.resume();
                 return;
             }
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat:*/mutable
+            rpp::parallel_task_detached([this, cont]()
             {
                 if (this->valid())
                     this->wait();
@@ -513,8 +512,8 @@ namespace rpp
              * For `rpp::cfuture<T> my_coroutine() {}` this is the hidden future object
              */
             RPP_CORO_WRAPPER rpp::cfuture<T> get_return_object() noexcept { return this->get_future(); }
-            RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
-            RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
+            rpp::suspend_never initial_suspend() const noexcept { return {}; }
+            rpp::suspend_never final_suspend() const noexcept { return {}; }
 
             // Deferred return value and exception: stored here so the future is only
             // signalled in ~promise_type(), AFTER the coroutine frame (and all its local
@@ -543,7 +542,6 @@ namespace rpp
                 else if (deferred_value) rpp::cpromise<T>::set_value(std::move(*deferred_value));
             }
         };
-    #endif // RPP_HAS_COROUTINES
     }; // cfuture<T>
 
 
@@ -875,7 +873,6 @@ namespace rpp
             return true;
         }
 
-    #if RPP_HAS_COROUTINES // C++20 coroutine support
 
         // suspension point that launches the background async task
         void await_suspend(rpp::coro_handle<> cont) noexcept
@@ -886,7 +883,7 @@ namespace rpp
                 cont.resume();
                 return;
             }
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat:*/mutable
+            rpp::parallel_task_detached([this, cont]()
             {
                 if (this->valid())
                     this->wait();
@@ -918,8 +915,8 @@ namespace rpp
         struct promise_type : rpp::cpromise<void>
         {
             RPP_CORO_WRAPPER rpp::cfuture<void> get_return_object() noexcept { return this->get_future(); }
-            RPP_CORO_STD::suspend_never initial_suspend() const noexcept { return {}; }
-            RPP_CORO_STD::suspend_never final_suspend() const noexcept { return {}; }
+            rpp::suspend_never initial_suspend() const noexcept { return {}; }
+            rpp::suspend_never final_suspend() const noexcept { return {}; }
 
             // Same deferred-signal approach as cfuture<T>::promise_type.
             std::exception_ptr deferred_ex     {};
@@ -934,7 +931,6 @@ namespace rpp
                 else if (deferred_return) rpp::cpromise<void>::set_value();
             }
         };
-    #endif // RPP_HAS_COROUTINES
     }; // cfuture<void>
 
 

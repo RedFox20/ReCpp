@@ -6,10 +6,8 @@
 
 import rpp.tests; // includes come first, the import goes last
 
-// future_types.h always defines this, and no import can carry a macro
-#ifndef RPP_HAS_COROUTINES
-#error tests.macros.h stopped including future_types.h, so TestCaseCoro went dark
-#endif
+// tests.macros.h re-exports future_types.h for <coroutine>, and the coroutine case below is
+// what pins it. Drop that include and this file stops finding std::coroutine_traits.
 
 TestImpl(module_only_suite)
 {
@@ -34,13 +32,11 @@ TestImpl(module_only_suite)
         throw std::runtime_error{"expected"};
     }
 
-#if RPP_HAS_COROUTINES // the macro comes from future_types.h, and no import can carry it
     TestCaseCoro(a_coroutine_case_compiles)
     {
         AssertThat(1, 1);
         co_return;
     }
-#endif
 };
 
 int main()

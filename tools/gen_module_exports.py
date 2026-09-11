@@ -29,8 +29,9 @@ GUARDS = (('RPP_ENABLE_UNICODE', ('RPP_ENABLE_UNICODE=0',)),
           ('!defined(RPP_BINARY_READWRITE_NO_FILE_IO)', ('RPP_BINARY_READWRITE_NO_FILE_IO=1',)))
 
 # a macro no define reaches, because the header derives it from __has_include. The generator
-# reads the region the header guards with it instead of parsing a second configuration
-TEXT_GUARDS = ('RPP_HAS_COROUTINES',)
+# reads the region the header guards with it instead of parsing a second configuration.
+# Empty since RPP_HAS_COROUTINES went, and the selftest still drives the rule
+TEXT_GUARDS = ()
 
 # a using-declaration cannot name these, and an importer never needs them
 # this set omits UNEXPOSED_DECL, because libclang reports a variable template under that
@@ -72,7 +73,8 @@ NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
              'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'}),
              'thread_pool.h': frozenset({'!RPP_BARE_METAL'}),
              'future.h': frozenset({'!RPP_BARE_METAL'}),
-             'event_loop.h': frozenset({'!RPP_BARE_METAL'})}
+             'event_loop.h': frozenset({'!RPP_BARE_METAL'}),
+             'coroutines.h': frozenset({'!RPP_BARE_METAL'})}
 
 # the condition a header declares for the names only an alternate configuration has, when the
 # guard the generator would negate is wider. mutex.h also declares critical_section on Cortex-M,
@@ -162,15 +164,15 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     return out
 
 
-def _guarded_spans(header: str) -> dict:
-    """Macro to the line spans its `#if` blocks cover, for every macro in TEXT_GUARDS.
+def _guarded_spans(header: str, macros: tuple = None) -> dict:
+    """Macro to the line spans its `#if` blocks cover, for every macro in `macros`.
 
     A span holds line numbers, not text. A block which only mentions an unconditional class
     would otherwise guard that whole class, and hide its API wherever the macro is 0.
     """
     lines = _read(header).split('\n')
     out = {}
-    for macro in TEXT_GUARDS:
+    for macro in (TEXT_GUARDS if macros is None else macros):
         spans, depth, start = [], 0, None
         for i, line in enumerate(lines, 1):
             s = line.strip()
@@ -351,7 +353,7 @@ def selftest() -> list:
         for name in ('TAU', 'Public'):
             if name not in shown: bad.append(f'{name} has external linkage and left the export list')
         if any(n.startswith('<') for n in shown): bad.append('a deduction guide reached the export list')
-        spans = _guarded_spans(path)
+        spans = _guarded_spans(path, ('RPP_HAS_COROUTINES',))
         base = _exported(path, BASE)
         if _condition('rpp', 'Awaited', rpp_ns['Awaited'], base, {}, spans) != 'RPP_HAS_COROUTINES':
             bad.append('a declaration inside a guard span took no #if')

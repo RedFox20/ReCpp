@@ -10,11 +10,11 @@
  *   #include <rpp/tests.macros.h>   // module: add this line for the macros
  *
  * Each macro below calls a name that <rpp/tests.h> or `import rpp.tests` declares.
- * Include one of the two first. The includes here carry the two macros an import cannot,
- * plus the three std names the macros expand to.
+ * Include one of the two first. The includes here carry the one macro an import cannot,
+ * plus the four std names the macros expand to.
  */
 #include "source_loc.h" // RPP_SOURCE_LOC_CURRENT
-#include "future_types.h" // RPP_HAS_COROUTINES, which guards TestCaseCoro
+#include "future_types.h" // re-export: a TestCaseCoro body needs the <coroutine> this brings
 #include <memory> // std::unique_ptr, which __TestInit returns
 #include <typeinfo> // typeid, which TestCaseExpectedEx takes
 #include <exception> // std::exception, which AssertNoThrowAny catches
@@ -226,12 +226,10 @@
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname ); \
     void test_##testname()
 
-#if RPP_HAS_COROUTINES
 // allows to use co_await in test cases, driven synchronously by the test runner
 #define TestCaseCoro(testname) \
     const int _test_##testname = add_coro_test_func(self(), #testname, &ClassType::test_##testname ); \
     rpp::test::test_coro test_##testname()
-#endif // RPP_HAS_COROUTINES
 
 #define TestCaseExpectedEx(testname, expectedExceptionType) \
     const int _test_##testname = add_test_func(self(), #testname, &ClassType::test_##testname, &typeid(expectedExceptionType)); \

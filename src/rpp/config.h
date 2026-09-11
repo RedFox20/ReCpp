@@ -70,14 +70,13 @@
 #  define RPPCAPI RPP_EXTERNC RPPAPI
 #endif
 
+// C++20 is the floor, so a wrong -std stops here instead of deep inside a header
 #if __cplusplus
 #  if _MSC_VER
-#    define RPP_HAS_CXX20 (_MSVC_LANG >= 202002L)
+   static_assert(_MSVC_LANG >= 202002L, "ReCpp requires C++20 or higher");
 #  else
-#    define RPP_HAS_CXX20 (__cplusplus >= 202002L)
+   static_assert(__cplusplus >= 202002L, "ReCpp requires C++20 or higher");
 #  endif
-   // C++20 is the floor, so a wrong -std stops here instead of deep inside a header
-   static_assert(RPP_HAS_CXX20, "ReCpp requires C++20 or higher");
 #endif
 
 #if __cplusplus

@@ -7,19 +7,13 @@
 #include "predicates.h" // rpp::IsCallable
 #include <atomic>
 
-#if RPP_HAS_CXX20
-#  include "future_types.h" // RPP_HAS_COROUTINES, rpp::coro_handle
-#  if RPP_HAS_COROUTINES
-#    include "delegate.h" // rpp::delegate (for coroutine awaiter)
-#  endif
-#endif
+#include "future_types.h" // rpp::coro_handle
+#include "delegate.h" // rpp::delegate (for coroutine awaiter)
 
 namespace rpp
 {
-#if RPP_HAS_COROUTINES
     // forward declaration: avoids circular include with thread_pool.h
     void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
-#endif
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -363,7 +357,6 @@ namespace rpp
             hasFinished = false;
         }
 
-#if RPP_HAS_COROUTINES
         /**
          * @brief Awaitable handle for co_await on semaphore wait.
          * Dispatches the blocking wait to a background thread and resumes the coroutine.
@@ -394,7 +387,6 @@ namespace rpp
             wait_result await_resume() noexcept { return result; }
         };
         RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
-#endif
     };
 
     /**
@@ -428,10 +420,8 @@ namespace rpp
         using semaphore::try_wait;
         using semaphore::wait;
         using semaphore::wait_no_unset;
-#if RPP_HAS_COROUTINES
         using semaphore::co_await_handle;
         using semaphore::await;
-#endif
     };
 
     /**
@@ -481,10 +471,8 @@ namespace rpp
         {
             return wait_no_unset(lock, timeout);
         }
-#if RPP_HAS_COROUTINES
         using semaphore::co_await_handle;
         using semaphore::await;
-#endif
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////

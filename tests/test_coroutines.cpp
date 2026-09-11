@@ -22,7 +22,6 @@ TestImpl(test_coroutines)
         rpp::thread_pool::global().clear_idle_tasks();
     }
 
-#if RPP_HAS_COROUTINES
 
     template<class T>
     void set_locked(T& out, const T& value)
@@ -291,5 +290,4 @@ TestImpl(test_coroutines)
         AssertThat(s, "future string"s);
     }
 
-#endif
 };

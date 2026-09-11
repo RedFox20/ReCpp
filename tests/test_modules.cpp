@@ -54,6 +54,7 @@ import rpp.binary_serializer;
 import rpp.thread_pool;
 import rpp.future;
 import rpp.event_loop;
+import rpp.coroutines;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
@@ -585,7 +586,6 @@ TestImpl(test_modules)
         rpp::run_tasks(no_items, &module_launch);
     }
 
-#if RPP_HAS_COROUTINES
     // an eager task runs to completion at construction, so this needs no event loop
     static rpp::task<int> module_task() { co_return 99; }
 
@@ -616,7 +616,28 @@ TestImpl(test_modules)
         AssertThat(value, 3);
         AssertThat(task.done(), true);
     }
-#endif
+
+    TestCase(coroutines_module_carries_the_whole_surface)
+    {
+        // a cfuture coroutine instantiates std::promise, so the probe drives await_ready() directly, see BUGS.md B16
+        rpp::time_awaiter elapsed { rpp::TimePoint::monotonic_now() };
+        AssertThat(elapsed.await_ready(), true);
+
+        using namespace rpp::coro_operators; // the module exports the inline namespace too
+        rpp::time_awaiter pending = operator co_await(rpp::seconds(1));
+        AssertThat(pending.await_ready(), false);
+
+        rpp::functor_awaiter<int> functor { rpp::delegate<int()>{ +[] { return 7; } } };
+        AssertThat(functor.await_ready(), false);
+
+        // the constrained overloads pick a different awaiter, so each one needs its own probe
+        static_assert(std::is_same_v<decltype(operator co_await(rpp::delegate<int()>{})), rpp::functor_awaiter<int>>);
+        static_assert(std::is_same_v<decltype(operator co_await(std::future<int>{})), rpp::std_future_awaiter<int>>);
+
+        static_assert(sizeof(rpp::functor_awaiter<void>) > 0, "the module must export functor_awaiter<void>");
+        static_assert(sizeof(rpp::functor_awaiter_fut<rpp::cfuture<int>>) > 0, "the module must export functor_awaiter_fut");
+        static_assert(sizeof(rpp::std_future_awaiter<int>) > 0, "the module must export std_future_awaiter");
+    }
 };
 
 #endif // RPP_BUILD_WITH_MODULES

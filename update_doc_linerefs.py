@@ -164,6 +164,21 @@ def score_candidate(line_text: str, param_pairs: list[tuple[str, str]]) -> int:
     return score
 
 
+def count_declared_params(decl: str, name: str) -> int | None:
+    """Count the parameters the named function takes here, or None when the name has no
+    argument list. The name anchors the search, so `unset() { reset(0); }` counts reset."""
+    m = re.search(r'\b' + re.escape(name) + r'\s*\(', decl)
+    if not m:
+        return None
+    depth = 1
+    for i in range(m.end(), len(decl)):
+        if decl[i] == '(': depth += 1
+        elif decl[i] == ')':
+            depth -= 1
+            if depth == 0: return len(split_params(decl[m.end():i]))
+    return None
+
+
 def get_full_declaration(lines: list[str], line_idx: int) -> str:
     """Get the full declaration text starting at line_idx (0-based).
     If the line ends with a comma, continuation lines are joined
@@ -270,6 +285,14 @@ def find_line_in_lines(lines: list[str], display: str, search_name: str, old_lin
             if len(best) == 1:
                 return best[0]
             candidates = best
+
+    # An untyped display such as `sort(container)` scores nothing, so the param count
+    # separates it from a wider overload. Only an exact single hit wins.
+    if is_callable:
+        want = count_declared_params(display, bare_name)
+        same = [c for c in candidates
+                if count_declared_params(get_full_declaration(lines, c - 1), bare_name) == want]
+        if len(same) == 1: return same[0]
 
     # Fallback: prefer the one closest to the old line number
     return min(candidates, key=lambda c: abs(c - old_line))
@@ -469,6 +492,17 @@ def tests():
           find(queue_lines, "wait_pop(T& outItem)", 10), 10)
     check("wait_pop() -> L5",
           find(queue_lines, "wait_pop()", 5), 5)
+
+    # An untyped display scores 0 against every overload, so the param count decides.
+    # The old line sits nearer the wrong overload, which is what the count has to beat.
+    sort_lines = _make_lines({
+        10: '    FINLINE void sort(Container&& container)',
+        20: '    FINLINE void sort(Container&& container, const Comparison& comparison)',
+    })
+    check("sort(container) -> L10 despite old line 16",
+          find(sort_lines, "sort(container)", 16), 10)
+    check("sort(container, comparison) -> L20",
+          find(sort_lines, "sort(container, comparison)", 16), 20)
 
     # verify should reject mismatched display text
     check("verify wait_pop(Duration timeout) at L20 -> ok",

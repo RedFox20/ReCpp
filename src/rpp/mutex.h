@@ -248,7 +248,6 @@ namespace rpp
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
 
-#if RPP_HAS_CXX20
     template<typename T>
     concept SyncableType = requires(T t) {
         { t.get_mutex() };
@@ -257,9 +256,6 @@ namespace rpp
     // Doesn't work for some reason :shrug:
     // #define RPP_SYNC_T SyncableType
     #define RPP_SYNC_T class
-#else
-    #define RPP_SYNC_T class
-#endif
 
     template<RPP_SYNC_T SyncType>
     class synchronize_guard

@@ -7,7 +7,7 @@
 #include "sprint.h" // we love strview and sprint, so it's a common dependency
 #include "debugging.h" // for adapting debugging API-s with tests API
 #include "./math.h" // rpp::min, rpp::max
-#include "future_types.h" // RPP_HAS_COROUTINES and to support TestCaseCoro()
+#include "future_types.h" // <coroutine> and rpp::coro_handle, which test_coro needs
 #include "source_loc.h" // rpp::source_loc
 #include "minmax.h" // rpp::max
 #include "strview.h" // rpp::strview
@@ -58,11 +58,10 @@ namespace rpp
     {
         struct dummy { };
 
-    #if RPP_HAS_COROUTINES
         /**
          * Simple coroutine return type for test cases.
          * Runs synchronously with suspend/resume points driven by the test runner.
-         * Use co_await std::suspend_always{} to create yield points.
+         * Use co_await rpp::suspend_always{} to create yield points.
          */
         struct RPP_CORO_RETURN_TYPE test_coro
         {
@@ -71,17 +70,17 @@ namespace rpp
                 std::exception_ptr exception;
                 test_coro get_return_object() noexcept
                 {
-                    return test_coro{RPP_CORO_STD::coroutine_handle<promise_type>::from_promise(*this)};
+                    return test_coro{rpp::coro_handle<promise_type>::from_promise(*this)};
                 }
-                RPP_CORO_STD::suspend_never initial_suspend() noexcept { return {}; }
-                RPP_CORO_STD::suspend_always final_suspend() noexcept { return {}; }
+                rpp::suspend_never initial_suspend() noexcept { return {}; }
+                rpp::suspend_always final_suspend() noexcept { return {}; }
                 void return_void() noexcept {}
                 void unhandled_exception() noexcept { exception = std::current_exception(); }
             };
 
-            RPP_CORO_STD::coroutine_handle<promise_type> handle;
+            rpp::coro_handle<promise_type> handle;
 
-            explicit test_coro(RPP_CORO_STD::coroutine_handle<promise_type> h) noexcept : handle{h} {}
+            explicit test_coro(rpp::coro_handle<promise_type> h) noexcept : handle{h} {}
             test_coro(test_coro&& o) noexcept : handle{o.handle} { o.handle = nullptr; }
             ~test_coro() { if (handle) handle.destroy(); }
             test_coro(const test_coro&) = delete;
@@ -100,7 +99,6 @@ namespace rpp
             }
             bool done() const noexcept { return !handle || handle.done(); }
         };
-    #endif // RPP_HAS_COROUTINES
 
         // minimal version from delegate.h for impossibly fast delegates
         #if _MSC_VER  // VC++
@@ -123,7 +121,6 @@ namespace rpp
             dummy_type dfunc;
         };
 
-    #if RPP_HAS_COROUTINES
         // function pointer types for coroutine test cases (returning test_coro)
         #if _MSC_VER  // VC++
             #if INTPTR_MAX != INT64_MAX // __thiscall only applies for 32-bit MSVC
@@ -144,7 +141,6 @@ namespace rpp
             coro_memb_type mfunc;
             coro_dummy_type dfunc;
         };
-    #endif // RPP_HAS_COROUTINES
     
         struct test_func;
         struct test_impl;
@@ -249,10 +245,8 @@ namespace rpp
         virtual void test_case_setup() {}
         virtual void test_case_cleanup() {}
 
-    #if RPP_HAS_COROUTINES
         // override to provide a custom coroutine runner (e.g. event loop driven)
         virtual void run_coro_test(test_coro& coro) { coro.run_until_done(); }
-    #endif // RPP_HAS_COROUTINES
 
         bool run_init();
         void run_cleanup();
@@ -407,7 +401,6 @@ namespace rpp
             return self->add_test_func(name, fn, expectedExHash, autorun);
         }
 
-    #if RPP_HAS_COROUTINES
         int add_coro_test_func(strview name, coro_func_type fn, size_t expectedExHash, bool autorun);
 
         // adds a coroutine test to the automatic test run list
@@ -431,7 +424,6 @@ namespace rpp
             size_t expectedExHash = ti ? ti->hash_code() : 0;
             return self->add_coro_test_func(name, fn, expectedExHash, autorun);
         }
-    #endif // RPP_HAS_COROUTINES
     };
 
     struct Compare

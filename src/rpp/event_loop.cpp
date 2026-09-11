@@ -5,7 +5,6 @@
  */
 #include "event_loop.h"
 
-#if RPP_HAS_COROUTINES
 
 namespace rpp
 {
@@ -307,4 +306,3 @@ namespace rpp
 
 } // namespace rpp
 
-#endif // RPP_HAS_COROUTINES

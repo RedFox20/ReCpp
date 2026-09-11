@@ -130,7 +130,7 @@ namespace rpp
         struct __wrap<std::string>
         {
             // constexpr c_str() available in C++20 and up, but not on GCC C++20
-            #if RPP_HAS_CXX23 || (RPP_HAS_CXX20 && __cpp_lib_constexpr_string && !RPP_GCC)
+            #if RPP_HAS_CXX23 || (__cpp_lib_constexpr_string && !RPP_GCC)
                 FINLINE static constexpr const char* w(const std::string& arg) noexcept { return arg.c_str(); }
             #else
                 FINLINE static const char* w(const std::string& arg) noexcept { return arg.c_str(); }

@@ -27,7 +27,6 @@
 #include <stdexcept>
 #include <type_traits>
 
-#if RPP_HAS_COROUTINES
 
 namespace rpp
 {
@@ -962,4 +961,3 @@ namespace rpp
 
 } // namespace rpp
 
-#endif // RPP_HAS_COROUTINES

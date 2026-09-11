@@ -9,10 +9,9 @@
  * Copyright (c) 2026, Jorma Rebane
  * Distributed under MIT Software License
  */
-#include "future_types.h" // RPP_HAS_COROUTINES
+#include "future_types.h" // rpp::coro_handle, rpp::suspend_never
 
-#if RPP_HAS_COROUTINES
-// NOTE: future_types.h already includes <coroutine> and exposes rpp::coro_handle / rpp::suspend_* / RPP_CORO_STD
+// NOTE: future_types.h already includes <coroutine> and exposes rpp::coro_handle and rpp::suspend_*
 #include <exception> // std::exception_ptr
 #include <type_traits> // std::conditional_t, std::is_void_v
 #include <utility> // std::exchange, std::move
@@ -76,7 +75,7 @@ namespace rpp
             rpp::coro_handle<> await_suspend(rpp::coro_handle<Promise> h) const noexcept
             {
                 rpp::coro_handle<> cont = h.promise().continuation;
-                return cont ? cont : RPP_CORO_STD::noop_coroutine();
+                return cont ? cont : std::noop_coroutine();
             }
             void await_resume() const noexcept {}
         };
@@ -197,7 +196,7 @@ namespace rpp
                         return handle;
                     }
                 }
-                return RPP_CORO_STD::noop_coroutine();
+                return std::noop_coroutine();
             }
 
             typename Promise::value_type await_resume() { return detail::take_result<typename Promise::value_type>(handle); }
@@ -240,4 +239,3 @@ namespace rpp
         }
     };
 } // namespace rpp
-#endif // RPP_HAS_COROUTINES
