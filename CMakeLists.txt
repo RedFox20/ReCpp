@@ -398,6 +398,8 @@ if(RPP_BUILD_MODULES)
         # L7
         src/rpp/rpp-future.cppm
         src/rpp/rpp-event_loop.cppm
+        # L8
+        src/rpp/rpp-coroutines.cppm
     )
 
     # Add module interface to the library target

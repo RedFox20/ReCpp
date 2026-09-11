@@ -8,13 +8,13 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B15. Five headers do not compile on bare metal
+### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
 only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
 `cv.wait(lock)` in `semaphore.h` and `concurrent_queue.h` reports `no matching member
-function for call to 'wait'`. `thread_pool.h`, `future.h` and `event_loop.h` reach one
-of those two, so they report the same.
+function for call to 'wait'`. `thread_pool.h`, `future.h`, `event_loop.h` and
+`coroutines.h` reach one of those two, so they report the same.
 
 The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
 hand-rolled `condition_variable` templated on the mutex type. A fix widens the `#if` so
@@ -23,7 +23,7 @@ bare metal takes that branch too, and it needs a target which can run the result
 `event_loop.h` carries a second gap of its own. It calls `rpp::get_thread_id()` at lines
 445 and 517, and `threads.h:31` declares that name only when `!RPP_BARE_METAL`.
 
-All five headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
+All six headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
 
 ### B16. gcc-14 cannot compile `std::promise` in a module importer
@@ -46,9 +46,9 @@ int main() { std::promise<int> p; p.set_value(7); return p.get_future().get() ==
 
 Ten headers reach `<future>`, and `future_types.h` is the only direct includer:
 `concurrent_queue.h`, `coroutines.h`, `event_loop.h`, `future.h`, `future_types.h`,
-`semaphore.h`, `task.h`, `tests.h`, `tests.macros.h` and `thread_pool.h`. Eight of them
+`semaphore.h`, `task.h`, `tests.h`, `tests.macros.h` and `thread_pool.h`. Nine of them
 ship as a module, six before L7, so this predates the layer which found it. `rpp.task`
-alone reproduces it, and `coroutines.h` inherits it the day L8 ships.
+alone reproduces it, and only `tests.macros.h` never becomes a module.
 
 No export list removes the crash, so `test_modules.cpp` names the `future.h` factories in
 an unevaluated context. Delete that workaround when a newer gcc compiles the reproducer.

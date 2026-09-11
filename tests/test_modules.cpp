@@ -54,6 +54,7 @@ import rpp.binary_serializer;
 import rpp.thread_pool;
 import rpp.future;
 import rpp.event_loop;
+import rpp.coroutines;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
@@ -615,6 +616,23 @@ TestImpl(test_modules)
         rpp::event_task task = module_event_task(&value);
         AssertThat(value, 3);
         AssertThat(task.done(), true);
+    }
+
+    TestCase(coroutines_module_carries_the_whole_surface)
+    {
+        // every awaiter suspends onto the pool, so the probe drives await_ready() on its own
+        rpp::time_awaiter elapsed { rpp::TimePoint::monotonic_now() };
+        AssertThat(elapsed.await_ready(), true);
+
+        using namespace rpp::coro_operators; // the module exports the inline namespace too
+        rpp::time_awaiter pending = operator co_await(rpp::seconds(1));
+        AssertThat(pending.await_ready(), false);
+
+        rpp::functor_awaiter<int> functor { rpp::delegate<int()>{ +[] { return 7; } } };
+        AssertThat(functor.await_ready(), false);
+
+        static_assert(sizeof(rpp::functor_awaiter_fut<rpp::cfuture<int>>) > 0);
+        static_assert(sizeof(rpp::std_future_awaiter<int>) > 0);
     }
 #endif
 };
