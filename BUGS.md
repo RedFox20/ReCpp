@@ -8,6 +8,24 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B17. A pool worker frees the generic task a test still reads (C18 recurred)
+`ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
+A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main
+thread read the same address in `rpp::test::run_test_func()` at `tests.cpp:726`. All
+538 cases passed, and TSAN alone sets exit code 66.
+
+That statement is what C18 closed. It sat at `thread_pool.cpp:351` then, so the line moved
+and the code did not. C18 closed it as unreproducible after 120 runs on 32 saturated cores.
+This is the first report since, so the rate is far below what the old hunt covered.
+
+The thread which frees comes from an earlier suite. Its creation stack names
+`parallel_task_detached` under `test_sockets::test_udp_poll_nonblocking_select`, so a
+detached task outlives the suite which started it. Suite shutdown order is the place to
+look, not the `catch` block which reports the write.
+
+Four other TSAN jobs pass on the same commit: `cpp20-tsan-gcc13`, `cpp20-tsan-clang18`,
+`cpp23-tsan-clang18` and `cpp26-tsan-gcc14`.
+
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
