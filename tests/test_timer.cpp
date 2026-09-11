@@ -571,11 +571,16 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
         AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(20'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("ThreadCPU 20ms spin elapsed: %lldus\n", elapsed_us);
-        // CPU time granularity on CI VMs can be ~10ms, so only assert non-zero
+
+        // GetThreadTimes reports whole ~15.6ms ticks, so one 20ms spin can start and end
+        // inside a single tick and read 0. Spin again until a tick lands, at most 10 times.
+        rpp::int64 elapsed_us = 0;
+        for (int spins = 0; spins < 10 && elapsed_us == 0; ++spins)
+        {
+            spin_sleep_for_us(20'000, /*full_spin*/true);
+            elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - t1).micros();
+        }
+        print_info("ThreadCPU spin elapsed: %lldus\n", elapsed_us);
         AssertGreater(elapsed_us, 0);
     }
 
