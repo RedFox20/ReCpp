@@ -9,7 +9,6 @@ export module rpp.memory_pool;
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
 export namespace rpp {
-    using rpp::pool_types_constructor;
     using rpp::linear_static_pool;
     using rpp::linear_dynamic_pool;
 }

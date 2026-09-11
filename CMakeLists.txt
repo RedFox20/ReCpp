@@ -392,6 +392,9 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-binary_stream.cppm
         src/rpp/rpp-concurrent_queue.cppm
         src/rpp/rpp-semaphore.cppm
+        # L6
+        src/rpp/rpp-binary_serializer.cppm
+        src/rpp/rpp-thread_pool.cppm
     )
 
     # Add module interface to the library target

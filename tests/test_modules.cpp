@@ -49,9 +49,19 @@ import rpp.sockets;
 import rpp.binary_stream;
 import rpp.concurrent_queue;
 import rpp.semaphore;
+import rpp.binary_serializer;
+import rpp.thread_pool;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;
+
+// serializable<T> is a CRTP base which calls introspect() once, so the probe needs a real type
+struct module_point : rpp::serializable<module_point>
+{
+    int x = 0;
+    float y = 0.0f;
+    void introspect() { bind_name("x", x); bind_name("y", y); }
+};
 
 TestImpl(test_modules)
 {
@@ -322,7 +332,7 @@ TestImpl(test_modules)
     TestCase(memory_pool_module_carries_the_whole_surface)
     {
         rpp::linear_static_pool pool { 4096 };
-        // the derived `allocate(int,int)` hides the base `allocate<T>()`, see BUGS.md B14
+        // the mixin stays off the module surface, so this proves an inherited member still reaches an importer
         int* value = pool.construct<int>(7);
         AssertThat(*value, 7);
 
@@ -488,6 +498,64 @@ TestImpl(test_modules)
             acquired = rpp::atomic_test_and_set(running);
         AssertThat(acquired, true);
         AssertThat(running.load(), false);
+    }
+
+    TestCase(binary_serializer_module_carries_the_whole_surface)
+    {
+        module_point written;
+        written.x = 7;
+        written.y = 2.5f;
+
+        const std::vector<rpp::member_serialize<module_point>>& members = module_point::members;
+        AssertThat(int(members.size()), 2);
+        AssertThat(members[0].name, "x");
+
+        rpp::binary_buffer buf;
+        buf << written;
+        module_point read;
+        buf >> read;
+        AssertThat(read.x, 7);
+        AssertThat(read.y, 2.5f);
+
+        rpp::string_buffer sb;
+        written.serialize(sb);
+        AssertThat(sb.view().starts_with("x;7;"), true);
+
+        rpp::strview line = sb.view();
+        module_point parsed;
+        line >> parsed;
+        AssertThat(parsed.x, 7);
+        AssertThat(parsed.y, 2.5f);
+    }
+
+    TestCase(thread_pool_module_carries_the_whole_surface)
+    {
+        static_assert(std::is_same_v<rpp::task_delegate<void()>, rpp::delegate<void()>>);
+        static_assert(std::is_same_v<rpp::duration_t<float>, rpp::fseconds_t>);
+
+        // a local pool keeps the probe off whatever parallelism another suite left on the global
+        rpp::thread_pool local { 2 };
+        AssertThat(local.max_parallelism(), 2);
+        AssertThat(local.active_tasks(), 0);
+
+        std::atomic_int counted { 0 };
+        rpp::parallel_for(0, 8, 1, [&](int start, int end) { counted += end - start; });
+        AssertThat(counted.load(), 8);
+
+        std::vector<int> items { 1, 2, 3 };
+        std::atomic_int summed { 0 };
+        rpp::parallel_foreach(items, [&](int item) { summed += item; });
+        AssertThat(summed.load(), 6);
+
+        rpp::pool_task_handle handle = rpp::parallel_task([&] { counted += 1; });
+        rpp::wait_result waited = handle.wait(rpp::seconds(1));
+        AssertThat(waited == rpp::wait_result::finished, true);
+        AssertThat(counted.load(), 9);
+
+        rpp::parallel_task_detached([&] { summed += 1; });
+        rpp::thread_pool& shared = rpp::thread_pool::global();
+        AssertThat(shared.wait_until_idle(rpp::seconds(1)) == rpp::wait_result::finished, true);
+        AssertThat(summed.load(), 7);
     }
 
 #if RPP_HAS_COROUTINES
