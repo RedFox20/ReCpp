@@ -1,9 +1,9 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 17. Forty-four modules exist: all of L0 to L8. Only `rpp.tests` re-exports another.
+Revision 18. Forty-four modules exist, all of L0 to L8, plus the umbrella `rpp`. The
+migration is complete. Only `rpp.tests` re-exports another module.
 
-This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the umbrella, which is all that remains.
+This document explains the pattern and records what real builds prove about it.
 
 ## Handover state
 
@@ -25,9 +25,15 @@ gate, #65 changeset 6.
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
 6 landed. The generator drives all forty-four modules. 4 is done through the generator
-`--check`. 5 has L0 to L8 finished. Section 11 lists what 7 owes.
+`--check`. 5 is finished: L0 to L8 and the umbrella. Section 11 lists what 7 owes.
 
-**Next:** changeset 5, the umbrella. Section 9 has the layers.
+**Next:** nothing in this plan. Section 11 holds the open follow-ups.
+
+**Measured: grouping the small modules would save nothing.** The 88 module translation
+units of a cold gcc-14 build cost 121 s, and the 14 cheapest cost 0.7 s of that, which is
+0.6%. Fifty units over one second each carry 88%, and each one is slow because its header
+is large. Merging those parses the same declarations and widens every rebuild, so the 1:1
+mapping of D2 stands. The umbrella itself costs about 50 ms.
 
 **A module re-exports nothing, and two headers ship with a workaround.** The generator
 carries `NO_EXPORT` with three entries and `RE_EXPORT` with one, and `BUGS.md` **B8** names
@@ -813,11 +819,13 @@ between layers.
 | L6 | **binary_serializer** ✓, **thread_pool** ✓ | 2 |
 | L7 | **event_loop** ✓, **future** ✓ | 2 |
 | L8 | **coroutines** ✓ | 1 |
-| top | umbrella `rpp` | 1 |
+| top | umbrella **rpp** ✓ | 1 |
 
-Every L8 module ships. `BUILD_WITH_MODULES` builds all forty-four.
+Every module ships. `BUILD_WITH_MODULES` builds all forty-four plus the umbrella.
 
-44 modules and one umbrella. L0 to L8 exist, so only the umbrella remains. Excluded: `config.h`
+44 modules and one umbrella, all of them built. `gen_module_exports.py --all --check` compares
+the umbrella list against the modules on disk, so a new module which nobody adds to
+`rpp.cppm` fails the gate. Excluded: `config.h`
 and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because it is
 Android glue. `tests.h` is in, and it is the one header whose macros split into
 `tests.macros.h`.

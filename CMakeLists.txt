@@ -400,6 +400,8 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-event_loop.cppm
         # L8
         src/rpp/rpp-coroutines.cppm
+        # the umbrella, which imports every module above
+        src/rpp/rpp.cppm
     )
 
     # Add module interface to the library target

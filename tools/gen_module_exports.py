@@ -281,6 +281,24 @@ def rewrite(header: str, check: bool) -> str:
     return ''
 
 
+UMBRELLA = 'rpp.cppm'
+
+
+def umbrella_drift() -> list:
+    """Every module the umbrella misses, and every name it imports which no module owns.
+
+    The umbrella list is hand written, so a new module reaches no `import rpp;` consumer
+    until someone adds a line. This compares it against the modules on disk.
+    """
+    path = os.path.join(rd.SRC, UMBRELLA)
+    if not os.path.exists(path):
+        return [f'{UMBRELLA}: missing, so `import rpp;` names nothing']
+    listed = set(re.findall(r'^export import\s+([\w.]+)\s*;', _read(UMBRELLA), re.M))
+    owned = {module_name(h) for h in with_modules()}
+    return ([f'{UMBRELLA}: does not export import {m}' for m in sorted(owned - listed)] +
+            [f'{UMBRELLA}: exports {m}, which no header owns' for m in sorted(listed - owned)])
+
+
 def name_collisions() -> list:
     """Every rpp header whose module name would repeat a macro, so `STEMS` must rename it.
 
@@ -425,7 +443,7 @@ def main() -> int:
     try:
         targets = with_modules() if a.all else [a.header]
         bad = [f for f in (rewrite(h, a.check) for h in targets) if f]
-        if a.all: bad += name_collisions()
+        if a.all: bad += name_collisions() + umbrella_drift()
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1

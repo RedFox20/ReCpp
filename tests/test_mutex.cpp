@@ -17,6 +17,26 @@ TestImpl(test_mutex)
         auto& get_ref() { return value; }
     };
 
+    // RPP_SYNC_T was a C++17 bridge and downstream code still writes it, so it stays defined
+    template<RPP_SYNC_T T> struct legacy_sync_user { T* instance; };
+
+    TestCase(syncable_type_answers_for_a_complete_type)
+    {
+        // the concept is public API, so a consumer can ask it about its own type
+        static_assert(rpp::SyncableType<SimpleValue>);
+        static_assert(rpp::SyncableType<rpp::synchronized<std::string>>);
+        static_assert(!rpp::SyncableType<int>);
+
+        // CRTP names the base while the derived type is incomplete, so neither template
+        // carries the constraint. This pins that both still accept a syncable type.
+        legacy_sync_user<SimpleValue> legacy {};
+        AssertThat(legacy.instance == nullptr, true);
+
+        SimpleValue value;
+        auto guard = value.guard();
+        AssertThat(guard.owns_lock(), true);
+    }
+
     TestCase(sync_guard_can_lock_simple_value)
     {
         SimpleValue simple;

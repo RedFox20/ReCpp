@@ -248,16 +248,19 @@ namespace rpp
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
 
+    /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
     template<typename T>
     concept SyncableType = requires(T t) {
         { t.get_mutex() };
         { t.get_ref() };
     };
-    // Doesn't work for some reason :shrug:
-    // #define RPP_SYNC_T SyncableType
+
+    /// @deprecated A C++17 bridge which now expands to `class`. Write `class` in new code.
     #define RPP_SYNC_T class
 
-    template<RPP_SYNC_T SyncType>
+    // SyncableType cannot constrain this: synchronizable names synchronize_guard<SyncType>
+    // in a member alias while CRTP still leaves SyncType incomplete
+    template<class SyncType>
     class synchronize_guard
     {
     public:
@@ -372,7 +375,9 @@ namespace rpp
      * };
      * @endcode
      */
-    template<RPP_SYNC_T SyncType>
+    // unconstrained for the same reason as synchronize_guard: CRTP names this base while
+    // SyncType is still incomplete
+    template<class SyncType>
     class synchronizable
     {
     public:

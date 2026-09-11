@@ -128,6 +128,20 @@ header leaks whatever its includes pull in, and a module hands over only what th
 importer asked for. `rpp.tests` is the one exception, and it re-exports
 `rpp.strview` for the `TestImpl` constructor.
 
+### The umbrella module
+
+`import rpp;` reaches every module at once, which suits a file that would otherwise name
+a dozen. It costs about 50 ms to build and it imports the test framework too.
+
+```cpp
+#include <rpp/tests.macros.h>   // macros never cross a module
+import rpp;                     // rpp::strview, rpp::cfuture, rpp::socket, ...
+```
+
+Name the modules you use when you want the narrower dependency. A file that imports
+`rpp.strview` alone rebuilds when `strview.h` changes, and a file that imports `rpp`
+rebuilds when any of the 44 headers changes.
+
 ### Macros need a header
 
 A C++20 module cannot export a macro. Where the macro surface is worth splitting, the
@@ -1815,7 +1829,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L406) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L411) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -1824,7 +1838,8 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`spin_lock(Mutex m)`](src/rpp/mutex.h#L196) | Spin-lock with fallback to blocking lock |
 | [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L232) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L127) | Indicates platform provides native critical_section mutex |
-| [`RPP_SYNC_T`](src/rpp/mutex.h#L258) | Template constraint placeholder for SyncableType concept |
+| [`RPP_SYNC_T`](src/rpp/mutex.h#L259) | Deprecated C++17 bridge which expands to `class`, kept so existing code compiles |
+| [`SyncableType`](src/rpp/mutex.h#L253) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 ### Example: Basic Mutex and Spin Lock
 
