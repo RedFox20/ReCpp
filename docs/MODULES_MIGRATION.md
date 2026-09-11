@@ -73,7 +73,7 @@ configuration became an unguarded export. Each rule carries a selftest.
 | Rule | Reaches | Mechanism |
 |---|---|---|
 | a macro a define can toggle | `RPP_ENABLE_UNICODE`, `!RPP_BARE_METAL` | parse each configuration, union the names, guard the difference |
-| a macro no define reaches | `RPP_HAS_COROUTINES` | read the `#if` span the header brackets, and match a declaration by line |
+| a macro no define reaches | none today, `RPP_HAS_COROUTINES` until it went | read the `#if` span the header brackets, and match a declaration by line |
 | an inline namespace | `rpp::literals`, `rpp::duration_literals` | read the `inline` keyword from the header |
 
 The second rule matches by declaration location, not by name text. A text search also
@@ -531,7 +531,6 @@ Cross-referencing every `#define` against README gives:
 | `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
 | `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
 | `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |
-| `future_types.h` | 2 | `RPP_CORO_STD`, `RPP_HAS_COROUTINES` |
 | `mutex.h` | 2 | `RPP_HAS_CRITICAL_SECTION_MUTEX`, `RPP_SYNC_T` |
 | `close_sync.h`, `minmax.h`, `scope_guard.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `scope_guard` |
 
@@ -610,9 +609,9 @@ import rpp.tests;               // rpp::test and the rest of the framework
 ```
 
 `tests.macros.h` declares nothing, and it includes five headers. `RPP_SOURCE_LOC_CURRENT`
-and `RPP_HAS_COROUTINES` are macros, so no import can carry them, and `source_loc.h` and
-`future_types.h` bring them. `<memory>`, `<typeinfo>` and `<exception>` carry the three
-std names the macros expand to. Every other name comes from `import rpp.tests`, and macro
+is a macro, so no import can carry it, and `source_loc.h` brings it. `future_types.h`
+brings `rpp::coro_handle`, which `TestCaseCoro` expands to. `<memory>`, `<typeinfo>` and
+`<exception>` carry the three std names the macros expand to. Every other name comes from `import rpp.tests`, and macro
 expansion happens later, at the use site.
 
 `tests/module_consumer/tests_module_only.cpp` writes a suite from that pair alone, with no

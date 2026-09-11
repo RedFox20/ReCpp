@@ -13,7 +13,6 @@ using namespace rpp;
 // The leaves here use loop.run_async(), which hops to a pool worker and posts the resume back to
 // the loop, so a task chain over those leaves stays on the loop thread end-to-end.
 
-#if RPP_HAS_COROUTINES
 
 // the loop outlives every coroutine below, so a reference parameter cannot dangle
 // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines,cppcoreguidelines-avoid-reference-coroutine-parameters)
@@ -81,13 +80,11 @@ namespace
         co_return 7;
     }
 } // namespace
-#endif
 
 TestImpl(test_task)
 {
     TestInit(test_task) {}
 
-#if RPP_HAS_COROUTINES
 
     std::unique_ptr<rpp::event_loop> loop;
     const uint64 main_tid = rpp::get_thread_id();
@@ -281,5 +278,4 @@ TestImpl(test_task)
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines,cppcoreguidelines-avoid-reference-coroutine-parameters)
 
-#endif // RPP_HAS_COROUTINES
 };

@@ -11,7 +11,6 @@
 #include "future_types.h" // rpp::IsFunctionNotReturningFuture
 #include "thread_pool.h" // rpp::parallel_task_detached
 
-#if RPP_HAS_COROUTINES
 
 namespace rpp
 {
@@ -57,7 +56,7 @@ namespace rpp
             // Use detached task: storing the pool_task_handle into a member is a race,
             // because cont.resume() may destroy the coroutine frame (and `this`)
             // before the handle assignment completes on the calling thread.
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable
+            rpp::parallel_task_detached([this, cont]()
             {
                 try { result = std::move(action()); }
                 catch (...) { ex = std::current_exception(); }
@@ -96,7 +95,7 @@ namespace rpp
             // Use detached task: storing the pool_task_handle into a member is a race,
             // because cont.resume() may destroy the coroutine frame (and `this`)
             // before the handle assignment completes on the calling thread.
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable {
+            rpp::parallel_task_detached([this, cont]() {
                 try { action(); }
                 catch (...) { ex = std::current_exception(); }
                 // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
@@ -132,7 +131,7 @@ namespace rpp
             // Use detached task: storing the pool_task_handle into a member is a race,
             // because cont.resume() may destroy the coroutine frame (and `this`)
             // before the handle assignment completes on the calling thread.
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable
+            rpp::parallel_task_detached([this, cont]()
             {
                 try {
                     f = action(); // get the future from the lambda
@@ -175,7 +174,7 @@ namespace rpp
             // Use detached task: storing the pool_task_handle into a member is a race,
             // because cont.resume() may destroy the coroutine frame (and `this`)
             // before the handle assignment completes on the calling thread.
-            rpp::parallel_task_detached([this, cont]() /*clang-12 compat*/mutable
+            rpp::parallel_task_detached([this, cont]()
             {
                 try { f.wait(); /* wait for the nested coroutine to finish (can throw) */ }
                 catch (...) { ex = std::current_exception(); }
@@ -205,7 +204,7 @@ namespace rpp
         }
         void await_suspend(rpp::coro_handle<> cont) const
         {
-            rpp::parallel_task_detached([cont,end=end]() /*clang-12 compat*/mutable
+            rpp::parallel_task_detached([cont,end=end]()
             {
                 rpp::sleep_until(end);
                 // resume execution while still inside the background thread
@@ -319,4 +318,3 @@ namespace rpp
         }
     }
 } // namespace rpp
-#endif // Coroutines support for C++20

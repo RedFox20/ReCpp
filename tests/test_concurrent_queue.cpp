@@ -789,7 +789,6 @@ TestImpl(test_concurrent_queue)
         print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
     }
 
-#if RPP_HAS_COROUTINES
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
     // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
     // resume on a background thread, which conflicts with the default test
@@ -906,5 +905,4 @@ TestImpl(test_concurrent_queue)
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-#endif // RPP_HAS_COROUTINES
 };

@@ -9,9 +9,7 @@ export module rpp.event_loop;
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
 export namespace rpp {
-#if RPP_HAS_COROUTINES
     using rpp::event_task;
     using rpp::event_loop;
-#endif
 }
 // GENERATED EXPORTS END

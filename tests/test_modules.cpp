@@ -586,7 +586,6 @@ TestImpl(test_modules)
         rpp::run_tasks(no_items, &module_launch);
     }
 
-#if RPP_HAS_COROUTINES
     // an eager task runs to completion at construction, so this needs no event loop
     static rpp::task<int> module_task() { co_return 99; }
 
@@ -639,7 +638,6 @@ TestImpl(test_modules)
         static_assert(sizeof(rpp::functor_awaiter_fut<rpp::cfuture<int>>) > 0, "the module must export functor_awaiter_fut");
         static_assert(sizeof(rpp::std_future_awaiter<int>) > 0, "the module must export std_future_awaiter");
     }
-#endif
 };
 
 #endif // RPP_BUILD_WITH_MODULES

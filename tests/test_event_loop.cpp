@@ -27,7 +27,6 @@ TestImpl(test_event_loop)
         rpp::thread_pool::global().clear_idle_tasks();
     }
 
-#if RPP_HAS_COROUTINES
 
     rpp::AtomicTimeSource clock;
     // a loop can hold a raw pointer to this pool, so the pool must outlive the loop
@@ -1359,5 +1358,4 @@ TestImpl(test_event_loop)
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
-#endif // RPP_HAS_COROUTINES
 };

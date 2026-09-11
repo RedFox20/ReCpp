@@ -364,7 +364,6 @@ TestImpl(test_semaphore)
         }
     }
 
-#if RPP_HAS_COROUTINES
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
     // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
     // resume on a background thread, which conflicts with the default test
@@ -415,5 +414,4 @@ TestImpl(test_semaphore)
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-#endif // RPP_HAS_COROUTINES
 };

@@ -9,17 +9,13 @@ export module rpp.coroutines;
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
 export namespace rpp {
-#if RPP_HAS_COROUTINES
     using rpp::functor_awaiter;
     using rpp::functor_awaiter_fut;
     using rpp::std_future_awaiter;
     using rpp::time_awaiter;
-#endif
 }
 
 export namespace rpp::inline coro_operators {
-#if RPP_HAS_COROUTINES
     using rpp::coro_operators::operator co_await;
-#endif
 }
 // GENERATED EXPORTS END

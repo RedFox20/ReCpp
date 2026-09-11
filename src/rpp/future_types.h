@@ -5,35 +5,8 @@
  */
 #include "config.h"
 #include <future>
-
-#if RPP_HAS_CXX20 && defined(__has_include) // Coroutines support for C++20
-    #if __has_include(<coroutine>)
-        #include <coroutine>
-        #define RPP_HAS_COROUTINES 1
-        #define RPP_CORO_STD std
-    #elif __has_include(<experimental/coroutine>) // backwards compatibility for clang-14 and older
-        #include <experimental/coroutine>
-        #define RPP_HAS_COROUTINES 1
-        #ifdef _VSTD_EXPERIMENTAL
-            #define RPP_CORO_STD _VSTD_EXPERIMENTAL
-        #else
-            #define RPP_CORO_STD std::experimental
-        #endif
-        // Clang 14 warns about std::experimental coroutines being removed in LLVM 15,
-        // suppress globally since it triggers at every co_await/co_return usage site
-        #if defined(__clang__) && defined(__has_warning)
-            #if __has_warning("-Wdeprecated-experimental-coroutine")
-                #pragma clang diagnostic ignored "-Wdeprecated-experimental-coroutine"
-            #endif
-        #endif
-    #else
-        #define RPP_HAS_COROUTINES 0
-        #define RPP_CORO_STD
-    #endif
-#else // no coroutine support for C++17 and below
-    #define RPP_HAS_COROUTINES 0
-    #define RPP_CORO_STD
-#endif
+// C++20 makes <coroutine> mandatory, freestanding included, and config.h asserts C++20
+#include <coroutine>
 
 namespace rpp
 {
@@ -41,12 +14,10 @@ namespace rpp
     class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture;
 
 
-#if RPP_HAS_COROUTINES
     template<typename T = void>
-    using coro_handle = RPP_CORO_STD::coroutine_handle<T>;
-    using suspend_never = RPP_CORO_STD::suspend_never;
-    using suspend_always = RPP_CORO_STD::suspend_always;
-#endif // RPP_HAS_COROUTINES
+    using coro_handle = std::coroutine_handle<T>;
+    using suspend_never = std::suspend_never;
+    using suspend_always = std::suspend_always;
 
 
 #if RPP_HAS_CXX20

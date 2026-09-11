@@ -10,15 +10,13 @@ export module rpp.future_types;
 
 export namespace rpp {
     using rpp::cfuture;
+    using rpp::coro_handle;
+    using rpp::suspend_never;
+    using rpp::suspend_always;
     using rpp::IsFuture;
     using rpp::NotFuture;
     using rpp::IsFunction;
     using rpp::IsFunctionReturningFuture;
     using rpp::IsFunctionNotReturningFuture;
-#if RPP_HAS_COROUTINES
-    using rpp::coro_handle;
-    using rpp::suspend_never;
-    using rpp::suspend_always;
-#endif
 }
 // GENERATED EXPORTS END

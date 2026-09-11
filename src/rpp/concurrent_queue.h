@@ -19,18 +19,14 @@
 #include <malloc.h> // malloc, free
 
 #if RPP_HAS_CXX20
-#  include "future_types.h" // RPP_HAS_COROUTINES, rpp::coro_handle
-#  if RPP_HAS_COROUTINES
+#  include "future_types.h" // rpp::coro_handle
 #    include "delegate.h" // rpp::delegate (for coroutine awaiter)
-#  endif
 #endif
 
 namespace rpp
 {
-    #if RPP_HAS_COROUTINES
         // forward declaration: avoids circular include with thread_pool.h
         void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
-    #endif
 
     /**
      * Provides a simple thread-safe queue with several synchronization helpers
@@ -972,7 +968,6 @@ namespace rpp
         }
 
     public:
-#if RPP_HAS_COROUTINES
         /**
          * @brief Awaitable handle for co_await on queue availability.
          * Dispatches a blocking wait to a background thread and resumes the coroutine.
@@ -1066,6 +1061,5 @@ namespace rpp
             std::optional<T> await_resume() noexcept { return std::move(result); }
         };
         RPP_CORO_WRAPPER co_pop_optional_handle await_pop(rpp::Duration timeout) noexcept { return { *this, timeout, std::nullopt }; }
-#endif
     };
 }
