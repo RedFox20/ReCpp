@@ -159,6 +159,27 @@ The nine umbrellas cost about 245 ms to build together. Name the modules you use
 want the narrowest dependency: a file that imports `rpp.strview` rebuilds when `strview.h`
 changes, and a file that imports `rpp` rebuilds when any of the 44 headers changes.
 
+### What an import saves
+
+Measured per translation unit on gcc-14, with the module interfaces already built:
+
+| Facility | Header | Import | Speedup |
+|---|---|---|---|
+| `rpp.future` | 976 ms | 573 ms | 1.70x |
+| `rpp.thread_pool` | 903 ms | 561 ms | 1.61x |
+| `rpp.file_io` | 688 ms | 496 ms | 1.39x |
+| `rpp.sprint` | 613 ms | 471 ms | 1.30x |
+| `rpp.strview` | 424 ms | 440 ms | 0.96x |
+
+An import costs about the same whatever it carries, near 430 ms here, while a header costs
+what its preprocessed size says. So a heavy header gains most, a light one gains nothing, and
+break-even sits near 40,000 preprocessed lines. A file which takes many facilities can lose,
+because `#pragma once` lets headers share what each import loads again: ten headers beat ten
+imports 1083 ms to 1438 ms.
+
+Take the narrowest module which covers the file. `import rpp;` costs 7.4x `import rpp.sprint;`
+for the same one-line body. `docs/MODULES_MIGRATION.md` section 2.2 has the full tables.
+
 ### Macros need a header
 
 A C++20 module cannot export a macro. Where the macro surface is worth splitting, the

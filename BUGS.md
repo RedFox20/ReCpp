@@ -8,6 +8,26 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B18. gcc-14 crashes on an importer of `rpp.concurrent_queue` at `-O1` and above
+A translation unit which imports the module and never includes the header crashes with
+`internal compiler error: in nonnull_arg_p, at tree.cc:14572`. The crash names
+`memmove@rpp.concurrent_queue`, so the module copy of `memmove` loses the nonnull attribute
+the optimizer expects.
+
+```cpp
+#include <atomic>
+import rpp.concurrent_queue;
+int main() { rpp::concurrent_queue<int> q; q.push(1); return int(q.size()) - 1; }
+```
+
+Three things change the answer. `-O0` compiles. `-O1` and `-O2` both crash. Adding
+`#include <rpp/concurrent_queue.h>` before the import compiles at every level.
+
+No ReCpp test hits it, because every one includes `<rpp/tests.h>`, which brings the header.
+A module-only consumer at `-O1` or higher is the exposed shape, and
+`tests/module_consumer/` has no concurrent_queue target yet. Add one when a newer gcc fixes
+this, so the gap cannot reopen unnoticed.
+
 ### B17. A pool worker frees the generic task a test still reads (C18 recurred)
 `ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
 A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main

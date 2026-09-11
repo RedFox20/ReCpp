@@ -217,6 +217,75 @@ compiler.
 | 16 | **A `cfuture` passed through `std::future` is not portable, and this branch fixes it.** | `start_coro_on_background_thread` returned a `cfuture<void>` out of `rpp::async_task`. That instantiates `std::future<cfuture<void>>::get()`, which returns a `[[clang::coro_return_type]]` without being a coroutine, so clang-21 rejected it. A raw `std::thread` plus `join()` replaces it, matching the pattern the same file already uses at line 1079. clang-21 now passes 498/498 in both modes. |
 | 17 | **A pre-existing race lives in `test_coroutines.cpp:135`, not in the module work.** | `AssertThat(e.what(), "aargh!"s)` reads the message of a `std::runtime_error` while another thread frees the future shared state that owns it. Under 6 parallel TSAN runs it fires 2 of 6 times, on the code before this branch and after it alike. Idle, both report 0 of 6. Track it apart from the migration. |
 
+### 2.2 What an import costs a consumer, measured
+
+Finding 10 said the module build costs and gains nothing. That measured the whole build.
+This measures one translation unit, which is what a consumer feels. Every number is the
+median of 7 alternating runs of `g++ -O2 -fsyntax-only` on gcc-14.2, with the binary module
+interfaces already built, so it isolates the consumer side.
+
+One facility per translation unit, the header against its module:
+
+| Facility | Preprocessed header lines | Header | Import | Speedup |
+|---|---|---|---|---|
+| `timepoint` | 32,316 | 391 ms | 430 ms | 0.91x |
+| `strview` | 33,902 | 424 ms | 440 ms | 0.96x |
+| `delegate` | 34,226 | 406 ms | 431 ms | 0.94x |
+| `sockets` | 50,471 | 613 ms | 490 ms | 1.25x |
+| `sprint` | 60,853 | 613 ms | 471 ms | 1.30x |
+| `paths` | 65,350 | 669 ms | 486 ms | 1.38x |
+| `file_io` | 65,743 | 688 ms | 496 ms | 1.39x |
+| `concurrent_queue` | 73,093 | 854 ms | 541 ms | 1.58x |
+| `thread_pool` | 73,983 | 903 ms | 561 ms | 1.61x |
+| `future` | 76,380 | 976 ms | 573 ms | 1.70x |
+| **median** | | | | **1.34x** |
+
+**An import costs about the same whatever it carries.** Over a 2.4x range of header size the
+import moves from 430 ms to 573 ms, a factor of 1.33, while the header moves from 391 ms to
+976 ms, a factor of 2.5. So the import has a floor near 430 ms and almost no slope. Break-even
+sits near 40,000 preprocessed lines: below it the header wins, above it the import wins, and
+the heaviest header in the library wins by 1.70x.
+
+**Headers share better than modules when one file uses many.** `#pragma once` parses a shared
+header once however many headers pull it, and each import pays its own load:
+
+| Facilities in one TU | Headers | Imports | Ratio |
+|---|---|---|---|
+| 1 | 435 ms | 448 ms | 0.97x |
+| 2 | 601 ms | 521 ms | 1.15x |
+| 4 | 622 ms | 627 ms | 0.99x |
+| 6 | 712 ms | 858 ms | 0.83x |
+| 8 | 999 ms | 1120 ms | 0.89x |
+| 10 | 1083 ms | 1438 ms | 0.75x |
+
+The marginal cost of one more facility is about 72 ms as a header and about 110 ms as an
+import. So the import advantage is real for a file which takes one or two heavy facilities,
+and it inverts for a file which takes many.
+
+**Size of the imported module decides the cost.** The same one-line body which calls
+`rpp::to_string`:
+
+| How rpp arrives | Time | Against the header |
+|---|---|---|
+| `#include <rpp/sprint.h>` | 611 ms | 1.00x |
+| `import rpp.sprint;` | 398 ms | 1.53x |
+| `import rpp.text;` | 489 ms | 1.25x |
+| `import rpp;` | 2949 ms | 0.21x |
+
+`rpp.text` adds `rpp.strview` and `rpp.obfuscated_string` to the same work and costs 23% more
+than `rpp.sprint`. `import rpp;` costs 7.4x `rpp.sprint`. What counts is the transitive
+closure, not the module file: a group umbrella interface is 1 to 3 KiB, because it holds only
+`export import` lines, while `rpp.sprint` is 4.9 MiB.
+
+**So name the narrowest module which covers the file.** A group umbrella buys organization,
+and it costs whatever its members cost.
+
+**`import std;` is not available here.** gcc-14 ships no libstdc++ std module, so the
+`std` half of every translation unit above is still a header parse in both columns.
+clang-18 ships a libc++ `std.cppm`, which this configuration cannot use: ReCpp builds against
+libstdc++, and `BUILD_WITH_MODULES` needs clang 21. Whenever the toolchain gains one, rerun
+this table, because the std parse is the floor both columns pay.
+
 ### 2.1 The gcc-14 ordering rule, characterized
 
 The question this answers: does the failure show up as a build error, a link
