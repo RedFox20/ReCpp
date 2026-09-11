@@ -527,7 +527,7 @@ Cross-referencing every `#define` against README gives:
 
 | Header | Public macros | What they are |
 |---|---|---|
-| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX20`, and the platform probes |
+| `config.h` | **51** | `RPPAPI`, `FINLINE`, `NOINLINE`, `NODISCARD`, `RPP_ENABLE_UNICODE`, `RPP_HAS_CXX23`, and the platform probes |
 | `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
 | `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
 | `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |

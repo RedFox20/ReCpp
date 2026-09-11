@@ -6,7 +6,7 @@
  */
 #include "config.h"
 
-#if RPP_HAS_CXX20 && __has_include(<source_location>)
+#if __has_include(<source_location>)
 #include <source_location> // std::source_location for better assert messages
 #  define RPP_HAS_SOURCE_LOCATION 1
 #  define RPP_SOURCE_LOC rpp::source_loc loc = { std::source_location::current() }

@@ -186,16 +186,8 @@ namespace rpp
         ScopedPerfTimer(const char* prefix, const char* location, const char* detail, unsigned long threshold_us = 0) noexcept;
         ScopedPerfTimer(const char* prefix, const char* location, unsigned long threshold_us = 0) noexcept
             : ScopedPerfTimer{prefix, location, nullptr, threshold_us} {}
-    #if RPP_HAS_CXX20 || _MSC_VER >= 1926 || defined(__GNUC__)
         explicit ScopedPerfTimer(const char* location = __builtin_FUNCTION()) noexcept
             : ScopedPerfTimer{"[perf]", location, nullptr, 0} {}
-    #else
-        ScopedPerfTimer() noexcept
-            : ScopedPerfTimer{"[perf]", "unknown location", nullptr, 0} {}
-        /** @brief For backwards compatibility */
-        explicit ScopedPerfTimer(const char* location) noexcept
-            : ScopedPerfTimer{"[perf]", location, nullptr, 0} {}
-    #endif
         ~ScopedPerfTimer() noexcept;
     };
 

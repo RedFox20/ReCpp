@@ -20,8 +20,6 @@ namespace rpp
     using suspend_always = std::suspend_always;
 
 
-#if RPP_HAS_CXX20
-
     template<typename F>
     concept IsFuture = requires(F f) {
         requires std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
@@ -45,6 +43,4 @@ namespace rpp
     {
         requires IsFunction<F> && NotFuture<decltype(f())>;
     };
-
-#endif // RPP_HAS_CXX20
 }

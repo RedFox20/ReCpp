@@ -1819,13 +1819,8 @@ namespace rpp
     }
 
 
-#if RPP_HAS_CXX20
     int socket::poll(std::span<socket* const> in, std::vector<int>& ready,
                      int timeoutMillis, PollFlag pollFlags) noexcept
-#else
-    int socket::poll(const std::vector<socket*>& in, std::vector<int>& ready,
-                     int timeoutMillis, PollFlag pollFlags) noexcept
-#endif
     {
         ready.resize(in.size());
 

@@ -83,7 +83,7 @@ clang++ 18 to 21, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 
 - A platform API needs a guard from `config.h`: `_MSC_VER`, `RPP_MSVC_WIN`,
   `RPP_ANDROID`, `__APPLE__`, `YOCTO_LINUX`, `MIPS`, `RASPI`, `RPP_ENABLE_UNICODE`,
-  `RPP_HAS_CXX20`. Do not invent a new macro name.
+  `RPP_BARE_METAL`. Do not invent a new macro name.
 - Prefer the ReCpp abstraction over the platform call: `rpp::TimePoint`,
   `rpp::Duration`, `rpp::mutex`, `rpp::semaphore`, `rpp::file_io`, `rpp::paths`,
   `rpp::threads`.

@@ -7,10 +7,8 @@
 #include "predicates.h" // rpp::IsCallable
 #include <atomic>
 
-#if RPP_HAS_CXX20
-#  include "future_types.h" // rpp::coro_handle
-#    include "delegate.h" // rpp::delegate (for coroutine awaiter)
-#endif
+#include "future_types.h" // rpp::coro_handle
+#include "delegate.h" // rpp::delegate (for coroutine awaiter)
 
 namespace rpp
 {

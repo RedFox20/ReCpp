@@ -12,9 +12,7 @@
 #include <vector>   // std::vector
 #include <optional> // std::optional
 #include "mutex.h"
-#if RPP_HAS_CXX20
-#  include <span>
-#endif
+#include <span>   // std::span
 
 namespace rpp
 {
@@ -674,12 +672,10 @@ namespace rpp
         int send(const std::vector<uint8_t>& bytes) noexcept {
             return send(bytes.data(), static_cast<int>(bytes.size()));
         }
-    #if RPP_HAS_CXX20
         // Send a span of bytes
         int send(std::span<const uint8_t> bytes) noexcept {
             return send(bytes.data(), static_cast<int>(bytes.size()));
         }
-    #endif
         // Send a C++ string
         template<class T> int send(const std::basic_string<T>& str) noexcept { 
             return this->send(str.data(), static_cast<int>(sizeof(T) * str.size())); 
@@ -714,12 +710,10 @@ namespace rpp
         int sendto(const ipaddress& to, const std::vector<char>& bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
-    #if RPP_HAS_CXX20
         // Send a span of bytes
         int sendto(const ipaddress& to, std::span<const uint8_t> bytes) noexcept {
             return sendto(to, bytes.data(), static_cast<int>(bytes.size()));
         }
-    #endif
         /** Send a C++ string */
         template<class T> int sendto(const ipaddress& to, const std::basic_string<T>& str) noexcept {
             return this->sendto(to, str.data(), static_cast<int>(sizeof(T) * str.size()));
@@ -1201,14 +1195,9 @@ namespace rpp
          *          Ready vector is cleared before use and reserved to fit in.size() indexes.
          *          To handle errors, you must check each socket last_err() individually
          */
-    #if RPP_HAS_CXX20
         static int poll(std::span<socket* const> in, std::vector<int>& ready,
                         int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
-    #else
-        static int poll(const std::vector<socket*>& in, std::vector<int>& ready,
-                        int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
-    #endif
-        
+
         /** 
          * @brief Enables polling multiple sockets for READ/WRITE readiness
          * @param in Array of socket pointers to poll
@@ -1225,7 +1214,6 @@ namespace rpp
         static int poll(socket* const* in, int inCount, int* outReadyIndexes, int outMaxCount,
                         int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
-    #if RPP_HAS_CXX20
         /**
          * @brief Enables polling multiple sockets for READ/WRITE readiness
          * @param in Span of socket pointers to poll
@@ -1244,7 +1232,6 @@ namespace rpp
                         outReadyIndexes.data(), static_cast<int>(outReadyIndexes.size()),
                         timeoutMillis, pollFlags);
         }
-    #endif
 
     private:
         bool on_poll_result(int revents, PollFlag pollFlags) noexcept;
