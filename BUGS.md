@@ -48,7 +48,7 @@ Ten headers reach `<future>`, and `future_types.h` is the only direct includer:
 `concurrent_queue.h`, `coroutines.h`, `event_loop.h`, `future.h`, `future_types.h`,
 `semaphore.h`, `task.h`, `tests.h`, `tests.macros.h` and `thread_pool.h`. Nine of them
 ship as a module, six before L7, so this predates the layer which found it. `rpp.task`
-alone reproduces it, and only `tests.macros.h` never becomes a module.
+alone reproduces it.
 
 No export list removes the crash, so `test_modules.cpp` names the `future.h` factories in
 an unevaluated context. Delete that workaround when a newer gcc compiles the reproducer.

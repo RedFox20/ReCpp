@@ -620,7 +620,7 @@ TestImpl(test_modules)
 
     TestCase(coroutines_module_carries_the_whole_surface)
     {
-        // every awaiter suspends onto the pool, so the probe drives await_ready() on its own
+        // a cfuture coroutine instantiates std::promise, so the probe drives await_ready() directly, see BUGS.md B16
         rpp::time_awaiter elapsed { rpp::TimePoint::monotonic_now() };
         AssertThat(elapsed.await_ready(), true);
 
@@ -631,8 +631,13 @@ TestImpl(test_modules)
         rpp::functor_awaiter<int> functor { rpp::delegate<int()>{ +[] { return 7; } } };
         AssertThat(functor.await_ready(), false);
 
-        static_assert(sizeof(rpp::functor_awaiter_fut<rpp::cfuture<int>>) > 0);
-        static_assert(sizeof(rpp::std_future_awaiter<int>) > 0);
+        // the constrained overloads pick a different awaiter, so each one needs its own probe
+        static_assert(std::is_same_v<decltype(operator co_await(rpp::delegate<int()>{})), rpp::functor_awaiter<int>>);
+        static_assert(std::is_same_v<decltype(operator co_await(std::future<int>{})), rpp::std_future_awaiter<int>>);
+
+        static_assert(sizeof(rpp::functor_awaiter<void>) > 0, "the module must export functor_awaiter<void>");
+        static_assert(sizeof(rpp::functor_awaiter_fut<rpp::cfuture<int>>) > 0, "the module must export functor_awaiter_fut");
+        static_assert(sizeof(rpp::std_future_awaiter<int>) > 0, "the module must export std_future_awaiter");
     }
 #endif
 };

@@ -947,7 +947,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | 2 | add the rpp-header include check | 0.5 | changeset 3 | done |
 | 3 | generate the export lists | 1.5 | changeset 5 | done |
 | 4 | dual-mode test harness | 0.5 | changeset 5 | done, the generator --check is the gate |
-| 5 | 44 modules plus the umbrella | 2.5 | changeset 6 | 44 of 44 written |
+| 5 | 44 modules plus the umbrella | 2.5 | changeset 6 | 44 of 44 modules, umbrella remains |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 
