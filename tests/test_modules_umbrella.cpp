@@ -7,8 +7,8 @@
 #if RPP_BUILD_WITH_MODULES
 
 #include <rpp/tests.macros.h> // TestImpl, TestCase, AssertThat
-#include <string>
-#include <vector>
+#include <string>      // std::string, which rpp::to_string returns
+#include <atomic>      // std::atomic_int, which the parallel_for case counts with
 #include <type_traits> // std::is_same_v, which pins an exported signature
 
 import rpp; // includes come first, the import goes last

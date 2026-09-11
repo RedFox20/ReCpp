@@ -356,6 +356,21 @@ def selftest() -> list:
     if macro_collision('scopeguard'): bad.append('the renamed module still reports a macro')
     if macro_collision('strview'): bad.append('a module which repeats no macro reported one')
 
+    # the umbrella list is hand written, so pin that the gate reports a drop and an unknown name
+    if umbrella_drift(): bad.append('the umbrella gate reports drift on a correct list')
+    dropped = sorted(module_name(h) for h in with_modules())[0]
+    real_read = _read
+    try:
+        globals()['_read'] = lambda h: (real_read(h).replace(f'export import {dropped};\n', '')
+                                        + 'export import rpp.no_such_module;\n') if h == UMBRELLA else real_read(h)
+        drift = umbrella_drift()
+        if not any(f'does not export import {dropped}' in f for f in drift):
+            bad.append('a dropped export import passed the umbrella gate')
+        if not any('rpp.no_such_module' in f for f in drift):
+            bad.append('an unknown export import passed the umbrella gate')
+    finally:
+        globals()['_read'] = real_read
+
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, 'probe.h')
         open(path, 'w').write(_SELFTEST_HEADER)
