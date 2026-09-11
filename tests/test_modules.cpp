@@ -561,6 +561,9 @@ TestImpl(test_modules)
         AssertThat(summed.load(), 7);
     }
 
+    // clang rejects a plain function which returns a cfuture, so the launcher takes the wrapper
+    RPP_CORO_WRAPPER static rpp::cfuture<void> module_launch(int&) { return {}; }
+
     TestCase(future_module_carries_the_whole_surface)
     {
         // every factory here builds a std::promise, which gcc-14 cannot compile in an
@@ -575,7 +578,7 @@ TestImpl(test_modules)
         AssertThat(int(rpp::get_all(none).size()), 0);
 
         std::vector<int> no_items;
-        rpp::run_tasks(no_items, [](int&) { return rpp::cfuture<void>{}; });
+        rpp::run_tasks(no_items, &module_launch);
         AssertThat(int(no_items.size()), 0);
     }
 
