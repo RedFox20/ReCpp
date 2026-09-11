@@ -395,6 +395,9 @@ if(RPP_BUILD_MODULES)
         # L6
         src/rpp/rpp-binary_serializer.cppm
         src/rpp/rpp-thread_pool.cppm
+        # L7
+        src/rpp/rpp-future.cppm
+        src/rpp/rpp-event_loop.cppm
     )
 
     # Add module interface to the library target
