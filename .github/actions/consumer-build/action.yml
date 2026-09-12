@@ -87,5 +87,12 @@ runs:
         CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
             --compiler ${{ inputs.compiler }} --expect modules --compare-paths --jobs $JOBS $UNICODE_OFF
 
-    # A C++23 step belongs here and cannot pass yet. `CXX23=1` now reaches the targets, and
-    # the run then fails two ways, see BUGS.md B24 and B25. Add the step when gcc fixes them
+    # C++23 costs gcc-14 more module source locations than C++20, so a layout which reads
+    # back on one standard can fail on the other. Only this step covers that, see BUGS.md B24
+    - name: Import the exported modules as C++23 with ${{ inputs.cc_version }}
+      shell: bash
+      run: |
+        JOBS=$(nproc)
+        cd tests/module_consumer
+        CXX23=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
+            --compiler ${{ inputs.compiler }} --expect modules --jobs $JOBS

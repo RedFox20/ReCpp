@@ -50,14 +50,5 @@ TestImpl(test_modules_umbrella)
         rpp::parallel_for(0, 4, 0, [&](int start, int end) { ran += (end - start); });
         AssertThat(ran.load(), 4);
     }
-
-    TestCase(the_umbrella_reaches_the_test_framework_itself)
-    {
-        // rpp.tests is a module like any other, so `import rpp;` carries its declarations.
-        // The macros above still come from the header, because a macro never crosses a module.
-        AssertThat(rpp::Compare::eq(1, 1), true);
-        AssertThat(rpp::Compare::lt(1, 2), true);
-        static_assert(std::is_same_v<decltype(rpp::TestVerbosity::AllMessages), rpp::TestVerbosity>);
-    }
 };
 #endif

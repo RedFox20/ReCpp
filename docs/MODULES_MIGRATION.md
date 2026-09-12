@@ -1,7 +1,8 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 20. Ten module interface units exist: eight header groups, the `rpp.std` stand-in,
-and the top umbrella `rpp`. The migration is complete. No group re-exports another group.
+Revision 21. Fifteen module interface units exist: eight header groups, the five part
+`rpp.std` stand-in with its own umbrella, and the top umbrella `rpp`. The migration is
+complete. No group re-exports another group, and `rpp` leaves `rpp.testing` out.
 
 This document explains the pattern and records what real builds prove about it.
 
@@ -12,13 +13,13 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the ten modules | build and pass on gcc-14 at C++20 and C++23, and CI covers clang-21 and MSVC 14.52 |
+| the fifteen modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test, 41 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 9 module-only targets which `run_test.py` builds and runs |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 10 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 29 jobs on GitHub Actions, and CircleCI is gone |
 | test counts | 584/584 on the modules build, 539/539 on the header build |
@@ -345,19 +346,20 @@ C++23, `-j4`:
 
 | | Modules ON | Modules OFF | Delta |
 |---|---|---|---|
-| `libReCpp.a` | 18,082,102 B | 15,573,910 B | +16.1% |
-| `RppTests` | 47,143,640 B | 44,690,736 B | +5.5% |
-| Defined symbols in the archive | 1818 | 1808 | +10 |
-| `RppTests` relink, median of 3 | 0.85 s | 0.81 s | +5% |
-| Full build | 87.4 s | 69.7 s | +25% |
+| `libReCpp.a` | 18,195,410 B | 15,573,950 B | +16.8% |
+| `RppTests` | 47,179,760 B | 44,690,768 B | +5.6% |
+| Defined symbols in the archive | 1483 | 1468 | +15 |
+| `RppTests` relink, median of 3 | 0.85 s | 0.79 s | +8% |
+| Full build | 89.4 s | 69.7 s | +28% |
 
 **Each module interface unit emits exactly one strong symbol**, `T initializer for module
-rpp.X`. The 10 is the eight groups, `rpp.std` and the umbrella, so the symbol delta is
-entirely those initializers. Finding 7 recorded the symbol.
+rpp.X`. The 15 is the eight groups, the five `rpp.std` parts and the two umbrellas, so the
+symbol delta is entirely those initializers. A diff of the two symbol sets gives 15 names in
+the modules archive and none in the header archive. Finding 7 recorded the symbol.
 
 The archive grows more than the binary, because the linker drops the interface objects a
-program never reaches. The full build grows most, and section 2.2 says why: 20 module
-translation units, which is 10 modules compiled twice.
+program never reaches. The full build grows most, and section 2.2 says why: 30 module
+translation units, which is 15 modules compiled twice.
 
 The 44 per-header layout cost far more: +35.6% on the archive and +64% on the full build,
 against 88 module translation units. Grouping cut the archive cost to less than half of that.
@@ -995,7 +997,7 @@ between layers.
 carry those headers directly, see `BUGS.md` **C28**. The layer order still describes the
 include graph, so it still says which group may import which.
 
-`BUILD_WITH_MODULES` builds the eight groups, `rpp.std` and the umbrella. The groups
+`BUILD_WITH_MODULES` builds the eight groups, the five `rpp.std` parts and the two umbrellas. The groups
 partition every public header, and `rpp` imports the groups. So a new header reaches an
 `import rpp;` consumer only by joining one group in `GROUP_HEADERS`, and no header can sit in
 two. `gen_module_exports.py --all --check` reports each way to drift, and the selftest pins

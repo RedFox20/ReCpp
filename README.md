@@ -129,10 +129,11 @@ re-export makes gcc-14 write a module no `<string>`-first importer can read, see
 `BUGS.md` B8. An importer of `rpp.testing` names `rpp.text` too, because `TestImpl`
 expands to a constructor taking an `rpp::strview`.
 
-### The ten modules
+### The fifteen modules
 
-Ten module interface units ship: eight subject groups, the std stand-in, and the umbrella.
-A group carries its headers directly, so the group is the unit you import:
+Fifteen module interface units ship: eight subject groups, the five part std stand-in with
+its own umbrella, and the ReCpp umbrella. A group carries its headers directly, so the group
+is the unit you import:
 
 | Module | Carries |
 |---|---|
@@ -149,14 +150,30 @@ The groups partition every public header, so each header sits in exactly one gro
 `gen_module_exports.py --all --check` fails when that stops holding. `tools/gen_module_exports.py`
 owns all eight files, and `GROUP_HEADERS` in it is the list a new header joins.
 
-`import rpp;` reaches all eight at once, which suits a file that would otherwise name
-several. `rpp.std` sits outside the groups. No header backs it, so a file which wants the
-std names writes `import rpp.std;` beside the rest.
+`import rpp;` reaches seven of the eight at once, which suits a file that would otherwise
+name several. `rpp.testing` stays out of the umbrella, because it overflows the gcc-14
+source location budget through that unit on C++23, see `BUGS.md` B25. A test file names it.
+
+`rpp.std` sits outside the groups. No header backs it, and it carries the std names a public
+ReCpp signature writes, so a file which wants them imports it beside the rest. It sits in
+five parts, and a file which wants less imports one part:
+
+| Module | Carries |
+|---|---|
+| `rpp.std.text` | string, wstring, u16string, to_string, basic_string, char_traits, the string views, the free operators |
+| `rpp.std.containers` | vector, array, deque, span, unordered_map, optional, initializer_list, tuple, pair |
+| `rpp.std.memory` | unique_ptr, shared_ptr, weak_ptr, make_unique, make_shared, default_delete |
+| `rpp.std.threading` | atomic and the memory orders, mutex, unique_lock, lock_guard, shared_mutex, shared_lock, condition_variable, cv_status |
+| `rpp.std.core` | source_location, type_info, the exceptions, the traits, move, forward, swap |
+
+`import rpp.std;` re-exports all five. One unit which carries `<memory>` beside the container
+headers writes a module gcc-14 cannot read back on C++23, which is why the parts exist.
 
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module
 import rpp.threading;           // rpp::mutex, rpp::cfuture, rpp::thread_pool, ...
-import rpp;                     // or everything, which imports the eight groups
+import rpp;                     // or everything but rpp.testing
+import rpp.testing;             // which a test file names on its own
 ```
 
 **Why a group and not one module per header.** ReCpp shipped 44 per-header modules first,
@@ -219,7 +236,7 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Ten modules ship, and `src/rpp/rpp-*.cppm` names each one. Each file carries the export
+Fifteen modules ship, and `src/rpp/rpp-*.cppm` names each one. Each file carries the export
 list its headers earned, so read it for the names a module gives you.
 
 Four groups carry a limit the export list cannot state:

@@ -331,6 +331,10 @@ GROUP_HEADERS = {
 }
 GROUPS = tuple(GROUP_HEADERS)
 
+# a group the umbrella leaves out. `rpp.testing` overflows the gcc-14 source location budget
+# through `import rpp;` on C++23, so a test file imports it by name, see BUGS.md B25
+UMBRELLA_OMITS = ('rpp.testing',)
+
 # a name behind a guard this checkout cannot parse, because its configuration needs a toolkit
 # the build does not carry. The group appends the text below the generated block, verbatim.
 MANUAL_EXPORTS = {
@@ -359,10 +363,12 @@ def umbrella_drift() -> list:
     if not os.path.exists(os.path.join(rd.SRC, UMBRELLA)):
         return [f'{UMBRELLA}: missing']
 
-    want = {f'rpp.{g}' for g in GROUPS}
+    want = {f'rpp.{g}' for g in GROUPS} - set(UMBRELLA_OMITS)
     top = _export_imports(UMBRELLA)
+    omits = set(UMBRELLA_OMITS)
     bad = [f'{UMBRELLA}: does not export import {m}' for m in sorted(want - top)]
-    bad += [f'{UMBRELLA}: exports {m}, which is not a group' for m in sorted(top - want)]
+    bad += [f'{UMBRELLA}: exports {m}, which UMBRELLA_OMITS leaves out' for m in sorted(top & omits)]
+    bad += [f'{UMBRELLA}: exports {m}, which is not a group' for m in sorted(top - want - omits)]
 
     seen = {}
     for g in GROUPS:
@@ -376,6 +382,11 @@ def umbrella_drift() -> list:
 
 
 STD_MODULE = 'rpp-std.cppm'
+
+# The std stand-in sits in five parts, and `rpp-std.cppm` re-exports all five. One unit which
+# carries <memory> beside the container headers is unreadable on C++23, see BUGS.md B24.
+STD_PARTS = ('rpp-std-text.cppm', 'rpp-std-containers.cppm', 'rpp-std-memory.cppm',
+             'rpp-std-threading.cppm', 'rpp-std-core.cppm')
 
 # Every std name a public parameter list writes which `rpp.std` does not export. The reason
 # is what the next reader needs, because `std_export_drift` reports anything absent from both
@@ -444,9 +455,13 @@ def std_export_drift() -> list:
     A consumer which imports instead of including has to spell each one, so a gap here is an
     API it cannot call. `STD_NOT_EXPORTED` carries the deliberate exclusions with a reason.
     """
-    if not os.path.exists(os.path.join(rd.SRC, STD_MODULE)):
-        return [f'{STD_MODULE}: missing']
-    exported = set(re.findall(r'^\s*using std::(\w+);', _read(STD_MODULE), re.M))
+    missing = [f'{p}: missing' for p in (STD_MODULE, *STD_PARTS)
+               if not os.path.exists(os.path.join(rd.SRC, p))]
+    if missing:
+        return missing
+    exported = set()
+    for part in STD_PARTS:
+        exported |= set(re.findall(r'^\s*using std::(\w+);', _read(part), re.M))
     found = {}
     for header in sorted(os.listdir(rd.SRC)):
         if not header.endswith('.h'): continue
@@ -455,8 +470,29 @@ def std_export_drift() -> list:
                 for name in _STD_NAME.findall(params):
                     if name not in exported and name not in STD_NOT_EXPORTED:
                         found.setdefault(name, header)
-    return [f'{STD_MODULE}: {h} writes std::{n} in a parameter list. Export it, or name it '
-            f'in STD_NOT_EXPORTED with the reason' for n, h in sorted(found.items())]
+    return [f'rpp.std: {h} writes std::{n} in a parameter list. Export it from a part, or '
+            f'name it in STD_NOT_EXPORTED with the reason' for n, h in sorted(found.items())]
+
+
+def std_umbrella_drift() -> list:
+    """Every std part `rpp-std.cppm` does not re-export, and every name it re-exports twice.
+
+    A part no umbrella names reaches no consumer which writes `import rpp.std;`, and a name
+    two parts export makes the importer report an ambiguity.
+    """
+    if not os.path.exists(os.path.join(rd.SRC, STD_MODULE)):
+        return [f'{STD_MODULE}: missing']
+    reexported = set(re.findall(r'^\s*export import (rpp\.std\.[\w.]+);', _read(STD_MODULE), re.M))
+    wanted = {f'rpp.std.{p[len("rpp-std-"):-len(".cppm")]}' for p in STD_PARTS}
+    bad = [f'{STD_MODULE}: does not re-export {m}' for m in sorted(wanted - reexported)]
+    bad += [f'{STD_MODULE}: re-exports {m}, which STD_PARTS does not name'
+            for m in sorted(reexported - wanted)]
+    owner = {}
+    for part in STD_PARTS:
+        for name in re.findall(r'^\s*using std::(\w+);', _read(part), re.M):
+            if name in owner: bad.append(f'{part}: exports std::{name}, which {owner[name]} also exports')
+            else: owner[name] = part
+    return bad
 
 
 def manual_export_drift() -> list:
@@ -531,6 +567,10 @@ def selftest() -> list:
         globals()['_read'] = lambda h: text(real_read(h)) if h == UMBRELLA else real_read(h)
         return umbrella_drift()
     try:
+        drift = _umbrella_patched(lambda t: t + f'export import {UMBRELLA_OMITS[0]};\n')
+        if not any('UMBRELLA_OMITS' in f for f in drift):
+            bad.append('an umbrella which exports an omitted group passed the umbrella gate')
+
         drift = _umbrella_patched(lambda t: t.replace(f'export import rpp.{first};\n', ''))
         if not any(f'does not export import rpp.{first}' in f for f in drift):
             bad.append('an umbrella which drops a group passed the umbrella gate')
@@ -577,11 +617,12 @@ def selftest() -> list:
 
     # the std export list is hand written too, so pin every way one can go stale
     if std_export_drift(): bad.append('the std gate reports drift on a correct list')
+    if std_umbrella_drift(): bad.append('the std umbrella gate reports drift on a correct list')
     def _std_patched(cppm, text):
         globals()['_read'] = lambda h: text(real_read(h)) if h == cppm else real_read(h)
         return std_export_drift()
     try:
-        drift = _std_patched(STD_MODULE, lambda t: t.replace('    using std::deque;\n', ''))
+        drift = _std_patched('rpp-std-containers.cppm', lambda t: t.replace('    using std::deque;\n', ''))
         if not any('std::deque' in f for f in drift):
             bad.append('a dropped std export passed the std gate')
 
@@ -606,6 +647,19 @@ def selftest() -> list:
         drift = _std_patched('strview.h', lambda t: t + wrapped.replace(',\n' + ' ' * 24, ', '))
         if not any('std::multiset' in f for f in drift):
             bad.append('a std name on one parameter line passed the std gate')
+
+        # the umbrella gate, which the two cases below are the only ways to break
+        def _umbrella_patched(cppm, text):
+            globals()['_read'] = lambda h: text(real_read(h)) if h == cppm else real_read(h)
+            return std_umbrella_drift()
+        drift = _umbrella_patched(STD_MODULE, lambda t: t.replace('export import rpp.std.memory;\n', ''))
+        if not any('rpp.std.memory' in f for f in drift):
+            bad.append('an umbrella which drops a part passed the std umbrella gate')
+
+        drift = _umbrella_patched('rpp-std-core.cppm',
+                                  lambda t: t.replace('    using std::move;', '    using std::vector;'))
+        if not any('std::vector' in f for f in drift):
+            bad.append('a name two parts export passed the std umbrella gate')
     finally:
         globals()['_read'] = real_read
 
@@ -698,7 +752,8 @@ def main() -> int:
         targets = list(GROUPS) if a.all else [header_group(a.header)]
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
-        if a.all: bad += name_collisions() + umbrella_drift() + std_export_drift() + manual_export_drift()
+        if a.all: bad += (name_collisions() + umbrella_drift() + std_export_drift()
+                          + std_umbrella_drift() + manual_export_drift())
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1

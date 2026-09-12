@@ -8,127 +8,6 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B24. gcc-14 writes an `rpp.std` on C++23 which it cannot read back
-The module compiles. Any importer then stops with `failed to read compiled module: Bad file
-data`, and the same source passes on C++20. The consumer gate hid this until 33160f0, because
-`tests/module_consumer/mamafile.py` called `enable_cxx20()` whatever `CXX23` said.
-
-Reproduce it in about a minute, outside cmake:
-```bash
-cd $(mktemp -d)
-printf 'import rpp.std;\nint main(){ return 0; }\n' > u.cpp
-g++-14 -std=gnu++23 -fmodules-ts -I ~/ReCpp/src -O2 -fPIC -x c++ -c ~/ReCpp/src/rpp/rpp-std.cppm -o m.o
-g++-14 -std=gnu++23 -fmodules-ts -I ~/ReCpp/src -O2 -fPIC -c u.cpp -o u.o   # Bad file data
-```
-
-It is not the C28 location budget. gcc prints no `unable to represent further imported source
-locations` note here, and the size is what moves: the interface is 7,088,288 bytes on C++20
-and 9,693,120 on C++23.
-
-No single header causes it. Dropping any one of the 21 in the fragment leaves the read
-failing. A two header stand-in which exports `std::string` and `std::vector` reads back on
-C++23 at 3,080,784 bytes, so the threshold sits between the two.
-
-`RPP_NO_STD_MODULE` drops `RppStdModuleOnly` and `RppExceptModuleOnly`, so a C++23 consumer run
-can cover the groups alone. B25 then stops that run as well, so no C++23 consumer step ships.
-
-### B25. A C++23 consumer of the whole module graph breaks on `std::packaged_task`
-With `RPP_NO_STD_MODULE=1`, so B24 is out of the way, the C++23 consumer build still stops:
-
-```
-rpp.testing: error: conflicting declaration of template
-  'template<class> class std::packaged_task@rpp.testing'
-```
-
-The same tree passes on C++20, and `RppTests` passes 585/585 on C++23, because it builds the
-interfaces in its own tree rather than as a consumer.
-
-No small case reproduces it. `import rpp.testing;` alone reads back on C++23, and so does
-`import rpp.testing; import rpp.text;`. It needs more of the graph, which puts it beside the
-B8 shapes rather than beside B24.
-
-Both defects together mean an outside project cannot import these modules on C++23 today.
-`consumer-build` therefore ships no C++23 step, and its comment names this entry.
-
-### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
-The interface compiles and so does the importer. The link then fails:
-
-```cpp
-module;
-#include <memory>
-export module probe;
-export namespace std { using std::shared_ptr; using std::make_shared; }
-```
-
-```cpp
-#include <new>
-#include <typeinfo>
-import probe;
-int main() { auto p = std::make_shared<int>(3); return *p == 3 ? 0 : 1; }
-```
-
-`undefined reference to 'std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()'`.
-That function is an inline explicit specialization in `shared_ptr_base.h`, and gcc emits it
-into neither object. `#include <memory>` in the importer fixes it. `std::unique_ptr` and
-`std::make_unique` link without the header, so the defect is specific to the shared count.
-
-### B21. gcc-14 loses the real `std::get` in every importer of a module which exports it
-The interface compiles. An importer which instantiates `std::unique_ptr` then fails, because
-`unique_ptr.h` calls `std::get<0>` and only the exported overload set stays visible:
-
-```cpp
-module;
-#include <memory>
-#include <tuple>
-export module probe;
-export namespace std { using std::unique_ptr; using std::make_unique; using std::get; }
-```
-
-```cpp
-#include <new>
-import probe;
-int main() { std::unique_ptr<int> p = std::make_unique<int>(3); return *p; }
-```
-
-The error is `no matching function for call to 'get<0>(std::tuple@probe<int*,
-std::default_delete@probe<int> >&)`, so the exported set does not match the module-owned
-`std::tuple`. `rpp-std.cppm` leaves `std::get` out. A consumer includes `<tuple>` for it.
-
-### B20. gcc-14 breaks `std::swap` lookup when the fragment includes `<future>`
-The interface does not compile. Four lines reproduce it:
-
-```cpp
-module;
-#include <future>
-export module probe;
-export namespace std { using std::swap; }
-```
-
-`shared_ptr_base.h:1687` reports `no matching function for call to 'swap(T*&, T*&)'`, so the
-generic `std::swap` left overload resolution. Only `<future>` triggers it. The same export
-with `<memory>`, `<mutex>` or `<thread>` compiles.
-
-`rpp-std.cppm` keeps `<future>` out of its fragment because of this, so `std::future` and
-`std::promise` stay out with it. B16 blocks `std::promise` in an importer anyway.
-
-### B19. gcc-14 writes an unreadable module when it exports `std::exception_ptr`
-The interface compiles. Every importer then fails with `failed to read compiled module: Bad
-file data`, which is fatal, so nothing downstream builds. Four lines reproduce it:
-
-```cpp
-module;
-#include <exception>
-export module probe;
-export namespace std { using std::exception_ptr; }
-```
-
-The name is what matters, not the header and not the size of the export list.
-`std::exception`, `std::runtime_error`, `std::current_exception`, `std::rethrow_exception`
-and `std::make_exception_ptr` all export cleanly from the same file.
-
-`rpp-std.cppm` leaves `std::exception_ptr` out because of this. Put it back when a newer gcc
-reads the module, because a consumer which catches through a pointer needs it.
-
 ### B17. A pool worker frees the generic task a test still reads (C18 recurred)
 `ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
 A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main
@@ -368,6 +247,16 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### B24. gcc-14 wrote an `rpp.std` on C++23 which no importer could read
+The module compiled, every importer then stopped with `failed to read compiled module: Bad
+file data`, and the same source passed on C++20. Five parts replaced the one unit, because a
+unit which carries `<memory>` beside the container headers is the shape gcc cannot write.
+
+### B25. A C++23 consumer of the whole module graph broke on `std::packaged_task`
+The consumer build stopped with `conflicting declaration of template 'std::packaged_task@
+rpp.testing'`, which the C28 source location budget causes through the umbrella. `rpp.cppm`
+dropped `export import rpp.testing;`, so a file which wants the test framework names it.
 
 ### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
 A clean C++23 build reported `unable to represent further imported source locations` six

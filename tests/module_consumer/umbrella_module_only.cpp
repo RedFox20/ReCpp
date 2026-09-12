@@ -1,5 +1,5 @@
-// Imports the umbrella with no rpp header, so `import rpp;` alone has to carry every layer.
-// A module missing from rpp.cppm fails to compile here, not just in the ReCpp build.
+// Imports the umbrella with no rpp header, so `import rpp;` alone has to carry every group
+// but rpp.testing. A module missing from rpp.cppm fails here, not just in the ReCpp build.
 #ifdef MAMA_HAS_MODULES
 #include <string> // std::string, which rpp::to_string returns
 
@@ -14,8 +14,7 @@ int main()
            && rpp::millis(1500) > rpp::seconds(1)      // rpp.time
            && rpp::delegate<int()>{ +[] { return 4; } }() == 4  // rpp.core
            && rpp::to_string(42) == "42"               // rpp.text
-           && rpp::path_combine("a", "b") == "a/b"     // rpp.io
-           && rpp::Compare::eq(1, 1);                  // rpp.testing
+           && rpp::path_combine("a", "b") == "a/b";    // rpp.io
 
     rpp::semaphore sem; // rpp.threading
     sem.notify();
