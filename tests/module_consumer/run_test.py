@@ -81,18 +81,20 @@ def check_unicode_off(cxx: str) -> str:
     reaches the guarded half of the module surface. `strview.h` declares the numeric overloads
     outside that guard, and one using-declaration carries a whole overload set, so a guarded
     `using rpp::to_string;` would drop them on Yocto, MIPS and Raspberry Pi.
+
+    @param cxx the compiler to run, such as `g++-14`
+    @returns the first error line, or an empty string when the module keeps the overloads
     """
     root = os.path.dirname(os.path.dirname(HERE))
     with tempfile.TemporaryDirectory() as d:
         use = os.path.join(d, 'use.cpp')
         with open(use, 'w') as f:
-            f.write('import rpp.strview;\n'
+            f.write('import rpp.text;\n'
                     'int main() { char b[32]; return rpp::to_string(b, 42) == 2 ? 0 : 1; }\n')
         flags = [cxx, '-std=c++20', '-fmodules-ts', '-DRPP_ENABLE_UNICODE=0', '-I', 'src']
         mapper = f'-fmodule-mapper=|@g++-mapper-server -r {d}'
-        # rpp.strview imports rpp.config, so the config module compiles first
-        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-config.cppm', '-o', f'{d}/c.o'],
-                     [*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-strview.cppm', '-o', f'{d}/m.o'],
+        # rpp.text carries strview.h and imports no other group, so one unit compiles first
+        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-text.cppm', '-o', f'{d}/m.o'],
                      [*flags, mapper, '-c', use, '-o', f'{d}/u.o']):
             p = subprocess.run(step, cwd=root, capture_output=True, text=True)
             if p.returncode != 0:
