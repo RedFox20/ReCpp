@@ -386,6 +386,10 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L378) | `1` if target is little-endian |
 | [`RPP_BIG_ENDIAN`](src/rpp/config.h#L380) | `1` if target is big-endian |
 | [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L401) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
+| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/config.h#L410) | Copies bytes through the compiler builtin, which needs no `<cstring>` |
+| [`RPP_BUILTIN_MEMMOVE(dst, src, size)`](src/rpp/config.h#L411) | Moves overlapping bytes through the compiler builtin, see `BUGS.md` C27 |
+| [`RPP_BUILTIN_MEMSET(dst, value, size)`](src/rpp/config.h#L412) | Fills bytes through the compiler builtin |
+| [`RPP_BUILTIN_MEMCMP(a, b, size)`](src/rpp/config.h#L413) | Compares bytes through the compiler builtin |
 
 ### Feature Detection
 
@@ -1880,7 +1884,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L417) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L414) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -1889,7 +1893,6 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`spin_lock(Mutex m)`](src/rpp/mutex.h#L196) | Spin-lock with fallback to blocking lock |
 | [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L232) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L127) | Indicates platform provides native critical_section mutex |
-| [`RPP_SYNC_T`](src/rpp/mutex.h#L259) | Deprecated C++17 bridge which expands to `class`, kept so existing code compiles |
 | [`SyncableType`](src/rpp/mutex.h#L253) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 ### Example: Basic Mutex and Spin Lock
@@ -4209,33 +4212,32 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 
 | Function | Description |
 |----------|-------------|
-| [`writeBEU16(out, value)`](src/rpp/endian.h#L58) | Write 16-bit big-endian |
-| [`writeBEU32(out, value)`](src/rpp/endian.h#L64) | Write 32-bit big-endian |
-| [`writeBEU64(out, value)`](src/rpp/endian.h#L70) | Write 64-bit big-endian |
-| [`readBEU16(in)`](src/rpp/endian.h#L76) | Read 16-bit big-endian |
-| [`readBEU32(in)`](src/rpp/endian.h#L83) | Read 32-bit big-endian |
-| [`readBEU64(in)`](src/rpp/endian.h#L90) | Read 64-bit big-endian |
+| [`writeBEU16(out, value)`](src/rpp/endian.h#L56) | Write 16-bit big-endian |
+| [`writeBEU32(out, value)`](src/rpp/endian.h#L62) | Write 32-bit big-endian |
+| [`writeBEU64(out, value)`](src/rpp/endian.h#L68) | Write 64-bit big-endian |
+| [`readBEU16(in)`](src/rpp/endian.h#L74) | Read 16-bit big-endian |
+| [`readBEU32(in)`](src/rpp/endian.h#L81) | Read 32-bit big-endian |
+| [`readBEU64(in)`](src/rpp/endian.h#L88) | Read 64-bit big-endian |
 
 ### Little-Endian
 
 | Function | Description |
 |----------|-------------|
-| [`writeLEU16(out, value)`](src/rpp/endian.h#L101) | Write 16-bit little-endian |
-| [`writeLEU32(out, value)`](src/rpp/endian.h#L107) | Write 32-bit little-endian |
-| [`writeLEU64(out, value)`](src/rpp/endian.h#L113) | Write 64-bit little-endian |
-| [`readLEU16(in)`](src/rpp/endian.h#L119) | Read 16-bit little-endian |
-| [`readLEU32(in)`](src/rpp/endian.h#L126) | Read 32-bit little-endian |
-| [`readLEU64(in)`](src/rpp/endian.h#L133) | Read 64-bit little-endian |
+| [`writeLEU16(out, value)`](src/rpp/endian.h#L99) | Write 16-bit little-endian |
+| [`writeLEU32(out, value)`](src/rpp/endian.h#L105) | Write 32-bit little-endian |
+| [`writeLEU64(out, value)`](src/rpp/endian.h#L111) | Write 64-bit little-endian |
+| [`readLEU16(in)`](src/rpp/endian.h#L117) | Read 16-bit little-endian |
+| [`readLEU32(in)`](src/rpp/endian.h#L124) | Read 32-bit little-endian |
+| [`readLEU64(in)`](src/rpp/endian.h#L131) | Read 64-bit little-endian |
 | [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L18) | Platform-specific 16-bit byte swap |
 | [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L19) | Platform-specific 32-bit byte swap |
 | [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L20) | Platform-specific 64-bit byte swap |
-| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/endian.h#L21) | Platform-specific memcpy used by the endian read and write helpers |
-| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L30) | Convert 16-bit value to big-endian byte order |
-| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L31) | Convert 32-bit value to big-endian byte order |
-| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L32) | Convert 64-bit value to big-endian byte order |
-| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L33) | Convert 16-bit value to little-endian byte order |
-| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L34) | Convert 32-bit value to little-endian byte order |
-| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L35) | Convert 64-bit value to little-endian byte order |
+| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L28) | Convert 16-bit value to big-endian byte order |
+| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L29) | Convert 32-bit value to big-endian byte order |
+| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L30) | Convert 64-bit value to big-endian byte order |
+| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L31) | Convert 16-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L32) | Convert 32-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L33) | Convert 64-bit value to little-endian byte order |
 
 ### Example: Big-Endian & Little-Endian Read/Write
 

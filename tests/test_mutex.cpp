@@ -23,9 +23,6 @@ TestImpl(test_mutex)
         std::string value;
     };
 
-    // RPP_SYNC_T was a C++17 bridge and downstream code still writes it, so it stays defined
-    template<RPP_SYNC_T T> struct legacy_sync_user { T* instance; };
-
     // whether guard() is callable, which is what SyncableType decides
     template<class T> static constexpr bool has_guard = requires(T t) { t.guard(); };
 
@@ -42,9 +39,6 @@ TestImpl(test_mutex)
         static_assert(has_guard<SimpleValue>);
         static_assert(has_guard<rpp::synchronized<std::string>>);
         static_assert(!has_guard<MissingAccessors>);
-
-        legacy_sync_user<SimpleValue> legacy {};
-        AssertThat(legacy.instance == nullptr, true);
 
         SimpleValue value;
         auto guard = value.guard();

@@ -255,9 +255,6 @@ namespace rpp
         { t.get_ref() };
     };
 
-    /// @deprecated A C++17 bridge which now expands to `class`. Write `class` in new code.
-    #define RPP_SYNC_T class
-
     // SyncableType cannot constrain this: synchronizable names synchronize_guard<SyncType>
     // in a member alias while CRTP still leaves SyncType incomplete
     template<class SyncType>

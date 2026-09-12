@@ -653,7 +653,7 @@ Cross-referencing every `#define` against README gives:
 | `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
 | `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
 | `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |
-| `mutex.h` | 2 | `RPP_HAS_CRITICAL_SECTION_MUTEX`, `RPP_SYNC_T` |
+| `mutex.h` | 1 | `RPP_HAS_CRITICAL_SECTION_MUTEX` |
 | `close_sync.h`, `minmax.h`, `scope_guard.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `scope_guard` |
 
 Everything else is an implementation macro (`DELEGATE_FINLINE`, `_rpp_wrap_args`,
