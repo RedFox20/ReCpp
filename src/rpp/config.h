@@ -403,9 +403,8 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////
-// The compiler builtins for the mem* family, which need no <cstring>.
-// A header which names ::memmove gives gcc-14 a module-attached copy of the builtin, and
-// gcc then crashes in nonnull_arg_p for any importer at -O1, see BUGS.md C27.
+// The compiler builtins for the mem* family, which need no <cstring>. Naming ::memmove in a
+// header instead gives gcc a module-attached copy it then crashes on, see BUGS.md C27.
 #ifndef RPP_BUILTIN_MEMCPY
 #  if defined(_MSC_VER)
 #    define RPP_BUILTIN_MEMCPY(dst, src, size)  memcpy(dst, src, size)
