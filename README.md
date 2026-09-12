@@ -169,6 +169,10 @@ five parts, and a file which wants less imports one part:
 `import rpp.std;` re-exports all five. One unit which carries `<memory>` beside the container
 headers writes a module gcc-14 cannot read back on C++23, which is why the parts exist.
 
+Two of these names need an include beside the import, because gcc-14 leaves something out of
+the module. A `std::vector` needs `<new>` for the placement `operator new`, and a
+`std::shared_ptr` needs `<memory>`, see `BUGS.md` B22. A `std::unique_ptr` needs neither.
+
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module
 import rpp.threading;           // rpp::mutex, rpp::cfuture, rpp::thread_pool, ...
