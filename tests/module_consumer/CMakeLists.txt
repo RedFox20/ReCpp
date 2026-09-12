@@ -42,15 +42,19 @@ target_include_directories(RppStdStringModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppStdStringModuleOnly)
 target_link_libraries(RppStdStringModuleOnly PRIVATE ${MAMA_LIBS})
 
-# rpp.std is the only target which may include no header, so only it proves that export list
-add_executable(RppStdModuleOnly std_module_only.cpp)
-target_include_directories(RppStdModuleOnly PRIVATE ${MAMA_INCLUDES})
-mama_target_modules(RppStdModuleOnly)
+# gcc-14 writes an rpp.std on C++23 which it cannot read back, so the C++23 run sets this
+# and covers the groups alone. See BUGS.md B24, and delete the option when gcc fixes it
+if(NOT RPP_NO_STD_MODULE)
+    # rpp.std is the only target which may include no header, so only it proves that export list
+    add_executable(RppStdModuleOnly std_module_only.cpp)
+    target_include_directories(RppStdModuleOnly PRIVATE ${MAMA_INCLUDES})
+    mama_target_modules(RppStdModuleOnly)
 
-# the exceptions need their own target, because the <new> above already declares std::exception
-add_executable(RppExceptModuleOnly except_module_only.cpp)
-target_include_directories(RppExceptModuleOnly PRIVATE ${MAMA_INCLUDES})
-mama_target_modules(RppExceptModuleOnly)
+    # the exceptions need their own target, because the <new> above declares std::exception
+    add_executable(RppExceptModuleOnly except_module_only.cpp)
+    target_include_directories(RppExceptModuleOnly PRIVATE ${MAMA_INCLUDES})
+    mama_target_modules(RppExceptModuleOnly)
+endif()
 
 # these targets build at -O2, which is the only way the BUGS.md B18 crash reaches a gate
 add_executable(RppQueueModuleOnly queue_module_only.cpp)

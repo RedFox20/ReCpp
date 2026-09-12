@@ -8,6 +8,48 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B24. gcc-14 writes an `rpp.std` on C++23 which it cannot read back
+The module compiles. Any importer then stops with `failed to read compiled module: Bad file
+data`, and the same source passes on C++20. The consumer gate hid this until 33160f0, because
+`tests/module_consumer/mamafile.py` called `enable_cxx20()` whatever `CXX23` said.
+
+Reproduce it in about a minute, outside cmake:
+```bash
+cd $(mktemp -d)
+printf 'import rpp.std;\nint main(){ return 0; }\n' > u.cpp
+g++-14 -std=gnu++23 -fmodules-ts -I ~/ReCpp/src -O2 -fPIC -x c++ -c ~/ReCpp/src/rpp/rpp-std.cppm -o m.o
+g++-14 -std=gnu++23 -fmodules-ts -I ~/ReCpp/src -O2 -fPIC -c u.cpp -o u.o   # Bad file data
+```
+
+It is not the C28 location budget. gcc prints no `unable to represent further imported source
+locations` note here, and the size is what moves: the interface is 7,088,288 bytes on C++20
+and 9,693,120 on C++23.
+
+No single header causes it. Dropping any one of the 21 in the fragment leaves the read
+failing. A two header stand-in which exports `std::string` and `std::vector` reads back on
+C++23 at 3,080,784 bytes, so the threshold sits between the two.
+
+`RPP_NO_STD_MODULE` drops `RppStdModuleOnly` and `RppExceptModuleOnly`, so a C++23 consumer run
+can cover the groups alone. B25 then stops that run as well, so no C++23 consumer step ships.
+
+### B25. A C++23 consumer of the whole module graph breaks on `std::packaged_task`
+With `RPP_NO_STD_MODULE=1`, so B24 is out of the way, the C++23 consumer build still stops:
+
+```
+rpp.testing: error: conflicting declaration of template
+  'template<class> class std::packaged_task@rpp.testing'
+```
+
+The same tree passes on C++20, and `RppTests` passes 585/585 on C++23, because it builds the
+interfaces in its own tree rather than as a consumer.
+
+No small case reproduces it. `import rpp.testing;` alone reads back on C++23, and so does
+`import rpp.testing; import rpp.text;`. It needs more of the graph, which puts it beside the
+B8 shapes rather than beside B24.
+
+Both defects together mean an outside project cannot import these modules on C++23 today.
+`consumer-build` therefore ships no C++23 step, and its comment names this entry.
+
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
 

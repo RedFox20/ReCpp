@@ -28,8 +28,8 @@ TestImpl(test_mutex)
     class WrongAccessorTypes : public rpp::synchronizable<WrongAccessorTypes>
     {
     public:
-        int get_mutex() noexcept { return 0; }
-        void get_ref() noexcept {}
+        static int get_mutex() noexcept { return 0; } // static, because it touches no member
+        static void get_ref() noexcept {}
     };
 
     // a get_ref() which returns by value, so the guard would hand out a reference to a temporary
@@ -38,7 +38,28 @@ TestImpl(test_mutex)
         rpp::mutex mutex;
     public:
         auto& get_mutex() noexcept { return mutex; }
-        std::string get_ref() noexcept { return {}; }
+        static std::string get_ref() noexcept { return {}; } // static, because it touches no member
+    };
+
+    // a mutex returned by value, which spin_lock cannot bind to its reference parameter
+    struct CopiedMutex { void lock() {} void unlock() {} bool try_lock() { return true; } };
+    class MutexByValue : public rpp::synchronizable<MutexByValue>
+    {
+        std::string value;
+    public:
+        static CopiedMutex get_mutex() noexcept { return {}; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // a mutex with no try_lock(), which spin_lock calls before it suspends the thread
+    struct NoTryLock { void lock() {} void unlock() {} };
+    class MutexWithoutTryLock : public rpp::synchronizable<MutexWithoutTryLock>
+    {
+        std::string value;
+        NoTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
     };
 
     // whether guard() is callable, which is what SyncableType decides
@@ -55,6 +76,8 @@ TestImpl(test_mutex)
         // an accessor of the wrong type fails the concept, not synchronize_guard
         static_assert(!rpp::SyncableType<WrongAccessorTypes>);
         static_assert(!rpp::SyncableType<ReturnsByValue>);
+        static_assert(!rpp::SyncableType<MutexByValue>);
+        static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
 
         // SyncableType constrains every synchronizable member, so a derived type which
         // forgot the accessors still compiles and only loses guard()
@@ -63,6 +86,8 @@ TestImpl(test_mutex)
         static_assert(!has_guard<MissingAccessors>);
         static_assert(!has_guard<WrongAccessorTypes>);
         static_assert(!has_guard<ReturnsByValue>);
+        static_assert(!has_guard<MutexByValue>);
+        static_assert(!has_guard<MutexWithoutTryLock>);
 
         SimpleValue value;
         auto guard = value.guard();

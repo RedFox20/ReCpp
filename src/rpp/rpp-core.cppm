@@ -118,3 +118,10 @@ export namespace rpp::detail {
     using rpp::detail::is_detected;
 }
 // GENERATED EXPORTS END
+
+// QtPrintable sits behind RPP_HAS_QT, which the generator cannot parse without Qt
+export namespace rpp {
+#if RPP_HAS_QT
+    using rpp::QtPrintable;
+#endif
+}

@@ -271,7 +271,7 @@ def write_group(group: str, check: bool) -> str:
            f'// The headers stay in the global module fragment, so an importer and an includer share one entity.\n'
            f'module;\n\n{includes}\n\n'
            f'export module rpp.{group};\n\n'
-           + group_export_block(group))
+           + group_export_block(group) + MANUAL_EXPORTS.get(group, ''))
     old = open(path, encoding='utf-8-sig', errors='replace').read() if os.path.exists(path) else ''
     if new == old: return ''
     if check: return f'{path}: stale, run tools/gen_module_exports.py --all'
@@ -330,6 +330,17 @@ GROUP_HEADERS = {
     'testing': ('tests.h',),
 }
 GROUPS = tuple(GROUP_HEADERS)
+
+# a name behind a guard this checkout cannot parse, because its configuration needs a toolkit
+# the build does not carry. The group appends the text below the generated block, verbatim.
+MANUAL_EXPORTS = {
+    'core': '\n// QtPrintable sits behind RPP_HAS_QT, which the generator cannot parse without Qt\n'
+            'export namespace rpp {\n'
+            '#if RPP_HAS_QT\n'
+            '    using rpp::QtPrintable;\n'
+            '#endif\n'
+            '}\n',
+}
 
 
 def _export_imports(cppm: str) -> set:
@@ -448,6 +459,20 @@ def std_export_drift() -> list:
             f'in STD_NOT_EXPORTED with the reason' for n, h in sorted(found.items())]
 
 
+def manual_export_drift() -> list:
+    """Every MANUAL_EXPORTS entry whose group went, or whose name no member header declares.
+
+    The generator cannot parse these, so nothing else notices when one goes stale.
+    """
+    bad = [f'MANUAL_EXPORTS: {g} is not a group' for g in MANUAL_EXPORTS if g not in GROUP_HEADERS]
+    for g, text in MANUAL_EXPORTS.items():
+        if g not in GROUP_HEADERS: continue
+        carried = ''.join(_read(h) for h in GROUP_HEADERS[g])
+        bad += [f'MANUAL_EXPORTS: rpp.{g} exports {n}, which no member header declares'
+                for n in re.findall(r'using rpp::(\w+);', text) if n not in carried]
+    return bad
+
+
 def name_collisions() -> list:
     """Every group whose name repeats a macro, because MSVC expands one inside a module directive."""
     return [f'rpp.{g}: the module name repeats a macro, so rename the group'
@@ -533,6 +558,22 @@ def selftest() -> list:
             bad.append('a header no group carries passed the umbrella gate')
     finally:
         GROUP_HEADERS.update(real_groups)
+
+    # MANUAL_EXPORTS names what no parse here can see, so pin both ways it goes stale
+    if manual_export_drift(): bad.append('the manual export gate reports drift on a correct list')
+    real_manual = dict(MANUAL_EXPORTS)
+    try:
+        MANUAL_EXPORTS['no_such_group'] = 'export namespace rpp {}\n'
+        if not any('no_such_group' in f for f in manual_export_drift()):
+            bad.append('an entry for a missing group passed the manual export gate')
+        del MANUAL_EXPORTS['no_such_group']
+
+        MANUAL_EXPORTS[GROUPS[0]] = 'export namespace rpp { using rpp::no_such_name; }\n'
+        if not any('no_such_name' in f for f in manual_export_drift()):
+            bad.append('an entry no header declares passed the manual export gate')
+    finally:
+        MANUAL_EXPORTS.clear()
+        MANUAL_EXPORTS.update(real_manual)
 
     # the std export list is hand written too, so pin every way one can go stale
     if std_export_drift(): bad.append('the std gate reports drift on a correct list')
@@ -657,7 +698,7 @@ def main() -> int:
         targets = list(GROUPS) if a.all else [header_group(a.header)]
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
-        if a.all: bad += name_collisions() + umbrella_drift() + std_export_drift()
+        if a.all: bad += name_collisions() + umbrella_drift() + std_export_drift() + manual_export_drift()
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1

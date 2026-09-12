@@ -256,12 +256,15 @@ namespace rpp
     }
 
     /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
-    /// The bodies here are what the guard does, so a wrong accessor type fails this concept
-    /// rather than hard-erroring inside synchronize_guard.
+    /// This asks for what the guard does, so a wrong accessor type fails the concept rather
+    /// than hard-erroring inside synchronize_guard.
     template<typename T>
     concept SyncableType = requires(T t) {
+        // spin_lock takes the mutex by reference and calls try_lock on it
         { t.get_mutex().lock() };
         { t.get_mutex().unlock() };
+        { t.get_mutex().try_lock() };
+        requires detail::is_lvalue_ref<decltype(t.get_mutex())>;
         { t.get_ref() };
         requires detail::is_lvalue_ref<decltype(t.get_ref())>; // the guard hands out a reference
     };

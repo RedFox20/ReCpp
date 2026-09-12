@@ -38,7 +38,11 @@ def module_only_stems() -> list:
     and a target whose predicate returns 1 would otherwise leave the gate green.
     """
     text = open(os.path.join(HERE, 'CMakeLists.txt'), encoding='utf-8').read()
-    return sorted(set(re.findall(r'add_executable\((\w+)\s+\w+_module_only\.cpp\)', text)))
+    stems = sorted(set(re.findall(r'add_executable\((\w+)\s+\w+_module_only\.cpp\)', text)))
+    # the cmake option drops these two, so the runner must not look for a binary cmake skipped
+    if os.getenv('RPP_NO_STD_MODULE'):
+        stems = [s for s in stems if s not in ('RppStdModuleOnly', 'RppExceptModuleOnly')]
+    return stems
 
 
 def run_module_only(env=None) -> None:
