@@ -3,13 +3,20 @@
 module;
 
 #include <string>
+#include <string_view>
 #include <vector>
+#include <array>
+#include <unordered_map>
+#include <tuple>
+#include <span>
 #include <atomic>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <exception>
 #include <type_traits>
+#include <utility>
+#include <initializer_list>
 
 export module rpp.std;
 
@@ -21,12 +28,26 @@ export namespace std {
     using std::to_string;
     using std::basic_string;
     using std::char_traits;
+    using std::string_view;
+    using std::wstring_view;
 
     // containers
     using std::vector;
+    using std::array;
+    using std::span;
+    using std::dynamic_extent;
+    using std::unordered_map;
     using std::optional;
     using std::nullopt;
     using std::nullopt_t;
+    using std::initializer_list;
+
+    // tuples. std::get stays out, see BUGS.md B21
+    using std::tuple;
+    using std::tuple_size;
+    using std::tuple_element;
+    using std::pair;
+    using std::make_pair;
 
     // memory
     using std::unique_ptr;
@@ -63,8 +84,20 @@ export namespace std {
     using std::move;
     using std::forward;
     using std::swap;
+
+    // an exported type does not carry its free operators, so `s != "x"` fails in an
+    // importer which includes no <string>
+    using std::operator==;
+    using std::operator!=;
+    using std::operator+;
+    using std::operator<=>;
 }
 
-// The fixed width integers stay out. <cstdint> also declares them at global scope, so a
-// translation unit which imports this and includes any rpp header finds both and reports
-// `reference to 'uint32_t' is ambiguous`. They cost almost nothing as a header anyway.
+// An importer includes <new> for the placement operator new a std::vector needs.
+// A std::shared_ptr also needs <memory> to link, see BUGS.md B22.
+
+// The fixed width integers stay out, because <cstdint> also declares them at global scope.
+// A translation unit which imports this and includes an rpp header then reports an ambiguity.
+
+// <future> stays out of the fragment above, see BUGS.md B20. std::future and std::promise
+// go with it, so a consumer of rpp::cfuture still includes <future> for those two names.

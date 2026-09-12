@@ -42,6 +42,11 @@ target_include_directories(RppStdStringModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppStdStringModuleOnly)
 target_link_libraries(RppStdStringModuleOnly PRIVATE ${MAMA_LIBS})
 
+# rpp.std is the only target which may include no header, so only it proves that export list
+add_executable(RppStdModuleOnly std_module_only.cpp)
+target_include_directories(RppStdModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppStdModuleOnly)
+
 # `import rpp;` has to reach every layer from outside the ReCpp build
 add_executable(RppUmbrellaModuleOnly umbrella_module_only.cpp)
 target_include_directories(RppUmbrellaModuleOnly PRIVATE ${MAMA_INCLUDES})

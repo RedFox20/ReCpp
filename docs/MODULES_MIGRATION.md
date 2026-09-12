@@ -287,21 +287,24 @@ headers ReCpp puts in a public signature, and it exports those names. Replacing
 
 | Facility | Header | Import, std as headers | Import, with `rpp.std` | Speedup |
 |---|---|---|---|---|
-| `timepoint` | 405 ms | 444 ms | 47 ms | 8.68x |
-| `file_io` | 697 ms | 503 ms | 109 ms | 6.40x |
-| `sockets` | 622 ms | 490 ms | 139 ms | 4.49x |
-| `paths` | 707 ms | 514 ms | 179 ms | 3.95x |
-| `future` | 982 ms | 587 ms | 251 ms | 3.91x |
-| `strview` | 441 ms | 454 ms | 126 ms | 3.50x |
-| **median over ten** | | **1.34x** | | **3.85x** |
+| `timepoint` | 397 ms | 442 ms | 45 ms | 8.74x |
+| `file_io` | 685 ms | 497 ms | 109 ms | 6.28x |
+| `sockets` | 619 ms | 479 ms | 159 ms | 3.89x |
+| `future` | 976 ms | 561 ms | 271 ms | 3.60x |
+| `paths` | 690 ms | 503 ms | 196 ms | 3.52x |
+| `strview` | 433 ms | 453 ms | 145 ms | 2.99x |
+| **median over ten** | | **1.34x** | | **3.56x** |
 
-The many-facility inversion goes with it. Ten rpp imports beside two std headers took
-1478 ms against 1144 ms for eleven headers. The same ten beside `import rpp.std;` take
-1153 ms, which is parity. So the import column was not losing to header sharing. It was
-paying for a std parse the header column shared for free.
+The many-facility inversion nearly goes with it. Ten rpp imports beside two std headers took
+1452 ms against 1074 ms for eleven headers, which is 0.74x. The same ten beside
+`import rpp.std;` take 1149 ms, which is 0.94x. So most of what the import column lost to
+header sharing was a std parse the header column shared for free.
 
-`std::exception_ptr` is absent from `rpp.std`, because exporting it writes an interface gcc
-cannot read back. See `BUGS.md` B19.
+Three names stay out of `rpp.std`, each because gcc-14 breaks on it. Exporting
+`std::exception_ptr` writes an interface gcc cannot read back (B19). Including `<future>` in
+the fragment kills `std::swap` lookup, so `std::future` and `std::promise` go with it (B20).
+Exporting `std::get` breaks `std::unique_ptr` in every importer (B21). Section 11.1 has the
+table, and `BUGS.md` has a reproducer for each.
 
 ### 2.3 What the linker sees
 
@@ -1036,7 +1039,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 Every entry here stops a build. Each has a reproducer in `BUGS.md` and a workaround in the
 tree, so nothing is unguarded today. Each workaround costs a consumer something, so retest
-all four whenever the toolchain moves, and delete the workaround which the new compiler
+all seven whenever the toolchain moves, and delete the workaround which the new compiler
 makes unnecessary.
 
 | Bug | Compiler | What dies | What guards it today |
@@ -1044,11 +1047,30 @@ makes unnecessary.
 | **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, nine of them ship modules |
 | **B18** | gcc-14 | An importer of `rpp.concurrent_queue` which never includes the header crashes at `-O1` and above, at `nonnull_arg_p` | No test hits it, because each includes `<rpp/tests.h>`. A module-only consumer at `-O1` is exposed and has no target yet |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | `rpp-std.cppm` leaves the name out |
+| **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | `rpp-std.cppm` keeps `<future>` out, so `std::future` and `std::promise` stay out too |
+| **B21** | gcc-14 | A module which exports `std::get` breaks `std::unique_ptr` in every importer | `rpp-std.cppm` leaves the name out |
+| **B22** | gcc-14 | An importer which reaches `std::shared_ptr` through a module fails to link, because no object carries `_Sp_counted_base<_S_atomic>::_M_release()` | `RppStdModuleOnly` names `std::unique_ptr` instead. An importer which needs a shared pointer includes `<memory>` |
 | **B8** | gcc-14 | Four separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
 
-Two of the four are silent traps rather than loud ones. B18 fires only for a shape no test
-covers, and B19 compiles the interface and fails every consumer afterwards. So a green build
-here does not prove the next consumer compiles, and item 4 of section 12 tracks that risk.
+Four of the seven are silent traps rather than loud ones. B18 fires only for a shape no test
+covers, B19 and B21 compile the interface and fail every consumer afterwards, and B22 reaches
+the linker. So a green build here does not prove the next consumer compiles, and item 4 of
+section 12 tracks that risk.
+
+B19, B20 and B21 share one shape: an `export using` inside namespace `std` either poisons a
+later instantiation or corrupts the interface. `RppStdModuleOnly` is the target which catches
+the next one, because it is the only consumer which names no std type in a header.
+
+Two more failures stop the same consumer, and neither is a compiler bug. A declaration in a
+global module fragment reaches an importer only when an exported declaration names it:
+
+| What dies | Where it surfaces | What carries it now |
+|---|---|---|
+| `s != "x"` and `s + "y"` on an exported `std::string` | The importer reports `no match for 'operator!='` | `rpp-std.cppm` exports `operator==`, `operator!=`, `operator+` and `operator<=>` |
+| `std::vector` construction | `stl_construct.h` reports `no matching function for call to 'operator new(sizetype, void*)'` | The importer includes `<new>` |
+
+So an export list of type names alone does not make a module usable. Every free function an
+exported type needs by argument-dependent lookup belongs in the list beside the type.
 
 ---
 

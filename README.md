@@ -180,10 +180,10 @@ them, and it is where the real win lives:
 
 | Facility | Header | Import | Import with `rpp.std` |
 |---|---|---|---|
-| `rpp.timepoint` | 405 ms | 444 ms | 47 ms |
-| `rpp.file_io` | 697 ms | 503 ms | 109 ms |
-| `rpp.future` | 982 ms | 587 ms | 251 ms |
-| **median speedup** | | **1.34x** | **3.85x** |
+| `rpp.timepoint` | 397 ms | 442 ms | 45 ms |
+| `rpp.file_io` | 685 ms | 497 ms | 109 ms |
+| `rpp.future` | 976 ms | 561 ms | 271 ms |
+| **median speedup** | | **1.34x** | **3.56x** |
 
 Take the narrowest module which covers the file. `import rpp;` costs 7.4x `import rpp.sprint;`
 for the same one-line body, because a re-export chain costs its whole transitive closure.

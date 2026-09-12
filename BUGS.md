@@ -8,6 +8,67 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
+The interface compiles and so does the importer. The link then fails:
+
+```cpp
+module;
+#include <memory>
+export module probe;
+export namespace std { using std::shared_ptr; using std::make_shared; }
+```
+
+```cpp
+#include <new>
+#include <typeinfo>
+import probe;
+int main() { auto p = std::make_shared<int>(3); return *p == 3 ? 0 : 1; }
+```
+
+`undefined reference to 'std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()'`.
+That function is an inline explicit specialization in `shared_ptr_base.h`, and gcc emits it
+into neither object. `#include <memory>` in the importer fixes it. `std::unique_ptr` and
+`std::make_unique` link without the header, so the defect is specific to the shared count.
+
+### B21. gcc-14 loses the real `std::get` in every importer of a module which exports it
+The interface compiles. An importer which instantiates `std::unique_ptr` then fails, because
+`unique_ptr.h` calls `std::get<0>` and only the exported overload set stays visible:
+
+```cpp
+module;
+#include <memory>
+#include <tuple>
+export module probe;
+export namespace std { using std::unique_ptr; using std::make_unique; using std::get; }
+```
+
+```cpp
+#include <new>
+import probe;
+int main() { std::unique_ptr<int> p = std::make_unique<int>(3); return *p; }
+```
+
+The error is `no matching function for call to 'get<0>(std::tuple@probe<int*,
+std::default_delete@probe<int> >&)`, so the exported set does not match the module-owned
+`std::tuple`. `rpp-std.cppm` leaves `std::get` out. A consumer includes `<tuple>` for it.
+
+### B20. gcc-14 breaks `std::swap` lookup when the fragment includes `<future>`
+The interface does not compile. Four lines reproduce it:
+
+```cpp
+module;
+#include <future>
+export module probe;
+export namespace std { using std::swap; }
+```
+
+`shared_ptr_base.h:1687` reports `no matching function for call to 'swap(T*&, T*&)'`, so the
+generic `std::swap` left overload resolution. Only `<future>` triggers it. The same export
+with `<memory>`, `<mutex>` or `<thread>` compiles.
+
+`rpp-std.cppm` keeps `<future>` out of its fragment because of this, so `std::future` and
+`std::promise` stay out with it. B16 blocks `std::promise` in an importer anyway.
+
 ### B19. gcc-14 writes an unreadable module when it exports `std::exception_ptr`
 The interface compiles. Every importer then fails with `failed to read compiled module: Bad
 file data`, which is fatal, so nothing downstream builds. Four lines reproduce it:
