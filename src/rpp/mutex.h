@@ -253,6 +253,9 @@ namespace rpp
         // MSVC takes the address of a prvalue as an extension, so SyncableType asks this instead
         template<class T> inline constexpr bool is_lvalue_ref = false;
         template<class T> inline constexpr bool is_lvalue_ref<T&> = true;
+
+        // what `!m.try_lock()` needs. A local concept keeps <concepts> out of this header
+        template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; };
     }
 
     /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
@@ -260,10 +263,11 @@ namespace rpp
     /// than hard-erroring inside synchronize_guard.
     template<typename T>
     concept SyncableType = requires(T t) {
-        // spin_lock takes the mutex by reference and calls try_lock on it
+        // spin_lock takes the mutex by reference and writes `!m.try_lock()`, so a try_lock
+        // which returns nothing has to fail here and not inside the guard
         { t.get_mutex().lock() };
         { t.get_mutex().unlock() };
-        { t.get_mutex().try_lock() };
+        { t.get_mutex().try_lock() } -> detail::BoolTestable;
         requires detail::is_lvalue_ref<decltype(t.get_mutex())>;
         { t.get_ref() };
         requires detail::is_lvalue_ref<decltype(t.get_ref())>; // the guard hands out a reference

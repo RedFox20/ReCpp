@@ -51,6 +51,17 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a try_lock() which returns nothing, so spin_lock would hard-error on `!m.try_lock()`
+    struct VoidTryLock { void lock() {} void unlock() {} static void try_lock() {} };
+    class MutexTryLockReturnsVoid : public rpp::synchronizable<MutexTryLockReturnsVoid>
+    {
+        std::string value;
+        VoidTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
     // a mutex with no try_lock(), which spin_lock calls before it suspends the thread
     struct NoTryLock { void lock() {} void unlock() {} };
     class MutexWithoutTryLock : public rpp::synchronizable<MutexWithoutTryLock>
@@ -78,6 +89,7 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<ReturnsByValue>);
         static_assert(!rpp::SyncableType<MutexByValue>);
         static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
+        static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
 
         // SyncableType constrains every synchronizable member, so a derived type which
         // forgot the accessors still compiles and only loses guard()
@@ -88,6 +100,7 @@ TestImpl(test_mutex)
         static_assert(!has_guard<ReturnsByValue>);
         static_assert(!has_guard<MutexByValue>);
         static_assert(!has_guard<MutexWithoutTryLock>);
+        static_assert(!has_guard<MutexTryLockReturnsVoid>);
 
         SimpleValue value;
         auto guard = value.guard();
