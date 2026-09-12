@@ -823,10 +823,12 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`write(const T& v)`](src/rpp/sprint.h#L133) | Write a value (auto-converts most types) |
 | [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L158) | Write a float or double with a chosen number of decimals, instead of the default 6 |
 | [`writeln(const Args&... args)`](src/rpp/sprint.h#L361) | Write values followed by newline |
+| [`join(const C& container, const S& sep)`](src/rpp/sprint.h#L369) | Write every item of a container, with `sep` between the items |
+| [`join(const C& container)`](src/rpp/sprint.h#L381) | Write every item of a container, with `string_buffer::separator` between the items |
 | [`writef(const char* format, ...)`](src/rpp/sprint.h#L131) | Printf-style formatted write |
 | [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L311) | Write data as hex string |
 | [`write_cont(const Container& c)`](src/rpp/sprint.h#L268) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L369) | Pretty-print a value |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L385) | Pretty-print a value |
 | [`clear()`](src/rpp/sprint.h#L122) | Clear the buffer |
 | [`reserve(int capacity)`](src/rpp/sprint.h#L123) | Reserve capacity |
 | [`resize(int size)`](src/rpp/sprint.h#L124) | Resize buffer |
@@ -842,9 +844,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L483) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L503) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L429) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L499) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L519) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L445) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -885,6 +887,22 @@ sb.writeln("second line");
 sb.clear();
 sb.writeln("x=", 10, "y=", 20);
 // sb.view() == "x= 10 y= 20\n"
+```
+
+### Example: join
+
+```cpp
+std::vector<std::string> lines = { "first", "second", "third" };
+
+rpp::string_buffer sb;
+sb.join(lines, '\n');
+// sb.view() == "first\nsecond\nthird"
+
+// with no separator argument, join uses string_buffer::separator
+sb.clear();
+sb.separator = ", ";
+sb.join(lines);
+// sb.view() == "first, second, third"
 ```
 
 ### Example: Custom Separator

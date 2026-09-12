@@ -166,6 +166,34 @@ TestImpl(test_sprint)
         AssertEqual(buf2.view(), bigs);
     }
 
+    TestCase(string_buffer_join)
+    {
+        std::vector<std::string> lines = { "first", "second", "third" };
+        string_buffer text;
+        text.join(lines, '\n');
+        AssertEqual(text.view(), "first\nsecond\nthird");
+
+        // join writes no separator before the first item, even when the buffer already holds text
+        text.write(" | ");
+        text.join(std::vector<int>{ 1, 2, 3 }, ", ");
+        AssertEqual(text.view(), "first\nsecond\nthird | 1, 2, 3");
+
+        string_buffer with_default;
+        with_default.join(lines);
+        AssertEqual(with_default.view(), "first second third");
+
+        with_default.clear();
+        with_default.separator = "; ";
+        with_default.join(lines);
+        AssertEqual(with_default.view(), "first; second; third");
+
+        string_buffer edge;
+        edge.join(std::vector<int>{}, ',');
+        AssertEqual(edge.view(), "");
+        edge.join(std::vector<int>{ 42 }, ',');
+        AssertEqual(edge.view(), "42");
+    }
+
     TestCase(println)
     {
         TempFILE printed;

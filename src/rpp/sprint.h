@@ -364,6 +364,22 @@ namespace rpp
             writeln();
         }
 
+        /// @brief Appends every item of the container with write(), and puts `sep` between the items
+        /// Ex: join(std::vector<int>{1,2,3}, ", ") --> "1, 2, 3"
+        template<is_container C, class S> void join(const C& container, const S& sep) noexcept
+        {
+            bool first = true;
+            for (const auto& item : container)
+            {
+                if (!first) write(sep);
+                first = false;
+                write(item);
+            }
+        }
+
+        /// @brief Appends every item of the container with write(), and puts string_buffer::separator between the items
+        template<is_container C> FINLINE void join(const C& container) noexcept { join(container, separator); }
+
         ////////////////////////////////////////////////////////////////////////////////////////////
 
         template<class T> FINLINE void prettyprint(const T& value) noexcept {
