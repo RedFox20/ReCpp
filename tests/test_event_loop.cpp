@@ -1316,6 +1316,19 @@ TestImpl(test_event_loop)
         AssertThat(result, 42);
     }
 
+    // no pump makes a deferred future ready, so reporting a timeout would throw on a future
+    // whose get() resolves it at once
+    TestCase(run_until_ready_resolves_a_deferred_future)
+    {
+        bool ran = false;
+        rpp::cfuture<int> fut = std::async(std::launch::deferred, [&] { ran = true; return 42; });
+
+        AssertThat(loop->pump_until_ready(fut, rpp::millis(20)), true);
+        AssertThat(ran, false); // the pump must not have run it
+        AssertThat(fut.get(), 42);
+        AssertThat(ran, true);
+    }
+
     // pump_until_ready returns false on timeout instead of blocking on get().
     TestCase(pump_until_ready_times_out_without_blocking)
     {

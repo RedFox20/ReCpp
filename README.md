@@ -176,8 +176,8 @@ directory on C++23 only. `BUGS.md` **C28** holds the measurements. Eight groups 
 `test_modules.cpp` from 39 imports to 8, and both C++20 and C++23 build clean.
 
 Name the group you use when you want the narrowest dependency. A file that imports
-`rpp.text` rebuilds when one of three headers changes, and a file that imports `rpp`
-rebuilds when any public header changes.
+`rpp.text` rebuilds when one of three headers changes, and a file that names several
+groups rebuilds when any header in any of them changes.
 
 ### What an import saves
 

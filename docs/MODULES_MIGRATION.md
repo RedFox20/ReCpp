@@ -1191,8 +1191,8 @@ Dropping `std::swap` does buy it, and the measured price is 18% on every importe
    tier 2 compiler still passes the headers-only build.
 3. Every public header joins one group in `GROUP_HEADERS`, and `gen_module_exports.py
    --all --check` reports no difference.
-4. `tests/module_consumer/` builds against an installed ReCpp using only
-   `import rpp;`, and links.
+4. `tests/module_consumer/` builds against an installed ReCpp using only the group
+   imports it needs, and links.
 5. The mixed-mode link check passes.
 6. README.md documents the contract of section 10 and carries a measured
    compile-time number.

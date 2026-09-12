@@ -388,7 +388,7 @@ namespace rpp
                 run_once(rpp::millis(5)); // block-wait briefly for the next continuation, then run it
             }
             // if the future is deferred, .get() needs to be called to trigger the continuation
-            return fut.valid() && fut.wait_for(rpp::Duration::zero()) == wait_result::finished;
+            return fut.valid() && fut.wait_for(rpp::Duration::zero()) != wait_result::timeout;
         }
 
         /**
@@ -661,7 +661,7 @@ namespace rpp
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 // already resolved (ready or invalid): hop to the loop thread, no worker needed
-                if (!fut.valid() || fut.wait_for(rpp::Duration::zero()) == wait_result::finished)
+                if (!fut.valid() || fut.wait_for(rpp::Duration::zero()) != wait_result::timeout)
                 {
                     // nothing to wait on; resume immediately on loop thread
                     loop.post_resume(cont);
