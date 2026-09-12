@@ -47,6 +47,11 @@ add_executable(RppStdModuleOnly std_module_only.cpp)
 target_include_directories(RppStdModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppStdModuleOnly)
 
+# the exceptions need their own target, because the <new> above already declares std::exception
+add_executable(RppExceptModuleOnly except_module_only.cpp)
+target_include_directories(RppExceptModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppExceptModuleOnly)
+
 # these targets build at -O2, which is the only way the BUGS.md B18 crash reaches a gate
 add_executable(RppQueueModuleOnly queue_module_only.cpp)
 target_include_directories(RppQueueModuleOnly PRIVATE ${MAMA_INCLUDES})

@@ -86,3 +86,13 @@ runs:
         cd tests/module_consumer
         CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
             --compiler ${{ inputs.compiler }} --expect modules --compare-paths --jobs $JOBS $UNICODE_OFF
+
+    - name: Import the exported modules on C++23 with ${{ inputs.cc_version }}
+      shell: bash
+      run: |
+        # RppTests imports no rpp.std, and these targets are its only importer, so without
+        # this run a rpp.std which gcc writes and cannot read back on C++23 stays green
+        JOBS=$(nproc)
+        cd tests/module_consumer
+        CXX23=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
+            --compiler ${{ inputs.compiler }} --expect modules --jobs $JOBS

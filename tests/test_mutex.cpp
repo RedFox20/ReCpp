@@ -23,6 +23,24 @@ TestImpl(test_mutex)
         std::string value;
     };
 
+    // accessors of the wrong type, which used to satisfy the concept and then hard-error
+    // on unique_lock<int> and a reference to void inside synchronize_guard
+    class WrongAccessorTypes : public rpp::synchronizable<WrongAccessorTypes>
+    {
+    public:
+        int get_mutex() noexcept { return 0; }
+        void get_ref() noexcept {}
+    };
+
+    // a get_ref() which returns by value, so the guard would hand out a reference to a temporary
+    class ReturnsByValue : public rpp::synchronizable<ReturnsByValue>
+    {
+        rpp::mutex mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        std::string get_ref() noexcept { return {}; }
+    };
+
     // whether guard() is callable, which is what SyncableType decides
     template<class T> static constexpr bool has_guard = requires(T t) { t.guard(); };
 
@@ -34,11 +52,17 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<int>);
         static_assert(!rpp::SyncableType<MissingAccessors>);
 
+        // an accessor of the wrong type fails the concept, not synchronize_guard
+        static_assert(!rpp::SyncableType<WrongAccessorTypes>);
+        static_assert(!rpp::SyncableType<ReturnsByValue>);
+
         // SyncableType constrains every synchronizable member, so a derived type which
         // forgot the accessors still compiles and only loses guard()
         static_assert(has_guard<SimpleValue>);
         static_assert(has_guard<rpp::synchronized<std::string>>);
         static_assert(!has_guard<MissingAccessors>);
+        static_assert(!has_guard<WrongAccessorTypes>);
+        static_assert(!has_guard<ReturnsByValue>);
 
         SimpleValue value;
         auto guard = value.guard();

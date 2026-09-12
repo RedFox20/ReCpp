@@ -44,9 +44,7 @@ int main()
     static_assert(std::is_same_v<std::decay_t<const int&>, int>);
     static_assert(std::is_same_v<std::conditional_t<true, int, char>, int>);
 
-    // exceptions. std::exception_ptr is absent on purpose, see BUGS.md B19
-    try { throw std::runtime_error{"x"}; }
-    catch (const std::exception& e) { if (std::string{e.what()} != "x") return 6; }
+    // the exceptions live in except_module_only.cpp, because the <new> above declares them
     return 0;
 }
 #else
