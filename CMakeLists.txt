@@ -276,6 +276,11 @@ target_link_libraries(ReCpp
     PUBLIC ${TRACE_LIBRARY}
     PUBLIC Threads::Threads
 )
+# A parent project which adds this directory never sees CMAKE_EXE_LINKER_FLAGS, so the
+# section flags would cost it size and reclaim nothing without this.
+if(RPP_GC_SECTIONS)
+    target_link_options(ReCpp INTERFACE ${RPP_GC_SECTIONS})
+endif()
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################

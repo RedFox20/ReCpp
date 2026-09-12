@@ -208,8 +208,8 @@ The import column parses no standard library header at all, which is what an imp
 really writes. A header costs what its preprocessed size says, so the heaviest group gains
 the most absolute time and the lightest gains the least.
 
-Take the narrowest group which covers the file. `import rpp;` pulls all eight, because a
-re-export chain costs its whole transitive closure.
+Take the narrowest group which covers the file. `import rpp;` pulls seven, every group but
+`rpp.testing`, because a re-export chain costs its whole transitive closure.
 `docs/MODULES_MIGRATION.md` sections 2.2 and 2.3 have the full tables and the linker numbers.
 
 ### Macros need a header
@@ -286,8 +286,8 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 ```
 
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
-`tests/test_modules.cpp`, which imports all eight groups. `tests/module_consumer/` adds nine
-module-only targets, and `run_test.py` builds and runs each one. Each imports what it needs
+`tests/test_modules.cpp`, which imports all eight groups. `tests/module_consumer/` adds ten
+module-only targets, and `run_test.py` builds and runs each one at C++20 and C++23. Each imports what it needs
 and includes no rpp header except a macro header, so a missing export fails the build, and a
 wrong answer fails the run. `RppStdStringModuleOnly` includes
 `<string>` first, because gcc-14 writes a module that only such an importer cannot read.

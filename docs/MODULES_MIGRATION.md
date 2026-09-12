@@ -447,13 +447,14 @@ module;
 export module rpp.text;
 ```
 
-`src/rpp/rpp.cppm` stays the umbrella, and it exports the eight groups:
+`src/rpp/rpp.cppm` stays the umbrella, and it exports seven of the eight groups.
+`rpp.testing` stays out, see BUGS.md B25:
 
 ```cpp
 export module rpp;
 export import rpp.core;
 export import rpp.text;
-// ... the other six groups
+// ... the other five groups, but not rpp.testing
 ```
 
 ### D3. Named modules, not partitions.
