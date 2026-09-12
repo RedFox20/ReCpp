@@ -254,23 +254,25 @@ namespace rpp
         template<class T> inline constexpr bool is_lvalue_ref = false;
         template<class T> inline constexpr bool is_lvalue_ref<T&> = true;
 
+        // the guard hands out a `std::decay_t<T>&`, which a volatile or const lvalue is not
+        template<class T> inline constexpr bool is_plain_lvalue_ref = false;
+        template<class T> inline constexpr bool is_plain_lvalue_ref<T&> = !std::is_volatile_v<T>;
+
         // what `!m.try_lock()` needs. A local concept keeps <concepts> out of this header
         template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; };
     }
 
     /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
-    /// This asks for what the guard does, so a wrong accessor type fails the concept rather
-    /// than hard-erroring inside synchronize_guard.
+    /// It asks for what the guard does, so a wrong accessor fails here and not inside the guard.
     template<typename T>
     concept SyncableType = requires(T t) {
-        // spin_lock takes the mutex by reference and writes `!m.try_lock()`, so a try_lock
-        // which returns nothing has to fail here and not inside the guard
+        // spin_lock takes the mutex by reference and writes `!m.try_lock()`
         { t.get_mutex().lock() };
         { t.get_mutex().unlock() };
         { t.get_mutex().try_lock() } -> detail::BoolTestable;
         requires detail::is_lvalue_ref<decltype(t.get_mutex())>;
         { t.get_ref() };
-        requires detail::is_lvalue_ref<decltype(t.get_ref())>; // the guard hands out a reference
+        requires detail::is_plain_lvalue_ref<decltype(t.get_ref())>;
     };
 
     // SyncableType cannot constrain this: synchronizable names synchronize_guard<SyncType>

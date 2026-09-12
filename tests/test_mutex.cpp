@@ -51,6 +51,16 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a volatile get_ref(), which the guard cannot hand out as a plain value_type&
+    class VolatileRef : public rpp::synchronizable<VolatileRef>
+    {
+        rpp::mutex mutex;
+        volatile int value = 0;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        volatile int& get_ref() noexcept { return value; }
+    };
+
     // a try_lock() which returns nothing, so spin_lock would hard-error on `!m.try_lock()`
     struct VoidTryLock { void lock() {} void unlock() {} static void try_lock() {} };
     class MutexTryLockReturnsVoid : public rpp::synchronizable<MutexTryLockReturnsVoid>
@@ -90,6 +100,7 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<MutexByValue>);
         static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
         static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
+        static_assert(!rpp::SyncableType<VolatileRef>);
 
         // SyncableType constrains every synchronizable member, so a derived type which
         // forgot the accessors still compiles and only loses guard()
@@ -101,6 +112,7 @@ TestImpl(test_mutex)
         static_assert(!has_guard<MutexByValue>);
         static_assert(!has_guard<MutexWithoutTryLock>);
         static_assert(!has_guard<MutexTryLockReturnsVoid>);
+        static_assert(!has_guard<VolatileRef>);
 
         SimpleValue value;
         auto guard = value.guard();

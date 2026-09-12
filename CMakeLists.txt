@@ -358,10 +358,8 @@ endif()
 if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 
-    # Fifteen module interface units: eight header groups, the five part std stand-in with
-    # its own umbrella, and the ReCpp umbrella. A group carries its headers directly,
-    # because gcc-14 runs out of module source locations when one translation unit imports
-    # dozens, see BUGS.md C28.
+    # Fifteen units: eight header groups, five std parts, and the two umbrellas. A group
+    # carries its headers directly, because of the gcc-14 budget in BUGS.md C28.
     set(RPP_MODULES_SRC
         src/rpp/rpp-core.cppm
         src/rpp/rpp-text.cppm
