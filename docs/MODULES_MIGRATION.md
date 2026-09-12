@@ -13,7 +13,7 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the fifteen modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
+| the eight modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |

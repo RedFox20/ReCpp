@@ -367,6 +367,21 @@ TestImpl(test_future)
         AssertThat(f1.valid(), false);
     }
 
+    // a deferred future runs on get(), so no wait finishes it. Reporting finished would send
+    // a caller which polls with a zero timeout straight into a blocking get()
+    TestCase(deferred_future_never_reports_finished)
+    {
+        bool ran = false;
+        cfuture<int> f = std::async(std::launch::deferred, [&] { ran = true; return 42; });
+
+        AssertThat(f.wait_for(rpp::Duration::zero()) == wait_result::deferred, true);
+        AssertThat(f.wait_for(rpp::millis(1)) == wait_result::finished, false);
+        AssertThat(ran, false); // the poll must not have run the callable
+
+        AssertThat(f.get(), 42);
+        AssertThat(ran, true);
+    }
+
 };
 
 // NOLINTEND(performance-*)

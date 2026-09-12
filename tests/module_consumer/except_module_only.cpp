@@ -5,6 +5,8 @@
 
 import rpp.core; // includes come first, the import goes last
 
+template<class T> using has_size = decltype(sizeof(T));
+
 int main()
 {
     try { throw std::runtime_error{"x"}; }
@@ -13,8 +15,9 @@ int main()
     try { throw std::logic_error{"y"}; }
     catch (const std::exception& e) { if (e.what()[0] != 'y') return 2; }
 
-    // an rpp name from the import, so the module really loads
-    return rpp::is_detected_v<std::decay_t, int> ? 0 : 3;
+    // an rpp name from the import, so the module really loads. The alias is local, because
+    // libc++ does not declare a std trait through <stdexcept> and libstdc++ does
+    return rpp::is_detected_v<has_size, int> ? 0 : 3;
 }
 #else
 int main() { return 0; } // the header build does not exercise the module
