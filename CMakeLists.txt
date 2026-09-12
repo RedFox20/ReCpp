@@ -101,8 +101,13 @@ if(CLANG OR GCC)
     # One section per function and per object, so the linker drops what nothing references.
     # A modules build emits one initializer per interface unit, and this reclaims the rest.
     add_compile_options(-ffunction-sections -fdata-sections)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections")
+    if(APPLE)
+        set(RPP_GC_SECTIONS "-Wl,-dead_strip") # ld64 rejects --gc-sections
+    else()
+        set(RPP_GC_SECTIONS "-Wl,--gc-sections")
+    endif()
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
     if(CLANG)
         message("Configure for Clang++ ${CMAKE_CXX_COMPILER_VERSION}")
         if(RPP_USE_LIBCXX)
@@ -204,8 +209,9 @@ elseif(MIPS)
         set(LIBDW_INCLUDE ${elfutils_INCLUDES})
     endif()
 elseif(YOCTO_LINUX)
-    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed")
-    set(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
+    # append, because a plain set() here would drop the collection flag added above
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
 elseif(OCLEA)
     set(LIBDL_LIB "dl")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
@@ -321,6 +327,10 @@ elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG
     set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
 elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
     set(RPP_NO_MODULES "MSVC ${MSVC_VERSION} is older than ${RPP_MODULES_MIN_MSVC}")
+elseif(GCC AND RPP_CXX_STANDARD GREATER_EQUAL 23)
+    # gcc-14 runs out of module source locations on this tree and then mis-merges a global
+    # module declaration. It fails only from a clean build dir, see BUGS.md B23
+    set(RPP_NO_MODULES "GCC on C++${RPP_CXX_STANDARD} fails a clean modules build, see BUGS.md B23")
 elseif(CLANG AND NOT EXISTS "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
     # Clang scans module dependencies with a separate clang-scan-deps binary, and an
     # Android NDK ships none. CMake leaves the variable empty and writes a scan rule
