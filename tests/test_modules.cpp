@@ -46,7 +46,7 @@ TestImpl(test_modules)
                             const char* /*msg*/, int /*len*/) noexcept {}
 
     // The macros expand to _LogInfo, _LogWarning, _FmtString and rpp::__wrap, so this
-    // fails to build if rpp.debugging stops exporting any of them.
+    // fails to build if rpp.core stops exporting any of them.
     TestCase(debugging_macros_work_beside_the_module)
     {
         LogSeverity previous = GetLogSeverityFilter();
@@ -232,7 +232,7 @@ TestImpl(test_modules)
         rpp::element_range<int> r = rpp::range(v);
         AssertThat(int(r.size()), 3);
 
-        // collections.h declares rpp::sort, not sort.h, so rpp.collections carries it
+        // collections.h declares rpp::sort, not sort.h, so rpp.containers carries it
         rpp::sort(v);
         AssertThat(v[0], 1);
         AssertThat(v[2], 4);

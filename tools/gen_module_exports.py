@@ -489,6 +489,35 @@ BUGS = 'BUGS.md'
 CITING = (BUGS, 'README.md', 'AGENTS.md', 'CMakeLists.txt')
 
 
+# a suffix which makes an `rpp.x` a file name and not a module name
+_NOT_A_MODULE = ('.cppm', '.cpp', '.h', '.py', '.tmp', '.txt', '.md')
+
+
+def module_name_drift() -> list:
+    """Every `rpp.<name>` in the sources which no `export module` declares.
+
+    A comment naming a module the tree dropped sends a reader to an import which does not
+    exist, and the grouping renamed most of them at once.
+    """
+    real = set()
+    for f in sorted(os.listdir(rd.SRC)):
+        if f.endswith('.cppm'):
+            real |= set(re.findall(r'^export module ([\w.]+);', _read(f), re.M))
+    if not real:
+        return ['no .cppm declares a module']
+    bad = []
+    for root in (rd.SRC, 'tests', os.path.join('tests', 'module_consumer')):
+        if not os.path.isdir(root): continue
+        for f in sorted(os.listdir(root)):
+            if not f.endswith(('.h', '.cpp', '.cppm')): continue
+            path = os.path.join(root, f)
+            for name in sorted(set(re.findall(r'\brpp\.[a-z][a-z_.]*', _readfile(path)))):
+                name = name.rstrip('.')
+                if name.endswith(_NOT_A_MODULE) or name in real: continue
+                bad.append(f'{path}: names {name}, which no module declares')
+    return bad
+
+
 def bugs_citation_drift() -> list:
     """Every `BUGS.md <id>` citation which names no entry, and every id the file defines twice.
 
@@ -600,6 +629,17 @@ def selftest() -> list:
     if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
     if macro_collision('core'): bad.append('a group name which repeats no macro reported one')
     if name_collisions(): bad.append('the group name gate reports a collision on the real groups')
+
+    # a rename can drop a module while the comments which name it stay, so pin that too
+    if module_name_drift(): bad.append('the module name gate reports drift on a correct tree')
+    real_read2 = _readfile
+    try:
+        globals()['_readfile'] = lambda f: (real_read2(f) + '\n// rpp.no_such_module\n'
+                                            if f.endswith('tests.h') else real_read2(f))
+        if not any('rpp.no_such_module' in f for f in module_name_drift()):
+            bad.append('a name no module declares passed the module name gate')
+    finally:
+        globals()['_readfile'] = real_read2
 
     # a BUGS.md rewrite can drop an entry while the comments which cite it stay, so pin both ways
     if bugs_citation_drift(): bad.append('the citation gate reports drift on a correct BUGS.md')
@@ -823,7 +863,7 @@ def main() -> int:
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
         if a.all: bad += (name_collisions() + umbrella_drift() + std_export_drift()
                           + std_umbrella_drift() + manual_export_drift()
-                          + bugs_citation_drift())
+                          + bugs_citation_drift() + module_name_drift())
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1

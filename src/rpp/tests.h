@@ -521,5 +521,5 @@ namespace rpp
 }
 
 // Every macro of this header lives in tests.macros.h, because a module cannot export one.
-// An importer of rpp.tests includes that header, and the declarations come from the module.
+// An importer of rpp.testing includes that header, and the declarations come from the module.
 #include "tests.macros.h" // re-export
