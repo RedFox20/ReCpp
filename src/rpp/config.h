@@ -413,18 +413,33 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  define RPP_HAS_BUILTIN(x) 0
 #endif
 
-#ifndef RPP_BUILTIN_MEMCPY
-#  if RPP_HAS_BUILTIN(__builtin_memcpy)
+// each macro guards itself, so a consumer which overrides one keeps the other three
+#if RPP_HAS_BUILTIN(__builtin_memcpy)
+#  ifndef RPP_BUILTIN_MEMCPY
 #    define RPP_BUILTIN_MEMCPY(dst, src, size)  __builtin_memcpy(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMMOVE
 #    define RPP_BUILTIN_MEMMOVE(dst, src, size) __builtin_memmove(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMSET
 #    define RPP_BUILTIN_MEMSET(dst, value, size) __builtin_memset(dst, value, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMCMP
 #    define RPP_BUILTIN_MEMCMP(a, b, size)      __builtin_memcmp(a, b, size)
-#  else
+#  endif
+#else
 // MSVC offers no such builtin, so the macros need the declarations this header carries
-#    include <string.h>
+#  include <string.h>
+#  ifndef RPP_BUILTIN_MEMCPY
 #    define RPP_BUILTIN_MEMCPY(dst, src, size)  memcpy(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMMOVE
 #    define RPP_BUILTIN_MEMMOVE(dst, src, size) memmove(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMSET
 #    define RPP_BUILTIN_MEMSET(dst, value, size) memset(dst, value, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMCMP
 #    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
 #  endif
 #endif
