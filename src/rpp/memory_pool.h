@@ -87,7 +87,7 @@ namespace rpp
         {
             if (staticBlockSize > 0 && Buffer)
             {
-                memset(Buffer, 0, staticBlockSize); // initialize memory to make static analyzers happy
+                RPP_BUILTIN_MEMSET(Buffer, 0, staticBlockSize); // make static analyzers happy
                 if (int rem = size_t(Buffer) % 16) { // always align Ptr to 16 bytes
                     Remaining -= (16 - rem);
                     Ptr       += (16 - rem);

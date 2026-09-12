@@ -8,6 +8,44 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B23. The modules build fails on gcc-14 with C++23, from a clean configure
+`CXX23=1 mama gcc build test="nogdb -vv"` with an empty build directory reports six times
+`note: unable to represent further imported source locations`, then fails:
+
+```
+rpp.event_loop:  error: conflicting global module declaration
+  'auto std::__format::_Sink_iter<_CharT>::_M_reserve(std::size_t) const'
+rpp.future:      error: conflicting global module declaration ...
+rpp.thread_pool: error: conflicting global module declaration ...
+```
+
+The same tree, same commit, passes 584/584 with `CXX20=1` and reports the note zero times.
+An incremental C++23 build also passes, because it reuses the binary module interfaces the
+clean run has to rebuild. So both ways a developer normally sees this are green.
+
+Two modules reproduce the C++23 half of it. Each compiles alone, and an importer of both
+fails only at `-std=gnu++23`:
+
+```cpp
+module;
+#include <memory>
+export module a;
+export namespace std { using std::unique_ptr; }
+```
+```cpp
+module;
+#include <condition_variable>
+export module b;
+export namespace std { using std::cv_status; }
+```
+
+`unique_ptr.h:522: error: conflicting declaration of template 'std::out_ptr_t@a'`. One module
+which includes both headers is fine, so the fault is two fragments which overlap on a C++23
+entity, not either header.
+
+Nothing guards this. Both CI modules jobs are `std: "20"`, so the matrix has no C++23 modules
+row at all. Add one, and expect it red until this is fixed.
+
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
 

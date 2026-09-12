@@ -18,6 +18,7 @@ module;
 #include <optional>
 #include <stdexcept>
 #include <exception>
+#include <typeinfo>
 #include <source_location>
 #include <type_traits>
 #include <utility>
@@ -85,8 +86,9 @@ export namespace std {
     using std::condition_variable;
     using std::cv_status;
 
-    // source_loc.h takes one in a public constructor
+    // source_loc.h takes one in a public constructor, tests.h takes the other
     using std::source_location;
+    using std::type_info;
 
     // exceptions. std::exception_ptr is absent on purpose, see BUGS.md B19
     using std::exception;

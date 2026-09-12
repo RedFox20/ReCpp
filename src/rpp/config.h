@@ -402,6 +402,24 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  endif
 #endif
 
+////////////////////////////////////////////////////////////////////////////////////
+// The compiler builtins for the mem* family, which need no <cstring>.
+// A header which names ::memmove gives gcc-14 a module-attached copy of the builtin, and
+// gcc then crashes in nonnull_arg_p for any importer at -O1, see BUGS.md C27.
+#ifndef RPP_BUILTIN_MEMCPY
+#  if defined(_MSC_VER)
+#    define RPP_BUILTIN_MEMCPY(dst, src, size)  memcpy(dst, src, size)
+#    define RPP_BUILTIN_MEMMOVE(dst, src, size) memmove(dst, src, size)
+#    define RPP_BUILTIN_MEMSET(dst, value, size) memset(dst, value, size)
+#    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
+#  else
+#    define RPP_BUILTIN_MEMCPY(dst, src, size)  __builtin_memcpy(dst, src, size)
+#    define RPP_BUILTIN_MEMMOVE(dst, src, size) __builtin_memmove(dst, src, size)
+#    define RPP_BUILTIN_MEMSET(dst, value, size) __builtin_memset(dst, value, size)
+#    define RPP_BUILTIN_MEMCMP(a, b, size)      __builtin_memcmp(a, b, size)
+#  endif
+#endif
+
 // config.types.h holds the integer aliases and the size macros. The include stays
 // unconditional, so a C translation unit still gets the RPP_*_SIZE macros.
 #include "config.types.h"

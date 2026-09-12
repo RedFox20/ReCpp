@@ -340,23 +340,49 @@ STD_NOT_EXPORTED = {
     'nullptr_t': 'the same global scope ambiguity as size_t',
     'nothrow_t': 'an importer already includes <new>, which carries it',
     'basic_string_view': 'rpp::strview replaces it, and std::string_view covers a caller',
+    'chrono': 'a namespace, and rpp::Duration replaces it in every ReCpp signature',
+    'declval': 'unevaluated, inside a trait, which no caller writes',
+    'get_if': 'a call inside an inline body, not an argument a caller passes',
+    'make_exception_ptr': 'the same, and B19 keeps std::exception_ptr out anyway',
 }
 
-# a declaration, not a call: a name, its parameter list, and what closes the declaration
-_DECL = re.compile(r'\b\w+\s*\(([^()]*)\)\s*(?:const\s*)?(?:noexcept\w*\s*)?(?:->|\{|;|$)')
+_OPEN = re.compile(r'\b\w+\s*\(')
 _STD_NAME = re.compile(r'\bstd::(\w+)')
 
 
-def _parameter_lines(header: str) -> list:
-    """The lines of a header which can declare a parameter, with comments and directives cut.
+def _parameter_lists(text: str):
+    """Every `name(...)` list in one logical line, matched by counting parentheses.
 
-    A concept body and a static_assert name a trait the caller never writes, so both go too.
+    A regex cannot span a nested list, and a member function pointer parameter carries one.
+    """
+    for opener in _OPEN.finditer(text):
+        i, depth = opener.end(), 1
+        while i < len(text) and depth:
+            depth += (text[i] == '(') - (text[i] == ')')
+            i += 1
+        if depth == 0:
+            yield text[opener.end():i - 1]
+
+
+def _parameter_lines(header: str) -> list:
+    """The logical lines of a header which can declare a parameter, comments and directives cut.
+
+    A declaration wraps its parameter list over several source lines, so join until the
+    parentheses balance. A concept body and a static_assert name a trait no caller writes.
     """
     text = re.sub(r'/\*.*?\*/', '', _read(header), flags=re.S)
     text = re.sub(r'//[^\n]*', '', text)
     text = re.sub(r'^[ \t]*#[^\n]*', '', text, flags=re.M)
-    return [ln for ln in text.splitlines()
-            if 'std::' in ln and not re.search(r'\b(requires|concept|static_assert)\b', ln)]
+    logical, pending, depth = [], '', 0
+    for line in text.splitlines():
+        pending = f'{pending} {line.strip()}' if pending else line
+        depth = max(0, depth + line.count('(') - line.count(')'))
+        if depth:
+            continue
+        if 'std::' in pending and not re.search(r'\b(requires|concept|static_assert)\b', pending):
+            logical.append(pending)
+        pending = ''
+    return logical
 
 
 def std_export_drift() -> list:
@@ -365,16 +391,15 @@ def std_export_drift() -> list:
     A consumer which imports instead of including has to spell each one, so a gap here is an
     API it cannot call. `STD_NOT_EXPORTED` carries the deliberate exclusions with a reason.
     """
-    path = os.path.join(rd.SRC, STD_MODULE)
-    if not os.path.exists(path):
+    if not os.path.exists(os.path.join(rd.SRC, STD_MODULE)):
         return [f'{STD_MODULE}: missing']
     exported = set(re.findall(r'^\s*using std::(\w+);', _read(STD_MODULE), re.M))
     found = {}
     for header in sorted(os.listdir(rd.SRC)):
         if not header.endswith('.h'): continue
         for line in _parameter_lines(header):
-            for decl in _DECL.finditer(line):
-                for name in _STD_NAME.findall(decl.group(1)):
+            for params in _parameter_lists(line):
+                for name in _STD_NAME.findall(params):
                     if name not in exported and name not in STD_NOT_EXPORTED:
                         found.setdefault(name, header)
     return [f'{STD_MODULE}: {h} writes std::{n} in a parameter list. Export it, or name it '
@@ -463,13 +488,13 @@ def selftest() -> list:
     finally:
         globals()['_read'] = real_read
 
-    # the std export list is hand written too, so pin both directions the same way
+    # the std export list is hand written too, so pin every way one can go stale
     if std_export_drift(): bad.append('the std gate reports drift on a correct list')
-    def _std_patched(text):
-        globals()['_read'] = lambda h: text(real_read(h)) if h == STD_MODULE else real_read(h)
+    def _std_patched(cppm, text):
+        globals()['_read'] = lambda h: text(real_read(h)) if h == cppm else real_read(h)
         return std_export_drift()
     try:
-        drift = _std_patched(lambda t: t.replace('    using std::deque;\n', ''))
+        drift = _std_patched(STD_MODULE, lambda t: t.replace('    using std::deque;\n', ''))
         if not any('std::deque' in f for f in drift):
             bad.append('a dropped std export passed the std gate')
 

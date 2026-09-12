@@ -925,12 +925,8 @@ namespace rpp
             if constexpr (std::is_trivially_move_assignable_v<T>)
             {
                 size_t count = (oldTail - oldHead);
-                // gcc-14 attaches ::memmove to this module and then crashes on it, see BUGS.md B18
-            #if defined(__GNUC__)
-                if (count) __builtin_memmove(newStart, oldHead, count * sizeof(T));
-            #else
-                if (count) ::memmove(newStart, oldHead, count * sizeof(T));
-            #endif
+                if (count)
+                    RPP_BUILTIN_MEMMOVE(newStart, oldHead, count * sizeof(T));
                 return newStart + count;
             }
             else

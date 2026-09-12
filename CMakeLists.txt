@@ -98,6 +98,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 # Add compiler specific flags
 if(CLANG OR GCC)
     add_compile_options(-g -Wall -Wextra -fPIC)
+    # One section per function and per object, so the linker drops what nothing references.
+    # A modules build emits one initializer per interface unit, and this reclaims the rest.
+    add_compile_options(-ffunction-sections -fdata-sections)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections")
     if(CLANG)
         message("Configure for Clang++ ${CMAKE_CXX_COMPILER_VERSION}")
         if(RPP_USE_LIBCXX)
