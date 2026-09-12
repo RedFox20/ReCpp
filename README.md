@@ -154,24 +154,15 @@ owns all eight files, and `GROUP_HEADERS` in it is the list a new header joins.
 name several. `rpp.testing` stays out of the umbrella, because it overflows the gcc-14
 source location budget through that unit on C++23, see `BUGS.md` B25. A test file names it.
 
-`rpp.std` sits outside the groups. No header backs it, and it carries the std names a public
-ReCpp signature writes, so a file which wants them imports it beside the rest. It sits in
-five parts, and a file which wants less imports one part:
+**No module exports a std name.** An importer includes the std headers it uses, before its
+imports, which is the include-before-import rule it already follows. ReCpp once shipped an
+`rpp.std` module for those names, and every gcc-14 defect it hit came from exporting them:
+B19, B20, B21, B22 and B24. Including the header directly reaches none of the five.
 
-| Module | Carries |
-|---|---|
-| `rpp.std.text` | string, wstring, u16string, to_string, basic_string, char_traits, the string views, the free operators |
-| `rpp.std.containers` | vector, array, deque, span, unordered_map, optional, initializer_list, tuple, pair |
-| `rpp.std.memory` | unique_ptr, shared_ptr, weak_ptr, make_unique, make_shared, default_delete |
-| `rpp.std.threading` | atomic and the memory orders, mutex, unique_lock, lock_guard, shared_mutex, shared_lock, condition_variable, cv_status |
-| `rpp.std.core` | source_location, type_info, the exceptions, the traits, move, forward, swap |
-
-`import rpp.std;` re-exports all five. One unit which carries `<memory>` beside the container
-headers writes a module gcc-14 cannot read back on C++23, which is why the parts exist.
-
-Two of these names need an include beside the import, because gcc-14 leaves something out of
-the module. A `std::vector` needs `<new>` for the placement `operator new`, and a
-`std::shared_ptr` needs `<memory>`, see `BUGS.md` B22. A `std::unique_ptr` needs neither.
+```cpp
+#include <string>       // the std names this file uses, includes first
+import rpp.text;        // then the groups
+```
 
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module

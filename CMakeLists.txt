@@ -376,12 +376,6 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
         src/rpp/rpp-testing.cppm
-        src/rpp/rpp-std-text.cppm
-        src/rpp/rpp-std-containers.cppm
-        src/rpp/rpp-std-memory.cppm
-        src/rpp/rpp-std-threading.cppm
-        src/rpp/rpp-std-core.cppm
-        src/rpp/rpp-std.cppm
         src/rpp/rpp.cppm
     )
 

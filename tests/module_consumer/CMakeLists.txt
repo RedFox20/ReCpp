@@ -42,12 +42,7 @@ target_include_directories(RppStdStringModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppStdStringModuleOnly)
 target_link_libraries(RppStdStringModuleOnly PRIVATE ${MAMA_LIBS})
 
-# rpp.std is the only target which may include no header, so only it proves that export list
-add_executable(RppStdModuleOnly std_module_only.cpp)
-target_include_directories(RppStdModuleOnly PRIVATE ${MAMA_INCLUDES})
-mama_target_modules(RppStdModuleOnly)
-
-# the exceptions need their own target, because the <new> above declares std::exception
+# an exception must cross a module boundary, which BUGS.md B19 broke
 add_executable(RppExceptModuleOnly except_module_only.cpp)
 target_include_directories(RppExceptModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppExceptModuleOnly)

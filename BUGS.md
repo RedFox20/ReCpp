@@ -50,7 +50,7 @@ int main() { std::unique_ptr<int> p = std::make_unique<int>(3); return *p; }
 
 The error is `no matching function for call to 'get<0>(std::tuple@probe<int*,
 std::default_delete@probe<int> >&)`, so the exported set does not match the module-owned
-`std::tuple`. `rpp-std-containers.cppm` leaves `std::get` out. A consumer includes `<tuple>` for it.
+`std::tuple`. No module exports a std name now, so a consumer includes `<tuple>` and never meets this.
 
 ### B20. gcc-14 breaks `std::swap` lookup when the fragment includes `<future>`
 The interface does not compile. Four lines reproduce it:
@@ -66,8 +66,8 @@ export namespace std { using std::swap; }
 generic `std::swap` left overload resolution. Only `<future>` triggers it. The same export
 with `<memory>`, `<mutex>` or `<thread>` compiles.
 
-`rpp-std-threading.cppm` keeps `<future>` out of its fragment because of this, so `std::future`
-and `std::promise` stay out with it. B16 blocks `std::promise` in an importer anyway.
+No module exports a std name now, so nothing in ReCpp reaches this. B16 blocks `std::promise`
+in an importer anyway.
 
 ### B19. gcc-14 writes an unreadable module when it exports `std::exception_ptr`
 The interface compiles. Every importer then fails with `failed to read compiled module: Bad
@@ -84,8 +84,8 @@ The name is what matters, not the header and not the size of the export list.
 `std::exception`, `std::runtime_error`, `std::current_exception`, `std::rethrow_exception`
 and `std::make_exception_ptr` all export cleanly from the same file.
 
-`rpp-std-core.cppm` leaves `std::exception_ptr` out because of this. Put it back when a newer
-gcc reads the module, because a consumer which catches through a pointer needs it.
+No module exports a std name now, so nothing in ReCpp reaches this. A consumer which catches
+through a pointer includes `<exception>`.
 
 ### B17. A pool worker frees the generic task a test still reads (C18 recurred)
 `ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
@@ -329,8 +329,8 @@ The script's own docstring already warns that it has mistakes.
 
 ### B24. gcc-14 wrote an `rpp.std` on C++23 which no importer could read
 The module compiled, every importer then stopped with `failed to read compiled module: Bad
-file data`, and the same source passed on C++20. Five parts replaced the one unit, because a
-unit which carries `<memory>` beside the container headers is the shape gcc cannot write.
+file data`, and the same source passed on C++20. A unit which carries `<memory>` beside the
+container headers is the shape gcc cannot write, and no module exports a std name now.
 
 ### B25. A C++23 consumer of the whole module graph broke on `std::packaged_task`
 The consumer build stopped with `conflicting declaration of template 'std::packaged_task@

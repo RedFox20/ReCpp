@@ -1,4 +1,4 @@
-// C++20 umbrella: `import rpp;` reaches every group below, and rpp.std imports by name.
+// C++20 umbrella: `import rpp;` reaches every group below. An importer includes its own std headers.
 // rpp.testing stays out, because it overflows the gcc-14 location budget here, see BUGS.md B25.
 export module rpp;
 

@@ -397,110 +397,6 @@ def umbrella_drift() -> list:
     return bad
 
 
-STD_MODULE = 'rpp-std.cppm'
-
-# The std stand-in sits in five parts, and `rpp-std.cppm` re-exports all five. One unit which
-# carries <memory> beside the container headers is unreadable on C++23, see BUGS.md B24.
-STD_PARTS = ('rpp-std-text.cppm', 'rpp-std-containers.cppm', 'rpp-std-memory.cppm',
-             'rpp-std-threading.cppm', 'rpp-std-core.cppm')
-
-# Every std name a public parameter list writes which `rpp.std` does not export. The reason
-# is what the next reader needs, because `std_export_drift` reports anything absent from both
-STD_NOT_EXPORTED = {
-    **{n: 'a trait in a default argument, which no caller writes' for n in (
-        'is_enum_v', 'is_function', 'is_void_v', 'is_nothrow_copy_constructible_v',
-        'is_nothrow_move_constructible_v', 'is_trivially_copy_assignable_v',
-        'is_trivially_destructible_v', 'is_trivially_move_assignable_v')},
-    'exception_ptr': 'gcc-14 writes an interface no importer can read, see BUGS.md B19',
-    'future': 'its header kills std::swap lookup in the fragment, see BUGS.md B20',
-    'future_status': 'the same header, and rpp::cfuture::await_ready() answers without it',
-    'promise': 'gcc-14 crashes an importer which instantiates it, see BUGS.md B16',
-    'get': 'gcc-14 breaks std::unique_ptr in every importer, see BUGS.md B21',
-    'size_t': '<cstddef> declares it at global scope too, so a mixed importer reports an ambiguity',
-    'nullptr_t': 'the same global scope ambiguity as size_t',
-    'nothrow_t': 'an importer already includes <new>, which carries it',
-    'basic_string_view': 'rpp::strview replaces it, and std::string_view covers a caller',
-    'chrono': 'a namespace, and rpp::Duration replaces it in every ReCpp signature',
-    'declval': 'unevaluated, inside a trait, which no caller writes',
-    'get_if': 'a call inside an inline body, not an argument a caller passes',
-    'make_exception_ptr': 'the same, and B19 keeps std::exception_ptr out anyway',
-}
-
-_OPEN = re.compile(r'\b\w+\s*\(')
-_STD_NAME = re.compile(r'\bstd::(\w+)')
-
-
-def _parameter_lists(text: str):
-    """Every `name(...)` list in one logical line, matched by counting parentheses.
-
-    A regex cannot span a nested list, and a member function pointer parameter carries one.
-    """
-    for opener in _OPEN.finditer(text):
-        i, depth = opener.end(), 1
-        while i < len(text) and depth:
-            depth += (text[i] == '(') - (text[i] == ')')
-            i += 1
-        if depth == 0:
-            yield text[opener.end():i - 1]
-
-
-def _parameter_lines(header: str) -> list:
-    """The logical lines of a header which can declare a parameter, comments and directives cut.
-
-    A declaration wraps its parameter list over several source lines, so join until the
-    parentheses balance. A concept body and a static_assert name a trait no caller writes.
-    """
-    text = re.sub(r'/\*.*?\*/', '', _read(header), flags=re.S)
-    text = re.sub(r'//[^\n]*', '', text)
-    text = re.sub(r'^[ \t]*#[^\n]*', '', text, flags=re.M)
-    logical, pending, depth = [], '', 0
-    for line in text.splitlines():
-        pending = f'{pending} {line.strip()}' if pending else line
-        depth = max(0, depth + line.count('(') - line.count(')'))
-        if depth:
-            continue
-        if 'std::' in pending and not re.search(r'\b(requires|concept|static_assert)\b', pending):
-            logical.append(pending)
-        pending = ''
-    return logical
-
-
-def std_export_drift() -> list:
-    """Every std name a public parameter list writes which `rpp.std` does not export.
-
-    A consumer which imports instead of including has to spell each one, so a gap here is an
-    API it cannot call. `STD_NOT_EXPORTED` carries the deliberate exclusions with a reason.
-    """
-    missing = [f'{p}: missing' for p in (STD_MODULE, *STD_PARTS)
-               if not os.path.exists(os.path.join(rd.SRC, p))]
-    if missing:
-        return missing
-    exported = set()
-    for part in STD_PARTS:
-        exported |= set(re.findall(r'^\s*using std::(\w+);', _read(part), re.M))
-    found = {}
-    for header in sorted(os.listdir(rd.SRC)):
-        if not header.endswith('.h'): continue
-        for line in _parameter_lines(header):
-            for params in _parameter_lists(line):
-                for name in _STD_NAME.findall(params):
-                    if name not in exported and name not in STD_NOT_EXPORTED:
-                        found.setdefault(name, header)
-    return [f'rpp.std: {h} writes std::{n} in a parameter list. Export it from a part, or '
-            f'name it in STD_NOT_EXPORTED with the reason' for n, h in sorted(found.items())]
-
-
-BUGS = 'BUGS.md'
-
-# every file which may cite a BUGS.md entry. A citation which resolves to nothing sends the
-# next reader to a reproducer somebody deleted
-CITING = (BUGS, 'README.md', 'AGENTS.md', 'CMakeLists.txt')
-
-
-# a suffix which makes an `rpp.x` a file name and not a module name
-_NOT_A_MODULE = ('.cppm', '.cpp', '.h', '.py', '.tmp', '.txt', '.md')
-
-
 def module_name_drift() -> list:
     """Every `rpp.<name>` in the sources which no `export module` declares.
 
@@ -530,6 +426,17 @@ def module_name_drift() -> list:
     return bad
 
 
+BUGS = 'BUGS.md'
+
+# every file which may cite a BUGS.md entry. A citation which resolves to nothing sends the
+# next reader to a reproducer somebody deleted
+CITING = (BUGS, 'README.md', 'AGENTS.md', 'CMakeLists.txt')
+
+
+# a suffix which makes an `rpp.x` a file name and not a module name
+_NOT_A_MODULE = ('.cppm', '.cpp', '.h', '.py', '.tmp', '.txt', '.md')
+
+
 def bugs_citation_drift() -> list:
     """Every `BUGS.md <id>` citation which names no entry, and every id the file defines twice.
 
@@ -556,26 +463,6 @@ def bugs_citation_drift() -> list:
 def _readfile(path: str) -> str:
     return open(path, encoding='utf-8-sig', errors='replace').read()
 
-
-def std_umbrella_drift() -> list:
-    """Every std part `rpp-std.cppm` does not re-export, and every name it re-exports twice.
-
-    A part no umbrella names reaches no consumer which writes `import rpp.std;`, and a name
-    two parts export makes the importer report an ambiguity.
-    """
-    if not os.path.exists(os.path.join(rd.SRC, STD_MODULE)):
-        return [f'{STD_MODULE}: missing']
-    reexported = set(re.findall(r'^\s*export import (rpp\.std\.[\w.]+);', _read(STD_MODULE), re.M))
-    wanted = {f'rpp.std.{p[len("rpp-std-"):-len(".cppm")]}' for p in STD_PARTS}
-    bad = [f'{STD_MODULE}: does not re-export {m}' for m in sorted(wanted - reexported)]
-    bad += [f'{STD_MODULE}: re-exports {m}, which STD_PARTS does not name'
-            for m in sorted(reexported - wanted)]
-    owner = {}
-    for part in STD_PARTS:
-        for name in re.findall(r'^\s*using std::(\w+);', _read(part), re.M):
-            if name in owner: bad.append(f'{part}: exports std::{name}, which {owner[name]} also exports')
-            else: owner[name] = part
-    return bad
 
 
 def manual_export_drift() -> list:
@@ -666,7 +553,7 @@ def selftest() -> list:
         globals()['_readfile'] = lambda f: text(real_readfile(f)) if f == BUGS else real_readfile(f)
         return bugs_citation_drift()
     try:
-        cited = re.search(r'BUGS\.md\s+([BC]\d+)', real_readfile(os.path.join(rd.SRC, STD_PARTS[2])))
+        cited = re.search(r'BUGS\.md\s+([BC]\d+)', real_readfile(os.path.join(rd.SRC, UMBRELLA)))
         dropped = cited.group(1)
         drift = _bugs_patched(lambda s: s.replace(f'### {dropped}.', f'### {dropped}_gone.'))
         if not any(dropped in f for f in drift):
@@ -745,54 +632,6 @@ def selftest() -> list:
     finally:
         MANUAL_EXPORTS.clear()
         MANUAL_EXPORTS.update(real_manual)
-
-    # the std export list is hand written too, so pin every way one can go stale
-    if std_export_drift(): bad.append('the std gate reports drift on a correct list')
-    if std_umbrella_drift(): bad.append('the std umbrella gate reports drift on a correct list')
-    def _std_patched(cppm, text):
-        globals()['_read'] = lambda h: text(real_read(h)) if h == cppm else real_read(h)
-        return std_export_drift()
-    try:
-        drift = _std_patched('rpp-std-containers.cppm', lambda t: t.replace('    using std::deque;\n', ''))
-        if not any('std::deque' in f for f in drift):
-            bad.append('a dropped std export passed the std gate')
-
-        excluded = sorted(STD_NOT_EXPORTED)[0]
-        reason = STD_NOT_EXPORTED.pop(excluded)
-        try:
-            if not any(excluded in f for f in std_export_drift()):
-                bad.append('a std name with no exclusion reason passed the std gate')
-        finally:
-            STD_NOT_EXPORTED[excluded] = reason
-
-        # a declaration which wraps its parameter list, so a regression in the parenthesis
-        # counting of _parameter_lines reports nothing instead of the name it stopped joining
-        wrapped = ('\nnamespace rpp {\n'
-                   '    void selftest_probe(int first,\n'
-                   '                        std::multiset<int>& wrapped) noexcept;\n}\n')
-        drift = _std_patched('strview.h', lambda t: t + wrapped)
-        if not any('std::multiset' in f for f in drift):
-            bad.append('a std name on a continued parameter line passed the std gate')
-
-        # the same name on one line, so the case above fails for the join and not for the name
-        drift = _std_patched('strview.h', lambda t: t + wrapped.replace(',\n' + ' ' * 24, ', '))
-        if not any('std::multiset' in f for f in drift):
-            bad.append('a std name on one parameter line passed the std gate')
-
-        # the umbrella gate, which the two cases below are the only ways to break
-        def _umbrella_patched(cppm, text):
-            globals()['_read'] = lambda h: text(real_read(h)) if h == cppm else real_read(h)
-            return std_umbrella_drift()
-        drift = _umbrella_patched(STD_MODULE, lambda t: t.replace('export import rpp.std.memory;\n', ''))
-        if not any('rpp.std.memory' in f for f in drift):
-            bad.append('an umbrella which drops a part passed the std umbrella gate')
-
-        drift = _umbrella_patched('rpp-std-core.cppm',
-                                  lambda t: t.replace('    using std::move;', '    using std::vector;'))
-        if not any('std::vector' in f for f in drift):
-            bad.append('a name two parts export passed the std umbrella gate')
-    finally:
-        globals()['_read'] = real_read
 
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, 'probe.h')
@@ -883,8 +722,7 @@ def main() -> int:
         targets = list(GROUPS) if a.all else [header_group(a.header)]
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
-        if a.all: bad += (name_collisions() + umbrella_drift() + std_export_drift()
-                          + std_umbrella_drift() + manual_export_drift()
+        if a.all: bad += (name_collisions() + umbrella_drift() + manual_export_drift()
                           + bugs_citation_drift() + module_name_drift())
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
