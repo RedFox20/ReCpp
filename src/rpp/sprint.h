@@ -365,7 +365,7 @@ namespace rpp
             writeln();
         }
 
-        /// @brief Appends every item of the container with write(), and puts `sep` between the items
+        /// @brief Appends every item with write(), puts `sep` between the items, and returns this buffer
         /// Ex: join(std::vector<int>{1,2,3}, ", ") --> "1, 2, 3"
         template<is_container C, class S> string_buffer& join(const C& container, const S& sep) noexcept
         {
@@ -379,7 +379,7 @@ namespace rpp
             return *this;
         }
 
-        /// @brief Appends every item of the container with write(), and puts string_buffer::separator between the items
+        /// @brief Same as join(container, sep), with string_buffer::separator between the items
         template<is_container C> FINLINE string_buffer& join(const C& container) noexcept { return join(container, separator); }
 
         ////////////////////////////////////////////////////////////////////////////////////////////

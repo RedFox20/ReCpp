@@ -824,7 +824,7 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L159) | Write a float or double with a chosen number of decimals, instead of the default 6 |
 | [`writeln(const Args&... args)`](src/rpp/sprint.h#L362) | Write values followed by newline |
 | [`join(const C& container, const S& sep)`](src/rpp/sprint.h#L370) | Write every item of a container, with `sep` between the items, and return the buffer for chaining |
-| [`join(const C& container)`](src/rpp/sprint.h#L383) | Write every item of a container, with `string_buffer::separator` between the items |
+| [`join(const C& container)`](src/rpp/sprint.h#L383) | Write every item of a container, with `string_buffer::separator` between the items, and return the buffer for chaining |
 | [`writef(const char* format, ...)`](src/rpp/sprint.h#L132) | Printf-style formatted write |
 | [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L312) | Write data as hex string |
 | [`write_cont(const Container& c)`](src/rpp/sprint.h#L269) | Write container contents |
