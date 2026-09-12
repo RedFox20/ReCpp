@@ -248,6 +248,13 @@ namespace rpp
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
 
+    namespace detail
+    {
+        // MSVC takes the address of a prvalue as an extension, so SyncableType asks this instead
+        template<class T> inline constexpr bool is_lvalue_ref = false;
+        template<class T> inline constexpr bool is_lvalue_ref<T&> = true;
+    }
+
     /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
     /// The bodies here are what the guard does, so a wrong accessor type fails this concept
     /// rather than hard-erroring inside synchronize_guard.
@@ -255,7 +262,8 @@ namespace rpp
     concept SyncableType = requires(T t) {
         { t.get_mutex().lock() };
         { t.get_mutex().unlock() };
-        { &t.get_ref() }; // an address needs an lvalue, so void and a prvalue both fail
+        { t.get_ref() };
+        requires detail::is_lvalue_ref<decltype(t.get_ref())>; // the guard hands out a reference
     };
 
     // SyncableType cannot constrain this: synchronizable names synchronize_guard<SyncType>
