@@ -391,8 +391,8 @@ namespace rpp
 
         using guard_type = rpp::synchronize_guard<SyncType>;
 
-        /// Each one returns a guard which holds the lock until it dies. SyncableType gates
-        /// them, so a derived type missing get_mutex() or get_ref() loses these six and nothing else.
+        /// Each one returns a guard which holds the lock until it dies. SyncableType gates them,
+        /// so a derived type missing get_mutex() or get_ref() loses these accessors and nothing else.
         guard_type operator->() noexcept requires SyncableType<SyncType> { return make_guard(); }
         guard_type operator*()  noexcept requires SyncableType<SyncType> { return make_guard(); }
         guard_type guard()      noexcept requires SyncableType<SyncType> { return make_guard(); }

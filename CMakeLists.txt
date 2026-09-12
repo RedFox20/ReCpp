@@ -409,7 +409,7 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
         src/rpp/rpp-testing.cppm
-        # the top umbrella, which imports the eight groups
+        # the top umbrella, which imports the groups above
         src/rpp/rpp.cppm
     )
 
