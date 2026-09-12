@@ -51,6 +51,22 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a try_lock() whose result reads as a bool but cannot be negated, which spin_lock does
+    struct NoNegate
+    {
+        explicit operator bool() const noexcept { return true; }
+        bool operator!() const = delete;
+    };
+    struct ProxyTryLock { void lock() {} void unlock() {} static NoNegate try_lock() { return {}; } };
+    class MutexTryLockNoNegate : public rpp::synchronizable<MutexTryLockNoNegate>
+    {
+        std::string value;
+        ProxyTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
     // a get_ref() returning a reference to an array, which decays to a pointer in value_type
     class ArrayRef : public rpp::synchronizable<ArrayRef>
     {
@@ -130,6 +146,7 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<MutexByValue>);
         static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
         static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
+        static_assert(!rpp::SyncableType<MutexTryLockNoNegate>);
         static_assert(!rpp::SyncableType<VolatileRef>);
         static_assert(!rpp::SyncableType<ConstRef>);
         static_assert(!rpp::SyncableType<ArrayRef>);
@@ -146,6 +163,7 @@ TestImpl(test_mutex)
         static_assert(!has_guard<MutexByValue>);
         static_assert(!has_guard<MutexWithoutTryLock>);
         static_assert(!has_guard<MutexTryLockReturnsVoid>);
+        static_assert(!has_guard<MutexTryLockNoNegate>);
         static_assert(!has_guard<VolatileRef>);
         static_assert(!has_guard<ConstRef>);
         static_assert(!has_guard<ArrayRef>);

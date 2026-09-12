@@ -255,8 +255,9 @@ namespace rpp
         template<class T> inline constexpr bool is_plain_lvalue_ref = false;
         template<class T> inline constexpr bool is_plain_lvalue_ref<T&> = std::is_same_v<T&, std::decay_t<T>&>;
 
-        // what `!m.try_lock()` needs. A local concept keeps <concepts> out of this header
-        template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; };
+        // spin_lock reads the result both ways, `if (m.try_lock())` and `if (!m.try_lock())`,
+        // so ask for both. A local concept keeps <concepts> out of this header
+        template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; !t ? 0 : 0; };
     }
 
     /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
