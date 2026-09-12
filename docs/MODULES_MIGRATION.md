@@ -1159,12 +1159,11 @@ human, and `std::cv_status` came in that way. Dropping `rpp.std` retired the gat
 It also matches the literal `std::` spelling, so an alias hides a name from it. `rpp::ustrview`
 takes a `string_view_t`, which is `std::u16string_view`, and a reviewer found that one.
 
-One return type stays out on purpose. `rpp::cfuture::wait_for` returns `std::future_status`,
-which lives in `<future>`, and B20 makes that header fatal beside an exported `std::swap`.
-Dropping `std::swap` does buy it, and the measured price is 18% on every importer of
-`rpp.std`, 166 ms against 196 ms. `rpp::cfuture::await_ready()` answers the same question as a
-`bool`, which is what AGENTS.md tells a caller to use, so the name stays out and
-`STD_NOT_EXPORTED` records why.
+One return type drove that question and no longer exists. `rpp::cfuture::wait_for` returned
+`std::future_status`, which lives in `<future>`, and B20 makes that header fatal beside an
+exported `std::swap`. Exporting it measured 18% on every importer of `rpp.std`, 166 ms against
+196 ms. The overload returns `rpp::wait_result` now, which `thread_pool::wait_until_idle`
+already used, so the public signature names no std type.
 
 ---
 
