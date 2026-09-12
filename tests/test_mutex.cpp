@@ -51,6 +51,16 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a const get_ref(), which the guard cannot hand out as a plain value_type&
+    class ConstRef : public rpp::synchronizable<ConstRef>
+    {
+        rpp::mutex mutex;
+        int value = 0;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        const int& get_ref() const noexcept { return value; }
+    };
+
     // a volatile get_ref(), which the guard cannot hand out as a plain value_type&
     class VolatileRef : public rpp::synchronizable<VolatileRef>
     {
@@ -101,6 +111,7 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
         static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
         static_assert(!rpp::SyncableType<VolatileRef>);
+        static_assert(!rpp::SyncableType<ConstRef>);
 
         // SyncableType constrains every synchronizable member, so a derived type which
         // forgot the accessors still compiles and only loses guard()
@@ -113,6 +124,7 @@ TestImpl(test_mutex)
         static_assert(!has_guard<MutexWithoutTryLock>);
         static_assert(!has_guard<MutexTryLockReturnsVoid>);
         static_assert(!has_guard<VolatileRef>);
+        static_assert(!has_guard<ConstRef>);
 
         SimpleValue value;
         auto guard = value.guard();

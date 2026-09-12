@@ -1903,7 +1903,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L428) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L435) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -1912,7 +1912,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`spin_lock(Mutex m)`](src/rpp/mutex.h#L196) | Spin-lock with fallback to blocking lock |
 | [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L232) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L127) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L262) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`SyncableType`](src/rpp/mutex.h#L269) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 ### Example: Basic Mutex and Spin Lock
 

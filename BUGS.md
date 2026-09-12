@@ -260,10 +260,9 @@ dropped `export import rpp.testing;`, so a file which wants the test framework n
 
 ### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
 A clean C++23 build reported `unable to represent further imported source locations` six
-times, then failed with `conflicting global module declaration` in three modules, while C++20
-passed on the same commit. Eight header groups cut one translation unit from 39 imports to 8,
-which builds clean on both standards, and a `ubuntu-cpp23-modules-gcc14` CI row now covers the
-standard the matrix used to miss.
+times, then failed with `conflicting global module declaration` in three modules. Eight header
+groups cut one translation unit from 39 imports to 8, and `ubuntu-cpp23-modules-gcc14` now
+covers that standard.
 
 ### C27. gcc-14 crashed any importer which built a concurrent queue at `-O1` (was B18)
 gcc attached its own builtin `memmove` to `rpp.concurrent_queue`, so `nonnull_arg_p` crashed

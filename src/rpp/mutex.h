@@ -254,9 +254,10 @@ namespace rpp
         template<class T> inline constexpr bool is_lvalue_ref = false;
         template<class T> inline constexpr bool is_lvalue_ref<T&> = true;
 
-        // the guard hands out a `std::decay_t<T>&`, which a volatile or const lvalue is not
+        // the guard hands out a `std::decay_t<T>&`, which a const or volatile lvalue is not
         template<class T> inline constexpr bool is_plain_lvalue_ref = false;
-        template<class T> inline constexpr bool is_plain_lvalue_ref<T&> = !std::is_volatile_v<T>;
+        template<class T> inline constexpr bool is_plain_lvalue_ref<T&> =
+            !std::is_const_v<T> && !std::is_volatile_v<T>;
 
         // what `!m.try_lock()` needs. A local concept keeps <concepts> out of this header
         template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; };
