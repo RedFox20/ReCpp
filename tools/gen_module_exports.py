@@ -482,6 +482,38 @@ def std_export_drift() -> list:
             f'name it in STD_NOT_EXPORTED with the reason' for n, h in sorted(found.items())]
 
 
+BUGS = 'BUGS.md'
+
+# every file which may cite a BUGS.md entry. A citation which resolves to nothing sends the
+# next reader to a reproducer somebody deleted
+CITING = (BUGS, 'README.md', 'AGENTS.md', 'CMakeLists.txt')
+
+
+def bugs_citation_drift() -> list:
+    """Every `BUGS.md <id>` citation which names no entry, and every id the file defines twice.
+
+    A rewrite of BUGS.md can drop an entry while the comments which point at it stay, and
+    nothing else notices. This reads the citations and the headings and compares them.
+    """
+    if not os.path.exists(BUGS):
+        return [f'{BUGS}: missing']
+    ids = re.findall(r'^### ([BC]\d+)\.', _readfile(BUGS), re.M)
+    bad = [f'{BUGS}: defines {i} more than once' for i in sorted({i for i in ids if ids.count(i) > 1})]
+    known = set(ids)
+    files = list(CITING) + [os.path.join(rd.SRC, f) for f in sorted(os.listdir(rd.SRC))
+                            if f.endswith(('.h', '.cpp', '.cppm'))]
+    files += [os.path.join('docs', f) for f in sorted(os.listdir('docs')) if f.endswith('.md')]
+    for path in files:
+        if not os.path.exists(path): continue
+        for cited in sorted(set(re.findall(r'BUGS\.md\s+([BC]\d+)', _readfile(path)))):
+            if cited not in known: bad.append(f'{path}: cites {cited}, which {BUGS} does not define')
+    return bad
+
+
+def _readfile(path: str) -> str:
+    return open(path, encoding='utf-8-sig', errors='replace').read()
+
+
 def std_umbrella_drift() -> list:
     """Every std part `rpp-std.cppm` does not re-export, and every name it re-exports twice.
 
@@ -566,6 +598,25 @@ def selftest() -> list:
     if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
     if macro_collision('core'): bad.append('a group name which repeats no macro reported one')
     if name_collisions(): bad.append('the group name gate reports a collision on the real groups')
+
+    # a BUGS.md rewrite can drop an entry while the comments which cite it stay, so pin both ways
+    if bugs_citation_drift(): bad.append('the citation gate reports drift on a correct BUGS.md')
+    real_readfile = _readfile
+    def _bugs_patched(text):
+        globals()['_readfile'] = lambda f: text(real_readfile(f)) if f == BUGS else real_readfile(f)
+        return bugs_citation_drift()
+    try:
+        cited = re.search(r'BUGS\.md\s+([BC]\d+)', real_readfile(os.path.join(rd.SRC, STD_PARTS[2])))
+        dropped = cited.group(1)
+        drift = _bugs_patched(lambda s: s.replace(f'### {dropped}.', f'### {dropped}_gone.'))
+        if not any(dropped in f for f in drift):
+            bad.append('a deleted BUGS.md entry passed the citation gate')
+
+        drift = _bugs_patched(lambda s: s + f'\n### {dropped}. a second heading\n')
+        if not any('more than once' in f for f in drift):
+            bad.append('a duplicated BUGS.md id passed the citation gate')
+    finally:
+        globals()['_readfile'] = real_readfile
 
     # a group which reopens an inline namespace without `inline` leans on the fragment having
     # declared it, so pin the qualifier on the group path and on a member which does not have one
@@ -769,7 +820,8 @@ def main() -> int:
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
         if a.all: bad += (name_collisions() + umbrella_drift() + std_export_drift()
-                          + std_umbrella_drift() + manual_export_drift())
+                          + std_umbrella_drift() + manual_export_drift()
+                          + bugs_citation_drift())
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1
