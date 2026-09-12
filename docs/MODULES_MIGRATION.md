@@ -280,11 +280,55 @@ closure, not the module file: a group umbrella interface is 1 to 3 KiB, because 
 **So name the narrowest module which covers the file.** A group umbrella buys organization,
 and it costs whatever its members cost.
 
-**`import std;` is not available here.** gcc-14 ships no libstdc++ std module, so the
-`std` half of every translation unit above is still a header parse in both columns.
-clang-18 ships a libc++ `std.cppm`, which this configuration cannot use: ReCpp builds against
-libstdc++, and `BUILD_WITH_MODULES` needs clang 21. Whenever the toolchain gains one, rerun
-this table, because the std parse is the floor both columns pay.
+**The std parse was the floor, and `rpp.std` removes it.** gcc-14 ships no libstdc++ std
+module, so `src/rpp/rpp-std.cppm` stands in: its global module fragment includes the std
+headers ReCpp puts in a public signature, and it exports those names. Replacing
+`#include <string>` and `#include <atomic>` with `import rpp.std;` changes every row:
+
+| Facility | Header | Import, std as headers | Import, with `rpp.std` | Speedup |
+|---|---|---|---|---|
+| `timepoint` | 405 ms | 444 ms | 47 ms | 8.68x |
+| `file_io` | 697 ms | 503 ms | 109 ms | 6.40x |
+| `sockets` | 622 ms | 490 ms | 139 ms | 4.49x |
+| `paths` | 707 ms | 514 ms | 179 ms | 3.95x |
+| `future` | 982 ms | 587 ms | 251 ms | 3.91x |
+| `strview` | 441 ms | 454 ms | 126 ms | 3.50x |
+| **median over ten** | | **1.34x** | | **3.85x** |
+
+The many-facility inversion goes with it. Ten rpp imports beside two std headers took
+1478 ms against 1144 ms for eleven headers. The same ten beside `import rpp.std;` take
+1153 ms, which is parity. So the import column was not losing to header sharing. It was
+paying for a std parse the header column shared for free.
+
+`std::exception_ptr` is absent from `rpp.std`, because exporting it writes an interface gcc
+cannot read back. See `BUGS.md` B19.
+
+### 2.3 What the linker sees
+
+Same compiler, same sources, one cmake tree per mode, `-j4`:
+
+| | Modules ON | Modules OFF | Delta |
+|---|---|---|---|
+| `libReCpp.a` | 17,117,276 B | 12,624,868 B | +35.6% |
+| `RppTests` | 40,894,992 B | 37,903,232 B | +7.9% |
+| Defined symbols in the archive | 1135 | 1081 | +54 |
+| `RppTests` relink, median of 3 | 0.76 s | 0.64 s | +19% |
+| Full build | 105.5 s | 64.4 s | +64% |
+
+**Each module interface unit emits exactly one strong symbol**, `T initializer for module
+rpp.X`. The 54 is 44 modules, 8 groups, the top umbrella, and `rpp.std`, so the symbol delta
+is entirely those initializers. Finding 7 recorded the symbol. This says what a library of
+them costs.
+
+The archive grows more than the binary, because the linker drops the interface objects a
+program never reaches. The full build grows most, and section 2.2 says why: 88 module
+translation units, which is 44 modules compiled twice.
+
+**A consumer must never compile ReCpp's `.cppm` and link `libReCpp.a` too.** Both define the
+same initializer, so the link fails on a duplicate symbol. mama already handles it: it
+exports the `.cppm` sources and strips the module objects out of the package, so a consumer
+builds its own interfaces against its own flags. D6 records why shipping a binary interface
+is not an option.
 
 ### 2.1 The gcc-14 ordering rule, characterized
 
@@ -982,11 +1026,29 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
    `selftest`, `self-contained` and `import-order`. `gen_module_exports.py --check`
    joins them with changeset 3.
 3. ~~Rewrite the README modules section.~~ **Done.** It now points here.
-4. Publish a compile-time measurement from `tests/module_consumer/`, not from
-   ReCpp's own build. ReCpp's own build gains nothing, because its `.cpp` files
-   keep using headers (D4).
+4. ~~Publish a compile-time measurement.~~ **Done.** Section 2.2 measures one consumer
+   translation unit both ways, which is what an importer feels. ReCpp's own build gains
+   nothing, because its `.cpp` files keep using headers (D4).
 
-**Estimate: half a day, because only item 4 and the CI gate of item 2 remain.**
+**Estimate: half a day, because only the CI gate of item 2 remains.**
+
+### 11.1 The fatal compiler defects, which block a consumer
+
+Every entry here stops a build. Each has a reproducer in `BUGS.md` and a workaround in the
+tree, so nothing is unguarded today. Each workaround costs a consumer something, so retest
+all four whenever the toolchain moves, and delete the workaround which the new compiler
+makes unnecessary.
+
+| Bug | Compiler | What dies | What guards it today |
+|---|---|---|---|
+| **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, nine of them ship modules |
+| **B18** | gcc-14 | An importer of `rpp.concurrent_queue` which never includes the header crashes at `-O1` and above, at `nonnull_arg_p` | No test hits it, because each includes `<rpp/tests.h>`. A module-only consumer at `-O1` is exposed and has no target yet |
+| **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | `rpp-std.cppm` leaves the name out |
+| **B8** | gcc-14 | Four separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
+
+Two of the four are silent traps rather than loud ones. B18 fires only for a shape no test
+covers, and B19 compiles the interface and fails every consumer afterwards. So a green build
+here does not prove the next consumer compiles, and item 4 of section 12 tracks that risk.
 
 ---
 

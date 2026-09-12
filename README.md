@@ -172,13 +172,22 @@ Measured per translation unit on gcc-14, with the module interfaces already buil
 | `rpp.strview` | 424 ms | 440 ms | 0.96x |
 
 An import costs about the same whatever it carries, near 430 ms here, while a header costs
-what its preprocessed size says. So a heavy header gains most, a light one gains nothing, and
-break-even sits near 40,000 preprocessed lines. A file which takes many facilities can lose,
-because `#pragma once` lets headers share what each import loads again: ten headers beat ten
-imports 1083 ms to 1438 ms.
+what its preprocessed size says. So a heavy header gains most and a light one gains nothing,
+with break-even near 40,000 preprocessed lines.
+
+Those rows still parse `<string>` and `<atomic>` in both columns. `import rpp.std;` replaces
+them, and it is where the real win lives:
+
+| Facility | Header | Import | Import with `rpp.std` |
+|---|---|---|---|
+| `rpp.timepoint` | 405 ms | 444 ms | 47 ms |
+| `rpp.file_io` | 697 ms | 503 ms | 109 ms |
+| `rpp.future` | 982 ms | 587 ms | 251 ms |
+| **median speedup** | | **1.34x** | **3.85x** |
 
 Take the narrowest module which covers the file. `import rpp;` costs 7.4x `import rpp.sprint;`
-for the same one-line body. `docs/MODULES_MIGRATION.md` section 2.2 has the full tables.
+for the same one-line body, because a re-export chain costs its whole transitive closure.
+`docs/MODULES_MIGRATION.md` sections 2.2 and 2.3 have the full tables and the linker numbers.
 
 ### Macros need a header
 

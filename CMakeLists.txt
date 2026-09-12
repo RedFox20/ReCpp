@@ -400,6 +400,8 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-event_loop.cppm
         # L8
         src/rpp/rpp-coroutines.cppm
+        # stands in for `import std;`, which no toolchain here ships
+        src/rpp/rpp-std.cppm
         # the group umbrellas, which partition every module above
         src/rpp/rpp-core.cppm
         src/rpp/rpp-text.cppm

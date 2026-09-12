@@ -8,6 +8,24 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B19. gcc-14 writes an unreadable module when it exports `std::exception_ptr`
+The interface compiles. Every importer then fails with `failed to read compiled module: Bad
+file data`, which is fatal, so nothing downstream builds. Four lines reproduce it:
+
+```cpp
+module;
+#include <exception>
+export module probe;
+export namespace std { using std::exception_ptr; }
+```
+
+The name is what matters, not the header and not the size of the export list.
+`std::exception`, `std::runtime_error`, `std::current_exception`, `std::rethrow_exception`
+and `std::make_exception_ptr` all export cleanly from the same file.
+
+`rpp-std.cppm` leaves `std::exception_ptr` out because of this. Put it back when a newer gcc
+reads the module, because a consumer which catches through a pointer needs it.
+
 ### B18. gcc-14 crashes on an importer of `rpp.concurrent_queue` at `-O1` and above
 A translation unit which imports the module and never includes the header crashes with
 `internal compiler error: in nonnull_arg_p, at tree.cc:14572`. The crash names
