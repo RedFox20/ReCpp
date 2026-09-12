@@ -106,6 +106,7 @@ export namespace rpp::inline coro_operators {
 export namespace rpp::detail {
     using rpp::detail::is_plain_lvalue_ref;
     using rpp::detail::BoolTestable;
+    using rpp::detail::addressof;
     using rpp::detail::task_final_awaiter;
     using rpp::detail::take_result;
     using rpp::detail::task_promise;

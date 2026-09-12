@@ -17,13 +17,13 @@ TestImpl(test_modules_group)
 
     TestCase(a_group_umbrella_carries_every_member)
     {
-        AssertThat(rpp::max(3, 7), 7);      // rpp.minmax
-        AssertThat(rpp::radf(0.0f), 0.0f);  // rpp.math
+        AssertThat(rpp::max(3, 7), 7);      // minmax.h
+        AssertThat(rpp::radf(0.0f), 0.0f);  // math.h
 
-        rpp::Vector2 v { 3.0f, 4.0f };      // rpp.vec
+        rpp::Vector2 v { 3.0f, 4.0f };      // vec.h
         AssertThat(v.length(), 5.0f);
 
-        std::vector<int> items { 5, 1, 3 }; // rpp.sort
+        std::vector<int> items { 5, 1, 3 }; // sort.h
         rpp::sort(items);
         AssertThat(items[0], 1);
     }

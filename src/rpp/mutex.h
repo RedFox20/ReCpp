@@ -258,6 +258,10 @@ namespace rpp
         // spin_lock reads the result both ways, `if (m.try_lock())` and `if (!m.try_lock())`,
         // so ask for both. A local concept keeps <concepts> out of this header
         template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; !t ? 0 : 0; };
+
+        // an overloaded operator& would hijack `&ref`, and <memory> for std::addressof
+        // doubles this header, from 43k preprocessed lines to 84k
+        template<class T> constexpr T* addressof(T& r) noexcept { return __builtin_addressof(r); }
     }
 
     /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
@@ -300,11 +304,11 @@ namespace rpp
         // NOTE: Do not allow overwriting accessors, because all writes need to go 
         //       through synchronize_guard::operator=() which detects SyncType::set() method.
         //       However existing value can be modified via operator->()
-        value_type* operator->() noexcept { return &instance->get_ref(); }
+        value_type* operator->() noexcept { return detail::addressof(instance->get_ref()); }
 
         // For const refs, all read accessors are allowed
         // WARNING: do not const_cast these, it will cause undefined behavior
-        const value_type* operator->() const noexcept { return &instance->get_ref(); }
+        const value_type* operator->() const noexcept { return detail::addressof(instance->get_ref()); }
         const value_type& operator*() const noexcept { return instance->get_ref(); }
         const value_type& get() const noexcept { return instance->get_ref(); }
         operator const value_type&() const noexcept { return instance->get_ref(); }

@@ -403,10 +403,8 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////
-// The compiler builtins for the mem* family. Naming ::memmove in a header instead gives gcc
-// a module-attached copy it then crashes on, see BUGS.md C27.
-// the test nests, because the MSVC preprocessor scans the whole line and warns C4067
-// on a `defined(X) && X(...)` chain it never evaluates
+// The compiler builtins for the mem* family, because naming ::memmove here crashes gcc, C27.
+// The test nests, because the MSVC preprocessor warns C4067 on a chain it never evaluates.
 #ifdef __has_builtin
 #  define RPP_HAS_BUILTIN(x) __has_builtin(x)
 #else

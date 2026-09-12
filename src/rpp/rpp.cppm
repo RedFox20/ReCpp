@@ -1,7 +1,5 @@
-// C++20 umbrella: `import rpp;` reaches every header-backed group below, and a file which
-// wants the std names imports rpp.std as well. No header backs that one.
-// rpp.testing stays out, because it overflows the gcc-14 source location budget through this
-// unit on C++23. A test file writes `import rpp; import rpp.testing;`, see BUGS.md B25.
+// C++20 umbrella: `import rpp;` reaches every group below, and rpp.std imports by name.
+// rpp.testing stays out, because it overflows the gcc-14 location budget here, see BUGS.md B25.
 export module rpp;
 
 export import rpp.core;

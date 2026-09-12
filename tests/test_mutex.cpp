@@ -51,6 +51,21 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a value type whose operator& returns something else, which the guard must not call
+    struct OddAddress
+    {
+        int value = 0;
+        int* operator&() noexcept { return &value; }
+    };
+    class OverloadedAddressOf : public rpp::synchronizable<OverloadedAddressOf>
+    {
+        rpp::mutex mutex;
+        OddAddress value;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
     // a try_lock() whose result reads as a bool but cannot be negated, which spin_lock does
     struct NoNegate
     {
@@ -172,6 +187,15 @@ TestImpl(test_mutex)
         SimpleValue value;
         auto guard = value.guard();
         AssertThat(guard.owns_lock(), true);
+    }
+
+    TestCase(sync_guard_ignores_an_overloaded_address_of)
+    {
+        // operator-> hands out the real address, so a hijacking operator& never runs
+        OverloadedAddressOf odd;
+        auto guard = odd.guard();
+        guard->value = 7;
+        AssertThat(guard->value, 7);
     }
 
     TestCase(sync_guard_can_lock_simple_value)
