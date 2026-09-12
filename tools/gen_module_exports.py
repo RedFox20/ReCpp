@@ -551,6 +551,20 @@ def selftest() -> list:
                 bad.append('a std name with no exclusion reason passed the std gate')
         finally:
             STD_NOT_EXPORTED[excluded] = reason
+
+        # a declaration which wraps its parameter list, so a regression in the parenthesis
+        # counting of _parameter_lines reports nothing instead of the name it stopped joining
+        wrapped = ('\nnamespace rpp {\n'
+                   '    void selftest_probe(int first,\n'
+                   '                        std::multiset<int>& wrapped) noexcept;\n}\n')
+        drift = _std_patched('strview.h', lambda t: t + wrapped)
+        if not any('std::multiset' in f for f in drift):
+            bad.append('a std name on a continued parameter line passed the std gate')
+
+        # the same name on one line, so the case above fails for the join and not for the name
+        drift = _std_patched('strview.h', lambda t: t + wrapped.replace(',\n' + ' ' * 24, ', '))
+        if not any('std::multiset' in f for f in drift):
+            bad.append('a std name on one parameter line passed the std gate')
     finally:
         globals()['_read'] = real_read
 
