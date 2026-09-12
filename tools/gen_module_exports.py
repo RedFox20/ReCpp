@@ -506,11 +506,15 @@ def module_name_drift() -> list:
     if not real:
         return ['no .cppm declares a module']
     bad = []
+    # a build file tells a maintainer which module a target proves, so a stale name there is a
+    # wrong instruction. BUGS.md and docs stay out, because they record the name of their own day
+    paths = ['CMakeLists.txt']
     for root in (rd.SRC, 'tests', os.path.join('tests', 'module_consumer')):
         if not os.path.isdir(root): continue
-        for f in sorted(os.listdir(root)):
-            if not f.endswith(('.h', '.cpp', '.cppm')): continue
-            path = os.path.join(root, f)
+        paths += [os.path.join(root, f) for f in sorted(os.listdir(root))
+                  if f.endswith(('.h', '.cpp', '.cppm', '.py')) or f == 'CMakeLists.txt']
+    for path in paths:
+        if os.path.exists(path):
             for name in sorted(set(re.findall(r'\brpp\.[a-z][a-z_.]*', _readfile(path)))):
                 name = name.rstrip('.')
                 if name.endswith(_NOT_A_MODULE) or name in real: continue
@@ -638,6 +642,12 @@ def selftest() -> list:
                                             if f.endswith('tests.h') else real_read2(f))
         if not any('rpp.no_such_module' in f for f in module_name_drift()):
             bad.append('a name no module declares passed the module name gate')
+        # a build file carries the same names and no source extension, so pin that reach
+        for build_file in ('CMakeLists.txt', 'mamafile.py'):
+            globals()['_readfile'] = lambda f, b=build_file: (real_read2(f) + '\n# rpp.no_such_module\n'
+                                                             if f.endswith(b) else real_read2(f))
+            if not any('rpp.no_such_module' in f for f in module_name_drift()):
+                bad.append(f'a stale module name in a {build_file} passed the module name gate')
     finally:
         globals()['_readfile'] = real_read2
 

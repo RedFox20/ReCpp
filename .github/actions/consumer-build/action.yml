@@ -87,8 +87,8 @@ runs:
         CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
             --compiler ${{ inputs.compiler }} --expect modules --compare-paths --jobs $JOBS $UNICODE_OFF
 
-    # C++23 costs gcc-14 more module source locations than C++20, so a layout which reads
-    # back on one standard can fail on the other. Only this step covers that, see BUGS.md B24
+    # C++23 costs gcc-14 more module source locations than C++20, see BUGS.md C28. A layout
+    # which reads back on C++20 can still fail here, see BUGS.md B24, and only this step covers it
     - name: Import the exported modules as C++23 with ${{ inputs.cc_version }}
       shell: bash
       run: |

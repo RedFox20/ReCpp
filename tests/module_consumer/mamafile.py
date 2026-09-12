@@ -1,7 +1,7 @@
 import mama, os
 
 class RppModuleConsumer(mama.BuildTarget):
-    """Imports the exported rpp.strview module, or uses its header instead.
+    """Imports the exported rpp.text module, or uses its header instead.
 
     tests/consumer proves the package exports headers and a library. This target proves
     the separate promise of export_modules: a consumer compiles the module interface unit
