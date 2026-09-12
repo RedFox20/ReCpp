@@ -6,10 +6,10 @@
  * A C++20 module cannot export a macro, so every macro of <rpp/tests.h> lives here.
  *
  *   #include <rpp/tests.h>          // classic: gives the declarations AND these macros
- *   import rpp.tests;               // module: gives the declarations
+ *   import rpp.testing;             // module: gives the declarations
  *   #include <rpp/tests.macros.h>   // module: add this line for the macros
  *
- * Each macro below calls a name that <rpp/tests.h> or `import rpp.tests` declares.
+ * Each macro below calls a name that <rpp/tests.h> or `import rpp.testing` declares.
  * Include one of the two first. The includes here carry the one macro an import cannot,
  * plus the four std names the macros expand to.
  */

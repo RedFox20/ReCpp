@@ -403,19 +403,21 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////
-// The compiler builtins for the mem* family, which need no <cstring>. Naming ::memmove in a
-// header instead gives gcc a module-attached copy it then crashes on, see BUGS.md C27.
+// The compiler builtins for the mem* family. Naming ::memmove in a header instead gives gcc
+// a module-attached copy it then crashes on, see BUGS.md C27.
 #ifndef RPP_BUILTIN_MEMCPY
-#  if defined(_MSC_VER)
-#    define RPP_BUILTIN_MEMCPY(dst, src, size)  memcpy(dst, src, size)
-#    define RPP_BUILTIN_MEMMOVE(dst, src, size) memmove(dst, src, size)
-#    define RPP_BUILTIN_MEMSET(dst, value, size) memset(dst, value, size)
-#    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
-#  else
+#  if defined(__has_builtin) && __has_builtin(__builtin_memcpy)
 #    define RPP_BUILTIN_MEMCPY(dst, src, size)  __builtin_memcpy(dst, src, size)
 #    define RPP_BUILTIN_MEMMOVE(dst, src, size) __builtin_memmove(dst, src, size)
 #    define RPP_BUILTIN_MEMSET(dst, value, size) __builtin_memset(dst, value, size)
 #    define RPP_BUILTIN_MEMCMP(a, b, size)      __builtin_memcmp(a, b, size)
+#  else
+// MSVC offers no such builtin, so the macros need the declarations this header carries
+#    include <string.h>
+#    define RPP_BUILTIN_MEMCPY(dst, src, size)  memcpy(dst, src, size)
+#    define RPP_BUILTIN_MEMMOVE(dst, src, size) memmove(dst, src, size)
+#    define RPP_BUILTIN_MEMSET(dst, value, size) memset(dst, value, size)
+#    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
 #  endif
 #endif
 

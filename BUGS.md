@@ -325,22 +325,11 @@ The script's own docstring already warns that it has mistakes.
 ## Closed
 
 ### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
-`CXX23=1 mama gcc build test="nogdb -vv"` from an empty build directory reported
-`note: unable to represent further imported source locations` six times, then failed with
-`conflicting global module declaration` on `std::__format::_Sink_iter<_CharT>::_M_reserve`
-in `rpp.event_loop`, `rpp.future` and `rpp.thread_pool`. C++20 passed 584/584 on the same
-commit and reported the note zero times. An incremental C++23 build also passed, because it
-reuses the interfaces a clean run rebuilds, so both ways a developer normally sees this were
-green.
-
-The count of imports in one translation unit drives it. `test_modules.cpp` imported 39
-modules, and dropping the 9 umbrella units to 47 total did not help. Eight header groups cut
-that file to 8 imports, and a clean build then reports the note zero times and passes
-584/584 on both C++20 and C++23. The `RPP_NO_MODULES` guard which forced headers on C++23 is
-gone.
-
-CI ran both modules jobs at `std: "20"`, so the matrix never covered this. Add a C++23
-modules row, because grouping raises the ceiling and does not remove it.
+A clean C++23 build reported `unable to represent further imported source locations` six
+times, then failed with `conflicting global module declaration` in three modules, while C++20
+passed on the same commit. Eight header groups cut one translation unit from 39 imports to 8,
+which builds clean on both standards, and a `ubuntu-cpp23-modules-gcc14` CI row now covers the
+standard the matrix used to miss.
 
 ### C27. gcc-14 crashed any importer which built a concurrent queue at `-O1` (was B18)
 gcc attached its own builtin `memmove` to `rpp.concurrent_queue`, so `nonnull_arg_p` crashed

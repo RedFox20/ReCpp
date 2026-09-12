@@ -529,7 +529,7 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    // rpp::sort moved to sort.h, so `import rpp.sort;` alone reaches it. These two keep the
+    // rpp::sort moved to sort.h, so `import rpp.numeric;` alone reaches it. These two keep the
     // shapes only this header could offer: `sort<T>(v)`, and a const view over mutable elements
 
     /**
