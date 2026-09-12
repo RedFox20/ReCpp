@@ -99,15 +99,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 if(CLANG OR GCC)
     add_compile_options(-g -Wall -Wextra -fPIC)
     # One section per function and per object, so the linker drops what nothing references.
-    # A modules build emits one initializer per interface unit, and this reclaims the rest.
-    add_compile_options(-ffunction-sections -fdata-sections)
-    if(APPLE)
-        set(RPP_GC_SECTIONS "-Wl,-dead_strip") # ld64 rejects --gc-sections
-    else()
-        set(RPP_GC_SECTIONS "-Wl,--gc-sections")
+    # clang-cl keeps MSVC true and takes this branch, and its driver rejects the GNU spelling
+    if(NOT MSVC)
+        add_compile_options(-ffunction-sections -fdata-sections)
+        if(APPLE)
+            set(RPP_GC_SECTIONS "-Wl,-dead_strip") # ld64 rejects --gc-sections
+        else()
+            set(RPP_GC_SECTIONS "-Wl,--gc-sections")
+        endif()
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
     endif()
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
     if(CLANG)
         message("Configure for Clang++ ${CMAKE_CXX_COMPILER_VERSION}")
         if(RPP_USE_LIBCXX)
