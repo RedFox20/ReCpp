@@ -1,5 +1,5 @@
 // Constructs an rpp::concurrent_queue from an import alone, the shape which crashes gcc-14
-// at -O1 and above, see BUGS.md C27. The umbrella carries the same module, so both run.
+// at -O1 and above, see BUGS.md C27.
 #ifdef MAMA_HAS_MODULES
 
 import rpp.threading;

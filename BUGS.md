@@ -334,8 +334,8 @@ container headers is the shape gcc cannot write, and no module exports a std nam
 
 ### B25. A C++23 consumer of the whole module graph broke on `std::packaged_task`
 The consumer build stopped with `conflicting declaration of template 'std::packaged_task@
-rpp.testing'`, which the C28 source location budget causes through the umbrella. `rpp.cppm`
-dropped `export import rpp.testing;`, so a file which wants the test framework names it.
+rpp.testing'`, which the C28 source location budget causes through the umbrella. The umbrella
+is gone now, and a file names each group it uses.
 
 ### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
 A clean C++23 build reported `unable to represent further imported source locations` six

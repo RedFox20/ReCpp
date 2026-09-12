@@ -328,7 +328,6 @@ def export_block(header: str) -> str:
     return '\n'.join(lines) + '\n'
 
 
-UMBRELLA = 'rpp.cppm'
 # the groups, which partition every header. A group is one module whose fragment includes
 # them, because gcc-14 runs out of locations when a unit imports dozens, see BUGS.md C28
 GROUP_HEADERS = {
@@ -346,10 +345,6 @@ GROUP_HEADERS = {
     'testing': ('tests.h',),
 }
 GROUPS = tuple(GROUP_HEADERS)
-
-# a group the umbrella leaves out. `rpp.testing` overflows the gcc-14 source location budget
-# through `import rpp;` on C++23, so a test file imports it by name, see BUGS.md B25
-UMBRELLA_OMITS = ('rpp.testing',)
 
 # a name behind a guard this checkout cannot parse, because its configuration needs a toolkit
 # the build does not carry. The group appends the text below the generated block, verbatim.
@@ -370,22 +365,13 @@ def _export_imports(cppm: str) -> set:
     return set(re.findall(r'^export import\s+([\w.]+)\s*;', _read(cppm), re.M))
 
 
-def umbrella_drift() -> list:
-    """Every header no group carries, every header two groups carry, and every umbrella gap.
+def group_partition_drift() -> list:
+    """Every header no group carries, and every header two groups carry.
 
     `GROUP_HEADERS` is hand written, so a new header reaches no importer until someone adds a
-    line. This compares it against the headers on disk and against what `rpp.cppm` imports.
+    line. This compares it against the headers on disk.
     """
-    if not os.path.exists(os.path.join(rd.SRC, UMBRELLA)):
-        return [f'{UMBRELLA}: missing']
-
-    want = {f'rpp.{g}' for g in GROUPS} - set(UMBRELLA_OMITS)
-    top = _export_imports(UMBRELLA)
-    omits = set(UMBRELLA_OMITS)
-    bad = [f'{UMBRELLA}: does not export import {m}' for m in sorted(want - top)]
-    bad += [f'{UMBRELLA}: exports {m}, which UMBRELLA_OMITS leaves out' for m in sorted(top & omits)]
-    bad += [f'{UMBRELLA}: exports {m}, which is not a group' for m in sorted(top - want - omits)]
-
+    bad = []
     seen = {}
     for g in GROUPS:
         for h in GROUP_HEADERS[g]:
@@ -553,7 +539,7 @@ def selftest() -> list:
         globals()['_readfile'] = lambda f: text(real_readfile(f)) if f == BUGS else real_readfile(f)
         return bugs_citation_drift()
     try:
-        cited = re.search(r'BUGS\.md\s+([BC]\d+)', real_readfile(os.path.join(rd.SRC, UMBRELLA)))
+        cited = re.search(r'BUGS\.md\s+([BC]\d+)', real_readfile(os.path.join(rd.SRC, 'binary_stream.h')))
         dropped = cited.group(1)
         drift = _bugs_patched(lambda s: s.replace(f'### {dropped}.', f'### {dropped}_gone.'))
         if not any(dropped in f for f in drift):
@@ -577,43 +563,25 @@ def selftest() -> list:
     if not _is_detail_ns('rpp::detail') or _is_detail_ns('rpp::detailed'):
         bad.append('the detail namespace test matches the wrong names')
 
-    # GROUP_HEADERS and the umbrella are hand written, so pin every way one can go stale
-    if umbrella_drift(): bad.append('the umbrella gate reports drift on a correct list')
-    real_read = _read
-    first, second = GROUPS[0], GROUPS[1]
-    def _umbrella_patched(text):
-        globals()['_read'] = lambda h: text(real_read(h)) if h == UMBRELLA else real_read(h)
-        return umbrella_drift()
-    try:
-        drift = _umbrella_patched(lambda t: t + f'export import {UMBRELLA_OMITS[0]};\n')
-        if not any('UMBRELLA_OMITS' in f for f in drift):
-            bad.append('an umbrella which exports an omitted group passed the umbrella gate')
-
-        drift = _umbrella_patched(lambda t: t.replace(f'export import rpp.{first};\n', ''))
-        if not any(f'does not export import rpp.{first}' in f for f in drift):
-            bad.append('an umbrella which drops a group passed the umbrella gate')
-
-        drift = _umbrella_patched(lambda t: t + 'export import rpp.no_such_group;\n')
-        if not any('rpp.no_such_group' in f for f in drift):
-            bad.append('an unknown export import passed the umbrella gate')
-    finally:
-        globals()['_read'] = real_read
+    # GROUP_HEADERS is hand written, so pin both ways the partition goes stale
+    if group_partition_drift(): bad.append('the partition gate reports drift on correct groups')
 
     real_groups = dict(GROUP_HEADERS)
+    first, second = GROUPS[0], GROUPS[1]
     def _groups_patched(group: str, headers: tuple):
         GROUP_HEADERS[group] = headers
-        return umbrella_drift()
+        return group_partition_drift()
     try:
-        # the same header in two groups declares one entity twice, which breaks `import rpp;`
+        # the same header in two groups declares one entity twice, so an importer of both fails
         shared = GROUP_HEADERS[first][0]
         if not any('already carries' in f for f in _groups_patched(second, real_groups[second] + (shared,))):
-            bad.append('a header in two groups passed the umbrella gate')
+            bad.append('a header in two groups passed the partition gate')
         GROUP_HEADERS[second] = real_groups[second]
 
         orphan = GROUP_HEADERS[first][0]
         drift = _groups_patched(first, real_groups[first][1:])
         if not any(f'no group carries {orphan}' in f for f in drift):
-            bad.append('a header no group carries passed the umbrella gate')
+            bad.append('a header no group carries passed the partition gate')
     finally:
         GROUP_HEADERS.update(real_groups)
 
@@ -722,7 +690,7 @@ def main() -> int:
         targets = list(GROUPS) if a.all else [header_group(a.header)]
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
-        if a.all: bad += (name_collisions() + umbrella_drift() + manual_export_drift()
+        if a.all: bad += (name_collisions() + group_partition_drift() + manual_export_drift()
                           + bugs_citation_drift() + module_name_drift())
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')

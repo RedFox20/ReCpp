@@ -59,13 +59,6 @@ target_include_directories(RppLiteralsModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppLiteralsModuleOnly)
 target_link_libraries(RppLiteralsModuleOnly PRIVATE ${MAMA_LIBS})
 
-# `import rpp;` has to reach every layer from outside the ReCpp build
-add_executable(RppUmbrellaModuleOnly umbrella_module_only.cpp)
-target_include_directories(RppUmbrellaModuleOnly PRIVATE ${MAMA_INCLUDES})
-mama_target_modules(RppUmbrellaModuleOnly)
-# the umbrella carries modules whose out-of-line half lives in the library
-target_link_libraries(RppUmbrellaModuleOnly PRIVATE ${MAMA_LIBS})
-
 # the tests.h macro split only pays when tests.macros.h plus rpp.testing writes a suite
 add_executable(RppTestsModuleOnly tests_module_only.cpp)
 target_include_directories(RppTestsModuleOnly PRIVATE ${MAMA_INCLUDES})

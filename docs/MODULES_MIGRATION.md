@@ -1,8 +1,8 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 22. Nine module interface units exist: eight header groups and the top umbrella
-`rpp`. The migration is complete. No group re-exports another group, no module exports a std
-name, and `rpp` leaves `rpp.testing` out. Section 12 records the `rpp.std` stand-in it dropped.
+Revision 23. Eight module interface units exist, one per header group. The migration is
+complete. No group re-exports another group, and no module exports a std name. Section 12
+records the `rpp.std` stand-in and the `rpp` umbrella it dropped.
 
 This document explains the pattern and records what real builds prove about it.
 
@@ -316,6 +316,11 @@ includes the std headers, which is the third column, so its median speedup is 1.
 3.29x. The trade was deliberate: exporting std names is what B19, B20, B21, B22 and B24 all
 break on, and including the header reaches none of them.
 
+**The `rpp` umbrella went for the opposite reason: it cost time instead of saving it.**
+`import rpp;` measured 2949 ms against 398 ms for a narrow import, which is 0.21x, because a
+re-export chain costs its whole transitive closure. It had already overflowed the gcc-14
+source location budget once, which is B25. A file names each group it uses now.
+
 Three names stayed out of `rpp.std`, each because gcc-14 breaks on it. Exporting
 `std::exception_ptr` writes an interface gcc cannot read back (B19). Including `<future>` in
 the fragment kills `std::swap` lookup, so `std::future` and `std::promise` go with it (B20).
@@ -453,7 +458,7 @@ module;
 export module rpp.text;
 ```
 
-`src/rpp/rpp.cppm` stays the umbrella, and it exports seven of the eight groups.
+`src/rpp/rpp.cppm` was the umbrella, and section 12 records why it went.
 `rpp.testing` stays out, see BUGS.md B25:
 
 ```cpp
@@ -998,16 +1003,15 @@ between layers.
 | L7 | **event_loop** ✓, **future** ✓ | 2 |
 | L8 | **coroutines** ✓ | 1 |
 | groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **testing** ✓ | 8 |
-| top | umbrella **rpp** ✓ | 1 |
+| ~~top~~ | umbrella **rpp**, dropped, see section 12 | 0 |
 
 **The layer table above is history.** The 44 per-header units are gone, and the eight groups
 carry those headers directly, see `BUGS.md` **C28**. The layer order still describes the
 include graph, so it still says which group may import which.
 
-`BUILD_WITH_MODULES` builds the eight groups and the umbrella. The groups
-partition every public header, and `rpp` imports the groups. So a new header reaches an
-`import rpp;` consumer only by joining one group in `GROUP_HEADERS`, and no header can sit in
-two. `gen_module_exports.py --all --check` reports each way to drift, and the selftest pins
+`BUILD_WITH_MODULES` builds the eight groups. The groups partition every public header, so a
+new header reaches an importer only by joining one group in `GROUP_HEADERS`, and no header
+can sit in two. `gen_module_exports.py --all --check` reports each way to drift, and the selftest pins
 each one. `rpp.numeric` carries the math headers, because `rpp.math` would name one header
 and not the group.
 Excluded: `config.h`

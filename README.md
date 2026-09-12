@@ -129,11 +129,10 @@ re-export makes gcc-14 write a module no `<string>`-first importer can read, see
 `BUGS.md` B8. An importer of `rpp.testing` names `rpp.text` too, because `TestImpl`
 expands to a constructor taking an `rpp::strview`.
 
-### The fifteen modules
+### The eight modules
 
-Fifteen module interface units ship: eight subject groups, the five part std stand-in with
-its own umbrella, and the ReCpp umbrella. A group carries its headers directly, so the group
-is the unit you import:
+Eight module interface units ship, one per subject group. A group carries its headers
+directly, so the group is the unit you import:
 
 | Module | Carries |
 |---|---|
@@ -150,9 +149,9 @@ The groups partition every public header, so each header sits in exactly one gro
 `gen_module_exports.py --all --check` fails when that stops holding. `tools/gen_module_exports.py`
 owns all eight files, and `GROUP_HEADERS` in it is the list a new header joins.
 
-`import rpp;` reaches seven of the eight at once, which suits a file that would otherwise
-name several. `rpp.testing` stays out of the umbrella, because it overflows the gcc-14
-source location budget through that unit on C++23, see `BUGS.md` B25. A test file names it.
+**There is no `rpp` umbrella.** A file names the groups it uses. One re-export chain costs its
+whole transitive closure, so `import rpp;` measured 2949 ms against 398 ms for a narrow import,
+and it overflowed the gcc-14 source location budget once already, see `BUGS.md` B25.
 
 **No module exports a std name.** An importer includes the std headers it uses, before its
 imports, which is the include-before-import rule it already follows. ReCpp once shipped an
@@ -167,8 +166,7 @@ import rpp.text;        // then the groups
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module
 import rpp.threading;           // rpp::mutex, rpp::cfuture, rpp::thread_pool, ...
-import rpp;                     // or everything but rpp.testing
-import rpp.testing;             // which a test file names on its own
+import rpp.testing;             // a test file names each group it uses
 ```
 
 **Why a group and not one module per header.** ReCpp shipped 44 per-header modules first,
@@ -203,9 +201,9 @@ The import column parses no standard library header at all, which is what an imp
 really writes. A header costs what its preprocessed size says, so the heaviest group gains
 the most absolute time and the lightest gains the least.
 
-Take the narrowest group which covers the file. `import rpp;` pulls seven, every group but
-`rpp.testing`, because a re-export chain costs its whole transitive closure.
-`docs/MODULES_MIGRATION.md` sections 2.2 and 2.3 have the full tables and the linker numbers.
+Take the narrowest group which covers the file, and name a second group beside it when you
+need one. `docs/MODULES_MIGRATION.md` sections 2.2 and 2.3 have the full tables and the
+linker numbers.
 
 ### Macros need a header
 

@@ -1,6 +1,5 @@
 /**
- * Imports one group umbrella and never the top one, so a group which drops a member fails
- * to compile here. test_modules_umbrella.cpp covers `import rpp;` instead.
+ * Imports one group, so a group which drops a member fails to compile here.
  */
 #include <rpp/tests.h>
 
@@ -15,7 +14,7 @@ TestImpl(test_modules_group)
 {
     TestInit(test_modules_group) {}
 
-    TestCase(a_group_umbrella_carries_every_member)
+    TestCase(a_group_carries_every_member)
     {
         AssertThat(rpp::max(3, 7), 7);      // minmax.h
         AssertThat(rpp::radf(0.0f), 0.0f);  // math.h

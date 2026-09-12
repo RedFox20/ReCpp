@@ -376,7 +376,6 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
         src/rpp/rpp-testing.cppm
-        src/rpp/rpp.cppm
     )
 
     # Add module interface to the library target
