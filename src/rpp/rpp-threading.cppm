@@ -102,14 +102,4 @@ export namespace rpp {
 export namespace rpp::inline coro_operators {
     using rpp::coro_operators::operator co_await;
 }
-
-export namespace rpp::detail {
-    using rpp::detail::is_plain_lvalue_ref;
-    using rpp::detail::BoolTestable;
-    using rpp::detail::addressof;
-    using rpp::detail::task_final_awaiter;
-    using rpp::detail::take_result;
-    using rpp::detail::task_promise;
-    using rpp::detail::task_base;
-}
 // GENERATED EXPORTS END

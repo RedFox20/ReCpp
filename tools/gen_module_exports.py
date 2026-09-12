@@ -46,11 +46,20 @@ def _is_private(name: str) -> bool:
     return name.startswith('__') and name not in _MACRO_HELPERS
 
 
+def _is_detail_ns(ns: str) -> bool:
+    """True for an implementation namespace, which no module surface carries.
+
+    The entities stay reachable through the global module fragment, so a public template
+    which names one still instantiates in an importer.
+    """
+    return 'detail' in ns.split('::')
+
+
 def _skip(ns: str, kind: str, name: str) -> bool:
     """True for a declaration no using-declaration can name, or which stays private."""
     # a deduction guide spells as `<deduction guide for X>`, which no using-declaration names
     return kind in SKIP_KINDS or name.startswith('<') or _is_private(name) \
-        or (ns and not ns.startswith('rpp'))
+        or (ns and not ns.startswith('rpp')) or _is_detail_ns(ns)
 
 
 # a private helper no importer needs. Empty, because every module gives its public names
@@ -674,8 +683,12 @@ def selftest() -> list:
     for group, ns in (('text', 'rpp::inline literals'), ('time', 'rpp::inline duration_literals')):
         if f'export namespace {ns} {{' not in group_export_block(group):
             bad.append(f'rpp.{group} reopens {ns} without the inline qualifier')
-    if 'export namespace rpp::inline detail' in group_export_block('core'):
-        bad.append('a namespace no header declares inline came out inline')
+    # an implementation namespace reaches an importer through the fragment, never the surface
+    for group in GROUP_HEADERS:
+        if 'detail' in group_export_block(group):
+            bad.append(f'rpp.{group} exports a detail namespace')
+    if not _is_detail_ns('rpp::detail') or _is_detail_ns('rpp::detailed'):
+        bad.append('the detail namespace test matches the wrong names')
 
     # GROUP_HEADERS and the umbrella are hand written, so pin every way one can go stale
     if umbrella_drift(): bad.append('the umbrella gate reports drift on a correct list')

@@ -112,11 +112,6 @@ export namespace rpp {
     using rpp::readLEU64;
     using rpp::bit_array;
 }
-
-export namespace rpp::detail {
-    using rpp::detail::void_t;
-    using rpp::detail::is_detected;
-}
 // GENERATED EXPORTS END
 
 // QtPrintable sits behind RPP_HAS_QT, which the generator cannot parse without Qt
