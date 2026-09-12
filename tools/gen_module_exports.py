@@ -333,6 +333,7 @@ STD_NOT_EXPORTED = {
         'is_trivially_destructible_v', 'is_trivially_move_assignable_v')},
     'exception_ptr': 'gcc-14 writes an interface no importer can read, see BUGS.md B19',
     'future': 'its header kills std::swap lookup in the fragment, see BUGS.md B20',
+    'future_status': 'the same header, and rpp::cfuture::await_ready() answers without it',
     'promise': 'gcc-14 crashes an importer which instantiates it, see BUGS.md B16',
     'get': 'gcc-14 breaks std::unique_ptr in every importer, see BUGS.md B21',
     'size_t': '<cstddef> declares it at global scope too, so a mixed importer reports an ambiguity',

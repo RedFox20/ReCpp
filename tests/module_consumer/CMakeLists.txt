@@ -47,6 +47,12 @@ add_executable(RppStdModuleOnly std_module_only.cpp)
 target_include_directories(RppStdModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppStdModuleOnly)
 
+# these targets build at -O2, which is the only way the BUGS.md B18 crash reaches a gate
+add_executable(RppQueueModuleOnly queue_module_only.cpp)
+target_include_directories(RppQueueModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppQueueModuleOnly)
+target_link_libraries(RppQueueModuleOnly PRIVATE ${MAMA_LIBS})
+
 # `import rpp;` has to reach every layer from outside the ReCpp build
 add_executable(RppUmbrellaModuleOnly umbrella_module_only.cpp)
 target_include_directories(RppUmbrellaModuleOnly PRIVATE ${MAMA_INCLUDES})

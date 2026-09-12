@@ -18,7 +18,7 @@ gate, #65 changeset 6.
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test, 41 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 8 module-only targets which `run_test.py` builds and runs |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 9 module-only targets which `run_test.py` builds and runs |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 28 jobs on GitHub Actions, and CircleCI is gone |
 | test counts | 584/584 on the modules build, 539/539 on the header build |
@@ -1039,23 +1039,26 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 Every entry here stops a build. Each has a reproducer in `BUGS.md` and a workaround in the
 tree, so nothing is unguarded today. Each workaround costs a consumer something, so retest
-all seven whenever the toolchain moves, and delete the workaround which the new compiler
-makes unnecessary.
+every row whenever the toolchain moves, and delete the workaround which the new compiler
+makes unnecessary. B18 is struck through, because a fix replaced its workaround.
 
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
 | **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, nine of them ship modules |
-| **B18** | gcc-14 | An importer of `rpp.concurrent_queue` which never includes the header crashes at `-O1` and above, at `nonnull_arg_p` | No test hits it, because each includes `<rpp/tests.h>`. A module-only consumer at `-O1` is exposed and has no target yet |
+| ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | `rpp-std.cppm` leaves the name out |
 | **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | `rpp-std.cppm` keeps `<future>` out, so `std::future` and `std::promise` stay out too |
 | **B21** | gcc-14 | A module which exports `std::get` breaks `std::unique_ptr` in every importer | `rpp-std.cppm` leaves the name out |
 | **B22** | gcc-14 | An importer which reaches `std::shared_ptr` through a module fails to link, because no object carries `_Sp_counted_base<_S_atomic>::_M_release()` | `RppStdModuleOnly` names `std::unique_ptr` instead. An importer which needs a shared pointer includes `<memory>` |
 | **B8** | gcc-14 | Four separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
 
-Four of the seven are silent traps rather than loud ones. B18 fires only for a shape no test
-covers, B19 and B21 compile the interface and fail every consumer afterwards, and B22 reaches
-the linker. So a green build here does not prove the next consumer compiles, and item 4 of
-section 12 tracks that risk.
+Three of the six that remain are silent traps rather than loud ones. B19 and B21 compile the
+interface and fail every consumer afterwards, and B22 reaches the linker. So a green build here
+does not prove the next consumer compiles, and item 4 of section 12 tracks that risk.
+
+B18 is the lesson the rest of the table should be read against. It sat here as one module's
+problem, and it was the group umbrella and the top umbrella as well, because no target built the
+shape which crashed. A defect is only as narrow as the test which bounds it.
 
 B19, B20 and B21 share one shape: an `export using` inside namespace `std` either poisons a
 later instantiation or corrupts the interface. `RppStdModuleOnly` is the target which catches
@@ -1076,7 +1079,14 @@ exported type needs by argument-dependent lookup belongs in the list beside the 
 reads every public parameter list and reports each `std::` name the module neither exports nor
 names in `STD_NOT_EXPORTED` with a reason. Its first run found four: `std::deque`,
 `std::unique_lock`, `std::source_location` and `std::memory_order_acq_rel`. It reads a
-parameter list only, so a return type such as `std::cv_status` still needs a human.
+parameter list only, so a return type still needs a human. `std::cv_status` came in that way.
+
+One return type stays out on purpose. `rpp::cfuture::wait_for` returns `std::future_status`,
+which lives in `<future>`, and B20 makes that header fatal beside an exported `std::swap`.
+Dropping `std::swap` does buy it, and the measured price is 18% on every importer of
+`rpp.std`, 166 ms against 196 ms. `rpp::cfuture::await_ready()` answers the same question as a
+`bool`, which is what AGENTS.md tells a caller to use, so the name stays out and
+`STD_NOT_EXPORTED` records why.
 
 ---
 

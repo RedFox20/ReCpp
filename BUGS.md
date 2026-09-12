@@ -87,26 +87,6 @@ and `std::make_exception_ptr` all export cleanly from the same file.
 `rpp-std.cppm` leaves `std::exception_ptr` out because of this. Put it back when a newer gcc
 reads the module, because a consumer which catches through a pointer needs it.
 
-### B18. gcc-14 crashes on an importer of `rpp.concurrent_queue` at `-O1` and above
-A translation unit which imports the module and never includes the header crashes with
-`internal compiler error: in nonnull_arg_p, at tree.cc:14572`. The crash names
-`memmove@rpp.concurrent_queue`, so the module copy of `memmove` loses the nonnull attribute
-the optimizer expects.
-
-```cpp
-#include <atomic>
-import rpp.concurrent_queue;
-int main() { rpp::concurrent_queue<int> q; q.push(1); return int(q.size()) - 1; }
-```
-
-Three things change the answer. `-O0` compiles. `-O1` and `-O2` both crash. Adding
-`#include <rpp/concurrent_queue.h>` before the import compiles at every level.
-
-No ReCpp test hits it, because every one includes `<rpp/tests.h>`, which brings the header.
-A module-only consumer at `-O1` or higher is the exposed shape, and
-`tests/module_consumer/` has no concurrent_queue target yet. Add one when a newer gcc fixes
-this, so the gap cannot reopen unnoticed.
-
 ### B17. A pool worker frees the generic task a test still reads (C18 recurred)
 `ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
 A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main
@@ -335,6 +315,11 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C27. gcc-14 crashed any importer which built a concurrent queue at `-O1` (was B18)
+gcc attached its own builtin `memmove` to `rpp.concurrent_queue`, so `nonnull_arg_p` crashed
+every importer which built a queue, through `rpp.threading` and `rpp` too. `__builtin_memmove`
+names no declaration to attach, and `RppQueueModuleOnly` builds that shape at `-O2`.
 
 ### C26. `pool_types_constructor::allocate<T>()` is unreachable, and that is intended (was B14)
 Each pool declares `allocate(int size, int align)`, which hides the template of the mixin and

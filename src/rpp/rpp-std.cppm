@@ -119,5 +119,5 @@ export namespace std {
 // The fixed width integers stay out, because <cstdint> also declares them at global scope.
 // A translation unit which imports this and includes an rpp header then reports an ambiguity.
 
-// <future> stays out of the fragment above, see BUGS.md B20. std::future and std::promise
-// go with it, so a consumer of rpp::cfuture still includes <future> for those two names.
+// <future> stays out of the fragment above, see BUGS.md B20. std::future, std::promise and
+// std::future_status go with it, and rpp::cfuture::await_ready() answers without the header.
