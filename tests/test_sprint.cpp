@@ -195,6 +195,24 @@ TestImpl(test_sprint)
         AssertEqual(edge.view(), "42");
     }
 
+    TestCase(string_buffer_join_chains)
+    {
+        std::vector<std::string> lines = { "first", "second" };
+
+        string_buffer text;
+        text.join(lines, '\n').writeln();
+        AssertEqual(text.view(), "first\nsecond\n");
+
+        text.clear();
+        text.join(lines, '\n').write(" tail");
+        AssertEqual(text.view(), "first\nsecond tail");
+
+        text.clear();
+        text.separator = "-";
+        text.join(lines).join(lines, '+');
+        AssertEqual(text.view(), "first-secondfirst+second");
+    }
+
     TestCase(println)
     {
         TempFILE printed;

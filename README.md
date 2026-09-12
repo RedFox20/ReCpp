@@ -820,20 +820,20 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Method | Description |
 |--------|-------------|
-| [`write(const T& v)`](src/rpp/sprint.h#L133) | Write a value (auto-converts most types) |
-| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L158) | Write a float or double with a chosen number of decimals, instead of the default 6 |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L361) | Write values followed by newline |
-| [`join(const C& container, const S& sep)`](src/rpp/sprint.h#L369) | Write every item of a container, with `sep` between the items |
-| [`join(const C& container)`](src/rpp/sprint.h#L381) | Write every item of a container, with `string_buffer::separator` between the items |
-| [`writef(const char* format, ...)`](src/rpp/sprint.h#L131) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L311) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L268) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L385) | Pretty-print a value |
-| [`clear()`](src/rpp/sprint.h#L122) | Clear the buffer |
-| [`reserve(int capacity)`](src/rpp/sprint.h#L123) | Reserve capacity |
-| [`resize(int size)`](src/rpp/sprint.h#L124) | Resize buffer |
-| [`append(const char* data, int len)`](src/rpp/sprint.h#L127) | Append raw data |
-| [`emplace_buffer(int n)`](src/rpp/sprint.h#L130) | Get writable buffer of N bytes |
+| [`write(const T& v)`](src/rpp/sprint.h#L134) | Write a value (auto-converts most types) |
+| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L159) | Write a float or double with a chosen number of decimals, instead of the default 6 |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L362) | Write values followed by newline |
+| [`join(const C& container, const S& sep)`](src/rpp/sprint.h#L370) | Write every item of a container, with `sep` between the items, and return the buffer for chaining |
+| [`join(const C& container)`](src/rpp/sprint.h#L383) | Write every item of a container, with `string_buffer::separator` between the items |
+| [`writef(const char* format, ...)`](src/rpp/sprint.h#L132) | Printf-style formatted write |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L312) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L269) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L387) | Pretty-print a value |
+| [`clear()`](src/rpp/sprint.h#L123) | Clear the buffer |
+| [`reserve(int capacity)`](src/rpp/sprint.h#L124) | Reserve capacity |
+| [`resize(int size)`](src/rpp/sprint.h#L125) | Resize buffer |
+| [`append(const char* data, int len)`](src/rpp/sprint.h#L128) | Append raw data |
+| [`emplace_buffer(int n)`](src/rpp/sprint.h#L131) | Get writable buffer of N bytes |
 
 ### Free Functions
 
@@ -844,9 +844,9 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 | [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
 | [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
 | [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L499) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L519) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L445) | Converts string bytes to hexadecimal representation |
+| [`print(args...)`](src/rpp/sprint.h#L501) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L521) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L447) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -903,6 +903,11 @@ sb.clear();
 sb.separator = ", ";
 sb.join(lines);
 // sb.view() == "first, second, third"
+
+// join returns the buffer, so it chains
+sb.clear();
+sb.join(lines, '\n').writeln();
+// sb.view() == "first\nsecond\nthird\n"
 ```
 
 ### Example: Custom Separator
