@@ -265,7 +265,7 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 ```
 
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
-`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds seven
+`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds eight
 module-only targets, and `run_test.py` builds and runs each one. Each imports what it needs
 and includes no rpp header except a macro header, so a missing export fails the build, and a
 wrong answer fails the run. `RppStdStringModuleOnly` includes
