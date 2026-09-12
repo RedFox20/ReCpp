@@ -43,8 +43,11 @@ export namespace std { using std::cv_status; }
 which includes both headers is fine, so the fault is two fragments which overlap on a C++23
 entity, not either header.
 
-Nothing guards this. Both CI modules jobs are `std: "20"`, so the matrix has no C++23 modules
-row at all. Add one, and expect it red until this is fixed.
+`RPP_NO_MODULES` names this now, so `AUTO` builds headers on gcc with C++23 and prints the
+reason. That costs the C++23 gate its module coverage until someone fixes the defect.
+
+CI never caught it, because both modules jobs are `std: "20"` and the matrix has no C++23
+modules row. Add one when the guard comes out, so it cannot hide a second time.
 
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:

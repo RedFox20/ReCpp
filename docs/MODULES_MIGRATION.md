@@ -1037,15 +1037,15 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 
 ### 11.1 The fatal compiler defects, which block a consumer
 
-Every entry here stops a build, and each has a reproducer in `BUGS.md`. All but one carry a
-workaround in the tree. **B23 does not**, so the C++23 modules build is broken from clean
-today. Each workaround costs a consumer something, so retest every row whenever the toolchain
-moves, and delete the one the new compiler makes unnecessary. B18 is struck through, because
-a fix replaced its workaround.
+Every entry here stops a build, each has a reproducer in `BUGS.md`, and each carries a
+workaround in the tree. B23 costs the most: gcc on C++23 builds headers instead of modules
+until it is fixed. Each workaround costs a consumer something, so retest every row whenever
+the toolchain moves, and delete the one the new compiler makes unnecessary. B18 is struck
+through, because a fix replaced its workaround.
 
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
-| **B23** | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc runs out of module source locations, then mis-merges a global module declaration | **Nothing.** Both CI modules jobs are C++20, and an incremental C++23 build reuses the interfaces a clean one rebuilds. C++20 passes 584/584 |
+| **B23** | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc runs out of module source locations, then mis-merges a global module declaration | `RPP_NO_MODULES` names it, so `AUTO` builds headers on gcc with C++23 and prints the reason. C++20 keeps its modules and passes 584/584 |
 | **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, nine of them ship modules |
 | ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | `rpp-std.cppm` leaves the name out |
