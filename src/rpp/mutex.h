@@ -255,9 +255,13 @@ namespace rpp
         template<class T> inline constexpr bool is_plain_lvalue_ref = false;
         template<class T> inline constexpr bool is_plain_lvalue_ref<T&> = std::is_same_v<T&, std::decay_t<T>&>;
 
-        // spin_lock reads the result both ways, `if (m.try_lock())` and `if (!m.try_lock())`,
-        // so ask for both. A local concept keeps <concepts> out of this header
-        template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; !t ? 0 : 0; };
+        // spin_lock reads the try_lock result both ways, and it reads the returned prvalue,
+        // so the cast asks in the value category the call site has
+        template<class T> concept BoolTestable = requires(T t)
+        {
+            static_cast<T&&>(t) ? 0 : 0;
+            !static_cast<T&&>(t) ? 0 : 0;
+        };
 
         // an overloaded operator& would hijack `&ref`, and <memory> for std::addressof
         // doubles this header, from 43k preprocessed lines to 84k

@@ -51,6 +51,27 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a try_lock() result whose boolean operators need an lvalue, which spin_lock has not
+    struct LvalueOnlyBool
+    {
+        explicit operator bool() & noexcept { return true; }
+        bool operator!() & noexcept { return false; }
+    };
+    struct LvalueBoolTryLock
+    {
+        void lock() {}
+        void unlock() {}
+        static LvalueOnlyBool try_lock() { return {}; }
+    };
+    class MutexTryLockLvalueOnly : public rpp::synchronizable<MutexTryLockLvalueOnly>
+    {
+        std::string value;
+        LvalueBoolTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
     // a value type whose operator& returns something else, which the guard must not call
     struct OddAddress
     {
@@ -162,6 +183,7 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
         static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
         static_assert(!rpp::SyncableType<MutexTryLockNoNegate>);
+        static_assert(!rpp::SyncableType<MutexTryLockLvalueOnly>);
         static_assert(!rpp::SyncableType<VolatileRef>);
         static_assert(!rpp::SyncableType<ConstRef>);
         static_assert(!rpp::SyncableType<ArrayRef>);
@@ -179,6 +201,7 @@ TestImpl(test_mutex)
         static_assert(!has_guard<MutexWithoutTryLock>);
         static_assert(!has_guard<MutexTryLockReturnsVoid>);
         static_assert(!has_guard<MutexTryLockNoNegate>);
+        static_assert(!has_guard<MutexTryLockLvalueOnly>);
         static_assert(!has_guard<VolatileRef>);
         static_assert(!has_guard<ConstRef>);
         static_assert(!has_guard<ArrayRef>);
