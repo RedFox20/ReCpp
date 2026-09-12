@@ -12,8 +12,8 @@
 #endif
 
 #ifdef MAMA_HAS_MODULES
-import rpp.strview;
-import rpp.debugging;
+import rpp.text;
+import rpp.core;
 #  define BUILT_WITH "MODULES"
 #endif
 

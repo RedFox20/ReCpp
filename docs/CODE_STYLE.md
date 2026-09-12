@@ -37,7 +37,7 @@ expression boundary. Keep `type name = expression` on the first line.
 #include <limits>
 
 #if RPP_BUILD_WITH_MODULES
-import rpp.strview;      // 3. imports, last
+import rpp.text;         // 3. imports, last
 #endif
 ```
 
@@ -50,7 +50,7 @@ templates then collide with the entities the module already made reachable. One
 template. Do not use that as a reason to break the order.
 
 The error is loud and it stops the compiler. It never reaches the linker, and it
-never becomes a duplicate symbol. A program which mixes `import rpp.strview` in
+never becomes a duplicate symbol. A program which mixes `import rpp.text` in
 one translation unit and `#include <rpp/strview.h>` in another links and runs
 correctly.
 

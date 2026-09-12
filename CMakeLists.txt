@@ -327,10 +327,6 @@ elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG
     set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
 elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
     set(RPP_NO_MODULES "MSVC ${MSVC_VERSION} is older than ${RPP_MODULES_MIN_MSVC}")
-elseif(GCC AND RPP_CXX_STANDARD GREATER_EQUAL 23)
-    # gcc-14 runs out of module source locations on this tree and then mis-merges a global
-    # module declaration. It fails only from a clean build dir, see BUGS.md B23
-    set(RPP_NO_MODULES "GCC on C++${RPP_CXX_STANDARD} fails a clean modules build, see BUGS.md B23")
 elseif(CLANG AND NOT EXISTS "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
     # Clang scans module dependencies with a separate clang-scan-deps binary, and an
     # Android NDK ships none. CMake leaves the variable empty and writes a scan rule
@@ -362,62 +358,10 @@ endif()
 if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 
+    # Ten module interface units: eight groups, the std stand-in, and the umbrella.
+    # A group carries its headers directly, because gcc-14 runs out of module source
+    # locations when one translation unit imports dozens, see BUGS.md C28.
     set(RPP_MODULES_SRC
-        src/rpp/rpp-config.cppm
-        src/rpp/rpp-minmax.cppm
-        src/rpp/rpp-obfuscated_string.cppm
-        src/rpp/rpp-scopeguard.cppm
-        src/rpp/rpp-strview.cppm
-        src/rpp/rpp-debugging.cppm
-        # L1
-        src/rpp/rpp-bitutils.cppm
-        src/rpp/rpp-traits.cppm
-        src/rpp/rpp-type_traits.cppm
-        src/rpp/rpp-source_loc.cppm
-        src/rpp/rpp-endian.cppm
-        src/rpp/rpp-predicates.cppm
-        src/rpp/rpp-sort.cppm
-        src/rpp/rpp-proc_utils.cppm
-        src/rpp/rpp-future_types.cppm
-        src/rpp/rpp-math.cppm
-        src/rpp/rpp-timepoint.cppm
-        src/rpp/rpp-delegate.cppm
-        # L2
-        src/rpp/rpp-atomic_timepoint.cppm
-        src/rpp/rpp-collections.cppm
-        src/rpp/rpp-stack_trace.cppm
-        src/rpp/rpp-threads.cppm
-        src/rpp/rpp-timer.cppm
-        src/rpp/rpp-vec.cppm
-        src/rpp/rpp-sprint.cppm
-        src/rpp/rpp-task.cppm
-        # L3
-        src/rpp/rpp-load_balancer.cppm
-        src/rpp/rpp-memory_pool.cppm
-        src/rpp/rpp-mutex.cppm
-        src/rpp/rpp-paths.cppm
-        src/rpp/rpp-tests.cppm
-        # L4
-        src/rpp/rpp-atomic_shared_ptr.cppm
-        src/rpp/rpp-close_sync.cppm
-        src/rpp/rpp-condition_variable.cppm
-        src/rpp/rpp-file_io.cppm
-        src/rpp/rpp-sockets.cppm
-        # L5
-        src/rpp/rpp-binary_stream.cppm
-        src/rpp/rpp-concurrent_queue.cppm
-        src/rpp/rpp-semaphore.cppm
-        # L6
-        src/rpp/rpp-binary_serializer.cppm
-        src/rpp/rpp-thread_pool.cppm
-        # L7
-        src/rpp/rpp-future.cppm
-        src/rpp/rpp-event_loop.cppm
-        # L8
-        src/rpp/rpp-coroutines.cppm
-        # stands in for `import std;`, which no toolchain here ships
-        src/rpp/rpp-std.cppm
-        # the group umbrellas, which partition every module above
         src/rpp/rpp-core.cppm
         src/rpp/rpp-text.cppm
         src/rpp/rpp-numeric.cppm
@@ -426,7 +370,7 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
         src/rpp/rpp-testing.cppm
-        # the top umbrella, which imports the groups above
+        src/rpp/rpp-std.cppm
         src/rpp/rpp.cppm
     )
 

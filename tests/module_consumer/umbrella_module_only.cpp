@@ -7,24 +7,24 @@ import rpp;
 
 int main()
 {
-    // one name per layer, so a dropped export import names the layer which lost it
-    bool ok = rpp::strview{"L0"}.length() == 2         // L0 rpp.strview
-           && rpp::max(2, 5) == 5                      // L0 rpp.minmax
-           && rpp::radf(0.0f) == 0.0f                  // L1 rpp.math
-           && rpp::millis(1500) > rpp::seconds(1)      // L1 rpp.timepoint
-           && rpp::delegate<int()>{ +[] { return 4; } }() == 4  // L1 rpp.delegate
-           && rpp::to_string(42) == "42"               // L2 rpp.sprint
-           && rpp::path_combine("a", "b") == "a/b"     // L3 rpp.paths
-           && rpp::Compare::eq(1, 1);                  // L3 rpp.tests
+    // one name per group, so a dropped export import names the group which lost it
+    bool ok = rpp::strview{"gp"}.length() == 2         // rpp.text
+           && rpp::max(2, 5) == 5                      // rpp.numeric
+           && rpp::radf(0.0f) == 0.0f                  // rpp.numeric
+           && rpp::millis(1500) > rpp::seconds(1)      // rpp.time
+           && rpp::delegate<int()>{ +[] { return 4; } }() == 4  // rpp.core
+           && rpp::to_string(42) == "42"               // rpp.text
+           && rpp::path_combine("a", "b") == "a/b"     // rpp.io
+           && rpp::Compare::eq(1, 1);                  // rpp.testing
 
-    rpp::semaphore sem; // L5 rpp.semaphore
+    rpp::semaphore sem; // rpp.threading
     sem.notify();
     ok = ok && sem.count() == 1;
 
-    // gcc-14 crashes when an importer instantiates std::promise, so L7 and L8 stay
+    // gcc-14 crashes when an importer instantiates std::promise, so these two stay
     // unevaluated here, see BUGS.md B16
-    static_assert(sizeof(rpp::cfuture<int>) > 0, "L7 rpp.future");
-    static_assert(sizeof(rpp::time_awaiter) > 0, "L8 rpp.coroutines");
+    static_assert(sizeof(rpp::cfuture<int>) > 0, "rpp.threading");
+    static_assert(sizeof(rpp::time_awaiter) > 0, "rpp.threading coroutines");
     return ok ? 0 : 1;
 }
 #else

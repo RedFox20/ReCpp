@@ -44,11 +44,15 @@ jobs:
               llvm_apt: "true" }
           - { name: ubuntu-cpp23-asan-clang20,       compiler: clang, cc: clang-20, std: "23", san: asan,       cov: "false",
               llvm_apt: "true" }
-          # C++20 modules. These need Ninja, so they set it. They also pass
+          # Modules. These need Ninja, so they set it. They also pass
           # BUILD_WITH_MODULES=ON, not AUTO: AUTO turns modules off and keeps going, so a job
-          # named modules would pass while it tested only headers
+          # named modules would pass while it tested only headers.
+          # The C++23 row exists because gcc-14 ran out of module source locations there
+          # first, and only a clean build showed it, see BUGS.md C28
           - { name: ubuntu-cpp20-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "20", san: asan,       cov: "false",
               ninja: "true", modules: "ON", check_includes: "true" }
+          - { name: ubuntu-cpp23-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "23", san: asan,       cov: "false",
+              ninja: "true", modules: "ON" }
           - { name: ubuntu-cpp20-modules-clang21,    compiler: clang, cc: clang-21, std: "20", san: asan,       cov: "false",
               ninja: "true", modules: "ON", llvm_apt: "true" }
     steps:

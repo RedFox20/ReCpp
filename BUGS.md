@@ -8,47 +8,6 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B23. The modules build fails on gcc-14 with C++23, from a clean configure
-`CXX23=1 mama gcc build test="nogdb -vv"` with an empty build directory reports six times
-`note: unable to represent further imported source locations`, then fails:
-
-```
-rpp.event_loop:  error: conflicting global module declaration
-  'auto std::__format::_Sink_iter<_CharT>::_M_reserve(std::size_t) const'
-rpp.future:      error: conflicting global module declaration ...
-rpp.thread_pool: error: conflicting global module declaration ...
-```
-
-The same tree, same commit, passes 584/584 with `CXX20=1` and reports the note zero times.
-An incremental C++23 build also passes, because it reuses the binary module interfaces the
-clean run has to rebuild. So both ways a developer normally sees this are green.
-
-Two modules reproduce the C++23 half of it. Each compiles alone, and an importer of both
-fails only at `-std=gnu++23`:
-
-```cpp
-module;
-#include <memory>
-export module a;
-export namespace std { using std::unique_ptr; }
-```
-```cpp
-module;
-#include <condition_variable>
-export module b;
-export namespace std { using std::cv_status; }
-```
-
-`unique_ptr.h:522: error: conflicting declaration of template 'std::out_ptr_t@a'`. One module
-which includes both headers is fine, so the fault is two fragments which overlap on a C++23
-entity, not either header.
-
-`RPP_NO_MODULES` names this now, so `AUTO` builds headers on gcc with C++23 and prints the
-reason. That costs the C++23 gate its module coverage until someone fixes the defect.
-
-CI never caught it, because both modules jobs are `std: "20"` and the matrix has no C++23
-modules row. Add one when the guard comes out, so it cannot hide a second time.
-
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
 
@@ -259,13 +218,12 @@ done; wait; done
 grep -l 'heap-use-after-free' /tmp/b10_*.log
 ```
 
-### B8. gcc-14 breaks a module for four shapes, and each one has a workaround
+### B8. gcc-14 breaks a module for five shapes, and each one has a workaround
 `tools/gen_module_exports.py` carries `NO_EXPORT` with one entry. Every module ships now.
 Delete that entry when a newer gcc reads the module back.
 
-Shapes 2 and 3 both need a re-export, and `RE_EXPORT` holds one for the whole library, so
-neither can fire today. Read them before you add a second entry. Shape 4 lives in a header,
-not in a list.
+Shapes 2, 3 and 5 all need a re-export, and `RE_EXPORT` is empty, so none can fire today.
+Read all three before you add an entry. Shape 4 lives in a header, not in a list.
 
 `NO_CONFIG` is a third list, and it is not a gcc defect. It names the two headers which do
 not compile on bare metal, see B15. Any parse failure the list does not name reaches the
@@ -279,8 +237,8 @@ Shape 1, in `rpp.sprint`. An export naming a function in the `std::__cxx11` inli
 makes the module unreadable. `std::to_string` and `std::stoi` both do it, and `std::swap`
 does not. The form does not matter. An `is_detected_v` alias, a plain alias template and a
 C++20 concept all fail the same way. So does a concept which calls an unexported helper that
-names it. `NO_EXPORT` drops `has_std_to_string` from `rpp.type_traits`, which is what
-`rpp.sprint` imports. A header includer still gets the trait.
+names it. `NO_EXPORT` drops `has_std_to_string`, so `rpp.core` leaves it out today. A header
+includer still gets the trait.
 
 Shape 2 reached `rpp.task`, `rpp.tests` and `rpp.file_io` while every rpp include became a
 re-export. A re-export makes the `.gcm` unreadable, and only an importer which included
@@ -294,13 +252,13 @@ then imports the six modules which name `std::string`, so this shape fails the b
 of a downstream consumer. Giving `file_io.h` its old re-exports makes that target report 2
 errors.
 
-Shape 3, in `rpp.tests`. gcc runs out of imported source locations and stops with
+Shape 3, in the old `rpp.tests`. gcc runs out of imported source locations and stops with
 `internal compiler error: in write_location, at cp/module.cc:16271`. It prints
 `unable to represent further imported source locations` first. The count is what matters,
 not one module. Seven re-exports pass, and `rpp.sprint` as the eighth crashes it, while
 `rpp.sprint` alone passes. The dependency `.gcm` files have to come from an `-O2` build to
-reach the limit, so a `-O0` bisect hides it. `rpp.tests` re-exports one module now, so the
-count sits six below the crash.
+reach the limit, so a `-O0` bisect hides it. `RE_EXPORT` is empty now, so the count sits at
+zero. C28 is the same budget hit from the import side rather than the re-export side.
 
 Shape 4, in `rpp.binary_stream`. A defaulted virtual destructor crashes the importer with
 `internal compiler error: Segmentation fault`, and the message names it
@@ -310,6 +268,15 @@ to name `rpp::binary_buffer`, and a bare `import` passes. No export list reduces
 carries the `= default` and no importer reads one. An empty body in the header also works,
 and clang-tidy rejects that one with `modernize-use-equals-default`. An isolated struct of
 the same shape does not crash, so the reduced case is still open.
+
+Shape 5, in `rpp.testing`, and it is shape 2 at the scale of a group. `rpp.testing` carried
+`export import rpp.text;`, because `TestImpl` expands to a constructor taking an
+`rpp::strview`. `#include <string>` and then `import rpp.testing;` alone reported
+`failed to read compiled module cluster 1818: Bad file data`. The same module with that one
+line removed reads fine, and so does `import rpp.text; import rpp.testing;` after the
+removal. `rpp.text` alone, `rpp.io` alone and `rpp.threading` alone all pass after
+`<string>`, so no member header carries it. `RE_EXPORT` is empty now, and an importer of
+`rpp.testing` names `rpp.text` too.
 
 Reproduce any of these shapes in seconds, outside cmake. Build every `.cppm` in the
 `RPP_MODULES_SRC` order into one `gcm.cache`, then compile a consumer:
@@ -356,6 +323,24 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
+`CXX23=1 mama gcc build test="nogdb -vv"` from an empty build directory reported
+`note: unable to represent further imported source locations` six times, then failed with
+`conflicting global module declaration` on `std::__format::_Sink_iter<_CharT>::_M_reserve`
+in `rpp.event_loop`, `rpp.future` and `rpp.thread_pool`. C++20 passed 584/584 on the same
+commit and reported the note zero times. An incremental C++23 build also passed, because it
+reuses the interfaces a clean run rebuilds, so both ways a developer normally sees this were
+green.
+
+The count of imports in one translation unit drives it. `test_modules.cpp` imported 39
+modules, and dropping the 9 umbrella units to 47 total did not help. Eight header groups cut
+that file to 8 imports, and a clean build then reports the note zero times and passes
+584/584 on both C++20 and C++23. The `RPP_NO_MODULES` guard which forced headers on C++23 is
+gone.
+
+CI ran both modules jobs at `std: "20"`, so the matrix never covered this. Add a C++23
+modules row, because grouping raises the ceiling and does not remove it.
 
 ### C27. gcc-14 crashed any importer which built a concurrent queue at `-O1` (was B18)
 gcc attached its own builtin `memmove` to `rpp.concurrent_queue`, so `nonnull_arg_p` crashed

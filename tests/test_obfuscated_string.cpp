@@ -4,7 +4,7 @@
 #if !RPP_BUILD_WITH_MODULES
 #include <rpp/obfuscated_string.h>
 #else
-import rpp.obfuscated_string; // the module alone must carry the whole surface
+import rpp.text; // the module alone must carry the whole surface
 #endif
 
 TestImpl(test_obfuscated_string)

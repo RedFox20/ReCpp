@@ -16,45 +16,14 @@
 #include <atomic>                 // std::atomic_bool, which rpp::atomic_test_and_set takes
 #include <future>                 // std::promise, which rpp::cpromise aliases
 
-import rpp.strview;   // includes come first, the import goes last
-import rpp.debugging;
-import rpp.obfuscated_string;
-import rpp.scopeguard;
-import rpp.bitutils;
-import rpp.traits;
-import rpp.endian;
-import rpp.predicates;
-import rpp.sort;
-import rpp.proc_utils;
-import rpp.math;
-import rpp.timepoint;
-import rpp.delegate;
-import rpp.atomic_timepoint;
-import rpp.collections;
-import rpp.stack_trace;
-import rpp.threads;
-import rpp.timer;
-import rpp.sprint;
-import rpp.task;
-import rpp.vec;
-import rpp.load_balancer;
-import rpp.memory_pool;
-import rpp.mutex;
-import rpp.paths;
-import rpp.tests;
-import rpp.atomic_shared_ptr;
-import rpp.close_sync;
-import rpp.condition_variable;
-import rpp.file_io;
-import rpp.sockets;
-import rpp.binary_stream;
-import rpp.concurrent_queue;
-import rpp.semaphore;
-import rpp.binary_serializer;
-import rpp.thread_pool;
-import rpp.future;
-import rpp.event_loop;
-import rpp.coroutines;
+import rpp.text;   // includes come first, the import goes last
+import rpp.core;
+import rpp.numeric;
+import rpp.time;
+import rpp.containers;
+import rpp.threading;
+import rpp.io;
+import rpp.testing;
 
 // test_modules_identity.cpp takes this address through the module and includes no rpp header
 const void* module_pi_addr() noexcept;

@@ -3,15 +3,10 @@
 #ifdef MAMA_HAS_MODULES
 #include <string> // the include which makes gcc reconcile std::__cxx11 against the module
 
-import rpp.strview; // includes come first, the imports go last
-import rpp.sprint;
-import rpp.paths;
-import rpp.file_io;
-import rpp.sockets;
-import rpp.tests;
-import rpp.binary_stream;
-import rpp.binary_serializer;
-import rpp.thread_pool;
+import rpp.text; // includes come first, the imports go last
+import rpp.io;
+import rpp.testing;
+import rpp.threading;
 
 static std::string module_trace() { return "trace"; }
 

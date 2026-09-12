@@ -1,7 +1,7 @@
-// Imports rpp.minmax with no header, so the build fails if the module drops an export.
+// Imports rpp.numeric with no header, so the build fails if the module drops a minmax export.
 // tests/test_minmax.cpp cannot prove this, because <rpp/tests.h> includes minmax.h.
 #ifdef MAMA_HAS_MODULES
-import rpp.minmax;
+import rpp.numeric;
 
 int main()
 {

@@ -4,7 +4,7 @@
 #include <climits> // INT_MIN
 #include <rpp/tests.h>
 #if RPP_BUILD_WITH_MODULES
-import rpp.minmax; // includes come first, the import goes last
+import rpp.numeric; // includes come first, the import goes last
 #endif
 using namespace std::literals;
 

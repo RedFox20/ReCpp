@@ -4,7 +4,7 @@
  */
 #if RPP_BUILD_WITH_MODULES
 
-import rpp.math; // includes come first, the import goes last
+import rpp.numeric; // includes come first, the import goes last
 
 // a namespace-scope constant without `inline` gets one copy per translation unit
 const void* module_pi_addr() noexcept { return &rpp::PI; }

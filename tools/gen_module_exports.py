@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Writes the export list of a module interface unit from the header it wraps.
+"""Writes a group module interface unit from the headers it carries.
 
-The generator owns one block between two markers, so a hand-written export list cannot drift.
-Everything outside the markers survives a regeneration.
+The generator owns the whole `.cppm`, so a hand-written export list cannot drift.
+`GROUP_HEADERS` says which headers each group carries.
 
-  tools/gen_module_exports.py strview.h            # write the block
-  tools/gen_module_exports.py --all                # every header carrying a .cppm
-  tools/gen_module_exports.py --all --check        # exit 1 when a block is stale
+  tools/gen_module_exports.py strview.h            # write the group which carries it
+  tools/gen_module_exports.py --all                # every group
+  tools/gen_module_exports.py --all --check        # exit 1 when a group is stale
 """
 import argparse
 import functools
@@ -63,9 +63,9 @@ NO_EXPORT = {'type_traits.h': frozenset({'has_std_to_string'}),
              'memory_pool.h': frozenset({'pool_types_constructor'}),
              'thread_pool.h': frozenset({'test_threadpool'})}
 
-# the modules a module re-exports, empty until a surface forces an entry
-# tests.h earns the one: TestImpl expands to a constructor taking rpp::strview
-RE_EXPORT = {'tests.h': ('rpp.strview',)}
+# the headers a header re-exports, empty because a re-export breaks a `<string>` first
+# importer on gcc-14. An importer names every group it uses, see BUGS.md B8
+RE_EXPORT = {}
 
 # a header which does not compile in a guard configuration, so no export list exists to
 # reduce against. Every entry below names a bare-metal gap, see BUGS.md B15
@@ -80,28 +80,6 @@ NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
 # guard the generator would negate is wider. mutex.h also declares critical_section on Cortex-M,
 # which RPP_BARE_METAL does not have to cover
 ALT_GUARD = {'mutex.h': 'RPP_HAS_CRITICAL_SECTION_MUTEX'}
-
-
-CONFIG_MODULE = 'rpp.config'
-
-# a header whose module name is not its stem. scope_guard.h drops the underscore, because
-# MSVC expands the scope_guard macro inside a module directive
-STEMS = {'config.types.h': 'config', 'scope_guard.h': 'scopeguard'}
-
-
-def module_stem(header: str) -> str:
-    """The last component of the module name, which is the `.cppm` stem too."""
-    return STEMS.get(header) or os.path.splitext(header)[0].replace('.', '_')
-
-
-def module_name(header: str) -> str:
-    """`strview.h` names module `rpp.strview`, and `config.types.h` names `rpp.config`."""
-    return 'rpp.' + module_stem(header)
-
-
-def cppm_path(header: str) -> str:
-    """`strview.h` writes `src/rpp/rpp-strview.cppm`, and `config.types.h` writes `rpp-config.cppm`."""
-    return os.path.join(rd.SRC, 'rpp-' + module_stem(header) + '.cppm')
 
 
 def _read(header: str) -> str:
@@ -226,6 +204,82 @@ def _declared(base: dict, reduced: dict) -> dict:
     return out
 
 
+def header_group(header: str) -> str:
+    """The group whose module carries this header, or '' when no group claims it."""
+    return next((g for g, hs in GROUP_HEADERS.items() if header in hs), '')
+
+
+def _namespace_groups(header: str) -> dict:
+    """Namespace to condition to names, for one header, which a group module then merges."""
+    base = _exported(header, BASE)
+    reduced = {g: n for g, off in GUARDS if (n := _configuration(header, g, BASE + off)) is not None}
+    spans = _guarded_spans(header)
+    declared = _declared(base, reduced)
+    alt_guard = ALT_GUARD.get(os.path.basename(header), '')
+    out = {}
+    for ns in declared:
+        for name, line in declared[ns].items():
+            cond = _condition(ns, name, line, base, reduced, spans, alt_guard)
+            out.setdefault(ns, {}).setdefault(cond, []).append(name)
+    return out
+
+
+def group_export_block(group: str) -> str:
+    """The generated block for one group module, merging every member header's exports."""
+    lines = [BEGIN]
+
+    # a member which re-exports a header names the group carrying it, and never its own group
+    re_exports = {f'rpp.{g}' for h in GROUP_HEADERS[group] for dep in RE_EXPORT.get(h, ())
+                  if (g := header_group(dep)) and g != group}
+    lines += [f'export import {imp};' for imp in sorted(re_exports)]
+
+    merged = {}  # namespace to condition to names, in member order, first declaration wins
+    seen = {}
+    for header in GROUP_HEADERS[group]:
+        for ns, conds in _namespace_groups(header).items():
+            for cond, names in conds.items():
+                for name in names:
+                    if (ns, name) in seen: continue
+                    seen[(ns, name)] = cond
+                    merged.setdefault(ns, {}).setdefault(cond, []).append(name)
+
+    for ns in sorted(merged):
+        if not ns:  # a C API keeps global scope, so a call site needs no change
+            lines += [''] + [f'export using ::{n};' for n in merged[ns].get('', [])]
+            continue
+        lines += ['', f'export namespace {ns} {{']
+        for cond, names in sorted(merged[ns].items()):
+            if cond: lines.append(f'#if {cond}')
+            lines += [f'    using {ns}::{n};' for n in names]
+            if cond: lines.append('#endif')
+        lines.append('}')
+
+    lines.append(END)
+    return '\n'.join(lines) + '\n'
+
+
+def write_group(group: str, check: bool) -> str:
+    """Writes the whole group `.cppm`, fragment included. Returns a finding, or ''."""
+    path = os.path.join(rd.SRC, f'rpp-{group}.cppm')
+    for header in GROUP_HEADERS[group]:
+        hidden = internal_names(header)
+        if hidden:
+            return (f'{header}: internal linkage hides {hidden} from rpp.{group}. Make each one '
+                    f'`inline`, or name it in INTERNAL_OK when no importer needs it')
+    includes = '\n'.join(f'#include "{h}"' for h in GROUP_HEADERS[group])
+    new = (f'// C++20 module interface unit for the rpp.{group} headers, owned by tools/gen_module_exports.py.\n'
+           f'// The headers stay in the global module fragment, so an importer and an includer share one entity.\n'
+           f'module;\n\n{includes}\n\n'
+           f'export module rpp.{group};\n\n'
+           + group_export_block(group))
+    old = open(path, encoding='utf-8-sig', errors='replace').read() if os.path.exists(path) else ''
+    if new == old: return ''
+    if check: return f'{path}: stale, run tools/gen_module_exports.py --all'
+    open(path, 'w', encoding='utf-8').write(new)
+    print(f'  wrote {path}')
+    return ''
+
+
 def export_block(header: str) -> str:
     """The generated block for one header, markers included."""
     base = _exported(header, BASE)
@@ -257,34 +311,25 @@ def export_block(header: str) -> str:
     return '\n'.join(lines) + '\n'
 
 
-def rewrite(header: str, check: bool) -> str:
-    """Writes the block into the `.cppm`, or reports the difference. Returns a finding, or ''."""
-    path = cppm_path(header)
-    if not os.path.exists(path): return f'{path}: no module interface unit for {header}'
-    old = open(path, encoding='utf-8-sig', errors='replace').read()
-    if BEGIN not in old or END not in old:
-        return f'{path}: carries no generated block, add the two markers first'
-    name = module_stem(header)
-    if macro_collision(name):
-        return f'{header}: module rpp.{name} repeats a macro, so rename it in STEMS'
-    hidden = internal_names(header)
-    if hidden:
-        return (f'{header}: internal linkage hides {hidden} from the module. Make each one `inline`, '
-                f'or name it in INTERNAL_OK when no importer needs it')
-    head, _, rest = old.partition(BEGIN)
-    _, _, tail = rest.partition(END)
-    new = head + export_block(header).rstrip('\n') + tail
-    if new == old: return ''
-    if check: return f'{path}: the export block is stale, run tools/gen_module_exports.py {header}'
-    open(path, 'w', encoding='utf-8').write(new)
-    print(f'  wrote {path}')
-    return ''
-
-
 UMBRELLA = 'rpp.cppm'
-# the group umbrellas, which partition every module. `import rpp;` imports these, never a
-# module directly, so a new module reaches a consumer only by joining one group
-GROUPS = ('core', 'text', 'numeric', 'time', 'containers', 'io', 'threading', 'testing')
+# the groups, which partition every header. A group is one module, and its fragment includes
+# the headers below, because gcc-14 runs out of module source locations when one translation
+# unit imports dozens of them, see BUGS.md C28. `import rpp;` imports the groups.
+GROUP_HEADERS = {
+    'core': ('config.types.h', 'debugging.h', 'source_loc.h', 'traits.h', 'type_traits.h',
+             'predicates.h', 'scope_guard.h', 'delegate.h', 'proc_utils.h', 'stack_trace.h',
+             'endian.h', 'bitutils.h'),
+    'text': ('strview.h', 'sprint.h', 'obfuscated_string.h'),
+    'numeric': ('math.h', 'minmax.h', 'vec.h', 'sort.h'),
+    'time': ('timepoint.h', 'timer.h', 'atomic_timepoint.h'),
+    'containers': ('collections.h', 'memory_pool.h', 'load_balancer.h'),
+    'io': ('file_io.h', 'paths.h', 'sockets.h', 'binary_stream.h', 'binary_serializer.h'),
+    'threading': ('mutex.h', 'condition_variable.h', 'semaphore.h', 'concurrent_queue.h',
+                  'thread_pool.h', 'threads.h', 'task.h', 'future.h', 'future_types.h',
+                  'event_loop.h', 'coroutines.h', 'atomic_shared_ptr.h', 'close_sync.h'),
+    'testing': ('tests.h',),
+}
+GROUPS = tuple(GROUP_HEADERS)
 
 
 def _export_imports(cppm: str) -> set:
@@ -295,30 +340,27 @@ def _export_imports(cppm: str) -> set:
 
 
 def umbrella_drift() -> list:
-    """Every module no group carries, every name no header owns, and every module in two groups.
+    """Every header no group carries, every header two groups carry, and every umbrella gap.
 
-    The lists are hand written, so a new module reaches no `import rpp;` consumer until
-    someone adds a line. This compares them against the modules on disk.
+    `GROUP_HEADERS` is hand written, so a new header reaches no importer until someone adds a
+    line. This compares it against the headers on disk and against what `rpp.cppm` imports.
     """
-    bad = []
-    for cppm in [UMBRELLA] + [f'rpp-{g}.cppm' for g in GROUPS]:
-        if not os.path.exists(os.path.join(rd.SRC, cppm)): bad.append(f'{cppm}: missing')
-    if bad:
-        return bad
+    if not os.path.exists(os.path.join(rd.SRC, UMBRELLA)):
+        return [f'{UMBRELLA}: missing']
 
-    want_groups = {f'rpp.{g}' for g in GROUPS}
+    want = {f'rpp.{g}' for g in GROUPS}
     top = _export_imports(UMBRELLA)
-    bad += [f'{UMBRELLA}: does not export import {m}' for m in sorted(want_groups - top)]
-    bad += [f'{UMBRELLA}: exports {m}, which is not a group' for m in sorted(top - want_groups)]
+    bad = [f'{UMBRELLA}: does not export import {m}' for m in sorted(want - top)]
+    bad += [f'{UMBRELLA}: exports {m}, which is not a group' for m in sorted(top - want)]
 
-    owned = {module_name(h) for h in with_modules()}
     seen = {}
     for g in GROUPS:
-        for m in sorted(_export_imports(f'rpp-{g}.cppm')):
-            if m in seen: bad.append(f'rpp.{g}: exports {m}, which rpp.{seen[m]} already carries')
-            else: seen[m] = g
-    bad += [f'no group exports {m}' for m in sorted(owned - set(seen))]
-    bad += [f'rpp.{seen[m]}: exports {m}, which no header owns' for m in sorted(set(seen) - owned)]
+        for h in GROUP_HEADERS[g]:
+            if h in seen: bad.append(f'rpp.{g}: carries {h}, which rpp.{seen[h]} already carries')
+            else: seen[h] = g
+    owned = set(module_headers())
+    bad += [f'no group carries {h}' for h in sorted(owned - set(seen))]
+    bad += [f'rpp.{seen[h]}: carries {h}, which src/rpp does not have' for h in sorted(set(seen) - owned)]
     return bad
 
 
@@ -407,21 +449,14 @@ def std_export_drift() -> list:
 
 
 def name_collisions() -> list:
-    """Every rpp header whose module name would repeat a macro, so `STEMS` must rename it.
-
-    This reads the headers, not the `.cppm` files. A wrong `STEMS` entry drops a module from
-    `with_modules`, and a check which only walks those would go quiet instead of reporting.
-    """
-    return [f'{h}: module {module_name(h)} repeats a macro, so rename it in STEMS'
-            for h in sorted(os.listdir(rd.SRC))
-            if h.endswith('.h') and h not in rd.NO_MODULE and macro_collision(module_stem(h))]
+    """Every group whose name repeats a macro, because MSVC expands one inside a module directive."""
+    return [f'rpp.{g}: the module name repeats a macro, so rename the group'
+            for g in GROUPS if macro_collision(g)]
 
 
-def with_modules() -> list:
-    """Every header which owns a module interface unit. The NO_MODULE filter drops config.h,
-    which shares config.types.h's .cppm path."""
-    return [h for h in sorted(os.listdir(rd.SRC))
-            if h.endswith('.h') and h not in rd.NO_MODULE and os.path.exists(cppm_path(h))]
+def module_headers() -> list:
+    """Every header a group must carry. `NO_MODULE` names the ones a module cannot export."""
+    return [h for h in sorted(os.listdir(rd.SRC)) if h.endswith('.h') and h not in rd.NO_MODULE]
 
 
 _SELFTEST_HEADER = '''#pragma once
@@ -458,35 +493,46 @@ def selftest() -> list:
     """Crafts a header and pins both gates, the macro name and the linkage."""
     import tempfile
     bad = []
-    # scope_guard.h defines the macro, and the rename to rpp.scopeguard is what clears it
+    # MSVC expands a macro inside a module directive, and scope_guard.h defines one
     if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
-    if macro_collision('scopeguard'): bad.append('the renamed module still reports a macro')
-    if macro_collision('strview'): bad.append('a module which repeats no macro reported one')
+    if macro_collision('core'): bad.append('a group name which repeats no macro reported one')
+    if name_collisions(): bad.append('the group name gate reports a collision on the real groups')
 
-    # the group lists are hand written, so pin every way one can go stale
+    # GROUP_HEADERS and the umbrella are hand written, so pin every way one can go stale
     if umbrella_drift(): bad.append('the umbrella gate reports drift on a correct list')
     real_read = _read
-    first = f'rpp-{GROUPS[0]}.cppm'
-    dropped = sorted(_export_imports(first))[0]
-    def _patched(text: str):
-        globals()['_read'] = lambda h: text(real_read(h)) if h == first else real_read(h)
+    first, second = GROUPS[0], GROUPS[1]
+    def _umbrella_patched(text):
+        globals()['_read'] = lambda h: text(real_read(h)) if h == UMBRELLA else real_read(h)
         return umbrella_drift()
     try:
-        drift = _patched(lambda t: t.replace(f'export import {dropped};\n', ''))
-        if not any(f'no group exports {dropped}' in f for f in drift):
-            bad.append('a module no group carries passed the umbrella gate')
+        drift = _umbrella_patched(lambda t: t.replace(f'export import rpp.{first};\n', ''))
+        if not any(f'does not export import rpp.{first}' in f for f in drift):
+            bad.append('an umbrella which drops a group passed the umbrella gate')
 
-        drift = _patched(lambda t: t + 'export import rpp.no_such_module;\n')
-        if not any('rpp.no_such_module' in f for f in drift):
+        drift = _umbrella_patched(lambda t: t + 'export import rpp.no_such_group;\n')
+        if not any('rpp.no_such_group' in f for f in drift):
             bad.append('an unknown export import passed the umbrella gate')
-
-        # the same module in two groups makes `import rpp;` ambiguous about who owns it
-        twice = sorted(_export_imports(f'rpp-{GROUPS[1]}.cppm'))[0]
-        drift = _patched(lambda t: t + f'export import {twice};\n')
-        if not any('already carries' in f for f in drift):
-            bad.append('a module in two groups passed the umbrella gate')
     finally:
         globals()['_read'] = real_read
+
+    real_groups = dict(GROUP_HEADERS)
+    def _groups_patched(group: str, headers: tuple):
+        GROUP_HEADERS[group] = headers
+        return umbrella_drift()
+    try:
+        # the same header in two groups declares one entity twice, which breaks `import rpp;`
+        shared = GROUP_HEADERS[first][0]
+        if not any('already carries' in f for f in _groups_patched(second, real_groups[second] + (shared,))):
+            bad.append('a header in two groups passed the umbrella gate')
+        GROUP_HEADERS[second] = real_groups[second]
+
+        orphan = GROUP_HEADERS[first][0]
+        drift = _groups_patched(first, real_groups[first][1:])
+        if not any(f'no group carries {orphan}' in f for f in drift):
+            bad.append('a header no group carries passed the umbrella gate')
+    finally:
+        GROUP_HEADERS.update(real_groups)
 
     # the std export list is hand written too, so pin every way one can go stale
     if std_export_drift(): bad.append('the std gate reports drift on a correct list')
@@ -581,9 +627,9 @@ def selftest() -> list:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('header', nargs='?', help='one header under src/rpp, such as strview.h')
-    ap.add_argument('--all', action='store_true', help='every header carrying a .cppm')
-    ap.add_argument('--check', action='store_true', help='exit 1 when a block is stale')
-    ap.add_argument('--selftest', action='store_true', help='pin the module directive macro guard')
+    ap.add_argument('--all', action='store_true', help='every group module')
+    ap.add_argument('--check', action='store_true', help='exit 1 when a group module is stale')
+    ap.add_argument('--selftest', action='store_true', help='pin every gate against a stubbed list')
     a = ap.parse_args()
     if a.selftest:
         findings = selftest()
@@ -593,15 +639,17 @@ def main() -> int:
     if not a.header and not a.all: ap.error('name a header, or pass --all')
 
     try:
-        targets = with_modules() if a.all else [a.header]
-        bad = [f for f in (rewrite(h, a.check) for h in targets) if f]
+        # a header names the group which carries it, because a group is the module now
+        targets = list(GROUPS) if a.all else [header_group(a.header)]
+        if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
+        bad = [f for f in (write_group(g, a.check) for g in targets) if f]
         if a.all: bad += name_collisions() + umbrella_drift() + std_export_drift()
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1
     for f in bad: print(f'  {f}')
     print(f'== gen_module_exports: {len(bad)} finding(s) over {len(targets)} module(s) ==')
-    return 1 if bad else 0  # write mode still fails on a missing .cppm or marker
+    return 1 if bad else 0  # write mode still fails on a hidden name or a drifted list
 
 
 if __name__ == '__main__':

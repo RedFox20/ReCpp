@@ -1,9 +1,9 @@
-// Imports rpp.sort alone, with no header and no rpp.collections, so the build fails if
-// rpp::sort stops reaching an importer of the module its name names.
+// Imports rpp.numeric alone, with no header and no rpp.containers, so the build fails if
+// rpp::sort stops reaching an importer of the group which carries sort.h.
 #ifdef MAMA_HAS_MODULES
 #include <vector>
 
-import rpp.sort; // includes come first, the import goes last
+import rpp.numeric; // includes come first, the import goes last
 
 int main()
 {
