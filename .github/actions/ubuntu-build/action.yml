@@ -113,6 +113,8 @@ runs:
         # a hand-written export list rots, so this fails when a .cppm no longer
         # matches the header it wraps
         python3 tools/gen_module_exports.py --all --check
+        # a header edit moves a declaration, and README.md then opens on the next line
+        python3 update_doc_linerefs.py --check
 
     - name: Print the toolchain versions
       shell: bash

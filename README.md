@@ -409,10 +409,10 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_BIG_ENDIAN`](src/rpp/config.h#L380) | `1` if target is big-endian |
 | [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L401) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
 | [`RPP_HAS_BUILTIN(x)`](src/rpp/config.h#L411) | `1` when the compiler offers the named builtin, and `0` where `__has_builtin` does not exist |
-| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/config.h#L419) | Copies bytes through the compiler builtin, which needs no `<cstring>` |
-| [`RPP_BUILTIN_MEMMOVE(dst, src, size)`](src/rpp/config.h#L422) | Moves overlapping bytes through the compiler builtin, see `BUGS.md` C27 |
-| [`RPP_BUILTIN_MEMSET(dst, value, size)`](src/rpp/config.h#L425) | Fills bytes through the compiler builtin |
-| [`RPP_BUILTIN_MEMCMP(a, b, size)`](src/rpp/config.h#L428) | Compares bytes through the compiler builtin |
+| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/config.h#L417) | Copies bytes through the compiler builtin, which needs no `<cstring>` |
+| [`RPP_BUILTIN_MEMMOVE(dst, src, size)`](src/rpp/config.h#L420) | Moves overlapping bytes through the compiler builtin, see `BUGS.md` C27 |
+| [`RPP_BUILTIN_MEMSET(dst, value, size)`](src/rpp/config.h#L423) | Fills bytes through the compiler builtin |
+| [`RPP_BUILTIN_MEMCMP(a, b, size)`](src/rpp/config.h#L426) | Compares bytes through the compiler builtin |
 
 ### Feature Detection
 
@@ -1907,7 +1907,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L433) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L442) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -1916,7 +1916,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`spin_lock(Mutex m)`](src/rpp/mutex.h#L196) | Spin-lock with fallback to blocking lock |
 | [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L232) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L127) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L265) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`SyncableType`](src/rpp/mutex.h#L274) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 ### Example: Basic Mutex and Spin Lock
 

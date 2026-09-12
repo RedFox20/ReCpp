@@ -41,7 +41,8 @@ one above it passes.
 3. **Document new API.** Run `python3 update_doc_linerefs.py` and
    `python3 update_doc_linerefs.py --check-undocumented`. Both must come back
    clean. A header README.md never mentions is a blind spot, and the check reports
-   it.
+   it. CI runs `--check`, which fails when a moved declaration left a stale line
+   reference behind.
 4. **Edit prose with the Edit or Write tool, never through the shell.** A hook lints
    the text before it lands, and it cannot see a shell redirect. This covers
    markdown, comments, doxygen, and log strings.
