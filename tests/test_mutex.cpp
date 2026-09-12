@@ -42,7 +42,7 @@ TestImpl(test_mutex)
     };
 
     // a mutex returned by value, which spin_lock cannot bind to its reference parameter
-    struct CopiedMutex { void lock() {} void unlock() {} bool try_lock() { return true; } };
+    struct CopiedMutex { void lock() {} void unlock() {} static bool try_lock() { return true; } };
     class MutexByValue : public rpp::synchronizable<MutexByValue>
     {
         std::string value;
