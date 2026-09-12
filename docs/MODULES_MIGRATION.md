@@ -1110,7 +1110,7 @@ B23 are struck through, because a fix replaced each one.
 | **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | `rpp-std.cppm` keeps `<future>` out, so `std::future` and `std::promise` stay out too |
 | **B21** | gcc-14 | A module which exports `std::get` breaks `std::unique_ptr` in every importer | `rpp-std.cppm` leaves the name out |
 | **B22** | gcc-14 | An importer which reaches `std::shared_ptr` through a module fails to link, because no object carries `_Sp_counted_base<_S_atomic>::_M_release()` | `RppStdModuleOnly` names `std::unique_ptr` instead. An importer which needs a shared pointer includes `<memory>` |
-| **B8** | gcc-14 | Four separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
+| **B8** | gcc-14 | Five separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
 
 Three of the five that remain are silent traps rather than loud ones. B19 and B21 compile the
 interface and fail every consumer afterwards, and B22 reaches the linker. So a green build here

@@ -320,9 +320,8 @@ def export_block(header: str) -> str:
 
 
 UMBRELLA = 'rpp.cppm'
-# the groups, which partition every header. A group is one module, and its fragment includes
-# the headers below, because gcc-14 runs out of module source locations when one translation
-# unit imports dozens of them, see BUGS.md C28. `import rpp;` imports the groups.
+# the groups, which partition every header. A group is one module whose fragment includes
+# them, because gcc-14 runs out of locations when a unit imports dozens, see BUGS.md C28
 GROUP_HEADERS = {
     'core': ('config.types.h', 'debugging.h', 'source_loc.h', 'traits.h', 'type_traits.h',
              'predicates.h', 'scope_guard.h', 'delegate.h', 'proc_utils.h', 'stack_trace.h',
