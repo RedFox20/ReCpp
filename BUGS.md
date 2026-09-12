@@ -151,6 +151,9 @@ Second sighting on fd9c088, and this time it was `ubuntu-cpp20-tsan-gcc13`. Same
 two stacks, same two lines. So the race is not specific to one standard, and the job which
 reports it moves between runs. A re-run of the same job passed.
 
+Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
+reported one warning, and the four other TSAN jobs passed on the same commit.
+
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
