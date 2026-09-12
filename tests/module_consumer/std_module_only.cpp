@@ -10,7 +10,8 @@ int main()
     // strings, and the free operators the module has to export beside them
     std::string s = "abcd";
     std::string_view sv = s;
-    if (s != "abcd" || s + "e" != "abcde" || sv.size() != 4) return 1;
+    std::u16string_view usv = u"abcd"; // rpp::ustrview takes one
+    if (s != "abcd" || s + "e" != "abcde" || sv.size() != 4 || usv.size() != 4) return 1;
 
     // containers. std::span reaches rpp::socket::send, std::deque reaches rpp::pop_front
     std::vector<int> v { 1, 2, 3 };

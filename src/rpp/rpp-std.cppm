@@ -36,6 +36,7 @@ export namespace std {
     using std::char_traits;
     using std::string_view;
     using std::wstring_view;
+    using std::u16string_view; // rpp::ustrview takes one, behind its string_view_t alias
 
     // containers
     using std::vector;

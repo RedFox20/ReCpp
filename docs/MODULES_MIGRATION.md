@@ -1087,6 +1087,8 @@ reads every public parameter list and reports each `std::` name the module neith
 names in `STD_NOT_EXPORTED` with a reason. Its first run found four: `std::deque`,
 `std::unique_lock`, `std::source_location` and `std::memory_order_acq_rel`. It reads a
 parameter list only, so a return type still needs a human. `std::cv_status` came in that way.
+It also matches the literal `std::` spelling, so an alias hides a name from it. `rpp::ustrview`
+takes a `string_view_t`, which is `std::u16string_view`, and a reviewer found that one.
 
 One return type stays out on purpose. `rpp::cfuture::wait_for` returns `std::future_status`,
 which lives in `<future>`, and B20 makes that header fatal beside an exported `std::swap`.

@@ -1,5 +1,5 @@
-// C++20 umbrella module: `import rpp;` reaches every ReCpp module through the groups below.
-// A macro never crosses a module, so the test macros still need <rpp/tests.macros.h>.
+// C++20 umbrella: `import rpp;` reaches every header-backed module through the groups below.
+// No header backs rpp.std, so a file which wants the std names imports that one as well.
 export module rpp;
 
 export import rpp.core;
