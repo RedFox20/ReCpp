@@ -165,13 +165,21 @@ def _guarded_spans(header: str, macros: tuple = None) -> dict:
     return out
 
 
-def _open_namespace(header: str, ns: str) -> str:
-    """`ns` with each component the header declares inline marked inline.
+def _inline_parts(headers) -> set:
+    """Every namespace component these headers declare inline."""
+    out = set()
+    for h in headers:
+        out |= set(re.findall(r'^\s*inline\s+namespace\s+(\w+)', _read(h), re.M))
+    return out
+
+
+def _open_namespace(headers, ns: str) -> str:
+    """`ns` with each component `headers` declares inline marked inline.
 
     A literal operator lives in an inline namespace, so `using namespace rpp` reaches it. The
-    module has to reopen that namespace inline too, or the importer loses the lookup.
+    module reopens that namespace inline too, and does not lean on the fragment having done it.
     """
-    inlines = set(re.findall(r'^\s*inline\s+namespace\s+(\w+)', _read(header), re.M))
+    inlines = _inline_parts(headers)
     return '::'.join(f'inline {p}' if p in inlines else p for p in ns.split('::'))
 
 
@@ -247,7 +255,7 @@ def group_export_block(group: str) -> str:
         if not ns:  # a C API keeps global scope, so a call site needs no change
             lines += [''] + [f'export using ::{n};' for n in merged[ns].get('', [])]
             continue
-        lines += ['', f'export namespace {ns} {{']
+        lines += ['', f'export namespace {_open_namespace(GROUP_HEADERS[group], ns)} {{']
         for cond, names in sorted(merged[ns].items()):
             if cond: lines.append(f'#if {cond}')
             lines += [f'    using {ns}::{n};' for n in names]
@@ -300,7 +308,7 @@ def export_block(header: str) -> str:
         if not ns:  # a C API keeps global scope, so a call site needs no change
             lines += [''] + [f'export using ::{n};' for n in groups.get('', [])]
             continue
-        lines += ['', f'export namespace {_open_namespace(header, ns)} {{']
+        lines += ['', f'export namespace {_open_namespace([header], ns)} {{']
         for cond, names in sorted(groups.items()):
             if cond: lines.append(f'#if {cond}')
             lines += [f'    using {ns}::{n};' for n in names]
@@ -558,6 +566,14 @@ def selftest() -> list:
     if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
     if macro_collision('core'): bad.append('a group name which repeats no macro reported one')
     if name_collisions(): bad.append('the group name gate reports a collision on the real groups')
+
+    # a group which reopens an inline namespace without `inline` leans on the fragment having
+    # declared it, so pin the qualifier on the group path and on a member which does not have one
+    for group, ns in (('text', 'rpp::inline literals'), ('time', 'rpp::inline duration_literals')):
+        if f'export namespace {ns} {{' not in group_export_block(group):
+            bad.append(f'rpp.{group} reopens {ns} without the inline qualifier')
+    if 'export namespace rpp::inline detail' in group_export_block('core'):
+        bad.append('a namespace no header declares inline came out inline')
 
     # GROUP_HEADERS and the umbrella are hand written, so pin every way one can go stale
     if umbrella_drift(): bad.append('the umbrella gate reports drift on a correct list')

@@ -62,6 +62,12 @@ target_include_directories(RppQueueModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppQueueModuleOnly)
 target_link_libraries(RppQueueModuleOnly PRIVATE ${MAMA_LIBS})
 
+# a literal operator lives in an inline namespace, which the module has to reopen inline
+add_executable(RppLiteralsModuleOnly literals_module_only.cpp)
+target_include_directories(RppLiteralsModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppLiteralsModuleOnly)
+target_link_libraries(RppLiteralsModuleOnly PRIVATE ${MAMA_LIBS})
+
 # `import rpp;` has to reach every layer from outside the ReCpp build
 add_executable(RppUmbrellaModuleOnly umbrella_module_only.cpp)
 target_include_directories(RppUmbrellaModuleOnly PRIVATE ${MAMA_INCLUDES})

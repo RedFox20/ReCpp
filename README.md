@@ -286,7 +286,7 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 ```
 
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
-`tests/test_modules.cpp`, which imports all eight groups. `tests/module_consumer/` adds ten
+`tests/test_modules.cpp`, which imports all eight groups. `tests/module_consumer/` adds eleven
 module-only targets, and `run_test.py` builds and runs each one at C++20 and C++23. Each imports what it needs
 and includes no rpp header except a macro header, so a missing export fails the build, and a
 wrong answer fails the run. `RppStdStringModuleOnly` includes
@@ -1903,7 +1903,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L435) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L433) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -1912,7 +1912,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`spin_lock(Mutex m)`](src/rpp/mutex.h#L196) | Spin-lock with fallback to blocking lock |
 | [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L232) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L127) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L269) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`SyncableType`](src/rpp/mutex.h#L265) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 ### Example: Basic Mutex and Spin Lock
 

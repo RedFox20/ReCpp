@@ -250,14 +250,10 @@ namespace rpp
 
     namespace detail
     {
-        // MSVC takes the address of a prvalue as an extension, so SyncableType asks this instead
-        template<class T> inline constexpr bool is_lvalue_ref = false;
-        template<class T> inline constexpr bool is_lvalue_ref<T&> = true;
-
-        // the guard hands out a `std::decay_t<T>&`, which a const or volatile lvalue is not
+        // the guard binds a `std::decay_t<T>&`, so an accessor returns exactly that. This one
+        // rule covers a prvalue, a cv lvalue and an array lvalue, which all decay to something else
         template<class T> inline constexpr bool is_plain_lvalue_ref = false;
-        template<class T> inline constexpr bool is_plain_lvalue_ref<T&> =
-            !std::is_const_v<T> && !std::is_volatile_v<T>;
+        template<class T> inline constexpr bool is_plain_lvalue_ref<T&> = std::is_same_v<T&, std::decay_t<T>&>;
 
         // what `!m.try_lock()` needs. A local concept keeps <concepts> out of this header
         template<class T> concept BoolTestable = requires(T t) { t ? 0 : 0; };
@@ -271,7 +267,7 @@ namespace rpp
         { t.get_mutex().lock() };
         { t.get_mutex().unlock() };
         { t.get_mutex().try_lock() } -> detail::BoolTestable;
-        requires detail::is_lvalue_ref<decltype(t.get_mutex())>;
+        requires detail::is_plain_lvalue_ref<decltype(t.get_mutex())>;
         { t.get_ref() };
         requires detail::is_plain_lvalue_ref<decltype(t.get_ref())>;
     };
@@ -282,8 +278,10 @@ namespace rpp
     class synchronize_guard
     {
     public:
-        using value_type = std::decay_t< decltype(std::declval<SyncType>().get_ref()) >;
-        using mutex_type = std::decay_t< decltype(std::declval<SyncType>().get_mutex()) >;
+        // an lvalue, because the guard holds a SyncType* and a ref-qualified accessor
+        // rejects the rvalue std::declval<SyncType>() gives
+        using value_type = std::decay_t< decltype(std::declval<SyncType&>().get_ref()) >;
+        using mutex_type = std::decay_t< decltype(std::declval<SyncType&>().get_mutex()) >;
     private:
         std::unique_lock<mutex_type> mtx_lock;
         SyncType* instance;

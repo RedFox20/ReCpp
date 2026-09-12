@@ -45,7 +45,7 @@ export namespace rpp {
     using rpp::AtomicTimeSource;
 }
 
-export namespace rpp::duration_literals {
+export namespace rpp::inline duration_literals {
     using rpp::duration_literals::operator""_s;
     using rpp::duration_literals::operator""_ms;
     using rpp::duration_literals::operator""_us;

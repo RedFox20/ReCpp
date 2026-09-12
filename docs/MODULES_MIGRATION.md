@@ -19,7 +19,7 @@ gate, #65 changeset 6.
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test, 41 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 10 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 11 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 29 jobs on GitHub Actions, and CircleCI is gone |
 | test counts | 584/584 on the modules build, 539/539 on the header build |

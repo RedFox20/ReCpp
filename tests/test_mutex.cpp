@@ -51,6 +51,26 @@ TestImpl(test_mutex)
         auto& get_ref() noexcept { return value; }
     };
 
+    // a get_ref() returning a reference to an array, which decays to a pointer in value_type
+    class ArrayRef : public rpp::synchronizable<ArrayRef>
+    {
+        rpp::mutex mutex;
+        int values[3] {};
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return values; }
+    };
+
+    // an lvalue ref-qualified get_ref(), which the guard only ever calls on an lvalue
+    class RefQualified : public rpp::synchronizable<RefQualified>
+    {
+        rpp::mutex mutex;
+        std::string value;
+    public:
+        auto& get_mutex() & noexcept { return mutex; }
+        auto& get_ref() & noexcept { return value; }
+    };
+
     // a const get_ref(), which the guard cannot hand out as a plain value_type&
     class ConstRef : public rpp::synchronizable<ConstRef>
     {
@@ -112,6 +132,9 @@ TestImpl(test_mutex)
         static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
         static_assert(!rpp::SyncableType<VolatileRef>);
         static_assert(!rpp::SyncableType<ConstRef>);
+        static_assert(!rpp::SyncableType<ArrayRef>);
+        // an lvalue ref-qualified accessor is the shape the guard uses, so it works
+        static_assert(rpp::SyncableType<RefQualified>);
 
         // SyncableType constrains every synchronizable member, so a derived type which
         // forgot the accessors still compiles and only loses guard()
@@ -125,6 +148,8 @@ TestImpl(test_mutex)
         static_assert(!has_guard<MutexTryLockReturnsVoid>);
         static_assert(!has_guard<VolatileRef>);
         static_assert(!has_guard<ConstRef>);
+        static_assert(!has_guard<ArrayRef>);
+        static_assert(has_guard<RefQualified>);
 
         SimpleValue value;
         auto guard = value.guard();

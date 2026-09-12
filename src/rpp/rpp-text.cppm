@@ -69,7 +69,7 @@ export namespace rpp {
 #endif
 }
 
-export namespace rpp::literals {
+export namespace rpp::inline literals {
     using rpp::literals::operator""_sv;
     using rpp::literals::operator""_obfuscated;
 }

@@ -99,12 +99,11 @@ export namespace rpp {
 #endif
 }
 
-export namespace rpp::coro_operators {
+export namespace rpp::inline coro_operators {
     using rpp::coro_operators::operator co_await;
 }
 
 export namespace rpp::detail {
-    using rpp::detail::is_lvalue_ref;
     using rpp::detail::is_plain_lvalue_ref;
     using rpp::detail::BoolTestable;
     using rpp::detail::task_final_awaiter;
