@@ -1,4 +1,4 @@
-# The build matrix: 28 jobs over Linux, Android, MIPS and Windows.
+# The build matrix, over Linux, Android, MIPS and Windows.
 name: CI
 
 # a branch push and its pull request both match, so push stays on master alone.
@@ -18,7 +18,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     strategy:
-      fail-fast: false # one red job must never cancel the other twenty-seven
+      fail-fast: false # one red job must never cancel the others
       matrix:
         include:
           # clang-18, C++20 and C++23
