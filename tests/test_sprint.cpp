@@ -8,6 +8,7 @@
 #include "TempFILE.h"
 #include <rpp/tests.h>
 #include <string> // std::string
+#include <vector> // std::vector
 
 using namespace rpp;
 
