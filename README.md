@@ -130,9 +130,9 @@ importer asked for. `rpp.tests` is the one exception, and it re-exports
 
 ### The umbrella modules
 
-`import rpp;` reaches every module at once, which suits a file that would otherwise name
-a dozen. Eight group umbrellas sit between it and the 44, so a file can take one subject
-instead of everything:
+`import rpp;` reaches every header-backed module at once, which suits a file that would
+otherwise name a dozen. Eight group umbrellas sit between it and the 44, so a file can take
+one subject instead of everything:
 
 | Module | Carries |
 |---|---|
@@ -148,6 +148,9 @@ instead of everything:
 The groups partition the 44, so every module sits in exactly one and
 `gen_module_exports.py --all --check` fails when that stops holding. `rpp.numeric` is
 named that way because `rpp.math` is already the module for `math.h`.
+
+`rpp.std` is the one module outside this. No header backs it and no group carries it, so a
+file which wants the std names writes `import rpp.std;` beside `import rpp;`.
 
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module
@@ -180,10 +183,10 @@ them, and it is where the real win lives:
 
 | Facility | Header | Import | Import with `rpp.std` |
 |---|---|---|---|
-| `rpp.timepoint` | 397 ms | 442 ms | 45 ms |
-| `rpp.file_io` | 685 ms | 497 ms | 109 ms |
-| `rpp.future` | 976 ms | 561 ms | 271 ms |
-| **median speedup** | | **1.34x** | **3.56x** |
+| `rpp.timepoint` | 398 ms | 444 ms | 45 ms |
+| `rpp.file_io` | 700 ms | 482 ms | 109 ms |
+| `rpp.future` | 978 ms | 560 ms | 283 ms |
+| **median speedup** | | **1.34x** | **3.29x** |
 
 Take the narrowest module which covers the file. `import rpp;` costs 7.4x `import rpp.sprint;`
 for the same one-line body, because a re-export chain costs its whole transitive closure.

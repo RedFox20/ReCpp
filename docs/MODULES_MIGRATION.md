@@ -287,17 +287,17 @@ headers ReCpp puts in a public signature, and it exports those names. Replacing
 
 | Facility | Header | Import, std as headers | Import, with `rpp.std` | Speedup |
 |---|---|---|---|---|
-| `timepoint` | 397 ms | 442 ms | 45 ms | 8.74x |
-| `file_io` | 685 ms | 497 ms | 109 ms | 6.28x |
-| `sockets` | 619 ms | 479 ms | 159 ms | 3.89x |
-| `future` | 976 ms | 561 ms | 271 ms | 3.60x |
-| `paths` | 690 ms | 503 ms | 196 ms | 3.52x |
-| `strview` | 433 ms | 453 ms | 145 ms | 2.99x |
-| **median over ten** | | **1.34x** | | **3.56x** |
+| `timepoint` | 398 ms | 444 ms | 45 ms | 8.85x |
+| `file_io` | 700 ms | 482 ms | 109 ms | 6.40x |
+| `sockets` | 618 ms | 479 ms | 160 ms | 3.87x |
+| `paths` | 672 ms | 494 ms | 194 ms | 3.47x |
+| `future` | 978 ms | 560 ms | 283 ms | 3.46x |
+| `strview` | 427 ms | 436 ms | 146 ms | 2.92x |
+| **median over ten** | | **1.34x** | | **3.29x** |
 
 The many-facility inversion nearly goes with it. Ten rpp imports beside two std headers took
-1452 ms against 1074 ms for eleven headers, which is 0.74x. The same ten beside
-`import rpp.std;` take 1149 ms, which is 0.94x. So most of what the import column lost to
+1454 ms against 1114 ms for eleven headers, which is 0.77x. The same ten beside
+`import rpp.std;` take 1187 ms, which is 0.94x. So most of what the import column lost to
 header sharing was a std parse the header column shared for free.
 
 Three names stay out of `rpp.std`, each because gcc-14 breaks on it. Exporting
@@ -1072,6 +1072,12 @@ global module fragment reaches an importer only when an exported declaration nam
 So an export list of type names alone does not make a module usable. Every free function an
 exported type needs by argument-dependent lookup belongs in the list beside the type.
 
+`gen_module_exports.py --all --check` holds `rpp.std` to its contract. `std_export_drift()`
+reads every public parameter list and reports each `std::` name the module neither exports nor
+names in `STD_NOT_EXPORTED` with a reason. Its first run found four: `std::deque`,
+`std::unique_lock`, `std::source_location` and `std::memory_order_acq_rel`. It reads a
+parameter list only, so a return type such as `std::cv_status` still needs a human.
+
 ---
 
 ## 12. Risks
@@ -1083,7 +1089,7 @@ exported type needs by argument-dependent lookup belongs in the list beside the 
 | The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | Track it as its own bug. `e.what()` reads a message the future shared state may free on another thread. |
 | Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |
 | A consumer writes its import above its includes | Hundreds of std redefinition errors on gcc-14 (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
-| Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI. |
+| Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI, which now covers the `rpp.std` list too. |
 | Duplicate module initializer symbol (finding 7) | Link failure in a consumer that compiles the `.cppm` and links `libReCpp.a` | Keep `.cppm` objects out of the shipped archive. Cover it in `examples/module_consumer/`. |
 | Sanitizer interaction | `BUILD_WITH_MEM_SAFETY` already disables `/fsanitize=address` on MSVC because of modules ([`CMakeLists.txt:154`](../CMakeLists.txt#L154)) | Keep the modules job separate from the sanitizer matrix. |
 

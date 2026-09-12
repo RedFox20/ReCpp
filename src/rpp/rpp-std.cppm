@@ -6,14 +6,19 @@ module;
 #include <string_view>
 #include <vector>
 #include <array>
+#include <deque>
 #include <unordered_map>
 #include <tuple>
 #include <span>
 #include <atomic>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <condition_variable>
 #include <optional>
 #include <stdexcept>
 #include <exception>
+#include <source_location>
 #include <type_traits>
 #include <utility>
 #include <initializer_list>
@@ -34,6 +39,7 @@ export namespace std {
     // containers
     using std::vector;
     using std::array;
+    using std::deque;
     using std::span;
     using std::dynamic_extent;
     using std::unordered_map;
@@ -66,7 +72,21 @@ export namespace std {
     using std::memory_order_relaxed;
     using std::memory_order_acquire;
     using std::memory_order_release;
+    using std::memory_order_acq_rel;
     using std::memory_order_seq_cst;
+
+    // locking. rpp::condition_variable::wait_for takes a std::unique_lock and returns a
+    // std::cv_status, and close_sync.h names std::shared_mutex in a public alias
+    using std::mutex;
+    using std::unique_lock;
+    using std::lock_guard;
+    using std::shared_mutex;
+    using std::shared_lock;
+    using std::condition_variable;
+    using std::cv_status;
+
+    // source_loc.h takes one in a public constructor
+    using std::source_location;
 
     // exceptions. std::exception_ptr is absent on purpose, see BUGS.md B19
     using std::exception;

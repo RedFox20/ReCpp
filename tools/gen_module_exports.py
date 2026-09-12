@@ -322,6 +322,64 @@ def umbrella_drift() -> list:
     return bad
 
 
+STD_MODULE = 'rpp-std.cppm'
+
+# Every std name a public parameter list writes which `rpp.std` does not export. The reason
+# is what the next reader needs, because `std_export_drift` reports anything absent from both
+STD_NOT_EXPORTED = {
+    **{n: 'a trait in a default argument, which no caller writes' for n in (
+        'is_enum_v', 'is_function', 'is_void_v', 'is_nothrow_copy_constructible_v',
+        'is_nothrow_move_constructible_v', 'is_trivially_copy_assignable_v',
+        'is_trivially_destructible_v', 'is_trivially_move_assignable_v')},
+    'exception_ptr': 'gcc-14 writes an interface no importer can read, see BUGS.md B19',
+    'future': 'its header kills std::swap lookup in the fragment, see BUGS.md B20',
+    'promise': 'gcc-14 crashes an importer which instantiates it, see BUGS.md B16',
+    'get': 'gcc-14 breaks std::unique_ptr in every importer, see BUGS.md B21',
+    'size_t': '<cstddef> declares it at global scope too, so a mixed importer reports an ambiguity',
+    'nullptr_t': 'the same global scope ambiguity as size_t',
+    'nothrow_t': 'an importer already includes <new>, which carries it',
+    'basic_string_view': 'rpp::strview replaces it, and std::string_view covers a caller',
+}
+
+# a declaration, not a call: a name, its parameter list, and what closes the declaration
+_DECL = re.compile(r'\b\w+\s*\(([^()]*)\)\s*(?:const\s*)?(?:noexcept\w*\s*)?(?:->|\{|;|$)')
+_STD_NAME = re.compile(r'\bstd::(\w+)')
+
+
+def _parameter_lines(header: str) -> list:
+    """The lines of a header which can declare a parameter, with comments and directives cut.
+
+    A concept body and a static_assert name a trait the caller never writes, so both go too.
+    """
+    text = re.sub(r'/\*.*?\*/', '', _read(header), flags=re.S)
+    text = re.sub(r'//[^\n]*', '', text)
+    text = re.sub(r'^[ \t]*#[^\n]*', '', text, flags=re.M)
+    return [ln for ln in text.splitlines()
+            if 'std::' in ln and not re.search(r'\b(requires|concept|static_assert)\b', ln)]
+
+
+def std_export_drift() -> list:
+    """Every std name a public parameter list writes which `rpp.std` does not export.
+
+    A consumer which imports instead of including has to spell each one, so a gap here is an
+    API it cannot call. `STD_NOT_EXPORTED` carries the deliberate exclusions with a reason.
+    """
+    path = os.path.join(rd.SRC, STD_MODULE)
+    if not os.path.exists(path):
+        return [f'{STD_MODULE}: missing']
+    exported = set(re.findall(r'^\s*using std::(\w+);', _read(STD_MODULE), re.M))
+    found = {}
+    for header in sorted(os.listdir(rd.SRC)):
+        if not header.endswith('.h'): continue
+        for line in _parameter_lines(header):
+            for decl in _DECL.finditer(line):
+                for name in _STD_NAME.findall(decl.group(1)):
+                    if name not in exported and name not in STD_NOT_EXPORTED:
+                        found.setdefault(name, header)
+    return [f'{STD_MODULE}: {h} writes std::{n} in a parameter list. Export it, or name it '
+            f'in STD_NOT_EXPORTED with the reason' for n, h in sorted(found.items())]
+
+
 def name_collisions() -> list:
     """Every rpp header whose module name would repeat a macro, so `STEMS` must rename it.
 
@@ -401,6 +459,26 @@ def selftest() -> list:
         drift = _patched(lambda t: t + f'export import {twice};\n')
         if not any('already carries' in f for f in drift):
             bad.append('a module in two groups passed the umbrella gate')
+    finally:
+        globals()['_read'] = real_read
+
+    # the std export list is hand written too, so pin both directions the same way
+    if std_export_drift(): bad.append('the std gate reports drift on a correct list')
+    def _std_patched(text):
+        globals()['_read'] = lambda h: text(real_read(h)) if h == STD_MODULE else real_read(h)
+        return std_export_drift()
+    try:
+        drift = _std_patched(lambda t: t.replace('    using std::deque;\n', ''))
+        if not any('std::deque' in f for f in drift):
+            bad.append('a dropped std export passed the std gate')
+
+        excluded = sorted(STD_NOT_EXPORTED)[0]
+        reason = STD_NOT_EXPORTED.pop(excluded)
+        try:
+            if not any(excluded in f for f in std_export_drift()):
+                bad.append('a std name with no exclusion reason passed the std gate')
+        finally:
+            STD_NOT_EXPORTED[excluded] = reason
     finally:
         globals()['_read'] = real_read
 
@@ -491,7 +569,7 @@ def main() -> int:
     try:
         targets = with_modules() if a.all else [a.header]
         bad = [f for f in (rewrite(h, a.check) for h in targets) if f]
-        if a.all: bad += name_collisions() + umbrella_drift()
+        if a.all: bad += name_collisions() + umbrella_drift() + std_export_drift()
     except rd.ClangMissing as e:
         print(f'cannot run: {e}')
         return 1
