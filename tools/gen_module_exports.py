@@ -500,9 +500,11 @@ def bugs_citation_drift() -> list:
     ids = re.findall(r'^### ([BC]\d+)\.', _readfile(BUGS), re.M)
     bad = [f'{BUGS}: defines {i} more than once' for i in sorted({i for i in ids if ids.count(i) > 1})]
     known = set(ids)
-    files = list(CITING) + [os.path.join(rd.SRC, f) for f in sorted(os.listdir(rd.SRC))
-                            if f.endswith(('.h', '.cpp', '.cppm'))]
-    files += [os.path.join('docs', f) for f in sorted(os.listdir('docs')) if f.endswith('.md')]
+    files = list(CITING)
+    for root in (rd.SRC, 'docs', 'tests', os.path.join('tests', 'module_consumer')):
+        if not os.path.isdir(root): continue
+        files += [os.path.join(root, f) for f in sorted(os.listdir(root))
+                  if f.endswith(('.h', '.cpp', '.cppm', '.md', '.py', '.txt'))]
     for path in files:
         if not os.path.exists(path): continue
         for cited in sorted(set(re.findall(r'BUGS\.md\s+([BC]\d+)', _readfile(path)))):

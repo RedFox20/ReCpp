@@ -1,7 +1,5 @@
-// Stands in for `import std;`, which gcc-14 does not ship. It carries the std names ReCpp
-// puts in a public signature, so a consumer can import instead of including each header.
-// The names sit in five parts, this unit re-exports all five, and a file which wants one
-// part imports it by name. Five, because gcc-14 cannot write one, see BUGS.md B24.
+// Stands in for `import std;`, which gcc-14 does not ship, and re-exports every part below.
+// The parts exist because gcc-14 cannot write one unit carrying them all, see BUGS.md B24.
 
 export module rpp.std;
 
