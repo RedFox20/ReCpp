@@ -57,12 +57,16 @@ TestImpl(test_event_loop)
     void idle() const { loop->run_until_idle(); }
 
     // spins without pumping the loop, so a test can order itself against a worker thread.
-    // the bound turns a condition which never arrives into a failed assertion, not a hang
-    template<class Predicate> static void spin_until(const Predicate& pred, rpp::Duration timeout = rpp::seconds(5))
+    // a condition which never arrives fails here, instead of letting the test run on
+    template<class Predicate> static void spin_until(const Predicate& pred, RPP_SOURCE_LOC)
     {
         rpp::TimePoint start = rpp::TimePoint::monotonic_now();
-        while (!pred() && (rpp::TimePoint::monotonic_now() - start) < timeout)
+        while ((rpp::TimePoint::monotonic_now() - start) < rpp::seconds(1))
+        {
+            if (pred()) return;
             rpp::yield();
+        }
+        AssertFailedLoc(loc, "spin_until timed out");
     }
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
@@ -789,8 +793,7 @@ TestImpl(test_event_loop)
         // post_resume_from_suspension() posts the resume BEFORE it drops the counter,
         // so a pending completion alone does not prove the counter reached 0 yet
         bg_may_finish.store(true);
-        spin_until([&]{ return loop->pending_completions() != 0 && loop->background_tasks() == 0; },
-                   rpp::seconds(1));
+        spin_until([&]{ return loop->pending_completions() != 0 && loop->background_tasks() == 0; });
 
         AssertThat(loop->background_tasks(), 0);
         AssertGreater(loop->pending_completions(), 0);
