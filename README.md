@@ -1661,12 +1661,12 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | Method | Description |
 |--------|-------------|
 | [`run_loop()`](src/rpp/event_loop.h#L372) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L381) | Process at most one pending resume event; `Duration::zero()` for non-blocking poll |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L381) | Process at most one pending resume event. `Duration::zero()` polls without blocking |
 | [`run_until_idle()`](src/rpp/event_loop.h#L398) | Run until no background tasks and no pending resume events remain |
 | [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L410) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L428) | Pump the loop until the eager `rpp::task<T>` completes; returns its value (or rethrows) |
-| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L458) | Pump on the owner thread until that one future is ready; `bool`, never blocks past timeout |
-| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L477) | Pump until that future is ready, then return its value; throws on timeout |
+| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L428) | Pump the loop until the eager `rpp::task<T>` completes, then return its value or rethrow |
+| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L458) | Pump on the owner thread until that one future is ready. Returns `bool` and never blocks past the timeout |
+| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L477) | Pump until that future is ready and return its value. Throws on timeout |
 | [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L490) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
 | [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L795) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
 | [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L519) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
