@@ -81,11 +81,15 @@ cmake --build build
 ```
 
 `tests/module_consumer/` keeps its module-only validation targets under a second cached
-option, `BUILD_MODULE_CONSUMER_TESTS`, which defaults to `BUILD_TESTS`. Turn it off to
-build the sample app alone. `run_test.py` turns it on, because it runs every one of them.
+option, `BUILD_MODULE_CONSUMER_TESTS`. It takes the value of `BUILD_TESTS` on the first
+configure of a build dir. `tests/module_consumer/mamafile.py` turns it on, because
+`run_test.py` runs every one of those targets.
+
+Run a mama build there first. It generates the `mama.cmake` this project includes, and
+git ignores that file.
 
 ```bash
-cmake -S tests/module_consumer -B build -DBUILD_MODULE_CONSUMER_TESTS=OFF
+cmake -S tests/module_consumer -B build -DBUILD_MODULE_CONSUMER_TESTS=ON
 ```
 
 ### Address Sanitizer (CMake)

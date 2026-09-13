@@ -5,7 +5,7 @@ project(RppModuleConsumer C CXX)
 include(${CMAKE_CURRENT_SOURCE_DIR}/mama.cmake)
 
 # mama sets BUILD_TESTS when the run asks for tests, and the validation targets below follow it.
-# A consumer who only wants the sample app builds one target instead of eleven
+# A consumer who only wants the sample app builds it alone
 option(BUILD_TESTS "Build the ReCpp validation targets?" OFF)
 option(BUILD_MODULE_CONSUMER_TESTS "Build the module-only validation targets?" ${BUILD_TESTS})
 

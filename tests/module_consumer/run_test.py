@@ -6,6 +6,7 @@ graph. A toolchain that misses one compiles the header instead, and the app must
 `--expect modules` or `--expect headers` to pin which path the toolchain took.
 """
 import argparse
+import json
 import os
 import re
 import shutil
@@ -15,6 +16,9 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# every target BUILD_MODULE_CONSUMER_TESTS gates, which a default configure must not declare
+GATED_TARGETS = re.compile(r'ModuleOnly$|^RppConfigCVisibility$')
 
 
 def run(cmd, env=None, **kw) -> subprocess.CompletedProcess:
@@ -51,6 +55,70 @@ def run_module_only(env=None) -> None:
         if result.returncode != 0:
             raise SystemExit(f'FAILED: {stem} exited {result.returncode}')
         print(f'  {stem:28} ok', flush=True)
+
+
+def built_cache() -> str:
+    """The CMakeCache.txt of the build mama just configured, whatever build dir name it chose."""
+    for root, _, files in os.walk(os.path.join(HERE, 'packages', 'RppModuleConsumer')):
+        if 'CMakeCache.txt' in files: return os.path.join(root, 'CMakeCache.txt')
+    raise SystemExit('FAILED: no CMakeCache.txt under packages/RppModuleConsumer')
+
+
+def cache_configure_args() -> list:
+    """The generator and compilers mama chose, so a second configure matches the first.
+
+    @returns cmake arguments, or an empty list when the generator is Visual Studio
+    """
+    values = {}
+    with open(built_cache(), encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            name, _, rest = line.partition(':')
+            if rest: values[name] = rest.partition('=')[2].strip()
+    generator = values.get('CMAKE_GENERATOR', '')
+    # a second Visual Studio configure needs the toolset environment this script does not hold
+    if not generator or generator.startswith('Visual Studio'): return []
+    args = ['-G', generator]
+    for name in ('CMAKE_C_COMPILER', 'CMAKE_CXX_COMPILER', 'CMAKE_MAKE_PROGRAM', 'CMAKE_CXX_STANDARD'):
+        if values.get(name): args.append(f'-D{name}={values[name]}')
+    return args
+
+
+def configured_targets(build_dir: str, args: list) -> set:
+    """Configures this project into build_dir and returns every target name cmake declared.
+
+    The cmake file-api reads the same on Ninja, make and Visual Studio, and a generated
+    build file does not. So this asks cmake for the model instead of parsing its output.
+    """
+    query = os.path.join(build_dir, '.cmake', 'api', 'v1', 'query')
+    os.makedirs(query, exist_ok=True)
+    open(os.path.join(query, 'codemodel-v2'), 'w').close()
+    p = run(['cmake', '-S', HERE, '-B', build_dir] + args, capture_output=True)
+    if p.returncode != 0:
+        raise SystemExit(f'FAILED: the default configure did not run:\n{p.stdout[-800:]}{p.stderr[-800:]}')
+    reply = os.path.join(build_dir, '.cmake', 'api', 'v1', 'reply')
+    index = next(f for f in os.listdir(reply) if f.startswith('codemodel-v2'))
+    model = json.load(open(os.path.join(reply, index), encoding='utf-8'))
+    return {t['name'] for c in model['configurations'] for t in c['targets']}
+
+
+def check_default_target_set() -> None:
+    """Pins the OFF default of BUILD_MODULE_CONSUMER_TESTS, which no other step reaches.
+
+    The mamafile turns that option on for every run of this script. So a regression which
+    restores the validation targets by default would leave every one of those runs green.
+    """
+    args = cache_configure_args()
+    if not args:
+        print('  default target set     skipped, the generator needs its own environment')
+        return
+    with tempfile.TemporaryDirectory(prefix='rpp-default-', ignore_cleanup_errors=True) as d:
+        targets = configured_targets(d, args)
+    gated = sorted(t for t in targets if GATED_TARGETS.search(t))
+    if gated:
+        raise SystemExit(f'FAILED: a default configure declares the validation targets: {gated}')
+    if 'RppModuleConsumer' not in targets:
+        raise SystemExit(f'FAILED: a default configure dropped RppModuleConsumer: {sorted(targets)}')
+    print(f'  default target set     ok, {len(targets)} target(s) and no validation target')
 
 
 def _drop_readonly(func, path, _exc):
@@ -122,6 +190,7 @@ def main() -> int:
         print('the unicode-disabled module still exports the numeric to_string')
 
     out = build_and_run(args.compiler, args.jobs)
+    check_default_target_set()
 
     took = 'modules' if 'built with MODULES' in out else 'headers'
     print(f'consumer took the {took} path')

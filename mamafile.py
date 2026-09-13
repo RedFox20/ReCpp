@@ -22,9 +22,11 @@ class ReCpp(mama.BuildTarget):
         if getattr(self.config, 'clang_stdlib', 'libc++') != 'libc++':
             self.add_cmake_options('RPP_USE_LIBCXX=OFF')
 
+        # cmake caches BUILD_TESTS, so a dropped flag leaves a warm dependency build dir at ON
+        wants_tests = self.is_test_target() or os.getenv('BUILD_TESTS') in ('1', 'ON', 'TRUE')
+        self.add_cmake_options(f'BUILD_TESTS={"ON" if wants_tests else "OFF"}')
+
         # enable CMAKE opts if env vars are enabled
-        # config.test is global, so without is_root a consumer's `mama build test` builds RppTests too
-        self.enable_from_env('BUILD_TESTS', force=self.config.test != '' and self.dep.is_root)
         self.enable_from_env('BUILD_WITH_MEM_SAFETY')
         self.enable_from_env('CXX20', force=self.is_enabled_cxx20())
         self.enable_from_env('CXX23', force=self.is_enabled_cxx23())
