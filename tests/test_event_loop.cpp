@@ -1181,6 +1181,24 @@ TestImpl(test_event_loop)
         });
     }
 
+    // the trailing post starts a blocked task, so run_all_ready() leaves the loop busy
+    void fork_with_trailing_post_starting(rpp::semaphore& release)
+    {
+        loop->fork([this, &release]() -> rpp::event_task
+        {
+            co_await loop->run_async([]{ rpp::sleep_ms(5); });
+            while (loop->has_background_tasks())
+                rpp::yield();
+            loop->post([this, &release]
+            {
+                loop->fork([this, &release]() -> rpp::event_task
+                {
+                    co_await loop->run_async([&release]{ release.wait(); });
+                });
+            });
+        });
+    }
+
     // ─── shutdown: wait_on_all is not a complete drain ──────────
     // the resume lands as the background count reaches zero, past the point wait_on_all rechecks
     TestCase(wait_on_all_leaves_a_trailing_post)
@@ -1222,6 +1240,21 @@ TestImpl(test_event_loop)
         clock.warp_forward(rpp::seconds(10000));
         AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
         // still attached: current_time() carries the warp, a detached loop would read wall time
+        AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
+
+        release.notify();
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+    }
+
+    // ─── shutdown: work started inside the drain keeps the clock ─
+    // run_all_ready() resumes a coroutine which starts a new task, so the pre-drain count is stale
+    TestCase(stop_and_wait_all_ready_keeps_the_clock_for_work_started_in_the_drain)
+    {
+        rpp::semaphore release;
+        fork_with_trailing_post_starting(release);
+        clock.warp_forward(rpp::seconds(10000));
+
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::seconds(1)));
         AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
 
         release.notify();

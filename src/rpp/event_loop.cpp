@@ -86,9 +86,11 @@ namespace rpp
         wait_on_all(max_wait);
         const bool tasks_done = !has_background_tasks(); // before the drain, so a late worker still counts
         run_all_ready(); // a resume queued as the background count hit zero is still pending
-        if (tasks_done)
+        // a drained resume can start new work, so the detach reads the count again
+        const bool idle = !has_pending_work();
+        if (idle)
             set_time_source(nullptr); // a live delay() worker polls it against a virtual deadline
-        return tasks_done && !has_pending_work();
+        return tasks_done && idle;
     }
 
     bool event_loop::run_loop(rpp::Duration suspend_interval) noexcept
