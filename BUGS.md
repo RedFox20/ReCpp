@@ -8,6 +8,17 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
+`event_loop::time_source` is a raw pointer. A pending `delay()` reads it once to pick its poll
+branch, then polls `current_time()` from a background worker (`event_loop.h:814-820`). A
+`set_time_source()` call from the owner thread races that read. The damage is worse than a torn
+read. The worker keeps a virtual `end` deadline and compares it against wall time, so it polls
+until that deadline arrives in real time.
+
+`stop_and_wait_all_ready()` detaches only after every task finished, so it does not reach this.
+Any other caller which retimes a loop with work in flight does. A fix makes the field atomic
+and has the worker load it once per poll. Found by review on PR #84.
+
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
 
@@ -326,6 +337,11 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C29. `delegate::copy` leaked the destination functor when the source was a function
+The function branch of `copy()` overwrote `f` and `obj` and never freed the functor the
+destination owned. It calls `to.reset()` first now, which `copy_assign_from_function_frees_the_old_functor` pins.
+
 
 ### B24. gcc-14 wrote an `rpp.std` on C++23 which no importer could read
 The module compiled, every importer then stopped with `failed to read compiled module: Bad

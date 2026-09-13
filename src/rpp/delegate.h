@@ -174,6 +174,7 @@ namespace rpp
 
         void copy(delegate& to) const noexcept
         {
+            if (this == &to) return; // a self copy has nothing to do, and both branches free first
             if (destructor) // looks like we have a functor
             {
                 proxy_copy(obj, to);
@@ -182,6 +183,7 @@ namespace rpp
             }
             else
             {
+                to.reset(); // a function source frees whatever functor `to` already owns
                 to.f = f;
                 to.obj = obj;
             }

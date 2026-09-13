@@ -204,6 +204,8 @@ namespace rpp
         event_loop(rpp::uint64 main_thr_id = 0/*0=rpp::get_thread_id()*/,
                    rpp::thread_pool* background_task_pool RPP_LIFETIMEBOUND = nullptr,
                    rpp::AtomicTimeSource* warpable_clock RPP_LIFETIMEBOUND = nullptr) noexcept;
+        /** @brief The destructor drains pending work and reads the time source, so the owner must
+         *         outlive the loop. stop_and_wait_all_ready() detaches the time source first. */
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
 
@@ -247,11 +249,25 @@ namespace rpp
         void stop() noexcept;
 
         /**
-         * @brief Waits on all pending tasks to fully drain the event loop
+         * @brief Waits on all pending tasks to fully drain the event loop.
+         *        This is not a complete drain. A resume queued as the background count reaches
+         *        zero stays queued, so a shutdown path wants stop_and_wait_all_ready() instead.
          * @param timeout Maximum time to wait for pending tasks to complete.
          * @returns true if all tasks were completed within timeout
          */
         bool wait_on_all(rpp::Duration timeout = rpp::seconds(1)) noexcept;
+
+        /**
+         * @brief Stops the loop, waits for the background tasks, runs every resume they
+         *        queued, and detaches the time source. The destructor then touches nothing
+         *        the owner may already have destroyed.
+         *        On timeout the time source stays attached, because a live delay() worker
+         *        polls it against a virtual deadline and would never reach a wall-clock one.
+         *        Call it on the loop thread, because the drain resumes coroutines.
+         * @param max_wait Maximum time to wait for the background tasks.
+         * @returns true when every task finished inside max_wait and nothing is left queued
+         */
+        bool stop_and_wait_all_ready(rpp::Duration max_wait = rpp::seconds(1)) noexcept;
 
         /**
          * @brief By default exceptions are swallowed and logged as warnings.
