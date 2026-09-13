@@ -9,12 +9,11 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 ## Open
 
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
-`~event_loop()` waits one second in `wait_on_all()`, reports a timeout through
-`__assertion_failure`, and then runs to the end. That macro does not act the same on every
-platform. On gcc, clang and an MSVC release build it reaches `RppAssertFail`, which
-terminates. An MSVC `_DEBUG` build calls `_CrtDbgReport`, which returns, so the destructor
-finishes under a live worker. The comment at `event_loop.cpp:35` describes the graceful exit
-as if every platform took it.
+`~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
+`__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
+an MSVC release build it reaches `RppAssertFail`, which terminates. An MSVC `_DEBUG` build
+calls `_CrtDbgReport`, which returns, so the destructor finishes under a live worker. The
+owner accepts that one, and the comment states it now instead of promising a graceful exit.
 
 A live worker holds three borrowed things: the loop, the time source and the pool. C30 closed
 the `delay()` half. A poll step reads the offset under a reader guard, and
@@ -29,9 +28,8 @@ the `delay()` half. A poll step reads the offset under a reader guard, and
 3. An owner which frees a clock it swapped out still reaches freed memory, because
    `set_time_source()` only stores. Retire through `stop_and_wait_all_ready()` first.
 
-So the destructor must never return while a task is live, and a wait which does not finish must
-abort on every platform. A shared pointer is not the fix, because it changes the borrow contract
-of every consumer.
+So the destructor must never return while a task is live. A shared pointer is not the fix,
+because it changes the borrow contract of every consumer.
 
 The drain counts every reader, so a steady stream of new readers can hold it up. Over 20000
 detach cycles on 4 cores it measured 2 readers at 21.8ms, 4 at 315ms and 8 at 88.8s. A poll

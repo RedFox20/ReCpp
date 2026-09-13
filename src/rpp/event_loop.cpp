@@ -29,10 +29,10 @@ namespace rpp
         stop();
 
         // give limited time for cleanup, before asserting an error
-        if (!wait_on_all(rpp::millis(1000)))
+        if (!wait_on_all(rpp::millis(2000)))
         {
+            // this terminates, except on an MSVC _DEBUG build, where _CrtDbgReport returns
             __assertion_failure("event_loop destroyed with pending tasks; this may cause resource leaks");
-            // do not terminate here (except via DEBUG __assertion_failure), just try to exit gracefully
         }
 
         cleanup_forks();
