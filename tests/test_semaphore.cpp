@@ -110,47 +110,34 @@ TestImpl(test_semaphore)
         }
     }
 
-    /// @brief Waits for the worker to count every notify, so stopping it drops none.
-    static void drain_notifies(const std::atomic_int& counted, int expected) noexcept
-    {
-        rpp::Timer drain;
-        while (counted < expected && drain.elapsed_millis() < 2000.0)
-            rpp::sleep_ms(1);
-    }
-
     TestCase(can_notify_worker_thread)
     {
         rpp::semaphore sem;
-        std::atomic_bool working = true;
         std::atomic_int num_notified = 0;
+        const int num_notifies_sent = 10;
 
         std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
         std::thread worker([&]
         {
-            while (working)
+            while (num_notified < num_notifies_sent)
             {
                 rpp::sleep_ms(1); // do some work
                 if (sem.wait(millis(50)) == rpp::semaphore::timeout)
                 {
                     not_notified = true;
                     AssertFailed("semaphore was not notified");
+                    break;
                 }
-                else if (working)
-                    ++num_notified;
+                ++num_notified;
             }
         });
 
-        int num_notifies_sent = 10;
         for (int i = 0; i < num_notifies_sent; ++i)
         {
             sem.notify();
             rpp::sleep_ms(2);
         }
-
-        drain_notifies(num_notified, num_notifies_sent);
-        working = false;
-        sem.notify(); // notify finished
-        worker.join();
+        worker.join(); // the worker exits once it has counted every notify
 
         AssertFalse(not_notified.load());
         AssertEqual(num_notified, num_notifies_sent);
@@ -160,36 +147,31 @@ TestImpl(test_semaphore)
     TestCase(can_notify_worker_thread_sub_millisecond)
     {
         rpp::semaphore sem;
-        std::atomic_bool working = true;
         std::atomic_int num_notified = 0;
+        const int num_notifies_sent = 500;
 
         std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
         std::thread worker([&]
         {
-            while (working)
+            while (num_notified < num_notifies_sent)
             {
                 spin_sleep_for_us(100); // do some work
                 if (sem.wait(millis(50)) == rpp::semaphore::timeout)
                 {
                     not_notified = true;
                     AssertFailed("semaphore was not notified");
+                    break;
                 }
-                else if (working)
-                    ++num_notified;
+                ++num_notified;
             }
         });
 
-        int num_notifies_sent = 500;
         for (int i = 0; i < num_notifies_sent; ++i)
         {
             sem.notify();
             spin_sleep_for_us(100);
         }
-
-        drain_notifies(num_notified, num_notifies_sent);
-        working = false;
-        sem.notify(); // notify finished
-        worker.join();
+        worker.join(); // the worker exits once it has counted every notify
 
         AssertFalse(not_notified.load());
         AssertEqual(num_notified, num_notifies_sent);

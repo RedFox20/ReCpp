@@ -49,6 +49,21 @@ TestImpl(test_timer)
         AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
     }
 
+    // best_of_3 can regress and the three timing callers still pass on an unloaded host.
+    // This pins the call count and the minimum on a fixed sequence.
+    TestCase(best_of_3_takes_three_samples_and_returns_the_smallest)
+    {
+        int calls = 0;
+        const double spike[] = { 40.0, 10.0, 25.0 }; // the smallest sits in the middle
+        AssertEqual(best_of_3([&]{ return spike[calls++]; }), 10.0);
+        AssertEqual(calls, 3); // a regression to one call would return the first sample
+
+        calls = 0;
+        const double rising[] = { 5.0, 6.0, 7.0 }; // the smallest sits first
+        AssertEqual(best_of_3([&]{ return rising[calls++]; }), 5.0);
+        AssertEqual(calls, 3);
+    }
+
     TestCase(ensure_sleep_millis_accuracy)
     {
         for (int i = 0; i < 3; ++i)

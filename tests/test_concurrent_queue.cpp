@@ -417,7 +417,7 @@ TestImpl(test_concurrent_queue)
         PopResult r;
 
         // this first check should definitely timeout, but make sure it WAITS
-        // a loaded machine stretches one wait, so the tight bound reads the best of 3
+        // a loaded machine stretches one wait, so the tight bound reads the best of several
         double timed_out_ms = best_of_3([&]
         {
             PopResult probe = wait_pop_until(queue, Now()+Millis(5));

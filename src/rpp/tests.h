@@ -236,9 +236,8 @@ namespace rpp
         static void spin_sleep_for_us(uint64_t microseconds, bool full_spin = false) noexcept;
 
         /**
-         * @brief Runs `measure` 3 times and returns the smallest result.
-         * A loaded machine stretches a timing sample, so the smallest of several is the
-         * honest cost. Use it for a tight bound which one scheduling spike can break.
+         * @brief Runs `measure` three times and returns the smallest result.
+         * A spike only inflates a sample, so the smallest one is the honest cost.
          * @param measure Callable which takes the measurement and returns it
          * @returns The smallest of the three results
          */
