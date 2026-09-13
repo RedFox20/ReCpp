@@ -56,6 +56,15 @@ TestImpl(test_event_loop)
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
 
+    // spins without pumping the loop, so a test can order itself against a worker thread.
+    // the bound turns a condition which never arrives into a failed assertion, not a hang
+    template<class Predicate> static void spin_until(const Predicate& pred, rpp::Duration timeout = rpp::seconds(5))
+    {
+        rpp::TimePoint start = rpp::TimePoint::monotonic_now();
+        while (!pred() && (rpp::TimePoint::monotonic_now() - start) < timeout)
+            rpp::yield();
+    }
+
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
     // ─── Showcase: event_loop API overview ──────────────────────
@@ -278,7 +287,7 @@ TestImpl(test_event_loop)
         auto coro_a = [&]() -> rpp::cfuture<int>
         {
             co_await loop->run_async([&] {
-                while (!b_resumed.load()) rpp::sleep_ms(1);
+                spin_until([&]{ return b_resumed.load(); });
             });
             record(1);
             co_return 10;
@@ -334,7 +343,7 @@ TestImpl(test_event_loop)
             // before proceeding.  This makes the assertion deterministic: we no
             // longer rely on wall-clock timing to observe slow_bg_running == true.
             co_await loop->run_async([&]() {
-                while (!slow_bg_running.load()) rpp::sleep_ms(1);
+                spin_until([&]{ return slow_bg_running.load(); });
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
@@ -582,8 +591,7 @@ TestImpl(test_event_loop)
         {
             co_await loop->run_async([&]() {
                 bg_started.store(true);
-                while (!bg_may_finish.load())
-                    rpp::sleep_ms(1);
+                spin_until([&]{ return bg_may_finish.load(); });
             });
             co_return;
         };
@@ -591,8 +599,7 @@ TestImpl(test_event_loop)
         auto future = coro();
 
         // wait until background task has actually started
-        while (!bg_started.load())
-            rpp::sleep_ms(1);
+        spin_until([&]{ return bg_started.load(); });
 
         // should have pending work now
         AssertThat(loop->has_pending_work(), true);
@@ -767,8 +774,7 @@ TestImpl(test_event_loop)
         {
             co_await loop->run_async([&]() {
                 bg_started.store(true);
-                while (!bg_may_finish.load())
-                    rpp::sleep_ms(1);
+                spin_until([&]{ return bg_may_finish.load(); });
             });
             co_return;
         };
@@ -776,18 +782,15 @@ TestImpl(test_event_loop)
         auto future = coro();
 
         // wait for bg task to start
-        while (!bg_started.load())
-            rpp::sleep_ms(1);
+        spin_until([&]{ return bg_started.load(); });
 
         AssertGreater(loop->background_tasks(), 0);
 
         // post_resume_from_suspension() posts the resume BEFORE it drops the counter,
         // so a pending completion alone does not prove the counter reached 0 yet
         bg_may_finish.store(true);
-        rpp::Timer drain;
-        while ((loop->pending_completions() == 0 || loop->background_tasks() != 0)
-               && drain.elapsed_ms() < 1000)
-            rpp::sleep_ms(1);
+        spin_until([&]{ return loop->pending_completions() != 0 && loop->background_tasks() == 0; },
+                   rpp::seconds(1));
 
         AssertThat(loop->background_tasks(), 0);
         AssertGreater(loop->pending_completions(), 0);
@@ -1160,8 +1163,8 @@ TestImpl(test_event_loop)
             });
         });
 
-        while (!bg_started.load()) // the task must own the counter before we wait
-            rpp::sleep_ms(1);
+        // the task must own the counter before we wait
+        spin_until([&]{ return bg_started.load(); });
         clock.warp_forward(rpp::seconds(10));
 
         AssertTrue(loop->wait_on_all(rpp::seconds(1)));
@@ -1181,8 +1184,8 @@ TestImpl(test_event_loop)
             done = true;
         });
 
-        while (!loop->has_background_tasks()) // the poll must own the counter before the detach
-            rpp::yield();
+        // the poll must own the counter before the detach
+        spin_until([&]{ return loop->has_background_tasks(); });
         loop->set_time_source(nullptr);
 
         loop_until(rpp::millis(150), [&]{ return done.load(); });
@@ -1201,8 +1204,8 @@ TestImpl(test_event_loop)
         readers.reserve(NUM_READERS);
         for (int t = 0; t < NUM_READERS; ++t)
             readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
-        while (reads.load() == 0) // a reader must be live before the first detach
-            rpp::yield();
+        // a reader must be live before the first detach
+        spin_until([&]{ return reads.load() != 0; });
 
         const int before = reads.load();
         for (int i = 0; i < 20000; ++i)
@@ -1225,8 +1228,7 @@ TestImpl(test_event_loop)
             co_await loop->run_async([]{ rpp::sleep_ms(5); });
             // the worker pushes the resume before it decrements, so the post must wait for
             // the count, or wait_on_all drains it in the same pass and the drain proves nothing
-            while (loop->has_background_tasks())
-                rpp::yield();
+            spin_until([&]{ return !loop->has_background_tasks(); });
             loop->post([&trailing_ran]{ trailing_ran = true; });
         });
     }
@@ -1237,8 +1239,8 @@ TestImpl(test_event_loop)
         loop->fork([this, &release]() -> rpp::event_task
         {
             co_await loop->run_async([]{ rpp::sleep_ms(5); });
-            while (loop->has_background_tasks()) // the fork must start inside run_all_ready()
-                rpp::yield();
+            // the fork must start inside run_all_ready()
+            spin_until([&]{ return !loop->has_background_tasks(); });
             loop->post([this, &release]
             {
                 loop->fork([this, &release]() -> rpp::event_task
