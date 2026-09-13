@@ -596,24 +596,34 @@ namespace rpp {
 _PROBES = ('config.types.h', 'endian.h')
 
 
-def _check_guard_skips() -> list:
-    """Parses every skipped configuration and compares it against BASE.
+def sweep_guard_skips() -> list:
+    """Parses every skipped configuration and compares it against BASE. `--sweep-guards` runs it.
 
-    One misclassified pair makes the generator drop or mis-guard an export, and only a parse
-    of that pair finds it, so the sweep reads all of them and not the first.
+    A correct classifier makes every skip correct, and `_check_guard_classifier` pins the
+    classifier for free, so the gate does not pay the 98 parses this costs.
     """
-    bad, pairs = [], skippable_pairs()
+    pairs = skippable_pairs()
     if not pairs:
-        return ['no configuration is skippable, so the guard test reports nothing']
+        return ['no configuration is skippable, so the sweep reports nothing']
     try:
         import multiprocessing as mp
         with mp.get_context('fork').Pool(min(len(pairs), os.cpu_count() or 1)) as pool:
             swept = list(pool.imap_unordered(_skip_repeats_base, pairs))
     except Exception:  # a sandbox without fork or shared memory still sweeps, one at a time
         swept = [_skip_repeats_base(p) for p in pairs]
-    bad += [f'{h} under {g} is skipped, and its parse does not repeat BASE'
+    return [f'{h} under {g} is skipped, and its parse does not repeat BASE'
             for h, g, ok in swept if not ok]
-    return bad + _check_guard_classifier()
+
+
+def _check_guard_skips() -> list:
+    """Pins the rule which decides a skip, because a correct rule makes every skip correct.
+
+    A header which starts to name a guard macro reads live and parses, so only a wrong
+    classifier can skip a configuration that differs. `--sweep-guards` still reads them all.
+    """
+    if not skippable_pairs():
+        return ['no configuration is skippable, so the guard test reports nothing']
+    return _check_guard_classifier()
 
 
 def _check_guard_classifier() -> list:
@@ -845,7 +855,15 @@ def main() -> int:
     ap.add_argument('--all', action='store_true', help='every group module')
     ap.add_argument('--check', action='store_true', help='exit 1 when a group module is stale')
     ap.add_argument('--selftest', action='store_true', help='pin every gate against a stubbed list')
+    ap.add_argument('--sweep-guards', action='store_true',
+                    help='parse every skipped configuration and compare it against BASE')
     a = ap.parse_args()
+    if a.sweep_guards:
+        findings = sweep_guard_skips()
+        for f in findings: print(f'  {f}')
+        print(f'== gen_module_exports guard sweep: {len(findings)} finding(s) over '
+              f'{len(skippable_pairs())} skipped pair(s) ==')
+        return 1 if findings else 0
     if a.selftest:
         findings = selftest()
         for f in findings: print(f'  {f}')
