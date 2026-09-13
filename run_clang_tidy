@@ -73,6 +73,11 @@ CMD=(run-clang-tidy -j "$JOBS"
 if [[ "$VERBOSE" == true ]]; then
     "${CMD[@]}"
 else
-    # quiet mode: only show actual warnings/errors, not per-file progress or check lists
-    "${CMD[@]}" 2>&1 | grep -vE '^(clang-tidy|Use -header-filter|Suppressed [0-9]+ warning|Enabled checks:|[0-9]+ warnings generated\.|    [-a-z]|\s*$)' || true
+    # quiet mode drops the per-file progress and the check list. `grep -v` returns 1 when it
+    # drops every line, so the analyzer status comes from PIPESTATUS and not from the pipeline
+    set +e
+    "${CMD[@]}" 2>&1 | grep -vE '^(clang-tidy|Use -header-filter|Suppressed [0-9]+ warning|Enabled checks:|[0-9]+ warnings generated\.|    [-a-z]|\s*$)'
+    STATUS=${PIPESTATUS[0]}
+    set -e
+    exit "$STATUS"
 fi
