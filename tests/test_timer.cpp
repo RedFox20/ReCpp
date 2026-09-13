@@ -21,6 +21,10 @@ TestImpl(test_timer)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
+    // two spins already cover several scheduler ticks, so a third failing read means
+    // the CPU clock is broken rather than quantized. Caps the worst case under 100ms.
+    static constexpr int MAX_CPU_CLOCK_SPINS = 3;
+
     TestInit(test_timer)
     {
     }
@@ -578,7 +582,7 @@ TestImpl(test_timer)
         // GetProcessTimes reports whole scheduler ticks, so one spin can start and end
         // inside a single tick and read 0. Spin again until a tick lands.
         rpp::int64 elapsed_us = 0;
-        for (int spins = 0; spins < 10 && elapsed_us == 0; ++spins)
+        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
         {
             spin_sleep_for_us(20'000, /*full_spin*/true);
             elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ProcessCPU) - t1).micros();
@@ -592,10 +596,10 @@ TestImpl(test_timer)
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
         AssertThat(t1.is_valid(), true);
 
-        // GetThreadTimes reports whole ~15.6ms ticks, so one 20ms spin can start and end
-        // inside a single tick and read 0. Spin again until a tick lands, at most 10 times.
+        // GetThreadTimes reports whole scheduler ticks, so one spin can start and end
+        // inside a single tick and read 0. Spin again until a tick lands.
         rpp::int64 elapsed_us = 0;
-        for (int spins = 0; spins < 10 && elapsed_us == 0; ++spins)
+        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
         {
             spin_sleep_for_us(20'000, /*full_spin*/true);
             elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - t1).micros();
