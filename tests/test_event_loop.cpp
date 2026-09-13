@@ -1609,8 +1609,8 @@ TestImpl(test_event_loop)
         double pump_ms = wall.elapsed_millis();
         print_info("pump_until_ready: ready=%d after %.1fms\n", (int)ready, pump_ms);
 
-        AssertThat(ready, false);   // the gated worker cannot finish in a 20ms budget
-        AssertLess(pump_ms, 150.0); // a dropped 400ms offset would hold the pump past its budget
+        AssertThat(ready, false);   // the gated worker cannot finish inside the budget
+        AssertLess(pump_ms, 150.0); // a dropped offset would hold the pump past its budget
 
         gate.notify(); // release the worker, so the drain below does not wait on the clock
         AssertThat(loop->pump_until_ready(fut, rpp::seconds(1)), true); // drain without throwing
