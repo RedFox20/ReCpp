@@ -22,7 +22,8 @@ the `delay()` half. A poll step reads the offset under a reader guard, and
 1. A pump call hands the raw pointer to `concurrent_queue`, which polls it for the whole wait
    outside the guard (`event_loop.cpp:106,144,162,193`). The guard cannot cover it, because a
    pump holds the clock for up to its whole timeout, and the retire would block for that long.
-   Each wait reloads the pointer, so only one wait can hold a stale one.
+   A pump holds one clock for the whole wait, because the deadline it built belongs to that
+   same clock. Only the owner thread pumps and retires, so the two cannot overlap.
 2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
    with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
 3. An owner which frees a clock it swapped out still reaches freed memory, because
