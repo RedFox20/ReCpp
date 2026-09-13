@@ -8,16 +8,55 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
-`event_loop::time_source` is a raw pointer. A pending `delay()` reads it once to pick its poll
-branch, then polls `current_time()` from a background worker (`event_loop.h:814-820`). A
-`set_time_source()` call from the owner thread races that read. The damage is worse than a torn
-read. The worker keeps a virtual `end` deadline and compares it against wall time, so it polls
-until that deadline arrives in real time.
+### B26. `~event_loop()` can return while a detached worker still holds the loop
+`~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
+`__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
+an MSVC release build it reaches `RppAssertFail`, which terminates. An MSVC `_DEBUG` build
+calls `_CrtDbgReport`, which returns, so the destructor finishes under a live worker. The
+owner accepts that one, and the comment states it now instead of promising a graceful exit.
 
-`stop_and_wait_all_ready()` detaches only after every task finished, so it does not reach this.
-Any other caller which retimes a loop with work in flight does. A fix makes the field atomic
-and has the worker load it once per poll. Found by review on PR #84.
+A live worker holds three borrowed things: the loop, the time source and the pool. C30 closed
+the `delay()` half. A poll step reads the offset under a reader guard, and
+`stop_and_wait_all_ready()` retires the pointer before the owner frees it. Three gaps stay open.
+
+1. `run_loop()`, `run_once()` and `run_until_idle()` hand the raw pointer to
+   `concurrent_queue`, which polls it for the whole wait outside the guard
+   (`event_loop.cpp:169,187,218`). The guard cannot cover it, because the retire would then
+   block for the whole timeout. Each one loads the pointer at the call, so no callback runs
+   between that load and the wait. `wait_on_all()` drains callbacks between the two, and a
+   drained callback can free the clock, so it polls from a `time_frame` instead.
+2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
+   with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
+3. An owner which frees a clock it swapped out for another still reaches freed memory,
+   because only a clear to null retires. Clear it before the free.
+
+So the destructor must never return while a task is live. A shared pointer is not the fix,
+because it changes the borrow contract of every consumer.
+
+The drain counts every reader, so a steady stream of new readers can hold it up. Over 20000
+detach cycles on 4 cores it measured 2 readers at 21.8ms, 4 at 315ms and 8 at 88.8s. A poll
+step holds the guard for nanoseconds and then sleeps, so real usage never reaches that shape.
+
+`stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it` is a stress reproducer,
+not a recipe which fails on demand. Without the drain, ASAN catches the use after free 4 runs
+in 10, and three times the cycles only reach 6 in 10. The guarded region is four atomic
+operations with nothing a test can block inside, because `AtomicTimeSource::total_offset()` is
+a non-virtual read. A deterministic version needs a test callback on a hot path, which costs
+every reader a load and a branch.
+
+**A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()` so
+a later reader joins the other count, reports a use after free 5 runs out of 12 under ASAN. A
+reader picks its count before it loads the pointer, so a reader which picked count `g` and
+then stalled can hold the pointer an attach stored, while the detach after it retires the
+other count, reads zero, and lets the caller free the clock. A correct split has to publish
+the pointer each reader holds, which is a hazard pointer, not a counter.
+
+The pool side needs measurement before a fix. `start_in_background()` hands the pool a
+delegate which captures the awaiter, and that awaiter lives in the coroutine frame.
+`post_resume_from_suspension()` pushes the resume first and decrements the count second. The
+count reaches zero while the worker is still inside a loop member function. The pool then
+frees the delegate. B17 reports a detached task which outlives the suite that started it.
+Both halves need a regression test which fails on demand.
 
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
@@ -123,6 +162,10 @@ reports it moves between runs. A re-run of the same job passed.
 Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
 reported one warning, and the four other TSAN jobs passed on the same commit.
 
+Fourth sighting on cab12a8, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two stacks,
+same two lines, and all 553 cases passed. The job passes on the next commit, so the rate is
+still far below one run.
+
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
@@ -171,11 +214,14 @@ an unevaluated context. Delete that workaround when a newer gcc compiles the rep
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
-This has two shapes. A bound too tight reports the overrun, as
+This has three shapes. A bound too tight reports the overrun, as
 `test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
-`~ImportantState: data != "aaaabbbbcccc"`. AGENTS.md R2 already says to wait on an
+`~ImportantState: data != "aaaabbbbcccc"`. A third shape compares two measured times, as
+`test_threadpool::parallel_for_performance` did on `ubuntu-cpp26-tsan-gcc14` with
+`parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
+gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
@@ -337,6 +383,12 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
+A poll step re-read the raw pointer, so a detach dropped the warp offset and left the worker
+waiting on a virtual deadline. A waiter now captures the offset once and refreshes it under a
+reader guard, which `delay_survives_a_detached_time_source` and
+`stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it` pin.
 
 ### C29. `delegate::copy` leaked the destination functor when the source was a function
 The function branch of `copy()` overwrote `f` and `obj` and never freed the functor the

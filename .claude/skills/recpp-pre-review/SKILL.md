@@ -25,11 +25,22 @@ The checks it runs mechanically:
 |-------|------------|
 | sentence over 25 words | markdown prose, comments |
 | contraction, semicolon | markdown prose, comments |
+| contraction, semicolon | a markdown table cell |
 | comment block over 2 lines | `.h`, `.cpp`, `.cppm` |
 | comment ending on a dangling comma | `.h`, `.cpp`, `.cppm` |
+| comment which names a number the code beside it sets | `.h`, `.cpp`, `.cppm` |
 | `sleep_ms(N)` with N over 10 | `.h`, `.cpp`, `.cppm` |
 
-Tables, code fences, and headings are exempt, because they carry reference data.
+Code fences and headings are exempt, because they carry reference data. A table
+cell is not exempt. The row around it is reference data and the cell is prose, so
+the README API index reaches the same word rules as any paragraph.
+
+Both whole-line and trailing comments reach these checks. A trailing comment breaks
+the constant rule most often, because the literal sits on the same line.
+
+All three hooks share `.claude/hooks/prose_rules.py`, so one module holds every rule
+above. Run `.claude/hooks/prose_rules.py --selftest` after you edit it. A linter
+which stops detecting reports nothing, and nothing looks the same as clean.
 
 ## Prose never goes in through the shell
 
@@ -83,7 +94,7 @@ Work through this list once per added line. Each check has a mechanical fix.
 | 1 | Comment over 2 lines | Cut to one line. Move the story to BUGS.md |
 | 2 | Comment names a session, an agent, a date, or a fix history | Delete that clause. A `see BUGS.md C15` pointer may stay |
 | 3 | Comment paraphrases the code below it | Delete the comment |
-| 4 | Comment repeats a constant: `10s`, `50ms`, `4096` | Drop the number. Name the value in code if it needs a name |
+| 4 | Comment repeats a constant the code beside it sets | Drop the number, keep the reason. A platform fact no line sets may stay |
 | 5 | Sentence over 20 words in an instruction, 25 in a description | Split it |
 | 6 | Semicolon | Write two sentences |
 | 7 | Contraction | Expand it |
@@ -94,6 +105,9 @@ Work through this list once per added line. Each check has a mechanical fix.
 | 12 | The same thing under two names | Pick one name and use it everywhere |
 | 13 | A public declaration with no doxygen | Add a one-line `///` |
 | 14 | Comment defends, justifies or overexplains a design decision | Cut to one sentence that states the reason |
+| 15 | Comment breaks off mid clause | Finish the sentence, or cut it to the half which carries the why |
+| 16 | A comment asserts which thread runs a callback | Name the reentrant case, or drop the claim. See R13 |
+| 17 | A new timing value no sibling case in the file uses | Reuse the sibling value. See R2 |
 
 ## The comment budget
 

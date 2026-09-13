@@ -35,6 +35,9 @@ one above it passes.
 1. **Plan, and write the test first.** A bug needs a recipe which fails on demand,
    and the test must fail before the fix and pass after it. A new feature needs its
    test in the same change. A fix with no failing reproducer is a guess.
+   **Prove the failure, do not assert it.** Revert the fix hunk alone, run the case
+   three times or more, and record the rate. A case which passes against the broken
+   code rests on a false premise, and it pins nothing. See `recpp-review` R1.
 2. **Fix it, and make the tests pass.** Change the smallest thing which works.
    Remove the race first, correct an unprovable assertion second, change a number
    last.
@@ -49,6 +52,21 @@ one above it passes.
 5. **Run the pre-review pass.** `recpp-pre-review` over every comment, doxygen
    block, log string, and markdown line you added. Cut each one to the shortest
    form which still carries the why.
+
+## Review Feedback
+
+A review comment is a hypothesis, not an instruction. A reviewer sees a diff, never
+the whole call chain. So a finding can name a real risk and still get the remedy
+wrong.
+
+1. **Check the premise before you write the fix.** Read the code the comment names,
+   and run the case it describes. Put the measurement in the reply, whether the
+   finding stands or falls.
+2. **The owner of this repository outranks a bot, and outranks a rule about line
+   count.** When the owner asked for a shape, keep it. Decline the finding which
+   asks you to undo it, and link the thread which asked.
+3. **Answer every thread.** Reply with the commit and the measurement, then resolve
+   the ones you fixed. Leave a declined finding open, because the owner decides.
 
 ## Development Requirements
 

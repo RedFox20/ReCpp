@@ -34,9 +34,13 @@ TestImpl(test_event_loop)
     std::unique_ptr<rpp::thread_pool> custom_pool;
     std::unique_ptr<rpp::event_loop> loop;
     const uint64 main_tid = rpp::get_thread_id();
+    // assert_failed() only records on the thread which owns the case, so a worker
+    // reports a spin_until() timeout through this flag instead
+    std::atomic_bool spin_timed_out { false };
 
     TestCaseSetup()
     {
+        spin_timed_out = false;
         loop = std::make_unique<rpp::event_loop>(0, nullptr, &clock);
     }
     // this sets up a custom loop runner for TestCaseCoro()
@@ -51,10 +55,24 @@ TestImpl(test_event_loop)
     {
         loop.reset();        // the loop may point at custom_pool, so it goes first
         custom_pool.reset(); // and only then may the pool and its mutex die
+        AssertFalse(spin_timed_out.load()); // a worker thread could not report it itself
     }
 
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
+
+    // spins without pumping the loop, so a test can order itself against a worker thread
+    template<class Predicate> void spin_until(const Predicate& pred, RPP_SOURCE_LOC)
+    {
+        rpp::TimePoint start = rpp::TimePoint::monotonic_now();
+        while ((rpp::TimePoint::monotonic_now() - start) < rpp::seconds(1))
+        {
+            if (pred()) return;
+            rpp::yield();
+        }
+        spin_timed_out = true;
+        AssertFailedLoc(loc, "spin_until timed out");
+    }
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
@@ -278,7 +296,7 @@ TestImpl(test_event_loop)
         auto coro_a = [&]() -> rpp::cfuture<int>
         {
             co_await loop->run_async([&] {
-                while (!b_resumed.load()) rpp::sleep_ms(1);
+                spin_until([&]{ return b_resumed.load(); });
             });
             record(1);
             co_return 10;
@@ -334,7 +352,7 @@ TestImpl(test_event_loop)
             // before proceeding.  This makes the assertion deterministic: we no
             // longer rely on wall-clock timing to observe slow_bg_running == true.
             co_await loop->run_async([&]() {
-                while (!slow_bg_running.load()) rpp::sleep_ms(1);
+                spin_until([&]{ return slow_bg_running.load(); });
                 rpp::sleep_ms(2);
             });
             fast_resume_count.fetch_add(1);
@@ -582,8 +600,7 @@ TestImpl(test_event_loop)
         {
             co_await loop->run_async([&]() {
                 bg_started.store(true);
-                while (!bg_may_finish.load())
-                    rpp::sleep_ms(1);
+                spin_until([&]{ return bg_may_finish.load(); });
             });
             co_return;
         };
@@ -591,8 +608,7 @@ TestImpl(test_event_loop)
         auto future = coro();
 
         // wait until background task has actually started
-        while (!bg_started.load())
-            rpp::sleep_ms(1);
+        spin_until([&]{ return bg_started.load(); });
 
         // should have pending work now
         AssertThat(loop->has_pending_work(), true);
@@ -767,8 +783,7 @@ TestImpl(test_event_loop)
         {
             co_await loop->run_async([&]() {
                 bg_started.store(true);
-                while (!bg_may_finish.load())
-                    rpp::sleep_ms(1);
+                spin_until([&]{ return bg_may_finish.load(); });
             });
             co_return;
         };
@@ -776,18 +791,14 @@ TestImpl(test_event_loop)
         auto future = coro();
 
         // wait for bg task to start
-        while (!bg_started.load())
-            rpp::sleep_ms(1);
+        spin_until([&]{ return bg_started.load(); });
 
         AssertGreater(loop->background_tasks(), 0);
 
         // post_resume_from_suspension() posts the resume BEFORE it drops the counter,
         // so a pending completion alone does not prove the counter reached 0 yet
         bg_may_finish.store(true);
-        rpp::Timer drain;
-        while ((loop->pending_completions() == 0 || loop->background_tasks() != 0)
-               && drain.elapsed_ms() < 1000)
-            rpp::sleep_ms(1);
+        spin_until([&]{ return loop->pending_completions() != 0 && loop->background_tasks() == 0; });
 
         AssertThat(loop->background_tasks(), 0);
         AssertGreater(loop->pending_completions(), 0);
@@ -1160,12 +1171,123 @@ TestImpl(test_event_loop)
             });
         });
 
-        while (!bg_started.load()) // the task must own the counter before we wait
-            rpp::sleep_ms(1);
+        // the task must own the counter before we wait
+        spin_until([&]{ return bg_started.load(); });
         clock.warp_forward(rpp::seconds(10));
 
         AssertTrue(loop->wait_on_all(rpp::seconds(1)));
         AssertThat(bg_finished.load(), true);
+    }
+
+    // ─── wait_on_all outlives a callback which frees the clock ──────────────────
+    // Its first drain runs owner-thread callbacks, and one of them can detach and free
+    // the clock. A wait which kept the raw source then reads freed memory.
+    TestCase(wait_on_all_survives_a_callback_which_frees_the_clock)
+    {
+        auto owned = std::make_unique<rpp::AtomicTimeSource>();
+        owned->warp_forward(rpp::seconds(2)); // the deadline below is built in this frame
+        loop->set_time_source(owned.get());
+
+        rpp::semaphore gate; // holds the worker, so the wait below reaches its timeout
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]{ gate.wait(); });
+        });
+        // the task must own the counter before the wait
+        spin_until([&]{ return loop->has_background_tasks(); });
+
+        // the drain runs this before the wait, so the wait must keep no raw source
+        loop->post([&]{ loop->set_time_source(nullptr); owned.reset(); });
+
+        rpp::Timer wall;
+        AssertThat(loop->wait_on_all(rpp::millis(20)), false); // the gated worker cannot finish
+        double wait_ms = wall.elapsed_millis();
+        print_info("wait_on_all: %.1fms\n", wait_ms);
+        AssertLess(wait_ms, 1000.0); // a freed offset would hold the wait far past its budget
+
+        gate.notify(); // release the worker, so the drain below does not wait on it
+        loop->run_until_idle();
+        AssertThat(loop->has_background_tasks(), false);
+    }
+
+    // ─── a delay() which loses its clock mid-wait ───────────────
+    // The waiter keeps the last offset it read. A waiter which re-reads a detached source
+    // drops the warp below and then waits for real time to reach the deadline.
+    TestCase(delay_survives_a_detached_time_source)
+    {
+        clock.warp_forward(rpp::millis(400)); // the deadline below is built in this frame
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::millis(20));
+            done = true;
+        });
+
+        // the poll must own the counter before the detach
+        spin_until([&]{ return loop->has_background_tasks(); });
+        loop->set_time_source(nullptr);
+
+        loop_until(rpp::millis(150), [&]{ return done.load(); });
+        AssertThat(done.load(), true);
+    }
+
+    // ─── a join_forks() which loses its clock mid-wait ──────────
+    // The join timer keeps the last offset it read. A timer which re-reads a detached source
+    // drops the warp below and then waits for real time to reach the deadline.
+    TestCase(join_forks_survives_a_detached_time_source)
+    {
+        clock.warp_forward(rpp::millis(400)); // the join deadline below is built in this frame
+        rpp::semaphore gate; // holds one fork open, so the join reaches its timeout
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]{ gate.wait(); });
+        });
+
+        std::atomic_bool joined { false };
+        auto joiner = [&]() -> rpp::event_task
+        {
+            co_await loop->join_forks(rpp::millis(20));
+            joined = true;
+        };
+        rpp::event_task task = joiner();
+
+        // the gated fork and the join timer must both own the counter before the detach
+        spin_until([&]{ return loop->background_tasks() >= 2; });
+        loop->set_time_source(nullptr);
+
+        loop_until(rpp::millis(150), [&]{ return joined.load(); });
+        AssertTrue(joined.load()); // a dropped offset would hold the join past its budget
+
+        gate.notify(); // release the fork, so the cleanup below does not wait on it
+        loop->run_until_idle();
+    }
+
+    // ─── the shutdown retires the clock before the owner frees it ───────────────
+    // A shutdown which does not wait out the readers leaves one reading freed memory.
+    // Stress reproducer: ASAN catches that 4 runs in 10, see BUGS.md B26.
+    TestCase(stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it)
+    {
+        std::atomic_bool stop { false };
+        std::atomic_int reads { 0 };
+        constexpr int NUM_READERS = 2; // more readers cost the retire far more time, see BUGS.md B26
+        std::vector<std::thread> readers;
+        readers.reserve(NUM_READERS);
+        for (int t = 0; t < NUM_READERS; ++t)
+            readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
+        // a reader must be live before the first detach
+        spin_until([&]{ return reads.load() != 0; });
+
+        const int before = reads.load();
+        for (int i = 0; i < 20000; ++i)
+        {
+            auto warpable = std::make_unique<rpp::AtomicTimeSource>();
+            loop->set_time_source(warpable.get());
+            loop->stop_and_wait_all_ready(rpp::millis(20)); // retires before the scope frees it
+        }
+
+        stop = true;
+        for (std::thread& reader : readers) reader.join();
+        AssertGreater(reads.load(), before); // the readers ran across the detach cycles
     }
 
     // posts a callback from the final resume, which lands as the background count hits zero
@@ -1176,8 +1298,7 @@ TestImpl(test_event_loop)
             co_await loop->run_async([]{ rpp::sleep_ms(5); });
             // the worker pushes the resume before it decrements, so the post must wait for
             // the count, or wait_on_all drains it in the same pass and the drain proves nothing
-            while (loop->has_background_tasks())
-                rpp::yield();
+            spin_until([&]{ return !loop->has_background_tasks(); });
             loop->post([&trailing_ran]{ trailing_ran = true; });
         });
     }
@@ -1188,8 +1309,8 @@ TestImpl(test_event_loop)
         loop->fork([this, &release]() -> rpp::event_task
         {
             co_await loop->run_async([]{ rpp::sleep_ms(5); });
-            while (loop->has_background_tasks()) // the fork must start inside run_all_ready()
-                rpp::yield();
+            // the fork must start inside run_all_ready()
+            spin_until([&]{ return !loop->has_background_tasks(); });
             loop->post([this, &release]
             {
                 loop->fork([this, &release]() -> rpp::event_task
@@ -1463,6 +1584,37 @@ TestImpl(test_event_loop)
         // the loop must own nothing in flight before the fixture replaces it
         AssertThat(loop->wait_on_all(rpp::millis(1000)), true);
         AssertThat(loop->has_background_tasks(), false);
+    }
+
+    // ─── pump_until_ready keeps its deadline when the clock detaches ────────────
+    // The pump builds `end` from the loop clock. A pump which re-reads a detached source
+    // drops the warp below and then overruns its own budget.
+    TestCase(pump_until_ready_survives_a_detached_time_source)
+    {
+        clock.warp_forward(rpp::millis(400)); // the pump deadline below is built in this frame
+        rpp::semaphore gate; // holds the worker until the pump budget is measured
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<int>
+        {
+            co_await loop->run_async([&]{ gate.wait(); return 1; });
+            co_return 1;
+        };
+        rpp::cfuture<int> fut = coro();
+
+        // the pump runs this on its first run_once(), so the detach lands after `end` is built
+        loop->post([this]{ loop->set_time_source(nullptr); });
+
+        rpp::Timer wall;
+        bool ready = loop->pump_until_ready(fut, rpp::millis(20));
+        double pump_ms = wall.elapsed_millis();
+        print_info("pump_until_ready: ready=%d after %.1fms\n", (int)ready, pump_ms);
+
+        AssertThat(ready, false);   // the gated worker cannot finish inside the budget
+        AssertLess(pump_ms, 150.0); // a dropped offset would hold the pump past its budget
+
+        gate.notify(); // release the worker, so the drain below does not wait on the clock
+        AssertThat(loop->pump_until_ready(fut, rpp::seconds(1)), true); // drain without throwing
+        AssertThat(fut.get(), 1);
     }
 
     // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).

@@ -97,6 +97,9 @@ documented symbol.
 
 - Keep the display text equal to the declaration, so `update_doc_linerefs.py`
   tracks it: `| [`rpp::sleep_us(int)`](src/rpp/timepoint.h#L120) | Description |`
+- **A table cell is prose.** The row is reference data and the cell inside it is
+  not, so every word rule applies. A semicolon there is the one which slips through
+  most, because the row does not read like a paragraph.
 - Write one descriptive sentence per table row. Max 25 words. No period needed.
 - Do not write "this function ...". Start with the verb: "Sleeps the current
   thread for the given microseconds."

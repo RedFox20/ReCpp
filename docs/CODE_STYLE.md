@@ -29,6 +29,37 @@ const bool future_was_ready_during_cleanup =
 When an initializer is too long, wrap inside its argument list or another natural
 expression boundary. Keep `type name = expression` on the first line.
 
+## Two peer branches take `if` and `else`
+
+A guard clause rejects input and leaves. Two branches which both do work are peers,
+and peers read as `if` and `else`. The reader sees one choice, at one indent level.
+
+```cpp
+// good: the two waits are peers, and the shape says so
+if (frame.warpable)
+{
+    // warpable clock: poll so warp_forward() can release the wait early
+    while (current_time(frame) < deadline)
+        rpp::sleep_ms(1); // wall-clock poll step
+}
+else
+{
+    rpp::sleep_until(deadline); // wall clock: one efficient sleep
+}
+
+// bad: an early return dressed as a guard, which hides the second branch below it
+if (!frame.warpable)
+{
+    rpp::sleep_until(deadline);
+    return;
+}
+while (current_time(frame) < deadline)
+    rpp::sleep_ms(1);
+```
+
+The bad shape is two lines shorter, and that is not a reason. R7 asks for vertical
+height, and this rule outranks it. Never trade the `else` for an early return.
+
 ## Includes come before imports
 
 ```cpp
