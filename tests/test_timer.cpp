@@ -559,11 +559,16 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
         AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(20'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("ProcessCPU 20ms spin elapsed: %lldus\n", elapsed_us);
-        // CPU time granularity on CI VMs can be ~10ms, so only assert non-zero
+
+        // GetProcessTimes reports whole scheduler ticks, so one spin can start and end
+        // inside a single tick and read 0. Spin again until a tick lands.
+        rpp::int64 elapsed_us = 0;
+        for (int spins = 0; spins < 10 && elapsed_us == 0; ++spins)
+        {
+            spin_sleep_for_us(20'000, /*full_spin*/true);
+            elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ProcessCPU) - t1).micros();
+        }
+        print_info("ProcessCPU spin elapsed: %lldus\n", elapsed_us);
         AssertGreater(elapsed_us, 0);
     }
 
