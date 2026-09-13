@@ -1266,7 +1266,8 @@ TestImpl(test_event_loop)
         fork_with_trailing_post_starting(release);
         clock.warp_forward(rpp::seconds(10000));
 
-        AssertFalse(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+        // the blocked task never finishes, so a short wait costs 20ms instead of a full second
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
         AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
 
         release.notify();
