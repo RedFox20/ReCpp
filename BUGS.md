@@ -338,7 +338,7 @@ The script's own docstring already warns that it has mistakes.
 
 ## Closed
 
-### C27. `delegate::copy` leaked the destination functor when the source was a function (was B24)
+### C29. `delegate::copy` leaked the destination functor when the source was a function
 The function branch of `copy()` overwrote `f` and `obj` and never freed the functor the
 destination owned. It calls `to.reset()` first now, which `copy_assign_from_function_frees_the_old_functor` pins.
 

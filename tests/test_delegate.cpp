@@ -901,7 +901,7 @@ namespace rpp
         ////////////////////////////////////////////////////
 
         // a function source overwrote the pointers and left the old functor allocated,
-        // which ASAN reported as a leak. see BUGS.md B24
+        // which ASAN reported as a leak. see BUGS.md C29
         TestCase(copy_assign_from_function_frees_the_old_functor)
         {
             static int destroyed = 0;
