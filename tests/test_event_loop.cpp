@@ -1233,6 +1233,37 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // ─── a join_forks() which loses its clock mid-wait ──────────
+    // The join timer keeps the last offset it read. A timer which re-reads a detached source
+    // drops the warp below and then waits for real time to reach the deadline.
+    TestCase(join_forks_survives_a_detached_time_source)
+    {
+        clock.warp_forward(rpp::millis(400)); // the join deadline below is built in this frame
+        rpp::semaphore gate; // holds one fork open, so the join reaches its timeout
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]{ gate.wait(); });
+        });
+
+        std::atomic_bool joined { false };
+        auto joiner = [&]() -> rpp::event_task
+        {
+            co_await loop->join_forks(rpp::millis(20));
+            joined = true;
+        };
+        rpp::event_task task = joiner();
+
+        // the gated fork and the join timer must both own the counter before the detach
+        spin_until([&]{ return loop->background_tasks() >= 2; });
+        loop->set_time_source(nullptr);
+
+        loop_until(rpp::millis(150), [&]{ return joined.load(); });
+        AssertTrue(joined.load()); // a dropped 400ms offset would hold the join past 150ms
+
+        gate.notify(); // release the fork, so the cleanup below does not wait on it
+        loop->run_until_idle();
+    }
+
     // ─── the shutdown retires the clock before the owner frees it ───────────────
     // A shutdown which does not wait out the readers leaves one reading freed memory.
     // Stress reproducer: ASAN catches that 4 runs in 10, see BUGS.md B26.
