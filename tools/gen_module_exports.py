@@ -231,12 +231,45 @@ def header_group(header: str) -> str:
 _NS_GROUPS_MEMO = {}
 _INTERNAL_MEMO = {}
 
+@functools.lru_cache(maxsize=1)
+def _rpp_includes() -> dict:
+    """Each rpp header to the rpp headers it reaches, directly or through another."""
+    names = {h for h in os.listdir(rd.SRC) if h.endswith('.h')}
+    direct = {h: [q for q in re.findall(r'#\s*include\s+"([^"]+)"', _read(h)) if q in names] for h in names}
+    out = {}
+    def reach(h, seen):
+        for d in direct.get(h, ()):
+            if d not in seen: seen.add(d); reach(d, seen)
+        return seen
+    for h in names: out[h] = reach(h, set())
+    return out
+
+
+def _guard_is_live(header: str, guard: str) -> bool:
+    """True when the header, or something it includes, names a macro the guard reads.
+
+    No translation unit can branch on a macro nothing in it mentions, so the reduced parse
+    would return what BASE already returned. A `NO_CONFIG` pair always parses, because the
+    caller reads a parse failure there as a missing configuration and not as an equal one.
+    """
+    if guard in NO_CONFIG.get(os.path.basename(header), frozenset()):
+        return True
+    reached = _rpp_includes().get(os.path.basename(header), set()) | {os.path.basename(header)}
+    macros = re.findall(r'[A-Z_][A-Z0-9_]+', guard)
+    return any(m in _read(h) for h in reached for m in macros)
+
+
 def _namespace_groups(header: str) -> dict:
     """Namespace to condition to names, for one header, which a group module then merges."""
     if (hit := _NS_GROUPS_MEMO.get(header)) is not None:
         return hit
     base = _exported(header, BASE)
-    reduced = {g: n for g, off in GUARDS if (n := _configuration(header, g, BASE + off)) is not None}
+    reduced = {}
+    for g, off in GUARDS:
+        if not _guard_is_live(header, g):
+            reduced[g] = base  # nothing in the unit reads the macro, so the parse repeats BASE
+        elif (n := _configuration(header, g, BASE + off)) is not None:
+            reduced[g] = n
     spans = _guarded_spans(header)
     declared = _declared(base, reduced)
     alt_guard = ALT_GUARD.get(os.path.basename(header), '')
@@ -610,6 +643,21 @@ def selftest() -> list:
     for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(probe, None)
     if _parse_one(probe)[1:] != serial:
         bad.append(f'the pool worker disagrees with the serial parse of {probe}')
+
+    # a skipped configuration must return what BASE returns, so parse one and compare
+    skipped = [(h, g, off) for g, off in GUARDS
+               for h in (GROUP_HEADERS[grp][i] for grp in GROUPS for i in range(len(GROUP_HEADERS[grp])))
+               if not _guard_is_live(h, g)]
+    if not skipped:
+        bad.append('no configuration is skippable, so the guard test reports nothing')
+    else:
+        h, g, off = skipped[0]
+        if _configuration(h, g, BASE + off) != _exported(h, BASE):
+            bad.append(f'{h} under {g} is skipped, and its parse does not repeat BASE')
+    # a guard the header names must never skip, or a real difference goes unread
+    live = [(h, g) for g, _ in GUARDS for h in NO_CONFIG if g in NO_CONFIG[h]]
+    if any(not _guard_is_live(h, g) for h, g in live):
+        bad.append('a NO_CONFIG pair was skipped, and a failed parse would read as an equal one')
 
     # GROUP_HEADERS is hand written, so pin both ways the partition goes stale
     if group_partition_drift(): bad.append('the partition gate reports drift on correct groups')
