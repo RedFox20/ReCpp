@@ -286,25 +286,28 @@ def _parse_one(header: str):
     return header, _namespace_groups(header), internal_names(header)
 
 
-def prefetch(headers, jobs: int = 0) -> None:
+def prefetch(headers, jobs: int = 0) -> bool:
     """Parses every header in parallel and fills the memo the serial pass then reads.
 
     A header parse costs about half a second and they do not depend on each other, so the
     whole run is core-bound rather than ordered. A pool failure leaves the serial path intact.
+    @returns True when the pool filled the memo, False when the serial pass must parse
     """
     headers = list(headers)
     jobs = jobs or min(len(headers), os.cpu_count() or 1)
     if jobs < 2 or len(headers) < 2:
-        return
+        return False
     try:
         import multiprocessing as mp
         with mp.get_context('fork').Pool(jobs) as pool:
             for header, groups, hidden in pool.imap_unordered(_parse_one, headers):
                 _NS_GROUPS_MEMO[header] = groups
                 _INTERNAL_MEMO[header] = hidden
+        return True
     except Exception:  # a sandbox without fork or shared memory still runs the serial path
         _NS_GROUPS_MEMO.clear()
         _INTERNAL_MEMO.clear()
+        return False
 
 
 def group_export_block(group: str) -> str:
@@ -655,12 +658,14 @@ def selftest() -> list:
     # prefetch is what fills the memo. a lost result or a wrong key fails here, and not
     # only in the worker the case above calls
     _forget(probes)
-    prefetch(probes)
-    for h in probes:
-        if h not in _NS_GROUPS_MEMO or h not in _INTERNAL_MEMO:
-            bad.append(f'prefetch left {h} out of a memo, so the serial pass reparses it')
-        elif (_NS_GROUPS_MEMO[h], _INTERNAL_MEMO[h]) != serial[h]:
-            bad.append(f'prefetch stored something other than the serial parse of {h}')
+    # jobs=2 so a single-CPU host takes the pool path too. A host with no fork answers
+    # False, and the serial fallback it took is correct, so the case has nothing to pin
+    if prefetch(probes, jobs=2):
+        for h in probes:
+            if h not in _NS_GROUPS_MEMO or h not in _INTERNAL_MEMO:
+                bad.append(f'prefetch left {h} out of a memo, so the serial pass reparses it')
+            elif (_NS_GROUPS_MEMO[h], _INTERNAL_MEMO[h]) != serial[h]:
+                bad.append(f'prefetch stored something other than the serial parse of {h}')
 
     # a skipped configuration must return what BASE returns, so parse one and compare
     skipped = [(h, g, off) for g, off in GUARDS
