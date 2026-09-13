@@ -8,6 +8,28 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B26. `~event_loop()` can return while a detached worker still holds the loop
+`~event_loop()` waits one second in `wait_on_all()`, reports a timeout through
+`__assertion_failure`, and then runs to the end. That macro does not act the same on every
+platform. On gcc, clang and an MSVC release build it reaches `RppAssertFail`, which
+terminates. An MSVC `_DEBUG` build calls `_CrtDbgReport`, which returns, so the destructor
+finishes under a live worker. The comment at `event_loop.cpp:35` describes the graceful exit
+as if every platform took it.
+
+A live worker holds three borrowed things: the loop, the time source and the pool. A
+`delay()` worker reads `loop.time_source` on every poll step (`event_loop.h:818-820`). A
+freed clock there is a read of freed memory, not a stale value. B23 covers the write side of
+the same pointer. So the destructor must never return while a task is live, and a wait which
+does not finish must abort on every platform. A shared pointer is not the fix, because it
+changes the borrow contract of every consumer.
+
+The pool side needs measurement before a fix. `start_in_background()` hands the pool a
+delegate which captures the awaiter, and that awaiter lives in the coroutine frame.
+`post_resume_from_suspension()` pushes the resume first and decrements the count second. The
+count reaches zero while the worker is still inside a loop member function. The pool then
+frees the delegate. B17 reports a detached task which outlives the suite that started it.
+Both halves need a regression test which fails on demand.
+
 ### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
 `event_loop::time_source` is a raw pointer. A pending `delay()` reads it once to pick its poll
 branch, then polls `current_time()` from a background worker (`event_loop.h:814-820`). A
