@@ -182,6 +182,7 @@ namespace rpp
             }
             else
             {
+                to.reset(); // a function source frees whatever functor `to` already owns
                 to.f = f;
                 to.obj = obj;
             }

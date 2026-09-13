@@ -8,6 +8,19 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B24. `delegate::operator=` leaks the old functor, so a second pop into one local leaks
+`event_loop::wait_on_all()` keeps one `resume_event event` and pops into it twice: once in the
+`try_pop` drain, once in the `wait_pop_until` loop. Each pop copy-assigns the delegate, and the
+assignment allocates a new functor without freeing the one already held.
+
+ASAN reports `Direct leak of 8 byte(s)` through `delegate::init_functor`
+(`delegate.h:571`) from `concurrent_queue::pop_unlocked` (`concurrent_queue.h:845`). One
+captured reference is 8 bytes, so the leak scales with the capture.
+
+Reproduce it by queuing a callback before `wait_on_all()` runs, so both loops pop. No test did
+that until PR #84 gated a worker that way, and reverting the gate hid it again. The fix belongs
+in `delegate::reset()` or in the copy path which calls it.
+
 ### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
 `event_loop::time_source` is a raw pointer. A pending `delay()` reads it once to pick its poll
 branch, then polls `current_time()` from a background worker (`event_loop.h:814-820`). A

@@ -899,6 +899,33 @@ namespace rpp
         }
 
         ////////////////////////////////////////////////////
+
+        // a function source overwrote the pointers and left the old functor allocated,
+        // which ASAN reported as a leak. see BUGS.md B24
+        TestCase(copy_assign_from_function_frees_the_old_functor)
+        {
+            static int destroyed = 0;
+            destroyed = 0;
+            struct tracked
+            {
+                int payload = 0;
+                ~tracked() { ++destroyed; }
+                void operator()() const noexcept {}
+            };
+            struct plain_source { static void func() noexcept {} };
+
+            rpp::delegate<void()> held { tracked{} };
+            const rpp::delegate<void()> plain { &plain_source::func };
+            const int base = destroyed; // the source temporary already died
+
+            held = plain; // the functor `held` owns must be freed here, not leaked
+            AssertThat(destroyed, base + 1);
+
+            held = plain; // a second assign has nothing left to free
+            AssertThat(destroyed, base + 1);
+        }
+
+        ////////////////////////////////////////////////////
     };
     
     // NOLINTEND(performance-*,readability-make-member-function-const,bugprone-exception-escape)
