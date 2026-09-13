@@ -24,9 +24,9 @@ in `delegate::reset()` or in the copy path which calls it.
 ### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
 `event_loop::time_source` is a raw pointer. A pending `delay()` reads it once to pick its poll
 branch, then polls `current_time()` from a background worker (`event_loop.h:814-820`). A
-`set_time_source()` call from the owner thread races that read. Worse than a torn read: the
-worker keeps a virtual `end` deadline and starts comparing it against wall time, so it polls
-until the deadline arrives in real time.
+`set_time_source()` call from the owner thread races that read. The damage is worse than a torn
+read. The worker keeps a virtual `end` deadline and compares it against wall time, so it polls
+until that deadline arrives in real time.
 
 `stop_and_wait_all_ready()` detaches only after every task finished, so it does not reach this.
 Any other caller which retimes a loop with work in flight does. A fix makes the field atomic
