@@ -21,7 +21,7 @@ the `delay()` half. A poll step reads the offset under a reader guard, and
 
 1. `run_loop()`, `run_once()` and `run_until_idle()` hand the raw pointer to
    `concurrent_queue`, which polls it for the whole wait outside the guard
-   (`event_loop.cpp:162,180,195`). The guard cannot cover it, because the retire would then
+   (`event_loop.cpp:169,187,218`). The guard cannot cover it, because the retire would then
    block for the whole timeout. Each one loads the pointer at the call, so no callback runs
    between that load and the wait. `wait_on_all()` drains callbacks between the two, and a
    drained callback can free the clock, so it polls from a `time_frame` instead.

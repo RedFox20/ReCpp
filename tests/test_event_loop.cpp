@@ -1200,7 +1200,7 @@ TestImpl(test_event_loop)
         loop->post([&]{ loop->set_time_source(nullptr); owned.reset(); });
 
         rpp::Timer wall;
-        AssertThat(loop->wait_on_all(rpp::millis(50)), false); // the gated worker cannot finish
+        AssertThat(loop->wait_on_all(rpp::millis(20)), false); // the gated worker cannot finish
         double wait_ms = wall.elapsed_millis();
         print_info("wait_on_all: %.1fms\n", wait_ms);
         AssertLess(wait_ms, 1000.0); // a freed offset would hold the wait far past its budget
@@ -1256,7 +1256,7 @@ TestImpl(test_event_loop)
         loop->set_time_source(nullptr);
 
         loop_until(rpp::millis(150), [&]{ return joined.load(); });
-        AssertTrue(joined.load()); // a dropped 400ms offset would hold the join past 150ms
+        AssertTrue(joined.load()); // a dropped offset would hold the join past its budget
 
         gate.notify(); // release the fork, so the cleanup below does not wait on it
         loop->run_until_idle();
