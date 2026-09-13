@@ -17,8 +17,8 @@ finishes under a live worker. The comment at `event_loop.cpp:35` describes the g
 as if every platform took it.
 
 A live worker holds three borrowed things: the loop, the time source and the pool. C30 closed
-the `delay()` half. A poll step reads the offset under a reader guard, and `set_time_source()`
-retires the pointer before it returns. Three gaps stay open.
+the `delay()` half. A poll step reads the offset under a reader guard, and
+`stop_and_wait_all_ready()` retires the pointer before the owner frees it. Three gaps stay open.
 
 1. A pump call hands the raw pointer to `concurrent_queue`, which polls it for the whole wait
    outside the guard (`event_loop.cpp:106,144,162,193`). The guard cannot cover it, because a

@@ -242,20 +242,6 @@ namespace rpp
          *           otherwise the monotonic wall clock. */
         rpp::TimePoint current_time() const noexcept { return get_time_source_frame().now(); }
 
-        /** @returns the virtual time of `src`, or the monotonic wall clock when it is null. */
-        static rpp::TimePoint current_time(const rpp::AtomicTimeSource* src) noexcept
-        {
-            return src ? src->time_now() : rpp::TimePoint::monotonic_now();
-        }
-
-        /** @brief Refreshes `frame` from the live clock, which a detached source leaves alone.
-         *  @returns the current time on that frame's clock. */
-        rpp::TimePoint current_time(time_frame& frame) const noexcept
-        {
-            get_time_source_offset(frame.offset_ns);
-            return frame.now();
-        }
-
         /** @returns true if there are background tasks currently in progress */
         bool has_background_tasks() const noexcept { return num_background_suspended.load(std::memory_order_acquire) > 0; }
 
@@ -981,6 +967,19 @@ namespace rpp
         {
             num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
             background_pool.parallel_task_detached(std::move(generic_task));
+        }
+
+        // the virtual time of `src`, or the monotonic wall clock when it is null
+        static rpp::TimePoint current_time(const rpp::AtomicTimeSource* src) noexcept
+        {
+            return src ? src->time_now() : rpp::TimePoint::monotonic_now();
+        }
+
+        // refreshes `frame` from the live clock, which a detached source leaves alone
+        rpp::TimePoint current_time(time_frame& frame) const noexcept
+        {
+            get_time_source_offset(frame.offset_ns);
+            return frame.now();
         }
 
         // takes a snapshot of the loop clock, on the thread which builds a deadline
