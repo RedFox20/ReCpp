@@ -1,0 +1,159 @@
+// C++20 module interface unit for the rpp.io headers, owned by tools/gen_module_exports.py.
+// The headers stay in the global module fragment, so an importer and an includer share one entity.
+module;
+
+#include "file_io.h"
+#include "paths.h"
+#include "sockets.h"
+#include "binary_stream.h"
+#include "binary_serializer.h"
+
+export module rpp.io;
+
+// GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
+
+export namespace rpp {
+    using rpp::load_buffer;
+    using rpp::file;
+    using rpp::buffer_parser;
+    using rpp::buffer_line_parser;
+    using rpp::buffer_bracket_parser;
+    using rpp::buffer_keyval_parser;
+    using rpp::file_exists;
+    using rpp::is_symlink;
+    using rpp::folder_exists;
+    using rpp::file_or_folder_exists;
+    using rpp::create_symlink;
+    using rpp::file_info;
+    using rpp::file_size;
+    using rpp::file_sizel;
+    using rpp::file_created;
+    using rpp::file_accessed;
+    using rpp::file_modified;
+    using rpp::delete_file;
+    using rpp::rename_file;
+    using rpp::move_file;
+    using rpp::copy_file;
+    using rpp::copy_file_mode;
+    using rpp::copy_file_if_needed;
+    using rpp::copy_file_into_folder;
+    using rpp::create_folder;
+    using rpp::delete_mode;
+    using rpp::delete_folder;
+    using rpp::full_path;
+    using rpp::merge_dirups;
+    using rpp::file_name;
+    using rpp::file_nameext;
+    using rpp::file_ext;
+    using rpp::file_replace_ext;
+    using rpp::file_name_append;
+    using rpp::file_name_replace;
+    using rpp::file_nameext_replace;
+    using rpp::folder_name;
+    using rpp::folder_path;
+    using rpp::normalize;
+    using rpp::normalized;
+    using rpp::path_combine;
+    using rpp::string_list;
+    using rpp::dir_iter_base;
+    using rpp::directory_iter;
+    using rpp::directory_entry;
+    using rpp::dir_iterator;
+    using rpp::dir_entry;
+    using rpp::list_dir_flags;
+    using rpp::dir_current;
+    using rpp::dir_relpath;
+    using rpp::dir_relpath_current;
+    using rpp::dir_recursive;
+    using rpp::dir_relpath_recursive;
+    using rpp::dir_fullpath;
+    using rpp::dir_fullpath_recursive;
+    using rpp::dir_relpath_combine;
+    using rpp::dir_relpath_combine_recursive;
+    using rpp::operator|;
+    using rpp::list_dirs;
+    using rpp::list_files;
+    using rpp::list_alldir;
+    using rpp::working_dir;
+    using rpp::module_dir;
+    using rpp::module_path;
+    using rpp::change_dir;
+    using rpp::temp_dir;
+    using rpp::home_dir;
+    using rpp::address_family;
+    using rpp::AF_DontCare;
+    using rpp::AF_IPv4;
+    using rpp::AF_IPv6;
+    using rpp::AF_Bth;
+    using rpp::socket_type;
+    using rpp::ST_Unspecified;
+    using rpp::ST_Stream;
+    using rpp::ST_Datagram;
+    using rpp::ST_Raw;
+    using rpp::ST_RDM;
+    using rpp::ST_SeqPacket;
+    using rpp::socket_category;
+    using rpp::SC_Unknown;
+    using rpp::SC_Listen;
+    using rpp::SC_Accept;
+    using rpp::SC_Client;
+    using rpp::ip_protocol;
+    using rpp::IPP_DontCare;
+    using rpp::IPP_ICMP;
+    using rpp::IPP_IGMP;
+    using rpp::IPP_BTH;
+    using rpp::IPP_TCP;
+    using rpp::IPP_UDP;
+    using rpp::IPP_ICMPV6;
+    using rpp::IPP_PGM;
+    using rpp::socket_option;
+    using rpp::SO_None;
+    using rpp::SO_ReuseAddr;
+    using rpp::SO_Blocking;
+    using rpp::SO_NonBlock;
+    using rpp::SO_Nagle;
+    using rpp::to_addrfamily;
+    using rpp::to_socktype;
+    using rpp::to_ipproto;
+    using rpp::addrfamily_int;
+    using rpp::socktype_int;
+    using rpp::ipproto_int;
+    using rpp::protocol_info;
+    using rpp::raw_address;
+    using rpp::ipaddress;
+    using rpp::ipaddress4;
+    using rpp::ipaddress6;
+    using rpp::ipinterface;
+    using rpp::socket;
+    using rpp::make_udp_randomport;
+    using rpp::make_tcp_randomport;
+    using rpp::get_ip_interface;
+    using rpp::get_system_ip;
+    using rpp::get_broadcast_ip;
+    using rpp::get_network_handle;
+    using rpp::stream_source;
+    using rpp::binary_stream;
+    using rpp::operator<<;
+    using rpp::endl;
+    using rpp::operator>>;
+    using rpp::binary_buffer;
+    using rpp::member_serialize;
+    using rpp::serializable;
+#if !defined(RPP_BINARY_READWRITE_NO_FILE_IO)
+    using rpp::file_writer;
+    using rpp::file_reader;
+#endif
+#if !defined(RPP_BINARY_READWRITE_NO_SOCKETS)
+    using rpp::socket_writer;
+    using rpp::socket_reader;
+#endif
+#if RPP_ENABLE_UNICODE
+    using rpp::ustring_list;
+    using rpp::udir_iterator;
+    using rpp::udir_entry;
+    using rpp::working_diru;
+    using rpp::temp_diru;
+    using rpp::home_diru;
+#endif
+}
+// GENERATED EXPORTS END

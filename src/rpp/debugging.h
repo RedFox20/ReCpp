@@ -195,5 +195,5 @@ namespace rpp
 #endif // __cplusplus
 
 // Every macro of this header lives in debugging.macros.h, because a module cannot export one.
-// An importer of rpp.debugging includes that header directly instead of this one.
+// An importer of rpp.core includes that header directly instead of this one.
 #include "debugging.macros.h" // re-export

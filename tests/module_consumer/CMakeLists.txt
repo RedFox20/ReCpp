@@ -14,7 +14,7 @@ target_include_directories(RppConfigCVisibility PRIVATE ${MAMA_INCLUDES})
 # toolchain builds modules
 mama_target_modules(RppModuleConsumer)
 
-# a module-only consumer proves rpp.config exports the aliases without the header fallback
+# a module-only consumer proves rpp.core exports the config aliases without the header fallback
 add_executable(RppConfigModuleOnly config_module_only.cpp)
 target_include_directories(RppConfigModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppConfigModuleOnly)
@@ -28,10 +28,10 @@ mama_target_modules(RppMinmaxModuleOnly)
 add_executable(RppMaskedModuleOnly masked_module_only.cpp)
 target_include_directories(RppMaskedModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppMaskedModuleOnly)
-# sprint.cpp holds the out-of-line half of rpp.sprint, so this target links the library
+# sprint.cpp holds the out-of-line half of rpp.text, so this target links the library
 target_link_libraries(RppMaskedModuleOnly PRIVATE ${MAMA_LIBS})
 
-# rpp::sort has to reach an importer of rpp.sort, without rpp.collections beside it
+# rpp::sort has to reach an importer of rpp.numeric, without rpp.containers beside it
 add_executable(RppSortModuleOnly sort_module_only.cpp)
 target_include_directories(RppSortModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppSortModuleOnly)
@@ -42,11 +42,28 @@ target_include_directories(RppStdStringModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppStdStringModuleOnly)
 target_link_libraries(RppStdStringModuleOnly PRIVATE ${MAMA_LIBS})
 
-# the tests.h macro split only pays when tests.macros.h plus rpp.tests writes a suite
+# an exception must cross a module boundary, which BUGS.md B19 broke
+add_executable(RppExceptModuleOnly except_module_only.cpp)
+target_include_directories(RppExceptModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppExceptModuleOnly)
+
+# these targets build at -O2, which is the only way the BUGS.md C27 crash reaches a gate
+add_executable(RppQueueModuleOnly queue_module_only.cpp)
+target_include_directories(RppQueueModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppQueueModuleOnly)
+target_link_libraries(RppQueueModuleOnly PRIVATE ${MAMA_LIBS})
+
+# a literal operator lives in an inline namespace, which the module has to reopen inline
+add_executable(RppLiteralsModuleOnly literals_module_only.cpp)
+target_include_directories(RppLiteralsModuleOnly PRIVATE ${MAMA_INCLUDES})
+mama_target_modules(RppLiteralsModuleOnly)
+target_link_libraries(RppLiteralsModuleOnly PRIVATE ${MAMA_LIBS})
+
+# the tests.h macro split only pays when tests.macros.h plus rpp.testing writes a suite
 add_executable(RppTestsModuleOnly tests_module_only.cpp)
 target_include_directories(RppTestsModuleOnly PRIVATE ${MAMA_INCLUDES})
 mama_target_modules(RppTestsModuleOnly)
-# tests.cpp holds the out-of-line half of rpp.tests, so this target links the library
+# tests.cpp holds the out-of-line half of rpp.testing, so this target links the library
 target_link_libraries(RppTestsModuleOnly PRIVATE ${MAMA_LIBS})
 target_link_libraries(RppModuleConsumer PRIVATE ${MAMA_LIBS})
 install(TARGETS RppModuleConsumer RUNTIME DESTINATION bin)

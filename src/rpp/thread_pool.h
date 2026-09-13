@@ -114,6 +114,7 @@ namespace rpp
     {
         finished, // task finished successfully
         timeout,  // waiting on task timed out
+        deferred, // the task runs on get(), so no wait can finish it
     };
 
     class pool_worker;

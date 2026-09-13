@@ -248,21 +248,49 @@ namespace rpp
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
 
+    namespace detail
+    {
+        // the guard binds a `std::decay_t<T>&`, so an accessor returns exactly that. This one
+        // rule covers a prvalue, a cv lvalue and an array lvalue, which all decay to something else
+        template<class T> inline constexpr bool is_plain_lvalue_ref = false;
+        template<class T> inline constexpr bool is_plain_lvalue_ref<T&> = std::is_same_v<T&, std::decay_t<T>&>;
+
+        // spin_lock reads the try_lock result both ways, and it reads the returned prvalue,
+        // so the cast asks in the value category the call site has
+        template<class T> concept BoolTestable = requires(T t)
+        {
+            static_cast<T&&>(t) ? 0 : 0;
+            !static_cast<T&&>(t) ? 0 : 0;
+        };
+
+        // an overloaded operator& would hijack `&ref`, and <memory> for std::addressof
+        // doubles the preprocessed size of a header the whole threading layer includes
+        template<class T> constexpr T* addressof(T& r) noexcept { return __builtin_addressof(r); }
+    }
+
+    /// @brief A type which synchronize_guard can lock: it offers get_mutex() and get_ref()
+    /// It asks for what the guard does, so a wrong accessor fails here and not inside the guard.
     template<typename T>
     concept SyncableType = requires(T t) {
-        { t.get_mutex() };
+        // spin_lock takes the mutex by reference and writes `!m.try_lock()`
+        { t.get_mutex().lock() };
+        { t.get_mutex().unlock() };
+        { t.get_mutex().try_lock() } -> detail::BoolTestable;
+        requires detail::is_plain_lvalue_ref<decltype(t.get_mutex())>;
         { t.get_ref() };
+        requires detail::is_plain_lvalue_ref<decltype(t.get_ref())>;
     };
-    // Doesn't work for some reason :shrug:
-    // #define RPP_SYNC_T SyncableType
-    #define RPP_SYNC_T class
 
-    template<RPP_SYNC_T SyncType>
+    // SyncableType cannot constrain this: synchronizable names synchronize_guard<SyncType>
+    // in a member alias while CRTP still leaves SyncType incomplete
+    template<class SyncType>
     class synchronize_guard
     {
     public:
-        using value_type = std::decay_t< decltype(std::declval<SyncType>().get_ref()) >;
-        using mutex_type = std::decay_t< decltype(std::declval<SyncType>().get_mutex()) >;
+        // an lvalue, because the guard holds a SyncType* and a ref-qualified accessor
+        // rejects the rvalue std::declval<SyncType>() gives
+        using value_type = std::decay_t< decltype(std::declval<SyncType&>().get_ref()) >;
+        using mutex_type = std::decay_t< decltype(std::declval<SyncType&>().get_mutex()) >;
     private:
         std::unique_lock<mutex_type> mtx_lock;
         SyncType* instance;
@@ -280,11 +308,11 @@ namespace rpp
         // NOTE: Do not allow overwriting accessors, because all writes need to go 
         //       through synchronize_guard::operator=() which detects SyncType::set() method.
         //       However existing value can be modified via operator->()
-        value_type* operator->() noexcept { return &instance->get_ref(); }
+        value_type* operator->() noexcept { return detail::addressof(instance->get_ref()); }
 
         // For const refs, all read accessors are allowed
         // WARNING: do not const_cast these, it will cause undefined behavior
-        const value_type* operator->() const noexcept { return &instance->get_ref(); }
+        const value_type* operator->() const noexcept { return detail::addressof(instance->get_ref()); }
         const value_type& operator*() const noexcept { return instance->get_ref(); }
         const value_type& get() const noexcept { return instance->get_ref(); }
         operator const value_type&() const noexcept { return instance->get_ref(); }
@@ -372,7 +400,9 @@ namespace rpp
      * };
      * @endcode
      */
-    template<RPP_SYNC_T SyncType>
+    // SyncableType constrains the members below, not SyncType: CRTP names this base while
+    // SyncType is still incomplete, and only a call site sees the complete type
+    template<class SyncType>
     class synchronizable
     {
     public:
@@ -386,12 +416,18 @@ namespace rpp
 
         using guard_type = rpp::synchronize_guard<SyncType>;
 
-        guard_type operator->() noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        guard_type operator*()  noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        guard_type guard()      noexcept { return guard_type{ static_cast<SyncType*>(this) }; }
-        const guard_type operator->() const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
-        const guard_type operator*()  const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
-        const guard_type guard()      const noexcept { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
+        /// Each one returns a guard which holds the lock until it dies. SyncableType gates them,
+        /// so a derived type missing get_mutex() or get_ref() loses these accessors and nothing else.
+        guard_type operator->() noexcept requires SyncableType<SyncType> { return make_guard(); }
+        guard_type operator*()  noexcept requires SyncableType<SyncType> { return make_guard(); }
+        guard_type guard()      noexcept requires SyncableType<SyncType> { return make_guard(); }
+        const guard_type operator->() const noexcept requires SyncableType<SyncType> { return make_guard(); }
+        const guard_type operator*()  const noexcept requires SyncableType<SyncType> { return make_guard(); }
+        const guard_type guard()      const noexcept requires SyncableType<SyncType> { return make_guard(); }
+
+    private:
+        guard_type make_guard() const noexcept
+        { return guard_type{ static_cast<SyncType*>(const_cast<synchronizable*>(this)) }; }
     };
 
     /**

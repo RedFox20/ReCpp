@@ -1,4 +1,4 @@
-# The build matrix: 28 jobs over Linux, Android, MIPS and Windows.
+# The build matrix, over Linux, Android, MIPS and Windows.
 name: CI
 
 # a branch push and its pull request both match, so push stays on master alone.
@@ -18,7 +18,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     strategy:
-      fail-fast: false # one red job must never cancel the other twenty-seven
+      fail-fast: false # one red job must never cancel the others
       matrix:
         include:
           # clang-18, C++20 and C++23
@@ -44,11 +44,12 @@ jobs:
               llvm_apt: "true" }
           - { name: ubuntu-cpp23-asan-clang20,       compiler: clang, cc: clang-20, std: "23", san: asan,       cov: "false",
               llvm_apt: "true" }
-          # C++20 modules. These need Ninja, so they set it. They also pass
-          # BUILD_WITH_MODULES=ON, not AUTO: AUTO turns modules off and keeps going, so a job
-          # named modules would pass while it tested only headers
+          # Modules need Ninja and BUILD_WITH_MODULES=ON, because AUTO turns them off and
+          # keeps going. The C++23 row is where gcc-14 ran out of locations, see BUGS.md C28.
           - { name: ubuntu-cpp20-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "20", san: asan,       cov: "false",
               ninja: "true", modules: "ON", check_includes: "true" }
+          - { name: ubuntu-cpp23-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "23", san: asan,       cov: "false",
+              ninja: "true", modules: "ON" }
           - { name: ubuntu-cpp20-modules-clang21,    compiler: clang, cc: clang-21, std: "20", san: asan,       cov: "false",
               ninja: "true", modules: "ON", llvm_apt: "true" }
     steps:

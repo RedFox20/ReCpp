@@ -12,8 +12,8 @@
 #endif
 
 #ifdef MAMA_HAS_MODULES
-import rpp.strview;
-import rpp.debugging;
+import rpp.text;
+import rpp.core;
 #  define BUILT_WITH "MODULES"
 #endif
 
@@ -81,14 +81,14 @@ int main()
         int written = rpp::to_string(buffer, 42);
         check("to_string int", rpp::strview(buffer, written) == "42");
     }
-    { // rpp.debugging, the second exported module. A misspelled export fails to import
+    { // the debugging names of rpp.core. A misspelled export fails to import
         LogSeverity previous = GetLogSeverityFilter();
         SetLogSeverityFilter(LogSeverityError);
-        check("rpp.debugging filter", GetLogSeverityFilter() == LogSeverityError);
+        check("rpp.core filter", GetLogSeverityFilter() == LogSeverityError);
         SetLogSeverityFilter(previous);
         // the macros expand to the exported _LogInfo, so this proves both halves reach a consumer
-        LogInfo("consumer imported rpp.debugging");
-        check("rpp.debugging shorten", rpp::strview{rpp::shorten_filename("a/b/c.cpp")} != "");
+        LogInfo("consumer imported rpp.core");
+        check("rpp.core shorten", rpp::strview{rpp::shorten_filename("a/b/c.cpp")} != "");
     }
     { // a formatted log macro expands to rpp::__wrap<rpp::__clean_type<T>>, the module-only helper path
         SetLogHandler([](LogSeverity, const char* msg, int len) { g_log_captured.assign(msg, (size_t)len); });

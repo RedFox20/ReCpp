@@ -11,7 +11,7 @@
 // that the export list is complete. GCC 14 redefines every std entity when an
 // import comes first, so the import always goes after the includes.
 #if RPP_BUILD_WITH_MODULES
-import rpp.strview;
+import rpp.text;
 #endif
 
 constexpr auto MAX_DOUBLE = std::numeric_limits<double>::max();

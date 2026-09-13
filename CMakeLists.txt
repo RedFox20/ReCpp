@@ -98,6 +98,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clang-tidy
 # Add compiler specific flags
 if(CLANG OR GCC)
     add_compile_options(-g -Wall -Wextra -fPIC)
+    # One section per function and per object, so the linker drops what nothing references.
+    # clang-cl keeps MSVC true and takes this branch, and its driver rejects the GNU spelling
+    if(NOT MSVC)
+        add_compile_options(-ffunction-sections -fdata-sections)
+        if(APPLE)
+            set(RPP_GC_SECTIONS "-Wl,-dead_strip") # ld64 rejects --gc-sections
+        else()
+            set(RPP_GC_SECTIONS "-Wl,--gc-sections")
+        endif()
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${RPP_GC_SECTIONS}")
+    endif()
     if(CLANG)
         message("Configure for Clang++ ${CMAKE_CXX_COMPILER_VERSION}")
         if(RPP_USE_LIBCXX)
@@ -199,8 +211,9 @@ elseif(MIPS)
         set(LIBDW_INCLUDE ${elfutils_INCLUDES})
     endif()
 elseif(YOCTO_LINUX)
-    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed")
-    set(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
+    # append, because a plain set() here would drop the collection flag added above
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
 elseif(OCLEA)
     set(LIBDL_LIB "dl")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
@@ -265,6 +278,11 @@ target_link_libraries(ReCpp
     PUBLIC ${TRACE_LIBRARY}
     PUBLIC Threads::Threads
 )
+# A parent project which adds this directory never sees CMAKE_EXE_LINKER_FLAGS, so the
+# section flags would cost it size and reclaim nothing without this.
+if(RPP_GC_SECTIONS)
+    target_link_options(ReCpp INTERFACE ${RPP_GC_SECTIONS})
+endif()
 install(TARGETS ReCpp DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 ###################################################
@@ -347,59 +365,17 @@ endif()
 if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 
+    # One unit per header group, each carrying its headers directly, because of the
+    # gcc-14 source location budget in BUGS.md C28.
     set(RPP_MODULES_SRC
-        src/rpp/rpp-config.cppm
-        src/rpp/rpp-minmax.cppm
-        src/rpp/rpp-obfuscated_string.cppm
-        src/rpp/rpp-scopeguard.cppm
-        src/rpp/rpp-strview.cppm
-        src/rpp/rpp-debugging.cppm
-        # L1
-        src/rpp/rpp-bitutils.cppm
-        src/rpp/rpp-traits.cppm
-        src/rpp/rpp-type_traits.cppm
-        src/rpp/rpp-source_loc.cppm
-        src/rpp/rpp-endian.cppm
-        src/rpp/rpp-predicates.cppm
-        src/rpp/rpp-sort.cppm
-        src/rpp/rpp-proc_utils.cppm
-        src/rpp/rpp-future_types.cppm
-        src/rpp/rpp-math.cppm
-        src/rpp/rpp-timepoint.cppm
-        src/rpp/rpp-delegate.cppm
-        # L2
-        src/rpp/rpp-atomic_timepoint.cppm
-        src/rpp/rpp-collections.cppm
-        src/rpp/rpp-stack_trace.cppm
-        src/rpp/rpp-threads.cppm
-        src/rpp/rpp-timer.cppm
-        src/rpp/rpp-vec.cppm
-        src/rpp/rpp-sprint.cppm
-        src/rpp/rpp-task.cppm
-        # L3
-        src/rpp/rpp-load_balancer.cppm
-        src/rpp/rpp-memory_pool.cppm
-        src/rpp/rpp-mutex.cppm
-        src/rpp/rpp-paths.cppm
-        src/rpp/rpp-tests.cppm
-        # L4
-        src/rpp/rpp-atomic_shared_ptr.cppm
-        src/rpp/rpp-close_sync.cppm
-        src/rpp/rpp-condition_variable.cppm
-        src/rpp/rpp-file_io.cppm
-        src/rpp/rpp-sockets.cppm
-        # L5
-        src/rpp/rpp-binary_stream.cppm
-        src/rpp/rpp-concurrent_queue.cppm
-        src/rpp/rpp-semaphore.cppm
-        # L6
-        src/rpp/rpp-binary_serializer.cppm
-        src/rpp/rpp-thread_pool.cppm
-        # L7
-        src/rpp/rpp-future.cppm
-        src/rpp/rpp-event_loop.cppm
-        # L8
-        src/rpp/rpp-coroutines.cppm
+        src/rpp/rpp-core.cppm
+        src/rpp/rpp-text.cppm
+        src/rpp/rpp-numeric.cppm
+        src/rpp/rpp-time.cppm
+        src/rpp/rpp-containers.cppm
+        src/rpp/rpp-io.cppm
+        src/rpp/rpp-threading.cppm
+        src/rpp/rpp-testing.cppm
     )
 
     # Add module interface to the library target

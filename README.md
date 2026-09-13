@@ -107,8 +107,8 @@ cmake --build build
 ### Using modules
 
 Module interface units are in `src/rpp/` with the naming convention `rpp-<module>.cppm`.
-Each module wraps an existing header, so the traditional `#include` keeps working and a
-program can mix both styles in one binary.
+Each module wraps a group of existing headers, so the traditional `#include` keeps working
+and a program can mix both styles in one binary.
 
 **Put every `#include` first and every `import` last.** GCC 14 re-parses a standard
 library header that follows an import, and its internal templates then collide with the
@@ -119,14 +119,91 @@ compile errors.
 #include <rpp/tests.h>   // 1. rpp headers
 #include <string>        // 2. std headers
 
-import rpp.strview;      // 3. imports, last
+import rpp.text;         // 3. imports, last
 ```
 
-**A module re-exports nothing.** `sprint.h` includes `strview.h`, and
-`import rpp.sprint;` still leaves `rpp::strview` invisible. Name that module too. A
-header leaks whatever its includes pull in, and a module hands over only what the
-importer asked for. `rpp.tests` is the one exception, and it re-exports
-`rpp.strview` for the `TestImpl` constructor.
+**A module re-exports nothing.** A header leaks whatever its includes pull in, and a
+module hands over only what the importer asked for. So `import rpp.text;` leaves
+`rpp::TimePoint` invisible. Name `rpp.time` too. This holds without exception, because a
+re-export makes gcc-14 write a module no `<string>`-first importer can read, see
+`BUGS.md` B8. An importer of `rpp.testing` names `rpp.text` too, because `TestImpl`
+expands to a constructor taking an `rpp::strview`.
+
+### The eight modules
+
+Eight module interface units ship, one per subject group. A group carries its headers
+directly, so the group is the unit you import:
+
+| Module | Carries |
+|---|---|
+| `rpp.core` | config.types, debugging, source_loc, traits, type_traits, predicates, scope_guard, delegate, proc_utils, stack_trace, endian, bitutils |
+| `rpp.text` | strview, sprint, obfuscated_string |
+| `rpp.numeric` | math, minmax, vec, sort |
+| `rpp.time` | timepoint, timer, atomic_timepoint |
+| `rpp.containers` | collections, memory_pool, load_balancer |
+| `rpp.io` | file_io, paths, sockets, binary_stream, binary_serializer |
+| `rpp.threading` | mutex, condition_variable, semaphore, concurrent_queue, thread_pool, threads, task, future, future_types, event_loop, coroutines, atomic_shared_ptr, close_sync |
+| `rpp.testing` | tests |
+
+The groups partition every public header, so each header sits in exactly one group.
+`gen_module_exports.py --all --check` fails when that stops holding. `tools/gen_module_exports.py`
+owns all eight files, and `GROUP_HEADERS` in it is the list a new header joins.
+
+**There is no `rpp` umbrella.** A file names the groups it uses. One re-export chain costs its
+whole transitive closure, so `import rpp;` measured 2949 ms against 398 ms for a narrow import,
+and it overflowed the gcc-14 source location budget once already, see `BUGS.md` B25.
+
+**No module exports a std name.** An importer includes the std headers it uses, before its
+imports, which is the include-before-import rule it already follows. ReCpp once shipped an
+`rpp.std` module for those names, and every gcc-14 defect it hit came from exporting them:
+B19, B20, B21, B22 and B24. Including the header directly reaches none of the five.
+
+```cpp
+#include <string>       // the std names this file uses, includes first
+import rpp.text;        // then the groups
+```
+
+```cpp
+#include <rpp/tests.macros.h>   // macros never cross a module
+import rpp.threading;           // rpp::mutex, rpp::cfuture, rpp::thread_pool, ...
+import rpp.testing;             // a test file names each group it uses
+```
+
+**Why a group and not one module per header.** ReCpp shipped 44 per-header modules first,
+and gcc-14 ran out of module source locations when one translation unit imported dozens of
+them. It then mis-merged a global module declaration and the build died, from a clean build
+directory on C++23 only. `BUGS.md` **C28** holds the measurements. Eight groups cut
+`test_modules.cpp` from 39 imports to 8, and both C++20 and C++23 build clean.
+
+Name the group you use when you want the narrowest dependency. A file that imports
+`rpp.text` rebuilds when one of three headers changes, and a file that names several
+groups rebuilds when any header in any of them changes.
+
+### What an import saves
+
+One translation unit per group, gcc-14 at `-O2`, best of three, with the module interfaces
+already built. Both columns compile the same body. The header column includes the group
+headers the body needs, and the import column names the group:
+
+| Group | Header | Import | Speedup |
+|---|---|---|---|
+| `rpp.numeric` | 696 ms | 22 ms | 31.1x |
+| `rpp.text` | 1303 ms | 151 ms | 8.6x |
+| `rpp.io` | 1388 ms | 179 ms | 7.8x |
+| `rpp.testing` | 1856 ms | 272 ms | 6.8x |
+| `rpp.core` | 395 ms | 67 ms | 5.9x |
+| `rpp.containers` | 576 ms | 101 ms | 5.7x |
+| `rpp.time` | 390 ms | 72 ms | 5.4x |
+| `rpp.threading` | 1731 ms | 409 ms | 4.2x |
+| **median** | | | **6.8x** |
+
+The import column parses no standard library header at all, which is what an importer
+really writes. A header costs what its preprocessed size says, so the heaviest group gains
+the most absolute time and the lightest gains the least.
+
+Take the narrowest group which covers the file, and name a second group beside it when you
+need one. `docs/MODULES_MIGRATION.md` sections 2.2 and 2.3 have the full tables and the
+linker numbers.
 
 ### Macros need a header
 
@@ -137,7 +214,7 @@ not, include the original header.
 ```cpp
 #include <rpp/debugging.macros.h>   // LogInfo, LogWarning, LogError, Assert, ThrowErr
 #include <stdexcept>                // only when the file uses ThrowErr or AssertEx
-import rpp.debugging;               // ::SetLogSeverityFilter, rpp::add_log_handler, ...
+import rpp.core;                    // ::SetLogSeverityFilter, rpp::add_log_handler, ...
 
 SetLogSeverityFilter(LogSeverityWarn);
 LogInfo("Beautiful Soup %d", 42);
@@ -152,41 +229,39 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Forty-four modules ship. `src/rpp/rpp-*.cppm` names each one, and section 9 of
-[`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md) lists them by dependency layer,
-with the ones still to come. Each `.cppm` carries the export list its header earned, so read
-that file for the names a module gives you.
+Eight modules ship, and `src/rpp/rpp-*.cppm` names each one. Each file carries the export
+list its headers earned, so read it for the names a module gives you.
 
-Six of them carry a limit the export list cannot state:
+Four groups carry a limit the export list cannot state:
 
 | Module | Header | The limit |
 |--------|--------|-----------|
-| `rpp.config` | [`config.types.h`](src/rpp/config.types.h) | Carries the ten integer aliases only. The macros of `config.h` need the header |
-| `rpp.minmax` | [`minmax.h`](src/rpp/minmax.h) | The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
-| `rpp.scopeguard` | [`scope_guard.h`](src/rpp/scope_guard.h) | The `scope_guard()` macro needs the header, and the module name drops the underscore to clear that macro |
-| `rpp.type_traits` | [`type_traits.h`](src/rpp/type_traits.h) | Drops `has_std_to_string`, which gcc-14 cannot write into a readable module. The header still declares it, see `BUGS.md` B8 |
-| `rpp.memory_pool` | [`memory_pool.h`](src/rpp/memory_pool.h) | Drops `pool_types_constructor`, an internal mixin. Each pool still gives you `construct<T>()` and the array forms |
-| `rpp.thread_pool` | [`thread_pool.h`](src/rpp/thread_pool.h) | Drops `test_threadpool`, the forward declaration a unit test needs as a friend |
+| `rpp.core` | [`config.types.h`](src/rpp/config.types.h) | Carries the ten integer aliases only. The macros of `config.h` need the header |
+| `rpp.core` | [`scope_guard.h`](src/rpp/scope_guard.h) | The `scope_guard()` macro needs the header, because no module exports a macro |
+| `rpp.core` | [`type_traits.h`](src/rpp/type_traits.h) | Drops `has_std_to_string`, which gcc-14 cannot write into a readable module. The header still declares it, see `BUGS.md` B8 |
+| `rpp.numeric` | [`minmax.h`](src/rpp/minmax.h) | The header undefines the Windows `min` and `max` macros, and no module carries an `#undef` |
+| `rpp.containers` | [`memory_pool.h`](src/rpp/memory_pool.h) | Drops `pool_types_constructor`, an internal mixin. Each pool still gives you `construct<T>()` and the array forms |
+| `rpp.threading` | [`thread_pool.h`](src/rpp/thread_pool.h) | Drops `test_threadpool`, the forward declaration a unit test needs as a friend |
 
-Nine modules wrap a header which reaches `<future>`, so each carries one more limit. On
-gcc-14 an importer of `rpp.concurrent_queue`, `rpp.coroutines`, `rpp.event_loop`,
-`rpp.future`, `rpp.future_types`, `rpp.semaphore`, `rpp.task`, `rpp.tests` or
-`rpp.thread_pool` cannot instantiate `std::promise`. The compiler crashes, no export list
-changes it, and `BUGS.md` B16 holds the reproducer. Include the header in a translation
-unit which instantiates `std::promise`.
+`rpp.threading` and `rpp.testing` carry a header which reaches `<future>`, so each carries
+one more limit. On gcc-14 an importer of either one cannot instantiate `std::promise`. The
+compiler crashes, no export list changes it, and `BUGS.md` B16 holds the reproducer.
+Include the header in a translation unit which instantiates `std::promise`.
 
 ### How it works
 
-A module interface unit includes its header in the **global module fragment**, then
+A module interface unit includes its headers in the **global module fragment**, then
 re-exports the names with `using`-declarations. Every declaration stays attached to the
-global module, so `import rpp.strview` and `#include <rpp/strview.h>` name the same type.
+global module, so `import rpp.text` and `#include <rpp/strview.h>` name the same type.
 This is the pattern `libstdc++` and `libc++` use to implement `import std;`.
 
 ```cpp
-// src/rpp/rpp-strview.cppm
+// src/rpp/rpp-text.cppm
 module;
-#include "strview.h"          // the umbrella include, in the global module fragment
-export module rpp.strview;
+#include "strview.h"          // every group member, in the global module fragment
+#include "sprint.h"
+#include "obfuscated_string.h"
+export module rpp.text;
 
 export namespace rpp {
     using rpp::strview;       // reachable becomes visible
@@ -204,9 +279,10 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 ```
 
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
-`tests/test_modules.cpp`, which imports every module. `tests/module_consumer/` adds six
-module-only targets. Each one imports what it needs and includes no rpp header except a
-macro header, so a missing export fails the build. `RppStdStringModuleOnly` includes
+`tests/test_modules.cpp`, which imports all eight groups. `tests/module_consumer/` adds nine
+module-only targets, and `run_test.py` builds and runs each one at C++20 and C++23. Each imports what it needs
+and includes no rpp header except a macro header, so a missing export fails the build, and a
+wrong answer fails the run. `RppStdStringModuleOnly` includes
 `<string>` first, because gcc-14 writes a module that only such an importer cannot read.
 See `BUGS.md` B8.
 
@@ -321,6 +397,11 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_LITTLE_ENDIAN`](src/rpp/config.h#L378) | `1` if target is little-endian |
 | [`RPP_BIG_ENDIAN`](src/rpp/config.h#L380) | `1` if target is big-endian |
 | [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L401) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
+| [`RPP_HAS_BUILTIN(x)`](src/rpp/config.h#L411) | `1` when the compiler offers the named builtin, and `0` where `__has_builtin` does not exist |
+| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/config.h#L417) | Copies bytes through the compiler builtin, which needs no `<cstring>` |
+| [`RPP_BUILTIN_MEMMOVE(dst, src, size)`](src/rpp/config.h#L420) | Moves overlapping bytes through the compiler builtin, see `BUGS.md` C27 |
+| [`RPP_BUILTIN_MEMSET(dst, value, size)`](src/rpp/config.h#L423) | Fills bytes through the compiler builtin |
+| [`RPP_BUILTIN_MEMCMP(a, b, size)`](src/rpp/config.h#L426) | Compares bytes through the compiler builtin |
 
 ### Feature Detection
 
@@ -1343,33 +1424,33 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 
 | Item | Description |
 |------|-------------|
-| [`cfuture<T>`](src/rpp/future.h#L134) | Extended `std::future` with composition and coroutine support |
-| [`async_task(task)`](src/rpp/future.h#L33) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L955) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L972) | Create an already-errored future |
-| [`wait_all(futures)`](src/rpp/future.h#L1040) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L994) | Block and gather results from all futures |
+| [`cfuture<T>`](src/rpp/future.h#L145) | Extended `std::future` with composition and coroutine support |
+| [`async_task(task)`](src/rpp/future.h#L44) | Launch a task on the thread pool, returns `cfuture<T>` |
+| [`make_ready_future(value)`](src/rpp/future.h#L966) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L983) | Create an already-errored future |
+| [`wait_all(futures)`](src/rpp/future.h#L1051) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L1005) | Block and gather results from all futures |
 
 ### cfuture Methods
 
 | Method | Description |
 |--------|-------------|
-| [`~cfuture()`](src/rpp/future.h#L148) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
-| [`then()`](src/rpp/future.h#L176) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
-| [`then(Task task)`](src/rpp/future.h#L193) | Chain a continuation that receives the result (runs via `async_task`) |
-| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L220) | Chain with 1–4 typed exception recovery handlers |
-| [`then(cfuture<U>&& next)`](src/rpp/future.h#L272) | Chain by waiting for this future, then returning the result of `next` |
-| [`continue_with(Task task)`](src/rpp/future.h#L288) | Fire-and-forget continuation (moves `*this` into background) |
-| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L296) | Fire-and-forget continuation with 1–4 typed exception handlers |
-| [`detach()`](src/rpp/future.h#L351) | Abandon future, wait in background (swallows exceptions) |
-| [`chain_async(Task task)`](src/rpp/future.h#L383) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
-| [`chain_async(cfuture&& next)`](src/rpp/future.h#L396) | Sequential chaining with another future |
-| [`await_ready()`](src/rpp/future.h#L410) | Non-blocking check if the future is already finished |
-| [`collect_ready(T* result)`](src/rpp/future.h#L441) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
-| [`collect_wait(T* result)`](src/rpp/future.h#L459) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
-| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L470) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L482) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L509) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`~cfuture()`](src/rpp/future.h#L159) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
+| [`then()`](src/rpp/future.h#L187) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
+| [`then(Task task)`](src/rpp/future.h#L204) | Chain a continuation that receives the result (runs via `async_task`) |
+| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L231) | Chain with 1–4 typed exception recovery handlers |
+| [`then(cfuture<U>&& next)`](src/rpp/future.h#L283) | Chain by waiting for this future, then returning the result of `next` |
+| [`continue_with(Task task)`](src/rpp/future.h#L299) | Fire-and-forget continuation (moves `*this` into background) |
+| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L307) | Fire-and-forget continuation with 1–4 typed exception handlers |
+| [`detach()`](src/rpp/future.h#L362) | Abandon future, wait in background (swallows exceptions) |
+| [`chain_async(Task task)`](src/rpp/future.h#L394) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
+| [`chain_async(cfuture&& next)`](src/rpp/future.h#L407) | Sequential chaining with another future |
+| [`await_ready()`](src/rpp/future.h#L421) | Non-blocking check if the future is already finished |
+| [`collect_ready(T* result)`](src/rpp/future.h#L452) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L470) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L481) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L493) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L520) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`coro_handle<T>`](src/rpp/future_types.h#L18) | Alias for `std::coroutine_handle<T>` |
 | [`suspend_never`](src/rpp/future_types.h#L19) | Alias for the standard never-suspend awaiter |
 | [`suspend_always`](src/rpp/future_types.h#L20) | Alias for the standard always-suspend awaiter |
@@ -1438,7 +1519,7 @@ auto f = rpp::async_task([=]{
     sendAnalyticsEvent(event);
 });
 
-if (f.wait_for(rpp::millis(100)) == std::future_status::timeout) {
+if (f.wait_for(rpp::millis(100)) == rpp::wait_result::timeout) {
     LogWarning("Analytics event is taking too long to send, abandoning to unblock UI");
     f.detach(); // don't care about the result, avoid terminate on destruction
 }
@@ -1694,9 +1775,9 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](src/rpp/thread_pool.h#L400) | Thread pool manager with auto-scaling workers |
-| [`pool_task_handle`](src/rpp/thread_pool.h#L145) | Waitable, reference-counted handle for pool tasks |
-| [`pool_worker`](src/rpp/thread_pool.h#L119) | Individual worker thread in the pool |
+| [`thread_pool`](src/rpp/thread_pool.h#L401) | Thread pool manager with auto-scaling workers |
+| [`pool_task_handle`](src/rpp/thread_pool.h#L146) | Waitable, reference-counted handle for pool tasks |
+| [`pool_worker`](src/rpp/thread_pool.h#L120) | Individual worker thread in the pool |
 
 ### Configuration
 
@@ -1708,23 +1789,23 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L592) | Split work across threads |
-| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L542) | Run a single async task, returns `pool_task_handle` |
-| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L438) | Set max concurrent workers |
-| [`max_parallelism()`](src/rpp/thread_pool.h#L441) | Get max concurrent workers |
-| [`active_tasks()`](src/rpp/thread_pool.h#L454) | Number of currently running tasks |
-| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L472) | Blocks until no pool task is running, including task delegate destruction |
-| [`idle_tasks()`](src/rpp/thread_pool.h#L475) | Number of idle workers |
-| [`total_tasks()`](src/rpp/thread_pool.h#L478) | Total number of workers |
-| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L482) | Remove idle workers |
+| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L593) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L543) | Run a single async task, returns `pool_task_handle` |
+| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L439) | Set max concurrent workers |
+| [`max_parallelism()`](src/rpp/thread_pool.h#L442) | Get max concurrent workers |
+| [`active_tasks()`](src/rpp/thread_pool.h#L455) | Number of currently running tasks |
+| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L473) | Blocks until no pool task is running, including task delegate destruction |
+| [`idle_tasks()`](src/rpp/thread_pool.h#L476) | Number of idle workers |
+| [`total_tasks()`](src/rpp/thread_pool.h#L479) | Total number of workers |
+| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L483) | Remove idle workers |
 
 ### Free Functions (Global Pool)
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L592) | Parallel for on the global thread pool |
-| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L613) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](src/rpp/thread_pool.h#L542) | Run async task on the global pool |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L593) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L614) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L543) | Run async task on the global pool |
 | [`action<TArgs...>`](src/rpp/thread_pool.h#L49) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for
@@ -1815,7 +1896,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`mutex`](src/rpp/mutex.h#L14) | Platform-specific mutex (custom on Windows/FreeRTOS, `std::mutex` on Linux/Mac) |
 | [`recursive_mutex`](src/rpp/mutex.h#L35) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L172) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L406) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`synchronized<T>`](src/rpp/mutex.h#L442) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
@@ -1824,7 +1905,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`spin_lock(Mutex m)`](src/rpp/mutex.h#L196) | Spin-lock with fallback to blocking lock |
 | [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L232) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L127) | Indicates platform provides native critical_section mutex |
-| [`RPP_SYNC_T`](src/rpp/mutex.h#L258) | Template constraint placeholder for SyncableType concept |
+| [`SyncableType`](src/rpp/mutex.h#L274) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 ### Example: Basic Mutex and Spin Lock
 
@@ -4143,33 +4224,32 @@ Endian byte-swap read/write utilities for big-endian and little-endian data.
 
 | Function | Description |
 |----------|-------------|
-| [`writeBEU16(out, value)`](src/rpp/endian.h#L58) | Write 16-bit big-endian |
-| [`writeBEU32(out, value)`](src/rpp/endian.h#L64) | Write 32-bit big-endian |
-| [`writeBEU64(out, value)`](src/rpp/endian.h#L70) | Write 64-bit big-endian |
-| [`readBEU16(in)`](src/rpp/endian.h#L76) | Read 16-bit big-endian |
-| [`readBEU32(in)`](src/rpp/endian.h#L83) | Read 32-bit big-endian |
-| [`readBEU64(in)`](src/rpp/endian.h#L90) | Read 64-bit big-endian |
+| [`writeBEU16(out, value)`](src/rpp/endian.h#L56) | Write 16-bit big-endian |
+| [`writeBEU32(out, value)`](src/rpp/endian.h#L62) | Write 32-bit big-endian |
+| [`writeBEU64(out, value)`](src/rpp/endian.h#L68) | Write 64-bit big-endian |
+| [`readBEU16(in)`](src/rpp/endian.h#L74) | Read 16-bit big-endian |
+| [`readBEU32(in)`](src/rpp/endian.h#L81) | Read 32-bit big-endian |
+| [`readBEU64(in)`](src/rpp/endian.h#L88) | Read 64-bit big-endian |
 
 ### Little-Endian
 
 | Function | Description |
 |----------|-------------|
-| [`writeLEU16(out, value)`](src/rpp/endian.h#L101) | Write 16-bit little-endian |
-| [`writeLEU32(out, value)`](src/rpp/endian.h#L107) | Write 32-bit little-endian |
-| [`writeLEU64(out, value)`](src/rpp/endian.h#L113) | Write 64-bit little-endian |
-| [`readLEU16(in)`](src/rpp/endian.h#L119) | Read 16-bit little-endian |
-| [`readLEU32(in)`](src/rpp/endian.h#L126) | Read 32-bit little-endian |
-| [`readLEU64(in)`](src/rpp/endian.h#L133) | Read 64-bit little-endian |
+| [`writeLEU16(out, value)`](src/rpp/endian.h#L99) | Write 16-bit little-endian |
+| [`writeLEU32(out, value)`](src/rpp/endian.h#L105) | Write 32-bit little-endian |
+| [`writeLEU64(out, value)`](src/rpp/endian.h#L111) | Write 64-bit little-endian |
+| [`readLEU16(in)`](src/rpp/endian.h#L117) | Read 16-bit little-endian |
+| [`readLEU32(in)`](src/rpp/endian.h#L124) | Read 32-bit little-endian |
+| [`readLEU64(in)`](src/rpp/endian.h#L131) | Read 64-bit little-endian |
 | [`RPP_BYTESWAP16(x)`](src/rpp/endian.h#L18) | Platform-specific 16-bit byte swap |
 | [`RPP_BYTESWAP32(x)`](src/rpp/endian.h#L19) | Platform-specific 32-bit byte swap |
 | [`RPP_BYTESWAP64(x)`](src/rpp/endian.h#L20) | Platform-specific 64-bit byte swap |
-| [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/endian.h#L21) | Platform-specific memcpy used by the endian read and write helpers |
-| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L30) | Convert 16-bit value to big-endian byte order |
-| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L31) | Convert 32-bit value to big-endian byte order |
-| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L32) | Convert 64-bit value to big-endian byte order |
-| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L33) | Convert 16-bit value to little-endian byte order |
-| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L34) | Convert 32-bit value to little-endian byte order |
-| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L35) | Convert 64-bit value to little-endian byte order |
+| [`RPP_TO_BIG16(x)`](src/rpp/endian.h#L28) | Convert 16-bit value to big-endian byte order |
+| [`RPP_TO_BIG32(x)`](src/rpp/endian.h#L29) | Convert 32-bit value to big-endian byte order |
+| [`RPP_TO_BIG64(x)`](src/rpp/endian.h#L30) | Convert 64-bit value to big-endian byte order |
+| [`RPP_TO_LITTLE16(x)`](src/rpp/endian.h#L31) | Convert 16-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE32(x)`](src/rpp/endian.h#L32) | Convert 32-bit value to little-endian byte order |
+| [`RPP_TO_LITTLE64(x)`](src/rpp/endian.h#L33) | Convert 64-bit value to little-endian byte order |
 
 ### Example: Big-Endian & Little-Endian Read/Write
 
@@ -4222,7 +4302,7 @@ Linear bump-allocator memory pools for arena-style allocation (no per-object dea
 |-------|-------------|
 | [`linear_static_pool`](src/rpp/memory_pool.h#L76) | Fixed-size bump allocator |
 | [`linear_dynamic_pool`](src/rpp/memory_pool.h#L158) | Growing bump allocator with configurable block growth |
-| [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | Internal CRTP mixin giving each pool `construct<T>()`, `destruct<T>()` and the array and range forms. `rpp.memory_pool` does not export it |
+| [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | Internal CRTP mixin giving each pool `construct<T>()`, `destruct<T>()` and the array and range forms. `rpp.containers` does not export it |
 
 ### Common Methods
 
@@ -4506,7 +4586,7 @@ Minimal unit testing framework with test discovery, assertions, and verbose outp
 | [`AssertFalse(expr)`](src/rpp/tests.macros.h#L56) | Assert expression is false |
 | [`AssertThrows(expr)`](src/rpp/tests.macros.h#L90) | Assert expression throws |
 
-`<rpp/tests.h>` gives both the framework and these macros. An importer of `rpp.tests`
+`<rpp/tests.h>` gives both the framework and these macros. An importer of `rpp.testing`
 adds `#include <rpp/tests.macros.h>` for them, because a module cannot export a macro.
 
 ### Running Tests

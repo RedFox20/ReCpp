@@ -24,6 +24,17 @@ namespace rpp
     template<typename T>
     using cpromise = std::promise<T>;
 
+    namespace detail
+    {
+        /// @returns the rpp::wait_result for a std::future_status, so deferred never reads as finished
+        constexpr wait_result to_wait_result(std::future_status s) noexcept
+        {
+            return s == std::future_status::ready    ? wait_result::finished
+                 : s == std::future_status::deferred ? wait_result::deferred
+                                                     : wait_result::timeout;
+        }
+    }
+
     /**
      * Runs any task delegate on the rpp::thread_pool using rpp::parallel_task()
      * @param task The task to run in background thread
@@ -416,17 +427,17 @@ namespace rpp
         using super::wait_for;
         using super::wait_until;
 
-        // convenience wrapper for rpp::Duration
-        std::future_status wait_for(rpp::Duration timeout) const
+        /// @returns wait_result::finished when the result arrives before the timeout
+        wait_result wait_for(rpp::Duration timeout) const
         {
-            return super::wait_for(std::chrono::nanoseconds(timeout.nsec));
+            return detail::to_wait_result(super::wait_for(std::chrono::nanoseconds(timeout.nsec)));
         }
 
-        // convenience wrapper for rpp::TimePoint
-        std::future_status wait_until(const rpp::TimePoint& until) const
+        /// @returns wait_result::finished when the result arrives before the deadline
+        wait_result wait_until(const rpp::TimePoint& until) const
         {
             auto until_tp = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(until.to_epoch_ns()));
-            return super::wait_until(until_tp);
+            return detail::to_wait_result(super::wait_until(until_tp));
         }
 
         /**
@@ -826,17 +837,17 @@ namespace rpp
         using super::wait_for;
         using super::wait_until;
 
-        // convenience wrapper for rpp::Duration
-        std::future_status wait_for(rpp::Duration timeout) const
+        /// @returns wait_result::finished when the result arrives before the timeout
+        wait_result wait_for(rpp::Duration timeout) const
         {
-            return super::wait_for(std::chrono::nanoseconds(timeout.nsec));
+            return detail::to_wait_result(super::wait_for(std::chrono::nanoseconds(timeout.nsec)));
         }
 
-        // convenience wrapper for rpp::TimePoint
-        std::future_status wait_until(const rpp::TimePoint& until) const
+        /// @returns wait_result::finished when the result arrives before the deadline
+        wait_result wait_until(const rpp::TimePoint& until) const
         {
             auto until_tp = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(until.to_epoch_ns()));
-            return super::wait_until(until_tp);
+            return detail::to_wait_result(super::wait_until(until_tp));
         }
 
         /**

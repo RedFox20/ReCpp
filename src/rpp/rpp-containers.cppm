@@ -1,10 +1,12 @@
-// C++20 module interface unit for <rpp/collections.h>.
+// C++20 module interface unit for the rpp.containers headers, owned by tools/gen_module_exports.py.
+// The headers stay in the global module fragment, so an importer and an includer share one entity.
 module;
 
-// global module fragment: the header stays here, so an importer and an includer share one entity
 #include "collections.h"
+#include "memory_pool.h"
+#include "load_balancer.h"
 
-export module rpp.collections;
+export module rpp.containers;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
@@ -43,5 +45,8 @@ export namespace rpp {
     using rpp::sort;
     using rpp::operator==;
     using rpp::operator!=;
+    using rpp::linear_static_pool;
+    using rpp::linear_dynamic_pool;
+    using rpp::load_balancer;
 }
 // GENERATED EXPORTS END

@@ -926,7 +926,7 @@ namespace rpp
             {
                 size_t count = (oldTail - oldHead);
                 if (count)
-                    ::memmove(newStart, oldHead, count * sizeof(T));
+                    RPP_BUILTIN_MEMMOVE(newStart, oldHead, count * sizeof(T));
                 return newStart + count;
             }
             else

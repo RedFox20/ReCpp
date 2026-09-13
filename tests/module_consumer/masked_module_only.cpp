@@ -5,11 +5,10 @@
 #include <utility> // std::declval
 #include <vector>
 
-import rpp.type_traits; // includes come first, the imports go last
-import rpp.source_loc;
-import rpp.future_types;
-import rpp.math;
-import rpp.sprint;
+import rpp.core; // includes come first, the imports go last
+import rpp.threading;
+import rpp.numeric;
+import rpp.text;
 
 // is_detected takes the alias of whoever calls it, so this proves the idiom, not one alias
 template<class T> using has_size = decltype(std::declval<T>().size());

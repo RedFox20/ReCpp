@@ -2,7 +2,7 @@
 #include <rpp/scope_guard.h>
 #include <rpp/tests.h>
 #if RPP_BUILD_WITH_MODULES
-import rpp.scopeguard; // includes come first, the import goes last
+import rpp.core; // includes come first, the import goes last
 #endif
 using namespace rpp;
 

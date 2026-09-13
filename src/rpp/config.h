@@ -402,6 +402,46 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  endif
 #endif
 
+////////////////////////////////////////////////////////////////////////////////////
+// The compiler builtins for the mem* family, because naming ::memmove here crashes gcc, C27.
+// The test nests, because the MSVC preprocessor warns C4067 on a chain it never evaluates.
+#ifdef __has_builtin
+#  define RPP_HAS_BUILTIN(x) __has_builtin(x)
+#else
+#  define RPP_HAS_BUILTIN(x) 0
+#endif
+
+// each macro guards itself, so a consumer which overrides one keeps the other three
+#if RPP_HAS_BUILTIN(__builtin_memcpy)
+#  ifndef RPP_BUILTIN_MEMCPY
+#    define RPP_BUILTIN_MEMCPY(dst, src, size)  __builtin_memcpy(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMMOVE
+#    define RPP_BUILTIN_MEMMOVE(dst, src, size) __builtin_memmove(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMSET
+#    define RPP_BUILTIN_MEMSET(dst, value, size) __builtin_memset(dst, value, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMCMP
+#    define RPP_BUILTIN_MEMCMP(a, b, size)      __builtin_memcmp(a, b, size)
+#  endif
+#else
+// MSVC offers no such builtin, so the macros need the declarations this header carries
+#  include <string.h>
+#  ifndef RPP_BUILTIN_MEMCPY
+#    define RPP_BUILTIN_MEMCPY(dst, src, size)  memcpy(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMMOVE
+#    define RPP_BUILTIN_MEMMOVE(dst, src, size) memmove(dst, src, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMSET
+#    define RPP_BUILTIN_MEMSET(dst, value, size) memset(dst, value, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMCMP
+#    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
+#  endif
+#endif
+
 // config.types.h holds the integer aliases and the size macros. The include stays
 // unconditional, so a C translation unit still gets the RPP_*_SIZE macros.
 #include "config.types.h"

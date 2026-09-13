@@ -6,10 +6,10 @@
  * A C++20 module cannot export a macro, so every macro of <rpp/debugging.h> lives here.
  *
  *   #include <rpp/debugging.h>          // classic: gives the declarations AND these macros
- *   import rpp.debugging;               // module: gives the declarations
+ *   import rpp.core;                    // module: gives the declarations
  *   #include <rpp/debugging.macros.h>   // module: add this line for the macros
  *
- * Each macro below calls a name that <rpp/debugging.h> or `import rpp.debugging` declares.
+ * Each macro below calls a name that <rpp/debugging.h> or `import rpp.core` declares.
  * Include one of the two first. This header declares almost nothing itself.
  *
  * ThrowErr and AssertEx name std::runtime_error, so a user of those adds <stdexcept>.

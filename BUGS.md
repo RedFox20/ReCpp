@@ -8,6 +8,85 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
+The interface compiles and so does the importer. The link then fails:
+
+```cpp
+module;
+#include <memory>
+export module probe;
+export namespace std { using std::shared_ptr; using std::make_shared; }
+```
+
+```cpp
+#include <new>
+#include <typeinfo>
+import probe;
+int main() { auto p = std::make_shared<int>(3); return *p == 3 ? 0 : 1; }
+```
+
+`undefined reference to 'std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()'`.
+That function is an inline explicit specialization in `shared_ptr_base.h`, and gcc emits it
+into neither object. `#include <memory>` in the importer fixes it. `std::unique_ptr` and
+`std::make_unique` link without the header, so the defect is specific to the shared count.
+
+### B21. gcc-14 loses the real `std::get` in every importer of a module which exports it
+The interface compiles. An importer which instantiates `std::unique_ptr` then fails, because
+`unique_ptr.h` calls `std::get<0>` and only the exported overload set stays visible:
+
+```cpp
+module;
+#include <memory>
+#include <tuple>
+export module probe;
+export namespace std { using std::unique_ptr; using std::make_unique; using std::get; }
+```
+
+```cpp
+#include <new>
+import probe;
+int main() { std::unique_ptr<int> p = std::make_unique<int>(3); return *p; }
+```
+
+The error is `no matching function for call to 'get<0>(std::tuple@probe<int*,
+std::default_delete@probe<int> >&)`, so the exported set does not match the module-owned
+`std::tuple`. No module exports a std name now, so a consumer includes `<tuple>` and never meets this.
+
+### B20. gcc-14 breaks `std::swap` lookup when the fragment includes `<future>`
+The interface does not compile. Four lines reproduce it:
+
+```cpp
+module;
+#include <future>
+export module probe;
+export namespace std { using std::swap; }
+```
+
+`shared_ptr_base.h:1687` reports `no matching function for call to 'swap(T*&, T*&)'`, so the
+generic `std::swap` left overload resolution. Only `<future>` triggers it. The same export
+with `<memory>`, `<mutex>` or `<thread>` compiles.
+
+No module exports a std name now, so nothing in ReCpp reaches this. B16 blocks `std::promise`
+in an importer anyway.
+
+### B19. gcc-14 writes an unreadable module when it exports `std::exception_ptr`
+The interface compiles. Every importer then fails with `failed to read compiled module: Bad
+file data`, which is fatal, so nothing downstream builds. Four lines reproduce it:
+
+```cpp
+module;
+#include <exception>
+export module probe;
+export namespace std { using std::exception_ptr; }
+```
+
+The name is what matters, not the header and not the size of the export list.
+`std::exception`, `std::runtime_error`, `std::current_exception`, `std::rethrow_exception`
+and `std::make_exception_ptr` all export cleanly from the same file.
+
+No module exports a std name now, so nothing in ReCpp reaches this. A consumer which catches
+through a pointer includes `<exception>`.
+
 ### B17. A pool worker frees the generic task a test still reads (C18 recurred)
 `ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
 A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main
@@ -25,6 +104,13 @@ look, not the `catch` block which reports the write.
 
 Four other TSAN jobs pass on the same commit: `cpp20-tsan-gcc13`, `cpp20-tsan-clang18`,
 `cpp23-tsan-clang18` and `cpp26-tsan-gcc14`.
+
+Second sighting on fd9c088, and this time it was `ubuntu-cpp20-tsan-gcc13`. Same test, same
+two stacks, same two lines. So the race is not specific to one standard, and the job which
+reports it moves between runs. A re-run of the same job passed.
+
+Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
+reported one warning, and the four other TSAN jobs passed on the same commit.
 
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
@@ -135,13 +221,12 @@ done; wait; done
 grep -l 'heap-use-after-free' /tmp/b10_*.log
 ```
 
-### B8. gcc-14 breaks a module for four shapes, and each one has a workaround
+### B8. gcc-14 breaks a module for five shapes, and each one has a workaround
 `tools/gen_module_exports.py` carries `NO_EXPORT` with one entry. Every module ships now.
 Delete that entry when a newer gcc reads the module back.
 
-Shapes 2 and 3 both need a re-export, and `RE_EXPORT` holds one for the whole library, so
-neither can fire today. Read them before you add a second entry. Shape 4 lives in a header,
-not in a list.
+Shapes 2, 3 and 5 all need a re-export, and `RE_EXPORT` is empty, so none can fire today.
+Read all three before you add an entry. Shape 4 lives in a header, not in a list.
 
 `NO_CONFIG` is a third list, and it is not a gcc defect. It names the two headers which do
 not compile on bare metal, see B15. Any parse failure the list does not name reaches the
@@ -155,8 +240,8 @@ Shape 1, in `rpp.sprint`. An export naming a function in the `std::__cxx11` inli
 makes the module unreadable. `std::to_string` and `std::stoi` both do it, and `std::swap`
 does not. The form does not matter. An `is_detected_v` alias, a plain alias template and a
 C++20 concept all fail the same way. So does a concept which calls an unexported helper that
-names it. `NO_EXPORT` drops `has_std_to_string` from `rpp.type_traits`, which is what
-`rpp.sprint` imports. A header includer still gets the trait.
+names it. `NO_EXPORT` drops `has_std_to_string`, so `rpp.core` leaves it out today. A header
+includer still gets the trait.
 
 Shape 2 reached `rpp.task`, `rpp.tests` and `rpp.file_io` while every rpp include became a
 re-export. A re-export makes the `.gcm` unreadable, and only an importer which included
@@ -170,13 +255,13 @@ then imports the six modules which name `std::string`, so this shape fails the b
 of a downstream consumer. Giving `file_io.h` its old re-exports makes that target report 2
 errors.
 
-Shape 3, in `rpp.tests`. gcc runs out of imported source locations and stops with
+Shape 3, in the old `rpp.tests`. gcc runs out of imported source locations and stops with
 `internal compiler error: in write_location, at cp/module.cc:16271`. It prints
 `unable to represent further imported source locations` first. The count is what matters,
 not one module. Seven re-exports pass, and `rpp.sprint` as the eighth crashes it, while
 `rpp.sprint` alone passes. The dependency `.gcm` files have to come from an `-O2` build to
-reach the limit, so a `-O0` bisect hides it. `rpp.tests` re-exports one module now, so the
-count sits six below the crash.
+reach the limit, so a `-O0` bisect hides it. `RE_EXPORT` is empty now, so the count sits at
+zero. C28 is the same budget hit from the import side rather than the re-export side.
 
 Shape 4, in `rpp.binary_stream`. A defaulted virtual destructor crashes the importer with
 `internal compiler error: Segmentation fault`, and the message names it
@@ -186,6 +271,15 @@ to name `rpp::binary_buffer`, and a bare `import` passes. No export list reduces
 carries the `= default` and no importer reads one. An empty body in the header also works,
 and clang-tidy rejects that one with `modernize-use-equals-default`. An isolated struct of
 the same shape does not crash, so the reduced case is still open.
+
+Shape 5, in `rpp.testing`, and it is shape 2 at the scale of a group. `rpp.testing` carried
+`export import rpp.text;`, because `TestImpl` expands to a constructor taking an
+`rpp::strview`. `#include <string>` and then `import rpp.testing;` alone reported
+`failed to read compiled module cluster 1818: Bad file data`. The same module with that one
+line removed reads fine, and so does `import rpp.text; import rpp.testing;` after the
+removal. `rpp.text` alone, `rpp.io` alone and `rpp.threading` alone all pass after
+`<string>`, so no member header carries it. `RE_EXPORT` is empty now, and an importer of
+`rpp.testing` names `rpp.text` too.
 
 Reproduce any of these shapes in seconds, outside cmake. Build every `.cppm` in the
 `RPP_MODULES_SRC` order into one `gcm.cache`, then compile a consumer:
@@ -232,6 +326,27 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### B24. gcc-14 wrote an `rpp.std` on C++23 which no importer could read
+The module compiled, every importer then stopped with `failed to read compiled module: Bad
+file data`, and the same source passed on C++20. A unit which carries `<memory>` beside the
+container headers is the shape gcc cannot write, and no module exports a std name now.
+
+### B25. A C++23 consumer of the whole module graph broke on `std::packaged_task`
+The consumer build stopped with `conflicting declaration of template 'std::packaged_task@
+rpp.testing'`, which the C28 source location budget causes through the umbrella. The umbrella
+is gone now, and a file names each group it uses.
+
+### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
+A clean C++23 build reported `unable to represent further imported source locations` six
+times, then failed with `conflicting global module declaration` in three modules. Eight header
+groups cut one translation unit from 39 imports to 8, and `ubuntu-cpp23-modules-gcc14` now
+covers that standard.
+
+### C27. gcc-14 crashed any importer which built a concurrent queue at `-O1` (was B18)
+gcc attached its own builtin `memmove` to `rpp.concurrent_queue`, so `nonnull_arg_p` crashed
+every importer which built a queue, through `rpp.threading` and `rpp` too. `__builtin_memmove`
+names no declaration to attach, and `RppQueueModuleOnly` builds that shape at `-O2`.
 
 ### C26. `pool_types_constructor::allocate<T>()` is unreachable, and that is intended (was B14)
 Each pool declares `allocate(int size, int align)`, which hides the template of the mixin and

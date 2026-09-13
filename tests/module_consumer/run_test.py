@@ -7,6 +7,7 @@ graph. A toolchain that misses one compiles the header instead, and the app must
 """
 import argparse
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -21,13 +22,35 @@ def run(cmd, env=None, **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=HERE, text=True, env=env, **kw)
 
 
-def find_exe() -> str:
-    """The built consumer, whatever build dir name the platform chose."""
+def find_exe(stem: str = 'RppModuleConsumer') -> str:
+    """A built executable, whatever build dir name the platform chose."""
     for root, _, files in os.walk(os.path.join(HERE, 'packages', 'RppModuleConsumer')):
-        for name in ('RppModuleConsumer', 'RppModuleConsumer.exe'):
+        for name in (stem, stem + '.exe'):
             path = os.path.join(root, name)
             if name in files and os.access(path, os.X_OK): return path
-    raise SystemExit('FAILED: no RppModuleConsumer executable under packages/RppModuleConsumer')
+    raise SystemExit(f'FAILED: no {stem} executable under packages/RppModuleConsumer')
+
+
+def module_only_stems() -> list:
+    """Every `*_module_only.cpp` target CMakeLists.txt declares, read from the source of truth.
+
+    Compiling one proves its imports resolve. Only running it proves the exported code works,
+    and a target whose predicate returns 1 would otherwise leave the gate green.
+    """
+    text = open(os.path.join(HERE, 'CMakeLists.txt'), encoding='utf-8').read()
+    return sorted(set(re.findall(r'add_executable\((\w+)\s+\w+_module_only\.cpp\)', text)))
+
+
+def run_module_only(env=None) -> None:
+    """Runs every module-only target. Raises SystemExit on the first non-zero exit."""
+    stems = module_only_stems()
+    if not stems: raise SystemExit('FAILED: CMakeLists.txt declares no module-only target')
+    for stem in stems:
+        result = run([find_exe(stem)], capture_output=True, env=env)
+        if result.stdout: print(result.stdout, end='')
+        if result.returncode != 0:
+            raise SystemExit(f'FAILED: {stem} exited {result.returncode}')
+        print(f'  {stem:28} ok', flush=True)
 
 
 def _drop_readonly(func, path, _exc):
@@ -47,6 +70,7 @@ def build_and_run(compiler, jobs, env=None) -> str:
     if result.stderr: print(result.stderr, end='', file=sys.stderr)
     if result.returncode != 0: raise SystemExit(f'FAILED: the consumer exited {result.returncode}')
     if 'OK:' not in result.stdout: raise SystemExit('FAILED: the consumer printed no OK line')
+    run_module_only(env)
     return result.stdout
 
 
@@ -57,18 +81,20 @@ def check_unicode_off(cxx: str) -> str:
     reaches the guarded half of the module surface. `strview.h` declares the numeric overloads
     outside that guard, and one using-declaration carries a whole overload set, so a guarded
     `using rpp::to_string;` would drop them on Yocto, MIPS and Raspberry Pi.
+
+    @param cxx the compiler to run, such as `g++-14`
+    @returns the first error line, or an empty string when the module keeps the overloads
     """
     root = os.path.dirname(os.path.dirname(HERE))
     with tempfile.TemporaryDirectory() as d:
         use = os.path.join(d, 'use.cpp')
         with open(use, 'w') as f:
-            f.write('import rpp.strview;\n'
+            f.write('import rpp.text;\n'
                     'int main() { char b[32]; return rpp::to_string(b, 42) == 2 ? 0 : 1; }\n')
         flags = [cxx, '-std=c++20', '-fmodules-ts', '-DRPP_ENABLE_UNICODE=0', '-I', 'src']
         mapper = f'-fmodule-mapper=|@g++-mapper-server -r {d}'
-        # rpp.strview imports rpp.config, so the config module compiles first
-        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-config.cppm', '-o', f'{d}/c.o'],
-                     [*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-strview.cppm', '-o', f'{d}/m.o'],
+        # rpp.text carries strview.h and imports no other group, so one unit compiles first
+        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-text.cppm', '-o', f'{d}/m.o'],
                      [*flags, mapper, '-c', use, '-o', f'{d}/u.o']):
             p = subprocess.run(step, cwd=root, capture_output=True, text=True)
             if p.returncode != 0:

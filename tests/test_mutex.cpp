@@ -17,6 +17,210 @@ TestImpl(test_mutex)
         auto& get_ref() { return value; }
     };
 
+    // a derived type which forgot the two accessors, so the constraint has something to reject
+    class MissingAccessors : public rpp::synchronizable<MissingAccessors>
+    {
+        std::string value;
+    };
+
+    // accessors of the wrong type: SyncableType must reject these, because synchronize_guard
+    // hard-errors on a unique_lock<int> and on a reference to void
+    class WrongAccessorTypes : public rpp::synchronizable<WrongAccessorTypes>
+    {
+    public:
+        static int get_mutex() noexcept { return 0; } // static, because it touches no member
+        static void get_ref() noexcept {}
+    };
+
+    // a get_ref() which returns by value, so the guard would hand out a reference to a temporary
+    class ReturnsByValue : public rpp::synchronizable<ReturnsByValue>
+    {
+        rpp::mutex mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        static std::string get_ref() noexcept { return {}; } // static, because it touches no member
+    };
+
+    // a mutex returned by value, which spin_lock cannot bind to its reference parameter
+    struct CopiedMutex { void lock() {} void unlock() {} static bool try_lock() { return true; } };
+    class MutexByValue : public rpp::synchronizable<MutexByValue>
+    {
+        std::string value;
+    public:
+        static CopiedMutex get_mutex() noexcept { return {}; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // a try_lock() result whose boolean operators need an lvalue, which spin_lock has not
+    struct LvalueOnlyBool
+    {
+        explicit operator bool() & noexcept { return true; }
+        bool operator!() & noexcept { return false; }
+    };
+    struct LvalueBoolTryLock
+    {
+        void lock() {}
+        void unlock() {}
+        static LvalueOnlyBool try_lock() { return {}; }
+    };
+    class MutexTryLockLvalueOnly : public rpp::synchronizable<MutexTryLockLvalueOnly>
+    {
+        std::string value;
+        LvalueBoolTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // a value type whose operator& returns something else, which the guard must not call
+    struct OddAddress
+    {
+        int value = 0;
+        int* operator&() noexcept { return &value; }
+    };
+    class OverloadedAddressOf : public rpp::synchronizable<OverloadedAddressOf>
+    {
+        rpp::mutex mutex;
+        OddAddress value;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // a try_lock() whose result reads as a bool but cannot be negated, which spin_lock does
+    struct NoNegate
+    {
+        explicit operator bool() const noexcept { return true; }
+        bool operator!() const = delete;
+    };
+    struct ProxyTryLock { void lock() {} void unlock() {} static NoNegate try_lock() { return {}; } };
+    class MutexTryLockNoNegate : public rpp::synchronizable<MutexTryLockNoNegate>
+    {
+        std::string value;
+        ProxyTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // a get_ref() returning a reference to an array, which decays to a pointer in value_type
+    class ArrayRef : public rpp::synchronizable<ArrayRef>
+    {
+        rpp::mutex mutex;
+        int values[3] {};
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return values; }
+    };
+
+    // an lvalue ref-qualified get_ref(), which the guard only ever calls on an lvalue
+    class RefQualified : public rpp::synchronizable<RefQualified>
+    {
+        rpp::mutex mutex;
+        std::string value;
+    public:
+        auto& get_mutex() & noexcept { return mutex; }
+        auto& get_ref() & noexcept { return value; }
+    };
+
+    // a const get_ref(), which the guard cannot hand out as a plain value_type&
+    class ConstRef : public rpp::synchronizable<ConstRef>
+    {
+        rpp::mutex mutex;
+        int value = 0;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        const int& get_ref() const noexcept { return value; }
+    };
+
+    // a volatile get_ref(), which the guard cannot hand out as a plain value_type&
+    class VolatileRef : public rpp::synchronizable<VolatileRef>
+    {
+        rpp::mutex mutex;
+        volatile int value = 0;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        volatile int& get_ref() noexcept { return value; }
+    };
+
+    // a try_lock() which returns nothing, so spin_lock would hard-error on `!m.try_lock()`
+    struct VoidTryLock { void lock() {} void unlock() {} static void try_lock() {} };
+    class MutexTryLockReturnsVoid : public rpp::synchronizable<MutexTryLockReturnsVoid>
+    {
+        std::string value;
+        VoidTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // a mutex with no try_lock(), which spin_lock calls before it suspends the thread
+    struct NoTryLock { void lock() {} void unlock() {} };
+    class MutexWithoutTryLock : public rpp::synchronizable<MutexWithoutTryLock>
+    {
+        std::string value;
+        NoTryLock mutex;
+    public:
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
+    };
+
+    // whether guard() is callable, which is what SyncableType decides
+    template<class T> static constexpr bool has_guard = requires(T t) { t.guard(); };
+
+    TestCase(syncable_type_answers_for_a_complete_type)
+    {
+        // the concept is public API, so a consumer can ask it about its own type
+        static_assert(rpp::SyncableType<SimpleValue>);
+        static_assert(rpp::SyncableType<rpp::synchronized<std::string>>);
+        static_assert(!rpp::SyncableType<int>);
+        static_assert(!rpp::SyncableType<MissingAccessors>);
+
+        // an accessor of the wrong type fails the concept, not synchronize_guard
+        static_assert(!rpp::SyncableType<WrongAccessorTypes>);
+        static_assert(!rpp::SyncableType<ReturnsByValue>);
+        static_assert(!rpp::SyncableType<MutexByValue>);
+        static_assert(!rpp::SyncableType<MutexWithoutTryLock>);
+        static_assert(!rpp::SyncableType<MutexTryLockReturnsVoid>);
+        static_assert(!rpp::SyncableType<MutexTryLockNoNegate>);
+        static_assert(!rpp::SyncableType<MutexTryLockLvalueOnly>);
+        static_assert(!rpp::SyncableType<VolatileRef>);
+        static_assert(!rpp::SyncableType<ConstRef>);
+        static_assert(!rpp::SyncableType<ArrayRef>);
+        // an lvalue ref-qualified accessor is the shape the guard uses, so it works
+        static_assert(rpp::SyncableType<RefQualified>);
+
+        // SyncableType constrains every synchronizable member, so a derived type which
+        // forgot the accessors still compiles and only loses guard()
+        static_assert(has_guard<SimpleValue>);
+        static_assert(has_guard<rpp::synchronized<std::string>>);
+        static_assert(!has_guard<MissingAccessors>);
+        static_assert(!has_guard<WrongAccessorTypes>);
+        static_assert(!has_guard<ReturnsByValue>);
+        static_assert(!has_guard<MutexByValue>);
+        static_assert(!has_guard<MutexWithoutTryLock>);
+        static_assert(!has_guard<MutexTryLockReturnsVoid>);
+        static_assert(!has_guard<MutexTryLockNoNegate>);
+        static_assert(!has_guard<MutexTryLockLvalueOnly>);
+        static_assert(!has_guard<VolatileRef>);
+        static_assert(!has_guard<ConstRef>);
+        static_assert(!has_guard<ArrayRef>);
+        static_assert(has_guard<RefQualified>);
+
+        SimpleValue value;
+        auto guard = value.guard();
+        AssertThat(guard.owns_lock(), true);
+    }
+
+    TestCase(sync_guard_ignores_an_overloaded_address_of)
+    {
+        // operator-> hands out the real address, so a hijacking operator& never runs
+        OverloadedAddressOf odd;
+        auto guard = odd.guard();
+        guard->value = 7;
+        AssertThat(guard->value, 7);
+    }
+
     TestCase(sync_guard_can_lock_simple_value)
     {
         SimpleValue simple;

@@ -1,10 +1,12 @@
-// C++20 module interface unit for <rpp/timepoint.h>.
+// C++20 module interface unit for the rpp.time headers, owned by tools/gen_module_exports.py.
+// The headers stay in the global module fragment, so an importer and an includer share one entity.
 module;
 
-// global module fragment: the header stays here, so an importer and an includer share one entity
 #include "timepoint.h"
+#include "timer.h"
+#include "atomic_timepoint.h"
 
-export module rpp.timepoint;
+export module rpp.time;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
@@ -35,6 +37,12 @@ export namespace rpp {
     using rpp::micros_f;
     using rpp::micros;
     using rpp::nanos;
+    using rpp::Timer;
+    using rpp::StopWatch;
+    using rpp::ScopedPerfTimer;
+    using rpp::AtomicDuration;
+    using rpp::AtomicTimePoint;
+    using rpp::AtomicTimeSource;
 }
 
 export namespace rpp::inline duration_literals {

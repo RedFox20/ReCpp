@@ -852,8 +852,8 @@ namespace rpp
 
                     int unshift = size - (i + 1);
                     if (unshift > 0) { // unshift N elements from end of array if needed
-                        memmove(reinterpret_cast<void*>(&data[i]), reinterpret_cast<void*>(&data[i + 1]),
-                                sizeof(deleg)*unshift);
+                        RPP_BUILTIN_MEMMOVE(reinterpret_cast<void*>(&data[i]),
+                                            reinterpret_cast<void*>(&data[i + 1]), sizeof(deleg)*unshift);
                     }
                     return;
                 }

@@ -848,7 +848,8 @@ def main():
         os.chdir(script_dir)
         sys.exit(tests())
 
-    dry_run = '--dry-run' in sys.argv or '-n' in sys.argv
+    check = '--check' in sys.argv
+    dry_run = check or '--dry-run' in sys.argv or '-n' in sys.argv
     check_undoc = '--check-undocumented' in sys.argv
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -869,12 +870,17 @@ def main():
             cprint("\n  All public declarations are documented", color='green')
         return
 
-    mode = "DRY RUN" if dry_run else "UPDATING"
+    mode = "CHECK" if check else "DRY RUN" if dry_run else "UPDATING"
     cprint(f"[update_doc_linerefs] {mode}: {readme_path}", color='blue')
 
     updated, warnings = update_readme(readme_path, dry_run=dry_run)
 
     cprint(f"\n  {updated} reference(s) {'would be ' if dry_run else ''}updated, {warnings} warning(s)", color='cyan')
+    # a header edit moves a declaration and leaves README.md pointing at the next line,
+    # so the gate fails and names each stale row
+    if check and (updated or warnings):
+        cprint("  run `python3 update_doc_linerefs.py` and commit README.md", color='red')
+        sys.exit(1)
 
 
 if __name__ == '__main__':

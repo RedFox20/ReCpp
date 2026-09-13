@@ -86,4 +86,25 @@ TestImpl(test_endian)
             AssertEqual(rpp::readBEU64(p), 0x0102030405060708ull);
         }
     }
+
+    // every reader and writer above goes through RPP_BUILTIN_MEMCPY, so pin the whole family
+    TestCase(builtin_mem_macros)
+    {
+        uint8_t dst[8] = {0};
+        const uint8_t src[8] = {1,2,3,4,5,6,7,8};
+
+        RPP_BUILTIN_MEMCPY(dst, src, sizeof(src));
+        AssertEqual(RPP_BUILTIN_MEMCMP(dst, src, sizeof(src)), 0);
+
+        // an overlapping move, which memcpy may not do
+        RPP_BUILTIN_MEMMOVE(dst + 2, dst, 6);
+        AssertEqual(dst[0], uint8_t(1));
+        AssertEqual(dst[2], uint8_t(1));
+        AssertEqual(dst[7], uint8_t(6));
+
+        RPP_BUILTIN_MEMSET(dst, 0xAB, sizeof(dst));
+        AssertEqual(dst[0], uint8_t(0xAB));
+        AssertEqual(dst[7], uint8_t(0xAB));
+        AssertNotEqual(RPP_BUILTIN_MEMCMP(dst, src, sizeof(src)), 0);
+    }
 };

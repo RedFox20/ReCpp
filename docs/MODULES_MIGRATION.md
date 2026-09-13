@@ -1,9 +1,10 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 17. Forty-four modules exist: all of L0 to L8. Only `rpp.tests` re-exports another.
+Revision 23. Eight module interface units exist, one per header group. The migration is
+complete. No group re-exports another group, and no module exports a std name. Section 12
+records the `rpp.std` stand-in and the `rpp` umbrella it dropped.
 
-This document explains the pattern, records what real builds prove about it, and
-gives the phased plan for the umbrella, which is all that remains.
+This document explains the pattern and records what real builds prove about it.
 
 ## Handover state
 
@@ -12,30 +13,42 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the forty-four modules | build and pass on gcc-14, and CI covers clang-21 and MSVC 14.52 |
+| the eight modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test, 41 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 6 module-only targets |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 9 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
-| CI | 28 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 579/579 on the modules build, 538/538 on the header build |
+| CI | 29 jobs on GitHub Actions, and CircleCI is gone |
+| test counts | 584/584 on the modules build, 539/539 on the header build |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all forty-four modules. 4 is done through the generator
-`--check`. 5 has L0 to L8 finished. Section 11 lists what 7 owes.
+6 landed. The generator drives all eight groups. 4 is done through the generator
+`--check`. 5 is finished. Section 11 lists what 7 owes.
 
-**Next:** changeset 5, the umbrella. Section 9 has the layers.
+**Next:** nothing in this plan. Section 11 holds the open follow-ups.
+
+**Why eight groups and not forty-four modules.** The tree shipped one module per header
+first. gcc-14 then ran out of module source locations in any translation unit which imported
+dozens, and it mis-merged a global module declaration. Only a clean C++23 build showed it,
+see `BUGS.md` **C28**. Eight groups cut `test_modules.cpp` from 39 imports to 8, and the
+clean build passes on both standards with zero overflow notes.
+
+Build time was never the argument either way. The 88 module translation units of a cold
+gcc-14 build cost 121 s, and the 14 cheapest carried 0.6% of that. Merging them parses the
+same declarations. Correctness is what decided this, and it overrode the 1:1 mapping D2 used
+to state.
 
 **A module re-exports nothing, and two headers ship with a workaround.** The generator
-carries `NO_EXPORT` with three entries and `RE_EXPORT` with one, and `BUGS.md` **B8** names
-the four shapes gcc-14 breaks. Shapes 2 and 3 both need a re-export, so neither can fire on
-one library-wide entry. Shape 4 lives in `binary_stream.h`, whose destructor moved out of
-line. The other two `NO_EXPORT` entries are internal names, a CRTP mixin and a unit-test
-friend, and no gcc defect drives them. `NO_CONFIG` names the six headers which do not
-compile on bare metal, see **B15**. The generator selftest still pins all three knobs.
+carries `NO_EXPORT` with three entries and `RE_EXPORT` empty, and `BUGS.md` **B8** names
+the five shapes gcc-14 breaks. Shape 5 killed the last re-export: `rpp.testing` carried
+`export import rpp.text;`, and gcc then wrote a module no `<string>`-first importer could
+read. Shape 4 lives in `binary_stream.h`, whose destructor moved out of line. The other two
+`NO_EXPORT` entries are internal names, a CRTP mixin and a unit-test friend, and no gcc
+defect drives them. `NO_CONFIG` names the six headers which do not compile on bare metal,
+see **B15**. The generator selftest still pins all three knobs.
 
 **gcc-14 cannot compile `std::promise` in an importer, and six modules carried that before
 L7.** Any module whose global module fragment includes `<future>` breaks such a consumer,
@@ -211,6 +224,163 @@ compiler.
 | 16 | **A `cfuture` passed through `std::future` is not portable, and this branch fixes it.** | `start_coro_on_background_thread` returned a `cfuture<void>` out of `rpp::async_task`. That instantiates `std::future<cfuture<void>>::get()`, which returns a `[[clang::coro_return_type]]` without being a coroutine, so clang-21 rejected it. A raw `std::thread` plus `join()` replaces it, matching the pattern the same file already uses at line 1079. clang-21 now passes 498/498 in both modes. |
 | 17 | **A pre-existing race lives in `test_coroutines.cpp:135`, not in the module work.** | `AssertThat(e.what(), "aargh!"s)` reads the message of a `std::runtime_error` while another thread frees the future shared state that owns it. Under 6 parallel TSAN runs it fires 2 of 6 times, on the code before this branch and after it alike. Idle, both report 0 of 6. Track it apart from the migration. |
 
+### 2.2 What an import costs a consumer, measured
+
+Finding 10 said the module build costs and gains nothing. That measured the whole build.
+This measures one translation unit, which is what a consumer feels. Every number is the
+median of 7 alternating runs of `g++ -O2 -fsyntax-only` on gcc-14.2, with the binary module
+interfaces already built, so it isolates the consumer side.
+
+**Every table under this heading measured the 44 per-header modules, which no longer ship.**
+Read them for the shape they found, not for a module name. The eight groups replaced that
+layout, see `BUGS.md` **C28**, and the group numbers sit at the end of this section.
+
+One facility per translation unit, the header against its module:
+
+| Facility | Preprocessed header lines | Header | Import | Speedup |
+|---|---|---|---|---|
+| `timepoint` | 32,316 | 391 ms | 430 ms | 0.91x |
+| `strview` | 33,902 | 424 ms | 440 ms | 0.96x |
+| `delegate` | 34,226 | 406 ms | 431 ms | 0.94x |
+| `sockets` | 50,471 | 613 ms | 490 ms | 1.25x |
+| `sprint` | 60,853 | 613 ms | 471 ms | 1.30x |
+| `paths` | 65,350 | 669 ms | 486 ms | 1.38x |
+| `file_io` | 65,743 | 688 ms | 496 ms | 1.39x |
+| `concurrent_queue` | 73,093 | 854 ms | 541 ms | 1.58x |
+| `thread_pool` | 73,983 | 903 ms | 561 ms | 1.61x |
+| `future` | 76,380 | 976 ms | 573 ms | 1.70x |
+| **median** | | | | **1.34x** |
+
+**An import costs about the same whatever it carries.** Over a 2.4x range of header size the
+import moves from 430 ms to 573 ms, a factor of 1.33, while the header moves from 391 ms to
+976 ms, a factor of 2.5. So the import has a floor near 430 ms and almost no slope. Break-even
+sits near 40,000 preprocessed lines: below it the header wins, above it the import wins, and
+the heaviest header in the library wins by 1.70x.
+
+**Headers share better than modules when one file uses many.** `#pragma once` parses a shared
+header once however many headers pull it, and each import pays its own load:
+
+| Facilities in one TU | Headers | Imports | Ratio |
+|---|---|---|---|
+| 1 | 435 ms | 448 ms | 0.97x |
+| 2 | 601 ms | 521 ms | 1.15x |
+| 4 | 622 ms | 627 ms | 0.99x |
+| 6 | 712 ms | 858 ms | 0.83x |
+| 8 | 999 ms | 1120 ms | 0.89x |
+| 10 | 1083 ms | 1438 ms | 0.75x |
+
+The marginal cost of one more facility is about 72 ms as a header and about 110 ms as an
+import. So the import advantage is real for a file which takes one or two heavy facilities,
+and it inverts for a file which takes many.
+
+**Size of the imported module decides the cost.** The same one-line body which calls
+`rpp::to_string`:
+
+| How rpp arrives | Time | Against the header |
+|---|---|---|
+| `#include <rpp/sprint.h>` | 611 ms | 1.00x |
+| `import rpp.sprint;` | 398 ms | 1.53x |
+| `import rpp.text;` | 489 ms | 1.25x |
+| `import rpp;` | 2949 ms | 0.21x |
+
+`rpp.text` adds `rpp.strview` and `rpp.obfuscated_string` to the same work and costs 23% more
+than `rpp.sprint`. `import rpp;` costs 7.4x `rpp.sprint`. What counts is the transitive
+closure, not the module file: a group umbrella interface is 1 to 3 KiB, because it holds only
+`export import` lines, while `rpp.sprint` is 4.9 MiB.
+
+**So name the narrowest module which covers the file.** A group umbrella buys organization,
+and it costs whatever its members cost.
+
+**The std parse is the floor, and `rpp.std` removed it while it existed.** gcc-14 ships no
+libstdc++ std module, so `src/rpp/rpp-std.cppm` stood in: its fragment included the std headers
+ReCpp puts in a public signature, and it exported those names. Replacing `#include <string>`
+and `#include <atomic>` with `import rpp.std;` changed every row:
+
+| Facility | Header | Import, std as headers | Import, with `rpp.std` | Speedup |
+|---|---|---|---|---|
+| `timepoint` | 398 ms | 444 ms | 45 ms | 8.85x |
+| `file_io` | 700 ms | 482 ms | 109 ms | 6.40x |
+| `sockets` | 618 ms | 479 ms | 160 ms | 3.87x |
+| `paths` | 672 ms | 494 ms | 194 ms | 3.47x |
+| `future` | 978 ms | 560 ms | 283 ms | 3.46x |
+| `strview` | 427 ms | 436 ms | 146 ms | 2.92x |
+| **median over ten** | | **1.34x** | | **3.29x** |
+
+The many-facility inversion nearly went with it. Ten rpp imports beside two std headers took
+1454 ms against 1114 ms for eleven headers, which is 0.77x. The same ten beside
+`import rpp.std;` took 1187 ms, which is 0.94x. So most of what the import column lost to
+header sharing was a std parse the header column shared for free.
+
+**This table is also the price of dropping `rpp.std`.** A consumer that needs std names now
+includes the std headers, which is the third column, so its median speedup is 1.34x and not
+3.29x. The trade was deliberate: exporting std names is what B19, B20, B21, B22 and B24 all
+break on, and including the header reaches none of them.
+
+**The `rpp` umbrella went for the opposite reason: it cost time instead of saving it.**
+`import rpp;` measured 2949 ms against 398 ms for a narrow import, which is 0.21x, because a
+re-export chain costs its whole transitive closure. It had already overflowed the gcc-14
+source location budget once, which is B25. A file names each group it uses now.
+
+Three names stayed out of `rpp.std`, each because gcc-14 breaks on it. Exporting
+`std::exception_ptr` writes an interface gcc cannot read back (B19). Including `<future>` in
+the fragment kills `std::swap` lookup, so `std::future` and `std::promise` go with it (B20).
+Exporting `std::get` breaks `std::unique_ptr` in every importer (B21). Section 11.1 has the
+table, and `BUGS.md` has a reproducer for each.
+
+**The eight groups, measured the same way.** One translation unit per group, `g++ -O2 -c` on
+gcc-14.2 with the project build flags, best of three, warm interfaces. Both columns compile
+the same body. The header column includes the group headers that body needs, and the import
+column names the group and parses no standard library header at all:
+
+| Group | Header | Import | Speedup |
+|---|---|---|---|
+| `rpp.numeric` | 696 ms | 22 ms | 31.1x |
+| `rpp.text` | 1303 ms | 151 ms | 8.6x |
+| `rpp.io` | 1388 ms | 179 ms | 7.8x |
+| `rpp.testing` | 1856 ms | 272 ms | 6.8x |
+| `rpp.core` | 395 ms | 67 ms | 5.9x |
+| `rpp.containers` | 576 ms | 101 ms | 5.7x |
+| `rpp.time` | 390 ms | 72 ms | 5.4x |
+| `rpp.threading` | 1731 ms | 409 ms | 4.2x |
+| **median** | | | **6.8x** |
+
+A group carries more headers than a per-header module did, so the header column is heavier
+than the rows above. The import column does not follow it, which is the same floor-and-slope
+shape the 44 modules showed. The group wins by more, because the header side of a real file
+is what a group already covers.
+
+### 2.3 What the linker sees
+
+Same compiler, same sources, one cmake tree per mode, gcc-14.2 at `-DCMAKE_BUILD_TYPE=Release`,
+C++23, `-j4`:
+
+| | Modules ON | Modules OFF | Delta |
+|---|---|---|---|
+| `libReCpp.a` | 18,195,410 B | 15,573,950 B | +16.8% |
+| `RppTests` | 47,179,760 B | 44,690,768 B | +5.6% |
+| Defined symbols in the archive | 1483 | 1468 | +15 |
+| `RppTests` relink, median of 3 | 0.85 s | 0.79 s | +8% |
+| Full build | 89.4 s | 69.7 s | +28% |
+
+**Each module interface unit emits exactly one strong symbol**, `T initializer for module
+rpp.X`. The 15 was the eight groups, the five `rpp.std` parts and the two umbrellas, so the
+symbol delta is entirely those initializers. A diff of the two symbol sets gives 15 names in
+the modules archive and none in the header archive. Finding 7 recorded the symbol. Dropping
+`rpp.std` later took the count to 9.
+
+The archive grows more than the binary, because the linker drops the interface objects a
+program never reaches. The full build grows most, and section 2.2 says why: 30 module
+translation units, which is 15 modules compiled twice.
+
+The 44 per-header layout cost far more: +35.6% on the archive and +64% on the full build,
+against 88 module translation units. Grouping cut the archive cost to less than half of that.
+
+**A consumer must never compile ReCpp's `.cppm` and link `libReCpp.a` too.** Both define the
+same initializer, so the link fails on a duplicate symbol. mama already handles it: it
+exports the `.cppm` sources and strips the module objects out of the package, so a consumer
+builds its own interfaces against its own flags. D6 records why shipping a binary interface
+is not an option.
+
 ### 2.1 The gcc-14 ordering rule, characterized
 
 The question this answers: does the failure show up as a build error, a link
@@ -269,19 +439,33 @@ and an `import` would violate the one-definition rule.
 Reject both. Keep the facade. The cost is the hand-maintained export list, and
 section 7 automates it away.
 
-### D2. One module per header, plus one umbrella module.
+### D2. One module per header group, plus one umbrella module. **(revised)**
 
-Keep the existing `rpp-<header>.cppm` naming and the 1:1 mapping. A consumer
-imports only what it uses, and a header edit rebuilds one binary module
-interface, not all of them.
+This started as one module per header. gcc-14 made that unshippable, so eight subject
+groups replaced the forty-four units, see `BUGS.md` **C28**. A group carries its member
+headers in one global module fragment, and `GROUP_HEADERS` in
+`tools/gen_module_exports.py` is the list which defines them.
 
-Add `src/rpp/rpp.cppm` as the umbrella:
+A group is the import granularity a consumer gets. A header edit rebuilds the group which
+carries it, and every group which imports that one.
+
+```cpp
+// src/rpp/rpp-text.cppm
+module;
+#include "strview.h"
+#include "sprint.h"
+#include "obfuscated_string.h"
+export module rpp.text;
+```
+
+`src/rpp/rpp.cppm` was the umbrella, and section 12 records why it went.
+`rpp.testing` stays out, see BUGS.md B25:
 
 ```cpp
 export module rpp;
-export import rpp.strview;
-export import rpp.sprint;
-// ... every other module
+export import rpp.core;
+export import rpp.text;
+// ... the other five groups, but not rpp.testing
 ```
 
 ### D3. Named modules, not partitions.
@@ -319,11 +503,16 @@ The first rule was the opposite one. Every `#include "X.h"` in `Y.h` gave
 `rpp-Y.cppm` an `export import rpp.X;`, so the module graph mirrored the include
 graph. That put 61 re-export lines in the library. With all 61 gone, the 571 case
 suite stayed green and five of the six module consumers passed.
-`RppTestsModuleOnly` was the sixth, and one line fixed it. `TestImpl` expands to a
-constructor which takes `rpp::strview`, so `rpp.tests` re-exports `rpp.strview`.
+`RppTestsModuleOnly` was the sixth, and one re-export fixed it: `TestImpl` expands to a
+constructor which takes `rpp::strview`.
 
-A consumer which needs `rpp::strview` from `import rpp.sprint;` writes
-`import rpp.strview;` too. One line names what that consumer depends on.
+**That last re-export is gone too, and gcc-14 is why.** With `export import rpp.text;` in
+`rpp.testing`, gcc wrote a module `RppStdStringModuleOnly` could not read at all. The same
+module without that line reads fine, and shape 5 of `BUGS.md` **B8** holds the measurement.
+So `RE_EXPORT` is empty and the rule has no exception.
+
+A consumer which needs `rpp::strview` from `import rpp.testing;` writes `import rpp.text;`
+too. One line names what that consumer depends on.
 
 ### D6. Ship `.cppm` sources. Never ship a binary module interface.
 
@@ -531,7 +720,7 @@ Cross-referencing every `#define` against README gives:
 | `tests.h` | **10** | `TestImpl`, `TestCase`, `TestInit`, `AssertThat`, `AssertEqual`, `AssertThrows`, ... |
 | `endian.h` | **9** | `RPP_BYTESWAP16/32/64`, `RPP_TO_BIG*`, `RPP_TO_LITTLE*` |
 | `debugging.h` | **4** | `LogInfo`, `LogWarning`, `LogError`, `Assert` |
-| `mutex.h` | 2 | `RPP_HAS_CRITICAL_SECTION_MUTEX`, `RPP_SYNC_T` |
+| `mutex.h` | 1 | `RPP_HAS_CRITICAL_SECTION_MUTEX` |
 | `close_sync.h`, `minmax.h`, `scope_guard.h` | 1 each | `try_lock_or_return`, `RPP_SSE_INTRINSICS`, `scope_guard` |
 
 Everything else is an implementation macro (`DELEGATE_FINLINE`, `_rpp_wrap_args`,
@@ -813,11 +1002,19 @@ between layers.
 | L6 | **binary_serializer** ✓, **thread_pool** ✓ | 2 |
 | L7 | **event_loop** ✓, **future** ✓ | 2 |
 | L8 | **coroutines** ✓ | 1 |
-| top | umbrella `rpp` | 1 |
+| groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **testing** ✓ | 8 |
+| ~~top~~ | umbrella **rpp**, dropped, see section 12 | 0 |
 
-Every L8 module ships. `BUILD_WITH_MODULES` builds all forty-four.
+**The layer table above is history.** The 44 per-header units are gone, and the eight groups
+carry those headers directly, see `BUGS.md` **C28**. The layer order still describes the
+include graph, so it still says which group may import which.
 
-44 modules and one umbrella. L0 to L8 exist, so only the umbrella remains. Excluded: `config.h`
+`BUILD_WITH_MODULES` builds the eight groups. The groups partition every public header, so a
+new header reaches an importer only by joining one group in `GROUP_HEADERS`, and no header
+can sit in two. `gen_module_exports.py --all --check` reports each way to drift, and the selftest pins
+each one. `rpp.numeric` carries the math headers, because `rpp.math` would name one header
+and not the group.
+Excluded: `config.h`
 and `log_colors.h` by rule 1 of section 6.3, and `jni_cpp.h` because it is
 Android glue. `tests.h` is in, and it is the one header whose macros split into
 `tests.macros.h`.
@@ -901,11 +1098,72 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
    `selftest`, `self-contained` and `import-order`. `gen_module_exports.py --check`
    joins them with changeset 3.
 3. ~~Rewrite the README modules section.~~ **Done.** It now points here.
-4. Publish a compile-time measurement from `tests/module_consumer/`, not from
-   ReCpp's own build. ReCpp's own build gains nothing, because its `.cpp` files
-   keep using headers (D4).
+4. ~~Publish a compile-time measurement.~~ **Done.** Section 2.2 measures one consumer
+   translation unit both ways, which is what an importer feels. ReCpp's own build gains
+   nothing, because its `.cpp` files keep using headers (D4).
 
-**Estimate: half a day, because only item 4 and the CI gate of item 2 remain.**
+**Nothing remains. Every item above landed.**
+
+### 11.1 The fatal compiler defects, which block a consumer
+
+Every entry here stops a build, each has a reproducer in `BUGS.md`, and each carries a
+workaround in the tree. Each workaround costs a consumer something, so retest every row
+whenever the toolchain moves, and delete the one the new compiler makes unnecessary. B18 and
+B23 are struck through, because a fix replaced each one.
+
+| Bug | Compiler | What dies | What guards it today |
+|---|---|---|---|
+| ~~B23~~ | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc ran out of module source locations on 44 modules, then mis-merged a global module declaration | Fixed. Eight header groups cut one translation unit from 39 imports to 8, and both standards build clean. A C++23 modules CI row now covers it. See `BUGS.md` C28 |
+| **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, and `rpp.threading` and `rpp.testing` carry them |
+| ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
+| **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | No module exports a std name. An importer includes `<exception>` |
+| **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | No module exports a std name, so nothing reaches this |
+| **B21** | gcc-14 | A module which exports `std::get` breaks `std::unique_ptr` in every importer | No module exports a std name. An importer includes `<tuple>` |
+| **B22** | gcc-14 | An importer which reaches `std::shared_ptr` through a module fails to link, because no object carries `_Sp_counted_base<_S_atomic>::_M_release()` | No module exports a std name. An importer includes `<memory>` |
+| **B8** | gcc-14 | Five separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
+
+Three of the five that remain are silent traps rather than loud ones. B19 and B21 compile the
+interface and fail every consumer afterwards, and B22 reaches the linker. So a green build here
+does not prove the next consumer compiles, and item 4 of section 12 tracks that risk.
+
+B18 is the lesson the rest of the table should be read against. It sat here as one module's
+problem, and it was the group umbrella and the top umbrella as well, because no target built the
+shape which crashed. A defect is only as narrow as the test which bounds it.
+
+B23 was that lesson at the scale of the whole build, and it is the reason this section exists.
+The C++23 modules build stayed broken from clean while both ways a developer sees the build
+were green: CI ran modules on C++20 only, and a local C++23 run reuses the interfaces a clean
+run rebuilds. **Measure a modules change from an empty build directory, or measure nothing.**
+Grouping fixed it, and the C++23 modules CI row keeps it fixed.
+
+B19, B20 and B21 share one shape: an `export using` inside namespace `std` either poisons a
+later instantiation or corrupts the interface. `RppStdModuleOnly` caught each one, and it went
+with `rpp.std`. No module exports a std name now, so the shape has no way back in.
+
+Two more failures stop the same consumer, and neither is a compiler bug. A declaration in a
+global module fragment reaches an importer only when an exported declaration names it:
+
+| What dies | Where it surfaces | What carries it now |
+|---|---|---|
+| `s != "x"` and `s + "y"` on an exported `std::string` | The importer reports `no match for 'operator!='` | No module exports `std::string`. The importer includes `<string>` |
+| `std::vector` construction | `stl_construct.h` reports `no matching function for call to 'operator new(sizetype, void*)'` | The importer includes `<new>` |
+
+So an export list of type names alone does not make a module usable. Every free function an
+exported type needs by argument-dependent lookup belongs in the list beside the type.
+
+`std_export_drift()` held `rpp.std` to that contract while it existed. It read every public
+parameter list and reported each `std::` name the module neither exported nor excused. Its
+first run found four: `std::deque`, `std::unique_lock`, `std::source_location` and
+`std::memory_order_acq_rel`. It read a parameter list only, so a return type still needed a
+human, and `std::cv_status` came in that way. Dropping `rpp.std` retired the gate.
+It also matches the literal `std::` spelling, so an alias hides a name from it. `rpp::ustrview`
+takes a `string_view_t`, which is `std::u16string_view`, and a reviewer found that one.
+
+One return type drove that question and no longer exists. `rpp::cfuture::wait_for` returned
+`std::future_status`, which lives in `<future>`, and B20 makes that header fatal beside an
+exported `std::swap`. Exporting it measured 18% on every importer of `rpp.std`, 166 ms against
+196 ms. The overload returns `rpp::wait_result` now, which `thread_pool::wait_until_idle`
+already used, so the public signature names no std type.
 
 ---
 
@@ -918,7 +1176,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | Track it as its own bug. `e.what()` reads a message the future shared state may free on another thread. |
 | Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |
 | A consumer writes its import above its includes | Hundreds of std redefinition errors on gcc-14 (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
-| Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI. |
+| Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI, which regenerates every group and fails on a stale one. |
 | Duplicate module initializer symbol (finding 7) | Link failure in a consumer that compiles the `.cppm` and links `libReCpp.a` | Keep `.cppm` objects out of the shipped archive. Cover it in `examples/module_consumer/`. |
 | Sanitizer interaction | `BUILD_WITH_MEM_SAFETY` already disables `/fsanitize=address` on MSVC because of modules ([`CMakeLists.txt:154`](../CMakeLists.txt#L154)) | Keep the modules job separate from the sanitizer matrix. |
 
@@ -930,10 +1188,10 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests`, which carries
    the module checks, and it passes every test on gcc-14 and clang-21. Every
    tier 2 compiler still passes the headers-only build.
-3. Every one of the 44 headers has a `.cppm`, and `gen_module_exports.py
-   --check` reports no difference.
-4. `tests/module_consumer/` builds against an installed ReCpp using only
-   `import rpp;`, and links.
+3. Every public header joins one group in `GROUP_HEADERS`, and `gen_module_exports.py
+   --all --check` reports no difference.
+4. `tests/module_consumer/` builds against an installed ReCpp using only the group
+   imports it needs, and links.
 5. The mixed-mode link check passes.
 6. README.md documents the contract of section 10 and carries a measured
    compile-time number.
@@ -946,7 +1204,7 @@ Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
 | 2 | add the rpp-header include check | 0.5 | changeset 3 | done |
 | 3 | generate the export lists | 1.5 | changeset 5 | done |
 | 4 | dual-mode test harness | 0.5 | changeset 5 | done, the generator --check is the gate |
-| 5 | 44 modules plus the umbrella | 2.5 | changeset 6 | 44 of 44 modules, umbrella remains |
+| 5 | the modules plus the umbrella | 2.5 | changeset 6 | done, and 8 groups replaced the 44 per-header units |
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 

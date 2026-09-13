@@ -18,12 +18,10 @@ namespace rpp
         #define RPP_BYTESWAP16(x) _byteswap_ushort(x)
         #define RPP_BYTESWAP32(x) _byteswap_ulong(x)
         #define RPP_BYTESWAP64(x) _byteswap_uint64(x)
-        #define RPP_BUILTIN_MEMCPY(dst, src, size) memcpy(dst, src, size)
     #else
         #define RPP_BYTESWAP16(x) __builtin_bswap16(x)
         #define RPP_BYTESWAP32(x) __builtin_bswap32(x)
         #define RPP_BYTESWAP64(x) __builtin_bswap64(x)
-        #define RPP_BUILTIN_MEMCPY(dst, src, size) __builtin_memcpy(dst, src, size)
     #endif
 
     #if RPP_LITTLE_ENDIAN

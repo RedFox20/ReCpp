@@ -1,11 +1,12 @@
-// C++20 module interface unit for rpp::strview, wrapping <rpp/strview.h>.
-// A module cannot export a macro, so RPPAPI and the _sv literal need <rpp/config.h>.
+// C++20 module interface unit for the rpp.text headers, owned by tools/gen_module_exports.py.
+// The headers stay in the global module fragment, so an importer and an includer share one entity.
 module;
 
-// global module fragment: the header stays here, so an importer and an includer share one entity
 #include "strview.h"
+#include "sprint.h"
+#include "obfuscated_string.h"
 
-export module rpp.strview;
+export module rpp.text;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
@@ -46,6 +47,22 @@ export namespace rpp {
     using rpp::keyval_parser;
     using rpp::bracket_parser;
     using rpp::__wrap;
+    using rpp::format_opt;
+    using rpp::none;
+    using rpp::lowercase;
+    using rpp::uppercase;
+    using rpp::string_buffer;
+    using rpp::has_ostream_op;
+    using rpp::has_member_sbuf_op;
+    using rpp::operator<<;
+    using rpp::to_hex_string;
+    using rpp::print;
+    using rpp::println;
+    using rpp::sprint;
+    using rpp::sprintln;
+    using rpp::format;
+    using rpp::obfuscated_string;
+    using rpp::make_obfuscated;
 #if RPP_ENABLE_UNICODE
     using rpp::ustrview;
     using rpp::to_ustring;
@@ -54,5 +71,6 @@ export namespace rpp {
 
 export namespace rpp::inline literals {
     using rpp::literals::operator""_sv;
+    using rpp::literals::operator""_obfuscated;
 }
 // GENERATED EXPORTS END

@@ -4,7 +4,8 @@
 #include <rpp/tests.macros.h> // TestImpl, TestCase, AssertThat
 #include <stdexcept>          // std::runtime_error, which this suite throws
 
-import rpp.tests; // includes come first, the import goes last
+import rpp.testing; // includes come first, the imports go last
+import rpp.text;    // TestImpl expands to a constructor taking rpp::strview
 
 // tests.macros.h re-exports future_types.h for <coroutine>, and the coroutine case below is
 // what pins it. Drop that include and this file stops finding std::coroutine_traits.

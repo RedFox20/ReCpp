@@ -1,15 +1,12 @@
-// C++20 module interface unit for <rpp/tests.h>.
-// A module cannot export a macro, so an importer adds <rpp/tests.macros.h> for
-// TestImpl, TestCase and the Assert family.
+// C++20 module interface unit for the rpp.testing headers, owned by tools/gen_module_exports.py.
+// The headers stay in the global module fragment, so an importer and an includer share one entity.
 module;
 
-// global module fragment: the header stays here, so an importer and an includer share one entity
 #include "tests.h"
 
-export module rpp.tests;
+export module rpp.testing;
 
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
-export import rpp.strview;
 
 export namespace rpp {
     using rpp::test;
