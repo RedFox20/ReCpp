@@ -73,6 +73,15 @@ namespace rpp
         return resume_queue.empty() && !has_background_tasks();
     }
 
+    bool event_loop::stop_and_wait_all_ready(rpp::Duration max_wait) noexcept
+    {
+        stop();
+        wait_on_all(max_wait);
+        run_all_ready(); // a resume queued as the background count hit zero is still pending
+        set_time_source(nullptr);
+        return !has_background_tasks() && resume_queue.empty();
+    }
+
     bool event_loop::run_loop(rpp::Duration suspend_interval) noexcept
     {
         // keep processing until stop() is called and pending tasks are completed

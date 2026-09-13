@@ -204,6 +204,8 @@ namespace rpp
         event_loop(rpp::uint64 main_thr_id = 0/*0=rpp::get_thread_id()*/,
                    rpp::thread_pool* background_task_pool RPP_LIFETIMEBOUND = nullptr,
                    rpp::AtomicTimeSource* warpable_clock RPP_LIFETIMEBOUND = nullptr) noexcept;
+        /** @brief Reads the time source while it drains, so the owner must outlive the loop
+         *         or detach the clock first. stop_and_wait_all_ready() detaches it. */
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
 
@@ -247,11 +249,22 @@ namespace rpp
         void stop() noexcept;
 
         /**
-         * @brief Waits on all pending tasks to fully drain the event loop
+         * @brief Waits on all pending tasks to fully drain the event loop.
+         *        This is not a complete drain. A resume queued as the background count reaches
+         *        zero stays queued, so a shutdown path wants stop_and_wait_all_ready() instead.
          * @param timeout Maximum time to wait for pending tasks to complete.
          * @returns true if all tasks were completed within timeout
          */
         bool wait_on_all(rpp::Duration timeout = rpp::seconds(1)) noexcept;
+
+        /**
+         * @brief Shuts the loop down: stops it, waits for the background tasks, runs every
+         *        resume they queued, and detaches the time source. The destructor then
+         *        touches nothing the owner may already have destroyed.
+         * @param max_wait Maximum time to wait for the background tasks.
+         * @returns true when the loop drained inside max_wait, leaving no task and no resume
+         */
+        bool stop_and_wait_all_ready(rpp::Duration max_wait = rpp::seconds(1)) noexcept;
 
         /**
          * @brief By default exceptions are swallowed and logged as warnings.

@@ -1167,6 +1167,41 @@ TestImpl(test_event_loop)
         AssertThat(bg_finished.load(), true);
     }
 
+    // posts a callback from the final resume, which lands as the background count hits zero
+    void fork_with_trailing_post(std::atomic_bool& trailing_ran)
+    {
+        loop->fork([this, &trailing_ran]() -> rpp::event_task
+        {
+            co_await loop->run_async([]{ rpp::sleep_ms(5); });
+            loop->post([&trailing_ran]{ trailing_ran = true; });
+        });
+    }
+
+    TestCase(wait_on_all_leaves_a_trailing_post)
+    {
+        std::atomic_bool trailing_ran { false };
+        fork_with_trailing_post(trailing_ran);
+
+        loop->wait_on_all(rpp::seconds(1));
+        AssertThat(trailing_ran.load(), false); // still queued, which is why the shutdown call exists
+
+        loop->run_all_ready();
+        AssertThat(trailing_ran.load(), true);
+    }
+
+    TestCase(stop_and_wait_all_ready_drains_and_detaches)
+    {
+        std::atomic_bool trailing_ran { false };
+        fork_with_trailing_post(trailing_ran);
+        clock.warp_forward(rpp::seconds(10000));
+
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+        AssertThat(trailing_ran.load(), true);
+
+        // detached: current_time() reads the wall clock, not the warped source
+        AssertLess(loop->current_time(), clock.time_now() - rpp::seconds(9000));
+    }
+
     // ─── loop hook: fires on every run_once() ───────────────────
     // run_once() always invokes the hook, whether or not an event was processed.
     TestCase(loop_hook_invoked_by_run_once)
