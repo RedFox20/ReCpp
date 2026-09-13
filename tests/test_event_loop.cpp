@@ -1196,8 +1196,10 @@ TestImpl(test_event_loop)
     {
         std::atomic_bool stop { false };
         std::atomic_int reads { 0 };
+        constexpr int NUM_READERS = 2; // 4 readers make the drain below spin for 300ms, see BUGS.md B26
         std::vector<std::thread> readers;
-        for (int t = 0; t < 2; ++t)
+        readers.reserve(NUM_READERS);
+        for (int t = 0; t < NUM_READERS; ++t)
             readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
         while (reads.load() == 0) // a reader must be live before the first detach
             rpp::yield();
@@ -1212,7 +1214,6 @@ TestImpl(test_event_loop)
 
         stop = true;
         for (std::thread& reader : readers) reader.join();
-        loop->set_time_source(&clock); // the fixture clock owns the loop again
         AssertGreater(reads.load(), before); // the readers ran across the detach cycles
     }
 
@@ -1511,6 +1512,35 @@ TestImpl(test_event_loop)
         // the loop must own nothing in flight before the fixture replaces it
         AssertThat(loop->wait_on_all(rpp::millis(1000)), true);
         AssertThat(loop->has_background_tasks(), false);
+    }
+
+    // ─── pump_until_ready keeps its deadline when the clock detaches ────────────
+    // The pump builds `end` from the loop clock. A pump which re-reads a detached source
+    // drops the warp below and then overruns its own budget.
+    TestCase(pump_until_ready_survives_a_detached_time_source)
+    {
+        clock.warp_forward(rpp::millis(400)); // the pump deadline below is built in this frame
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<int>
+        {
+            co_await loop->run_async([]{ rpp::sleep_ms(200); return 1; });
+            co_return 1;
+        };
+        rpp::cfuture<int> fut = coro();
+
+        // the pump runs this on its first run_once(), so the detach lands after `end` is built
+        loop->post([this]{ loop->set_time_source(nullptr); });
+
+        rpp::Timer wall;
+        bool ready = loop->pump_until_ready(fut, rpp::millis(20));
+        double pump_ms = wall.elapsed_millis();
+        print_info("pump_until_ready: ready=%d after %.1fms\n", (int)ready, pump_ms);
+
+        AssertThat(ready, false);   // 200ms of work cannot finish in a 20ms budget
+        AssertLess(pump_ms, 150.0); // a dropped 400ms offset would hold the pump past its budget
+
+        AssertThat(loop->pump_until_ready(fut, rpp::seconds(15)), true); // drain without throwing
+        AssertThat(fut.get(), 1);
     }
 
     // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).

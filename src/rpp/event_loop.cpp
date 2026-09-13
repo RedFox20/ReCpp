@@ -98,14 +98,15 @@ namespace rpp
     {
         // drain any remaining events to avoid leaking coroutine frames
         // the deadline must use the same clock wait_pop_until() polls, or it expires at once
-        rpp::TimePoint end = current_time() + timeout;
+        rpp::AtomicTimeSource* src = time_source.load(std::memory_order_relaxed);
+        rpp::TimePoint end = (src ? src->time_now() : rpp::TimePoint::monotonic_now()) + timeout;
         resume_event event;
         while (resume_queue.try_pop(event))
         {
             process_event(event);
         }
         // only wait with timeout if there are still background tasks that could post events
-        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, time_source.load(std::memory_order_relaxed)))
+        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, src))
         {
             process_event(event);
             invoke_loop_hook();

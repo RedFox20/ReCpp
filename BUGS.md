@@ -17,11 +17,25 @@ finishes under a live worker. The comment at `event_loop.cpp:35` describes the g
 as if every platform took it.
 
 A live worker holds three borrowed things: the loop, the time source and the pool. C30 closed
-the time source half. A poll step reads the offset under a reader guard, and
-`set_time_source()` retires the pointer before it returns. An owner which frees the clock
-without a detach still reaches freed memory. So the destructor must never return while a task
-is live, and a wait which does not finish must abort on every platform. A shared pointer is
-not the fix, because it changes the borrow contract of every consumer.
+the `delay()` half. A poll step reads the offset under a reader guard, and `set_time_source()`
+retires the pointer before it returns. Three gaps stay open.
+
+1. A pump call hands the raw pointer to `concurrent_queue`, which polls it for the whole wait
+   outside the guard (`event_loop.cpp:108,146,164,195`). A detach from another thread returns
+   while that pump still holds the clock. The guard cannot cover it, because a pump holds the
+   clock for up to its whole timeout, and `set_time_source()` would block for that long.
+2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
+   with the offset of the new clock. A detach is safe. A swap re-arms the same stranding.
+3. An owner which frees the clock without a detach still reaches freed memory.
+
+So the destructor must never return while a task is live, and a wait which does not finish must
+abort on every platform. A shared pointer is not the fix, because it changes the borrow contract
+of every consumer.
+
+The reader guard has no spin bound, and `rpp::yield()` promises no progress. A standalone
+replica over 20000 detach cycles measured 2 readers on 4 cores at 21.8ms, 4 readers at 315ms,
+and 8 readers at 88.8s. A poll step holds the guard for nanoseconds and then sleeps, so real
+usage never reaches that shape. A backoff belongs with the work above, not before it.
 
 The pool side needs measurement before a fix. `start_in_background()` hands the pool a
 delegate which captures the awaiter, and that awaiter lives in the coroutine frame.
@@ -350,10 +364,10 @@ The script's own docstring already warns that it has mistakes.
 ## Closed
 
 ### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
-A poll step re-read the raw pointer every millisecond, so a detach dropped the warp offset and
-left the worker waiting for real time to reach a virtual deadline. A waiter now captures the
-offset once and refreshes it under a reader guard, which `delay_survives_a_detached_time_source`
-and `set_time_source_retires_the_pointer_before_a_reader_leaves` pin.
+A poll step re-read the raw pointer, so a detach dropped the warp offset. The worker then waited
+for real time to reach a virtual deadline. A waiter now captures the offset once and refreshes it
+under a reader guard, which `delay_survives_a_detached_time_source` and
+`set_time_source_retires_the_pointer_before_a_reader_leaves` pin.
 
 ### C29. `delegate::copy` leaked the destination functor when the source was a function
 The function branch of `copy()` overwrote `f` and `obj` and never freed the functor the

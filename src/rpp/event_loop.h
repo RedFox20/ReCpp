@@ -157,6 +157,18 @@ namespace rpp
             ~resume_event() noexcept = default;
         };
 
+        // a snapshot of the loop clock, so a detached source cannot strand a waiter
+        struct time_frame
+        {
+            rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
+            bool warpable = false; // a time source was attached at capture time
+            rpp::TimePoint now() const noexcept
+            {
+                return warpable ? rpp::TimePoint{ rpp::TimePoint::system_now().duration.nsec + offset_ns }
+                                : rpp::TimePoint::monotonic_now();
+            }
+        };
+
         // the thread that owns and drives this event loop, initialized in CTOR
         std::atomic_uint64_t owner_thread_id {0};
 
@@ -174,18 +186,6 @@ namespace rpp
 
         // number of threads reading through time_source right now
         mutable std::atomic_int time_source_readers { 0 };
-
-        // a snapshot of the loop clock, so a detached source cannot strand a waiter
-        struct time_frame
-        {
-            rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
-            bool warpable = false; // a time source was attached at capture time
-            rpp::TimePoint now() const noexcept
-            {
-                return warpable ? rpp::TimePoint{ rpp::TimePoint::system_now().duration.nsec + offset_ns }
-                                : rpp::TimePoint::monotonic_now();
-            }
-        };
 
         // thread-safe FIFO queue of resume events
         rpp::concurrent_queue<resume_event> resume_queue;
@@ -230,8 +230,8 @@ namespace rpp
          *        Pass null to revert to wall-clock timing.
          *        The loop borrows the clock and MUST NOT outlive it. No attribute states
          *        that: clang rejects lifetimebound on a function that returns void.
-         *        Returns only after every reader released the old clock, so the caller
-         *        may then destroy it.
+         *        Returns only after every delay() and current_time() reader released the
+         *        old clock. A pump call on another thread still holds it, see BUGS.md B26.
          */
         void set_time_source(rpp::AtomicTimeSource* clock) noexcept;
 
@@ -410,10 +410,12 @@ namespace rpp
         template<typename T>
         bool pump_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15))
         {
-            rpp::TimePoint end = current_time() + timeout;
+            time_frame frame = capture_frame();
+            rpp::TimePoint end = frame.now() + timeout;
             while (fut.valid() && fut.wait_for(rpp::Duration::zero()) == wait_result::timeout)
             {
-                if (current_time() >= end)
+                read_time_offset(frame.offset_ns); // a detached source leaves the last offset in place
+                if (frame.now() >= end)
                     return false;
                 run_once(rpp::millis(5)); // block-wait briefly for the next continuation, then run it
             }
@@ -827,7 +829,7 @@ namespace rpp
                 : loop{loop}, frame{loop.capture_frame()}, end{tp} {}
             delay_awaiter(event_loop& loop, rpp::Duration d) noexcept
                 : loop{loop}, frame{loop.capture_frame()}, end{frame.now() + d} {}
-            bool await_ready() const noexcept { return loop.current_time() >= end; }
+            bool await_ready() const noexcept { return frame.now() >= end; } // same clock which built `end`
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
                 loop.start_in_background([this, cont]() mutable
