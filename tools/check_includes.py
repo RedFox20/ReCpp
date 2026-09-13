@@ -222,13 +222,14 @@ def _referenced_one(h: str):
     return h, rpp_decls.referenced_rpp_headers(h)
 
 
-def _referenced_all(names: list) -> dict:
+def _referenced_all(names: list, jobs: int = 0) -> dict:
     """Maps each header to the rpp headers its names come from, in parallel where it can.
 
     One parse costs over a second and no header needs another's answer, so the whole scan is
     core-bound. A pool failure falls back to the serial path, which returns the same map.
+    @param jobs worker count, or 0 to take one per CPU
     """
-    jobs = min(len(names), os.cpu_count() or 1)
+    jobs = jobs or min(len(names), os.cpu_count() or 1)
     if jobs > 1 and len(names) > 1:
         try:
             import multiprocessing as mp
@@ -751,7 +752,8 @@ def _check_referenced_all() -> list[str]:
     names = [h for h in _PROBES if h in every] or every[:2]
     if len(names) < 2:
         return ['fewer than two headers to scan, so the pool path never runs']
-    pooled = _referenced_all(names)
+    # jobs=2 so a single-CPU host takes the pool path too, and does not compare two serial scans
+    pooled = _referenced_all(names, jobs=2)
     # the ground truth, not `_referenced_one`, which both paths call and would agree with itself
     serial = {h: rpp_decls.referenced_rpp_headers(h) for h in names}
     # a probe which names nothing matches a worker that dropped everything, so the case needs one

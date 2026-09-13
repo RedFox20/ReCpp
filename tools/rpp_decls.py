@@ -178,6 +178,47 @@ def selftest() -> list:
         if flags.get('Public'): bad.append('an external-linkage struct is marked internal')
         # an out-of-line member body would export a name no namespace holds, and the module fails to build
         if ('rpp', 'method') in got: bad.append('an out-of-line member definition reached the namespace')
+    return bad + _check_parse_memo()
+
+
+def _check_parse_memo() -> list:
+    """Pins the parse memo: a repeat answers from it, and a rewrite never does.
+
+    The key carries the mtime and the size, so each rewrite below changes one of the two and
+    holds the other. Drop either field and one case reads a stale parse.
+    """
+    import tempfile
+    global parse
+    bad, real, parses = [], parse, []
+
+    def counting(header, defines=()):
+        parses.append(header)
+        return real(header, defines)
+
+    parse = counting
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'memo.h')
+            open(path, 'w').write(_SELFTEST_HEADER)
+            first = declarations(path)
+            if declarations(path) != first:
+                bad.append('the memo answered a repeat with different declarations')
+            if len(parses) != 1:
+                bad.append(f'an unchanged header parsed {len(parses)} times, not once')
+            # equal length, and utime moves the mtime, so only the mtime tells this rewrite apart
+            st = os.stat(path)
+            open(path, 'w').write(_SELFTEST_HEADER.replace('struct Public', 'struct Publik'))
+            os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
+            if 'Publik' not in {n for ns, kind, n, internal, line in declarations(path)}:
+                bad.append('a rewrite of equal size answered from the earlier parse')
+            # utime puts the mtime back, so only the size tells this one apart
+            st = os.stat(path)
+            open(path, 'a').write('namespace rpp { struct Extra {}; }\n')
+            os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
+            if 'Extra' not in {n for ns, kind, n, internal, line in declarations(path)}:
+                bad.append('a rewrite at an unchanged mtime answered from the earlier parse')
+    finally:
+        parse = real
     return bad
 
 
