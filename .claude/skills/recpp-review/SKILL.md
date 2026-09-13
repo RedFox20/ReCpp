@@ -1,6 +1,6 @@
 ---
 name: recpp-review
-description: Review a ReCpp change against the project rules — mandatory tests, fast tests, cross-platform support, 1-2 line comments, STE wording, compact 130-column style, and the four build gates. Runs in the recpp-reviewer subagent. Also invocable as /recpp-review.
+description: Review a ReCpp change against the project rules — proven regression tests, fast tests, cross-platform support, borrowed-pointer lifetime, 1-2 line comments, STE wording, compact 130-column style, and the four build gates. Runs in the recpp-reviewer subagent. Also invocable as /recpp-review.
 ---
 
 # recpp-review
@@ -48,6 +48,20 @@ of `python3 update_doc_linerefs.py`.
 - A bug fix needs a case which replicates the bug, not a case which repeats an
   existing path.
 
+**"It fails without the fix" is a measurement, not a claim.** A case which nobody
+reverted is not a regression test. It is a case which happens to pass.
+
+- Revert the fix hunk alone, not the whole change. Run the case. Record the rate:
+  `3/3`, or `5/5 under ASAN`. Put that rate in the commit message.
+- One run proves nothing for a race or a lifetime case. Run it at least three times.
+- Read the failure text. A case which fails for the wrong reason pins nothing, and
+  it still passes the revert.
+- A revert which leaves every new case green means the change has no test. Two
+  shapes cause that. The case reached a different code path than the one the fix
+  touched. Or the premise the case rests on is false, so the assertion never
+  depended on the fix at all.
+- Block a change whose diff moves a behavior no case reaches. Name the function.
+
 ### R2. Tests stay fast
 
 The whole suite runs 512 cases in about 4.3 seconds, and 5.5 seconds under TSAN.
@@ -73,6 +87,12 @@ Protect that number.
   change a number last.
 - Use the ReCpp timing API. Do not add `std::chrono`, `std::this_thread::sleep_for`,
   or `std::this_thread::yield` to source or tests.
+- An assertion on a pool worker does not fail the case. `test::assert_failed()`
+  records into a thread-local which only the case thread owns, so off that thread it
+  prints and returns. Set an `std::atomic_bool` and assert it in `TestCaseCleanup()`.
+- `TimePoint::monotonic_now()` and `system_now()` agree to about 100ns, because
+  `timepoint.cpp` shifts the monotonic clocks onto the realtime epoch. A case which
+  expects the two to diverge measures nothing. Warp an offset instead.
 
 ### R3. Every change works on every target
 
@@ -101,7 +121,12 @@ clang++ 18 to 21, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
   story all go stale. `BUGS.md` holds that record.
 - One `see BUGS.md C15` pointer is allowed. The entry there carries the story.
 - No constants in a comment. A `10s`, a `50ms`, or a `4096` in prose goes stale on
-  the first tune. The code holds the value, and the comment holds the reason.
+  the first tune. The code holds the value, and the comment holds the reason. A
+  trailing comment breaks this most often, because the literal sits on the same line.
+- A platform fact is not a tunable constant. A 15.6ms Windows timer granularity
+  belongs in the comment, because no line of this code sets it.
+- A comment is a complete sentence. A clause which breaks off mid thought is a
+  defect, not brevity.
 - Do not paraphrase the code below the comment.
 - No defense. Never defend, justify or overexplain a design decision. State the
   reason in one short sentence.
@@ -167,6 +192,10 @@ Scrolling is the bottleneck. The column limit is 130.
   is off on purpose.
 - Do not put one argument per line when the call fits on one line.
 - Do not split a short guard clause over three lines.
+- **Two peer branches take `if` and `else`.** A guard clause rejects input and
+  returns. It does not choose between two paths which both do work. Never trade the
+  `else` for an early return to save lines, and never ask an author to. This rule
+  outranks the vertical height it costs. See `docs/CODE_STYLE.md`.
 
 ### R8. A line which does not fit needs a local variable
 
@@ -250,6 +279,8 @@ The Windows checkout is a separate clone. Treat it as somebody else's tree.
 - Git holds the investigation, the disproved theories, and the measurements. Do
   not carry them forward.
 - An open entry keeps what an investigation needs, and no more.
+- Check every `file.cpp:123` citation against the file before you commit. A line
+  reference moves with the next edit. Name the function when the line adds nothing.
 
 ### R10. TSAN is a suggestion, not a gate
 
@@ -268,6 +299,17 @@ A TSAN run is welcome. A TSAN report never blocks the change on its own.
 4. Then fix it in 3 to 5 lines. A larger fix needs the owner to agree first.
 5. A rewrite of the pool, the future, the delegate, or the test framework is
    forbidden as a race fix.
+
+**A red CI job is not always this change.** Read the failure before you touch code.
+
+- Search `BUGS.md` for the two stacks and the two line numbers. A match means the
+  job hit a known defect. Add the sighting to that entry and name it in the reply.
+- Two red jobs in one run can have two different causes. Read both logs. Never
+  assume the second job failed for the reason the first one did.
+- A TSAN warning sets exit code 66 on its own, so every case can pass while the job
+  reports failure. Read the case count before you call it a test failure.
+- Green on the next commit is evidence about the rate, not proof the defect is
+  gone. Record the sighting either way.
 
 ### R12. Every `#include` comes before every `import`
 
@@ -290,6 +332,29 @@ Two shapes fail it:
 Clang accepts both shapes, so a clang-only run proves nothing here. Read the gate
 output, and never conclude from a green clang build.
 
+### R13. A borrowed pointer never crosses a callback
+
+A class which holds a raw `T*` it does not own must not keep that pointer across a
+call into user code. The callback can detach the object and free it, and the code
+after the call then reads freed memory.
+
+- Load the pointer where the call which needs it sits. Do not load it once and
+  reuse it after a `process_event()`, a delegate, a resumed coroutine, or a hook.
+- **A thread argument does not cover reentrancy.** "Only the owner thread frees
+  this" is false when the owner thread is the one running the callback. Ask which
+  thread runs the callback before you accept such an argument, in a review or in
+  your own comment.
+- When a whole wait needs the value, snapshot the value and not the pointer.
+  `event_loop::time_frame` is that shape. A deadline belongs to the clock which
+  built it, so the snapshot keeps both together.
+- A reader count tells an owner when the readers are gone. It does not keep the
+  object alive, and it is not a hazard pointer. A second count per generation does
+  not fix it, because a reader picks its count before it loads the pointer. See
+  BUGS.md B26.
+
+Report a retained borrowed pointer as blocking. ASAN catches it, so the case which
+proves it runs under ASAN and reports the rate, per R1.
+
 ## Report format
 
 Order the findings by severity. Keep one line per finding where possible.
@@ -304,7 +369,7 @@ Gates: gcc PASS 512/512 5.5s | clang PASS | clang-tidy PASS | android NOT RUN | 
 Verdict: BLOCK, 2 findings
 ```
 
-- `BLOCK` breaks R1, R2, R3, R8, R9, or R12.
+- `BLOCK` breaks R1, R2, R3, R8, R9, R12, or R13.
 - `WARN` breaks R4, R5, R6, or R7.
 - `NOTE` records a TSAN report or deferred work.
 - A clean review says `Verdict: PASS` and lists the gates.
@@ -316,3 +381,6 @@ Verdict: BLOCK, 2 findings
 3. Did you run every gate the change can reach, and report the ones you skipped?
 4. Did you avoid proposing a rewrite?
 5. Is the report itself STE, with no sentence over 25 words?
+6. Did you check the R1 revert, and not take the author's word for it?
+7. Did the tree move under you? The author commits while you read. Re-read the
+   files you cite, and say which commit each finding applies to.
