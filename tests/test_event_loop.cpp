@@ -34,6 +34,9 @@ TestImpl(test_event_loop)
     std::unique_ptr<rpp::thread_pool> custom_pool;
     std::unique_ptr<rpp::event_loop> loop;
     const uint64 main_tid = rpp::get_thread_id();
+    // assert_failed() only records on the thread which owns the case, so a worker
+    // reports a spin_until() timeout through this flag instead
+    std::atomic_bool spin_timed_out { false };
 
     TestCaseSetup()
     {
@@ -58,12 +61,7 @@ TestImpl(test_event_loop)
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
 
-    // a worker thread cannot fail a test, because assert_failed() only records on the
-    // thread which owns the case, so TestCaseCleanup() reads this flag instead
-    std::atomic_bool spin_timed_out { false };
-
-    // spins without pumping the loop, so a test can order itself against a worker thread.
-    // a condition which never arrives fails here, instead of letting the test run on
+    // spins without pumping the loop, so a test can order itself against a worker thread
     template<class Predicate> void spin_until(const Predicate& pred, RPP_SOURCE_LOC)
     {
         rpp::TimePoint start = rpp::TimePoint::monotonic_now();
