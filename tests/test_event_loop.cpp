@@ -5,6 +5,7 @@
 #include <rpp/timer.h>
 #include <rpp/threads.h>
 #include <rpp/collections.h>
+#include <rpp/semaphore.h>
 
 #include <rpp/tests.h>
 #include <atomic>
@@ -1165,6 +1166,112 @@ TestImpl(test_event_loop)
 
         AssertTrue(loop->wait_on_all(rpp::seconds(1)));
         AssertThat(bg_finished.load(), true);
+    }
+
+    // posts a callback from the final resume, which lands as the background count hits zero
+    void fork_with_trailing_post(std::atomic_bool& trailing_ran)
+    {
+        loop->fork([this, &trailing_ran]() -> rpp::event_task
+        {
+            co_await loop->run_async([]{ rpp::sleep_ms(5); });
+            // the worker pushes the resume before it decrements, so the post must wait for
+            // the count, or wait_on_all drains it in the same pass and the drain proves nothing
+            while (loop->has_background_tasks())
+                rpp::yield();
+            loop->post([&trailing_ran]{ trailing_ran = true; });
+        });
+    }
+
+    // the trailing post starts a blocked task, so run_all_ready() leaves the loop busy
+    void fork_with_trailing_post_starting(rpp::semaphore& release)
+    {
+        loop->fork([this, &release]() -> rpp::event_task
+        {
+            co_await loop->run_async([]{ rpp::sleep_ms(5); });
+            while (loop->has_background_tasks()) // the fork must start inside run_all_ready()
+                rpp::yield();
+            loop->post([this, &release]
+            {
+                loop->fork([this, &release]() -> rpp::event_task
+                {
+                    co_await loop->run_async([&release]{ release.wait(); });
+                });
+            });
+        });
+    }
+
+    // parks the coroutine handle instead of starting background work, so neither counter sees it
+    struct parking_awaiter
+    {
+        rpp::coro_handle<>& slot;
+        // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+        bool await_ready() const noexcept { return false; }
+        void await_suspend(rpp::coro_handle<> h) noexcept { slot = h; }
+        void await_resume() const noexcept {}
+    };
+
+    // ─── shutdown: the one call that drains and detaches ────────
+    TestCase(stop_and_wait_all_ready_drains_and_detaches)
+    {
+        std::atomic_bool trailing_ran { false };
+        fork_with_trailing_post(trailing_ran);
+        clock.warp_forward(rpp::seconds(10000));
+
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+        AssertThat(trailing_ran.load(), true);
+
+        // detached: current_time() reads the wall clock, not the warped source
+        AssertLess(loop->current_time(), clock.time_now() - rpp::seconds(9000));
+    }
+
+    // ─── shutdown: a timeout keeps the time source attached ─────
+    // a live delay() worker polls it against a virtual deadline and would never reach a wall-clock one
+    TestCase(stop_and_wait_all_ready_keeps_the_clock_on_timeout)
+    {
+        rpp::semaphore release;
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]{ release.wait(); });
+        });
+
+        clock.warp_forward(rpp::seconds(10000));
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
+        // still attached: current_time() carries the warp, a detached loop would read wall time
+        AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
+
+        release.notify();
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+    }
+
+    // ─── shutdown: a suspended fork blocks completion ───────────
+    // it runs no background task and queues no resume, so num_forks() is the only signal
+    TestCase(stop_and_wait_all_ready_counts_a_suspended_fork)
+    {
+        rpp::coro_handle<> parked {};
+        loop->fork([&]() -> rpp::event_task { co_await parking_awaiter{ parked }; });
+        clock.warp_forward(rpp::seconds(10000));
+
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
+        AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
+
+        loop->post_resume(parked);
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+    }
+
+    // ─── shutdown: work started inside the drain keeps the clock ─
+    // run_all_ready() resumes a coroutine which starts a new task, so the pre-drain count is stale
+    TestCase(stop_and_wait_all_ready_keeps_the_clock_for_work_started_in_the_drain)
+    {
+        rpp::semaphore release;
+        fork_with_trailing_post_starting(release);
+        clock.warp_forward(rpp::seconds(10000));
+
+        // the blocked task never finishes, so a short wait costs 20ms instead of a full second
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
+        AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
+
+        release.notify();
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
     }
 
     // ─── loop hook: fires on every run_once() ───────────────────
