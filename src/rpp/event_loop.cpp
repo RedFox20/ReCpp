@@ -96,9 +96,8 @@ namespace rpp
 
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
     {
-        // one clock for the whole wait: a reload mid-wait would poll a deadline this frame
-        // built, which overruns by the warp offset. only the owner thread retires the clock,
-        // and only the owner thread waits here, so it cannot be freed under this call.
+        // one clock for the whole wait, because `end` belongs to it and a reload would poll
+        // that deadline against a different clock, see BUGS.md B26
         rpp::AtomicTimeSource* src = time_source.load(std::memory_order_relaxed);
         rpp::TimePoint end = current_time(src) + timeout;
         resume_event event;

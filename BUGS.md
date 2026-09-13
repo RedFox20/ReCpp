@@ -378,8 +378,8 @@ The script's own docstring already warns that it has mistakes.
 
 ### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
 A poll step re-read the raw pointer, so a detach dropped the warp offset and left the worker
-waiting for real time to reach a virtual deadline. A waiter now captures the offset once and
-refreshes it under a reader guard, which `delay_survives_a_detached_time_source` and
+waiting on a virtual deadline. A waiter now captures the offset once and refreshes it under a
+reader guard, which `delay_survives_a_detached_time_source` and
 `stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it` pin.
 
 ### C29. `delegate::copy` leaked the destination functor when the source was a function
