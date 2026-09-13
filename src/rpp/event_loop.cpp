@@ -96,17 +96,17 @@ namespace rpp
 
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
     {
-        // drain any remaining events to avoid leaking coroutine frames
-        // the deadline must use the same clock wait_pop_until() polls, or it expires at once
-        rpp::TimePoint end = current_time(time_source.load(std::memory_order_relaxed)) + timeout;
+        // one clock for the whole wait: a reload mid-wait would poll a deadline this frame
+        // built, which overruns by the warp offset. only the owner thread retires the clock,
+        // and only the owner thread waits here, so it cannot be freed under this call.
+        rpp::AtomicTimeSource* src = time_source.load(std::memory_order_relaxed);
+        rpp::TimePoint end = current_time(src) + timeout;
         resume_event event;
         while (resume_queue.try_pop(event))
         {
             process_event(event);
         }
-        // reload the clock every pass, so a detach between waits does not keep a stale one
-        while (has_background_tasks()
-            && resume_queue.wait_pop_until(event, end, time_source.load(std::memory_order_relaxed)))
+        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, src))
         {
             process_event(event);
             invoke_loop_hook();

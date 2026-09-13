@@ -1541,7 +1541,7 @@ TestImpl(test_event_loop)
         AssertLess(pump_ms, 150.0); // a dropped 400ms offset would hold the pump past its budget
 
         gate.notify(); // release the worker, so the drain below does not wait on the clock
-        AssertThat(loop->pump_until_ready(fut, rpp::seconds(15)), true); // drain without throwing
+        AssertThat(loop->pump_until_ready(fut, rpp::seconds(1)), true); // drain without throwing
         AssertThat(fut.get(), 1);
     }
 
