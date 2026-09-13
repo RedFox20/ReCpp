@@ -174,8 +174,8 @@ jobs:
         shell: bash
         run: |
           COV_FLAGS=$([[ $COVERAGE_ON == 1 ]] && echo "coverage=src" || echo "")
-          # clang-tidy runs as its own step for clang, so this build passes no sanitizer
-          SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" && $COMPILER == "clang" ]] && echo "" || echo "$SANITIZE")
+          # clang-tidy runs as its own step, so this build passes no sanitizer
+          SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" ]] && echo "" || echo "$SANITIZE")
           JOBS=$(nproc)
           # a modules build clears NO_NINJA, and taskset then pins the count ninja reads
           NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
@@ -196,8 +196,8 @@ jobs:
         run: .github/scripts/report_test_count.sh ${{ matrix.name }}
 
       - name: Clang Tidy Analysis
-        # clang-tidy is slow during a clang build, so it runs as its own step
-        if: matrix.san == 'clang-tidy' && matrix.compiler == 'clang'
+        # a build which also tidies runs it one file at a time, so this step parallelizes it
+        if: matrix.san == 'clang-tidy'
         shell: bash
         run: ./run_clang_tidy -j 5
 
