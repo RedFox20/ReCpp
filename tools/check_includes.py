@@ -727,6 +727,41 @@ def check_selftest() -> list[str]:
             got = int(found.split(':')[1]) if found else 0
             if got != want:
                 bad.append(f'{name}: the scan named line {got}, not {want}')
+    bad += _check_referenced_all()
+    return bad
+
+
+# the cheapest headers to parse. one still names another rpp header, so a dropped
+# dependency fails the case
+_PROBES = ('proc_utils.h', 'config.types.h')
+
+
+def _check_referenced_all() -> list[str]:
+    """Pins that the pool and the serial fallback answer the same map.
+
+    A worker which drops a dependency, or a pool which loses a header, leaves `rpp-includes`
+    accepting a file it should report. Only a comparison of the two paths names that.
+    """
+    try:
+        import rpp_decls
+    except ImportError as e:
+        return [f'rpp_decls is missing: {e}']
+    every = [h for h in headers() if h not in rpp_decls.NO_MODULE]
+    names = [h for h in _PROBES if h in every] or every[:2]
+    if len(names) < 2:
+        return ['fewer than two headers to scan, so the pool path never runs']
+    try:
+        pooled = _referenced_all(names)
+        # the ground truth, not `_referenced_one`, which both paths call and would agree with itself
+        serial = {h: rpp_decls.referenced_rpp_headers(h) for h in names}
+    except rpp_decls.ClangMissing as e:
+        return [f'skipped, install libclang: {e}']
+    # a probe which names nothing matches a worker that dropped everything, so the case needs one
+    bad = [] if any(serial.values()) else ['no probe names an rpp header, so a dropped one hides']
+    if set(pooled) != set(serial):
+        bad.append(f'the pool scanned {sorted(pooled)}, not {sorted(serial)}')
+    bad += [f'{h}: the pool found {sorted(pooled[h])}, the serial path {sorted(serial[h])}'
+            for h in serial if h in pooled and pooled[h] != serial[h]]
     return bad
 
 

@@ -575,6 +575,11 @@ namespace rpp {
 '''
 
 
+# the cheapest headers to parse. both still declare names, so a wrong memo entry
+# fails the two pool cases
+_PROBES = ('config.types.h', 'endian.h')
+
+
 def selftest() -> list:
     """Crafts a header and pins both gates, the macro name and the linkage."""
     import tempfile
@@ -637,12 +642,25 @@ def selftest() -> list:
 
     # the pool fills the memo the serial pass reads, so a worker which answers differently
     # would change a generated module and no other case would see it
-    probe = GROUP_HEADERS[GROUPS[0]][0]
-    for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(probe, None)
-    serial = (_namespace_groups(probe), internal_names(probe))
-    for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(probe, None)
-    if _parse_one(probe)[1:] != serial:
-        bad.append(f'the pool worker disagrees with the serial parse of {probe}')
+    probes = [h for h in _PROBES if header_group(h)] or GROUP_HEADERS[GROUPS[0]][:2]
+    def _forget(hs):
+        for h in hs:
+            for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(h, None)
+    _forget(probes)
+    serial = {h: (_namespace_groups(h), internal_names(h)) for h in probes}
+    _forget(probes)
+    if any(_parse_one(h)[1:] != serial[h] for h in probes):
+        bad.append('the pool worker disagrees with the serial parse')
+
+    # prefetch is what fills the memo. a lost result or a wrong key fails here, and not
+    # only in the worker the case above calls
+    _forget(probes)
+    prefetch(probes)
+    for h in probes:
+        if h not in _NS_GROUPS_MEMO or h not in _INTERNAL_MEMO:
+            bad.append(f'prefetch left {h} out of a memo, so the serial pass reparses it')
+        elif (_NS_GROUPS_MEMO[h], _INTERNAL_MEMO[h]) != serial[h]:
+            bad.append(f'prefetch stored something other than the serial parse of {h}')
 
     # a skipped configuration must return what BASE returns, so parse one and compare
     skipped = [(h, g, off) for g, off in GUARDS
