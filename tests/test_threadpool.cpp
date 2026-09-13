@@ -353,8 +353,11 @@ TestImpl(test_threadpool)
         }
         else if (parallelism <= 2)
         {
-            // if the system doesn't have enough parallelism, the overhead should be minimal
-            AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.005);
+            // a low-parallelism system keeps the overhead small, but a sanitizer instruments
+            // every access and outgrows this budget, so the bound does not run there
+            #if !RPP_SANITIZERS
+                AssertLessOrEqual(parallel_elapsed, serial_elapsed+0.005);
+            #endif
         }
         else
         {
