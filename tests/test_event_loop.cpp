@@ -1181,6 +1181,37 @@ TestImpl(test_event_loop)
         AssertThat(bg_finished.load(), true);
     }
 
+    // ─── wait_on_all outlives a callback which frees the clock ──────────────────
+    // Its first drain runs owner-thread callbacks, and one of them can detach and free
+    // the clock. A wait which kept the raw source then reads freed memory.
+    TestCase(wait_on_all_survives_a_callback_which_frees_the_clock)
+    {
+        auto owned = std::make_unique<rpp::AtomicTimeSource>();
+        owned->warp_forward(rpp::seconds(2)); // the deadline below is built in this frame
+        loop->set_time_source(owned.get());
+
+        rpp::semaphore gate; // holds the worker, so the wait below reaches its timeout
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]{ gate.wait(); });
+        });
+        // the task must own the counter before the wait
+        spin_until([&]{ return loop->has_background_tasks(); });
+
+        // the drain runs this before the wait, so the wait must keep no raw source
+        loop->post([&]{ loop->set_time_source(nullptr); owned.reset(); });
+
+        rpp::Timer wall;
+        AssertThat(loop->wait_on_all(rpp::millis(50)), false); // the gated worker cannot finish
+        double wait_ms = wall.elapsed_millis();
+        print_info("wait_on_all: %.1fms\n", wait_ms);
+        AssertLess(wait_ms, 1000.0); // a freed offset would hold the wait far past its budget
+
+        gate.notify(); // release the worker, so the drain below does not wait on it
+        loop->run_until_idle();
+        AssertThat(loop->has_background_tasks(), false);
+    }
+
     // ─── a delay() which loses its clock mid-wait ───────────────
     // The waiter keeps the last offset it read. A waiter which re-reads a detached source
     // drops the warp below and then waits for real time to reach the deadline.

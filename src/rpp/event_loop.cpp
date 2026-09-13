@@ -88,6 +88,22 @@ namespace rpp
             rpp::sleep_ms(1); // wall-clock poll step
     }
 
+    bool event_loop::wait_pop_until(resume_event& event, rpp::TimePoint deadline, time_frame& frame) noexcept
+    {
+        if (!frame.warpable)
+            return resume_queue.wait_pop_until(event, deadline); // wall clock: one efficient wait
+
+        constexpr rpp::Duration warp_poll = rpp::millis(1); // wall-clock poll step
+        while (true) // warpable clock: poll so warp_forward() can release the wait early
+        {
+            rpp::Duration remaining = deadline - current_time(frame);
+            if (remaining <= rpp::Duration::zero())
+                return false;
+            if (resume_queue.wait_pop(event, remaining < warp_poll ? remaining : warp_poll))
+                return true;
+        }
+    }
+
     void event_loop::stop() noexcept
     {
         loop_running = false;
@@ -96,16 +112,16 @@ namespace rpp
 
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
     {
-        // one clock for the whole wait, because `end` belongs to it and a reload would poll
-        // that deadline against a different clock, see BUGS.md B26
-        rpp::AtomicTimeSource* src = time_source.load(std::memory_order_relaxed);
-        rpp::TimePoint end = current_time(src) + timeout;
+        // one clock frame for the whole wait, because `end` belongs to it and a drained
+        // callback can free the source, see BUGS.md B26
+        time_frame frame = get_time_source_frame();
+        rpp::TimePoint end = frame.now() + timeout;
         resume_event event;
         while (resume_queue.try_pop(event))
         {
             process_event(event);
         }
-        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, src))
+        while (has_background_tasks() && wait_pop_until(event, end, frame))
         {
             process_event(event);
             invoke_loop_hook();

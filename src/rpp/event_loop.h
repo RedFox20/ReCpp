@@ -279,6 +279,10 @@ namespace rpp
         // offset every poll step, so warp_forward() still releases the wait early
         void wait_until(rpp::TimePoint deadline, time_frame frame) const noexcept;
 
+        // pops until `deadline` on the clock `frame` captured, so a drained callback
+        // which frees the clock leaves no raw source inside the wait
+        bool wait_pop_until(resume_event& event, rpp::TimePoint deadline, time_frame& frame) noexcept;
+
     public:
         // ─── end of the loop clock ──────────────────────────────────
 

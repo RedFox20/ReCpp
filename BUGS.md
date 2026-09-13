@@ -19,11 +19,12 @@ A live worker holds three borrowed things: the loop, the time source and the poo
 the `delay()` half. A poll step reads the offset under a reader guard, and
 `stop_and_wait_all_ready()` retires the pointer before the owner frees it. Three gaps stay open.
 
-1. A pump call hands the raw pointer to `concurrent_queue`, which polls it for the whole wait
-   outside the guard (`event_loop.cpp:106,144,162,193`). The guard cannot cover it, because a
-   pump holds the clock for up to its whole timeout, and the retire would block for that long.
-   A pump holds one clock for the whole wait, because the deadline it built belongs to that
-   same clock. Only the owner thread pumps and retires, so the two cannot overlap.
+1. `run_loop()`, `run_once()` and `run_until_idle()` hand the raw pointer to
+   `concurrent_queue`, which polls it for the whole wait outside the guard
+   (`event_loop.cpp:162,180,195`). The guard cannot cover it, because the retire would then
+   block for the whole timeout. Each one loads the pointer at the call, so no callback runs
+   between that load and the wait. `wait_on_all()` drains callbacks between the two, and a
+   drained callback can free the clock, so it polls from a `time_frame` instead.
 2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
    with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
 3. An owner which frees a clock it swapped out for another still reaches freed memory,
