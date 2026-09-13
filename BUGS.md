@@ -21,9 +21,10 @@ the `delay()` half. A poll step reads the offset under a reader guard, and `set_
 retires the pointer before it returns. Three gaps stay open.
 
 1. A pump call hands the raw pointer to `concurrent_queue`, which polls it for the whole wait
-   outside the guard (`event_loop.cpp:108,146,164,195`). A detach from another thread returns
-   while that pump still holds the clock. The guard cannot cover it, because a pump holds the
-   clock for up to its whole timeout, and `set_time_source()` would block for that long.
+   outside the guard (`event_loop.cpp:108,146,164,195`). The guard cannot cover it, because a
+   pump holds the clock for up to its whole timeout, and `set_time_source()` would block for
+   that long. Only the owner thread pumps, so the doxygen asks the owner thread to detach.
+   Nothing enforces that yet.
 2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
    with the offset of the new clock. A detach is safe. A swap re-arms the same stranding.
 3. An owner which frees the clock without a detach still reaches freed memory.
@@ -32,10 +33,16 @@ So the destructor must never return while a task is live, and a wait which does 
 abort on every platform. A shared pointer is not the fix, because it changes the borrow contract
 of every consumer.
 
-The reader guard has no spin bound, and `rpp::yield()` promises no progress. A standalone
-replica over 20000 detach cycles measured 2 readers on 4 cores at 21.8ms, 4 readers at 315ms,
-and 8 readers at 88.8s. A poll step holds the guard for nanoseconds and then sleeps, so real
-usage never reaches that shape. A backoff belongs with the work above, not before it.
+The drain counts every reader, so a steady stream of new readers can hold it up. Over 20000
+detach cycles on 4 cores it measured 2 readers at 21.8ms, 4 at 315ms and 8 at 88.8s. A poll
+step holds the guard for nanoseconds and then sleeps, so real usage never reaches that shape.
+
+**A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()` so
+a later reader joins the other count, reports a use after free 5 runs out of 12 under ASAN. A
+reader picks its count before it loads the pointer, so a reader which picked count `g` and
+then stalled can hold the pointer an attach stored, while the detach after it retires the
+other count, reads zero, and lets the caller free the clock. A correct split has to publish
+the pointer each reader holds, which is a hazard pointer, not a counter.
 
 The pool side needs measurement before a fix. `start_in_background()` hands the pool a
 delegate which captures the awaiter, and that awaiter lives in the coroutine frame.

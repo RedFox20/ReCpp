@@ -231,7 +231,9 @@ namespace rpp
          *        The loop borrows the clock and MUST NOT outlive it. No attribute states
          *        that: clang rejects lifetimebound on a function that returns void.
          *        Returns only after every delay() and current_time() reader released the
-         *        old clock. A pump call on another thread still holds it, see BUGS.md B26.
+         *        old clock, so the caller may then destroy it.
+         * @warning Must be called on the loop's owner thread. A pump hands the clock to the
+         *          queue outside the reader guard, and only the owner thread pumps.
          */
         void set_time_source(rpp::AtomicTimeSource* clock) noexcept;
 

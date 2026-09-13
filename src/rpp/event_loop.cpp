@@ -62,6 +62,7 @@ namespace rpp
     void event_loop::set_time_source(rpp::AtomicTimeSource* clock) noexcept
     {
         time_source.store(clock, std::memory_order_seq_cst);
+        // every reader counts, because a reader picks its count before it loads the pointer
         while (time_source_readers.load(std::memory_order_seq_cst) != 0)
             rpp::yield(); // a reader holds the old clock and the caller may free it next
     }

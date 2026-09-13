@@ -1196,7 +1196,7 @@ TestImpl(test_event_loop)
     {
         std::atomic_bool stop { false };
         std::atomic_int reads { 0 };
-        constexpr int NUM_READERS = 2; // 4 readers make the drain below spin for 300ms, see BUGS.md B26
+        constexpr int NUM_READERS = 2; // 4 readers cost 535ms here and 8 cost 7s, see BUGS.md B26
         std::vector<std::thread> readers;
         readers.reserve(NUM_READERS);
         for (int t = 0; t < NUM_READERS; ++t)
