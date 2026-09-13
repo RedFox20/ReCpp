@@ -124,13 +124,17 @@ TestImpl(test_semaphore)
         std::atomic_bool working = true;
         std::atomic_int num_notified = 0;
 
+        std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
         std::thread worker([&]
         {
             while (working)
             {
                 rpp::sleep_ms(1); // do some work
                 if (sem.wait(millis(50)) == rpp::semaphore::timeout)
+                {
+                    not_notified = true;
                     AssertFailed("semaphore was not notified");
+                }
                 else if (working)
                     ++num_notified;
             }
@@ -148,6 +152,7 @@ TestImpl(test_semaphore)
         sem.notify(); // notify finished
         worker.join();
 
+        AssertFalse(not_notified.load());
         AssertEqual(num_notified, num_notifies_sent);
     }
 
@@ -158,13 +163,17 @@ TestImpl(test_semaphore)
         std::atomic_bool working = true;
         std::atomic_int num_notified = 0;
 
+        std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
         std::thread worker([&]
         {
             while (working)
             {
                 spin_sleep_for_us(100); // do some work
                 if (sem.wait(millis(50)) == rpp::semaphore::timeout)
+                {
+                    not_notified = true;
                     AssertFailed("semaphore was not notified");
+                }
                 else if (working)
                     ++num_notified;
             }
@@ -182,6 +191,7 @@ TestImpl(test_semaphore)
         sem.notify(); // notify finished
         worker.join();
 
+        AssertFalse(not_notified.load());
         AssertEqual(num_notified, num_notifies_sent);
     }
 
@@ -205,12 +215,17 @@ TestImpl(test_semaphore)
             }
         });
 
-        // a worker thread cannot fail the case, so the main thread reads this after the join
+        // AssertFailed prints the file and line from any thread, but only the case thread
+        // records it, so the main thread reads this flag after the join
         std::atomic_bool not_notified { false };
         std::thread consumer([&] {
             constexpr auto timeout = rpp::seconds(1); // a stuck semaphore must fail the case, not hang it
             while (consumer_data.size() < MAX_DATA) {
-                if (sem.wait(timeout) != rpp::semaphore::notified) { not_notified = true; break; }
+                if (sem.wait(timeout) != rpp::semaphore::notified) {
+                    not_notified = true;
+                    AssertFailed("semaphore was not notified");
+                    break;
+                }
                 std::lock_guard lock { producer_mutex };
                 consumer_data.emplace_back(std::move(producer_queue.front()));
                 producer_queue.pop_front();
