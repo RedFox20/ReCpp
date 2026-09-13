@@ -1407,25 +1407,25 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 | Class | Description |
 |-------|-------------|
 | [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L168) | Single-target function delegate |
-| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L746) | Multi-target event delegate (`event<>` alias) |
+| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L747) | Multi-target event delegate (`event<>` alias) |
 
 ### delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`operator()(Args... args)`](src/rpp/delegate.h#L685) | Invoke the delegate |
-| [`operator bool()`](src/rpp/delegate.h#L640) | True if delegate is bound |
-| [`reset()`](src/rpp/delegate.h#L585) | Unbind the delegate |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L686) | Invoke the delegate |
+| [`operator bool()`](src/rpp/delegate.h#L641) | True if delegate is bound |
+| [`reset()`](src/rpp/delegate.h#L586) | Unbind the delegate |
 
 ### multicast_delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L829) / [`operator+=`](src/rpp/delegate.h#L889) | Register a callback |
-| [`operator-=`](src/rpp/delegate.h#L894) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L914) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L743) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L791) | Number of registered callbacks |
+| [`add(delegate)`](src/rpp/delegate.h#L830) / [`operator+=`](src/rpp/delegate.h#L890) | Register a callback |
+| [`operator-=`](src/rpp/delegate.h#L895) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L915) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L744) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L792) | Number of registered callbacks |
 | [`multicast_fwd<T>`](src/rpp/delegate.h#L910) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
