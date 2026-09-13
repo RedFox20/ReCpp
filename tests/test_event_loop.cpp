@@ -1190,8 +1190,8 @@ TestImpl(test_event_loop)
     }
 
     // ─── the shutdown retires the clock before the owner frees it ───────────────
-    // set_time_source() only swaps. A shutdown which does not wait out the readers leaves
-    // one dereferencing freed memory, which ASAN reports as a heap-use-after-free.
+    // A shutdown which does not wait out the readers leaves one reading freed memory.
+    // Stress reproducer: ASAN catches that 4 runs in 10, see BUGS.md B26.
     TestCase(stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it)
     {
         std::atomic_bool stop { false };

@@ -37,6 +37,13 @@ The drain counts every reader, so a steady stream of new readers can hold it up.
 detach cycles on 4 cores it measured 2 readers at 21.8ms, 4 at 315ms and 8 at 88.8s. A poll
 step holds the guard for nanoseconds and then sleeps, so real usage never reaches that shape.
 
+`stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it` is a stress reproducer,
+not a recipe which fails on demand. Without the drain, ASAN catches the use after free 4 runs
+in 10, and three times the cycles only reach 6 in 10. The guarded region is four atomic
+operations with nothing a test can block inside, because `AtomicTimeSource::total_offset()` is
+a non-virtual read. A deterministic version needs a test callback on a hot path, which costs
+every reader a load and a branch.
+
 **A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()` so
 a later reader joins the other count, reports a use after free 5 runs out of 12 under ASAN. A
 reader picks its count before it loads the pointer, so a reader which picked count `g` and
