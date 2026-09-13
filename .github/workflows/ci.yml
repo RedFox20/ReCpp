@@ -28,12 +28,10 @@ jobs:
           - { name: ubuntu-cpp23-asan-clang18,       compiler: clang, cc: clang-18, std: "23", san: asan,       cov: "true" }
           - { name: ubuntu-cpp23-clang-tidy-clang18, compiler: clang, cc: clang-18, std: "23", san: clang-tidy, cov: "true" }
           - { name: ubuntu-cpp23-tsan-clang18,       compiler: clang, cc: clang-18, std: "23", san: tsan,       cov: "true" }
-          # gcc-13, C++20 and C++23
+          # gcc-13, C++20 and C++23. clang-tidy runs on clang-18 and gcc-14 instead
           - { name: ubuntu-cpp20-asan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "20", san: asan,       cov: "true" }
-          - { name: ubuntu-cpp20-clang-tidy-gcc13,   compiler: gcc,   cc: gcc-13,   std: "20", san: clang-tidy, cov: "true" }
           - { name: ubuntu-cpp20-tsan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "20", san: tsan,       cov: "true" }
           - { name: ubuntu-cpp23-asan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "23", san: asan,       cov: "true" }
-          - { name: ubuntu-cpp23-clang-tidy-gcc13,   compiler: gcc,   cc: gcc-13,   std: "23", san: clang-tidy, cov: "true" }
           - { name: ubuntu-cpp23-tsan-gcc13,         compiler: gcc,   cc: gcc-13,   std: "23", san: tsan,       cov: "true" }
           # gcc-14 on C++26. Coverage stays off, because it runs the runner out of memory
           - { name: ubuntu-cpp26-asan-gcc14,         compiler: gcc,   cc: gcc-14,   std: "26", san: asan,       cov: "false" }

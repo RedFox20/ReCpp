@@ -5004,7 +5004,7 @@ Four composite actions under [`.github/actions/`](.github/actions/) carry the sh
 
 | Action | Jobs |
 |---|---|
-| `ubuntu-build` | the 19 compiler, standard and sanitizer combinations |
+| `ubuntu-build` | the 18 compiler, standard and sanitizer combinations |
 | `consumer-build` | ReCpp built as a dependency, on gcc-14 and clang-21 |
 | `android-build` | the NDK builds, the QEMU tests and clang-tidy |
 
