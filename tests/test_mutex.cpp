@@ -23,8 +23,8 @@ TestImpl(test_mutex)
         std::string value;
     };
 
-    // accessors of the wrong type, which used to satisfy the concept and then hard-error
-    // on unique_lock<int> and a reference to void inside synchronize_guard
+    // accessors of the wrong type: SyncableType must reject these, because synchronize_guard
+    // hard-errors on a unique_lock<int> and on a reference to void
     class WrongAccessorTypes : public rpp::synchronizable<WrongAccessorTypes>
     {
     public:

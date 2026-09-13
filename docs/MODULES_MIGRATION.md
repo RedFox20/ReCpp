@@ -1137,8 +1137,8 @@ run rebuilds. **Measure a modules change from an empty build directory, or measu
 Grouping fixed it, and the C++23 modules CI row keeps it fixed.
 
 B19, B20 and B21 share one shape: an `export using` inside namespace `std` either poisons a
-later instantiation or corrupts the interface. `RppStdModuleOnly` is the target which catches
-the next one, because it is the only consumer which names no std type in a header.
+later instantiation or corrupts the interface. `RppStdModuleOnly` caught each one, and it went
+with `rpp.std`. No module exports a std name now, so the shape has no way back in.
 
 Two more failures stop the same consumer, and neither is a compiler bug. A declaration in a
 global module fragment reaches an importer only when an exported declaration names it:

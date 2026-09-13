@@ -365,8 +365,8 @@ endif()
 if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 
-    # Eight units, one per header group. A group carries its headers directly, because of
-    # the gcc-14 source location budget in BUGS.md C28.
+    # One unit per header group, each carrying its headers directly, because of the
+    # gcc-14 source location budget in BUGS.md C28.
     set(RPP_MODULES_SRC
         src/rpp/rpp-core.cppm
         src/rpp/rpp-text.cppm

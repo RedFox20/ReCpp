@@ -435,10 +435,13 @@ def bugs_citation_drift() -> list:
     bad = [f'{BUGS}: defines {i} more than once' for i in sorted({i for i in ids if ids.count(i) > 1})]
     known = set(ids)
     files = list(CITING)
-    for root in (rd.SRC, 'docs', 'tests', os.path.join('tests', 'module_consumer')):
+    # a workflow cites an entry to tell a maintainer which failure a red job means
+    for root in (rd.SRC, 'docs', 'tests', os.path.join('tests', 'module_consumer'),
+                 os.path.join('.github', 'workflows'), os.path.join('.github', 'actions', 'consumer-build'),
+                 os.path.join('.github', 'actions', 'ubuntu-build')):
         if not os.path.isdir(root): continue
         files += [os.path.join(root, f) for f in sorted(os.listdir(root))
-                  if f.endswith(('.h', '.cpp', '.cppm', '.md', '.py', '.txt'))]
+                  if f.endswith(('.h', '.cpp', '.cppm', '.md', '.py', '.txt', '.yml'))]
     for path in files:
         if not os.path.exists(path): continue
         for cited in sorted(set(re.findall(r'BUGS\.md\s+([BC]\d+)', _readfile(path)))):

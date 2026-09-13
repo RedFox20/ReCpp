@@ -264,7 +264,7 @@ namespace rpp
         };
 
         // an overloaded operator& would hijack `&ref`, and <memory> for std::addressof
-        // doubles this header, from 43k preprocessed lines to 84k
+        // doubles the preprocessed size of a header the whole threading layer includes
         template<class T> constexpr T* addressof(T& r) noexcept { return __builtin_addressof(r); }
     }
 
