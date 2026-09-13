@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Writes the test count into the run summary, so a reader needs no scroll through the
-# whole build log. Runs after a failure too, where it reports that no count exists.
-# Usage: report_test_count.sh ubuntu-cpp20-asan-clang18
+# Writes the test count into the run summary, so a reader needs no scroll through the log.
+# Usage: report_test_count.sh <job-name>
 set -uo pipefail
 
 JOB_NAME="$1"
