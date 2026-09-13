@@ -16,12 +16,12 @@ terminates. An MSVC `_DEBUG` build calls `_CrtDbgReport`, which returns, so the 
 finishes under a live worker. The comment at `event_loop.cpp:35` describes the graceful exit
 as if every platform took it.
 
-A live worker holds three borrowed things: the loop, the time source and the pool. A
-`delay()` worker reads `loop.time_source` on every poll step (`event_loop.h:818-820`). A
-freed clock there is a read of freed memory, not a stale value. B23 covers the write side of
-the same pointer. So the destructor must never return while a task is live, and a wait which
-does not finish must abort on every platform. A shared pointer is not the fix, because it
-changes the borrow contract of every consumer.
+A live worker holds three borrowed things: the loop, the time source and the pool. C30 closed
+the time source half. A poll step reads the offset under a reader guard, and
+`set_time_source()` retires the pointer before it returns. An owner which frees the clock
+without a detach still reaches freed memory. So the destructor must never return while a task
+is live, and a wait which does not finish must abort on every platform. A shared pointer is
+not the fix, because it changes the borrow contract of every consumer.
 
 The pool side needs measurement before a fix. `start_in_background()` hands the pool a
 delegate which captures the awaiter, and that awaiter lives in the coroutine frame.
@@ -29,17 +29,6 @@ delegate which captures the awaiter, and that awaiter lives in the coroutine fra
 count reaches zero while the worker is still inside a loop member function. The pool then
 frees the delegate. B17 reports a detached task which outlives the suite that started it.
 Both halves need a regression test which fails on demand.
-
-### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
-`event_loop::time_source` is a raw pointer. A pending `delay()` reads it once to pick its poll
-branch, then polls `current_time()` from a background worker (`event_loop.h:814-820`). A
-`set_time_source()` call from the owner thread races that read. The damage is worse than a torn
-read. The worker keeps a virtual `end` deadline and compares it against wall time, so it polls
-until that deadline arrives in real time.
-
-`stop_and_wait_all_ready()` detaches only after every task finished, so it does not reach this.
-Any other caller which retimes a loop with work in flight does. A fix makes the field atomic
-and has the worker load it once per poll. Found by review on PR #84.
 
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
@@ -359,6 +348,12 @@ inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
 
 ## Closed
+
+### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
+A poll step re-read the raw pointer every millisecond, so a detach dropped the warp offset and
+left the worker waiting for real time to reach a virtual deadline. A waiter now captures the
+offset once and refreshes it under a reader guard, which `delay_survives_a_detached_time_source`
+and `set_time_source_retires_the_pointer_before_a_reader_leaves` pin.
 
 ### C29. `delegate::copy` leaked the destination functor when the source was a function
 The function branch of `copy()` overwrote `f` and `obj` and never freed the functor the

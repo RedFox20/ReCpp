@@ -48,6 +48,46 @@ namespace rpp
         fork_tasks.clear();
     }
 
+    bool event_loop::read_time_offset(rpp::int64& offset_ns) const noexcept
+    {
+        // seq_cst on both sides: either set_time_source() sees this count, or this load
+        // sees the new pointer, so this never dereferences a retired clock
+        time_source_readers.fetch_add(1, std::memory_order_seq_cst);
+        rpp::AtomicTimeSource* src = time_source.load(std::memory_order_seq_cst);
+        if (src) offset_ns = src->total_offset().nsec;
+        time_source_readers.fetch_sub(1, std::memory_order_release);
+        return src != nullptr;
+    }
+
+    void event_loop::set_time_source(rpp::AtomicTimeSource* clock) noexcept
+    {
+        time_source.store(clock, std::memory_order_seq_cst);
+        while (time_source_readers.load(std::memory_order_seq_cst) != 0)
+            rpp::yield(); // a reader holds the old clock and the caller may free it next
+    }
+
+    event_loop::time_frame event_loop::capture_frame() const noexcept
+    {
+        time_frame frame;
+        frame.warpable = read_time_offset(frame.offset_ns);
+        return frame;
+    }
+
+    void event_loop::wait_until(rpp::TimePoint deadline, time_frame frame) const noexcept
+    {
+        if (!frame.warpable)
+        {
+            rpp::sleep_until(deadline); // wall clock: one efficient sleep
+            return;
+        }
+        // warpable clock: poll so warp_forward() can release the wait early
+        while (frame.now() < deadline)
+        {
+            rpp::sleep_ms(1); // wall-clock poll step
+            read_time_offset(frame.offset_ns); // a detached source leaves the last offset in place
+        }
+    }
+
     void event_loop::stop() noexcept
     {
         loop_running = false;
@@ -65,7 +105,7 @@ namespace rpp
             process_event(event);
         }
         // only wait with timeout if there are still background tasks that could post events
-        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, time_source))
+        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, time_source.load(std::memory_order_relaxed)))
         {
             process_event(event);
             invoke_loop_hook();
@@ -103,7 +143,7 @@ namespace rpp
             resume_event event;
             // background tasks still running: wait for the next resume with a timeout
             // to avoid missing a race where pending_count drops after we checked
-            if (resume_queue.wait_pop(event, suspend_interval, time_source))
+            if (resume_queue.wait_pop(event, suspend_interval, time_source.load(std::memory_order_relaxed)))
             {
                 process_event(event);
                 invoke_loop_hook();
@@ -121,7 +161,7 @@ namespace rpp
         resume_event event;
         const bool got_event = timeout == rpp::Duration::zero()
                              ? resume_queue.try_pop(event)
-                             : resume_queue.wait_pop(event, timeout, time_source);
+                             : resume_queue.wait_pop(event, timeout, time_source.load(std::memory_order_relaxed));
         if (got_event)
             process_event(event);
 
@@ -152,7 +192,7 @@ namespace rpp
             resume_event event;
             // background tasks still running: wait for the next resume with a timeout
             // to avoid missing a race where pending_count drops after we checked
-            if (resume_queue.wait_pop(event, suspend_interval, time_source))
+            if (resume_queue.wait_pop(event, suspend_interval, time_source.load(std::memory_order_relaxed)))
             {
                 process_event(event);
                 ++processed_count;

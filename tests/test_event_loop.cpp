@@ -1168,6 +1168,54 @@ TestImpl(test_event_loop)
         AssertThat(bg_finished.load(), true);
     }
 
+    // ─── a delay() which loses its clock mid-wait ───────────────
+    // The waiter keeps the last offset it read. A waiter which re-reads a detached source
+    // drops the warp below and then waits for real time to reach the deadline.
+    TestCase(delay_survives_a_detached_time_source)
+    {
+        clock.warp_forward(rpp::millis(400)); // the deadline below is built in this frame
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::millis(20));
+            done = true;
+        });
+
+        while (!loop->has_background_tasks()) // the poll must own the counter before the detach
+            rpp::yield();
+        loop->set_time_source(nullptr);
+
+        loop_until(rpp::millis(150), [&]{ return done.load(); });
+        AssertThat(done.load(), true);
+    }
+
+    // ─── a detach retires the pointer before the owner frees the clock ──────────
+    // A store alone leaves a reader which already loaded the pointer dereferencing freed
+    // memory, which ASAN reports as a heap-use-after-free.
+    TestCase(set_time_source_retires_the_pointer_before_a_reader_leaves)
+    {
+        std::atomic_bool stop { false };
+        std::atomic_int reads { 0 };
+        std::vector<std::thread> readers;
+        for (int t = 0; t < 2; ++t)
+            readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
+        while (reads.load() == 0) // a reader must be live before the first detach
+            rpp::yield();
+
+        const int before = reads.load();
+        for (int i = 0; i < 20000; ++i)
+        {
+            auto warpable = std::make_unique<rpp::AtomicTimeSource>();
+            loop->set_time_source(warpable.get());
+            loop->set_time_source(nullptr); // must not return while the reader holds the old pointer
+        }
+
+        stop = true;
+        for (std::thread& reader : readers) reader.join();
+        loop->set_time_source(&clock); // the fixture clock owns the loop again
+        AssertGreater(reads.load(), before); // the readers ran across the detach cycles
+    }
+
     // posts a callback from the final resume, which lands as the background count hits zero
     void fork_with_trailing_post(std::atomic_bool& trailing_ran)
     {
