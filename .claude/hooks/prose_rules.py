@@ -157,8 +157,44 @@ def dedupe(findings, limit=8):
     return list(dict.fromkeys(findings))[:limit]
 
 
+# (path, lines, the text a finding must contain, or None when the lines are clean)
+SELFTEST = [
+    ("t.cpp", ["loop->pump_until_ready(fut, rpp::millis(20));",
+               "AssertThat(ready, false); // the worker cannot finish in a 20ms budget"], "20ms"),
+    ("t.cpp", ["// the granularity of WinAPI SleepConditionVariable is ~15.6ms"], None),
+    ("t.cpp", ["int x = 1; // https://example.com/a//b is one comment"], None),
+    ("t.cpp", ['const char* s = "a // b"; // a string holding slashes stays quiet'], None),
+    ("t.cpp", ["constexpr int READERS = 2; // more readers cost the retire more, see BUGS.md B26"], None),
+    ("t.cpp", ["rpp::sleep_ms(1); // wall-clock poll step"], None),
+    ("t.cpp", ["rpp::sleep_ms(50);"], "sleep_ms(50)"),
+    ("t.cpp", ["// one line", "// two lines", "// three lines"], "over 2 lines"),
+    ("t.cpp", ["// the loop can't reach this"], "contraction"),
+    ("README.md", ["| [`f()`](a.h#L1) | Attach a clock; null reverts to wall time |"], "semicolon in a table cell"),
+    ("README.md", ["| [`f()`](a.h#L1) | Attach a clock. Null reverts to wall time |"], None),
+    ("README.md", ["|---|---|"], None),
+    ("README.md", ["```", "| a; b |", "```"], None),
+]
+
+
+def selftest():
+    """Pin every check, so a refactor cannot turn one into a silent false negative."""
+    bad = 0
+    for path, lines, want in SELFTEST:
+        got = lint_path(path, lines)
+        if want is None and got:
+            bad += 1
+            print(f"FAIL clean lines reported {got[0]}\n     {lines}")
+        elif want is not None and not any(want in g for g in got):
+            bad += 1
+            print(f"FAIL expected '{want}', got {got or 'nothing'}\n     {lines}")
+    print(f"== prose_rules selftest: {bad} finding(s) over {len(SELFTEST)} case(s) ==")
+    return 1 if bad else 0
+
+
 def _main():
     """Lint added lines of a unified diff read from stdin."""
+    if "--selftest" in sys.argv:
+        return selftest()
     per_file, path = {}, None
     for raw in sys.stdin:
         if raw.startswith("+++ b/"):

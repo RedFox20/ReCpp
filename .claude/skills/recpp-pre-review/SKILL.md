@@ -38,6 +38,10 @@ the README API index reaches the same word rules as any paragraph.
 Both whole-line and trailing comments reach these checks. A trailing comment breaks
 the constant rule most often, because the literal sits on the same line.
 
+All three hooks share `.claude/hooks/prose_rules.py`, so one module holds every rule
+above. Run `.claude/hooks/prose_rules.py --selftest` after you edit it. A linter
+which stops detecting reports nothing, and nothing looks the same as clean.
+
 ## Prose never goes in through the shell
 
 A second hook refuses a Bash command which writes a `.md`, `.h`, `.cpp`, or `.cppm`

@@ -222,6 +222,8 @@ result. A gate which does not run is a gate which failed.
 #    reports nothing passes import-order whether or not it still detects anything.
 tools/check_includes.py selftest --check
 tools/check_includes.py import-order --check
+# the prose hooks share one rule module, so its selftest guards all three of them
+.claude/hooks/prose_rules.py --selftest
 # 1. Linux GCC
 CXX23=1 mama gcc build test="nogdb -vv"
 # 2. Linux Clang, plus the clang-tidy pass which AGENTS.md requires
