@@ -5,6 +5,7 @@
 #include <rpp/timer.h>
 #include <rpp/threads.h>
 #include <rpp/collections.h>
+#include <rpp/semaphore.h>
 
 #include <rpp/tests.h>
 #include <atomic>
@@ -1173,6 +1174,9 @@ TestImpl(test_event_loop)
         loop->fork([this, &trailing_ran]() -> rpp::event_task
         {
             co_await loop->run_async([]{ rpp::sleep_ms(5); });
+            // the worker pushes the resume before it decrements, so wait for the count
+            while (loop->has_background_tasks()) // else wait_on_all drains the post it left
+                rpp::yield();
             loop->post([&trailing_ran]{ trailing_ran = true; });
         });
     }
@@ -1203,6 +1207,25 @@ TestImpl(test_event_loop)
 
         // detached: current_time() reads the wall clock, not the warped source
         AssertLess(loop->current_time(), clock.time_now() - rpp::seconds(9000));
+    }
+
+    // ─── shutdown: a timeout keeps the time source attached ─────
+    // a live delay() worker polls it against a virtual deadline and would never reach a wall-clock one
+    TestCase(stop_and_wait_all_ready_keeps_the_clock_on_timeout)
+    {
+        rpp::semaphore release;
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->run_async([&]{ release.wait(); });
+        });
+
+        clock.warp_forward(rpp::seconds(10000));
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
+        // still attached: current_time() carries the warp, a detached loop would read wall time
+        AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
+
+        release.notify();
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
     }
 
     // ─── loop hook: fires on every run_once() ───────────────────

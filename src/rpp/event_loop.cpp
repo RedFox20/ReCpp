@@ -75,11 +75,20 @@ namespace rpp
 
     bool event_loop::stop_and_wait_all_ready(rpp::Duration max_wait) noexcept
     {
+        // the drain resumes coroutines, which must run on the loop thread
+        if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+        {
+            LogError("event_loop::stop_and_wait_all_ready() must be called on the event loop thread");
+            return false;
+        }
+
         stop();
         wait_on_all(max_wait);
+        const bool tasks_done = !has_background_tasks(); // before the drain, so a late worker still counts
         run_all_ready(); // a resume queued as the background count hit zero is still pending
-        set_time_source(nullptr);
-        return !has_pending_work();
+        if (tasks_done)
+            set_time_source(nullptr); // a live delay() worker polls it against a virtual deadline
+        return tasks_done && !has_pending_work();
     }
 
     bool event_loop::run_loop(rpp::Duration suspend_interval) noexcept

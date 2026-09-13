@@ -261,8 +261,11 @@ namespace rpp
          * @brief Stops the loop, waits for the background tasks, runs every resume they
          *        queued, and detaches the time source. The destructor then touches nothing
          *        the owner may already have destroyed.
+         *        On timeout the time source stays attached, because a live delay() worker
+         *        polls it against a virtual deadline and would never reach a wall-clock one.
+         *        Call it on the loop thread, because the drain resumes coroutines.
          * @param max_wait Maximum time to wait for the background tasks.
-         * @returns true when the loop drained inside max_wait, leaving no task and no resume
+         * @returns true when every task finished inside max_wait and nothing is left queued
          */
         bool stop_and_wait_all_ready(rpp::Duration max_wait = rpp::seconds(1)) noexcept;
 
