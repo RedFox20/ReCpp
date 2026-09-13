@@ -46,9 +46,11 @@ namespace rpp
 
         // destroy all fork coroutine frames (both completed and stale)
         fork_tasks.clear();
+
+        retire_time_source(); // a worker which outlived the wait must not read a freed clock
     }
 
-    bool event_loop::read_time_offset(rpp::int64& offset_ns) const noexcept
+    bool event_loop::get_time_source_offset(rpp::int64& offset_ns) const noexcept
     {
         // seq_cst on both sides: either set_time_source() sees this count, or this load
         // sees the new pointer, so this never dereferences a retired clock
@@ -59,18 +61,18 @@ namespace rpp
         return src != nullptr;
     }
 
-    void event_loop::set_time_source(rpp::AtomicTimeSource* clock) noexcept
+    void event_loop::retire_time_source() noexcept
     {
-        time_source.store(clock, std::memory_order_seq_cst);
+        time_source.store(nullptr, std::memory_order_seq_cst);
         // every reader counts, because a reader picks its count before it loads the pointer
         while (time_source_readers.load(std::memory_order_seq_cst) != 0)
-            rpp::yield(); // a reader holds the old clock and the caller may free it next
+            rpp::yield(); // a reader holds the old clock and the owner may free it next
     }
 
-    event_loop::time_frame event_loop::capture_frame() const noexcept
+    event_loop::time_frame event_loop::get_time_source_frame() const noexcept
     {
         time_frame frame;
-        frame.warpable = read_time_offset(frame.offset_ns);
+        frame.warpable = get_time_source_offset(frame.offset_ns);
         return frame;
     }
 
@@ -82,11 +84,8 @@ namespace rpp
             return;
         }
         // warpable clock: poll so warp_forward() can release the wait early
-        while (frame.now() < deadline)
-        {
+        while (current_time(frame) < deadline)
             rpp::sleep_ms(1); // wall-clock poll step
-            read_time_offset(frame.offset_ns); // a detached source leaves the last offset in place
-        }
     }
 
     void event_loop::stop() noexcept
@@ -99,15 +98,15 @@ namespace rpp
     {
         // drain any remaining events to avoid leaking coroutine frames
         // the deadline must use the same clock wait_pop_until() polls, or it expires at once
-        rpp::AtomicTimeSource* src = time_source.load(std::memory_order_relaxed);
-        rpp::TimePoint end = (src ? src->time_now() : rpp::TimePoint::monotonic_now()) + timeout;
+        rpp::TimePoint end = current_time(time_source.load(std::memory_order_relaxed)) + timeout;
         resume_event event;
         while (resume_queue.try_pop(event))
         {
             process_event(event);
         }
-        // only wait with timeout if there are still background tasks that could post events
-        while (has_background_tasks() && resume_queue.wait_pop_until(event, end, src))
+        // reload the clock every pass, so a detach between waits does not keep a stale one
+        while (has_background_tasks()
+            && resume_queue.wait_pop_until(event, end, time_source.load(std::memory_order_relaxed)))
         {
             process_event(event);
             invoke_loop_hook();
@@ -132,7 +131,7 @@ namespace rpp
         // a fork suspended on a post_resume() awaiter counts in neither, so it gets its own term
         const bool idle = !has_pending_work() && num_forks() == 0;
         if (idle)
-            set_time_source(nullptr); // a live delay() worker polls it against a virtual deadline
+            retire_time_source(); // a live delay() worker polls it against a virtual deadline
         return tasks_done && idle;
     }
 

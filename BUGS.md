@@ -21,13 +21,13 @@ the `delay()` half. A poll step reads the offset under a reader guard, and `set_
 retires the pointer before it returns. Three gaps stay open.
 
 1. A pump call hands the raw pointer to `concurrent_queue`, which polls it for the whole wait
-   outside the guard (`event_loop.cpp:108,146,164,195`). The guard cannot cover it, because a
-   pump holds the clock for up to its whole timeout, and `set_time_source()` would block for
-   that long. Only the owner thread pumps, so the doxygen asks the owner thread to detach.
-   Nothing enforces that yet.
+   outside the guard (`event_loop.cpp:106,144,162,193`). The guard cannot cover it, because a
+   pump holds the clock for up to its whole timeout, and the retire would block for that long.
+   Each wait reloads the pointer, so only one wait can hold a stale one.
 2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
-   with the offset of the new clock. A detach is safe. A swap re-arms the same stranding.
-3. An owner which frees the clock without a detach still reaches freed memory.
+   with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
+3. An owner which frees a clock it swapped out still reaches freed memory, because
+   `set_time_source()` only stores. Retire through `stop_and_wait_all_ready()` first.
 
 So the destructor must never return while a task is live, and a wait which does not finish must
 abort on every platform. A shared pointer is not the fix, because it changes the borrow contract
@@ -371,10 +371,10 @@ The script's own docstring already warns that it has mistakes.
 ## Closed
 
 ### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
-A poll step re-read the raw pointer, so a detach dropped the warp offset. The worker then waited
-for real time to reach a virtual deadline. A waiter now captures the offset once and refreshes it
-under a reader guard, which `delay_survives_a_detached_time_source` and
-`set_time_source_retires_the_pointer_before_a_reader_leaves` pin.
+A poll step re-read the raw pointer, so a detach dropped the warp offset and left the worker
+waiting for real time to reach a virtual deadline. A waiter now captures the offset once and
+refreshes it under a reader guard, which `delay_survives_a_detached_time_source` and
+`stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it` pin.
 
 ### C29. `delegate::copy` leaked the destination functor when the source was a function
 The function branch of `copy()` overwrote `f` and `obj` and never freed the functor the

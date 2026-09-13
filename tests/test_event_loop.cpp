@@ -1189,10 +1189,10 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
-    // ─── a detach retires the pointer before the owner frees the clock ──────────
-    // A store alone leaves a reader which already loaded the pointer dereferencing freed
-    // memory, which ASAN reports as a heap-use-after-free.
-    TestCase(set_time_source_retires_the_pointer_before_a_reader_leaves)
+    // ─── the shutdown retires the clock before the owner frees it ───────────────
+    // set_time_source() only swaps. A shutdown which does not wait out the readers leaves
+    // one dereferencing freed memory, which ASAN reports as a heap-use-after-free.
+    TestCase(stop_and_wait_all_ready_retires_the_clock_before_the_owner_frees_it)
     {
         std::atomic_bool stop { false };
         std::atomic_int reads { 0 };
@@ -1209,7 +1209,7 @@ TestImpl(test_event_loop)
         {
             auto warpable = std::make_unique<rpp::AtomicTimeSource>();
             loop->set_time_source(warpable.get());
-            loop->set_time_source(nullptr); // must not return while the reader holds the old pointer
+            loop->stop_and_wait_all_ready(rpp::millis(20)); // retires before the scope frees it
         }
 
         stop = true;
@@ -1520,10 +1520,11 @@ TestImpl(test_event_loop)
     TestCase(pump_until_ready_survives_a_detached_time_source)
     {
         clock.warp_forward(rpp::millis(400)); // the pump deadline below is built in this frame
+        rpp::semaphore gate; // holds the worker until the pump budget is measured
         // the closure must outlive the coroutine, which reads its captures after the suspend
         auto coro = [&]() -> rpp::cfuture<int>
         {
-            co_await loop->run_async([]{ rpp::sleep_ms(200); return 1; });
+            co_await loop->run_async([&]{ gate.wait(); return 1; });
             co_return 1;
         };
         rpp::cfuture<int> fut = coro();
@@ -1536,9 +1537,10 @@ TestImpl(test_event_loop)
         double pump_ms = wall.elapsed_millis();
         print_info("pump_until_ready: ready=%d after %.1fms\n", (int)ready, pump_ms);
 
-        AssertThat(ready, false);   // 200ms of work cannot finish in a 20ms budget
+        AssertThat(ready, false);   // the gated worker cannot finish in a 20ms budget
         AssertLess(pump_ms, 150.0); // a dropped 400ms offset would hold the pump past its budget
 
+        gate.notify(); // release the worker, so the drain below does not wait on the clock
         AssertThat(loop->pump_until_ready(fut, rpp::seconds(15)), true); // drain without throwing
         AssertThat(fut.get(), 1);
     }
