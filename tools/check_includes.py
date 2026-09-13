@@ -245,12 +245,16 @@ def check_rpp_includes() -> list[str]:
     D5 emits one `export import` per rpp include, so a name from a sibling include breaks importers.
     """
     import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
-    bad = []
+    # the scan pins its own two paths before it reports on a header
+    bad = _check_referenced_all()
     # ClangMissing propagates out of the scan, and main decides soft or hard
     scanned = _referenced_all([h for h in headers() if h not in rpp_decls.NO_MODULE])
     for h in headers():
         if h in rpp_decls.NO_MODULE: continue
-        used = scanned[h]
+        # a header the pool lost would read as a clean one, so name it instead
+        if (used := scanned.get(h)) is None:
+            bad.append(f'{SRC}/{h}: the scan lost this header, so nothing checked its names')
+            continue
         direct = set(QUOTED_RE.findall(_read(os.path.join(SRC, h))))
         # config.h includes config.types.h, so a header including config.h already has it
         if 'config.h' in direct: direct.add('config.types.h')
@@ -727,7 +731,6 @@ def check_selftest() -> list[str]:
             got = int(found.split(':')[1]) if found else 0
             if got != want:
                 bad.append(f'{name}: the scan named line {got}, not {want}')
-    bad += _check_referenced_all()
     return bad
 
 
@@ -741,21 +744,16 @@ def _check_referenced_all() -> list[str]:
 
     A worker which drops a dependency, or a pool which loses a header, leaves `rpp-includes`
     accepting a file it should report. Only a comparison of the two paths names that.
+    ClangMissing propagates, so the caller decides a soft skip or a hard failure.
     """
-    try:
-        import rpp_decls
-    except ImportError as e:
-        return [f'rpp_decls is missing: {e}']
+    import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
     every = [h for h in headers() if h not in rpp_decls.NO_MODULE]
     names = [h for h in _PROBES if h in every] or every[:2]
     if len(names) < 2:
         return ['fewer than two headers to scan, so the pool path never runs']
-    try:
-        pooled = _referenced_all(names)
-        # the ground truth, not `_referenced_one`, which both paths call and would agree with itself
-        serial = {h: rpp_decls.referenced_rpp_headers(h) for h in names}
-    except rpp_decls.ClangMissing as e:
-        return [f'skipped, install libclang: {e}']
+    pooled = _referenced_all(names)
+    # the ground truth, not `_referenced_one`, which both paths call and would agree with itself
+    serial = {h: rpp_decls.referenced_rpp_headers(h) for h in names}
     # a probe which names nothing matches a worker that dropped everything, so the case needs one
     bad = [] if any(serial.values()) else ['no probe names an rpp header, so a dropped one hides']
     if set(pooled) != set(serial):
