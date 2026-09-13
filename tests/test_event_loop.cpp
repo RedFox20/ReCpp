@@ -1203,6 +1203,7 @@ TestImpl(test_event_loop)
     struct parking_awaiter
     {
         rpp::coro_handle<>& slot;
+        // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
         bool await_ready() const noexcept { return false; }
         void await_suspend(rpp::coro_handle<> h) noexcept { slot = h; }
         void await_resume() const noexcept {}
