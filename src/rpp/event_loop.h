@@ -204,8 +204,8 @@ namespace rpp
         event_loop(rpp::uint64 main_thr_id = 0/*0=rpp::get_thread_id()*/,
                    rpp::thread_pool* background_task_pool RPP_LIFETIMEBOUND = nullptr,
                    rpp::AtomicTimeSource* warpable_clock RPP_LIFETIMEBOUND = nullptr) noexcept;
-        /** @brief Reads the time source while it drains, so the owner must outlive the loop
-         *         or detach the clock first. stop_and_wait_all_ready() detaches it. */
+        /** @brief The destructor drains pending work and reads the time source, so the owner must
+         *         outlive the loop. stop_and_wait_all_ready() detaches the time source first. */
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
 
@@ -258,9 +258,9 @@ namespace rpp
         bool wait_on_all(rpp::Duration timeout = rpp::seconds(1)) noexcept;
 
         /**
-         * @brief Shuts the loop down: stops it, waits for the background tasks, runs every
-         *        resume they queued, and detaches the time source. The destructor then
-         *        touches nothing the owner may already have destroyed.
+         * @brief Stops the loop, waits for the background tasks, runs every resume they
+         *        queued, and detaches the time source. The destructor then touches nothing
+         *        the owner may already have destroyed.
          * @param max_wait Maximum time to wait for the background tasks.
          * @returns true when the loop drained inside max_wait, leaving no task and no resume
          */

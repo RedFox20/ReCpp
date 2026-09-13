@@ -8,6 +8,15 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B23. `set_time_source()` writes a plain pointer a `delay()` worker still reads
+`event_loop::time_source` is a raw pointer, and `delay()` polls it from a background worker
+(`event_loop.h:816`). `stop_and_wait_all_ready()` nulls it, so a worker which outlives the
+drain compares a virtual deadline against wall time, and TSAN sees an unsynchronized write.
+
+Only reachable when the drain already failed, and the call returns false there, so no
+shutdown path in ReCpp hits it. A fix makes the field atomic and loads it once per poll.
+Found by review on PR #84.
+
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
 

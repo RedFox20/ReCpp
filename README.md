@@ -1682,8 +1682,8 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`delay(Duration duration)`](src/rpp/event_loop.h#L838) | Sleep on a background thread, resume on the loop thread |
 | [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L842) | Sleep until a time point, resume on the loop thread |
 | [`stop()`](src/rpp/event_loop.h#L249) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L258) | Block until all pending work drains, with timeout. Leaves a resume queued as the count hits zero |
-| [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L267) | Shutdown call: stop, wait, run every queued resume, and detach the time source |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L258) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
+| [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L267) | Stop, wait for the background tasks, run every queued resume, and detach the time source |
 | [`set_except_handler(handler)`](src/rpp/event_loop.h#L273) | Set custom exception handler for unhandled background errors |
 | [`has_pending_work()`](src/rpp/event_loop.h#L241) | True if any background tasks or resume events are pending |
 | [`background_tasks()`](src/rpp/event_loop.h#L232) | Number of tasks currently suspended in background work |

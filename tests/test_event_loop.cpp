@@ -1177,6 +1177,8 @@ TestImpl(test_event_loop)
         });
     }
 
+    // ─── shutdown: wait_on_all is not a complete drain ──────────
+    // the resume lands as the background count reaches zero, past the point wait_on_all rechecks
     TestCase(wait_on_all_leaves_a_trailing_post)
     {
         std::atomic_bool trailing_ran { false };
@@ -1189,6 +1191,7 @@ TestImpl(test_event_loop)
         AssertThat(trailing_ran.load(), true);
     }
 
+    // ─── shutdown: the one call that drains and detaches ────────
     TestCase(stop_and_wait_all_ready_drains_and_detaches)
     {
         std::atomic_bool trailing_ran { false };
