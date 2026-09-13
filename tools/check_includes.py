@@ -216,16 +216,46 @@ def check_missing() -> list[str]:
 _UCN_RE = re.compile(r'\\(?:[uU][0-9a-fA-F]+|[uUN]\{[^}\n]*\})')
 
 
+def _referenced_one(h: str):
+    """A pool worker: the rpp headers one header's names come from, as data a pipe can carry."""
+    import rpp_decls
+    return h, rpp_decls.referenced_rpp_headers(h)
+
+
+def _referenced_all(names: list, jobs: int = 0) -> dict:
+    """Maps each header to the rpp headers its names come from, in parallel where it can.
+
+    One parse costs over a second and no header needs another's answer, so the whole scan is
+    core-bound. A pool failure falls back to the serial path, which returns the same map.
+    @param jobs worker count, or 0 to take one per CPU
+    """
+    jobs = jobs or min(len(names), os.cpu_count() or 1)
+    if jobs > 1 and len(names) > 1:
+        try:
+            import multiprocessing as mp
+            with mp.get_context('fork').Pool(jobs) as pool:
+                return dict(pool.imap_unordered(_referenced_one, names))
+        except Exception:  # a sandbox without fork or shared memory still answers below
+            pass
+    return dict(_referenced_one(h) for h in names)
+
+
 def check_rpp_includes() -> list[str]:
     """Reports an rpp header whose names a header uses without including that header itself.
 
     D5 emits one `export import` per rpp include, so a name from a sibling include breaks importers.
     """
     import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
-    bad = []
+    # the scan pins its own two paths before it reports on a header
+    bad = _check_referenced_all()
+    # ClangMissing propagates out of the scan, and main decides soft or hard
+    scanned = _referenced_all([h for h in headers() if h not in rpp_decls.NO_MODULE])
     for h in headers():
         if h in rpp_decls.NO_MODULE: continue
-        used = rpp_decls.referenced_rpp_headers(h)  # ClangMissing propagates, main decides soft or hard
+        # a header the pool lost would read as a clean one, so name it instead
+        if (used := scanned.get(h)) is None:
+            bad.append(f'{SRC}/{h}: the scan lost this header, so nothing checked its names')
+            continue
         direct = set(QUOTED_RE.findall(_read(os.path.join(SRC, h))))
         # config.h includes config.types.h, so a header including config.h already has it
         if 'config.h' in direct: direct.add('config.types.h')
@@ -702,6 +732,36 @@ def check_selftest() -> list[str]:
             got = int(found.split(':')[1]) if found else 0
             if got != want:
                 bad.append(f'{name}: the scan named line {got}, not {want}')
+    return bad
+
+
+# the cheapest headers to parse. one still names another rpp header, so a dropped
+# dependency fails the case
+_PROBES = ('proc_utils.h', 'config.types.h')
+
+
+def _check_referenced_all() -> list[str]:
+    """Pins that the pool and the serial fallback answer the same map.
+
+    A worker which drops a dependency, or a pool which loses a header, leaves `rpp-includes`
+    accepting a file it should report. Only a comparison of the two paths names that.
+    ClangMissing propagates, so the caller decides a soft skip or a hard failure.
+    """
+    import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
+    every = [h for h in headers() if h not in rpp_decls.NO_MODULE]
+    names = [h for h in _PROBES if h in every] or every[:2]
+    if len(names) < 2:
+        return ['fewer than two headers to scan, so the pool path never runs']
+    # jobs=2 so a single-CPU host takes the pool path too, and does not compare two serial scans
+    pooled = _referenced_all(names, jobs=2)
+    # the ground truth, not `_referenced_one`, which both paths call and would agree with itself
+    serial = {h: rpp_decls.referenced_rpp_headers(h) for h in names}
+    # a probe which names nothing matches a worker that dropped everything, so the case needs one
+    bad = [] if any(serial.values()) else ['no probe names an rpp header, so a dropped one hides']
+    if set(pooled) != set(serial):
+        bad.append(f'the pool scanned {sorted(pooled)}, not {sorted(serial)}')
+    bad += [f'{h}: the pool found {sorted(pooled[h])}, the serial path {sorted(serial[h])}'
+            for h in serial if h in pooled and pooled[h] != serial[h]]
     return bad
 
 

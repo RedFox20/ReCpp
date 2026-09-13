@@ -143,6 +143,8 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     A `static constexpr` function and a namespace-scope `constexpr` both land here, and no
     module can export either. `allow` names the helpers whose loss is intended.
     """
+    if allow is None and (hit := _INTERNAL_MEMO.get(header)) is not None:
+        return hit
     allow = INTERNAL_OK if allow is None else allow
     out = []
     for ns, kind, name, internal, line in rd.declarations(header, BASE):
@@ -226,10 +228,48 @@ def header_group(header: str) -> str:
     return next((g for g, hs in GROUP_HEADERS.items() if header in hs), '')
 
 
+_NS_GROUPS_MEMO = {}
+_INTERNAL_MEMO = {}
+
+@functools.lru_cache(maxsize=1)
+def _rpp_includes() -> dict:
+    """Each rpp header to the rpp headers it reaches, directly or through another."""
+    names = {h for h in os.listdir(rd.SRC) if h.endswith('.h')}
+    direct = {h: [q for q in re.findall(r'#\s*include\s+"([^"]+)"', _read(h)) if q in names] for h in names}
+    out = {}
+    def reach(h, seen):
+        for d in direct.get(h, ()):
+            if d not in seen: seen.add(d); reach(d, seen)
+        return seen
+    for h in names: out[h] = reach(h, set())
+    return out
+
+
+def _guard_is_live(header: str, guard: str) -> bool:
+    """True when the header, or something it includes, names a macro the guard reads.
+
+    No translation unit can branch on a macro nothing in it mentions, so the reduced parse
+    would return what BASE already returned. A `NO_CONFIG` pair always parses, because the
+    caller reads a parse failure there as a missing configuration and not as an equal one.
+    """
+    if guard in NO_CONFIG.get(os.path.basename(header), frozenset()):
+        return True
+    reached = _rpp_includes().get(os.path.basename(header), set()) | {os.path.basename(header)}
+    macros = re.findall(r'[A-Z_][A-Z0-9_]+', guard)
+    return any(m in _read(h) for h in reached for m in macros)
+
+
 def _namespace_groups(header: str) -> dict:
     """Namespace to condition to names, for one header, which a group module then merges."""
+    if (hit := _NS_GROUPS_MEMO.get(header)) is not None:
+        return hit
     base = _exported(header, BASE)
-    reduced = {g: n for g, off in GUARDS if (n := _configuration(header, g, BASE + off)) is not None}
+    reduced = {}
+    for g, off in GUARDS:
+        if not _guard_is_live(header, g):
+            reduced[g] = base  # nothing in the unit reads the macro, so the parse repeats BASE
+        elif (n := _configuration(header, g, BASE + off)) is not None:
+            reduced[g] = n
     spans = _guarded_spans(header)
     declared = _declared(base, reduced)
     alt_guard = ALT_GUARD.get(os.path.basename(header), '')
@@ -239,6 +279,48 @@ def _namespace_groups(header: str) -> dict:
             cond = _condition(ns, name, line, base, reduced, spans, alt_guard)
             out.setdefault(ns, {}).setdefault(cond, []).append(name)
     return out
+
+
+def _skip_repeats_base(pair):
+    """A pool worker: True when a skipped configuration returns what BASE already returned."""
+    h, g, off = pair
+    return h, g, _configuration(h, g, BASE + off) == _exported(h, BASE)
+
+
+def skippable_pairs() -> list:
+    """Every (header, guard, offset) whose configuration `_guard_is_live` decides to skip."""
+    return [(h, g, off) for g, off in GUARDS
+            for h in (GROUP_HEADERS[grp][i] for grp in GROUPS for i in range(len(GROUP_HEADERS[grp])))
+            if not _guard_is_live(h, g)]
+
+
+def _parse_one(header: str):
+    """A pool worker: every libclang answer one header needs, as plain data a pipe can carry."""
+    return header, _namespace_groups(header), internal_names(header)
+
+
+def prefetch(headers, jobs: int = 0) -> bool:
+    """Parses every header in parallel and fills the memo the serial pass then reads.
+
+    A header parse costs about half a second and they do not depend on each other, so the
+    whole run is core-bound rather than ordered. A pool failure leaves the serial path intact.
+    @returns True when the pool filled the memo, False when the serial pass must parse
+    """
+    headers = list(headers)
+    jobs = jobs or min(len(headers), os.cpu_count() or 1)
+    if jobs < 2 or len(headers) < 2:
+        return False
+    try:
+        import multiprocessing as mp
+        with mp.get_context('fork').Pool(jobs) as pool:
+            for header, groups, hidden in pool.imap_unordered(_parse_one, headers):
+                _NS_GROUPS_MEMO[header] = groups
+                _INTERNAL_MEMO[header] = hidden
+        return True
+    except Exception:  # a sandbox without fork or shared memory still runs the serial path
+        _NS_GROUPS_MEMO.clear()
+        _INTERNAL_MEMO.clear()
+        return False
 
 
 def group_export_block(group: str) -> str:
@@ -509,10 +591,73 @@ namespace rpp {
 '''
 
 
+# the cheapest headers to parse. both still declare names, so a wrong memo entry
+# fails the two pool cases
+_PROBES = ('config.types.h', 'endian.h')
+
+
+def sweep_guard_skips() -> list:
+    """Parses every skipped configuration and compares it against BASE. `--sweep-guards` runs it.
+
+    A correct classifier makes every skip correct, and `_check_guard_classifier` pins the
+    classifier for free, so the gate does not pay the 98 parses this costs.
+    """
+    pairs = skippable_pairs()
+    if not pairs:
+        return ['no configuration is skippable, so the sweep reports nothing']
+    try:
+        import multiprocessing as mp
+        with mp.get_context('fork').Pool(min(len(pairs), os.cpu_count() or 1)) as pool:
+            swept = list(pool.imap_unordered(_skip_repeats_base, pairs))
+    except Exception:  # a sandbox without fork or shared memory still sweeps, one at a time
+        swept = [_skip_repeats_base(p) for p in pairs]
+    return [f'{h} under {g} is skipped, and its parse does not repeat BASE'
+            for h, g, ok in swept if not ok]
+
+
+def _check_guard_skips() -> list:
+    """Pins the rule which decides a skip, because a correct rule makes every skip correct.
+
+    A header which starts to name a guard macro reads live and parses, so only a wrong
+    classifier can skip a configuration that differs. `--sweep-guards` still reads them all.
+    """
+    if not skippable_pairs():
+        return ['no configuration is skippable, so the guard test reports nothing']
+    return _check_guard_classifier()
+
+
+def _check_guard_classifier() -> list:
+    """Pins `_guard_is_live` on a crafted closure, one case per guard and no parse at all.
+
+    The sweep above proves the pairs on disk today. These pin the rule which chose them, so a
+    macro the guard reads still counts when it sits one include away.
+    """
+    bad, real_read, real_incs = [], _read, _rpp_includes
+    globals()['_rpp_includes'] = lambda: {'near.h': set(), 'far.h': {'near.h'}, 'none.h': set()}
+    try:
+        for guard, _ in GUARDS:
+            macro = re.findall(r'[A-Z_][A-Z0-9_]+', guard)[0]
+            files = {'near.h': f'#if {macro}\n#endif\n', 'far.h': '#include "rpp/near.h"\n', 'none.h': '\n'}
+            # `.get` would evaluate the real read eagerly and never reach the crafted text
+            globals()['_read'] = lambda h, f=files: f[b] if (b := os.path.basename(h)) in f else real_read(h)
+            if not _guard_is_live('near.h', guard):
+                bad.append(f'{guard} reads dead where the header itself names {macro}')
+            if not _guard_is_live('far.h', guard):
+                bad.append(f'{guard} reads dead where an include names {macro}')
+            if _guard_is_live('none.h', guard):
+                bad.append(f'{guard} reads live where nothing in the closure names {macro}')
+    finally:
+        globals()['_read'], globals()['_rpp_includes'] = real_read, real_incs
+    return bad
+
+
 def selftest() -> list:
     """Crafts a header and pins both gates, the macro name and the linkage."""
     import tempfile
     bad = []
+    # the cases below read every group block, and only `_readfile` is ever patched, so a
+    # parse of the headers on disk answers all of them
+    prefetch(h for g in GROUPS for h in GROUP_HEADERS[g])
     # MSVC expands a macro inside a module directive, and scope_guard.h defines one
     if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
     if macro_collision('core'): bad.append('a group name which repeats no macro reported one')
@@ -565,6 +710,36 @@ def selftest() -> list:
             bad.append(f'rpp.{group} exports a detail namespace')
     if not _is_detail_ns('rpp::detail') or _is_detail_ns('rpp::detailed'):
         bad.append('the detail namespace test matches the wrong names')
+
+    # the pool fills the memo the serial pass reads, so a worker which answers differently
+    # would change a generated module and no other case would see it
+    probes = [h for h in _PROBES if header_group(h)] or GROUP_HEADERS[GROUPS[0]][:2]
+    def _forget(hs):
+        for h in hs:
+            for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(h, None)
+    _forget(probes)
+    serial = {h: (_namespace_groups(h), internal_names(h)) for h in probes}
+    _forget(probes)
+    if any(_parse_one(h)[1:] != serial[h] for h in probes):
+        bad.append('the pool worker disagrees with the serial parse')
+
+    # prefetch is what fills the memo. a lost result or a wrong key fails here, and not
+    # only in the worker the case above calls
+    _forget(probes)
+    # jobs=2 so a single-CPU host takes the pool path too. A host with no fork answers
+    # False, and the serial fallback it took is correct, so the case has nothing to pin
+    if prefetch(probes, jobs=2):
+        for h in probes:
+            if h not in _NS_GROUPS_MEMO or h not in _INTERNAL_MEMO:
+                bad.append(f'prefetch left {h} out of a memo, so the serial pass reparses it')
+            elif (_NS_GROUPS_MEMO[h], _INTERNAL_MEMO[h]) != serial[h]:
+                bad.append(f'prefetch stored something other than the serial parse of {h}')
+
+    bad += _check_guard_skips()
+    # a guard the header names must never skip, or a real difference goes unread
+    live = [(h, g) for g, _ in GUARDS for h in NO_CONFIG if g in NO_CONFIG[h]]
+    if any(not _guard_is_live(h, g) for h, g in live):
+        bad.append('a NO_CONFIG pair was skipped, and a failed parse would read as an equal one')
 
     # GROUP_HEADERS is hand written, so pin both ways the partition goes stale
     if group_partition_drift(): bad.append('the partition gate reports drift on correct groups')
@@ -680,7 +855,15 @@ def main() -> int:
     ap.add_argument('--all', action='store_true', help='every group module')
     ap.add_argument('--check', action='store_true', help='exit 1 when a group module is stale')
     ap.add_argument('--selftest', action='store_true', help='pin every gate against a stubbed list')
+    ap.add_argument('--sweep-guards', action='store_true',
+                    help='parse every skipped configuration and compare it against BASE')
     a = ap.parse_args()
+    if a.sweep_guards:
+        findings = sweep_guard_skips()
+        for f in findings: print(f'  {f}')
+        print(f'== gen_module_exports guard sweep: {len(findings)} finding(s) over '
+              f'{len(skippable_pairs())} skipped pair(s) ==')
+        return 1 if findings else 0
     if a.selftest:
         findings = selftest()
         for f in findings: print(f'  {f}')
@@ -692,6 +875,7 @@ def main() -> int:
         # a header names the group which carries it, because a group is the module now
         targets = list(GROUPS) if a.all else [header_group(a.header)]
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
+        prefetch(h for g in targets for h in GROUP_HEADERS[g])
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
         if a.all: bad += (name_collisions() + group_partition_drift() + manual_export_drift()
                           + bugs_citation_drift() + module_name_drift())
