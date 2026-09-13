@@ -216,6 +216,29 @@ def check_missing() -> list[str]:
 _UCN_RE = re.compile(r'\\(?:[uU][0-9a-fA-F]+|[uUN]\{[^}\n]*\})')
 
 
+def _referenced_one(h: str):
+    """A pool worker: the rpp headers one header's names come from, as data a pipe can carry."""
+    import rpp_decls
+    return h, rpp_decls.referenced_rpp_headers(h)
+
+
+def _referenced_all(names: list) -> dict:
+    """Maps each header to the rpp headers its names come from, in parallel where it can.
+
+    One parse costs over a second and no header needs another's answer, so the whole scan is
+    core-bound. A pool failure falls back to the serial path, which returns the same map.
+    """
+    jobs = min(len(names), os.cpu_count() or 1)
+    if jobs > 1 and len(names) > 1:
+        try:
+            import multiprocessing as mp
+            with mp.get_context('fork').Pool(jobs) as pool:
+                return dict(pool.imap_unordered(_referenced_one, names))
+        except Exception:  # a sandbox without fork or shared memory still answers below
+            pass
+    return dict(_referenced_one(h) for h in names)
+
+
 def check_rpp_includes() -> list[str]:
     """Reports an rpp header whose names a header uses without including that header itself.
 
@@ -223,9 +246,11 @@ def check_rpp_includes() -> list[str]:
     """
     import rpp_decls  # a missing sibling script is a setup fault, not a soft skip
     bad = []
+    # ClangMissing propagates out of the scan, and main decides soft or hard
+    scanned = _referenced_all([h for h in headers() if h not in rpp_decls.NO_MODULE])
     for h in headers():
         if h in rpp_decls.NO_MODULE: continue
-        used = rpp_decls.referenced_rpp_headers(h)  # ClangMissing propagates, main decides soft or hard
+        used = scanned[h]
         direct = set(QUOTED_RE.findall(_read(os.path.join(SRC, h))))
         # config.h includes config.types.h, so a header including config.h already has it
         if 'config.h' in direct: direct.add('config.types.h')

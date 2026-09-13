@@ -86,15 +86,24 @@ def _cursors_in(tu, path: str):
         stack += list(c.get_children())
 
 
+_PARSE_MEMO = {}
+
 def declarations(header: str, defines: tuple = ()) -> list:
     """The declarations this header makes, as `(namespace, kind, name, internal, line)`, in source order.
 
     One declaration carries every overload of a name, so the caller deduplicates. `internal`
     marks internal linkage, which clang refuses to export. `line` locates the declaration, so a
     caller can tell a name declared inside a `#if` from one the block only mentions.
+
+    A parse costs about half a second, and one run repeats some. The memo keys on the file
+    stat as well as the path, so a rewritten file never answers from an earlier parse.
     """
     cindex = _cindex()
     me = os.path.abspath(_resolve(header))
+    st = os.stat(me)
+    key = (me, defines, st.st_mtime_ns, st.st_size)
+    if (hit := _PARSE_MEMO.get(key)) is not None:
+        return hit
     out = []
 
     def walk(cursor, ns):
@@ -121,6 +130,7 @@ def declarations(header: str, defines: tuple = ()) -> list:
                         out.append(('::'.join(ns), e.kind.name, e.spelling, False, e.location.line))
 
     walk(parse(header, defines).cursor, [])
+    _PARSE_MEMO[key] = out
     return out
 
 

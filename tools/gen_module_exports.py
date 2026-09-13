@@ -143,6 +143,8 @@ def internal_names(header: str, allow: frozenset = None) -> list:
     A `static constexpr` function and a namespace-scope `constexpr` both land here, and no
     module can export either. `allow` names the helpers whose loss is intended.
     """
+    if allow is None and (hit := _INTERNAL_MEMO.get(header)) is not None:
+        return hit
     allow = INTERNAL_OK if allow is None else allow
     out = []
     for ns, kind, name, internal, line in rd.declarations(header, BASE):
@@ -226,8 +228,13 @@ def header_group(header: str) -> str:
     return next((g for g, hs in GROUP_HEADERS.items() if header in hs), '')
 
 
+_NS_GROUPS_MEMO = {}
+_INTERNAL_MEMO = {}
+
 def _namespace_groups(header: str) -> dict:
     """Namespace to condition to names, for one header, which a group module then merges."""
+    if (hit := _NS_GROUPS_MEMO.get(header)) is not None:
+        return hit
     base = _exported(header, BASE)
     reduced = {g: n for g, off in GUARDS if (n := _configuration(header, g, BASE + off)) is not None}
     spans = _guarded_spans(header)
@@ -239,6 +246,32 @@ def _namespace_groups(header: str) -> dict:
             cond = _condition(ns, name, line, base, reduced, spans, alt_guard)
             out.setdefault(ns, {}).setdefault(cond, []).append(name)
     return out
+
+
+def _parse_one(header: str):
+    """A pool worker: every libclang answer one header needs, as plain data a pipe can carry."""
+    return header, _namespace_groups(header), internal_names(header)
+
+
+def prefetch(headers, jobs: int = 0) -> None:
+    """Parses every header in parallel and fills the memo the serial pass then reads.
+
+    A header parse costs about half a second and they do not depend on each other, so the
+    whole run is core-bound rather than ordered. A pool failure leaves the serial path intact.
+    """
+    headers = list(headers)
+    jobs = jobs or min(len(headers), os.cpu_count() or 1)
+    if jobs < 2 or len(headers) < 2:
+        return
+    try:
+        import multiprocessing as mp
+        with mp.get_context('fork').Pool(jobs) as pool:
+            for header, groups, hidden in pool.imap_unordered(_parse_one, headers):
+                _NS_GROUPS_MEMO[header] = groups
+                _INTERNAL_MEMO[header] = hidden
+    except Exception:  # a sandbox without fork or shared memory still runs the serial path
+        _NS_GROUPS_MEMO.clear()
+        _INTERNAL_MEMO.clear()
 
 
 def group_export_block(group: str) -> str:
@@ -513,6 +546,9 @@ def selftest() -> list:
     """Crafts a header and pins both gates, the macro name and the linkage."""
     import tempfile
     bad = []
+    # the cases below read every group block, and only `_readfile` is ever patched, so a
+    # parse of the headers on disk answers all of them
+    prefetch(h for g in GROUPS for h in GROUP_HEADERS[g])
     # MSVC expands a macro inside a module directive, and scope_guard.h defines one
     if not macro_collision('scope_guard'): bad.append('a macro name passed the module name guard')
     if macro_collision('core'): bad.append('a group name which repeats no macro reported one')
@@ -565,6 +601,15 @@ def selftest() -> list:
             bad.append(f'rpp.{group} exports a detail namespace')
     if not _is_detail_ns('rpp::detail') or _is_detail_ns('rpp::detailed'):
         bad.append('the detail namespace test matches the wrong names')
+
+    # the pool fills the memo the serial pass reads, so a worker which answers differently
+    # would change a generated module and no other case would see it
+    probe = GROUP_HEADERS[GROUPS[0]][0]
+    for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(probe, None)
+    serial = (_namespace_groups(probe), internal_names(probe))
+    for memo in (_NS_GROUPS_MEMO, _INTERNAL_MEMO): memo.pop(probe, None)
+    if _parse_one(probe)[1:] != serial:
+        bad.append(f'the pool worker disagrees with the serial parse of {probe}')
 
     # GROUP_HEADERS is hand written, so pin both ways the partition goes stale
     if group_partition_drift(): bad.append('the partition gate reports drift on correct groups')
@@ -692,6 +737,7 @@ def main() -> int:
         # a header names the group which carries it, because a group is the module now
         targets = list(GROUPS) if a.all else [header_group(a.header)]
         if not targets[0]: ap.error(f'no group carries {a.header}, see GROUP_HEADERS')
+        prefetch(h for g in targets for h in GROUP_HEADERS[g])
         bad = [f for f in (write_group(g, a.check) for g in targets) if f]
         if a.all: bad += (name_collisions() + group_partition_drift() + manual_export_drift()
                           + bugs_citation_drift() + module_name_drift())
