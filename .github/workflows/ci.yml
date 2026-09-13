@@ -13,6 +13,8 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job writes its steps inline. A composite action renders as one collapsed node,
+# so the run shows neither which step failed nor what each one cost.
 jobs:
   ubuntu:
     name: ${{ matrix.name }}
@@ -52,18 +54,152 @@ jobs:
               ninja: "true", modules: "ON", llvm_apt: "true" }
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/ubuntu-build
+
+      # a matrix value cannot name an env key, so CXX<std> is written here and not in `env`
+      - name: Set the build environment
+        shell: bash
+        run: |
+          # only a gcc asan build makes coverage data, so one place decides it
+          # Ninja reads more cores than the runner has and OOMs, so NO_NINJA=1 is the default
+          NO_NINJA_VALUE=$([[ "${{ matrix.ninja }}" == "true" ]] && echo "" || echo "1")
+          COVERAGE_ON=0
+          if [[ "${{ matrix.cov }}" == "true" && "${{ matrix.compiler }}" == "gcc" &&
+                "${{ matrix.san }}" == "asan" ]]; then COVERAGE_ON=1; fi
+          {
+            echo "COMPILER=${{ matrix.compiler }}"
+            echo "SANITIZE=${{ matrix.san }}"
+            echo "COVERAGE_ON=$COVERAGE_ON"
+            echo "NO_NINJA=$NO_NINJA_VALUE"
+            echo "BUILD_WITH_MODULES=${{ matrix.modules }}"
+            echo "CXX${{ matrix.std }}=1"
+          } >> "$GITHUB_ENV"
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr ninja-build
+
+      - name: Register apt.llvm.org for ${{ matrix.cc }}
+        if: matrix.llvm_apt == 'true'
+        shell: bash
+        run: .github/scripts/register_llvm_apt.sh ${{ matrix.cc }}
+
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
-          job_name: ${{ matrix.name }}
-          compiler: ${{ matrix.compiler }}
-          cc_version: ${{ matrix.cc }}
-          cpp_version: ${{ matrix.std }}
-          sanitizer: ${{ matrix.san }}
-          coverage: ${{ matrix.cov }}
-          use_ninja: ${{ matrix.ninja || 'false' }}
-          build_with_modules: ${{ matrix.modules }}
-          llvm_apt: ${{ matrix.llvm_apt || 'false' }}
-          check_includes: ${{ matrix.check_includes || 'false' }}
+          python-version: "3.12"
+
+      - name: Install mama and ${{ matrix.cc }}
+        shell: bash
+        run: |
+          pip install --upgrade mama
+          mama install-${{ matrix.cc }}
+
+      # the tree conforms, so a scan that reports nothing passes each gate below
+      - name: Gate, the import-order scan over crafted sources
+        if: matrix.check_includes == 'true'
+        shell: bash
+        run: python3 tools/check_includes.py selftest --check
+
+      - name: Gate, every header compiles alone
+        if: matrix.check_includes == 'true'
+        shell: bash
+        run: |
+          # a consumer may include any header first, so each one must stand on its own
+          export CXX=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
+          export CXXSTD=c++${{ matrix.std }}
+          python3 tools/check_includes.py self-contained --check
+
+      - name: Gate, no include follows an import
+        if: matrix.check_includes == 'true'
+        shell: bash
+        # an #include after an import gives GCC a thousand redefinitions, and clang
+        # accepts the same file, so only this gate stops it reaching a GCC build
+        run: python3 tools/check_includes.py import-order --check
+
+      # the three gates above are pure Python, and they run before this install so a
+      # tree with no libclang still gets them
+      - name: Install libclang for the gates below
+        if: matrix.check_includes == 'true'
+        shell: bash
+        run: |
+          # libclang reads clang builtin headers, because a gcc SIMD header names a
+          # __builtin_ia32 that clang does not define
+          sudo apt-get install -y libclang-common-18-dev || sudo apt-get install -y clang
+          pip3 install --quiet libclang
+
+      - name: Gate, the libclang declaration traversal
+        if: matrix.check_includes == 'true'
+        shell: bash
+        # the traversal decides a real module surface, so a crafted header pins it
+        run: python3 tools/rpp_decls.py selftest
+
+      - name: Gate, a header takes no name from a sibling include
+        if: matrix.check_includes == 'true'
+        shell: bash
+        # a module exports one import per rpp include, so a name that arrives through
+        # a sibling include yields no import line and every importer then fails
+        run: python3 tools/check_includes.py rpp-includes --check
+
+      - name: Gate, the export generator against crafted sources
+        if: matrix.check_includes == 'true'
+        shell: bash
+        # MSVC expands a macro named inside the module directive, so a crafted
+        # fragment pins where the global module fragment must undefine it
+        run: python3 tools/gen_module_exports.py --selftest
+
+      - name: Gate, every .cppm matches the header it wraps
+        if: matrix.check_includes == 'true'
+        shell: bash
+        # a hand-written export list rots, so this fails when a .cppm falls behind
+        run: python3 tools/gen_module_exports.py --all --check
+
+      - name: Gate, README.md line references
+        if: matrix.check_includes == 'true'
+        shell: bash
+        # a header edit moves a declaration, and README.md then opens on the next line
+        run: python3 update_doc_linerefs.py --check
+
+      - name: Print the toolchain versions
+        shell: bash
+        run: |
+          # the log names the toolchain that built the run, so a failure needs no guess
+          echo "cmake:  $(command -v cmake) $(cmake --version | head -1)"
+          echo "mama:   $(mama --version)"
+          CXX_BIN=$([[ $COMPILER == "gcc" ]] && echo g++ || echo clang++)
+          echo "$CXX_BIN: $(command -v $CXX_BIN) $($CXX_BIN --version | head -1)"
+
+      - name: Build ${{ matrix.cc }} C++${{ matrix.std }} ${{ matrix.san }}
+        shell: bash
+        run: |
+          COV_FLAGS=$([[ $COVERAGE_ON == 1 ]] && echo "coverage=src" || echo "")
+          # clang-tidy runs as its own step, so this build passes no sanitizer
+          SAN_FLAGS=$([[ $SANITIZE == "clang-tidy" ]] && echo "" || echo "$SANITIZE")
+          JOBS=$(nproc)
+          # a modules build clears NO_NINJA, and taskset then pins the count ninja reads
+          NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
+          $NINJA_CAP mama $COMPILER verbose $SAN_FLAGS $COV_FLAGS build with_tests jobs=$JOBS
+
+      - name: Test ${{ matrix.cc }} C++${{ matrix.std }} ${{ matrix.san }}
+        shell: bash
+        run: |
+          COV_FLAGS=$([[ $COVERAGE_ON == 1 ]] && echo "coverage-report=src" || echo "")
+          # setarch -R turns off address space randomization. Without it TSAN aborts on
+          # these runners with "FATAL: ThreadSanitizer: unexpected memory mapping".
+          setarch $(uname -m) -R mama $COMPILER verbose $COV_FLAGS test="nogdb -vv" jobs=$(nproc) \
+            | tee "$RUNNER_TEMP/test_output.txt"
+
+      - name: Report the test count
+        if: always()
+        shell: bash
+        run: .github/scripts/report_test_count.sh ${{ matrix.name }}
+
+      - name: Clang Tidy Analysis
+        # a build which also tidies runs it one file at a time, so this step parallelizes it
+        if: matrix.san == 'clang-tidy'
+        shell: bash
+        run: ./run_clang_tidy -j 5
 
   mipsel-cpp20-gcc12:
     name: mipsel-cpp20-gcc12
@@ -96,11 +232,76 @@ jobs:
           - { name: consumer-clang21,     compiler: clang, cc: clang-21, llvm_apt: "true" }
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/consumer-build
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get -y --allow-unauthenticated install libdw-dev libunwind-dev ninja-build
+
+      - name: Register apt.llvm.org for ${{ matrix.cc }}
+        if: matrix.llvm_apt == 'true'
+        shell: bash
+        run: .github/scripts/register_llvm_apt.sh ${{ matrix.cc }}
+
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
-          compiler: ${{ matrix.compiler }}
-          cc_version: ${{ matrix.cc }}
-          llvm_apt: ${{ matrix.llvm_apt }}
+          python-version: "3.12"
+
+      - name: Install mama and ${{ matrix.cc }}
+        shell: bash
+        run: |
+          pip install --upgrade mama
+          mama install-${{ matrix.cc }}
+
+      # Ninja plus a compiler over the modules minimum turns modules on by itself, so this
+      # job builds ReCpp with modules the way a downstream project builds it.
+      - name: Build and run the consumer with ${{ matrix.cc }}
+        shell: bash
+        run: |
+          JOBS=$(nproc)
+          cd tests/consumer
+          # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
+          CXX20=1 taskset -c 0-$((JOBS - 1)) mama ${{ matrix.compiler }} verbose build test jobs=$JOBS 2>&1 \
+            | tee build.log
+          # AUTO turns modules off and keeps going, so without this the job would still pass
+          # if ReCpp stopped enabling modules when another project builds it
+          if ! grep -q "C++20 Modules enabled" build.log; then
+            echo "FAIL: ReCpp built no modules as a dependency"
+            grep -i "MODULES" build.log
+            # a missing binary blames this job, a set binary with an empty cache entry blames
+            # the build tool, which configures a dependency differently from a root target
+            echo "--- clang-scan-deps on this box ---"
+            ls -la /usr/bin/clang-scan-deps* /usr/lib/llvm-*/bin/clang-scan-deps 2>&1 | head
+            echo "--- what cmake resolved for the ReCpp dependency ---"
+            find .. -name CMakeCache.txt -path "*ReCpp*" \
+                 -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
+            exit 1
+          fi
+
+      - name: Import the exported modules with ${{ matrix.cc }}
+        shell: bash
+        run: |
+          # this job clears the modules minimum, so the consumer must take the module path.
+          # --compare-paths builds the same source through the headers and compares the report.
+          # --unicode-off reaches the half of the module surface no consumer job builds, because
+          # config.h turns unicode on for every one of them
+          JOBS=$(nproc)
+          UNICODE_OFF=$([[ ${{ matrix.compiler }} == "gcc" ]] && echo "--unicode-off g++-14" || echo "")
+          cd tests/module_consumer
+          CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
+              --compiler ${{ matrix.compiler }} --expect modules --compare-paths --jobs $JOBS $UNICODE_OFF
+
+      # C++23 costs gcc-14 more module source locations than C++20, see BUGS.md C28. A layout
+      # which reads back on C++20 can still fail here, see BUGS.md B24, and only this step covers it
+      - name: Import the exported modules as C++23 with ${{ matrix.cc }}
+        shell: bash
+        run: |
+          JOBS=$(nproc)
+          cd tests/module_consumer
+          CXX23=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
+              --compiler ${{ matrix.compiler }} --expect modules --jobs $JOBS
 
   android:
     name: ${{ matrix.name }}
@@ -117,11 +318,57 @@ jobs:
           - { name: android-cpp20-r29-ninja,               ndk: "29.0.14206865", ninja: "true" }
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/android-build
+
+      - name: Install the NDK and the test tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          # qemu-user runs the aarch64 test binary, and clang-tidy runs the analysis step
+          sudo apt-get install -y clang-tidy qemu-user
+          # the runner image carries other NDK releases, so pin the one this job names
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;${{ matrix.ndk }}"
+          NDK_PATH="$ANDROID_HOME/ndk/${{ matrix.ndk }}"
+          test -d "$NDK_PATH" || { echo "NDK ${{ matrix.ndk }} did not install"; exit 1; }
+          {
+            # mama reads ANDROID_NDK_LATEST_HOME before ANDROID_NDK_HOME, and the runner image
+            # points it at its own NDK, so every job built with that one until this line
+            echo "ANDROID_NDK_LATEST_HOME=$NDK_PATH"
+            echo "ANDROID_NDK_HOME=$NDK_PATH"
+            echo "ANDROID_NDK_ROOT=$NDK_PATH"
+            echo "NO_NINJA=$([[ '${{ matrix.ninja }}' == 'true' ]] && echo '' || echo '1')"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
-          job_name: ${{ matrix.name }}
-          ndk_version: ${{ matrix.ndk }}
-          use_ninja: ${{ matrix.ninja || 'false' }}
+          python-version: "3.12"
+
+      - name: Install mama
+        shell: bash
+        run: pip install --upgrade mama
+
+      - name: Build Android NDK ${{ matrix.ndk }}
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          JOBS=$(nproc)
+          # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
+          NINJA_CAP=$([[ -z "$NO_NINJA" ]] && echo "taskset -c 0-$((JOBS - 1))" || echo "")
+          $NINJA_CAP env CXX20=1 mama android verbose build with_tests jobs=$JOBS
+
+      - name: Run the tests under QEMU aarch64
+        shell: bash
+        run: ./run_android_tests -vv | tee "$RUNNER_TEMP/test_output.txt"
+
+      - name: Report the test count
+        if: always()
+        shell: bash
+        run: .github/scripts/report_test_count.sh ${{ matrix.name }}
+
+      - name: Clang Tidy Analysis
+        # clang-tidy is slow during a build, so it runs as its own step
+        shell: bash
+        run: ./run_clang_tidy --android -j 5
 
   win64-cpp20-msvc:
     name: win64-cpp20-msvc

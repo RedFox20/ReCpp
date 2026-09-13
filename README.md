@@ -5007,13 +5007,18 @@ JArray bytes = getData.arrayF(JniType::Byte, instance);
 ## Development > CI
 
 GitHub Actions runs the build matrix from [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-Four composite actions under [`.github/actions/`](.github/actions/) carry the shared steps:
+Every job writes its steps inline, so a run names the step which failed and what each one cost.
+A composite action renders as one collapsed node and reports neither.
 
-| Action | Jobs |
+| Job | Covers |
 |---|---|
-| `ubuntu-build` | the 18 compiler, standard and sanitizer combinations |
-| `consumer-build` | ReCpp built as a dependency, on gcc-14 and clang-21 |
-| `android-build` | the NDK builds, the QEMU tests and clang-tidy |
+| `ubuntu` | the 18 compiler, standard and sanitizer combinations |
+| `consumer` | ReCpp built as a dependency, on gcc-14 and clang-21 |
+| `android` | the NDK builds, the QEMU tests and clang-tidy |
+| `mipsel-cpp20-gcc12`, `win64-cpp20-msvc`, `consumer-msvc` | one configuration each |
+
+Two steps repeat across jobs, so they live in [`.github/scripts/`](.github/scripts/) and each
+job calls one of them on a single line.
 
 A job runs plain `mama` commands, so any one reproduces locally. The C++20 gcc-13 ASAN job
 is this pair:
