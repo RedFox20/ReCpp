@@ -923,6 +923,15 @@ namespace rpp
 
             held = plain; // a second assign has nothing left to free
             AssertThat(destroyed, base + 1);
+
+            // a self copy must survive: both branches free the destination before they read
+            plain.copy(const_cast<rpp::delegate<void()>&>(plain));
+            AssertThat(plain.good(), true);
+
+            rpp::delegate<void()> functor { tracked{} };
+            functor.copy(functor);
+            AssertThat(functor.good(), true);
+            functor(); // the functor is still callable, not freed
         }
 
         ////////////////////////////////////////////////////
