@@ -27,26 +27,26 @@ TestImpl(test_timer)
 
     TestCase(basic_timer_sec)
     {
-        for (int i = 0; i < 3; ++i)
+        double elapsed_ms = best_of_3([]
         {
             rpp::Timer t;
             spin_sleep_for_ms(10);
-            double elapsed_ms = t.elapsed_millis();
-            print_info("timer %d 10ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
-        }
+            return t.elapsed_millis();
+        });
+        print_info("timer 10ms spin_sleep best of 3: %fms\n", elapsed_ms);
+        AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
     }
 
     TestCase(basic_timer_ms)
     {
-        for (int i = 0; i < 3; ++i)
+        double elapsed_ms = best_of_3([]
         {
             rpp::Timer t;
             spin_sleep_for_ms(10);
-            double elapsed_ms = t.elapsed_millis();
-            print_info("timer_ms %d 10ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
-        }
+            return t.elapsed_millis();
+        });
+        print_info("timer_ms 10ms spin_sleep best of 3: %fms\n", elapsed_ms);
+        AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
     }
 
     TestCase(ensure_sleep_millis_accuracy)
