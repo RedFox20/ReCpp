@@ -281,6 +281,19 @@ def _namespace_groups(header: str) -> dict:
     return out
 
 
+def _skip_repeats_base(pair):
+    """A pool worker: True when a skipped configuration returns what BASE already returned."""
+    h, g, off = pair
+    return h, g, _configuration(h, g, BASE + off) == _exported(h, BASE)
+
+
+def skippable_pairs() -> list:
+    """Every (header, guard, offset) whose configuration `_guard_is_live` decides to skip."""
+    return [(h, g, off) for g, off in GUARDS
+            for h in (GROUP_HEADERS[grp][i] for grp in GROUPS for i in range(len(GROUP_HEADERS[grp])))
+            if not _guard_is_live(h, g)]
+
+
 def _parse_one(header: str):
     """A pool worker: every libclang answer one header needs, as plain data a pipe can carry."""
     return header, _namespace_groups(header), internal_names(header)
@@ -583,6 +596,51 @@ namespace rpp {
 _PROBES = ('config.types.h', 'endian.h')
 
 
+def _check_guard_skips() -> list:
+    """Parses every skipped configuration and compares it against BASE.
+
+    One misclassified pair makes the generator drop or mis-guard an export, and only a parse
+    of that pair finds it, so the sweep reads all of them and not the first.
+    """
+    bad, pairs = [], skippable_pairs()
+    if not pairs:
+        return ['no configuration is skippable, so the guard test reports nothing']
+    try:
+        import multiprocessing as mp
+        with mp.get_context('fork').Pool(min(len(pairs), os.cpu_count() or 1)) as pool:
+            swept = list(pool.imap_unordered(_skip_repeats_base, pairs))
+    except Exception:  # a sandbox without fork or shared memory still sweeps, one at a time
+        swept = [_skip_repeats_base(p) for p in pairs]
+    bad += [f'{h} under {g} is skipped, and its parse does not repeat BASE'
+            for h, g, ok in swept if not ok]
+    return bad + _check_guard_classifier()
+
+
+def _check_guard_classifier() -> list:
+    """Pins `_guard_is_live` on a crafted closure, one case per guard and no parse at all.
+
+    The sweep above proves the pairs on disk today. These pin the rule which chose them, so a
+    macro the guard reads still counts when it sits one include away.
+    """
+    bad, real_read, real_incs = [], _read, _rpp_includes
+    globals()['_rpp_includes'] = lambda: {'near.h': set(), 'far.h': {'near.h'}, 'none.h': set()}
+    try:
+        for guard, _ in GUARDS:
+            macro = re.findall(r'[A-Z_][A-Z0-9_]+', guard)[0]
+            files = {'near.h': f'#if {macro}\n#endif\n', 'far.h': '#include "rpp/near.h"\n', 'none.h': '\n'}
+            # `.get` would evaluate the real read eagerly and never reach the crafted text
+            globals()['_read'] = lambda h, f=files: f[b] if (b := os.path.basename(h)) in f else real_read(h)
+            if not _guard_is_live('near.h', guard):
+                bad.append(f'{guard} reads dead where the header itself names {macro}')
+            if not _guard_is_live('far.h', guard):
+                bad.append(f'{guard} reads dead where an include names {macro}')
+            if _guard_is_live('none.h', guard):
+                bad.append(f'{guard} reads live where nothing in the closure names {macro}')
+    finally:
+        globals()['_read'], globals()['_rpp_includes'] = real_read, real_incs
+    return bad
+
+
 def selftest() -> list:
     """Crafts a header and pins both gates, the macro name and the linkage."""
     import tempfile
@@ -667,16 +725,7 @@ def selftest() -> list:
             elif (_NS_GROUPS_MEMO[h], _INTERNAL_MEMO[h]) != serial[h]:
                 bad.append(f'prefetch stored something other than the serial parse of {h}')
 
-    # a skipped configuration must return what BASE returns, so parse one and compare
-    skipped = [(h, g, off) for g, off in GUARDS
-               for h in (GROUP_HEADERS[grp][i] for grp in GROUPS for i in range(len(GROUP_HEADERS[grp])))
-               if not _guard_is_live(h, g)]
-    if not skipped:
-        bad.append('no configuration is skippable, so the guard test reports nothing')
-    else:
-        h, g, off = skipped[0]
-        if _configuration(h, g, BASE + off) != _exported(h, BASE):
-            bad.append(f'{h} under {g} is skipped, and its parse does not repeat BASE')
+    bad += _check_guard_skips()
     # a guard the header names must never skip, or a real difference goes unread
     live = [(h, g) for g, _ in GUARDS for h in NO_CONFIG if g in NO_CONFIG[h]]
     if any(not _guard_is_live(h, g) for h, g in live):
