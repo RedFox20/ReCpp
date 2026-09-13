@@ -81,6 +81,7 @@ namespace rpp
     /**
      * Always null terminated version of stringstream, which is compatible with strview
      * Not intended for moving or copying
+     * No write source may point into this buffer. A write can move the storage.
      */
     struct RPPAPI string_buffer
     {
@@ -363,6 +364,23 @@ namespace rpp
             write(first, second, args...);
             writeln();
         }
+
+        /// @brief Appends every item with write(), puts `sep` between the items, and returns this buffer
+        /// Ex: join(std::vector<int>{1,2,3}, ", ") --> "1, 2, 3"
+        template<is_container C, class S> string_buffer& join(const C& container, const S& sep) noexcept
+        {
+            bool first = true;
+            for (const auto& item : container)
+            {
+                if (!first) write(sep);
+                first = false;
+                write(item);
+            }
+            return *this;
+        }
+
+        /// @brief Same as join(container, sep), with string_buffer::separator between the items
+        template<is_container C> FINLINE string_buffer& join(const C& container) noexcept { return join(container, separator); }
 
         ////////////////////////////////////////////////////////////////////////////////////////////
 
