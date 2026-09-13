@@ -162,6 +162,10 @@ reports it moves between runs. A re-run of the same job passed.
 Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
 reported one warning, and the four other TSAN jobs passed on the same commit.
 
+Fourth sighting on cab12a8, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two stacks,
+same two lines, and all 553 cases passed. The job passes on the next commit, so the rate is
+still far below one run.
+
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
@@ -210,11 +214,14 @@ an unevaluated context. Delete that workaround when a newer gcc compiles the rep
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
-This has two shapes. A bound too tight reports the overrun, as
+This has three shapes. A bound too tight reports the overrun, as
 `test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
-`~ImportantState: data != "aaaabbbbcccc"`. AGENTS.md R2 already says to wait on an
+`~ImportantState: data != "aaaabbbbcccc"`. A third shape compares two measured times, as
+`test_threadpool::parallel_for_performance` did on `ubuntu-cpp26-tsan-gcc14` with
+`parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
+gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
