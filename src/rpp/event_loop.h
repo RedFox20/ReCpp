@@ -157,18 +157,6 @@ namespace rpp
             ~resume_event() noexcept = default;
         };
 
-        // a snapshot of the loop clock, so a detached source cannot strand a waiter
-        struct time_frame
-        {
-            rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
-            bool warpable = false; // a time source was attached at capture time
-            rpp::TimePoint now() const noexcept
-            {
-                return warpable ? rpp::TimePoint{ rpp::TimePoint::system_now().duration.nsec + offset_ns }
-                                : rpp::TimePoint::monotonic_now();
-            }
-        };
-
         // the thread that owns and drives this event loop, initialized in CTOR
         std::atomic_uint64_t owner_thread_id {0};
 
@@ -224,6 +212,26 @@ namespace rpp
         ~event_loop() noexcept;
         NOCOPY_NOMOVE(event_loop)
 
+        // ─── the loop clock ─────────────────────────────────────────
+
+        /** @brief A snapshot of the loop clock, so a detached time source cannot strand a waiter. */
+        struct time_frame
+        {
+            rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
+            bool warpable = false; // a time source was attached at capture time
+
+            time_frame() noexcept = default;
+            explicit time_frame(const rpp::AtomicTimeSource* src) noexcept
+                : offset_ns{src ? src->total_offset().nsec : 0}, warpable{src != nullptr} {}
+
+            /** @returns the time on this frame's clock: the one definition this loop uses. */
+            rpp::TimePoint now() const noexcept
+            {
+                return warpable ? rpp::TimePoint{ rpp::TimePoint::system_now().duration.nsec + offset_ns }
+                                : rpp::TimePoint::monotonic_now();
+            }
+        };
+
         /**
          * @brief Attaches a warpable clock used by delay()/delay_until(). When set, a pending
          *        delay tracks this source's virtual time, so warp_forward() advances the wait.
@@ -245,6 +253,34 @@ namespace rpp
         /** @returns the loop's current time: the warpable clock's virtual time if attached,
          *           otherwise the monotonic wall clock. */
         rpp::TimePoint current_time() const noexcept { return get_time_source_frame().now(); }
+
+        /** @returns the virtual time of `src`, or the monotonic wall clock when it is null. */
+        static rpp::TimePoint current_time(const rpp::AtomicTimeSource* src) noexcept { return time_frame{src}.now(); }
+
+        /** @brief Refreshes `frame` from the live clock, which a detached source leaves alone.
+         *  @returns the current time on that frame's clock. */
+        rpp::TimePoint current_time(time_frame& frame) const noexcept
+        {
+            get_time_source_offset(frame.offset_ns);
+            return frame.now();
+        }
+
+        /** @returns a snapshot of the loop clock, taken on the thread which builds a deadline. */
+        time_frame get_time_source_frame() const noexcept;
+
+    private:
+        // reads the live source offset while the reader guard is up
+        bool get_time_source_offset(rpp::int64& offset_ns) const noexcept;
+
+        // clears the clock and waits for every reader to drop it, so the owner may free it
+        void retire_time_source() noexcept;
+
+        // sleeps until `deadline` on the clock `frame` captured, and refreshes the
+        // offset every poll step, so warp_forward() still releases the wait early
+        void wait_until(rpp::TimePoint deadline, time_frame frame) const noexcept;
+
+    public:
+        // ─── end of the loop clock ──────────────────────────────────
 
         /** @returns true if there are background tasks currently in progress */
         bool has_background_tasks() const noexcept { return num_background_suspended.load(std::memory_order_acquire) > 0; }
@@ -973,31 +1009,6 @@ namespace rpp
             background_pool.parallel_task_detached(std::move(generic_task));
         }
 
-        // the virtual time of `src`, or the monotonic wall clock when it is null
-        static rpp::TimePoint current_time(const rpp::AtomicTimeSource* src) noexcept
-        {
-            return src ? src->time_now() : rpp::TimePoint::monotonic_now();
-        }
-
-        // refreshes `frame` from the live clock, which a detached source leaves alone
-        rpp::TimePoint current_time(time_frame& frame) const noexcept
-        {
-            get_time_source_offset(frame.offset_ns);
-            return frame.now();
-        }
-
-        // takes a snapshot of the loop clock, on the thread which builds a deadline
-        time_frame get_time_source_frame() const noexcept;
-
-        // sleeps until `deadline` on the clock `frame` captured, and refreshes the
-        // offset every poll step, so warp_forward() still releases the wait early
-        void wait_until(rpp::TimePoint deadline, time_frame frame) const noexcept;
-
-        // reads the live source offset while the reader guard is up
-        bool get_time_source_offset(rpp::int64& offset_ns) const noexcept;
-
-        // clears the clock and waits for every reader to drop it, so the owner may free it
-        void retire_time_source() noexcept;
 
         // posts a resume event and decrements the background suspension count
         void post_resume_from_suspension(rpp::coro_handle<> handle) noexcept;
