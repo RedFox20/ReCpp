@@ -188,16 +188,15 @@ TestImpl(test_semaphore)
     // this is a much more intensive test
     TestCase(can_transfer_data_between_two_threads)
     {
+        constexpr size_t MAX_DATA = 10'000;
         std::vector<std::string> producer_data; // for later comparison
         std::deque<std::string> producer_queue;
         std::vector<std::string> consumer_data;
         rpp::mutex producer_mutex;
         rpp::semaphore sem;
 
-        std::atomic_bool working = true;
         std::thread producer([&] {
-            const int max_data = 10'000;
-            for (int i = 0; i < max_data; ++i) {
+            for (size_t i = 0; i < MAX_DATA; ++i) {
                 { std::lock_guard lock { producer_mutex };
                     producer_data.push_back("data_" + std::to_string(i));
                     producer_queue.push_back(producer_data.back());
@@ -206,32 +205,22 @@ TestImpl(test_semaphore)
             }
         });
 
+        // a worker thread cannot fail the case, so the main thread reads this after the join
+        std::atomic_bool not_notified { false };
         std::thread consumer([&] {
             constexpr auto timeout = rpp::seconds(1); // a stuck semaphore must fail the case, not hang it
-            while (working) {
-                if (sem.wait(timeout) == rpp::semaphore::notified) {
-                    if (!working) break; // stopped
-                    std::lock_guard lock { producer_mutex };
-                    consumer_data.emplace_back(std::move(producer_queue.front()));
-                    producer_queue.pop_front();
-                } else AssertFailed("semaphore was not notified");
+            while (consumer_data.size() < MAX_DATA) {
+                if (sem.wait(timeout) != rpp::semaphore::notified) { not_notified = true; break; }
+                std::lock_guard lock { producer_mutex };
+                consumer_data.emplace_back(std::move(producer_queue.front()));
+                producer_queue.pop_front();
             }
         });
 
         producer.join();
+        consumer.join(); // the counting semaphore delivers every notify, so the consumer exits on its own
 
-        // wait for consumer to finish receiving all of the data
-        for (int i = 0; i < 40; ++i) { // with a max wait limit
-            { std::lock_guard lock { producer_mutex };
-              if (producer_queue.empty()) break;
-            }
-            rpp::sleep_ms(1);
-        }
-
-        working = false;
-        sem.notify(); // notify finished
-        consumer.join();
-
+        AssertFalse(not_notified.load()); // a slow runner must not make the wait time out
         AssertEqual(consumer_data.size(), producer_data.size());
         AssertEqual(consumer_data, producer_data);
     }
