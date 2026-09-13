@@ -26,8 +26,8 @@ the `delay()` half. A poll step reads the offset under a reader guard, and
    same clock. Only the owner thread pumps and retires, so the two cannot overlap.
 2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
    with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
-3. An owner which frees a clock it swapped out still reaches freed memory, because
-   `set_time_source()` only stores. Retire through `stop_and_wait_all_ready()` first.
+3. An owner which frees a clock it swapped out for another still reaches freed memory,
+   because only a clear to null retires. Clear it before the free.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.

@@ -227,15 +227,19 @@ namespace rpp
         /**
          * @brief Attaches a warpable clock used by delay()/delay_until(). When set, a pending
          *        delay tracks this source's virtual time, so warp_forward() advances the wait.
-         *        Pass null to revert to wall-clock timing.
+         *        Pass null to revert to wall-clock timing, which also waits for every reader
+         *        to drop the old clock, so the caller may then destroy it.
          *        The loop borrows the clock and MUST NOT outlive it. No attribute states
          *        that: clang rejects lifetimebound on a function that returns void.
-         *        This only swaps the pointer. A reader may still hold the old clock, so
-         *        destroy it through stop_and_wait_all_ready(), which retires it first.
+         *        A swap to another clock does not wait, so a reader may still hold the one
+         *        it replaced. Clear it to null first when the caller frees it.
          */
         void set_time_source(rpp::AtomicTimeSource* clock) noexcept
         {
-            time_source.store(clock, std::memory_order_seq_cst);
+            if (clock == nullptr)
+                retire_time_source();
+            else
+                time_source.store(clock, std::memory_order_seq_cst);
         }
 
         /** @returns the loop's current time: the warpable clock's virtual time if attached,
