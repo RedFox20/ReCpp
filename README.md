@@ -1681,10 +1681,10 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`resume_on_loop()`](src/rpp/event_loop.h#L995) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
 | [`delay(Duration duration)`](src/rpp/event_loop.h#L897) | Sleep on a background thread, resume on the loop thread |
 | [`time_frame`](src/rpp/event_loop.h#L218) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
-| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L245) | Attach a warpable clock; null reverts to wall-clock time and waits for readers to drop the old one |
+| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L245) | Attach a warpable clock. Null reverts to wall-clock time and waits for readers to drop the old one |
 | [`current_time()`](src/rpp/event_loop.h#L255) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
 | [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L258) | The virtual time of `src`, or the monotonic wall clock when it is null |
-| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L262) | Refresh `frame` from the live clock and return its time; a detached source leaves it alone |
+| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L262) | Refresh `frame` from the live clock and return its time. A detached source leaves it alone |
 | [`get_time_source_frame()`](src/rpp/event_loop.h#L269) | Snapshot the loop clock on the thread which builds a deadline |
 | [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L901) | Sleep until a time point, resume on the loop thread |
 | [`stop()`](src/rpp/event_loop.h#L310) | Signal the loop to stop and finalize pending tasks |

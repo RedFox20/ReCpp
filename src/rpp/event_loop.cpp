@@ -78,29 +78,36 @@ namespace rpp
 
     void event_loop::wait_until(rpp::TimePoint deadline, time_frame frame) const noexcept
     {
-        if (!frame.warpable)
+        if (frame.warpable)
+        {
+            // warpable clock: poll so warp_forward() can release the wait early
+            while (current_time(frame) < deadline)
+                rpp::sleep_ms(1); // wall-clock poll step
+        }
+        else
         {
             rpp::sleep_until(deadline); // wall clock: one efficient sleep
-            return;
         }
-        // warpable clock: poll so warp_forward() can release the wait early
-        while (current_time(frame) < deadline)
-            rpp::sleep_ms(1); // wall-clock poll step
     }
 
     bool event_loop::wait_pop_until(resume_event& event, rpp::TimePoint deadline, time_frame& frame) noexcept
     {
-        if (!frame.warpable)
-            return resume_queue.wait_pop_until(event, deadline); // wall clock: one efficient wait
-
-        constexpr rpp::Duration warp_poll = rpp::millis(1); // wall-clock poll step
-        while (true) // warpable clock: poll so warp_forward() can release the wait early
+        if (frame.warpable)
         {
-            rpp::Duration remaining = deadline - current_time(frame);
-            if (remaining <= rpp::Duration::zero())
-                return false;
-            if (resume_queue.wait_pop(event, remaining < warp_poll ? remaining : warp_poll))
-                return true;
+            // warpable clock: poll so warp_forward() can release the wait early
+            constexpr rpp::Duration warp_poll = rpp::millis(1); // wall-clock poll step
+            for (;;)
+            {
+                rpp::Duration left = deadline - current_time(frame);
+                if (left <= rpp::Duration::zero())
+                    return false;
+                if (resume_queue.wait_pop(event, left < warp_poll ? left : warp_poll))
+                    return true;
+            }
+        }
+        else
+        {
+            return resume_queue.wait_pop_until(event, deadline); // wall clock: one efficient wait
         }
     }
 
