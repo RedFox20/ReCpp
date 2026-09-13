@@ -87,7 +87,8 @@ namespace rpp
         const bool tasks_done = !has_background_tasks(); // before the drain, so a late worker still counts
         run_all_ready(); // a resume queued as the background count hit zero is still pending
         // a drained resume can start new work, so the detach reads the count again
-        const bool idle = !has_pending_work();
+        // a fork suspended on a post_resume() awaiter counts in neither, so it gets its own term
+        const bool idle = !has_pending_work() && num_forks() == 0;
         if (idle)
             set_time_source(nullptr); // a live delay() worker polls it against a virtual deadline
         return tasks_done && idle;

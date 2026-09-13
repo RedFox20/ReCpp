@@ -1199,6 +1199,15 @@ TestImpl(test_event_loop)
         });
     }
 
+    // parks the coroutine handle instead of starting background work, so neither counter sees it
+    struct parking_awaiter
+    {
+        rpp::coro_handle<>& slot;
+        bool await_ready() const noexcept { return false; }
+        void await_suspend(rpp::coro_handle<> h) noexcept { slot = h; }
+        void await_resume() const noexcept {}
+    };
+
     // ─── shutdown: wait_on_all is not a complete drain ──────────
     // the resume lands as the background count reaches zero, past the point wait_on_all rechecks
     TestCase(wait_on_all_leaves_a_trailing_post)
@@ -1243,6 +1252,21 @@ TestImpl(test_event_loop)
         AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
 
         release.notify();
+        AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
+    }
+
+    // ─── shutdown: a suspended fork blocks completion ───────────
+    // it runs no background task and queues no resume, so num_forks() is the only signal
+    TestCase(stop_and_wait_all_ready_counts_a_suspended_fork)
+    {
+        rpp::coro_handle<> parked {};
+        loop->fork([&]() -> rpp::event_task { co_await parking_awaiter{ parked }; });
+        clock.warp_forward(rpp::seconds(10000));
+
+        AssertFalse(loop->stop_and_wait_all_ready(rpp::millis(20)));
+        AssertGreater(loop->current_time(), rpp::TimePoint::monotonic_now() + rpp::seconds(9000));
+
+        loop->post_resume(parked);
         AssertTrue(loop->stop_and_wait_all_ready(rpp::seconds(1)));
     }
 
