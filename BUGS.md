@@ -313,7 +313,7 @@ Import another module, or include `<rpp/future.h>` in the unit which names `std:
 `RppPromiseModuleOnly` in `tests/module_consumer/` is the gate. It imports `rpp.threading`,
 instantiates `std::promise` and runs at `-O2`. It failed to build before the split.
 
-`test_modules.cpp` imports `rpp.future`, so it keeps naming the factories unevaluated.
+`test_modules_future.cpp` imports `rpp.future`, so it keeps naming the factories unevaluated.
 Delete that workaround when a newer gcc compiles the reproducer above.
 
 Ten headers reached `<future>` before the split, and `future_types.h` was the only direct

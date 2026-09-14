@@ -18,7 +18,8 @@ gate, #65 changeset 6.
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 41 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/test_modules.cpp` | module consumer test over eight groups. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/test_modules_future.cpp` | the ninth group. A ninth import in the unit above exhausts the imported source locations of gcc-14 |
 | `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 9 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
 | CI | 29 jobs on GitHub Actions, and CircleCI is gone |
@@ -59,9 +60,9 @@ see **B15**. The generator selftest still pins all three knobs.
 
 **gcc-14 cannot compile `std::promise` in an importer, and six modules carried that before
 L7.** Any module whose global module fragment includes `<future>` breaks such a consumer,
-and `rpp.task` alone reproduces it. No export list changes the crash, so the L7 tests name
-the `future.h` factories in an unevaluated context. **B16** holds the reproducer and the
-list of ten headers which reach `<future>`. Nine of them ship as a module now.
+No export list changes the crash, so `test_modules_future.cpp` names the `future.h`
+factories in an unevaluated context. **B16** holds the reproducer. Three headers reach
+`<future>` now, and `rpp.future` carries all three.
 
 **An importer which includes `<string>` first reads a different module.** `rpp.file_io`
 passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the
@@ -1121,7 +1122,7 @@ B23 are struck through, because a fix replaced each one.
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
 | ~~B23~~ | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc ran out of module source locations on 44 modules, then mis-merged a global module declaration | Fixed. Eight header groups cut one translation unit from 39 imports to 8, and both standards build clean. A C++23 modules CI row now covers it. See `BUGS.md` C28 |
-| **B16** | gcc-14 | An importer of a module whose fragment includes `<future>` crashes on `std::promise` at `-O1` and above, at `propagate_necessity` | `rpp.future` carries the only three headers which reach `<future>`, so eight modules are clean. `RppPromiseModuleOnly` gates it, and `test_modules.cpp` still names `cfuture` unevaluated |
+| **B16** | gcc-14 | An importer of a module whose fragment includes `<future>` crashes on `std::promise` at `-O1` and above, at `propagate_necessity` | `rpp.future` carries the only three headers which reach `<future>`, so eight modules are clean. `RppPromiseModuleOnly` gates it, and `test_modules_future.cpp` still names `cfuture` unevaluated |
 | ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | No module exports a std name. An importer includes `<exception>` |
 | **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | No module exports a std name, so nothing reaches this |
