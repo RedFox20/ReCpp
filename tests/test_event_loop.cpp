@@ -1632,9 +1632,11 @@ TestImpl(test_event_loop)
             {
                 co_await ev->run_async([&ran]{ ran = true; });
             });
-            if (ev->stop_and_wait_all_ready(rpp::seconds(1))) ++drained;
+            const bool drain_ok = ev->stop_and_wait_all_ready(rpp::seconds(1));
+            if (drain_ok) ++drained;
             scoped.reset(); // frees the loop while a worker may still be inside run()
             if (ran.load()) ++completed;
+            if (!drain_ok) break; // a stuck drain costs a second per cycle, so stop at the first
         }
         AssertEqual(drained, CYCLES); // a shutdown which gave up proves nothing about the window
         AssertEqual(completed, CYCLES);

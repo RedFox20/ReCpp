@@ -226,11 +226,13 @@ SELFTEST_DIFFS = [
 ]
 
 
-def _deep_fence_diff(tmp_name):
-    """A hunk which starts inside a fenced block, with the fence above the hunk."""
+def _seeded_fence_diffs(tmp_name):
+    """A hunk which starts inside a fenced block, then a later hunk which does not."""
     with open(tmp_name, "w", encoding="utf-8") as f:
-        f.write(FENCE + "\n" + "code\n" * 4 + FENCE + "\n")
-    return f"+++ b/{tmp_name}\n@@ -4,2 +4,4 @@\n code\n+{_P14}\n+{_P13}\n code\n"
+        f.write(FENCE + "\n" + "code\n" * 4 + FENCE + "\n" + "prose\n" * 20)
+    inside = f"+++ b/{tmp_name}\n@@ -4,2 +4,4 @@\n code\n+{_P14}\n+{_P13}\n code\n"
+    after = "@@ -12,2 +14,3 @@\n prose\n+A sentence which doesn't belong here.\n prose\n"
+    return [(inside, None), (inside + after, "contraction")]
 
 
 def selftest():
@@ -238,7 +240,7 @@ def selftest():
     bad = 0
     tmp = tempfile.NamedTemporaryFile(suffix=".md", delete=False)
     tmp.close()
-    diffs = SELFTEST_DIFFS + [(_deep_fence_diff(tmp.name), None)]
+    diffs = SELFTEST_DIFFS + _seeded_fence_diffs(tmp.name)
     for diff, want in diffs:
         got = lint_diff(diff.splitlines(keepends=True))
         if want is None and got:
@@ -283,6 +285,8 @@ def added_lines(diff):
         elif raw.startswith("+"):
             per_file[path].append(raw[1:].rstrip("\n"))
         elif raw.startswith("@@"):
+            if fenced(per_file[path]):
+                per_file[path].append(FENCE) # a hunk never inherits the fence of the one above
             per_file[path].append("") # text this edit did not add ends the paragraph
             if path.endswith(".md") and _hunk_opens_a_fence(path, raw):
                 per_file[path].append(FENCE)
