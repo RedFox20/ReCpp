@@ -178,7 +178,7 @@ import rpp.testing;             // a test file names each group it uses
 **Why a group and not one module per header.** ReCpp shipped 44 per-header modules first,
 and gcc-14 ran out of module source locations when one translation unit imported dozens of
 them. It then mis-merged a global module declaration and the build died, from a clean build
-directory on C++23 only. `BUGS.md` **C28** holds the measurements. Eight groups cut
+directory on C++23 only. `BUGS.md` **C28** holds the measurements. The groups cut
 `test_modules.cpp` from 39 imports to 8, and both C++20 and C++23 build clean.
 
 Name the group you use when you want the narrowest dependency. A file that imports
@@ -235,7 +235,7 @@ preprocessed lines and needs no split.
 
 ### Available modules
 
-Eight modules ship, and `src/rpp/rpp-*.cppm` names each one. Each file carries the export
+Nine modules ship, and `src/rpp/rpp-*.cppm` names each one. Each file carries the export
 list its headers earned, so read it for the names a module gives you.
 
 Four groups carry a limit the export list cannot state:

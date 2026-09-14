@@ -1,6 +1,6 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 23. Eight module interface units exist, one per header group. The migration is
+Revision 23. Nine module interface units exist, one per header group. The migration is
 complete. No group re-exports another group, and no module exports a std name. Section 12
 records the `rpp.std` stand-in and the `rpp` umbrella it dropped.
 
@@ -41,7 +41,7 @@ dropping `rpp.std` retired that shape for good.
 **Why groups and not forty-four modules.** The tree shipped one module per header
 first. gcc-14 then ran out of module source locations in any translation unit which imported
 dozens, and it mis-merged a global module declaration. Only a clean C++23 build showed it,
-see `BUGS.md` **C28**. Eight groups cut `test_modules.cpp` from 39 imports to 8, and the
+see `BUGS.md` **C28**. The groups cut `test_modules.cpp` from 39 imports to 8, and the
 clean build passes on both standards with zero overflow notes.
 
 Build time was never the argument either way. The 88 module translation units of a cold
