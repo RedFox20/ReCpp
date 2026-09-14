@@ -184,6 +184,12 @@ def next_fence(fence, mark):
     return fence or mark
 
 
+def kept_marker(line):
+    """A line an edit keeps is a break, unless it is a fence or an underline."""
+    s = line.strip()
+    return s if fence_mark(s) or RULE.match(s) else ""
+
+
 def fenced(lines):
     """The delimiter of the block which follows these lines, or None if none is open."""
     fence = None
@@ -268,6 +274,19 @@ SELFTEST_DIFFS = [
 ]
 
 
+# (before, old, new, the text a finding must contain, or None when the edit is clean)
+_W26 = " ".join(["word"] * (MAX_WORDS + 1))
+SELFTEST_EDITS = [
+    # the delimiters sit in old_string, so the filter must not drop them
+    ("", FENCE + "\nfoo\n" + FENCE, f"{FENCE}\nfoo\n{_P14}\n{_P13}\n{FENCE}", None),
+    # the block opened above the edit, so only the file says the added lines are code
+    (FENCE + "\n", "foo", f"foo\n{_P14}\n{_P13}", None),
+    # a kept underline still makes the line above it a heading
+    ("", "old heading\n---", f"{_W26}\n---", None),
+    ("", "anchor", f"anchor\n{_P14} {_P13}", "in one sentence"),
+]
+
+
 def _seeded_fence_diffs(tmp_name):
     """A hunk which starts inside a fenced block, then a later hunk which does not."""
     with open(tmp_name, "w", encoding="utf-8") as f:
@@ -291,6 +310,14 @@ def selftest():
         elif want is not None and not any(want in g for g in got):
             bad += 1
             print(f"FAIL expected '{want}' from a diff, got {got or 'nothing'}")
+    for before, old, new, want in SELFTEST_EDITS:
+        got = lint_path("X.md", edit_lines("X.md", old, new, before))
+        if want is None and got:
+            bad += 1
+            print(f"FAIL clean edit reported {got[0]}")
+        elif want is not None and not any(want in g for g in got):
+            bad += 1
+            print(f"FAIL expected '{want}' from an edit, got {got or 'nothing'}")
     for path, lines, want in SELFTEST:
         got = lint_path(path, lines)
         if want is None and got:
@@ -301,7 +328,7 @@ def selftest():
             print(f"FAIL expected '{want}', got {got or 'nothing'}\n     {lines}")
     os.unlink(tmp.name)
     print(f"== prose_rules selftest: {bad} finding(s) over "
-          f"{len(SELFTEST) + len(diffs)} case(s) ==")
+          f"{len(SELFTEST) + len(diffs) + len(SELFTEST_EDITS)} case(s) ==")
     return 1 if bad else 0
 
 
@@ -338,12 +365,18 @@ def added_lines(diff):
             seed = _hunk_opens_a_fence(path, raw) if path.endswith(".md") else None
             if seed: per_file[path].append(seed)
         elif raw.startswith(" "):
-            # a kept fence or underline keeps its meaning, so added lines read as what they are
-            kept = raw[1:].strip()
-            per_file[path].append(kept if fence_mark(kept) or RULE.match(kept) else "")
+            per_file[path].append(kept_marker(raw[1:]))
         elif raw.startswith("-"):
             per_file[path].append("") # a removed line is not in the file the lint measures
     return per_file
+
+
+def edit_lines(path, old, new, before=""):
+    """The lines an edit introduces, plus the fence it lands inside."""
+    oldset = set(old.split("\n"))
+    lines = [l if l not in oldset else kept_marker(l) for l in new.split("\n")]
+    seed = fenced(before.split("\n")) if path.endswith(".md") else None
+    return [seed] + lines if seed else lines
 
 
 def lint_diff(diff):
