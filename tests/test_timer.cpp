@@ -21,32 +21,51 @@ TestImpl(test_timer)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
+    // a spin which starts and ends inside one scheduler tick reads 0, so a CPU clock
+    // case retries. A read which still fails after every spin means a broken clock.
+    static constexpr int MAX_CPU_CLOCK_SPINS = 3;
+
     TestInit(test_timer)
     {
     }
 
     TestCase(basic_timer_sec)
     {
-        for (int i = 0; i < 3; ++i)
+        double elapsed_ms = best_of_3([]
         {
             rpp::Timer t;
             spin_sleep_for_ms(10);
-            double elapsed_ms = t.elapsed_millis();
-            print_info("timer %d 10ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
-        }
+            return t.elapsed_millis();
+        });
+        print_info("timer 10ms spin_sleep best of 3: %fms\n", elapsed_ms);
+        AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
     }
 
     TestCase(basic_timer_ms)
     {
-        for (int i = 0; i < 3; ++i)
+        double elapsed_ms = best_of_3([]
         {
             rpp::Timer t;
             spin_sleep_for_ms(10);
-            double elapsed_ms = t.elapsed_millis();
-            print_info("timer_ms %d 10ms spin_sleep timer result: %fms\n", i+1, elapsed_ms);
-            AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
-        }
+            return t.elapsed_millis();
+        });
+        print_info("timer_ms 10ms spin_sleep best of 3: %fms\n", elapsed_ms);
+        AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
+    }
+
+    // best_of_3 can regress and the three timing callers still pass on an unloaded host.
+    // This pins the call count and the minimum on a fixed sequence.
+    TestCase(best_of_3_takes_three_samples_and_returns_the_smallest)
+    {
+        int calls = 0;
+        const double spike[] = { 40.0, 10.0, 25.0 }; // the smallest sits in the middle
+        AssertEqual(best_of_3([&]{ return spike[calls++]; }), 10.0);
+        AssertEqual(calls, 3); // a regression to one call would return the first sample
+
+        calls = 0;
+        const double rising[] = { 5.0, 6.0, 7.0 }; // the smallest sits first
+        AssertEqual(best_of_3([&]{ return rising[calls++]; }), 5.0);
+        AssertEqual(calls, 3);
     }
 
     TestCase(ensure_sleep_millis_accuracy)
@@ -559,11 +578,16 @@ TestImpl(test_timer)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
         AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(20'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("ProcessCPU 20ms spin elapsed: %lldus\n", elapsed_us);
-        // CPU time granularity on CI VMs can be ~10ms, so only assert non-zero
+
+        // GetProcessTimes reports whole scheduler ticks, so one spin can start and end
+        // inside a single tick and read 0. Spin again until a tick lands.
+        rpp::int64 elapsed_us = 0;
+        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
+        {
+            spin_sleep_for_us(20'000, /*full_spin*/true);
+            elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ProcessCPU) - t1).micros();
+        }
+        print_info("ProcessCPU spin elapsed: %lldus\n", elapsed_us);
         AssertGreater(elapsed_us, 0);
     }
 
@@ -572,10 +596,10 @@ TestImpl(test_timer)
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
         AssertThat(t1.is_valid(), true);
 
-        // GetThreadTimes reports whole ~15.6ms ticks, so one 20ms spin can start and end
-        // inside a single tick and read 0. Spin again until a tick lands, at most 10 times.
+        // GetThreadTimes reports whole scheduler ticks, so one spin can start and end
+        // inside a single tick and read 0. Spin again until a tick lands.
         rpp::int64 elapsed_us = 0;
-        for (int spins = 0; spins < 10 && elapsed_us == 0; ++spins)
+        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
         {
             spin_sleep_for_us(20'000, /*full_spin*/true);
             elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - t1).micros();

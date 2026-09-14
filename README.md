@@ -4623,10 +4623,11 @@ adds `#include <rpp/tests.macros.h>` for them, because a module cannot export a 
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(strview testNamePatterns)`](src/rpp/tests.h#L265) | Run tests matching patterns |
-| [`test::run_tests(int argc, char* argv[])`](src/rpp/tests.h#L276) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L281) | Run all registered tests |
+| [`test::run_tests(strview testNamePatterns)`](src/rpp/tests.h#L281) | Run tests matching patterns |
+| [`test::run_tests(int argc, char* argv[])`](src/rpp/tests.h#L292) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L297) | Run all registered tests |
 | [`test::is_ci_machine()`](src/rpp/tests.h#L206) | Returns TRUE if the tests run on a CI machine, which shares its CPU time |
+| [`test::best_of_3(measure)`](src/rpp/tests.h#L245) | Takes the smallest of three measurements, so one scheduling spike cannot break a tight timing bound |
 | [`register_test(name, factory, autorun)`](src/rpp/tests.h#L47) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase

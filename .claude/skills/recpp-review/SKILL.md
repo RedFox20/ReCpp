@@ -89,7 +89,12 @@ Protect that number.
   or `std::this_thread::yield` to source or tests.
 - An assertion on a pool worker does not fail the case. `test::assert_failed()`
   records into a thread-local which only the case thread owns, so off that thread it
-  prints and returns. Set an `std::atomic_bool` and assert it in `TestCaseCleanup()`.
+  prints and returns. Keep the `AssertFailed`, because it prints the file and the
+  line from any thread and that pinpoints the failure. Also set an `std::atomic_bool`
+  which the case thread reads after the join, so the case fails as well.
+- A bound whose purpose is the bound cannot be widened. Take `test::best_of_3()` of
+  the measurement instead. A spike only inflates a sample, so the smallest one is
+  the honest cost and the bound stays where it was.
 - `TimePoint::monotonic_now()` and `system_now()` agree to about 100ns, because
   `timepoint.cpp` shifts the monotonic clocks onto the realtime epoch. A case which
   expects the two to diverge measures nothing. Warp an offset instead.

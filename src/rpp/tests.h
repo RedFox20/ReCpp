@@ -235,6 +235,22 @@ namespace rpp
          */
         static void spin_sleep_for_us(uint64_t microseconds, bool full_spin = false) noexcept;
 
+        /**
+         * @brief Runs `measure` three times and returns the smallest result.
+         * A spike only inflates a sample, so the smallest one is the honest cost.
+         * @param measure Callable which measures one sample and returns it
+         * @returns The smallest of the three results
+         */
+        template<class Measure>
+        static auto best_of_3(const Measure& measure)
+        {
+            auto best = measure();
+            for (int i = 1; i < 3; ++i)
+                if (auto sample = measure(); sample < best)
+                    best = sample;
+            return best;
+        }
+
         // main entry/initialization point for the test class
         virtual void init_test() {}
 

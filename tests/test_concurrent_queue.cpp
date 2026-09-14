@@ -417,7 +417,15 @@ TestImpl(test_concurrent_queue)
         PopResult r;
 
         // this first check should definitely timeout, but make sure it WAITS
-        AssertWaitPopUntil(Now()+Millis(5), false, /*item*/"", /*elapsed ms:*/ 2.9, 10.0);
+        // a loaded machine stretches one wait, so the tight bound reads the best of three
+        double timed_out_ms = best_of_3([&]
+        {
+            PopResult probe = wait_pop_until(queue, Now()+Millis(5));
+            AssertThat(bool(probe), false);
+            AssertThat(probe.item, "");
+            return probe.elapsed_ms;
+        });
+        AssertInRange(timed_out_ms, 2.9, 10.0);
         AssertWaitPopUntil(Now()+Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
         // if someone pushes an item if we have a huge timeout,
