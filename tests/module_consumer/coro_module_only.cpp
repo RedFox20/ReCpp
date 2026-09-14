@@ -1,9 +1,9 @@
-// Drives the event_loop and awaiter half of rpp.future beside <memory>, which B27 forbids
+// Drives the event_loop and awaiter half of rpp.future beside <memory>, which B28 forbids
 // next to a cfuture. This target holds no cfuture, so no get() reaches the merge.
 #ifdef MAMA_HAS_MODULES
 #include <typeinfo> // libstdc++ names typeid inside <future>, and the fragment does not carry it
 #include <new>      // placement new, which the loop queue runs
-#include <memory>   // the header B27 rejects beside a cfuture, see BUGS.md B27
+#include <memory>   // the header B28 rejects beside a cfuture, see BUGS.md B28
 #include <vector>
 
 import rpp.core;
@@ -12,7 +12,7 @@ import rpp.future;
 
 int main()
 {
-    // <memory> is live here, so the target fails if B27 ever widens past cfuture
+    // <memory> is live here, so the target fails if B28 ever widens past cfuture
     std::shared_ptr<int> owned = std::make_shared<int>(4);
     if (*owned != 4) return 1;
 

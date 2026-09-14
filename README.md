@@ -270,7 +270,7 @@ A translation unit which names no `cfuture` imports `rpp.future` beside any incl
 `tests/module_consumer/coro_module_only.cpp` pins that on gcc-14, driving `event_loop` and
 the awaiters with `<memory>` live. `future_module_only.cpp` holds the restricted half, and
 a gcc-14 consumer which wants both uses `<rpp/future.h>` there. clang-21 and MSVC carry no
-such limit. `BUGS.md` B27 holds the reduced reproducer and every repair which failed.
+such limit. `BUGS.md` B28 holds the reduced reproducer and every repair which failed.
 
 ### How it works
 

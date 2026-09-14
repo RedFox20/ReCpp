@@ -1,18 +1,18 @@
 // Drives the cfuture half of rpp.future from an import alone. The include list keeps clear of
-// bits/exception_ptr.h, which gcc-14 cannot merge beside a cfuture. See BUGS.md B27.
+// bits/exception_ptr.h, which gcc-14 cannot merge beside a cfuture. See BUGS.md B28.
 #ifdef MAMA_HAS_MODULES
 #include <typeinfo> // libstdc++ names typeid inside <future>, and the fragment does not carry it
 #include <new>      // placement new, which a vector of cfuture runs
 #include <vector>
 #if _MSC_VER
 // MSVC parses <thread> from the fragment here and needs the time_point operators. <chrono>
-// reaches exception_ptr.h, which gcc-14 rejects beside a cfuture. See BUGS.md B27
+// reaches exception_ptr.h, which gcc-14 rejects beside a cfuture. See BUGS.md B28
 #include <chrono>
 #endif
 #if defined(__clang__) || defined(_MSC_VER)
-// B27 is a gcc-14 defect, and this proves the other two carry no such limit. Only a compiler
+// B28 is a gcc-14 defect, and this proves the other two carry no such limit. Only a compiler
 // which is not gcc reads these lines, because <memory> reaches exception_ptr.h
-#define RPP_B27_FREE 1
+#define RPP_B28_FREE 1
 #include <memory>
 #endif
 
@@ -40,8 +40,8 @@ int main()
     const std::vector<int> values = rpp::get_all(futures);
     if (values.size() != 2 || values[0] + values[1] != 3) return 5;
 
-#if RPP_B27_FREE
-    // the B27 shape, which gcc-14 cannot compile. A shared_ptr beside a future call
+#if RPP_B28_FREE
+    // the B28 shape, which gcc-14 cannot compile. A shared_ptr beside a future call
     std::shared_ptr<int> owned = std::make_shared<int>(4);
     if (rpp::async_task([v = owned] { return *v; }).get() != 4) return 8;
 #endif
