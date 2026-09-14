@@ -25,6 +25,9 @@ This is not B17. That one names `thread_pool.cpp:359` and `tests.cpp:726` in
 Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
 `cpp23-tsan-gcc13`, `cpp23-tsan-clang18` and `cpp26-tsan-gcc14`. Only libc++ reports it.
 
+The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
+run. B17 reported on the same commit instead, which is a different race in another test.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
@@ -200,6 +203,10 @@ reported one warning, and the four other TSAN jobs passed on the same commit.
 Fourth sighting on cab12a8, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two stacks,
 same two lines, and all 553 cases passed. The job passes on the next commit, so the rate is
 still far below one run.
+
+Fifth sighting on c5a9d9b, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two lines, and
+the same creation stack under `test_sockets::test_udp_poll_nonblocking_select`. All 557 cases
+passed, and three other TSAN jobs passed on the same commit.
 
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
