@@ -422,8 +422,11 @@ GROUP_HEADERS = {
     'containers': ('collections.h', 'memory_pool.h', 'load_balancer.h'),
     'io': ('file_io.h', 'paths.h', 'sockets.h', 'binary_stream.h', 'binary_serializer.h'),
     'threading': ('mutex.h', 'condition_variable.h', 'semaphore.h', 'concurrent_queue.h',
-                  'thread_pool.h', 'threads.h', 'task.h', 'future.h', 'future_types.h',
-                  'event_loop.h', 'coroutines.h', 'atomic_shared_ptr.h', 'close_sync.h'),
+                  'thread_pool.h', 'threads.h', 'task.h', 'future_types.h',
+                  'atomic_shared_ptr.h', 'close_sync.h'),
+    # the only three headers which reach <future>. gcc-14 crashes an importer of any module
+    # whose fragment carries it, so they sit alone and rpp.threading stays safe. See BUGS.md B16
+    'future': ('future.h', 'event_loop.h', 'coroutines.h'),
     'testing': ('tests.h',),
 }
 GROUPS = tuple(GROUP_HEADERS)

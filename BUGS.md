@@ -184,32 +184,61 @@ bare metal takes that branch too, and it needs a target which can run the result
 All six headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
 
-### B16. gcc-14 cannot compile `std::promise` in a module importer
+### B16. gcc-14 crashes an importer which instantiates `std::promise` at `-O1` and above
 A module whose global module fragment includes `<future>` breaks every importer which
 instantiates `std::promise`. gcc-14 reports `internal compiler error: in
-propagate_necessity, at tree-ssa-dce.cc:1001`. The crash needs no export, and `-O0`
-crashes the same as `-O2`.
+propagate_necessity, at tree-ssa-dce.cc:1001`, in GIMPLE pass `cddce`.
+
+The crash needs no export. An empty purview is enough.
+
+Measured on gcc 14.2.0. The earlier entry said `-O0` crashes the same as `-O2`, and that
+is wrong. The pass which crashes does not run below `-O1`.
+
+| Optimization | Result |
+|---|---|
+| `-O0`, `-Og` | compiles |
+| `-O1`, `-O2`, `-O3`, `-Os` | ICE in `cddce` |
+
+`<future>` is the only trigger. A fragment which includes `<memory>`, `<thread>` or
+`<mutex>` instead compiles. No flag avoids it either. `-fno-tree-dce`,
+`-fno-tree-builtin-call-dce` and `-fno-module-lazy` each still crash.
 
 ```cpp
-// m.cppm
+// m.cppm -- an empty purview is enough
 module;
 #include <future>
 export module m;
 
-// c.cpp
+// c.cpp -- g++ -std=c++20 -fmodules-ts -O2 -c c.cpp
 #include <future>
 import m;
 int main() { std::promise<int> p; p.set_value(7); return p.get_future().get() == 7 ? 0 : 1; }
 ```
 
-Ten headers reach `<future>`, and `future_types.h` is the only direct includer:
-`concurrent_queue.h`, `coroutines.h`, `event_loop.h`, `future.h`, `future_types.h`,
-`semaphore.h`, `task.h`, `tests.h`, `tests.macros.h` and `thread_pool.h`. Nine of them
-ship as a module, six before L7, so this predates the layer which found it. `rpp.task`
-alone reproduces it.
+**Narrowed to one module.** `future_types.h` reached every rpp header and carried `<future>`
+into all ten. It needed the include for one concept, and `IsFuture` moved to `future.h`.
+`rpp.future` now carries the three headers which reach `<future>`, and the other eight
+modules are clean. Measured after the split, each at `-O2`:
 
-No export list removes the crash, so `test_modules.cpp` names the `future.h` factories in
-an unevaluated context. Delete that workaround when a newer gcc compiles the reproducer.
+| Importer | Result |
+|---|---|
+| `rpp.threading`, `rpp.testing`, `rpp.io` | compiles and runs |
+| `rpp.future` | ICE |
+
+So a consumer meets this defect only when it imports `rpp.future`. Two ways around it.
+Import another module, or include `<rpp/future.h>` in the unit which names `std::promise`.
+
+`RppPromiseModuleOnly` in `tests/module_consumer/` is the gate. It imports `rpp.threading`,
+instantiates `std::promise` and runs at `-O2`. It failed to build before the split.
+
+`test_modules.cpp` imports `rpp.future`, so it keeps naming the factories unevaluated.
+Delete that workaround when a newer gcc compiles the reproducer above.
+
+Ten headers reached `<future>` before the split, and `future_types.h` was the only direct
+includer. Three reach it now: `future.h`, `event_loop.h` and `coroutines.h`. `future.h`
+includes `<future>` itself, which it always needed, and the other two include `future.h`.
+
+No export list removes the crash. Only the fragment which carries `<future>` decides it.
 
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A

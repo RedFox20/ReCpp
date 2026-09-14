@@ -14,6 +14,7 @@
 #include "config.h"
 #include "debugging.h"
 #include "future_types.h"
+#include "future.h" // rpp::IsFuture, rpp::IsFunctionReturningFuture
 #include "task.h" // rpp::task<T> (driven to completion by run_until_done)
 #include "thread_pool.h" // parallel_task, pool_task_handle
 #include "timepoint.h" // rpp::Duration

@@ -13,7 +13,7 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the eight modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
+| the nine modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
@@ -28,7 +28,14 @@ gate, #65 changeset 6.
 6 landed. The generator drives all eight groups. 4 is done through the generator
 `--check`. 5 is finished. Section 11 lists what 7 owes.
 
-**Next:** nothing in this plan. Section 11 holds the open follow-ups.
+**Next:** nothing in this plan. Every remaining item is a follow-up to it, and section 11.1
+holds the list.
+
+**The follow-ups, ranked.** B16 is narrowed to `rpp.future`, the ninth group, which carries
+the only three headers that reach `<future>`. Eight modules are clean, and
+`RppPromiseModuleOnly` gates it. B8 costs one trait, which a module importer does not get
+and an includer does. B19, B20, B21 and B22 are dormant. No module exports a std name, and
+dropping `rpp.std` retired that shape for good.
 
 **Why eight groups and not forty-four modules.** The tree shipped one module per header
 first. gcc-14 then ran out of module source locations in any translation unit which imported
@@ -1114,7 +1121,7 @@ B23 are struck through, because a fix replaced each one.
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
 | ~~B23~~ | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc ran out of module source locations on 44 modules, then mis-merged a global module declaration | Fixed. Eight header groups cut one translation unit from 39 imports to 8, and both standards build clean. A C++23 modules CI row now covers it. See `BUGS.md` C28 |
-| **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, and `rpp.threading` and `rpp.testing` carry them |
+| **B16** | gcc-14 | An importer of a module whose fragment includes `<future>` crashes on `std::promise` at `-O1` and above, at `propagate_necessity` | `rpp.future` carries the only three headers which reach `<future>`, so eight modules are clean. `RppPromiseModuleOnly` gates it, and `test_modules.cpp` still names `cfuture` unevaluated |
 | ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | No module exports a std name. An importer includes `<exception>` |
 | **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | No module exports a std name, so nothing reaches this |
@@ -1208,5 +1215,5 @@ already used, so the public signature names no std type.
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 
-**About 5 working days remain.** Changeset 5 is half of that. Every decision in
-sections 3 and 6 is settled, and nothing blocks the start.
+**Every changeset landed.** The table above is a record, not a plan. What remains is the
+follow-up list in section 11.1, and B16 is the one which reaches a consumer.

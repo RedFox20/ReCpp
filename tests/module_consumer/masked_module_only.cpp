@@ -7,6 +7,7 @@
 
 import rpp.core; // includes come first, the imports go last
 import rpp.threading;
+import rpp.future; // NotFuture, which rpp.threading no longer carries
 import rpp.numeric;
 import rpp.text;
 

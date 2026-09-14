@@ -67,6 +67,12 @@ if (BUILD_MODULE_CONSUMER_TESTS)
     mama_target_modules(RppLiteralsModuleOnly)
     target_link_libraries(RppLiteralsModuleOnly PRIVATE ${MAMA_LIBS})
 
+    # an importer which includes <future> and instantiates std::promise, see BUGS.md B16
+    add_executable(RppPromiseModuleOnly promise_module_only.cpp)
+    target_include_directories(RppPromiseModuleOnly PRIVATE ${MAMA_INCLUDES})
+    mama_target_modules(RppPromiseModuleOnly)
+    target_link_libraries(RppPromiseModuleOnly PRIVATE ${MAMA_LIBS})
+
     # the tests.h macro split only pays when tests.macros.h plus rpp.testing writes a suite
     add_executable(RppTestsModuleOnly tests_module_only.cpp)
     target_include_directories(RppTestsModuleOnly PRIVATE ${MAMA_INCLUDES})

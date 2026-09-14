@@ -12,9 +12,33 @@
 #include "timepoint.h" // rpp::Duration
 #include "delegate.h" // rpp::delegate
 #include <optional> // for async_task() deterministic task cleanup
+#include <future> // std::future, std::promise, std::future_status
 
 namespace rpp
 {
+    // These name std::future, so they live here and not in future_types.h. That header
+    // reaches every rpp header, and <future> there crashes an importer. See BUGS.md B16
+    template<typename F>
+    concept IsFuture = requires(F f) {
+        requires std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
+              || std::is_same_v<F, std::future<decltype(f.get())>>;
+    };
+
+    template<typename F>
+    concept NotFuture = !IsFuture<F>;
+
+    template<typename F>
+    concept IsFunctionReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && IsFuture<decltype(f())>;
+    };
+
+    template<typename F>
+    concept IsFunctionNotReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && NotFuture<decltype(f())>;
+    };
+
     ////////////////////////////////////////////////////////////////////////////////
 
 

@@ -22,6 +22,7 @@ import rpp.numeric;
 import rpp.time;
 import rpp.containers;
 import rpp.threading;
+import rpp.future;
 import rpp.io;
 import rpp.testing;
 
