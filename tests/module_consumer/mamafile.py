@@ -22,3 +22,5 @@ class RppModuleConsumer(mama.BuildTarget):
         # CXX23 reaches the targets, so the C++23 consumer run compiles as C++23 and not as C++20
         if os.getenv('CXX23'): self.enable_cxx23()
         else:                  self.enable_cxx20()
+        # run_test.py runs every module-only target, so a root build of this project builds them
+        self.enable_from_env('BUILD_MODULE_CONSUMER_TESTS', force=self.dep.is_root)

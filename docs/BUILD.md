@@ -68,6 +68,9 @@ mama gcc tsan build clang-tidy test="nogdb -vv"
 
 ## Building with CMake directly
 
+`BUILD_TESTS` is OFF by default, so a project which builds ReCpp as a dependency
+compiles the library alone. Turn it on to get `RppTests`.
+
 ```bash
 # configure and build
 cmake -B build -DBUILD_TESTS=ON -DCXX20=ON
@@ -75,6 +78,18 @@ cmake --build build
 
 # run tests
 ./bin/RppTests -vv
+```
+
+`tests/module_consumer/` keeps its module-only validation targets under a second cached
+option, `BUILD_MODULE_CONSUMER_TESTS`. It takes the value of `BUILD_TESTS` on the first
+configure of a build dir. `tests/module_consumer/mamafile.py` turns it on, because
+`run_test.py` runs every one of those targets.
+
+Run a mama build there first. It generates the `mama.cmake` this project includes, and
+git ignores that file.
+
+```bash
+cmake -S tests/module_consumer -B build -DBUILD_MODULE_CONSUMER_TESTS=ON
 ```
 
 ### Address Sanitizer (CMake)
