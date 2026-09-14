@@ -21,8 +21,8 @@ TestImpl(test_timer)
     static constexpr double sigma_ms = sigma_s * 1000.0;
 #endif
 
-    // two spins already cover several scheduler ticks, so a third failing read means
-    // the CPU clock is broken rather than quantized. Caps the worst case under 100ms.
+    // a spin which starts and ends inside one scheduler tick reads 0, so a CPU clock
+    // case retries. A read which still fails after every spin means a broken clock.
     static constexpr int MAX_CPU_CLOCK_SPINS = 3;
 
     TestInit(test_timer)
