@@ -8,6 +8,23 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B27. A `then()` exception handler reads a string the async state frees
+`ubuntu-cpp20-tsan-clang18` reported one race in `test_future::except_handlers_catch_first`.
+Thread T107 runs `~invalid_argument` inside the libc++ `std::async` state and calls `free`.
+Thread T100 reads the same address through `bcmp`, under the `e.what()` compare of the
+handler. All 557 cases passed, and TSAN alone sets exit code 66.
+
+The handler takes `std::domain_error e` by value (`test_future.cpp:143`). libc++ holds the
+message in a refcounted buffer which a copy shares, so the copy and the async state point at
+one allocation. Whether the refcount is the defect or the report is a false positive needs a
+read of `__libcpp_refstring`.
+
+This is not B17. That one names `thread_pool.cpp:359` and `tests.cpp:726` in
+`test_threadpool::parallel_task_reentrance`, and neither stack appears here.
+
+Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
+`cpp23-tsan-gcc13`, `cpp23-tsan-clang18` and `cpp26-tsan-gcc14`. Only libc++ reports it.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
