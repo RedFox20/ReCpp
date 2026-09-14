@@ -19,6 +19,7 @@ MAX_SLEEP_MS = 10       # R2, the sanctioned sleep band
 NEARBY = 4              # R4, how far a comment may sit from the literal it repeats
 
 FENCE = "```"
+FENCE_RE = re.compile(r'^(?:```|~~~)') # markdown accepts either delimiter
 
 TIME_UNIT = re.compile(r'\b(\d+(?:\.\d+)?)\s*(?:ns|us|ms|s|sec|secs|seconds)\b')
 TABLE_RULE = re.compile(r'^\|[\s:|-]+\|?\s*$')
@@ -99,15 +100,16 @@ def lint_markdown(lines, label="md"):
     Prose wraps, so a sentence spans lines. The paragraph is the unit which carries one,
     and a per-line check misses every sentence the wrap split.
     """
-    out, fence, para, start = [], False, [], 0
+    out, fence, para, start = [], None, [], 0
     for i, l in enumerate(lines):
         st = l.lstrip()
-        new_para = st.startswith(("```", "|", ">", "#")) or not st or bool(LIST_ITEM.match(st))
+        mark = fence_mark(st)
+        new_para = bool(mark) or st.startswith(("|", ">", "#")) or not st or bool(LIST_ITEM.match(st))
         if new_para and para:
             _sentence_rules(" ".join(para), f"{label}+{start}", out)
             para = []
-        if st.startswith("```"):
-            fence = not fence
+        if mark:
+            fence = None if fence == mark else fence or mark
             continue
         if fence or st.startswith((">", "#")) or not st:
             continue
@@ -163,9 +165,20 @@ def lint_code(lines, label="src", creating=False):
     return out
 
 
+def fence_mark(line):
+    """The fence delimiter a line opens or closes with, or None."""
+    m = FENCE_RE.match(line.lstrip())
+    return m.group(0) if m else None
+
+
 def fenced(lines):
-    """True when the text after these lines starts inside a fenced block."""
-    return sum(1 for l in lines if l.lstrip().startswith(FENCE)) % 2 == 1
+    """The delimiter of the block which follows these lines, or None if none is open."""
+    fence = None
+    for l in lines:
+        mark = fence_mark(l)
+        # only the delimiter which opened a block closes it, so the other one is content
+        if mark: fence = None if fence == mark else fence or mark
+    return fence
 
 
 def lint_path(path, lines, creating=False):
@@ -225,6 +238,9 @@ SELFTEST_DIFFS = [
     (f"+++ b/X.md\n@@ -1,3 +1,4 @@\n+{_P14}\n-gone\n+{_P13}\n", None),
     # a kept fence delimiter marks the additions between them as code, not prose
     (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ```\n+{_P14}\n+{_P13}\n ```\n", None),
+    (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ~~~\n+{_P14}\n+{_P13}\n ~~~\n", None),
+    # only the delimiter which opened a block closes it, so the other one is content
+    (f"+++ b/X.md\n@@ -1,5 +1,7 @@\n ```\n ~~~\n+{_P14}\n+{_P13}\n ```\n", None),
     # an added `++count;` line makes a diff record which starts like a file header
     (f"+++ b/X.cpp\n@@ -1,2 +1,4 @@\n+++count;\n+// a comment which doesn't belong\n", "contraction"),
 ]
@@ -268,13 +284,13 @@ def selftest():
 
 
 def _hunk_opens_a_fence(path, header):
-    """True when a hunk which starts at this header lands inside a fenced block."""
+    """The fence delimiter a hunk which starts at this header lands inside, or None."""
     start = re.search(r'\+(\d+)', header)
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
-            return bool(start) and fenced(f.read().splitlines()[:int(start.group(1)) - 1])
+            return fenced(f.read().splitlines()[:int(start.group(1)) - 1]) if start else None
     except OSError:
-        return False # a deleted or renamed file has no state to read
+        return None # a deleted or renamed file has no state to read
 
 
 def added_lines(diff):
@@ -293,15 +309,15 @@ def added_lines(diff):
             per_file[path].append(raw[1:].rstrip("\n"))
         elif raw.startswith("@@"):
             in_hunk = True
-            if fenced(per_file[path]):
-                per_file[path].append(FENCE) # a hunk never inherits the fence of the one above
+            open_mark = fenced(per_file[path])
+            if open_mark:
+                per_file[path].append(open_mark) # a hunk never inherits the fence above it
             per_file[path].append("") # text this edit did not add ends the paragraph
-            if path.endswith(".md") and _hunk_opens_a_fence(path, raw):
-                per_file[path].append(FENCE)
+            seed = _hunk_opens_a_fence(path, raw) if path.endswith(".md") else None
+            if seed: per_file[path].append(seed)
         elif raw.startswith(" "):
-            body = raw[1:].rstrip("\n")
             # a kept fence delimiter keeps its meaning, so added code never reads as prose
-            per_file[path].append(FENCE if body.lstrip().startswith(FENCE) else "")
+            per_file[path].append(fence_mark(raw[1:].rstrip("\n")) or "")
         elif raw.startswith("-"):
             per_file[path].append("") # a removed line is not in the file the lint measures
     return per_file

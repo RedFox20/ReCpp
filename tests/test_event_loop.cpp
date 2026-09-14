@@ -1636,7 +1636,7 @@ TestImpl(test_event_loop)
             if (drain_ok) ++drained;
             scoped.reset(); // frees the loop while a worker may still be inside run()
             if (ran.load()) ++completed;
-            if (!drain_ok) break; // a stuck drain costs a second per cycle, so stop at the first
+            if (!drain_ok) break; // a stuck drain burns the whole timeout each cycle
         }
         AssertEqual(drained, CYCLES); // a shutdown which gave up proves nothing about the window
         AssertEqual(completed, CYCLES);

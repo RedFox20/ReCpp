@@ -4,7 +4,7 @@ exit 0 allows the write. exit 2 blocks it and hands stderr back."""
 import json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from prose_rules import lint_path, dedupe, fenced, FENCE
+from prose_rules import lint_path, dedupe, fenced, fence_mark
 
 try:
     ev = json.load(sys.stdin)
@@ -19,23 +19,22 @@ if not path or not new:
     sys.exit(0)
 
 oldset = set(old.split("\n"))                       # only lines this edit introduces
-added = [l if l not in oldset else (FENCE if l.lstrip().startswith(FENCE) else "")
-         for l in new.split("\n")]
+added = [l if l not in oldset else (fence_mark(l) or "") for l in new.split("\n")]
 
 
 def lands_inside_a_fence():
-    """An edit inside a fenced block adds code, and the lint must not read it as prose."""
+    """The fence an edit lands inside, so the lint reads the added code as code."""
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             text = f.read()
     except OSError:
-        return False
+        return None
     at = text.find(old) if old else -1
-    return at >= 0 and fenced(text[:at].split("\n"))
+    return fenced(text[:at].split("\n")) if at >= 0 else None
 
 
-if path.endswith(".md") and lands_inside_a_fence():
-    added.insert(0, FENCE)
+seed = lands_inside_a_fence() if path.endswith(".md") else None
+if seed: added.insert(0, seed)
 findings = lint_path(path, added, creating=not old)
 
 if findings:
