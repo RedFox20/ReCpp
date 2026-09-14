@@ -46,6 +46,40 @@ MSVC needs the opposite. It parses `<thread>` from the fragment and fails withou
 `<chrono>`, which gcc-14 forbids here, so `future_module_only.cpp` guards that include on
 `_MSC_VER`.
 
+**Reduced to libstdc++, with no rpp code.** Report this one upstream. gcc 14.2.0, `-O2`:
+
+```cpp
+// m.cppm
+module;
+#include <future>
+export module m;
+export template<class T> inline std::future<T> mk(T v)
+{ std::promise<T> p; p.set_value(v); return p.get_future(); }
+
+// c.cpp -- g++ -std=c++20 -fmodules-ts -O2 -c c.cpp
+#include <memory>
+import m;
+int main() { return mk(11).get() == 11 ? 0 : 1; }
+```
+
+The crash needs the include and the call together. Either one alone compiles.
+
+**No source-level mitigation works.** Each of these still crashes:
+
+| Attempt | Result |
+|---|---|
+| the importer includes `<future>` itself, in either order | ICE |
+| `-fno-module-lazy`, `-fno-inline`, one LTO partition | ICE |
+| `template class std::promise<int>;` in the module | ICE |
+| the module primes the call path for one type | ICE, once `mk` is a template |
+
+A non-template `mk(int)` is the one shape which a primer repairs. The module instantiates
+`get()` itself, and the importer then reuses it. Every factory of `rpp.future` takes a
+template parameter, so that shape does not reach this code.
+
+So gcc-14 cannot export a templated future factory from a module. Only a newer gcc closes
+this, and until then `future.h` serves a consumer through the include path.
+
 A consumer which throws across the boundary needs no `<exception>`. A thrown `int` and a
 `catch (int)` cross it, and `future_module_only.cpp` holds that shape.
 
