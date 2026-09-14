@@ -8,6 +8,30 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B27. gcc-14 segfaults on an importer which includes `<exception>` and drives a future
+An importer of `rpp.future` compiles until it includes `<exception>` and instantiates the
+future machinery. gcc-14 then reports `internal compiler error: Segmentation fault` at
+`bits/exception_ptr.h:169`. `<stdexcept>` reaches `<exception>`, so it triggers the same
+crash. This predates the `rpp.future` split, and `import rpp.threading` reproduced it on
+the tree before that.
+
+Measured on gcc 14.2.0 at `-O2`, each line an importer of `rpp.future`:
+
+| Importer | Result |
+|---|---|
+| `<typeinfo>` and `<new>`, empty `main` | compiles |
+| `<exception>`, empty `main` | compiles |
+| `<typeinfo>` and `<new>`, calls `make_ready_future` | compiles |
+| `<exception>`, `<typeinfo>` and `<new>`, calls `make_ready_future` | ICE |
+
+So neither half alone is enough. The crash needs the include and the instantiation.
+
+A consumer which throws across the boundary needs no `<exception>`. A thrown `int` and a
+`catch (int)` cross it, and `future_module_only.cpp` holds that shape.
+
+`RppFutureModuleOnly` drives this group, and it includes no `<exception>` for this reason.
+Give it one to watch the build fail.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and

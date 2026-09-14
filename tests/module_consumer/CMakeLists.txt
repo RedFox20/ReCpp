@@ -67,6 +67,12 @@ if (BUILD_MODULE_CONSUMER_TESTS)
     mama_target_modules(RppLiteralsModuleOnly)
     target_link_libraries(RppLiteralsModuleOnly PRIVATE ${MAMA_LIBS})
 
+    # the rpp.future surface, which no other target reaches
+    add_executable(RppFutureModuleOnly future_module_only.cpp)
+    target_include_directories(RppFutureModuleOnly PRIVATE ${MAMA_INCLUDES})
+    mama_target_modules(RppFutureModuleOnly)
+    target_link_libraries(RppFutureModuleOnly PRIVATE ${MAMA_LIBS})
+
     # an importer which includes <future> and instantiates std::promise, see BUGS.md B16
     add_executable(RppPromiseModuleOnly promise_module_only.cpp)
     target_include_directories(RppPromiseModuleOnly PRIVATE ${MAMA_INCLUDES})

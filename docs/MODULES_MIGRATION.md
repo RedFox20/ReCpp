@@ -1154,6 +1154,7 @@ global module fragment reaches an importer only when an exported declaration nam
 |---|---|---|
 | `s != "x"` and `s + "y"` on an exported `std::string` | The importer reports `no match for 'operator!='` | No module exports `std::string`. The importer includes `<string>` |
 | `std::vector` construction | `stl_construct.h` reports `no matching function for call to 'operator new(sizetype, void*)'` | The importer includes `<new>` |
+| Any call into the future machinery of `rpp.future` | The importer reports `must '#include <typeinfo>' before using 'typeid'` | libstdc++ names `typeid` inside `<future>`. The importer includes `<typeinfo>` |
 
 So an export list of type names alone does not make a module usable. Every free function an
 exported type needs by argument-dependent lookup belongs in the list beside the type.

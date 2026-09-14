@@ -256,6 +256,12 @@ list changes that. `BUGS.md` B16 holds the reproducer and the measurements.
 Two ways around it. Import another module, because only this one carries `<future>`. Or
 include `<rpp/future.h>` instead of importing, in the translation unit which needs both.
 
+An importer of `rpp.future` also includes `<typeinfo>` and `<new>` before it calls into the
+future machinery. libstdc++ names `typeid` and placement `new` inside `<future>`, and a
+global module fragment reaches an importer only when an exported declaration names it. That
+same importer must not include `<exception>`, which crashes gcc-14. See `BUGS.md` B27.
+`tests/module_consumer/future_module_only.cpp` shows the shape which works.
+
 ### How it works
 
 A module interface unit includes its headers in the **global module fragment**, then
