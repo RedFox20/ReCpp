@@ -22,7 +22,7 @@ FENCE = "```"
 
 TIME_UNIT = re.compile(r'\b(\d+(?:\.\d+)?)\s*(?:ns|us|ms|s|sec|secs|seconds)\b')
 TABLE_RULE = re.compile(r'^\|[\s:|-]+\|?\s*$')
-LIST_ITEM = re.compile(r'^(?:[-*+]|\d+[.)])\s')
+LIST_ITEM = re.compile(r'^(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?')
 
 
 def looks_like_code(body):
@@ -201,8 +201,10 @@ SELFTEST = [
                    "carries, so this one goes over the cap and the lint reports it here."], "in one sentence"),
     ("README.md", ["1. A short numbered item.", "2. Another short numbered item.",
                    "- a short bullet", "- another short bullet"], None),
-    # a list marker is punctuation, so it never counts against the word cap
+    # a list marker and a task checkbox are punctuation, so neither counts against the cap
     ("README.md", ["- " + " ".join(["word"] * MAX_WORDS)], None),
+    ("README.md", ["- [ ] " + " ".join(["word"] * MAX_WORDS)], None),
+    ("README.md", ["- [x] " + " ".join(["word"] * (MAX_WORDS + 1))], "in one sentence"),
     ("README.md", ["- " + " ".join(["word"] * (MAX_WORDS + 1))], "in one sentence"),
     # a bold lead-in ends its own sentence, so the two never join into one
     ("README.md", ["**A bold lead-in ends here.** " + " ".join(["word"] * MAX_WORDS)], None),
@@ -223,6 +225,8 @@ SELFTEST_DIFFS = [
     (f"+++ b/X.md\n@@ -1,3 +1,4 @@\n+{_P14}\n-gone\n+{_P13}\n", None),
     # a kept fence delimiter marks the additions between them as code, not prose
     (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ```\n+{_P14}\n+{_P13}\n ```\n", None),
+    # an added `++count;` line makes a diff record which starts like a file header
+    (f"+++ b/X.cpp\n@@ -1,2 +1,4 @@\n+++count;\n+// a comment which doesn't belong\n", "contraction"),
 ]
 
 
@@ -275,9 +279,12 @@ def _hunk_opens_a_fence(path, header):
 
 def added_lines(diff):
     """Added lines of a unified diff, per file, with a break at every boundary."""
-    per_file, path = {}, None
+    per_file, path, in_hunk = {}, None, False
     for raw in diff:
-        if raw.startswith("+++"):
+        if raw.startswith("diff --git"):
+            path, in_hunk = None, False
+        elif not in_hunk and raw.startswith("+++"):
+            # a file header sits outside a hunk, so an added `++count;` line is never one
             path = raw[6:].strip() if raw.startswith("+++ b/") else None
             if path: per_file.setdefault(path, [])
         elif not path:
@@ -285,6 +292,7 @@ def added_lines(diff):
         elif raw.startswith("+"):
             per_file[path].append(raw[1:].rstrip("\n"))
         elif raw.startswith("@@"):
+            in_hunk = True
             if fenced(per_file[path]):
                 per_file[path].append(FENCE) # a hunk never inherits the fence of the one above
             per_file[path].append("") # text this edit did not add ends the paragraph
