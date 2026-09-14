@@ -8,6 +8,26 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B29. `udp_load_balancer` misses its throughput floor under full-suite load
+`test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate
+over the run. One full-suite run reported 91 KB against a 153 KB floor, at
+`test_sockets.cpp:1232`.
+
+The sender loop runs on the calling thread and shares the container with the rest of the
+suite. A starved sender sends less, so the floor measures the machine as much as it measures
+the balancer.
+
+Measured in this container, on a docs-only tree:
+
+| Run shape | Result |
+|---|---|
+| full suite, 4 runs | 1 failure |
+| `test_sockets` alone, 3 runs | 0 failures |
+
+R10 says to record a timing report rather than patch it on the spot. A `best_of_3` around
+the send loop would pin the balancer instead of the load. Issue #70 took that same repair for
+`test_concurrent_queue`.
+
 ### B28. gcc-14 crashes an importer which reaches `exception_ptr.h` and calls `future::get()`
 gcc-14 needs three conditions at once. Remove any one of them and the importer compiles.
 

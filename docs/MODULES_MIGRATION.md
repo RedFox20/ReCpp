@@ -26,7 +26,7 @@ gate, #65 changeset 6.
 | test counts | the modules build runs more cases than the header build, because a module-only case compiles out without one. Read both from the last green run |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all eight groups. 4 is done through the generator
+6 landed. The generator drives all nine groups. 4 is done through the generator
 `--check`. 5 is finished. Section 11 lists what 7 owes.
 
 **Next:** nothing in this plan. Every remaining item is a follow-up to it, and section 11.1
@@ -38,7 +38,7 @@ the only three headers that reach `<future>`. Eight modules are clean, and
 and an includer does. B19, B20, B21 and B22 are dormant. No module exports a std name, and
 dropping `rpp.std` retired that shape for good.
 
-**Why eight groups and not forty-four modules.** The tree shipped one module per header
+**Why groups and not forty-four modules.** The tree shipped one module per header
 first. gcc-14 then ran out of module source locations in any translation unit which imported
 dozens, and it mis-merged a global module declaration. Only a clean C++23 build showed it,
 see `BUGS.md` **C28**. Eight groups cut `test_modules.cpp` from 39 imports to 8, and the
@@ -240,7 +240,7 @@ median of 7 alternating runs of `g++ -O2 -fsyntax-only` on gcc-14.2, with the bi
 interfaces already built, so it isolates the consumer side.
 
 **Every table under this heading measured the 44 per-header modules, which no longer ship.**
-Read them for the shape they found, not for a module name. The eight groups replaced that
+Read them for the shape they found, not for a module name. The groups replaced that
 layout, see `BUGS.md` **C28**, and the group numbers sit at the end of this section.
 
 One facility per translation unit, the header against its module:
@@ -335,8 +335,9 @@ the fragment kills `std::swap` lookup, so `std::future` and `std::promise` go wi
 Exporting `std::get` breaks `std::unique_ptr` in every importer (B21). Section 11.1 has the
 table, and `BUGS.md` has a reproducer for each.
 
-**The eight groups, measured the same way.** One translation unit per group, `g++ -O2 -c` on
-gcc-14.2 with the project build flags, best of three, warm interfaces. Both columns compile
+**The groups, measured the same way.** One translation unit per group, `g++ -O2 -c` on
+gcc-14.2 with the project build flags, best of three, warm interfaces. `rpp.future` has no
+row, because the split which created it came after this run. Both columns compile
 the same body. The header column includes the group headers that body needs, and the import
 column names the group and parses no standard library header at all:
 
@@ -1010,14 +1011,14 @@ between layers.
 | L6 | **binary_serializer** ✓, **thread_pool** ✓ | 2 |
 | L7 | **event_loop** ✓, **future** ✓ | 2 |
 | L8 | **coroutines** ✓ | 1 |
-| groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **testing** ✓ | 8 |
+| groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **future** ✓, **testing** ✓ | 9 |
 | ~~top~~ | umbrella **rpp**, dropped, see section 12 | 0 |
 
-**The layer table above is history.** The 44 per-header units are gone, and the eight groups
+**The layer table above is history.** The 44 per-header units are gone, and the nine groups
 carry those headers directly, see `BUGS.md` **C28**. The layer order still describes the
 include graph, so it still says which group may import which.
 
-`BUILD_WITH_MODULES` builds the eight groups. The groups partition every public header, so a
+`BUILD_WITH_MODULES` builds the nine groups. The groups partition every public header, so a
 new header reaches an importer only by joining one group in `GROUP_HEADERS`, and no header
 can sit in two. `gen_module_exports.py --all --check` reports each way to drift, and the selftest pins
 each one. `rpp.numeric` carries the math headers, because `rpp.math` would name one header
