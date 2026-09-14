@@ -1618,6 +1618,28 @@ TestImpl(test_event_loop)
     }
 
     // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).
+    // BUGS.md B26 pool half: the owner frees the loop as soon as the background count
+    // reaches zero, while the worker may still sit inside pool_worker::run().
+    TestCase(the_background_count_is_a_workers_last_touch_of_the_loop)
+    {
+        constexpr int CYCLES = 200; // the shutdown path is what this exercises, not a narrow window
+        int completed = 0;
+        for (int i = 0; i < CYCLES; ++i)
+        {
+            auto scoped = std::make_unique<rpp::event_loop>();
+            rpp::event_loop* ev = scoped.get();
+            std::atomic_bool ran { false };
+            ev->fork([ev, &ran]() -> rpp::event_task
+            {
+                co_await ev->run_async([&ran]{ ran = true; });
+            });
+            ev->stop_and_wait_all_ready(rpp::seconds(1));
+            scoped.reset(); // frees the loop while a worker may still be inside run()
+            if (ran.load()) ++completed;
+        }
+        AssertEqual(completed, CYCLES);
+    }
+
     TestCase(ensure_on_owner_thread_detects_off_thread)
     {
         AssertThat(loop->ensure_on_owner_thread(RPP_SOURCE_LOC_CURRENT), true); // we are the owner thread

@@ -51,12 +51,30 @@ then stalled can hold the pointer an attach stored, while the detach after it re
 other count, reads zero, and lets the caller free the clock. A correct split has to publish
 the pointer each reader holds, which is a hazard pointer, not a counter.
 
-The pool side needs measurement before a fix. `start_in_background()` hands the pool a
-delegate which captures the awaiter, and that awaiter lives in the coroutine frame.
-`post_resume_from_suspension()` pushes the resume first and decrements the count second. The
-count reaches zero while the worker is still inside a loop member function. The pool then
-frees the delegate. B17 reports a detached task which outlives the suite that started it.
-Both halves need a regression test which fails on demand.
+**The pool window is measured.** `post_resume_from_suspension()` pushes the resume first and
+decrements the count second, so the count reaches zero while the worker is still inside a loop
+member function. Three probes over 2000 destroy cycles under ASAN answer what that costs:
+
+| Probe | Post-decrement code | Result |
+|---|---|---|
+| A | a 200us delay, no access | clean |
+| B | a 200us delay, then one member read | **heap-use-after-free, at once** |
+| C | one member read, no delay | clean, 5 runs out of 5 |
+
+So the owner really does free the loop under the worker, and B proves it. The window is
+harmless today only because no awaiter touches the loop after the decrement. Every awaiter
+makes `post_resume_from_suspension()` the last statement of its lambda, and `join_forks`
+inlines the same two steps in the same order. Nothing enforces that.
+
+C is the part which matters for a fix: the natural window is too narrow to catch a real
+violation, so a test cannot pin this. A structural fix can. Move the decrement out of the
+awaiters and into the wrapper `start_in_background()` hands the pool, so it runs after the
+task returns and no awaiter can add code after it. That costs one delegate move per
+background task, which is a hot path, so it needs the owner to agree.
+
+`the_background_count_is_a_workers_last_touch_of_the_loop` covers the shutdown path rather
+than the invariant. Probe B is what gives it teeth, and probe B needs a hook this repo does
+not have. B17 reports a detached task which outlives the suite that started it.
 
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
