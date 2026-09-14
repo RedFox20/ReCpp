@@ -20,10 +20,10 @@ gate, #65 changeset 6.
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test over eight groups. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
 | `tests/test_modules_future.cpp` | the ninth group. A ninth import in the unit above exhausts the imported source locations of gcc-14 |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 9 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC. `run_test.py` reads the module-only targets from `CMakeLists.txt`, then builds and runs each at C++20 and C++23 |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
-| CI | 29 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 584/584 on the modules build, 539/539 on the header build |
+| CI | GitHub Actions runs the matrix in `.github/workflows/ci.yml`, and CircleCI is gone |
+| test counts | the modules build runs more cases than the header build, because a module-only case compiles out without one. Read both from the last green run |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
 6 landed. The generator drives all eight groups. 4 is done through the generator

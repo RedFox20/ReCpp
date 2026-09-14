@@ -171,7 +171,7 @@ import rpp.text;        // then the groups
 
 ```cpp
 #include <rpp/tests.macros.h>   // macros never cross a module
-import rpp.threading;           // rpp::mutex, rpp::cfuture, rpp::thread_pool, ...
+import rpp.threading;           // rpp::mutex, rpp::task, rpp::thread_pool, ...
 import rpp.testing;             // a test file names each group it uses
 ```
 

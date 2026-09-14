@@ -25,5 +25,5 @@ namespace rpp
     template<typename Function>
     concept IsFunction = std::is_invocable_v<Function>;
 
-    // IsFuture and the three concepts built on it live in future.h, which owns <future>
+    // IsFuture and the concepts built on it live in future.h, which owns <future>
 }
