@@ -4,6 +4,11 @@
 #include <typeinfo> // libstdc++ names typeid inside <future>, and the fragment does not carry it
 #include <new>      // placement new, which a vector of cfuture runs
 #include <vector>
+#if _MSC_VER
+// MSVC parses <thread> from the fragment here and needs the time_point operators. gcc-14
+// crashes on this same include beside a future call, so the guard carries both. See BUGS.md B27
+#include <chrono>
+#endif
 
 import rpp.future;
 

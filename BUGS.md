@@ -26,6 +26,26 @@ Measured on gcc 14.2.0 at `-O2`, each line an importer of `rpp.future`:
 
 So neither half alone is enough. The crash needs the include and the instantiation.
 
+**`<exception>` is not the only header which does this.** Beside `<typeinfo>` and `<new>`,
+with a call into the future machinery:
+
+| Added include | Result |
+|---|---|
+| `<vector>` | compiles |
+| `<memory>` | ICE |
+| `<chrono>` | ICE |
+| `<thread>` | ICE |
+| `<exception>`, `<stdexcept>` | ICE |
+
+`<memory>` alone puts this beyond a workaround. Almost every real translation unit reaches
+one of these, so **no realistic consumer can import `rpp.future` and call it on gcc-14.**
+The group still earns its place, because it keeps `<future>` out of the eight modules a
+consumer can use. Read that as a quarantine, not as a working module.
+
+MSVC needs the opposite. It parses `<thread>` from the fragment and fails without
+`<chrono>`, which gcc-14 forbids here, so `future_module_only.cpp` guards that include on
+`_MSC_VER`.
+
 A consumer which throws across the boundary needs no `<exception>`. A thrown `int` and a
 `catch (int)` cross it, and `future_module_only.cpp` holds that shape.
 
