@@ -195,9 +195,28 @@ SELFTEST = [
 ]
 
 
+# (diff text, the text a finding must contain, or None when the diff is clean)
+_P14 = "One paragraph here which carries exactly fourteen plain simple ordinary words and then stops"
+_P13 = "Another separate paragraph which also carries exactly fourteen plain simple ordinary words here"
+SELFTEST_DIFFS = [
+    # two hunks are two paragraphs, so neither addition joins the other
+    (f"+++ b/X.md\n@@ -1,2 +1,3 @@\n+{_P14}\n@@ -40,2 +41,3 @@\n+{_P13}\n", None),
+    # the same two lines inside one hunk are one paragraph, and that sentence is over the cap
+    (f"+++ b/X.md\n@@ -1,2 +1,4 @@\n+{_P14}\n+{_P13}\n", "in one sentence"),
+]
+
+
 def selftest():
     """Pin every check, so a refactor cannot turn one into a silent false negative."""
     bad = 0
+    for diff, want in SELFTEST_DIFFS:
+        got = lint_diff(diff.splitlines(keepends=True))
+        if want is None and got:
+            bad += 1
+            print(f"FAIL clean diff reported {got[0]}")
+        elif want is not None and not any(want in g for g in got):
+            bad += 1
+            print(f"FAIL expected '{want}' from a diff, got {got or 'nothing'}")
     for path, lines, want in SELFTEST:
         got = lint_path(path, lines)
         if want is None and got:
@@ -206,24 +225,37 @@ def selftest():
         elif want is not None and not any(want in g for g in got):
             bad += 1
             print(f"FAIL expected '{want}', got {got or 'nothing'}\n     {lines}")
-    print(f"== prose_rules selftest: {bad} finding(s) over {len(SELFTEST)} case(s) ==")
+    print(f"== prose_rules selftest: {bad} finding(s) over "
+          f"{len(SELFTEST) + len(SELFTEST_DIFFS)} case(s) ==")
     return 1 if bad else 0
+
+
+def added_lines(diff):
+    """Added lines of a unified diff, per file, with a break between hunks."""
+    per_file, path = {}, None
+    for raw in diff:
+        if raw.startswith("+++ b/"):
+            path = raw[6:].strip()
+            per_file.setdefault(path, [])
+        elif raw.startswith("@@") and path:
+            per_file[path].append("") # two hunks are never one paragraph
+        elif raw.startswith("+") and not raw.startswith("+++") and path:
+            per_file[path].append(raw[1:].rstrip("\n"))
+    return per_file
+
+
+def lint_diff(diff):
+    out = []
+    for p, lines in added_lines(diff).items():
+        out += lint_path(p, lines)
+    return out
 
 
 def _main():
     """Lint added lines of a unified diff read from stdin."""
     if "--selftest" in sys.argv:
         return selftest()
-    per_file, path = {}, None
-    for raw in sys.stdin:
-        if raw.startswith("+++ b/"):
-            path = raw[6:].strip()
-            per_file.setdefault(path, [])
-        elif raw.startswith("+") and not raw.startswith("+++") and path:
-            per_file[path].append(raw[1:].rstrip("\n"))
-    out = []
-    for p, lines in per_file.items():
-        out += lint_path(p, lines)
+    out = lint_diff(sys.stdin)
     if out:
         print("\n".join(dedupe(out)))
         return 1
