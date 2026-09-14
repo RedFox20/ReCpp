@@ -18,7 +18,7 @@ NEARBY = 4              # R4, how far a comment may sit from the literal it repe
 
 TIME_UNIT = re.compile(r'\b(\d+(?:\.\d+)?)\s*(?:ns|us|ms|s|sec|secs|seconds)\b')
 TABLE_RULE = re.compile(r'^\|[\s:|-]+\|?\s*$')
-LIST_ITEM = re.compile(r'^\d+[.)]\s')
+LIST_ITEM = re.compile(r'^(?:[-*+]|\d+[.)])\s')
 
 
 def looks_like_code(body):
@@ -74,6 +74,7 @@ def _cell_rules(row, where, out):
 
 def _sentence_rules(text, where, out):
     t = re.sub(r'`[^`]*`', 'X', text).strip()
+    t = re.sub(r'([.!?])[*_]+', r'\1', t) # a bold or italic closer still ends the sentence
     if not t:
         return
     for c in CONTRACTIONS:
@@ -97,8 +98,7 @@ def lint_markdown(lines, label="md"):
     out, fence, para, start = [], False, [], 0
     for i, l in enumerate(lines):
         st = l.lstrip()
-        new_para = st.startswith(("```", "|", ">", "#")) or not st \
-                or st.startswith(("- ", "* ", "+ ")) or bool(LIST_ITEM.match(st))
+        new_para = st.startswith(("```", "|", ">", "#")) or not st or bool(LIST_ITEM.match(st))
         if new_para and para:
             _sentence_rules(" ".join(para), f"{label}+{start}", out)
             para = []
@@ -112,7 +112,7 @@ def lint_markdown(lines, label="md"):
             continue
         if not para:
             start = i + 1
-        para.append(st)
+        para.append(LIST_ITEM.sub("", st)) # a list marker is not a word of the sentence
     if para:
         _sentence_rules(" ".join(para), f"{label}+{start}", out)
     return out
@@ -192,6 +192,11 @@ SELFTEST = [
                    "carries, so this one goes over the cap and the lint reports it here."], "in one sentence"),
     ("README.md", ["1. A short numbered item.", "2. Another short numbered item.",
                    "- a short bullet", "- another short bullet"], None),
+    # a list marker is punctuation, so it never counts against the word cap
+    ("README.md", ["- " + " ".join(["word"] * MAX_WORDS)], None),
+    ("README.md", ["- " + " ".join(["word"] * (MAX_WORDS + 1))], "in one sentence"),
+    # a bold lead-in ends its own sentence, so the two never join into one
+    ("README.md", ["**A bold lead-in ends here.** " + " ".join(["word"] * MAX_WORDS)], None),
 ]
 
 
@@ -203,6 +208,10 @@ SELFTEST_DIFFS = [
     (f"+++ b/X.md\n@@ -1,2 +1,3 @@\n+{_P14}\n@@ -40,2 +41,3 @@\n+{_P13}\n", None),
     # the same two lines inside one hunk are one paragraph, and that sentence is over the cap
     (f"+++ b/X.md\n@@ -1,2 +1,4 @@\n+{_P14}\n+{_P13}\n", "in one sentence"),
+    # an unchanged blank line between them splits them again
+    (f"+++ b/X.md\n@@ -1,3 +1,5 @@\n+{_P14}\n \n+{_P13}\n", None),
+    # so does the line an edit replaced
+    (f"+++ b/X.md\n@@ -1,3 +1,4 @@\n+{_P14}\n-gone\n+{_P13}\n", None),
 ]
 
 
@@ -231,16 +240,18 @@ def selftest():
 
 
 def added_lines(diff):
-    """Added lines of a unified diff, per file, with a break between hunks."""
+    """Added lines of a unified diff, per file, with a break at every boundary."""
     per_file, path = {}, None
     for raw in diff:
-        if raw.startswith("+++ b/"):
-            path = raw[6:].strip()
-            per_file.setdefault(path, [])
-        elif raw.startswith("@@") and path:
-            per_file[path].append("") # two hunks are never one paragraph
-        elif raw.startswith("+") and not raw.startswith("+++") and path:
+        if raw.startswith("+++"):
+            path = raw[6:].strip() if raw.startswith("+++ b/") else None
+            if path: per_file.setdefault(path, [])
+        elif not path:
+            continue
+        elif raw.startswith("+"):
             per_file[path].append(raw[1:].rstrip("\n"))
+        elif raw.startswith(("@@", " ", "-")):
+            per_file[path].append("") # text this edit did not add ends the paragraph
     return per_file
 
 

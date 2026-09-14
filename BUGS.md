@@ -44,12 +44,12 @@ operations with nothing a test can block inside, because `AtomicTimeSource::tota
 a non-virtual read. A deterministic version needs a test callback on a hot path, which costs
 every reader a load and a branch.
 
-**A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()` so
-a later reader joins the other count, reports a use after free 5 runs out of 12 under ASAN. A
-reader picks its count before it loads the pointer, so a reader which picked count `g` and
-then stalled can hold the pointer an attach stored, while the detach after it retires the
-other count, reads zero, and lets the caller free the clock. A correct split has to publish
-the pointer each reader holds, which is a hazard pointer, not a counter.
+**A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()`,
+send a later reader to the other count. That shape reports a use after free 5 runs out of 12
+under ASAN. A reader picks its count before it loads the pointer. So a reader which picked
+count `g` and then stalled can hold the pointer an attach stored. The detach after it retires
+the other count, reads zero, and lets the caller free the clock. A correct split has to
+publish the pointer each reader holds, which is a hazard pointer, not a counter.
 
 **The pool window is measured.** `post_resume_from_suspension()` pushes the resume first and
 decrements the count second. The count reaches zero while the worker is still inside a loop
