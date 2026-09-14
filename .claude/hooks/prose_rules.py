@@ -18,6 +18,7 @@ NEARBY = 4              # R4, how far a comment may sit from the literal it repe
 
 TIME_UNIT = re.compile(r'\b(\d+(?:\.\d+)?)\s*(?:ns|us|ms|s|sec|secs|seconds)\b')
 TABLE_RULE = re.compile(r'^\|[\s:|-]+\|?\s*$')
+LIST_ITEM = re.compile(r'^\d+[.)]\s')
 
 
 def looks_like_code(body):
@@ -88,19 +89,32 @@ def _sentence_rules(text, where, out):
 
 
 def lint_markdown(lines, label="md"):
-    """Prose lines only. A table, a code fence, and a heading carry reference data."""
-    out, fence = [], False
+    """Prose lines only. A table, a code fence, and a heading carry reference data.
+
+    Prose wraps, so a sentence spans lines. The paragraph is the unit which carries one,
+    and a per-line check misses every sentence the wrap split.
+    """
+    out, fence, para, start = [], False, [], 0
     for i, l in enumerate(lines):
-        if l.lstrip().startswith("```"):
+        st = l.lstrip()
+        new_para = st.startswith(("```", "|", ">", "#")) or not st \
+                or st.startswith(("- ", "* ", "+ ")) or bool(LIST_ITEM.match(st))
+        if new_para and para:
+            _sentence_rules(" ".join(para), f"{label}+{start}", out)
+            para = []
+        if st.startswith("```"):
             fence = not fence
             continue
-        st = l.lstrip()
-        if fence or st.startswith((">", "#")):
+        if fence or st.startswith((">", "#")) or not st:
             continue
         if st.startswith("|"):
             _cell_rules(st, f"{label}+{i+1}", out)
-        else:
-            _sentence_rules(l, f"{label}+{i+1}", out)
+            continue
+        if not para:
+            start = i + 1
+        para.append(st)
+    if para:
+        _sentence_rules(" ".join(para), f"{label}+{start}", out)
     return out
 
 
@@ -173,6 +187,11 @@ SELFTEST = [
     ("README.md", ["| [`f()`](a.h#L1) | Attach a clock. Null reverts to wall time |"], None),
     ("README.md", ["|---|---|"], None),
     ("README.md", ["```", "| a; b |", "```"], None),
+    # prose wraps, so the paragraph is the unit which carries a sentence
+    ("README.md", ["A sentence which the wrap splits over two lines still counts every word it",
+                   "carries, so this one goes over the cap and the lint reports it here."], "in one sentence"),
+    ("README.md", ["1. A short numbered item.", "2. Another short numbered item.",
+                   "- a short bullet", "- another short bullet"], None),
 ]
 
 
