@@ -19,11 +19,13 @@ MAX_SLEEP_MS = 10       # R2, the sanctioned sleep band
 NEARBY = 4              # R4, how far a comment may sit from the literal it repeats
 
 FENCE = "```"
-FENCE_RE = re.compile(r'^(?:```|~~~)') # markdown accepts either delimiter
+FENCE_RE = re.compile(r'^(`{3,}|~{3,})') # markdown accepts either delimiter, at any length
 
 TIME_UNIT = re.compile(r'\b(\d+(?:\.\d+)?)\s*(?:ns|us|ms|s|sec|secs|seconds)\b')
 TABLE_RULE = re.compile(r'^\|[\s:|-]+\|?\s*$')
 LIST_ITEM = re.compile(r'^(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?')
+RULE = re.compile(r'^(?:-{3,}|={3,}|\*{3,}|_{3,})\s*$')
+SETEXT = re.compile(r'^(?:-{3,}|={3,})\s*$') # under prose it makes a heading, not a break
 
 
 def looks_like_code(body):
@@ -104,14 +106,18 @@ def lint_markdown(lines, label="md"):
     for i, l in enumerate(lines):
         st = l.lstrip()
         mark = fence_mark(st)
-        new_para = bool(mark) or st.startswith(("|", ">", "#")) or not st or bool(LIST_ITEM.match(st))
+        if not fence and not mark and para and SETEXT.match(st):
+            para = [] # the lines above a setext underline are a heading, not prose
+            continue
+        new_para = bool(mark) or st.startswith(("|", ">", "#")) or not st \
+                or bool(LIST_ITEM.match(st)) or bool(RULE.match(st))
         if new_para and para:
             _sentence_rules(" ".join(para), f"{label}+{start}", out)
             para = []
         if mark:
-            fence = None if fence == mark else fence or mark
+            fence = next_fence(fence, mark)
             continue
-        if fence or st.startswith((">", "#")) or not st:
+        if fence or st.startswith((">", "#")) or not st or RULE.match(st):
             continue
         if st.startswith("|"):
             _cell_rules(st, f"{label}+{i+1}", out)
@@ -168,7 +174,14 @@ def lint_code(lines, label="src", creating=False):
 def fence_mark(line):
     """The fence delimiter a line opens or closes with, or None."""
     m = FENCE_RE.match(line.lstrip())
-    return m.group(0) if m else None
+    return m.group(1) if m else None
+
+
+def next_fence(fence, mark):
+    """The open delimiter after this line. Only a same, no shorter run closes a block."""
+    if fence and fence[0] == mark[0] and len(mark) >= len(fence):
+        return None
+    return fence or mark
 
 
 def fenced(lines):
@@ -176,8 +189,7 @@ def fenced(lines):
     fence = None
     for l in lines:
         mark = fence_mark(l)
-        # only the delimiter which opened a block closes it, so the other one is content
-        if mark: fence = None if fence == mark else fence or mark
+        if mark: fence = next_fence(fence, mark)
     return fence
 
 
@@ -221,6 +233,10 @@ SELFTEST = [
     ("README.md", ["- " + " ".join(["word"] * (MAX_WORDS + 1))], "in one sentence"),
     # a bold lead-in ends its own sentence, so the two never join into one
     ("README.md", ["**A bold lead-in ends here.** " + " ".join(["word"] * MAX_WORDS)], None),
+    # a setext underline makes a heading, and a rule with a blank above it is a break
+    ("README.md", [" ".join(["word"] * MAX_WORDS), "---"], None),
+    ("README.md", [" ".join(["word"] * MAX_WORDS), "", "---"], None),
+    ("README.md", [" ".join(["word"] * (MAX_WORDS + 1)), "", "***"], "in one sentence"),
 ]
 
 
@@ -239,6 +255,8 @@ SELFTEST_DIFFS = [
     # a kept fence delimiter marks the additions between them as code, not prose
     (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ```\n+{_P14}\n+{_P13}\n ```\n", None),
     (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ~~~\n+{_P14}\n+{_P13}\n ~~~\n", None),
+    # a shorter run does not close a longer one, so the code between stays code
+    (f"+++ b/X.md\n@@ -1,5 +1,7 @@\n ````\n ```\n+{_P14}\n+{_P13}\n ````\n", None),
     # only the delimiter which opened a block closes it, so the other one is content
     (f"+++ b/X.md\n@@ -1,5 +1,7 @@\n ```\n ~~~\n+{_P14}\n+{_P13}\n ```\n", None),
     # an added `++count;` line makes a diff record which starts like a file header
