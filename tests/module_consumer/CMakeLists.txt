@@ -73,6 +73,12 @@ if (BUILD_MODULE_CONSUMER_TESTS)
     mama_target_modules(RppFutureModuleOnly)
     target_link_libraries(RppFutureModuleOnly PRIVATE ${MAMA_LIBS})
 
+    # the event_loop and awaiter half, which an importer reaches beside <memory>, see BUGS.md B27
+    add_executable(RppCoroModuleOnly coro_module_only.cpp)
+    target_include_directories(RppCoroModuleOnly PRIVATE ${MAMA_INCLUDES})
+    mama_target_modules(RppCoroModuleOnly)
+    target_link_libraries(RppCoroModuleOnly PRIVATE ${MAMA_LIBS})
+
     # an importer which includes <future> and instantiates std::promise, see BUGS.md B16
     add_executable(RppPromiseModuleOnly promise_module_only.cpp)
     target_include_directories(RppPromiseModuleOnly PRIVATE ${MAMA_INCLUDES})

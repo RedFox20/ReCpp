@@ -5,7 +5,7 @@
  * Distributed under MIT Software License
  */
 #include "thread_pool.h"
-#include "future_types.h"
+#include "future_types.h" // rpp::cfuture, rpp::coro_handle, rpp::IsFunction
 #include "traits.h"
 #include "debugging.h" // __assertion_failure
 #include "config.types.h" // rpp::__wrap

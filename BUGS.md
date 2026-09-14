@@ -8,38 +8,48 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B27. gcc-14 segfaults on an importer which includes `<exception>` and drives a future
-An importer of `rpp.future` compiles until it includes `<exception>` and instantiates the
-future machinery. gcc-14 then reports `internal compiler error: Segmentation fault` at
-`bits/exception_ptr.h:169`. `<stdexcept>` reaches `<exception>`, so it triggers the same
-crash. This predates the `rpp.future` split, and `import rpp.threading` reproduced it on
-the tree before that.
+### B27. gcc-14 crashes an importer which reaches `exception_ptr.h` and calls `future::get()`
+gcc-14 needs three conditions at once. Remove any one of them and the importer compiles.
 
-Measured on gcc 14.2.0 at `-O2`, each line an importer of `rpp.future`:
+1. The module fragment carries `<future>`, which carries `bits/exception_ptr.h`.
+2. The importer includes a header which reaches `bits/exception_ptr.h` by text.
+3. The importer instantiates `std::future<T>::get()`.
 
-| Importer | Result |
+The compiler reports `internal compiler error: Segmentation fault` at
+`bits/exception_ptr.h:169`. The pass which dies is `cddce`, so `-O0` and `-Og` compile.
+This predates the `rpp.future` split, and `import rpp.threading` reproduced it before that.
+
+**Condition 3 is `get()`, and neither the factory nor the template matters.** `wait()`
+compiles where `get()` crashes. A non-template factory crashes the same way. An earlier
+version of this entry blamed the templated factory, and that was wrong.
+
+| Importer body, on a module which exports a future factory | Result |
 |---|---|
-| `<typeinfo>` and `<new>`, empty `main` | compiles |
-| `<exception>`, empty `main` | compiles |
-| `<typeinfo>` and `<new>`, calls `make_ready_future` | compiles |
-| `<exception>`, `<typeinfo>` and `<new>`, calls `make_ready_future` | ICE |
+| imports the module and calls nothing | compiles |
+| calls the factory and never reads the result | compiles |
+| calls `wait()` | compiles |
+| calls `get()` | ICE |
 
-So neither half alone is enough. The crash needs the include and the instantiation.
+**Condition 2 names one header, and every other one only reaches it.** Beside `<typeinfo>`
+and `<new>`, which the fragment requires anyway:
 
-**`<exception>` is not the only header which does this.** Beside `<typeinfo>` and `<new>`,
-with a call into the future machinery:
+| Added include | Reaches `exception_ptr.h` | Result |
+|---|---|---|
+| `<vector>`, `<string>`, `<functional>` | no | compiles |
+| `<memory>`, `<chrono>`, `<thread>` | yes | ICE |
+| `<exception>`, `<stdexcept>` | yes | ICE |
 
-| Added include | Result |
-|---|---|
-| `<vector>` | compiles |
-| `<memory>` | ICE |
-| `<chrono>` | ICE |
-| `<thread>` | ICE |
-| `<exception>`, `<stdexcept>` | ICE |
+The rule predicts the column on the right. `<string>` and `<functional>` were predicted
+from the middle column first, then measured.
 
-`<memory>` alone puts this beyond a workaround, so a gcc-14 consumer which imports
-`rpp.future` and calls it keeps to `<typeinfo>`, `<new>` and `<vector>`. That is a narrow
-budget, and a consumer which needs more includes `<rpp/future.h>` instead.
+**`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
+ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
+the type is enough, and no explicit `get()` call has to appear.
+
+So the restriction bounds one type, not the group. A consumer which names no `cfuture`
+imports `rpp.future` beside any include. `RppCoroModuleOnly` pins that on gcc-14. It
+includes `<memory>` and drives `event_loop`, `time_awaiter` and `functor_awaiter`.
+`RppFutureModuleOnly` holds the other half, where a `cfuture` restricts the include set.
 
 **This is a gcc-14 limit, not a limit of the module.** clang-21 and MSVC build and run
 `RppFutureModuleOnly` with no such restriction, and the `RPP_B27_FREE` block in that file
@@ -68,21 +78,42 @@ int main() { return mk(11).get() == 11 ? 0 : 1; }
 
 The crash needs the include and the call together. Either one alone compiles.
 
-**No source-level mitigation works.** Each of these still crashes:
+**One mitigation works, and it moves the cost onto the consumer.** Both sides must consume
+the header as a header unit, so one copy reaches the merge instead of two:
+
+```
+g++ -fmodule-header=system -xc++-system-header future
+g++ -fmodule-header=system -xc++-system-header memory
+```
+
+The module then writes `import <future>;` and the consumer writes `import <memory>;`. A
+consumer which includes `<memory>` by text still crashes, so this repairs nothing for a
+consumer which will not rewrite its own includes.
+
+**Everything else fails.** Each of these still crashes:
 
 | Attempt | Result |
 |---|---|
 | the importer includes `<future>` itself, in either order | ICE |
-| `-fno-module-lazy`, `-fno-inline`, one LTO partition | ICE |
+| the fragment carries `<exception>` before `<future>` | ICE |
+| the fragment also carries `<memory>`, `<chrono>`, `<thread>` and `<stdexcept>` | ICE |
+| the module imports `<future>` as a header unit, the importer includes by text | ICE |
 | `template class std::promise<int>;` in the module | ICE |
-| the module primes the call path for one type | ICE, once `mk` is a template |
+| the module primes the call path for one type | ICE |
+| `-fno-tree-dce`, `-fno-tree-builtin-call-dce`, `-fno-module-lazy`, `-fno-inline` | ICE |
+| `-fno-lifetime-dse`, `-fno-ipa-icf`, `-fno-devirtualize`, `-fno-strict-aliasing` | ICE |
+| one LTO partition | ICE |
 
-A non-template `mk(int)` is the one shape which a primer repairs. The module instantiates
-`get()` itself, and the importer then reuses it. Every factory of `rpp.future` takes a
-template parameter, so that shape does not reach this code.
+**A second gcc-14 defect blocks the obvious repair.** An `optimize` attribute on an
+exported template would carry a weaker pass list into the importer. Writing one crashes
+the module writer instead, at `cp/module.cc:6334`:
 
-So gcc-14 cannot export a templated future factory from a module. Only a newer gcc closes
-this, and until then `future.h` serves a consumer through the include path.
+```cpp
+export template<class T> __attribute__((optimize("O0"))) inline std::future<T> mk(T v);
+```
+
+gcc-13 does not reach this bug, because it fails the same module without `<memory>`. So
+gcc-14 is the oldest gcc which builds this group at all.
 
 A consumer which throws across the boundary needs no `<exception>`. A thrown `int` and a
 `catch (int)` cross it, and `future_module_only.cpp` holds that shape.

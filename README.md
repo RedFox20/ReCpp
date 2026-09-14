@@ -260,10 +260,17 @@ An importer of `rpp.future` also includes `<typeinfo>` and `<new>` before it cal
 future machinery. libstdc++ names `typeid` and placement `new` inside `<future>`, and a
 global module fragment reaches an importer only when an exported declaration names it.
 
-On gcc-14 that importer keeps to `<typeinfo>`, `<new>` and `<vector>`. Adding `<memory>`,
-`<chrono>`, `<thread>` or `<exception>` crashes the compiler, which `BUGS.md` B27 measures.
-clang-21 and MSVC carry no such limit, and a gcc-14 consumer which needs a wider include
-set uses `<rpp/future.h>`. `tests/module_consumer/future_module_only.cpp` holds both shapes.
+**The gcc-14 limit bounds `cfuture`, not the module.** A translation unit which names a
+`cfuture` keeps to `<typeinfo>`, `<new>`, `<vector>`, `<string>` and `<functional>`. Adding
+`<memory>`, `<chrono>`, `<thread>`, `<exception>` or `<stdexcept>` crashes the compiler.
+Those five reach `bits/exception_ptr.h`, and the first five do not, which is the whole
+rule. `~cfuture()` calls `get()`, so naming the type is enough to meet it.
+
+A translation unit which names no `cfuture` imports `rpp.future` beside any include.
+`tests/module_consumer/coro_module_only.cpp` pins that on gcc-14, driving `event_loop` and
+the awaiters with `<memory>` live. `future_module_only.cpp` holds the restricted half, and
+a gcc-14 consumer which wants both uses `<rpp/future.h>` there. clang-21 and MSVC carry no
+such limit. `BUGS.md` B27 holds the reduced reproducer and every repair which failed.
 
 ### How it works
 
@@ -298,8 +305,8 @@ export using ::LogSeverityWarn;   // an unscoped enum does not carry its enumera
 `BUILD_WITH_MODULES=ON` puts the module file set on `RppTests` and builds
 `tests/test_modules.cpp`, which imports eight groups. `tests/test_modules_future.cpp` takes
 the ninth, `rpp.future`, because a ninth import there exhausts the imported source locations
-of gcc-14. `tests/module_consumer/` adds eleven
-module-only targets, and `run_test.py` builds and runs each one at C++20 and C++23. Each imports what it needs
+of gcc-14. `tests/module_consumer/` adds a module-only target for each group and each
+limit, and `run_test.py` builds and runs each one at C++20 and C++23. Each imports what it needs
 and includes no rpp header except a macro header, so a missing export fails the build, and a
 wrong answer fails the run. `RppStdStringModuleOnly` includes
 `<string>` first, because gcc-14 writes a module that only such an importer cannot read.

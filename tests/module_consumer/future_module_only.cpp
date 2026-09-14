@@ -1,17 +1,17 @@
-// Drives the rpp.future surface from an import alone, which no other target reaches.
-// It includes no <exception>, because that segfaults gcc-14 here. See BUGS.md B27.
+// Drives the cfuture half of rpp.future from an import alone. The include list keeps clear of
+// bits/exception_ptr.h, which gcc-14 cannot merge beside a cfuture. See BUGS.md B27.
 #ifdef MAMA_HAS_MODULES
 #include <typeinfo> // libstdc++ names typeid inside <future>, and the fragment does not carry it
 #include <new>      // placement new, which a vector of cfuture runs
 #include <vector>
 #if _MSC_VER
-// MSVC parses <thread> from the fragment here and needs the time_point operators. gcc-14
-// crashes on this same include beside a future call, so the guard carries both. See BUGS.md B27
+// MSVC parses <thread> from the fragment here and needs the time_point operators. <chrono>
+// reaches exception_ptr.h, which gcc-14 rejects beside a cfuture. See BUGS.md B27
 #include <chrono>
 #endif
 #if defined(__clang__) || defined(_MSC_VER)
-// B27 is a gcc-14 defect, and this proves the other two carry no such limit. gcc-14 crashes
-// on <memory> beside a future call, so only a compiler which is not gcc reads these lines
+// B27 is a gcc-14 defect, and this proves the other two carry no such limit. Only a compiler
+// which is not gcc reads these lines, because <memory> reaches exception_ptr.h
 #define RPP_B27_FREE 1
 #include <memory>
 #endif
