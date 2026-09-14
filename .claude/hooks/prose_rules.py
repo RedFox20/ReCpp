@@ -257,6 +257,10 @@ SELFTEST_DIFFS = [
     (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ~~~\n+{_P14}\n+{_P13}\n ~~~\n", None),
     # a shorter run does not close a longer one, so the code between stays code
     (f"+++ b/X.md\n@@ -1,5 +1,7 @@\n ````\n ```\n+{_P14}\n+{_P13}\n ````\n", None),
+    # a kept underline still makes the added line above it a heading
+    (f"+++ b/X.md\n@@ -1,2 +1,3 @@\n+{_P14} {_P13}\n ---\n", None),
+    # a blank line below makes the same line prose, and the rule below it only ends it
+    (f"+++ b/X.md\n@@ -1,3 +1,4 @@\n+{_P14} {_P13}\n \n ---\n", "in one sentence"),
     # only the delimiter which opened a block closes it, so the other one is content
     (f"+++ b/X.md\n@@ -1,5 +1,7 @@\n ```\n ~~~\n+{_P14}\n+{_P13}\n ```\n", None),
     # an added `++count;` line makes a diff record which starts like a file header
@@ -334,8 +338,9 @@ def added_lines(diff):
             seed = _hunk_opens_a_fence(path, raw) if path.endswith(".md") else None
             if seed: per_file[path].append(seed)
         elif raw.startswith(" "):
-            # a kept fence delimiter keeps its meaning, so added code never reads as prose
-            per_file[path].append(fence_mark(raw[1:].rstrip("\n")) or "")
+            # a kept fence or underline keeps its meaning, so added lines read as what they are
+            kept = raw[1:].strip()
+            per_file[path].append(kept if fence_mark(kept) or RULE.match(kept) else "")
         elif raw.startswith("-"):
             per_file[path].append("") # a removed line is not in the file the lint measures
     return per_file
