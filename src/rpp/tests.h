@@ -238,7 +238,7 @@ namespace rpp
         /**
          * @brief Runs `measure` three times and returns the smallest result.
          * A spike only inflates a sample, so the smallest one is the honest cost.
-         * @param measure Callable which takes the measurement and returns it
+         * @param measure Callable which measures one sample and returns it
          * @returns The smallest of the three results
          */
         template<class Measure>

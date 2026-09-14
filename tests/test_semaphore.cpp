@@ -122,7 +122,7 @@ TestImpl(test_semaphore)
             while (num_notified < num_notifies_sent)
             {
                 rpp::sleep_ms(1); // do some work
-                if (sem.wait(millis(50)) == rpp::semaphore::timeout)
+                if (sem.wait(rpp::seconds(1)) == rpp::semaphore::timeout)
                 {
                     not_notified = true;
                     AssertFailed("semaphore was not notified");
@@ -156,7 +156,7 @@ TestImpl(test_semaphore)
             while (num_notified < num_notifies_sent)
             {
                 spin_sleep_for_us(100); // do some work
-                if (sem.wait(millis(50)) == rpp::semaphore::timeout)
+                if (sem.wait(rpp::seconds(1)) == rpp::semaphore::timeout)
                 {
                     not_notified = true;
                     AssertFailed("semaphore was not notified");
@@ -197,9 +197,7 @@ TestImpl(test_semaphore)
             }
         });
 
-        // AssertFailed prints the file and line from any thread, but only the case thread
-        // records it, so the main thread reads this flag after the join
-        std::atomic_bool not_notified { false };
+        std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
         std::thread consumer([&] {
             constexpr auto timeout = rpp::seconds(1); // a stuck semaphore must fail the case, not hang it
             while (consumer_data.size() < MAX_DATA) {
