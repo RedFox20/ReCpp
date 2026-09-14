@@ -6,8 +6,10 @@ A second copy always drifts, and two layers which disagree block a correct edit.
 
 Run it directly to lint a unified diff on stdin:  git diff HEAD | prose_rules.py
 """
+import os
 import re
 import sys
+import tempfile
 
 CONTRACTIONS = ("don't", "doesn't", "it's", "can't", "won't", "isn't",
                 "we're", "that's", "you're")
@@ -15,6 +17,8 @@ MAX_WORDS = 25          # R5, a descriptive sentence
 MAX_COMMENT_LINES = 2   # R4, the comment budget
 MAX_SLEEP_MS = 10       # R2, the sanctioned sleep band
 NEARBY = 4              # R4, how far a comment may sit from the literal it repeats
+
+FENCE = "```"
 
 TIME_UNIT = re.compile(r'\b(\d+(?:\.\d+)?)\s*(?:ns|us|ms|s|sec|secs|seconds)\b')
 TABLE_RULE = re.compile(r'^\|[\s:|-]+\|?\s*$')
@@ -159,6 +163,11 @@ def lint_code(lines, label="src", creating=False):
     return out
 
 
+def fenced(lines):
+    """True when the text after these lines starts inside a fenced block."""
+    return sum(1 for l in lines if l.lstrip().startswith(FENCE)) % 2 == 1
+
+
 def lint_path(path, lines, creating=False):
     if path.endswith(".md"):
         return lint_markdown(lines, path)
@@ -212,13 +221,25 @@ SELFTEST_DIFFS = [
     (f"+++ b/X.md\n@@ -1,3 +1,5 @@\n+{_P14}\n \n+{_P13}\n", None),
     # so does the line an edit replaced
     (f"+++ b/X.md\n@@ -1,3 +1,4 @@\n+{_P14}\n-gone\n+{_P13}\n", None),
+    # a kept fence delimiter marks the additions between them as code, not prose
+    (f"+++ b/X.md\n@@ -1,4 +1,6 @@\n ```\n+{_P14}\n+{_P13}\n ```\n", None),
 ]
+
+
+def _deep_fence_diff(tmp_name):
+    """A hunk which starts inside a fenced block, with the fence above the hunk."""
+    with open(tmp_name, "w", encoding="utf-8") as f:
+        f.write(FENCE + "\n" + "code\n" * 4 + FENCE + "\n")
+    return f"+++ b/{tmp_name}\n@@ -4,2 +4,4 @@\n code\n+{_P14}\n+{_P13}\n code\n"
 
 
 def selftest():
     """Pin every check, so a refactor cannot turn one into a silent false negative."""
     bad = 0
-    for diff, want in SELFTEST_DIFFS:
+    tmp = tempfile.NamedTemporaryFile(suffix=".md", delete=False)
+    tmp.close()
+    diffs = SELFTEST_DIFFS + [(_deep_fence_diff(tmp.name), None)]
+    for diff, want in diffs:
         got = lint_diff(diff.splitlines(keepends=True))
         if want is None and got:
             bad += 1
@@ -234,9 +255,20 @@ def selftest():
         elif want is not None and not any(want in g for g in got):
             bad += 1
             print(f"FAIL expected '{want}', got {got or 'nothing'}\n     {lines}")
+    os.unlink(tmp.name)
     print(f"== prose_rules selftest: {bad} finding(s) over "
-          f"{len(SELFTEST) + len(SELFTEST_DIFFS)} case(s) ==")
+          f"{len(SELFTEST) + len(diffs)} case(s) ==")
     return 1 if bad else 0
+
+
+def _hunk_opens_a_fence(path, header):
+    """True when a hunk which starts at this header lands inside a fenced block."""
+    start = re.search(r'\+(\d+)', header)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return bool(start) and fenced(f.read().splitlines()[:int(start.group(1)) - 1])
+    except OSError:
+        return False # a deleted or renamed file has no state to read
 
 
 def added_lines(diff):
@@ -250,8 +282,16 @@ def added_lines(diff):
             continue
         elif raw.startswith("+"):
             per_file[path].append(raw[1:].rstrip("\n"))
-        elif raw.startswith(("@@", " ", "-")):
+        elif raw.startswith("@@"):
             per_file[path].append("") # text this edit did not add ends the paragraph
+            if path.endswith(".md") and _hunk_opens_a_fence(path, raw):
+                per_file[path].append(FENCE)
+        elif raw.startswith(" "):
+            body = raw[1:].rstrip("\n")
+            # a kept fence delimiter keeps its meaning, so added code never reads as prose
+            per_file[path].append(FENCE if body.lstrip().startswith(FENCE) else "")
+        elif raw.startswith("-"):
+            per_file[path].append("") # a removed line is not in the file the lint measures
     return per_file
 
 
