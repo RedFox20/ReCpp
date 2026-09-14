@@ -8,6 +8,26 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B27. A `then()` exception handler reads a string the async state frees
+`ubuntu-cpp20-tsan-clang18` reported one race in `test_future::except_handlers_catch_first`.
+Thread T107 runs `~invalid_argument` inside the libc++ `std::async` state and calls `free`.
+Thread T100 reads the same address through `bcmp`, under the `e.what()` compare of the
+handler. All 557 cases passed, and TSAN alone sets exit code 66.
+
+The handler takes `std::domain_error e` by value (`test_future.cpp:143`). libc++ holds the
+message in a refcounted buffer which a copy shares, so the copy and the async state point at
+one allocation. Whether the refcount is the defect or the report is a false positive needs a
+read of `__libcpp_refstring`.
+
+This is not B17. That one names `thread_pool.cpp:359` and `tests.cpp:726` in
+`test_threadpool::parallel_task_reentrance`, and neither stack appears here.
+
+Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
+`cpp23-tsan-gcc13`, `cpp23-tsan-clang18` and `cpp26-tsan-gcc14`. Only libc++ reports it.
+
+The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
+run. B17 reported on the same commit instead, which is a different race in another test.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
@@ -44,19 +64,37 @@ operations with nothing a test can block inside, because `AtomicTimeSource::tota
 a non-virtual read. A deterministic version needs a test callback on a hot path, which costs
 every reader a load and a branch.
 
-**A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()` so
-a later reader joins the other count, reports a use after free 5 runs out of 12 under ASAN. A
-reader picks its count before it loads the pointer, so a reader which picked count `g` and
-then stalled can hold the pointer an attach stored, while the detach after it retires the
-other count, reads zero, and lets the caller free the clock. A correct split has to publish
-the pointer each reader holds, which is a hazard pointer, not a counter.
+**A generation flip does not fix it.** Two counts, with a bump on each `set_time_source()`,
+send a later reader to the other count. That shape reports a use after free 5 runs out of 12
+under ASAN. A reader picks its count before it loads the pointer. So a reader which picked
+count `g` and then stalled can hold the pointer an attach stored. The detach after it retires
+the other count, reads zero, and lets the caller free the clock. A correct split has to
+publish the pointer each reader holds, which is a hazard pointer, not a counter.
 
-The pool side needs measurement before a fix. `start_in_background()` hands the pool a
-delegate which captures the awaiter, and that awaiter lives in the coroutine frame.
-`post_resume_from_suspension()` pushes the resume first and decrements the count second. The
-count reaches zero while the worker is still inside a loop member function. The pool then
-frees the delegate. B17 reports a detached task which outlives the suite that started it.
-Both halves need a regression test which fails on demand.
+**The pool window is measured.** `post_resume_from_suspension()` pushes the resume first and
+decrements the count second. The count reaches zero while the worker is still inside a loop
+member function. Three probes over 2000 destroy cycles under ASAN answer what that costs:
+
+| Probe | Post-decrement code | Result |
+|---|---|---|
+| A | a 200us delay, no access | clean |
+| B | a 200us delay, then one member read | **heap-use-after-free, at once** |
+| C | one member read, no delay | clean, 5 runs out of 5 |
+
+So the owner really does free the loop under the worker, and B proves it. The window is
+harmless today only because no awaiter touches the loop after the decrement. Every awaiter
+makes `post_resume_from_suspension()` the last statement of its lambda, and `join_forks`
+inlines the same two steps in the same order. Nothing enforces that.
+
+C is the part which matters for a fix. The natural window is too narrow to catch a real
+violation, so no test can pin this. A structural fix can. Move the decrement out of the
+awaiters and into the wrapper `start_in_background()` hands the pool. It then runs after the
+task returns, and no awaiter can add code after it. That costs one delegate move per
+background task, which is a hot path, so it needs the owner to agree.
+
+`the_background_count_is_a_workers_last_touch_of_the_loop` covers the shutdown path rather
+than the invariant. Probe B is what gives it teeth, and probe B needs a hook this repo does
+not have. B17 reports a detached task which outlives the suite that started it.
 
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
@@ -165,6 +203,10 @@ reported one warning, and the four other TSAN jobs passed on the same commit.
 Fourth sighting on cab12a8, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two stacks,
 same two lines, and all 553 cases passed. The job passes on the next commit, so the rate is
 still far below one run.
+
+Fifth sighting on c5a9d9b, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two lines, and
+the same creation stack under `test_sockets::test_udp_poll_nonblocking_select`. All 557 cases
+passed, and three other TSAN jobs passed on the same commit.
 
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
