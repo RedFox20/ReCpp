@@ -52,7 +52,7 @@ other count, reads zero, and lets the caller free the clock. A correct split has
 the pointer each reader holds, which is a hazard pointer, not a counter.
 
 **The pool window is measured.** `post_resume_from_suspension()` pushes the resume first and
-decrements the count second, so the count reaches zero while the worker is still inside a loop
+decrements the count second. The count reaches zero while the worker is still inside a loop
 member function. Three probes over 2000 destroy cycles under ASAN answer what that costs:
 
 | Probe | Post-decrement code | Result |
@@ -66,10 +66,10 @@ harmless today only because no awaiter touches the loop after the decrement. Eve
 makes `post_resume_from_suspension()` the last statement of its lambda, and `join_forks`
 inlines the same two steps in the same order. Nothing enforces that.
 
-C is the part which matters for a fix: the natural window is too narrow to catch a real
-violation, so a test cannot pin this. A structural fix can. Move the decrement out of the
-awaiters and into the wrapper `start_in_background()` hands the pool, so it runs after the
-task returns and no awaiter can add code after it. That costs one delegate move per
+C is the part which matters for a fix. The natural window is too narrow to catch a real
+violation, so no test can pin this. A structural fix can. Move the decrement out of the
+awaiters and into the wrapper `start_in_background()` hands the pool. It then runs after the
+task returns, and no awaiter can add code after it. That costs one delegate move per
 background task, which is a hot path, so it needs the owner to agree.
 
 `the_background_count_is_a_workers_last_touch_of_the_loop` covers the shutdown path rather
