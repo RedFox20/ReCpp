@@ -424,8 +424,8 @@ GROUP_HEADERS = {
     'threading': ('mutex.h', 'condition_variable.h', 'semaphore.h', 'concurrent_queue.h',
                   'thread_pool.h', 'threads.h', 'task.h', 'future_types.h',
                   'atomic_shared_ptr.h', 'close_sync.h'),
-    # the only three headers which reach <future>. gcc-14 crashes an importer of any module
-    # whose fragment carries it, so they sit alone and rpp.threading stays safe. See BUGS.md B16
+    # every header which reaches <future>. gcc-14 crashes an importer of any module whose
+    # fragment carries it, so they sit alone and rpp.threading stays safe. See BUGS.md B16
     'future': ('future.h', 'event_loop.h', 'coroutines.h'),
     'testing': ('tests.h',),
 }
