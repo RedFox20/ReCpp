@@ -5,16 +5,45 @@
  * Distributed under MIT Software License
  */
 #include "thread_pool.h"
-#include "future_types.h"
+#include "future_types.h" // rpp::cfuture, rpp::coro_handle, rpp::IsFunction
 #include "traits.h"
 #include "debugging.h" // __assertion_failure
 #include "config.types.h" // rpp::__wrap
 #include "timepoint.h" // rpp::Duration
 #include "delegate.h" // rpp::delegate
 #include <optional> // for async_task() deterministic task cleanup
+#include <future> // std::future, std::promise, std::future_status
 
 namespace rpp
 {
+    // These name std::future, so they live here and not in future_types.h. That header
+    // reaches every rpp header, and <future> there crashes an importer. See BUGS.md B16
+
+    /// Matches `rpp::cfuture<T>` and `std::future<T>`, by the return type of `get()`
+    template<typename F>
+    concept IsFuture = requires(F f) {
+        requires std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
+              || std::is_same_v<F, std::future<decltype(f.get())>>;
+    };
+
+    /// Matches any type `IsFuture` rejects
+    template<typename F>
+    concept NotFuture = !IsFuture<F>;
+
+    /// Matches a callable which takes no argument and returns a future
+    template<typename F>
+    concept IsFunctionReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && IsFuture<decltype(f())>;
+    };
+
+    /// Matches a callable which takes no argument and returns anything but a future
+    template<typename F>
+    concept IsFunctionNotReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && NotFuture<decltype(f())>;
+    };
+
     ////////////////////////////////////////////////////////////////////////////////
 
 

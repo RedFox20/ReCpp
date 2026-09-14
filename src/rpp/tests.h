@@ -20,6 +20,7 @@
 #include <vector>  // access to std::vector and std::string
 #include <atomic>  // std::atomic<T> type support
 #include <typeinfo> // std::type_info for exception type checking
+#include <exception> // std::exception_ptr, std::current_exception
 
 namespace rpp
 {

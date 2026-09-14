@@ -8,6 +8,139 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B29. `udp_load_balancer` misses its throughput floor under full-suite load
+`test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate
+over the run. One full-suite run reported 91 KB against a 153 KB floor, at
+`test_sockets.cpp:1232`.
+
+The sender loop runs on the calling thread and shares the container with the rest of the
+suite. A starved sender sends less, so the floor measures the machine as much as it measures
+the balancer.
+
+Measured in this container, on a docs-only tree:
+
+| Run shape | Result |
+|---|---|
+| full suite, 4 runs | 1 failure |
+| `test_sockets` alone, 3 runs | 0 failures |
+
+R10 says to record a timing report rather than patch it on the spot. A `best_of_3` around
+the send loop would pin the balancer instead of the load. Issue #70 took that same repair for
+`test_concurrent_queue`.
+
+### B28. gcc-14 crashes an importer which reaches `exception_ptr.h` and calls `future::get()`
+gcc-14 needs three conditions at once. Remove any one of them and the importer compiles.
+
+1. The module fragment carries `<future>`, which carries `bits/exception_ptr.h`.
+2. The importer includes a header which reaches `bits/exception_ptr.h` by text.
+3. The importer instantiates `std::future<T>::get()`.
+
+The compiler reports `internal compiler error: Segmentation fault` at
+`bits/exception_ptr.h:169`. The pass which dies is `cddce`, so `-O0` and `-Og` compile.
+This predates the `rpp.future` split, and `import rpp.threading` reproduced it before that.
+
+**Condition 3 is `get()`, and neither the factory nor the template matters.** `wait()`
+compiles where `get()` crashes. A non-template factory crashes the same way. An earlier
+version of this entry blamed the templated factory, and that was wrong.
+
+| Importer body, on a module which exports a future factory | Result |
+|---|---|
+| imports the module and calls nothing | compiles |
+| calls the factory and never reads the result | compiles |
+| calls `wait()` | compiles |
+| calls `get()` | ICE |
+
+**Condition 2 names one header, and every other one only reaches it.** Beside `<typeinfo>`
+and `<new>`, which the fragment requires anyway:
+
+| Added include | Reaches `exception_ptr.h` | Result |
+|---|---|---|
+| `<vector>`, `<string>`, `<functional>` | no | compiles |
+| `<memory>`, `<chrono>`, `<thread>` | yes | ICE |
+| `<exception>`, `<stdexcept>` | yes | ICE |
+
+The rule predicts the column on the right. `<string>` and `<functional>` were predicted
+from the middle column first, then measured.
+
+**`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
+ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
+the type is enough, and no explicit `get()` call has to appear.
+
+So the restriction bounds one type, not the group. A consumer which names no `cfuture`
+imports `rpp.future` beside any include. `RppCoroModuleOnly` pins that on gcc-14. It
+includes `<memory>` and drives `event_loop`, `time_awaiter` and `functor_awaiter`.
+`RppFutureModuleOnly` holds the other half, where a `cfuture` restricts the include set.
+
+**This is a gcc-14 limit, not a limit of the module.** clang-21 and MSVC build and run
+`RppFutureModuleOnly` with no such restriction, and the `RPP_B28_FREE` block in that file
+drives the exact shape gcc-14 rejects. So the group works on both other tier 1 compilers,
+and it keeps `<future>` out of the eight modules beside it either way.
+
+MSVC needs the opposite. It parses `<thread>` from the fragment and fails without
+`<chrono>`, which gcc-14 forbids here, so `future_module_only.cpp` guards that include on
+`_MSC_VER`.
+
+**Reduced to libstdc++, with no rpp code.** Report this one upstream. gcc 14.2.0, `-O2`:
+
+```cpp
+// m.cppm
+module;
+#include <future>
+export module m;
+export template<class T> inline std::future<T> mk(T v)
+{ std::promise<T> p; p.set_value(v); return p.get_future(); }
+
+// c.cpp -- g++ -std=c++20 -fmodules-ts -O2 -c c.cpp
+#include <memory>
+import m;
+int main() { return mk(11).get() == 11 ? 0 : 1; }
+```
+
+The crash needs the include and the call together. Either one alone compiles.
+
+**One mitigation works, and it moves the cost onto the consumer.** Both sides must consume
+the header as a header unit, so one copy reaches the merge instead of two:
+
+```
+g++ -fmodule-header=system -xc++-system-header future
+g++ -fmodule-header=system -xc++-system-header memory
+```
+
+The module then writes `import <future>;` and the consumer writes `import <memory>;`. A
+consumer which includes `<memory>` by text still crashes, so this repairs nothing for a
+consumer which will not rewrite its own includes.
+
+**Everything else fails.** Each of these still crashes:
+
+| Attempt | Result |
+|---|---|
+| the importer includes `<future>` itself, in either order | ICE |
+| the fragment carries `<exception>` before `<future>` | ICE |
+| the fragment also carries `<memory>`, `<chrono>`, `<thread>` and `<stdexcept>` | ICE |
+| the module imports `<future>` as a header unit, the importer includes by text | ICE |
+| `template class std::promise<int>;` in the module | ICE |
+| the module primes the call path for one type | ICE |
+| `-fno-tree-dce`, `-fno-tree-builtin-call-dce`, `-fno-module-lazy`, `-fno-inline` | ICE |
+| `-fno-lifetime-dse`, `-fno-ipa-icf`, `-fno-devirtualize`, `-fno-strict-aliasing` | ICE |
+| one LTO partition | ICE |
+
+**A second gcc-14 defect blocks the obvious repair.** An `optimize` attribute on an
+exported template would carry a weaker pass list into the importer. Writing one crashes
+the module writer instead, at `cp/module.cc:6334`:
+
+```cpp
+export template<class T> __attribute__((optimize("O0"))) inline std::future<T> mk(T v);
+```
+
+gcc-13 does not reach this bug, because it fails the same module without `<memory>`. So
+gcc-14 is the oldest gcc which builds this group at all.
+
+A consumer which throws across the boundary needs no `<exception>`. A thrown `int` and a
+`catch (int)` cross it, and `future_module_only.cpp` holds that shape.
+
+`RppFutureModuleOnly` drives this group, and it includes no `<exception>` for this reason.
+Give it one to watch the build fail.
+
 ### B27. A `then()` exception handler reads a string the async state frees
 `ubuntu-cpp20-tsan-clang18` reported one race in `test_future::except_handlers_catch_first`.
 Thread T107 runs `~invalid_argument` inside the libc++ `std::async` state and calls `free`.
@@ -197,6 +330,10 @@ Second sighting on fd9c088, and this time it was `ubuntu-cpp20-tsan-gcc13`. Same
 two stacks, same two lines. So the race is not specific to one standard, and the job which
 reports it moves between runs. A re-run of the same job passed.
 
+Third sighting on 8dc779d, again on `ubuntu-cpp20-tsan-gcc13`, and again the same two
+lines. That commit edits three markdown files, so the rate alone moved it, not the code.
+All 556 cases passed and TSAN set exit 66 on its own.
+
 Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
 reported one warning, and the four other TSAN jobs passed on the same commit.
 
@@ -226,32 +363,61 @@ bare metal takes that branch too, and it needs a target which can run the result
 All six headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
 
-### B16. gcc-14 cannot compile `std::promise` in a module importer
+### B16. gcc-14 crashes an importer which instantiates `std::promise` at `-O1` and above
 A module whose global module fragment includes `<future>` breaks every importer which
 instantiates `std::promise`. gcc-14 reports `internal compiler error: in
-propagate_necessity, at tree-ssa-dce.cc:1001`. The crash needs no export, and `-O0`
-crashes the same as `-O2`.
+propagate_necessity, at tree-ssa-dce.cc:1001`, in GIMPLE pass `cddce`.
+
+The crash needs no export. An empty purview is enough.
+
+Measured on gcc 14.2.0. The earlier entry said `-O0` crashes the same as `-O2`, and that
+is wrong. The pass which crashes does not run below `-O1`.
+
+| Optimization | Result |
+|---|---|
+| `-O0`, `-Og` | compiles |
+| `-O1`, `-O2`, `-O3`, `-Os` | ICE in `cddce` |
+
+`<future>` is the only trigger. A fragment which includes `<memory>`, `<thread>` or
+`<mutex>` instead compiles. No flag avoids it either. `-fno-tree-dce`,
+`-fno-tree-builtin-call-dce` and `-fno-module-lazy` each still crash.
 
 ```cpp
-// m.cppm
+// m.cppm -- an empty purview is enough
 module;
 #include <future>
 export module m;
 
-// c.cpp
+// c.cpp -- g++ -std=c++20 -fmodules-ts -O2 -c c.cpp
 #include <future>
 import m;
 int main() { std::promise<int> p; p.set_value(7); return p.get_future().get() == 7 ? 0 : 1; }
 ```
 
-Ten headers reach `<future>`, and `future_types.h` is the only direct includer:
-`concurrent_queue.h`, `coroutines.h`, `event_loop.h`, `future.h`, `future_types.h`,
-`semaphore.h`, `task.h`, `tests.h`, `tests.macros.h` and `thread_pool.h`. Nine of them
-ship as a module, six before L7, so this predates the layer which found it. `rpp.task`
-alone reproduces it.
+**Narrowed to one module.** `future_types.h` reached every rpp header and carried `<future>`
+into all ten. It needed the include for one concept, and `IsFuture` moved to `future.h`.
+`rpp.future` now carries the three headers which reach `<future>`, and the other eight
+modules are clean. Measured after the split, each at `-O2`:
 
-No export list removes the crash, so `test_modules.cpp` names the `future.h` factories in
-an unevaluated context. Delete that workaround when a newer gcc compiles the reproducer.
+| Importer | Result |
+|---|---|
+| `rpp.threading`, `rpp.testing`, `rpp.io` | compiles and runs |
+| `rpp.future` | ICE |
+
+So a consumer meets this defect only when it imports `rpp.future`. Two ways around it.
+Import another module, or include `<rpp/future.h>` in the unit which names `std::promise`.
+
+`RppPromiseModuleOnly` in `tests/module_consumer/` is the gate. It imports `rpp.threading`,
+instantiates `std::promise` and runs at `-O2`. It failed to build before the split.
+
+`test_modules_future.cpp` imports `rpp.future`, so it keeps naming the factories unevaluated.
+Delete that workaround when a newer gcc compiles the reproducer above.
+
+Ten headers reached `<future>` before the split, and `future_types.h` was the only direct
+includer. Three reach it now: `future.h`, `event_loop.h` and `coroutines.h`. `future.h`
+includes `<future>` itself, which it always needed, and the other two include `future.h`.
+
+No export list removes the crash. Only the fragment which carries `<future>` decides it.
 
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A

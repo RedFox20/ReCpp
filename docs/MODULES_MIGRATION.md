@@ -1,6 +1,6 @@
 # ReCpp C++20 Modules Migration Plan
 
-Revision 23. Eight module interface units exist, one per header group. The migration is
+Revision 23. Nine module interface units exist, one per header group. The migration is
 complete. No group re-exports another group, and no module exports a std name. Section 12
 records the `rpp.std` stand-in and the `rpp` umbrella it dropped.
 
@@ -13,27 +13,35 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the eight modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
+| the nine modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
 | `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
-| `tests/test_modules.cpp` | module consumer test, 41 cases. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
-| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC, with 9 module-only targets which `run_test.py` builds and runs at C++20 and C++23 |
+| `tests/test_modules.cpp` | module consumer test over eight groups. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
+| `tests/test_modules_future.cpp` | the ninth group. A ninth import in the unit above exhausts the imported source locations of gcc-14 |
+| `tests/module_consumer/` | a real mama consumer, on gcc, clang and MSVC. `run_test.py` reads the module-only targets from `CMakeLists.txt`, then builds and runs each at C++20 and C++23 |
 | mama | 0.14.0 exports the `.cppm` files and strips the module objects |
-| CI | 29 jobs on GitHub Actions, and CircleCI is gone |
-| test counts | 584/584 on the modules build, 539/539 on the header build |
+| CI | GitHub Actions runs the matrix in `.github/workflows/ci.yml`, and CircleCI is gone |
+| test counts | the modules build runs more cases than the header build, because a module-only case compiles out without one. Read both from the last green run |
 
 **Changeset state:** 1a is dropped, see section 4. 1b, 2, 3 and the mama half of
-6 landed. The generator drives all eight groups. 4 is done through the generator
+6 landed. The generator drives all nine groups. 4 is done through the generator
 `--check`. 5 is finished. Section 11 lists what 7 owes.
 
-**Next:** nothing in this plan. Section 11 holds the open follow-ups.
+**Next:** nothing in this plan. Every remaining item is a follow-up to it, and section 11.1
+holds the list.
 
-**Why eight groups and not forty-four modules.** The tree shipped one module per header
+**The follow-ups, ranked.** B16 is narrowed to `rpp.future`, the ninth group, which carries
+the only three headers that reach `<future>`. Eight modules are clean, and
+`RppPromiseModuleOnly` gates it. B8 costs one trait, which a module importer does not get
+and an includer does. B19, B20, B21 and B22 are dormant. No module exports a std name, and
+dropping `rpp.std` retired that shape for good.
+
+**Why groups and not forty-four modules.** The tree shipped one module per header
 first. gcc-14 then ran out of module source locations in any translation unit which imported
 dozens, and it mis-merged a global module declaration. Only a clean C++23 build showed it,
-see `BUGS.md` **C28**. Eight groups cut `test_modules.cpp` from 39 imports to 8, and the
+see `BUGS.md` **C28**. The groups cut `test_modules.cpp` from 39 imports to 8, and the
 clean build passes on both standards with zero overflow notes.
 
 Build time was never the argument either way. The 88 module translation units of a cold
@@ -52,9 +60,9 @@ see **B15**. The generator selftest still pins all three knobs.
 
 **gcc-14 cannot compile `std::promise` in an importer, and six modules carried that before
 L7.** Any module whose global module fragment includes `<future>` breaks such a consumer,
-and `rpp.task` alone reproduces it. No export list changes the crash, so the L7 tests name
-the `future.h` factories in an unevaluated context. **B16** holds the reproducer and the
-list of ten headers which reach `<future>`. Nine of them ship as a module now.
+No export list changes the crash, so `test_modules_future.cpp` names the `future.h`
+factories in an unevaluated context. **B16** holds the reproducer. Three headers reach
+`<future>` now, and `rpp.future` carries all three.
 
 **An importer which includes `<string>` first reads a different module.** `rpp.file_io`
 passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the
@@ -232,7 +240,7 @@ median of 7 alternating runs of `g++ -O2 -fsyntax-only` on gcc-14.2, with the bi
 interfaces already built, so it isolates the consumer side.
 
 **Every table under this heading measured the 44 per-header modules, which no longer ship.**
-Read them for the shape they found, not for a module name. The eight groups replaced that
+Read them for the shape they found, not for a module name. The groups replaced that
 layout, see `BUGS.md` **C28**, and the group numbers sit at the end of this section.
 
 One facility per translation unit, the header against its module:
@@ -327,8 +335,9 @@ the fragment kills `std::swap` lookup, so `std::future` and `std::promise` go wi
 Exporting `std::get` breaks `std::unique_ptr` in every importer (B21). Section 11.1 has the
 table, and `BUGS.md` has a reproducer for each.
 
-**The eight groups, measured the same way.** One translation unit per group, `g++ -O2 -c` on
-gcc-14.2 with the project build flags, best of three, warm interfaces. Both columns compile
+**The groups, measured the same way.** One translation unit per group, `g++ -O2 -c` on
+gcc-14.2 with the project build flags, best of three, warm interfaces. `rpp.future` has no
+row, because the split which created it came after this run. Both columns compile
 the same body. The header column includes the group headers that body needs, and the import
 column names the group and parses no standard library header at all:
 
@@ -1002,14 +1011,14 @@ between layers.
 | L6 | **binary_serializer** ✓, **thread_pool** ✓ | 2 |
 | L7 | **event_loop** ✓, **future** ✓ | 2 |
 | L8 | **coroutines** ✓ | 1 |
-| groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **testing** ✓ | 8 |
+| groups | **core** ✓, **text** ✓, **numeric** ✓, **time** ✓, **containers** ✓, **io** ✓, **threading** ✓, **future** ✓, **testing** ✓ | 9 |
 | ~~top~~ | umbrella **rpp**, dropped, see section 12 | 0 |
 
-**The layer table above is history.** The 44 per-header units are gone, and the eight groups
+**The layer table above is history.** The 44 per-header units are gone, and the nine groups
 carry those headers directly, see `BUGS.md` **C28**. The layer order still describes the
 include graph, so it still says which group may import which.
 
-`BUILD_WITH_MODULES` builds the eight groups. The groups partition every public header, so a
+`BUILD_WITH_MODULES` builds the nine groups. The groups partition every public header, so a
 new header reaches an importer only by joining one group in `GROUP_HEADERS`, and no header
 can sit in two. `gen_module_exports.py --all --check` reports each way to drift, and the selftest pins
 each one. `rpp.numeric` carries the math headers, because `rpp.math` would name one header
@@ -1114,7 +1123,7 @@ B23 are struck through, because a fix replaced each one.
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
 | ~~B23~~ | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc ran out of module source locations on 44 modules, then mis-merged a global module declaration | Fixed. Eight header groups cut one translation unit from 39 imports to 8, and both standards build clean. A C++23 modules CI row now covers it. See `BUGS.md` C28 |
-| **B16** | gcc-14 | An importer of a module whose global module fragment includes `<future>` crashes on `std::promise`, at `propagate_necessity` | Every probe names `cfuture` unevaluated. Ten headers reach `<future>`, and `rpp.threading` and `rpp.testing` carry them |
+| **B16** | gcc-14 | An importer of a module whose fragment includes `<future>` crashes on `std::promise` at `-O1` and above, at `propagate_necessity` | `rpp.future` carries the only three headers which reach `<future>`, so eight modules are clean. `RppPromiseModuleOnly` gates it, and `test_modules_future.cpp` still names `cfuture` unevaluated |
 | ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | No module exports a std name. An importer includes `<exception>` |
 | **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | No module exports a std name, so nothing reaches this |
@@ -1147,6 +1156,7 @@ global module fragment reaches an importer only when an exported declaration nam
 |---|---|---|
 | `s != "x"` and `s + "y"` on an exported `std::string` | The importer reports `no match for 'operator!='` | No module exports `std::string`. The importer includes `<string>` |
 | `std::vector` construction | `stl_construct.h` reports `no matching function for call to 'operator new(sizetype, void*)'` | The importer includes `<new>` |
+| Any call into the future machinery of `rpp.future` | The importer reports `must '#include <typeinfo>' before using 'typeid'` | libstdc++ names `typeid` inside `<future>`. The importer includes `<typeinfo>` |
 
 So an export list of type names alone does not make a module usable. Every free function an
 exported type needs by argument-dependent lookup belongs in the list beside the type.
@@ -1208,5 +1218,5 @@ already used, so the public signature names no std type.
 | 6 | mama and CMake packaging, consumer example | 1.5 | changeset 7 | mama done, PR #65 |
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 
-**About 5 working days remain.** Changeset 5 is half of that. Every decision in
-sections 3 and 6 is settled, and nothing blocks the start.
+**Every changeset landed.** The table above is a record, not a plan. What remains is the
+follow-up list in section 11.1, and B16 is the one which reaches a consumer.

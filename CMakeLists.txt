@@ -375,6 +375,7 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-containers.cppm
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
+        src/rpp/rpp-future.cppm
         src/rpp/rpp-testing.cppm
     )
 
