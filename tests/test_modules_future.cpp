@@ -1,6 +1,6 @@
 /**
- * Imports rpp.future, which test_modules.cpp cannot. That unit already imports eight groups,
- * and a ninth exhausts the imported source locations of gcc-14. See BUGS.md B8 shape 3.
+ * Imports rpp.future, which test_modules.cpp cannot. That unit already imports every other
+ * group, and one more exhausts the imported source locations of gcc-14. See BUGS.md B8 shape 3.
  */
 #include <rpp/tests.h>
 
@@ -11,8 +11,8 @@
 #include <type_traits>        // std::is_same_v, which pins an exported signature
 #include <vector>
 
-// Three imports, and no more. rpp.future carries the whole threading stack in its fragment,
-// so a fourth group here costs more imported source locations than gcc-14 can represent
+// Keep this import list as short as it is. rpp.future carries the whole threading stack in
+// its fragment, so another group here exceeds the source locations gcc-14 can represent
 import rpp.core; // includes come first, the imports go last
 import rpp.time;
 import rpp.future;
