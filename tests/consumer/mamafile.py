@@ -26,8 +26,9 @@ class RppConsumer(mama.BuildTarget):
         mama shares one config across the tree. So a `test` argument aimed at this consumer
         must not reach the mamafile of ReCpp and build its whole test suite.
         """
-        # `test all`, `update` and `with_tests` ask mama for the tests of every target
-        if self.config.targets_all() or self.config.with_tests:
+        # the same opt-ins the ReCpp mamafile reads, so the two can never disagree on one run
+        env_on = os.getenv('BUILD_TESTS') in ('1', 'ON', 'TRUE')
+        if self.config.targets_all() or self.config.with_tests or env_on:
             console('this run asked for the tests of every target, so this check does not apply')
             return
         cache = os.path.join(self.get_dependency('ReCpp').build_dir, 'CMakeCache.txt')
