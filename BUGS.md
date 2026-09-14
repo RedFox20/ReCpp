@@ -37,10 +37,14 @@ with a call into the future machinery:
 | `<thread>` | ICE |
 | `<exception>`, `<stdexcept>` | ICE |
 
-`<memory>` alone puts this beyond a workaround. Almost every real translation unit reaches
-one of these, so **no realistic consumer can import `rpp.future` and call it on gcc-14.**
-The group still earns its place, because it keeps `<future>` out of the eight modules a
-consumer can use. Read that as a quarantine, not as a working module.
+`<memory>` alone puts this beyond a workaround, so a gcc-14 consumer which imports
+`rpp.future` and calls it keeps to `<typeinfo>`, `<new>` and `<vector>`. That is a narrow
+budget, and a consumer which needs more includes `<rpp/future.h>` instead.
+
+**This is a gcc-14 limit, not a limit of the module.** clang-21 and MSVC build and run
+`RppFutureModuleOnly` with no such restriction, and the `RPP_B27_FREE` block in that file
+drives the exact shape gcc-14 rejects. So the group works on both other tier 1 compilers,
+and it keeps `<future>` out of the eight modules beside it either way.
 
 MSVC needs the opposite. It parses `<thread>` from the fragment and fails without
 `<chrono>`, which gcc-14 forbids here, so `future_module_only.cpp` guards that include on

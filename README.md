@@ -258,9 +258,12 @@ include `<rpp/future.h>` instead of importing, in the translation unit which nee
 
 An importer of `rpp.future` also includes `<typeinfo>` and `<new>` before it calls into the
 future machinery. libstdc++ names `typeid` and placement `new` inside `<future>`, and a
-global module fragment reaches an importer only when an exported declaration names it. That
-same importer must not include `<exception>`, which crashes gcc-14. See `BUGS.md` B27.
-`tests/module_consumer/future_module_only.cpp` shows the shape which works.
+global module fragment reaches an importer only when an exported declaration names it.
+
+On gcc-14 that importer keeps to `<typeinfo>`, `<new>` and `<vector>`. Adding `<memory>`,
+`<chrono>`, `<thread>` or `<exception>` crashes the compiler, which `BUGS.md` B27 measures.
+clang-21 and MSVC carry no such limit, and a gcc-14 consumer which needs a wider include
+set uses `<rpp/future.h>`. `tests/module_consumer/future_module_only.cpp` holds both shapes.
 
 ### How it works
 
