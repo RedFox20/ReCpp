@@ -922,6 +922,68 @@ TestImpl(test_sockets)
                       socket::connect_to({ip, port}, 5000/*ms*/, opt));
     }
 
+    // each entry carries its own flags and its own result
+    TestCase(poll_entries_with_own_flags)
+    {
+        socket a = create_udp_listener(rpp::SO_NonBlock);
+        socket b = create_udp_listener(rpp::SO_NonBlock);
+        AssertGreater(a.sendto(ipaddress(AF_IPv4, "127.0.0.1", b.port()), "hi", 2), 0);
+
+        socket::poll_entry entries[] = { { &a, socket::PF_Read }, { &b, socket::PF_Read }, { &a, socket::PF_Write } };
+        AssertThat(socket::poll(entries, 100), 2);
+        AssertThat(entries[0].ready, false);
+        AssertThat(entries[1].ready, true);
+        AssertThat(entries[2].ready, true);
+
+        socket closed;
+        socket::poll_entry ignored[] = { { &closed, socket::PF_Read } };
+        AssertThat(socket::poll(ignored, 1), 0); // a closed socket never marks ready
+        AssertThat(ignored[0].ready, false);
+    }
+
+    // a wake() from another thread ends a poll which would otherwise run to its timeout
+    TestCase(socket_poller_wakes_from_another_thread)
+    {
+        socket a = create_udp_listener(rpp::SO_NonBlock);
+        socket_poller poller;
+        AssertThat(poller.add(a, socket::PF_Read), 0);
+        rpp::cfuture<void> waker = rpp::async_task([&]{ rpp::sleep_ms(5); poller.wake(); });
+        rpp::Timer wall;
+        AssertThat(poller.poll(1000), 0); // nothing arrives, so only the wake ends it before the timeout
+        AssertLess(wall.elapsed_millis(), 500.0);
+        waker.get();
+        AssertThat(poller.ready(0), false);
+        AssertThat(poller.can_wake(), true);
+    }
+
+    // the work check runs after the wake is armed, so pending work skips the poll
+    TestCase(socket_poller_skips_the_poll_for_pending_work)
+    {
+        socket a = create_udp_listener(rpp::SO_NonBlock);
+        socket_poller poller;
+        poller.add(a, socket::PF_Read);
+        rpp::Timer wall;
+        AssertThat(poller.poll(1000, []{ return true; }), 0);
+        AssertLess(wall.elapsed_millis(), 100.0);
+
+        AssertGreater(a.sendto(ipaddress(AF_IPv4, "127.0.0.1", a.port()), "hi", 2), 0);
+        AssertThat(poller.poll(10), 1); // a ready entry reports, and the wake entry never counts
+        AssertThat(poller.ready(0), true);
+    }
+
+    TestCase(tcp_connect_start_then_finish)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        socket client;
+        AssertTrue(client.connect_start({"127.0.0.1", server.port()}));
+        AssertTrue(client.poll(1000, socket::PF_Write));
+        AssertTrue(client.connect_finish());
+        AssertTrue(client.connected());
+        AssertThat(client.is_blocking(), false);
+        socket remote = accept(server);
+        AssertTrue(remote.good());
+    }
+
     TestCase(tcp_connect_to_nonexisting_server_fails)
     {
         socket client = socket::connect_to({"127.0.0.1", 12345}, 50/*ms*/);

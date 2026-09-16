@@ -37,17 +37,13 @@ owner accepts that one, and the comment states it now instead of promising a gra
 
 A live worker holds three borrowed things: the loop, the time source and the pool. C30 closed
 the `delay()` half. A poll step reads the offset under a reader guard, and
-`stop_and_wait_all_ready()` retires the pointer before the owner frees it. Three gaps stay open.
+`stop_and_wait_all_ready()` retires the pointer before the owner frees it. Every loop wait
+now goes through `wait_next_event()` with a `time_frame`, so no wait hands the raw pointer to
+`concurrent_queue` any more. Two gaps stay open.
 
-1. `run_loop()`, `run_once()` and `run_until_idle()` hand the raw pointer to
-   `concurrent_queue`, which polls it for the whole wait outside the guard
-   (`event_loop.cpp:169,187,218`). The guard cannot cover it, because the retire would then
-   block for the whole timeout. Each one loads the pointer at the call, so no callback runs
-   between that load and the wait. `wait_on_all()` drains callbacks between the two, and a
-   drained callback can free the clock, so it polls from a `time_frame` instead.
-2. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
+1. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
    with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
-3. An owner which frees a clock it swapped out for another still reaches freed memory,
+2. An owner which frees a clock it swapped out for another still reaches freed memory,
    because only a clear to null retires. Clear it before the free.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
@@ -260,7 +256,8 @@ This has three shapes. A bound too tight reports the overrun, as
 `test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
-`~ImportantState: data != "aaaabbbbcccc"`. A third shape compares two measured times, as
+`~ImportantState: data != "aaaabbbbcccc"`, and again on `win64-cpp20-msvc` for #97 at
+13fd878, which touched no close_sync code. A third shape compares two measured times, as
 `test_threadpool::parallel_for_performance` did on `ubuntu-cpp26-tsan-gcc14` with
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an

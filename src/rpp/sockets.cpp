@@ -1598,6 +1598,22 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+#if _WIN32 || _WIN64
+    using poll_fd_t = SOCKET;
+#else
+    using poll_fd_t = int;
+#endif
+
+    // the one place which names the platform poll, so every caller builds a pollfd array and nothing else
+    static int os_poll(struct pollfd* fds, int count, int timeoutMillis) noexcept
+    {
+    #if _WIN32 || _WIN64
+        return WSAPoll(fds, ULONG(count), timeoutMillis);
+    #else
+        return ::poll(fds, nfds_t(count), timeoutMillis);
+    #endif
+    }
+
     bool socket::connected() noexcept
     {
         // try to lock, but don't deadlock if another thread is doing an atomic
@@ -1645,13 +1661,8 @@ namespace rpp
             // if the socket is blocking, then MSG_PEEK can cause a blocking operation.
             // So we use poll() to detect whether the socket is readable first.
             // A subsequent call to `recv()` will return 0, indicating a graceful close.
-        #if _WIN32 || _WIN64
-            struct pollfd pfd = { SOCKET(sock), POLLRDNORM, 0 };
-            int poll_r = WSAPoll(&pfd, 1, 0);
-        #else
-            struct pollfd pfd = { sock, POLLRDNORM, 0 };
-            int poll_r = ::poll(&pfd, 1, 0);
-        #endif
+            struct pollfd pfd = { poll_fd_t(sock), POLLRDNORM, 0 };
+            int poll_r = os_poll(&pfd, 1, 0);
             if (poll_r > 0) // data is available to read
             {
                 char c;
@@ -1803,13 +1814,8 @@ namespace rpp
             ((pollFlags & PF_Write) ? POLLOUT : 0)
         );
 
-    #if _WIN32 || _WIN64
-        struct pollfd pfd = { SOCKET(os_handle()), events, 0 };
-        int r = WSAPoll(&pfd, 1, timeoutMillis);
-    #else
-        struct pollfd pfd = { os_handle(), events, 0 };
-        int r = ::poll(&pfd, 1, timeoutMillis);
-    #endif
+        struct pollfd pfd = { poll_fd_t(os_handle()), events, 0 };
+        int r = os_poll(&pfd, 1, timeoutMillis);
         if (r < 0)
         {
             handle_errno();
@@ -1832,38 +1838,40 @@ namespace rpp
         return n;
     }
 
+    // a pollfd array which stays on the stack for the usual small set, and every poll site shares it
+    struct pollfd_buffer
+    {
+        static constexpr int MAX_LOCAL_FDS = 32; // in 99.9% of cases only 2-4 sockets are polled
+        struct pollfd local[MAX_LOCAL_FDS];
+        std::vector<struct pollfd> heap;
+        struct pollfd* fds;
+
+        explicit pollfd_buffer(int count) : fds{local}
+        {
+            if (count > MAX_LOCAL_FDS)
+            {
+                heap.resize(count);
+                fds = heap.data();
+            }
+        }
+        void set(int i, int handle, short events) const noexcept { fds[i] = { poll_fd_t(handle), events, 0 }; }
+    };
+
+    static short poll_events(socket::PollFlag flags) noexcept
+    {
+        return short(((flags & socket::PF_Read) ? POLLIN : 0) | ((flags & socket::PF_Write) ? POLLOUT : 0));
+    }
+
     int socket::poll(socket* const* in, int inCount,
                      int* outReadyIndexes, int outMaxCount,
                      int timeoutMillis, PollFlag pollFlags) noexcept
     {
-        // in 99.9% of cases only 2-4 sockets are polled
-        // 32 sockets takes roughly 256 bytes of stack space
-        constexpr int MAX_LOCAL_FDS = 32;
-
-        struct pollfd local_pfd[MAX_LOCAL_FDS];
-        struct pollfd* pfd = local_pfd;
-        if (inCount > MAX_LOCAL_FDS) // too many fds, allocate dynamically
-            pfd = (struct pollfd*)malloc(sizeof(struct pollfd) * inCount);
-
-        memset(pfd, 0, sizeof(struct pollfd) * inCount);
-
-        const short events = short(
-            ((pollFlags & PF_Read) ? POLLIN : 0) |
-            ((pollFlags & PF_Write) ? POLLOUT : 0)
-        );
-
+        pollfd_buffer buffer { inCount };
+        struct pollfd* pfd = buffer.fds;
         for (int i = 0; i < inCount; ++i)
-        {
-            pfd[i].fd = in[i]->os_handle();
-            pfd[i].events = events;
-            pfd[i].revents = 0;
-        }
+            buffer.set(i, in[i]->os_handle(), poll_events(pollFlags));
 
-    #if _WIN32 || _WIN64
-        int r = WSAPoll(pfd, inCount, timeoutMillis);
-    #else
-        int r = ::poll(pfd, inCount, timeoutMillis);
-    #endif
+        int r = os_poll(pfd, inCount, timeoutMillis);
 
         int readyCount = 0;
         if (r >= 0)
@@ -1881,9 +1889,72 @@ namespace rpp
             }
         }
 
-        if (pfd != local_pfd)
-            free(pfd); // free the dynamically allocated pollfd array
         return readyCount;
+    }
+
+    int socket::poll(std::span<poll_entry> entries, int timeoutMillis) noexcept
+    {
+        const int count = int(entries.size());
+        pollfd_buffer buffer { count };
+        for (int i = 0; i < count; ++i)
+        {
+            buffer.set(i, entries[i].sock->os_handle(), poll_events(entries[i].events)); // a closed socket is ignored
+            entries[i].ready = false;
+        }
+
+        int readyCount = 0;
+        if (os_poll(buffer.fds, count, timeoutMillis) > 0)
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                entries[i].ready = buffer.fds[i].revents != 0;
+                if (entries[i].ready) ++readyCount;
+            }
+        }
+        return readyCount;
+    }
+
+    int socket_poller::add(socket& sock, socket::PollFlag events) noexcept
+    {
+        entries.push_back(socket::poll_entry{ &sock, events });
+        return int(entries.size()) - 1;
+    }
+
+    void socket_poller::arm() noexcept
+    {
+        if (!wake_socket_opened)
+        {
+            wake_socket_opened = true;
+            const raw_address loopback { AF_IPv4, "127.0.0.1" };
+            wake_socket = make_udp_randomport(SO_NonBlock, loopback);
+            wake_addr = ipaddress{ loopback, wake_socket.port() };
+            if (wake_socket.bad()) // the socket layer logged the cause, and a caller polls in slices instead
+                LogWarning("socket_poller wake socket failed, wake() cannot end a poll");
+        }
+        armed.store(wake_socket.good(), std::memory_order_release);
+    }
+
+    int socket_poller::poll_armed(int timeoutMillis) noexcept
+    {
+        entries.push_back(socket::poll_entry{ &wake_socket, socket::PF_Read }); // a closed one is ignored
+        int readyCount = socket::poll(entries, timeoutMillis);
+        if (entries.back().ready)
+        {
+            --readyCount;
+            char kicks[64];
+            while (wake_socket.recv(kicks, sizeof(kicks)) > 0) {} // one datagram per wake(), drain them all
+        }
+        entries.pop_back();
+        return readyCount;
+    }
+
+    void socket_poller::wake() noexcept
+    {
+        if (armed.load(std::memory_order_acquire))
+        {
+            const char kick = 0;
+            wake_socket.sendto(wake_addr, &kick, 1);
+        }
     }
 
     bool socket::on_poll_result(int revents, PollFlag pollFlags) noexcept
@@ -2033,6 +2104,18 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
+        if (!connect_start(remoteAddr, opt))
+            return false;
+        const int pending = get_errno(); // a poll timeout clears the code, so the in-progress one is kept
+        if (poll(millis, PF_Write))
+            return connect_finish(opt);
+        if (!get_errno())
+            set_errno(pending);
+        return false;
+    }
+
+    bool socket::connect_start(const ipaddress& remoteAddr, socket_option opt) noexcept
+    {
         std::unique_lock lock { Mtx };
 
         // disallow connecting to an unspecified address
@@ -2055,51 +2138,44 @@ namespace rpp
 
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
-        int sock = os_handle_unsafe();
-
         set_errno_unlocked(0); // clear any errors
 
         // this will return immediately because socket is in non-blocking mode and we hold the mutex
-        if (::connect(sock, sa, sa.size()) == 0)
-        {
-            configure_connected_client(opt);
+        if (::connect(os_handle_unsafe(), sa, sa.size()) == 0)
             return true;
-        }
 
         int err = os_getsockerr(); // read errno
         // EALREADY: nonblocking connect is already in progress, second connect has no effect
         // EINPROGRESS|EWOULDBLOCK: nonblocking connect is in progress, use poll() to wait for completion
         if (err == ESOCK(EALREADY) || err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
         {
-            lock.unlock(); // unlock before entering very slow poll()
-            if (poll(millis, PF_Write))
-            {
-                // the socket is writable, but according to connect() manual,
-                // SO_ERROR needs to be checked for the final status
-                lock.lock(); // relock again
-                int so_err = get_socket_level_error();
-                if (so_err == 0)
-                {
-                    configure_connected_client(opt);
-                    return true;
-                }
-                handle_errno(so_err);
-                return false;
-            }
-            else
-            {
-                lock.lock(); // relock again
-                // if poll timed out (no last errno), then use the EINPROGRESS / EALREADY error codes
-                if (!get_errno_unlocked())
-                    set_errno_unlocked(err);
-                return false;
-            }
+            set_errno_unlocked(err); // the in-progress code, which a caller reports when its wait times out
+            return true;
         }
 
         logerror("socket fh:%d async connect error: %s",
                   os_handle_unsafe(), last_os_socket_err(err).c_str());
         handle_errno(err);
         return false;
+    }
+
+    bool socket::connect_finish(socket_option opt) noexcept
+    {
+        std::unique_lock lock { Mtx };
+        int so_err = get_socket_level_error(); // the connect() manual puts the final status here
+        if (so_err != 0)
+        {
+            handle_errno(so_err);
+            return false;
+        }
+        if (!poll(0, PF_Write)) // a connect still in progress also has no SO_ERROR yet
+        {
+            if (!get_errno_unlocked())
+                set_errno_unlocked(ESOCK(EINPROGRESS));
+            return false;
+        }
+        configure_connected_client(opt);
+        return true;
     }
 
     void socket::configure_connected_client(socket_option opt) noexcept
