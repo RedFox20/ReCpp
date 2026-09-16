@@ -8,6 +8,7 @@
 
 #if _WIN32
 #  define WIN32_LEAN_AND_MEAN
+#  define NOMINMAX // Windows.h defines a max macro, which breaks rpp::Duration::max()
 #  include <WinSock2.h> // WSAPoll
 #else
 #  include <poll.h> // poll()
