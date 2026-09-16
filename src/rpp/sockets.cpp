@@ -1838,32 +1838,38 @@ namespace rpp
         return n;
     }
 
+    // a pollfd array which stays on the stack for the usual small set, and every poll site shares it
+    struct pollfd_buffer
+    {
+        static constexpr int MAX_LOCAL_FDS = 32; // in 99.9% of cases only 2-4 sockets are polled
+        struct pollfd local[MAX_LOCAL_FDS];
+        std::vector<struct pollfd> heap;
+        struct pollfd* fds;
+
+        explicit pollfd_buffer(int count) : fds{local}
+        {
+            if (count > MAX_LOCAL_FDS)
+            {
+                heap.resize(count);
+                fds = heap.data();
+            }
+        }
+        void set(int i, int handle, short events) const noexcept { fds[i] = { poll_fd_t(handle), events, 0 }; }
+    };
+
+    static short poll_events(socket::PollFlag flags) noexcept
+    {
+        return short(((flags & socket::PF_Read) ? POLLIN : 0) | ((flags & socket::PF_Write) ? POLLOUT : 0));
+    }
+
     int socket::poll(socket* const* in, int inCount,
                      int* outReadyIndexes, int outMaxCount,
                      int timeoutMillis, PollFlag pollFlags) noexcept
     {
-        // in 99.9% of cases only 2-4 sockets are polled
-        // 32 sockets takes roughly 256 bytes of stack space
-        constexpr int MAX_LOCAL_FDS = 32;
-
-        struct pollfd local_pfd[MAX_LOCAL_FDS];
-        struct pollfd* pfd = local_pfd;
-        if (inCount > MAX_LOCAL_FDS) // too many fds, allocate dynamically
-            pfd = (struct pollfd*)malloc(sizeof(struct pollfd) * inCount);
-
-        memset(pfd, 0, sizeof(struct pollfd) * inCount);
-
-        const short events = short(
-            ((pollFlags & PF_Read) ? POLLIN : 0) |
-            ((pollFlags & PF_Write) ? POLLOUT : 0)
-        );
-
+        pollfd_buffer buffer { inCount };
+        struct pollfd* pfd = buffer.fds;
         for (int i = 0; i < inCount; ++i)
-        {
-            pfd[i].fd = in[i]->os_handle();
-            pfd[i].events = events;
-            pfd[i].revents = 0;
-        }
+            buffer.set(i, in[i]->os_handle(), poll_events(pollFlags));
 
         int r = os_poll(pfd, inCount, timeoutMillis);
 
@@ -1883,37 +1889,25 @@ namespace rpp
             }
         }
 
-        if (pfd != local_pfd)
-            free(pfd); // free the dynamically allocated pollfd array
         return readyCount;
     }
 
     int socket::poll(std::span<poll_entry> entries, int timeoutMillis) noexcept
     {
-        constexpr int MAX_LOCAL_FDS = 32; // in 99.9% of cases only 2-4 sockets are polled
-        struct pollfd local_pfd[MAX_LOCAL_FDS];
-        std::vector<struct pollfd> heap_pfd;
         const int count = int(entries.size());
-        struct pollfd* pfd = local_pfd;
-        if (count > MAX_LOCAL_FDS)
-        {
-            heap_pfd.resize(count);
-            pfd = heap_pfd.data();
-        }
+        pollfd_buffer buffer { count };
         for (int i = 0; i < count; ++i)
         {
-            const PollFlag f = entries[i].events;
-            const short events = short(((f & PF_Read) ? POLLIN : 0) | ((f & PF_Write) ? POLLOUT : 0));
-            pfd[i] = { poll_fd_t(entries[i].sock->os_handle()), events, 0 }; // a closed socket is ignored by poll
+            buffer.set(i, entries[i].sock->os_handle(), poll_events(entries[i].events)); // a closed socket is ignored
             entries[i].ready = false;
         }
 
         int readyCount = 0;
-        if (os_poll(pfd, count, timeoutMillis) > 0)
+        if (os_poll(buffer.fds, count, timeoutMillis) > 0)
         {
             for (int i = 0; i < count; ++i)
             {
-                entries[i].ready = pfd[i].revents != 0;
+                entries[i].ready = buffer.fds[i].revents != 0;
                 if (entries[i].ready) ++readyCount;
             }
         }

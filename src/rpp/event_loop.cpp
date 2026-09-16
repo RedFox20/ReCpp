@@ -33,7 +33,7 @@ namespace rpp
     event_loop::~event_loop() noexcept
     {
         // if loop is destroyed by anyone other than the owner thread, terminate
-        if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+        if (!on_owner_thread())
         {
             __assertion_failure("event_loop destroyed from non-owner thread; this is not allowed and may cause resource leaks");
             std::terminate();
@@ -138,7 +138,7 @@ namespace rpp
     bool event_loop::stop_and_wait_all_ready(rpp::Duration max_wait) noexcept
     {
         // the drain resumes coroutines, which must run on the loop thread
-        if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+        if (!on_owner_thread())
         {
             LogError("event_loop::stop_and_wait_all_ready() must be called on the event loop thread");
             return false;
@@ -162,9 +162,8 @@ namespace rpp
         loop_running = true;
         while (loop_running)
         {
-            time_frame frame = get_time_source_frame(); // one snapshot per wait, see BUGS.md B26
             resume_event event;
-            if (wait_next_event(event, frame.now() + suspend_interval, frame))
+            if (wait_next_event(event, suspend_interval))
             {
                 process_event(event);
                 invoke_loop_hook();
@@ -179,9 +178,8 @@ namespace rpp
 
     bool event_loop::run_once(rpp::Duration timeout) noexcept
     {
-        time_frame frame = get_time_source_frame(); // one snapshot per wait, see BUGS.md B26
         resume_event event;
-        const bool got_event = wait_next_event(event, frame.now() + timeout, frame);
+        const bool got_event = wait_next_event(event, timeout);
         if (got_event)
             process_event(event);
 
@@ -210,9 +208,8 @@ namespace rpp
         int processed_count = 0;
         while (true)
         {
-            time_frame frame = get_time_source_frame(); // one snapshot per wait, see BUGS.md B26
             resume_event event;
-            if (wait_next_event(event, frame.now() + suspend_interval, frame))
+            if (wait_next_event(event, suspend_interval))
             {
                 process_event(event);
                 ++processed_count;
@@ -315,6 +312,12 @@ namespace rpp
         }
     }
 
+    bool event_loop::wait_next_event(resume_event& event, rpp::Duration timeout) noexcept
+    {
+        time_frame frame = get_time_source_frame(); // one snapshot per wait, see BUGS.md B26
+        return wait_next_event(event, frame.now() + timeout, frame);
+    }
+
     rpp::Duration event_loop::time_to_next_waiter() noexcept
     {
         rpp::Duration next = rpp::Duration::max();
@@ -394,18 +397,11 @@ namespace rpp
 
     void event_loop::add_timer(rpp::TimePoint end, time_frame frame, rpp::coro_handle<> owner, resume_event event) noexcept
     {
-        if (rpp::get_thread_id() == owner_thread_id.load(std::memory_order_acquire))
+        run_on_loop([this, end, frame, owner, event = std::move(event)]() mutable
         {
             timers.push_back(timer{end, frame, owner, std::move(event)});
             num_waiters.fetch_add(1, std::memory_order_acq_rel);
-        }
-        else
-        {
-            post([this, end, frame, owner, event = std::move(event)]() mutable
-            {
-                add_timer(end, frame, owner, std::move(event));
-            });
-        }
+        });
     }
 
     void event_loop::cancel_timers(rpp::coro_handle<> owner) noexcept
@@ -420,17 +416,13 @@ namespace rpp
 
     void event_loop::add_socket_waiter(socket_awaiter& awaiter, rpp::coro_handle<> cont) noexcept
     {
-        if (rpp::get_thread_id() == owner_thread_id.load(std::memory_order_acquire))
+        run_on_loop([this, &awaiter, cont]
         {
             if (!wake_socket_opened)
                 open_wake_socket();
             socket_waiters.push_back(socket_waiter{&awaiter, cont});
             num_waiters.fetch_add(1, std::memory_order_acq_rel);
-        }
-        else
-        {
-            post([this, &awaiter, cont] { add_socket_waiter(awaiter, cont); });
-        }
+        });
     }
 
     void event_loop::complete_socket_waiter(socket_waiter& waiter, bool ready) noexcept

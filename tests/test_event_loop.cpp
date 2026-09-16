@@ -65,6 +65,22 @@ TestImpl(test_event_loop)
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
 
+    std::atomic_bool wait_done { false };
+    bool wait_ready = false;
+    // forks a coroutine which waits until `client` is readable, and reports through wait_ready and wait_done
+    void fork_wait_readable(rpp::Duration timeout)
+    {
+        wait_done = false;
+        // fork() keeps the closure alive for the coroutine, and the fixture outlives the loop
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+        loop->fork([this, timeout]() -> rpp::event_task
+        {
+            wait_ready = co_await loop->wait_readable(client, timeout);
+            assert_on_main_thread();
+            wait_done = true;
+        });
+    }
+
     void connect_pair()
     {
         server = rpp::make_tcp_randomport(rpp::SO_NonBlock);
@@ -1749,20 +1765,13 @@ TestImpl(test_event_loop)
     TestCase(wait_readable_resumes_when_data_arrives)
     {
         connect_pair();
-        std::atomic_bool done { false };
-        bool ready = false;
-        loop->fork([&]() -> rpp::event_task
-        {
-            ready = co_await loop->wait_readable(client, rpp::seconds(1));
-            assert_on_main_thread();
-            done = true;
-        });
+        fork_wait_readable(rpp::seconds(1));
         AssertThat(loop->pending_waiters(), 1);
         AssertThat(loop->background_tasks(), 0);
         rpp::cfuture<void> sender = rpp::async_task([&]{ rpp::sleep_ms(5); peer.send("hi", 2); });
-        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return done.load(); });
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
         sender.get();
-        AssertThat(ready, true);
+        AssertThat(wait_ready, true);
         AssertLess(spent, rpp::millis(500));
         AssertThat(client.available(), 2);
     }
@@ -1770,31 +1779,19 @@ TestImpl(test_event_loop)
     TestCase(wait_readable_times_out_without_data)
     {
         connect_pair();
-        std::atomic_bool done { false };
-        bool ready = true;
-        loop->fork([&]() -> rpp::event_task
-        {
-            ready = co_await loop->wait_readable(client, rpp::millis(10));
-            done = true;
-        });
-        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return done.load(); });
-        AssertThat(ready, false);
+        fork_wait_readable(rpp::millis(10));
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        AssertThat(wait_ready, false);
         AssertLess(spent, rpp::millis(500));
     }
 
     TestCase(wait_readable_timeout_is_released_by_time_warp)
     {
         connect_pair();
-        std::atomic_bool done { false };
-        bool ready = true;
-        loop->fork([&]() -> rpp::event_task
-        {
-            ready = co_await loop->wait_readable(client, rpp::seconds(10)); // 10 *virtual* seconds
-            done = true;
-        });
+        fork_wait_readable(rpp::seconds(10)); // 10 *virtual* seconds
         clock.warp_forward(rpp::seconds(10));
-        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return done.load(); });
-        AssertThat(ready, false);
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        AssertThat(wait_ready, false);
         AssertLess(spent, rpp::millis(500));
     }
 
@@ -1802,16 +1799,10 @@ TestImpl(test_event_loop)
     TestCase(closing_the_socket_releases_wait_readable)
     {
         connect_pair();
-        std::atomic_bool done { false };
-        bool ready = false;
-        loop->fork([&]() -> rpp::event_task
-        {
-            ready = co_await loop->wait_readable(client, rpp::seconds(1)); // the close releases it, never the timeout
-            done = true;
-        });
+        fork_wait_readable(rpp::seconds(1)); // the close releases it, never the timeout
         client.close();
-        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return done.load(); });
-        AssertThat(ready, true); // the socket needs attention, and recv() then reports the close
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        AssertThat(wait_ready, true); // the socket needs attention, and recv() then reports the close
         AssertLess(spent, rpp::millis(500));
     }
 
@@ -1820,10 +1811,7 @@ TestImpl(test_event_loop)
     {
         loop = std::make_unique<rpp::event_loop>(); // a warpable clock slices the poll, and that would hide a lost wake
         connect_pair();
-        loop->fork([&]() -> rpp::event_task
-        {
-            co_await loop->wait_readable(client, rpp::seconds(1)); // nothing arrives, so the poll sits here
-        });
+        fork_wait_readable(rpp::seconds(1)); // nothing arrives, so the poll sits here
         std::atomic_bool posted { false };
         rpp::cfuture<void> poster = rpp::async_task([&]{ rpp::sleep_ms(5); loop->post([&]{ posted = true; }); });
         rpp::Timer wall;

@@ -314,6 +314,16 @@ namespace rpp
         // pops the next resume event until `deadline` on `frame`, but wakes at the earliest timer
         // or socket deadline first, so every wait of the loop fires them without a worker
         bool wait_next_event(resume_event& event, rpp::TimePoint deadline, time_frame& frame) noexcept;
+        bool wait_next_event(resume_event& event, rpp::Duration timeout) noexcept;
+
+        bool on_owner_thread() const noexcept { return rpp::get_thread_id() == owner_thread_id.load(std::memory_order_acquire); }
+
+        // runs `f` now on the owner thread, and posts it there from any other thread
+        template<class F> void run_on_loop(F&& f) noexcept
+        {
+            if (on_owner_thread()) f();
+            else post(std::forward<F>(f));
+        }
 
         // polls the registered sockets and the wake socket until `until`, then completes the ready ones
         bool poll_sockets_until(resume_event& event, rpp::TimePoint until, time_frame& frame) noexcept;
@@ -328,7 +338,7 @@ namespace rpp
         // moves every timer and socket wait whose deadline passed onto the resume queue
         void fire_due_waiters() noexcept;
 
-        // the waiter lists belong to the loop thread, so a call from another thread posts itself there
+        // the waiter lists belong to the loop thread, so a call from another thread runs through run_on_loop()
         void add_timer(rpp::TimePoint end, time_frame frame, rpp::coro_handle<> owner, resume_event event) noexcept;
         void cancel_timers(rpp::coro_handle<> owner) noexcept;
         void add_socket_waiter(socket_awaiter& awaiter, rpp::coro_handle<> cont) noexcept;
@@ -581,7 +591,7 @@ namespace rpp
         void fork(F&& coro_factory)
         {
             // must be called on the event loop thread (fork_tasks is not thread-safe)
-            if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+            if (!on_owner_thread())
             {
                 LogError("event_loop::fork() must be called on the event loop thread");
                 return;
@@ -653,18 +663,7 @@ namespace rpp
         template<typename CoroFactory>
         void run_async_void(CoroFactory coro_factory) noexcept
         {
-            if (rpp::get_thread_id() == owner_thread_id.load(std::memory_order_acquire))
-            {
-                fork(std::move(coro_factory)); // already on the owner thread: start immediately
-            }
-            else
-            {
-                // marshal onto the owner thread, then start the tracked coroutine there
-                post([this, coro_factory = std::move(coro_factory)]() mutable
-                {
-                    fork(std::move(coro_factory));
-                });
-            }
+            run_on_loop([this, coro_factory = std::move(coro_factory)]() mutable { fork(std::move(coro_factory)); });
         }
 
         /**
@@ -1007,23 +1006,21 @@ namespace rpp
          * @brief Awaiter which starts a non-blocking connect, waits on the loop thread until the
          *        socket is writable, then reads the connect result. No pool worker is involved.
          */
-        struct RPP_CORO_RETURN_TYPE connect_awaiter
+        struct RPP_CORO_RETURN_TYPE connect_awaiter : socket_awaiter
         {
-            socket_awaiter wait;
             rpp::ipaddress addr;
 
             connect_awaiter(event_loop& loop, rpp::socket& sock, const rpp::ipaddress& addr, rpp::Duration timeout) noexcept
-                : wait{loop, sock, socket::PF_Write, timeout}, addr{addr} {}
-            bool await_ready() const noexcept { return false; }
+                : socket_awaiter{loop, sock, socket::PF_Write, timeout}, addr{addr} {}
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                if (wait.sock.connect_start(addr))
-                    wait.loop.add_socket_waiter(wait, cont);
+                if (sock.connect_start(addr))
+                    loop.add_socket_waiter(*this, cont);
                 else
-                    wait.loop.post_resume(cont); // failed at once, and `ready` stays false
+                    loop.post_resume(cont); // failed at once, and `ready` stays false
             }
             /** @returns true when the socket connected inside the timeout, else false with sock.last_err() set */
-            bool await_resume() const noexcept { return wait.ready && wait.sock.connect_finish(); }
+            bool await_resume() const noexcept { return ready && sock.connect_finish(); }
         };
 
         /**
@@ -1042,16 +1039,12 @@ namespace rpp
         }
 
         /** @brief Awaiter which waits on the loop thread until a listener has a pending connection, then accepts it. */
-        struct RPP_CORO_RETURN_TYPE accept_awaiter
+        struct RPP_CORO_RETURN_TYPE accept_awaiter : socket_awaiter
         {
-            socket_awaiter wait;
-
             accept_awaiter(event_loop& loop, rpp::socket& listener, rpp::Duration timeout) noexcept
-                : wait{loop, listener, socket::PF_Read, timeout} {}
-            bool await_ready() const noexcept { return false; }
-            void await_suspend(rpp::coro_handle<> cont) noexcept { wait.loop.add_socket_waiter(wait, cont); }
+                : socket_awaiter{loop, listener, socket::PF_Read, timeout} {}
             /** @returns the accepted socket, or an invalid one when `timeout` passed */
-            rpp::socket await_resume() const noexcept { return wait.ready ? wait.sock.accept(0) : rpp::socket{}; }
+            rpp::socket await_resume() const noexcept { return ready ? sock.accept(0) : rpp::socket{}; }
         };
 
         /**
