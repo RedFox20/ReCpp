@@ -1037,6 +1037,31 @@ namespace rpp
             return connect_awaiter{ *this, sock, addr, timeout };
         }
 
+        /** @brief Awaiter which waits on the loop thread until a listener has a pending connection, then accepts it. */
+        struct RPP_CORO_RETURN_TYPE accept_awaiter
+        {
+            socket_awaiter wait;
+
+            accept_awaiter(event_loop& loop, rpp::socket& listener, rpp::Duration timeout) noexcept
+                : wait{loop, listener, socket::PF_Read, timeout} {}
+            bool await_ready() const noexcept { return false; }
+            void await_suspend(rpp::coro_handle<> cont) noexcept { wait.loop.add_socket_waiter(wait, cont); }
+            /** @returns the accepted socket, or an invalid one when `timeout` passed */
+            rpp::socket await_resume() const noexcept { return wait.ready ? wait.sock.accept(0) : rpp::socket{}; }
+        };
+
+        /**
+         * @brief Accepts a connection on `listener` on the loop thread, see socket::accept().
+         * @returns the accepted socket, or an invalid one when `timeout` passed
+         * @code
+         *     rpp::socket client = co_await loop.accept(listener, rpp::millis(10));
+         * @endcode
+         */
+        RPP_CORO_WRAPPER accept_awaiter accept(rpp::socket& listener RPP_LIFETIMEBOUND, rpp::Duration timeout) noexcept
+        {
+            return accept_awaiter{ *this, listener, timeout };
+        }
+
         /**
          * @brief Awaiter that suspends the caller until all forks complete or timeout expires.
          *

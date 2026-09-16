@@ -69,9 +69,9 @@ TestImpl(test_event_loop)
     {
         server = rpp::make_tcp_randomport(rpp::SO_NonBlock);
         AssertTrue(server.good());
-        client = rpp::socket::connect_to(rpp::ipaddress4{"127.0.0.1", server.port()}, 1000, rpp::SO_NonBlock);
+        client = rpp::socket::connect_to(rpp::ipaddress4{"127.0.0.1", server.port()}, 10, rpp::SO_NonBlock);
         AssertTrue(client.good());
-        peer = server.accept(1000);
+        peer = server.accept(10);
         AssertTrue(peer.good());
     }
 
@@ -1774,7 +1774,7 @@ TestImpl(test_event_loop)
         bool ready = true;
         loop->fork([&]() -> rpp::event_task
         {
-            ready = co_await loop->wait_readable(client, rpp::millis(20));
+            ready = co_await loop->wait_readable(client, rpp::millis(10));
             done = true;
         });
         rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return done.load(); });
@@ -1806,7 +1806,7 @@ TestImpl(test_event_loop)
         bool ready = false;
         loop->fork([&]() -> rpp::event_task
         {
-            ready = co_await loop->wait_readable(client, rpp::seconds(10));
+            ready = co_await loop->wait_readable(client, rpp::seconds(1)); // the close releases it, never the timeout
             done = true;
         });
         client.close();
@@ -1839,7 +1839,7 @@ TestImpl(test_event_loop)
     TestCaseCoro(wait_writable_is_ready_on_a_connected_socket)
     {
         connect_pair();
-        const bool ready = co_await loop->wait_writable(client, rpp::millis(100));
+        const bool ready = co_await loop->wait_writable(client, rpp::millis(10));
         AssertThat(ready, true);
         assert_on_main_thread();
     }
@@ -1850,12 +1850,13 @@ TestImpl(test_event_loop)
         server = rpp::make_tcp_randomport(rpp::SO_NonBlock);
         AssertTrue(server.good());
         rpp::socket sock;
-        const bool connected = co_await sock.connect(*loop, rpp::ipaddress4{"127.0.0.1", server.port()}, rpp::seconds(1));
+        const bool connected = co_await sock.connect(*loop, rpp::ipaddress4{"127.0.0.1", server.port()}, rpp::millis(10));
         assert_on_main_thread();
         AssertThat(connected, true);
         AssertThat(sock.connected(), true);
         AssertThat(loop->background_tasks(), 0);
-        peer = server.accept(1000);
+        peer = co_await server.accept(*loop, rpp::millis(10));
+        assert_on_main_thread();
         AssertTrue(peer.good());
     }
 
@@ -1866,10 +1867,10 @@ TestImpl(test_event_loop)
         closed.close();
         rpp::socket sock;
         rpp::Timer wall;
-        const bool connected = co_await loop->connect(sock, rpp::ipaddress4{"127.0.0.1", port}, rpp::millis(100));
+        const bool connected = co_await loop->connect(sock, rpp::ipaddress4{"127.0.0.1", port}, rpp::millis(10));
         AssertThat(connected, false);
         // Windows reports a refused loopback connect late, so the bound is the timeout and not the refusal
-        AssertLess(wall.elapsed_millis(), 500.0);
+        AssertLess(wall.elapsed_millis(), 100.0);
         AssertNotEqual(sock.last_err_type(), rpp::socket::SE_NONE);
     }
 

@@ -1318,6 +1318,20 @@ namespace rpp
         socket accept(int timeoutMillis = 0) noexcept;
 
         /**
+         * @brief Accepts on an event loop without a pool worker, see event_loop::accept().
+         *        A template, so this header needs no event_loop.h.
+         * @code
+         *     rpp::socket client = co_await listener.accept(loop, rpp::millis(10));
+         * @endcode
+         */
+        template<class Loop>
+        RPP_CORO_WRAPPER auto accept(Loop& loop RPP_LIFETIMEBOUND, rpp::Duration timeout) noexcept
+            -> decltype(loop.accept(*this, timeout))
+        {
+            return loop.accept(*this, timeout);
+        }
+
+        /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param opt Socket options to set, use SO_Blocking if you want blocking sockets
