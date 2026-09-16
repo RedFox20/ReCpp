@@ -1698,7 +1698,7 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`has_pending_work()`](src/rpp/event_loop.h#L355) | True if any background tasks or resume events are pending |
 | [`background_tasks()`](src/rpp/event_loop.h#L343) | Number of tasks currently suspended in background work |
 | [`pending_completions()`](src/rpp/event_loop.h#L349) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L362) | Thread ID of the loop's owner thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L361) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 

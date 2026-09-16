@@ -1705,7 +1705,47 @@ TestImpl(test_event_loop)
         AssertLess(wall.elapsed_millis(), 500.0);
     }
 
+    // an await from another thread registers through the resume queue, so the loop thread owns the timer list
+    TestCase(delay_from_another_thread_registers_through_the_queue)
+    {
+        std::atomic<uint64> resume_tid{0};
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            co_await loop->delay(rpp::millis(5));
+            resume_tid = rpp::get_thread_id();
+        };
+        rpp::cfuture<void> fut;
+        rpp::async_task([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
+        AssertThat(loop->pending_completions(), 1); // the registration waits in the queue
+        AssertThat(loop->pending_waiters(), 0);
+        loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
+        fut.get(); // ready in the success path, and a cfuture must be consumed before it dies
+        AssertThat(resume_tid.load(), main_tid);
+    }
+
     // ─── socket waits: the loop thread polls the descriptor ─────
+    TestCase(wait_readable_from_another_thread_registers_through_the_queue)
+    {
+        connect_pair();
+        std::atomic<uint64> resume_tid{0};
+        bool ready = true;
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            ready = co_await loop->wait_readable(client, rpp::millis(5));
+            resume_tid = rpp::get_thread_id();
+        };
+        rpp::cfuture<void> fut;
+        rpp::async_task([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
+        AssertThat(loop->pending_completions(), 1); // the registration waits in the queue
+        AssertThat(loop->pending_waiters(), 0);
+        loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
+        fut.get(); // ready in the success path, and a cfuture must be consumed before it dies
+        AssertThat(ready, false);
+        AssertThat(resume_tid.load(), main_tid);
+    }
+
     TestCase(wait_readable_resumes_when_data_arrives)
     {
         connect_pair();
