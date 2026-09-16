@@ -1609,7 +1609,7 @@ Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_awa
 | [`done()`](src/rpp/task.h#L178) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
 | [`deferred<T>::start()`](src/rpp/task.h#L232) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
-Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L467) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L496).
+Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L468) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L497).
 
 Example: [tests/test_task.cpp](tests/test_task.cpp)
 
@@ -1660,45 +1660,45 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L428) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L438) | Process at most one pending resume event. `Duration::zero()` polls without blocking |
-| [`run_until_idle()`](src/rpp/event_loop.h#L455) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L467) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L485) | Pump the loop until the eager `rpp::task<T>` completes, then return its value or rethrow |
-| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L515) | Pump on the owner thread until that one future is ready. Returns `bool` and never blocks past the timeout |
-| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L534) | Pump until that future is ready and return its value. Throws on timeout |
-| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L547) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L852) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L576) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1105) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L620) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L628) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L883) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L897) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L911) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L677) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L669) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L1120) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L947) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
-| [`pending_waiters()`](src/rpp/event_loop.h#L352) | Number of delay() timers and socket waits pending on the loop thread |
-| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L987) | Suspend until the socket has data, a closed peer or an error. False on timeout |
-| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L996) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
-| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1033) | Non-blocking connect which completes through wait_writable(). True when connected |
+| [`run_loop()`](src/rpp/event_loop.h#L429) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L439) | Process at most one pending resume event. `Duration::zero()` polls without blocking |
+| [`run_until_idle()`](src/rpp/event_loop.h#L456) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L468) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L486) | Pump the loop until the eager `rpp::task<T>` completes, then return its value or rethrow |
+| [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L516) | Pump on the owner thread until that one future is ready. Returns `bool` and never blocks past the timeout |
+| [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L535) | Pump until that future is ready and return its value. Throws on timeout |
+| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L548) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L853) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L577) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1106) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L621) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L629) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L884) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L898) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L912) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L678) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L670) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L1121) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L948) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
+| [`pending_waiters()`](src/rpp/event_loop.h#L353) | Number of delay() timers and socket waits pending on the loop thread |
+| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L988) | Suspend until the socket has data, a closed peer or an error. False on timeout |
+| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L997) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
+| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1034) | Non-blocking connect which completes through wait_writable(). True when connected |
 | [`time_frame`](src/rpp/event_loop.h#L162) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
-| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L276) | Attach a warpable clock. Null reverts to wall-clock time and waits for readers to drop the old one |
-| [`current_time()`](src/rpp/event_loop.h#L286) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
-| [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L289) | The virtual time of `src`, or the monotonic wall clock when it is null |
-| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L293) | Refresh `frame` from the live clock and return its time. A detached source leaves it alone |
-| [`get_time_source_frame()`](src/rpp/event_loop.h#L286) | Snapshot the loop clock on the thread which builds a deadline |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L951) | Park on the loop timer queue until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L366) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L375) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
-| [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L387) | Stop, wait for the background tasks, run every queued resume, and detach the time source |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L393) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L355) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L343) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L349) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L361) | Thread ID of the loop's owner thread |
+| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L277) | Attach a warpable clock. Null reverts to wall-clock time and waits for readers to drop the old one |
+| [`current_time()`](src/rpp/event_loop.h#L287) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
+| [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L290) | The virtual time of `src`, or the monotonic wall clock when it is null |
+| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L294) | Refresh `frame` from the live clock and return its time. A detached source leaves it alone |
+| [`get_time_source_frame()`](src/rpp/event_loop.h#L287) | Snapshot the loop clock on the thread which builds a deadline |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L952) | Park on the loop timer queue until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L367) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L376) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
+| [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L388) | Stop, wait for the background tasks, run every queued resume, and detach the time source |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L394) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L356) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L344) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L350) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L362) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
@@ -2146,54 +2146,57 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 
 | Enum | Description |
 |------|-------------|
-| [`address_family`](src/rpp/sockets.h#L19) | `AF_DontCare`, `AF_IPv4`, `AF_IPv6`, `AF_Bth` |
-| [`socket_type`](src/rpp/sockets.h#L27) | `ST_Stream`, `ST_Datagram`, `ST_Raw`, `ST_RDM`, `ST_SeqPacket` |
-| [`socket_category`](src/rpp/sockets.h#L37) | `SC_Unknown`, `SC_Listen`, `SC_Accept`, `SC_Client` |
-| [`ip_protocol`](src/rpp/sockets.h#L45) | `IPP_TCP`, `IPP_UDP`, `IPP_ICMP`, `IPP_BTH`, etc. |
-| [`socket_option`](src/rpp/sockets.h#L57) | `SO_None`, `SO_ReuseAddr`, `SO_Blocking`, `SO_NonBlock`, `SO_Nagle` |
+| [`address_family`](src/rpp/sockets.h#L20) | `AF_DontCare`, `AF_IPv4`, `AF_IPv6`, `AF_Bth` |
+| [`socket_type`](src/rpp/sockets.h#L28) | `ST_Stream`, `ST_Datagram`, `ST_Raw`, `ST_RDM`, `ST_SeqPacket` |
+| [`socket_category`](src/rpp/sockets.h#L38) | `SC_Unknown`, `SC_Listen`, `SC_Accept`, `SC_Client` |
+| [`ip_protocol`](src/rpp/sockets.h#L46) | `IPP_TCP`, `IPP_UDP`, `IPP_ICMP`, `IPP_BTH`, etc. |
+| [`socket_option`](src/rpp/sockets.h#L58) | `SO_None`, `SO_ReuseAddr`, `SO_Blocking`, `SO_NonBlock`, `SO_Nagle` |
 
 ### Classes
 
 | Class | Description |
 |-------|-------------|
-| [`raw_address`](src/rpp/sockets.h#L99) | IP address without port (IPv4/IPv6) |
-| [`ipaddress`](src/rpp/sockets.h#L211) | IP address + port, constructible from `"ip:port"` strings |
-| [`ipaddress4`](src/rpp/sockets.h#L365) | IPv4 convenience wrapper |
-| [`ipaddress6`](src/rpp/sockets.h#L400) | IPv6 convenience wrapper |
-| [`ipinterface`](src/rpp/sockets.h#L432) | Network interface info (name, addr, netmask, broadcast, gateway) |
-| [`socket`](src/rpp/sockets.h#L477) | Full TCP/UDP socket with send, recv, select, etc. |
+| [`raw_address`](src/rpp/sockets.h#L100) | IP address without port (IPv4/IPv6) |
+| [`ipaddress`](src/rpp/sockets.h#L212) | IP address + port, constructible from `"ip:port"` strings |
+| [`ipaddress4`](src/rpp/sockets.h#L366) | IPv4 convenience wrapper |
+| [`ipaddress6`](src/rpp/sockets.h#L401) | IPv6 convenience wrapper |
+| [`ipinterface`](src/rpp/sockets.h#L433) | Network interface info (name, addr, netmask, broadcast, gateway) |
+| [`socket`](src/rpp/sockets.h#L478) | Full TCP/UDP socket with send, recv, select, etc. |
 
 ### socket Methods
 
 | Method | Description |
 |--------|-------------|
-| [`close()`](src/rpp/sockets.h#L554) | Close the socket |
-| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L665) | Send data |
-| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L785) | Receive data |
-| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L699) | UDP send to address |
-| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L815) | UDP receive with source address |
-| [`flush()`](src/rpp/sockets.h#L735) | Flush pending data |
-| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L808) | Peek at incoming data without consuming |
-| [`skip(int bytes)`](src/rpp/sockets.h#L758) | Skip incoming bytes |
-| [`available()`](src/rpp/sockets.h#L769) | Bytes available to read |
-| [`select(int millis)`](src/rpp/sockets.h#L1160) | Wait for socket readability |
-| [`good()`](src/rpp/sockets.h#L573) / [`bad()`](src/rpp/sockets.h#L575) | Socket state |
-| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1012) | Enable/disable Nagle's algorithm |
+| [`close()`](src/rpp/sockets.h#L555) | Close the socket |
+| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L666) | Send data |
+| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L786) | Receive data |
+| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L700) | UDP send to address |
+| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L816) | UDP receive with source address |
+| [`flush()`](src/rpp/sockets.h#L736) | Flush pending data |
+| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L809) | Peek at incoming data without consuming |
+| [`skip(int bytes)`](src/rpp/sockets.h#L759) | Skip incoming bytes |
+| [`available()`](src/rpp/sockets.h#L770) | Bytes available to read |
+| [`select(int millis)`](src/rpp/sockets.h#L1161) | Wait for socket readability |
+| [`good()`](src/rpp/sockets.h#L574) / [`bad()`](src/rpp/sockets.h#L576) | Socket state |
+| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1013) | Enable/disable Nagle's algorithm |
 
 ### socket Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1246) | Create a listening server socket |
-| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1255) | Create a listening server socket |
-| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1299) | Accept an incoming connection |
-| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1307) | Connect to an address |
-| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1346) | Connect by hostname and port |
-| [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1326) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
-| [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1333) | Read the result of connect_start() once the socket is writable. True when connected |
-| [`protocol_info`](src/rpp/sockets.h#L84) | Describes socket protocol version, address family, type and protocol |
-| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1385) | Creates an INADDR_ANY UDP socket bound to a random port |
-| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1391) | Creates an INADDR_ANY TCP listener bound to a random port |
+| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1265) | Create a listening server socket |
+| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1274) | Create a listening server socket |
+| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1318) | Accept an incoming connection |
+| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1326) | Connect to an address |
+| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1380) | Connect by hostname and port |
+| [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1345) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
+| [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1352) | Read the result of connect_start() once the socket is writable. True when connected |
+| [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1363) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
+| [`poll_entry`](src/rpp/sockets.h#L1238) | One socket in a poll set, with its own flags and its own ready result |
+| [`socket::poll(std::span<poll_entry> entries, int timeoutMillis)`](src/rpp/sockets.h#L1253) | Poll a set of sockets, each with its own flags. An error or a hangup also marks an entry ready |
+| [`protocol_info`](src/rpp/sockets.h#L85) | Describes socket protocol version, address family, type and protocol |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1419) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1425) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 

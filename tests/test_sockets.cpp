@@ -922,6 +922,25 @@ TestImpl(test_sockets)
                       socket::connect_to({ip, port}, 5000/*ms*/, opt));
     }
 
+    // each entry carries its own flags and its own result
+    TestCase(poll_entries_with_own_flags)
+    {
+        socket a = create_udp_listener(rpp::SO_NonBlock);
+        socket b = create_udp_listener(rpp::SO_NonBlock);
+        AssertGreater(a.sendto(ipaddress(AF_IPv4, "127.0.0.1", b.port()), "hi", 2), 0);
+
+        socket::poll_entry entries[] = { { &a, socket::PF_Read }, { &b, socket::PF_Read }, { &a, socket::PF_Write } };
+        AssertThat(socket::poll(entries, 100), 2);
+        AssertThat(entries[0].ready, false);
+        AssertThat(entries[1].ready, true);
+        AssertThat(entries[2].ready, true);
+
+        socket closed;
+        socket::poll_entry ignored[] = { { &closed, socket::PF_Read } };
+        AssertThat(socket::poll(ignored, 1), 0); // a closed socket never marks ready
+        AssertThat(ignored[0].ready, false);
+    }
+
     TestCase(tcp_connect_start_then_finish)
     {
         socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));

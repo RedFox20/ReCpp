@@ -6,14 +6,6 @@
 #include "event_loop.h"
 #include <climits> // INT_MAX
 
-#if _WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  define NOMINMAX // Windows.h defines a max macro, which breaks rpp::Duration::max()
-#  include <WinSock2.h> // WSAPoll
-#else
-#  include <poll.h> // poll()
-#endif
-
 
 namespace rpp
 {
@@ -369,27 +361,10 @@ namespace rpp
             return closed;
         });
 
-        constexpr int MAX_LOCAL_FDS = 32; // a loop rarely waits on more, so the set stays on the stack
-        struct pollfd local_fds[MAX_LOCAL_FDS];
-        std::vector<struct pollfd> heap_fds;
-        const int count = int(socket_waiters.size()) + 1;
-        struct pollfd* fds = local_fds;
-        if (count > MAX_LOCAL_FDS)
-        {
-            heap_fds.resize(count);
-            fds = heap_fds.data();
-        }
-    #if _WIN32
-        using poll_fd_t = SOCKET;
-    #else
-        using poll_fd_t = int;
-    #endif
-        fds[0] = { poll_fd_t(wake_socket.os_handle()), short(POLLIN), 0 };
-        for (int i = 1; i < count; ++i)
-        {
-            const socket_awaiter& a = *socket_waiters[i - 1].awaiter;
-            fds[i] = { poll_fd_t(a.sock.os_handle()), short(a.flag == socket::PF_Write ? POLLOUT : POLLIN), 0 };
-        }
+        poll_entries.clear();
+        poll_entries.push_back(socket::poll_entry{ &wake_socket, socket::PF_Read });
+        for (const socket_waiter& w : socket_waiters)
+            poll_entries.push_back(socket::poll_entry{ &w.awaiter->sock, w.awaiter->flag });
 
         // the queue mutex orders this flag against a push, so a push after the empty check sends a wake datagram
         polling_sockets.store(wake_socket.good(), std::memory_order_release);
@@ -400,15 +375,11 @@ namespace rpp
             // a warped clock and a missing wake socket both need short slices, so a warp or a post is seen
             if ((frame.warpable || wake_socket.bad()) && left > POLL_SLICE)
                 left = POLL_SLICE;
-        #if _WIN32
-            WSAPoll(fds, count, poll_millis(left));
-        #else
-            ::poll(fds, count, poll_millis(left));
-        #endif
+            socket::poll(poll_entries, poll_millis(left));
         }
         polling_sockets.store(false, std::memory_order_release);
 
-        if (fds[0].revents != 0)
+        if (poll_entries[0].ready)
         {
             char kicks[64];
             while (wake_socket.recv(kicks, sizeof(kicks)) > 0) {} // one datagram per post, drain them all
@@ -416,7 +387,7 @@ namespace rpp
         int i = 0;
         rpp::erase_if(socket_waiters, [&](socket_waiter& w)
         {
-            const bool ready = fds[++i].revents != 0; // an error or a hangup needs the coroutine too
+            const bool ready = poll_entries[++i].ready; // an error or a hangup needs the coroutine too
             if (ready) complete_socket_waiter(w, true);
             return ready;
         });

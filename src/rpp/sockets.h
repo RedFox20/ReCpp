@@ -9,6 +9,7 @@
 #include "config.h"
 #include "strview.h" // rpp::strview, std::string
 #include "load_balancer.h" // rpp::load_balancer
+#include "timepoint.h" // rpp::Duration
 #include <vector>   // std::vector
 #include <optional> // std::optional
 #include "mutex.h"
@@ -1233,6 +1234,24 @@ namespace rpp
                         timeoutMillis, pollFlags);
         }
 
+        /** @brief One socket in a poll set, with its own flags and its own result */
+        struct poll_entry
+        {
+            socket* sock;
+            PollFlag events;
+            bool ready = false; // an event, an error or a hangup fired, so the next call on the socket does not block
+        };
+
+        /**
+         * @brief Polls a set of sockets, each with its own flags, and marks every ready entry.
+         *        An error or a hangup also marks an entry ready, so the caller reads the error itself.
+         *        A closed socket never marks ready. event_loop polls its socket waits through this.
+         * @param entries Sockets and flags to poll, and each one gets its `ready` result
+         * @param timeoutMillis Maximum time to wait for any entry to be ready
+         * @returns number of ready entries, or 0 on timeout or error
+         */
+        static int poll(std::span<poll_entry> entries, int timeoutMillis) noexcept;
+
     private:
         bool on_poll_result(int revents, PollFlag pollFlags) noexcept;
 
@@ -1331,6 +1350,21 @@ namespace rpp
          * @return TRUE when the socket is connected. FALSE sets last_err(), SE_INPROGRESS while the connect still runs
          */
         bool connect_finish(socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Connects on an event loop without a pool worker, see event_loop::connect().
+         *        A template, so this header needs no event_loop.h.
+         * @code
+         *     if (co_await sock.connect(loop, rpp::ipaddress4{"192.168.168.1", 23}, rpp::seconds(2)))
+         *         sock.send("hello");
+         * @endcode
+         */
+        template<class Loop>
+        RPP_CORO_WRAPPER auto connect(Loop& loop RPP_LIFETIMEBOUND, const ipaddress& remoteAddr, rpp::Duration timeout) noexcept
+            -> decltype(loop.connect(*this, remoteAddr, timeout))
+        {
+            return loop.connect(*this, remoteAddr, timeout);
+        }
 
     private:
         void configure_connected_client(socket_option opt) noexcept;

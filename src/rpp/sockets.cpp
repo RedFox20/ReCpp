@@ -1598,6 +1598,22 @@ namespace rpp
 
     ////////////////////////////////////////////////////////////////////////////////
 
+#if _WIN32 || _WIN64
+    using poll_fd_t = SOCKET;
+#else
+    using poll_fd_t = int;
+#endif
+
+    // the one place which names the platform poll, so every caller builds a pollfd array and nothing else
+    static int os_poll(struct pollfd* fds, int count, int timeoutMillis) noexcept
+    {
+    #if _WIN32 || _WIN64
+        return WSAPoll(fds, ULONG(count), timeoutMillis);
+    #else
+        return ::poll(fds, nfds_t(count), timeoutMillis);
+    #endif
+    }
+
     bool socket::connected() noexcept
     {
         // try to lock, but don't deadlock if another thread is doing an atomic
@@ -1645,13 +1661,8 @@ namespace rpp
             // if the socket is blocking, then MSG_PEEK can cause a blocking operation.
             // So we use poll() to detect whether the socket is readable first.
             // A subsequent call to `recv()` will return 0, indicating a graceful close.
-        #if _WIN32 || _WIN64
-            struct pollfd pfd = { SOCKET(sock), POLLRDNORM, 0 };
-            int poll_r = WSAPoll(&pfd, 1, 0);
-        #else
-            struct pollfd pfd = { sock, POLLRDNORM, 0 };
-            int poll_r = ::poll(&pfd, 1, 0);
-        #endif
+            struct pollfd pfd = { poll_fd_t(sock), POLLRDNORM, 0 };
+            int poll_r = os_poll(&pfd, 1, 0);
             if (poll_r > 0) // data is available to read
             {
                 char c;
@@ -1803,13 +1814,8 @@ namespace rpp
             ((pollFlags & PF_Write) ? POLLOUT : 0)
         );
 
-    #if _WIN32 || _WIN64
-        struct pollfd pfd = { SOCKET(os_handle()), events, 0 };
-        int r = WSAPoll(&pfd, 1, timeoutMillis);
-    #else
-        struct pollfd pfd = { os_handle(), events, 0 };
-        int r = ::poll(&pfd, 1, timeoutMillis);
-    #endif
+        struct pollfd pfd = { poll_fd_t(os_handle()), events, 0 };
+        int r = os_poll(&pfd, 1, timeoutMillis);
         if (r < 0)
         {
             handle_errno();
@@ -1859,11 +1865,7 @@ namespace rpp
             pfd[i].revents = 0;
         }
 
-    #if _WIN32 || _WIN64
-        int r = WSAPoll(pfd, inCount, timeoutMillis);
-    #else
-        int r = ::poll(pfd, inCount, timeoutMillis);
-    #endif
+        int r = os_poll(pfd, inCount, timeoutMillis);
 
         int readyCount = 0;
         if (r >= 0)
@@ -1883,6 +1885,38 @@ namespace rpp
 
         if (pfd != local_pfd)
             free(pfd); // free the dynamically allocated pollfd array
+        return readyCount;
+    }
+
+    int socket::poll(std::span<poll_entry> entries, int timeoutMillis) noexcept
+    {
+        constexpr int MAX_LOCAL_FDS = 32; // in 99.9% of cases only 2-4 sockets are polled
+        struct pollfd local_pfd[MAX_LOCAL_FDS];
+        std::vector<struct pollfd> heap_pfd;
+        const int count = int(entries.size());
+        struct pollfd* pfd = local_pfd;
+        if (count > MAX_LOCAL_FDS)
+        {
+            heap_pfd.resize(count);
+            pfd = heap_pfd.data();
+        }
+        for (int i = 0; i < count; ++i)
+        {
+            const PollFlag f = entries[i].events;
+            const short events = short(((f & PF_Read) ? POLLIN : 0) | ((f & PF_Write) ? POLLOUT : 0));
+            pfd[i] = { poll_fd_t(entries[i].sock->os_handle()), events, 0 }; // a closed socket is ignored by poll
+            entries[i].ready = false;
+        }
+
+        int readyCount = 0;
+        if (os_poll(pfd, count, timeoutMillis) > 0)
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                entries[i].ready = pfd[i].revents != 0;
+                if (entries[i].ready) ++readyCount;
+            }
+        }
         return readyCount;
     }
 

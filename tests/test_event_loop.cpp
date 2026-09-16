@@ -1850,7 +1850,7 @@ TestImpl(test_event_loop)
         server = rpp::make_tcp_randomport(rpp::SO_NonBlock);
         AssertTrue(server.good());
         rpp::socket sock;
-        const bool connected = co_await loop->connect(sock, rpp::ipaddress4{"127.0.0.1", server.port()}, rpp::seconds(1));
+        const bool connected = co_await sock.connect(*loop, rpp::ipaddress4{"127.0.0.1", server.port()}, rpp::seconds(1));
         assert_on_main_thread();
         AssertThat(connected, true);
         AssertThat(sock.connected(), true);

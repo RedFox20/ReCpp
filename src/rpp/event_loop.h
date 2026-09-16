@@ -233,6 +233,7 @@ namespace rpp
         // the timers and socket waits the loop thread owns, see wait_next_event()
         std::vector<timer> timers;
         std::vector<socket_waiter> socket_waiters;
+        std::vector<socket::poll_entry> poll_entries; // the poll set of one wait, kept so a poll allocates nothing
         std::atomic_int num_waiters {0}; // both lists, so has_pending_work() reads it from any thread
 
         // a post() during a socket poll also sends a datagram to the wake socket, so the poll returns
