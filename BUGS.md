@@ -256,7 +256,8 @@ This has three shapes. A bound too tight reports the overrun, as
 `test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
-`~ImportantState: data != "aaaabbbbcccc"`. A third shape compares two measured times, as
+`~ImportantState: data != "aaaabbbbcccc"`, and again on `win64-cpp20-msvc` for #97 at
+13fd878, which touched no close_sync code. A third shape compares two measured times, as
 `test_threadpool::parallel_for_performance` did on `ubuntu-cpp26-tsan-gcc14` with
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
