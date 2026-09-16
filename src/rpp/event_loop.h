@@ -317,6 +317,10 @@ namespace rpp
 
         // polls the registered sockets and the wake socket until `until`, then completes the ready ones
         bool poll_sockets_until(resume_event& event, rpp::TimePoint until, time_frame& frame) noexcept;
+        // fills poll_entries with the wake socket first, then every waiter in the order of socket_waiters
+        void build_poll_set() noexcept;
+        // the wall time one poll may block, which is one slice when a warp or a post cannot end it
+        rpp::Duration poll_wait(rpp::TimePoint until, time_frame& frame) noexcept;
 
         // time left until the earliest timer or socket deadline, each on the clock which built it
         rpp::Duration time_to_next_waiter() noexcept;
