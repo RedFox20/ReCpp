@@ -941,6 +941,36 @@ TestImpl(test_sockets)
         AssertThat(ignored[0].ready, false);
     }
 
+    // a wake() from another thread ends a poll which would otherwise run to its timeout
+    TestCase(socket_poller_wakes_from_another_thread)
+    {
+        socket a = create_udp_listener(rpp::SO_NonBlock);
+        socket_poller poller;
+        AssertThat(poller.add(a, socket::PF_Read), 0);
+        rpp::cfuture<void> waker = rpp::async_task([&]{ rpp::sleep_ms(5); poller.wake(); });
+        rpp::Timer wall;
+        AssertThat(poller.poll(1000), 0); // nothing arrives, so only the wake ends it before the timeout
+        AssertLess(wall.elapsed_millis(), 500.0);
+        waker.get();
+        AssertThat(poller.ready(0), false);
+        AssertThat(poller.can_wake(), true);
+    }
+
+    // the work check runs after the wake is armed, so pending work skips the poll
+    TestCase(socket_poller_skips_the_poll_for_pending_work)
+    {
+        socket a = create_udp_listener(rpp::SO_NonBlock);
+        socket_poller poller;
+        poller.add(a, socket::PF_Read);
+        rpp::Timer wall;
+        AssertThat(poller.poll(1000, []{ return true; }), 0);
+        AssertLess(wall.elapsed_millis(), 100.0);
+
+        AssertGreater(a.sendto(ipaddress(AF_IPv4, "127.0.0.1", a.port()), "hi", 2), 0);
+        AssertThat(poller.poll(10), 1); // a ready entry reports, and the wake entry never counts
+        AssertThat(poller.ready(0), true);
+    }
+
     TestCase(tcp_connect_start_then_finish)
     {
         socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));

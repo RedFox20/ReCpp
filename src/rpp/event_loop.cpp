@@ -113,7 +113,7 @@ namespace rpp
     {
         loop_running = false;
         resume_queue.notify_one(); // wake up the loop if it's waiting for events
-        wake_socket_poll(); // and when it sits in a socket poll instead
+        poller.wake(); // and when it sits in a socket poll instead
     }
 
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
@@ -254,7 +254,7 @@ namespace rpp
         // the wake runs under the queue lock, so the loop cannot pop the event and die under this thread
         std::unique_lock<rpp::mutex> lock = resume_queue.spin_lock();
         resume_queue.push(lock, resume_event{handle});
-        wake_socket_poll();
+        poller.wake();
     }
 
     void event_loop::post_resume_from_suspension(rpp::coro_handle<> handle) noexcept
@@ -277,7 +277,7 @@ namespace rpp
         // the wake runs under the queue lock, so the loop cannot pop the event and die under this thread
         std::unique_lock<rpp::mutex> lock = resume_queue.spin_lock();
         resume_queue.push(lock, resume_event{std::move(callback)});
-        wake_socket_poll();
+        poller.wake();
     }
 
     void event_loop::notify_fork_joiner() noexcept
@@ -354,44 +354,40 @@ namespace rpp
         });
     }
 
-    void event_loop::build_poll_set() noexcept
-    {
-        poll_entries.clear();
-        poll_entries.push_back(socket::poll_entry{ &wake_socket, socket::PF_Read });
-        for (const socket_waiter& w : socket_waiters)
-            poll_entries.push_back(socket::poll_entry{ &w.awaiter->sock, w.awaiter->flag });
-    }
-
     rpp::Duration event_loop::poll_wait(rpp::TimePoint until, time_frame& frame) noexcept
     {
         const rpp::Duration left = until - current_time(frame);
-        // a warped clock and a missing wake socket both need short slices, so a warp or a post is seen
-        const bool sliced = frame.warpable || wake_socket.bad();
+        // a warped clock and a poller without a wake both need short slices, so a warp or a post is seen
+        const bool sliced = frame.warpable || !poller.can_wake();
         return sliced && left > POLL_SLICE ? POLL_SLICE : left;
     }
 
     bool event_loop::poll_sockets_until(resume_event& event, rpp::TimePoint until, time_frame& frame) noexcept
     {
-        // a closed socket cannot enter the poll set, so its waiter resumes now and reads the error itself
+        // 1. a closed socket cannot enter the poll set, so its waiter resumes now and reads the error itself
         for (socket_waiter& w : socket_waiters)
             if (w.awaiter->sock.bad()) complete_socket_waiter(w, true);
-        build_poll_set();
 
-        // the queue mutex orders this flag against a push, so a push after the empty check sends a wake datagram
-        polling_sockets.store(wake_socket.good(), std::memory_order_release);
-        const bool got = resume_queue.try_pop(event);
-        if (!got)
-            socket::poll(poll_entries, poll_millis(poll_wait(until, frame)));
-        polling_sockets.store(false, std::memory_order_release);
+        // 2. the poll set follows the order of socket_waiters, so ready(i) belongs to socket_waiters[i]
+        poller.clear();
+        for (const socket_waiter& w : socket_waiters)
+            poller.add(w.awaiter->sock, w.awaiter->flag);
 
-        if (poll_entries[0].ready)
+        // 3. the poller arms its wake before the queue check, so a post() after the check still ends the poll
+        bool got = false;
+        poller.poll(poll_millis(poll_wait(until, frame)), [&]
         {
-            char kicks[64];
-            while (wake_socket.recv(kicks, sizeof(kicks)) > 0) {} // one datagram per post, drain them all
-        }
-        for (size_t i = 0; i < socket_waiters.size(); ++i) // an error or a hangup marks ready, and the coroutine reads it
-            if (poll_entries[i + 1].ready) complete_socket_waiter(socket_waiters[i], true);
+            got = resume_queue.try_pop(event);
+            return got;
+        });
+
+        // 4. an error or a hangup marks an entry ready too, and the coroutine reads it from the socket
+        for (size_t i = 0; i < socket_waiters.size(); ++i)
+            if (poller.ready(int(i))) complete_socket_waiter(socket_waiters[i], true);
+
+        // 5. every waiter which step 1 or step 4 completed leaves the list
         rpp::erase_if(socket_waiters, [](const socket_waiter& w) { return w.awaiter->ready; });
+
         return got || resume_queue.try_pop(event);
     }
 
@@ -418,8 +414,6 @@ namespace rpp
     {
         run_on_loop([this, &awaiter, cont]
         {
-            if (!wake_socket_opened)
-                open_wake_socket();
             socket_waiters.push_back(socket_waiter{&awaiter, cont});
             num_waiters.fetch_add(1, std::memory_order_acq_rel);
         });
@@ -430,25 +424,6 @@ namespace rpp
         waiter.awaiter->ready = ready;
         resume_queue.push(resume_event{waiter.cont});
         num_waiters.fetch_sub(1, std::memory_order_acq_rel);
-    }
-
-    void event_loop::open_wake_socket() noexcept
-    {
-        wake_socket_opened = true;
-        const rpp::raw_address loopback { rpp::AF_IPv4, "127.0.0.1" };
-        wake_socket = rpp::make_udp_randomport(rpp::SO_NonBlock, loopback);
-        wake_addr = rpp::ipaddress{ loopback, wake_socket.port() };
-        if (wake_socket.bad()) // the socket layer logged the cause, and the poll falls back to slices
-            LogWarning("event_loop wake socket failed, a post() now waits for the poll slice");
-    }
-
-    void event_loop::wake_socket_poll() noexcept
-    {
-        if (polling_sockets.load(std::memory_order_acquire))
-        {
-            const char kick = 0;
-            wake_socket.sendto(wake_addr, &kick, 1);
-        }
     }
 
     // automatically clean up completed forks; exceptions go through except_handler

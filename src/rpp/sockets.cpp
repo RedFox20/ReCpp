@@ -1914,6 +1914,49 @@ namespace rpp
         return readyCount;
     }
 
+    int socket_poller::add(socket& sock, socket::PollFlag events) noexcept
+    {
+        entries.push_back(socket::poll_entry{ &sock, events });
+        return int(entries.size()) - 1;
+    }
+
+    void socket_poller::arm() noexcept
+    {
+        if (!wake_socket_opened)
+        {
+            wake_socket_opened = true;
+            const raw_address loopback { AF_IPv4, "127.0.0.1" };
+            wake_socket = make_udp_randomport(SO_NonBlock, loopback);
+            wake_addr = ipaddress{ loopback, wake_socket.port() };
+            if (wake_socket.bad()) // the socket layer logged the cause, and a caller polls in slices instead
+                LogWarning("socket_poller wake socket failed, wake() cannot end a poll");
+        }
+        armed.store(wake_socket.good(), std::memory_order_release);
+    }
+
+    int socket_poller::poll_armed(int timeoutMillis) noexcept
+    {
+        entries.push_back(socket::poll_entry{ &wake_socket, socket::PF_Read }); // a closed one is ignored
+        int readyCount = socket::poll(entries, timeoutMillis);
+        if (entries.back().ready)
+        {
+            --readyCount;
+            char kicks[64];
+            while (wake_socket.recv(kicks, sizeof(kicks)) > 0) {} // one datagram per wake(), drain them all
+        }
+        entries.pop_back();
+        return readyCount;
+    }
+
+    void socket_poller::wake() noexcept
+    {
+        if (armed.load(std::memory_order_acquire))
+        {
+            const char kick = 0;
+            wake_socket.sendto(wake_addr, &kick, 1);
+        }
+    }
+
     bool socket::on_poll_result(int revents, PollFlag pollFlags) noexcept
     {
         if ((revents & POLLNVAL) != 0) // dead socket

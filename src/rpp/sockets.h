@@ -13,6 +13,7 @@
 #include <vector>   // std::vector
 #include <optional> // std::optional
 #include "mutex.h"
+#include <atomic> // std::atomic_bool
 #include <span>   // std::span
 
 namespace rpp
@@ -1425,6 +1426,64 @@ namespace rpp
     };
 
     ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief A poll set with a wake handle. poll() returns when an entry is ready, the timeout passes,
+     *        or another thread calls wake(). The wake is a datagram to a loopback socket, so it works
+     *        wherever poll() does. event_loop waits on its socket waiters through one of these.
+     * @code
+     *     rpp::socket_poller poller;
+     *     poller.add(sock, rpp::socket::PF_Read);
+     *     if (poller.poll(100, [&]{ return queue.has_work(); }) > 0 && poller.ready(0))
+     *         sock.recv(buf, sizeof(buf));
+     * @endcode
+     */
+    class RPPAPI socket_poller
+    {
+        std::vector<socket::poll_entry> entries;
+        socket wake_socket; // loopback datagram socket, opened by the first poll()
+        ipaddress wake_addr;
+        bool wake_socket_opened = false; // one attempt, because a retry would race a wake() inside sendto()
+        std::atomic_bool armed { false }; // a wake() during a poll sends a datagram, so the poll returns
+
+    public:
+        socket_poller() noexcept = default;
+        NOCOPY_NOMOVE(socket_poller)
+
+        /** @brief Drops every entry and keeps the capacity, so a rebuilt set allocates nothing */
+        void clear() noexcept { entries.clear(); }
+        /** @brief Adds a socket to the next poll. @returns its index for ready() */
+        int add(socket& sock RPP_LIFETIMEBOUND, socket::PollFlag events) noexcept;
+        /** @returns the number of entries */
+        int size() const noexcept { return int(entries.size()); }
+        /** @returns true when entry `index` fired in the last poll. An error or a hangup fires too */
+        bool ready(int index) const noexcept { return entries[index].ready; }
+        /** @returns true when wake() can end a poll. Without it a caller polls in short slices */
+        bool can_wake() const noexcept { return wake_socket.good(); }
+
+        /**
+         * @brief Polls the entries until one is ready, `timeoutMillis` passes, or wake() is called.
+         *        `has_work` runs after the wake is armed and before the poll. When it returns true the
+         *        poll is skipped, so a wake() which lands after the check still ends a poll.
+         * @returns number of ready entries, or 0 on timeout, wake, skip or error
+         */
+        template<class HasWork> int poll(int timeoutMillis, const HasWork& has_work) noexcept
+        {
+            arm();
+            const int readyCount = has_work() ? 0 : poll_armed(timeoutMillis);
+            armed.store(false, std::memory_order_release);
+            return readyCount;
+        }
+        /** @brief Polls the entries until one is ready, `timeoutMillis` passes, or wake() is called */
+        int poll(int timeoutMillis) noexcept { return poll(timeoutMillis, []{ return false; }); }
+
+        /** @brief Ends a poll in progress from any thread, and does nothing when no poll is armed */
+        void wake() noexcept;
+
+    private:
+        void arm() noexcept;
+        int poll_armed(int timeoutMillis) noexcept;
+    };
 
     /**
      * Creates am INADDR_ANY UDP socket with a random port

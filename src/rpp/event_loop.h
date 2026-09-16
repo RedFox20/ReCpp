@@ -233,14 +233,8 @@ namespace rpp
         // the timers and socket waits the loop thread owns, see wait_next_event()
         std::vector<timer> timers;
         std::vector<socket_waiter> socket_waiters;
-        std::vector<socket::poll_entry> poll_entries; // the poll set of one wait, kept so a poll allocates nothing
         std::atomic_int num_waiters {0}; // both lists, so has_pending_work() reads it from any thread
-
-        // a post() during a socket poll also sends a datagram to the wake socket, so the poll returns
-        std::atomic_bool polling_sockets {false};
-        rpp::socket wake_socket; // loopback datagram socket, opened with the first socket wait
-        rpp::ipaddress wake_addr;
-        bool wake_socket_opened = false; // one attempt, because a retry would race a post() inside sendto()
+        rpp::socket_poller poller; // polls the socket waiters, and a post() wakes it from any thread
 
     public:
         /**
@@ -325,10 +319,8 @@ namespace rpp
             else post(std::forward<F>(f));
         }
 
-        // polls the registered sockets and the wake socket until `until`, then completes the ready ones
+        // polls the socket waiters until `until`, then completes the ready ones
         bool poll_sockets_until(resume_event& event, rpp::TimePoint until, time_frame& frame) noexcept;
-        // fills poll_entries with the wake socket first, then every waiter in the order of socket_waiters
-        void build_poll_set() noexcept;
         // the wall time one poll may block, which is one slice when a warp or a post cannot end it
         rpp::Duration poll_wait(rpp::TimePoint until, time_frame& frame) noexcept;
 
@@ -343,10 +335,6 @@ namespace rpp
         void cancel_timers(rpp::coro_handle<> owner) noexcept;
         void add_socket_waiter(socket_awaiter& awaiter, rpp::coro_handle<> cont) noexcept;
         void complete_socket_waiter(socket_waiter& waiter, bool ready) noexcept;
-
-        void open_wake_socket() noexcept;
-        // sends a wake datagram while the loop thread sits in a socket poll
-        void wake_socket_poll() noexcept;
 
     public:
         // ─── end of the loop clock ──────────────────────────────────
