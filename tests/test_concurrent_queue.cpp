@@ -92,6 +92,22 @@ TestImpl(test_concurrent_queue)
         AssertThat(items.at(2), "item3");
     }
 
+    // a consumer sees the item only after the producer releases its lock
+    TestCase(push_under_external_lock)
+    {
+        concurrent_queue<std::string> queue;
+        std::string popped;
+        {
+            std::unique_lock lock = queue.spin_lock();
+            queue.push(lock, "item1");
+            AssertThat(lock.owns_lock(), true); // size() would take the lock again, so it waits for the block to end
+        }
+        AssertThat(queue.size(), 1);
+        AssertThat(queue.wait_pop(popped, Millis(100)), true);
+        AssertThat(popped, "item1");
+        AssertThat(queue.empty(), true);
+    }
+
     TestCase(iterate_external_lock)
     {
         concurrent_queue<std::string> queue;

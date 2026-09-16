@@ -922,6 +922,19 @@ TestImpl(test_sockets)
                       socket::connect_to({ip, port}, 5000/*ms*/, opt));
     }
 
+    TestCase(tcp_connect_start_then_finish)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        socket client;
+        AssertTrue(client.connect_start({"127.0.0.1", server.port()}));
+        AssertTrue(client.poll(1000, socket::PF_Write));
+        AssertTrue(client.connect_finish());
+        AssertTrue(client.connected());
+        AssertThat(client.is_blocking(), false);
+        socket remote = accept(server);
+        AssertTrue(remote.good());
+    }
+
     TestCase(tcp_connect_to_nonexisting_server_fails)
     {
         socket client = socket::connect_to({"127.0.0.1", 12345}, 50/*ms*/);

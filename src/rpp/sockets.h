@@ -1316,6 +1316,22 @@ namespace rpp
         bool connect(const ipaddress& remoteAddr, int millis,
                      socket_option opt = SO_None) noexcept;
 
+        /**
+         * @brief Starts a non-blocking connect and returns at once. Poll the socket for PF_Write,
+         *        then call connect_finish() to read the result. event_loop::connect() does both.
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()
+         * @return TRUE when the connect started or completed, FALSE on an immediate error (check socket::last_err())
+         */
+        bool connect_start(const ipaddress& remoteAddr, socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Reads the result of a connect_start() once the socket is writable, and configures the client.
+         * @param opt Socket options to set, use SO_Blocking if you want blocking sockets
+         * @return TRUE when the socket is connected. FALSE sets last_err(), SE_INPROGRESS while the connect still runs
+         */
+        bool connect_finish(socket_option opt = SO_None) noexcept;
+
     private:
         void configure_connected_client(socket_option opt) noexcept;
 

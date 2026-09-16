@@ -2033,6 +2033,18 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
+        if (!connect_start(remoteAddr, opt))
+            return false;
+        const int pending = get_errno(); // a poll timeout clears the code, so the in-progress one is kept
+        if (poll(millis, PF_Write))
+            return connect_finish(opt);
+        if (!get_errno())
+            set_errno(pending);
+        return false;
+    }
+
+    bool socket::connect_start(const ipaddress& remoteAddr, socket_option opt) noexcept
+    {
         std::unique_lock lock { Mtx };
 
         // disallow connecting to an unspecified address
@@ -2055,51 +2067,44 @@ namespace rpp
 
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
-        int sock = os_handle_unsafe();
-
         set_errno_unlocked(0); // clear any errors
 
         // this will return immediately because socket is in non-blocking mode and we hold the mutex
-        if (::connect(sock, sa, sa.size()) == 0)
-        {
-            configure_connected_client(opt);
+        if (::connect(os_handle_unsafe(), sa, sa.size()) == 0)
             return true;
-        }
 
         int err = os_getsockerr(); // read errno
         // EALREADY: nonblocking connect is already in progress, second connect has no effect
         // EINPROGRESS|EWOULDBLOCK: nonblocking connect is in progress, use poll() to wait for completion
         if (err == ESOCK(EALREADY) || err == ESOCK(EINPROGRESS) || err == ESOCK(EWOULDBLOCK))
         {
-            lock.unlock(); // unlock before entering very slow poll()
-            if (poll(millis, PF_Write))
-            {
-                // the socket is writable, but according to connect() manual,
-                // SO_ERROR needs to be checked for the final status
-                lock.lock(); // relock again
-                int so_err = get_socket_level_error();
-                if (so_err == 0)
-                {
-                    configure_connected_client(opt);
-                    return true;
-                }
-                handle_errno(so_err);
-                return false;
-            }
-            else
-            {
-                lock.lock(); // relock again
-                // if poll timed out (no last errno), then use the EINPROGRESS / EALREADY error codes
-                if (!get_errno_unlocked())
-                    set_errno_unlocked(err);
-                return false;
-            }
+            set_errno_unlocked(err); // the in-progress code, which a caller reports when its wait times out
+            return true;
         }
 
         logerror("socket fh:%d async connect error: %s",
                   os_handle_unsafe(), last_os_socket_err(err).c_str());
         handle_errno(err);
         return false;
+    }
+
+    bool socket::connect_finish(socket_option opt) noexcept
+    {
+        std::unique_lock lock { Mtx };
+        int so_err = get_socket_level_error(); // the connect() manual puts the final status here
+        if (so_err != 0)
+        {
+            handle_errno(so_err);
+            return false;
+        }
+        if (!poll(0, PF_Write)) // a connect still in progress also has no SO_ERROR yet
+        {
+            if (!get_errno_unlocked())
+                set_errno_unlocked(ESOCK(EINPROGRESS));
+            return false;
+        }
+        configure_connected_client(opt);
+        return true;
     }
 
     void socket::configure_connected_client(socket_option opt) noexcept
