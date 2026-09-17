@@ -9,9 +9,11 @@
 #include "config.h"
 #include "strview.h" // rpp::strview, std::string
 #include "load_balancer.h" // rpp::load_balancer
+#include "timepoint.h" // rpp::Duration
 #include <vector>   // std::vector
 #include <optional> // std::optional
 #include "mutex.h"
+#include <atomic> // std::atomic_bool
 #include <span>   // std::span
 
 namespace rpp
@@ -1233,6 +1235,24 @@ namespace rpp
                         timeoutMillis, pollFlags);
         }
 
+        /** @brief One socket in a poll set, with its own flags and its own result */
+        struct poll_entry
+        {
+            socket* sock;
+            PollFlag events;
+            bool ready = false; // an event, an error or a hangup fired, so the next call on the socket does not block
+        };
+
+        /**
+         * @brief Polls a set of sockets, each with its own flags, and marks every ready entry.
+         *        An error or a hangup also marks an entry ready, so the caller reads the error itself.
+         *        A closed socket never marks ready. event_loop polls its socket waits through this.
+         * @param entries Sockets and flags to poll, and each one gets its `ready` result
+         * @param timeoutMillis Maximum time to wait for any entry to be ready
+         * @returns number of ready entries, or 0 on timeout or error
+         */
+        static int poll(std::span<poll_entry> entries, int timeoutMillis) noexcept;
+
     private:
         bool on_poll_result(int revents, PollFlag pollFlags) noexcept;
 
@@ -1299,6 +1319,20 @@ namespace rpp
         socket accept(int timeoutMillis = 0) noexcept;
 
         /**
+         * @brief Accepts on an event loop without a pool worker, see event_loop::accept().
+         *        A template, so this header needs no event_loop.h.
+         * @code
+         *     rpp::socket client = co_await listener.accept(loop, rpp::millis(10));
+         * @endcode
+         */
+        template<class Loop>
+        RPP_CORO_WRAPPER auto accept(Loop& loop RPP_LIFETIMEBOUND, rpp::Duration timeout) noexcept
+            -> decltype(loop.accept(*this, timeout))
+        {
+            return loop.accept(*this, timeout);
+        }
+
+        /**
          * Connects to a remote socket and sets the socket as nonblocking and tcp nodelay
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param opt Socket options to set, use SO_Blocking if you want blocking sockets
@@ -1315,6 +1349,37 @@ namespace rpp
          */
         bool connect(const ipaddress& remoteAddr, int millis,
                      socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Starts a non-blocking connect and returns at once. Poll the socket for PF_Write,
+         *        then call connect_finish() to read the result. event_loop::connect() does both.
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()
+         * @return TRUE when the connect started or completed, FALSE on an immediate error (check socket::last_err())
+         */
+        bool connect_start(const ipaddress& remoteAddr, socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Reads the result of a connect_start() once the socket is writable, and configures the client.
+         * @param opt Socket options to set, use SO_Blocking if you want blocking sockets
+         * @return TRUE when the socket is connected. FALSE sets last_err(), SE_INPROGRESS while the connect still runs
+         */
+        bool connect_finish(socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Connects on an event loop without a pool worker, see event_loop::connect().
+         *        A template, so this header needs no event_loop.h.
+         * @code
+         *     if (co_await sock.connect(loop, rpp::ipaddress4{"192.168.168.1", 23}, rpp::seconds(2)))
+         *         sock.send("hello");
+         * @endcode
+         */
+        template<class Loop>
+        RPP_CORO_WRAPPER auto connect(Loop& loop RPP_LIFETIMEBOUND, const ipaddress& remoteAddr, rpp::Duration timeout) noexcept
+            -> decltype(loop.connect(*this, remoteAddr, timeout))
+        {
+            return loop.connect(*this, remoteAddr, timeout);
+        }
 
     private:
         void configure_connected_client(socket_option opt) noexcept;
@@ -1361,6 +1426,64 @@ namespace rpp
     };
 
     ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief A poll set with a wake handle. poll() returns when an entry is ready, the timeout passes,
+     *        or another thread calls wake(). The wake is a datagram to a loopback socket, so it works
+     *        wherever poll() does. event_loop waits on its socket waiters through one of these.
+     * @code
+     *     rpp::socket_poller poller;
+     *     poller.add(sock, rpp::socket::PF_Read);
+     *     if (poller.poll(100, [&]{ return queue.has_work(); }) > 0 && poller.ready(0))
+     *         sock.recv(buf, sizeof(buf));
+     * @endcode
+     */
+    class RPPAPI socket_poller
+    {
+        std::vector<socket::poll_entry> entries;
+        socket wake_socket; // loopback datagram socket, opened by the first poll()
+        ipaddress wake_addr;
+        bool wake_socket_opened = false; // one attempt, because a retry would race a wake() inside sendto()
+        std::atomic_bool armed { false }; // a wake() during a poll sends a datagram, so the poll returns
+
+    public:
+        socket_poller() noexcept = default;
+        NOCOPY_NOMOVE(socket_poller)
+
+        /** @brief Drops every entry and keeps the capacity, so a rebuilt set allocates nothing */
+        void clear() noexcept { entries.clear(); }
+        /** @brief Adds a socket to the next poll. @returns its index for ready() */
+        int add(socket& sock RPP_LIFETIMEBOUND, socket::PollFlag events) noexcept;
+        /** @returns the number of entries */
+        int size() const noexcept { return int(entries.size()); }
+        /** @returns true when entry `index` fired in the last poll. An error or a hangup fires too */
+        bool ready(int index) const noexcept { return entries[index].ready; }
+        /** @returns true when wake() can end a poll. Without it a caller polls in short slices */
+        bool can_wake() const noexcept { return wake_socket.good(); }
+
+        /**
+         * @brief Polls the entries until one is ready, `timeoutMillis` passes, or wake() is called.
+         *        `has_work` runs after the wake is armed and before the poll. When it returns true the
+         *        poll is skipped, so a wake() which lands after the check still ends a poll.
+         * @returns number of ready entries, or 0 on timeout, wake, skip or error
+         */
+        template<class HasWork> int poll(int timeoutMillis, const HasWork& has_work) noexcept
+        {
+            arm();
+            const int readyCount = has_work() ? 0 : poll_armed(timeoutMillis);
+            armed.store(false, std::memory_order_release);
+            return readyCount;
+        }
+        /** @brief Polls the entries until one is ready, `timeoutMillis` passes, or wake() is called */
+        int poll(int timeoutMillis) noexcept { return poll(timeoutMillis, []{ return false; }); }
+
+        /** @brief Ends a poll in progress from any thread, and does nothing when no poll is armed */
+        void wake() noexcept;
+
+    private:
+        void arm() noexcept;
+        int poll_armed(int timeoutMillis) noexcept;
+    };
 
     /**
      * Creates am INADDR_ANY UDP socket with a random port

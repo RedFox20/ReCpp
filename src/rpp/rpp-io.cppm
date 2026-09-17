@@ -125,6 +125,7 @@ export namespace rpp {
     using rpp::ipaddress6;
     using rpp::ipinterface;
     using rpp::socket;
+    using rpp::socket_poller;
     using rpp::make_udp_randomport;
     using rpp::make_tcp_randomport;
     using rpp::get_ip_interface;

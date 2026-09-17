@@ -4,10 +4,23 @@
  * Distributed under MIT Software License
  */
 #include "event_loop.h"
+#include <climits> // INT_MAX
 
 
 namespace rpp
 {
+    // the wall-clock step at which a wait re-reads a warped clock, or a poll with no wake socket re-checks the queue
+    static constexpr rpp::Duration POLL_SLICE = rpp::millis(1);
+
+    // rounds a wait up to whole milliseconds for poll(), so a sub-millisecond rest does not spin
+    static int poll_millis(rpp::Duration left) noexcept
+    {
+        if (left <= rpp::Duration::zero())
+            return 0;
+        const rpp::int64 ms = (left.nsec + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
+        return ms > INT_MAX ? INT_MAX : int(ms);
+    }
+
     event_loop::event_loop(rpp::uint64 main_thr_id,
                            rpp::thread_pool* background_task_pool,
                            rpp::AtomicTimeSource* warpable_clock) noexcept
@@ -20,7 +33,7 @@ namespace rpp
     event_loop::~event_loop() noexcept
     {
         // if loop is destroyed by anyone other than the owner thread, terminate
-        if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+        if (!on_owner_thread())
         {
             __assertion_failure("event_loop destroyed from non-owner thread; this is not allowed and may cause resource leaks");
             std::terminate();
@@ -76,32 +89,17 @@ namespace rpp
         return frame;
     }
 
-    void event_loop::wait_until(rpp::TimePoint deadline, time_frame frame) const noexcept
-    {
-        if (frame.warpable)
-        {
-            // warpable clock: poll so warp_forward() can release the wait early
-            while (current_time(frame) < deadline)
-                rpp::sleep_ms(1); // wall-clock poll step
-        }
-        else
-        {
-            rpp::sleep_until(deadline); // wall clock: one efficient sleep
-        }
-    }
-
     bool event_loop::wait_pop_until(resume_event& event, rpp::TimePoint deadline, time_frame& frame) noexcept
     {
         if (frame.warpable)
         {
             // warpable clock: poll so warp_forward() can release the wait early
-            constexpr rpp::Duration warp_poll = rpp::millis(1); // wall-clock poll step
             for (;;)
             {
                 rpp::Duration left = deadline - current_time(frame);
                 if (left <= rpp::Duration::zero())
                     return false;
-                if (resume_queue.wait_pop(event, left < warp_poll ? left : warp_poll))
+                if (resume_queue.wait_pop(event, left < POLL_SLICE ? left : POLL_SLICE))
                     return true;
             }
         }
@@ -115,6 +113,7 @@ namespace rpp
     {
         loop_running = false;
         resume_queue.notify_one(); // wake up the loop if it's waiting for events
+        poller.wake(); // and when it sits in a socket poll instead
     }
 
     bool event_loop::wait_on_all(rpp::Duration timeout) noexcept
@@ -128,18 +127,18 @@ namespace rpp
         {
             process_event(event);
         }
-        while (has_background_tasks() && wait_pop_until(event, end, frame))
+        while ((has_background_tasks() || pending_waiters() > 0) && wait_next_event(event, end, frame))
         {
             process_event(event);
             invoke_loop_hook();
         }
-        return resume_queue.empty() && !has_background_tasks();
+        return resume_queue.empty() && !has_background_tasks() && pending_waiters() == 0;
     }
 
     bool event_loop::stop_and_wait_all_ready(rpp::Duration max_wait) noexcept
     {
         // the drain resumes coroutines, which must run on the loop thread
-        if (rpp::get_thread_id() != owner_thread_id.load(std::memory_order_acquire))
+        if (!on_owner_thread())
         {
             LogError("event_loop::stop_and_wait_all_ready() must be called on the event loop thread");
             return false;
@@ -164,9 +163,7 @@ namespace rpp
         while (loop_running)
         {
             resume_event event;
-            // background tasks still running: wait for the next resume with a timeout
-            // to avoid missing a race where pending_count drops after we checked
-            if (resume_queue.wait_pop(event, suspend_interval, time_source.load(std::memory_order_relaxed)))
+            if (wait_next_event(event, suspend_interval))
             {
                 process_event(event);
                 invoke_loop_hook();
@@ -182,9 +179,7 @@ namespace rpp
     bool event_loop::run_once(rpp::Duration timeout) noexcept
     {
         resume_event event;
-        const bool got_event = timeout == rpp::Duration::zero()
-                             ? resume_queue.try_pop(event)
-                             : resume_queue.wait_pop(event, timeout, time_source.load(std::memory_order_relaxed));
+        const bool got_event = wait_next_event(event, timeout);
         if (got_event)
             process_event(event);
 
@@ -197,6 +192,7 @@ namespace rpp
     {
         bool processed = false;
         resume_event event;
+        fire_due_waiters(); // a delay() whose deadline passed is ready too
         while (resume_queue.try_pop(event))
         {
             process_event(event);
@@ -213,9 +209,7 @@ namespace rpp
         while (true)
         {
             resume_event event;
-            // background tasks still running: wait for the next resume with a timeout
-            // to avoid missing a race where pending_count drops after we checked
-            if (resume_queue.wait_pop(event, suspend_interval, time_source.load(std::memory_order_relaxed)))
+            if (wait_next_event(event, suspend_interval))
             {
                 process_event(event);
                 ++processed_count;
@@ -257,7 +251,10 @@ namespace rpp
 
     void event_loop::post_resume(rpp::coro_handle<> handle) noexcept
     {
-        resume_queue.push(resume_event{handle});
+        // the wake runs under the queue lock, so the loop cannot pop the event and die under this thread
+        std::unique_lock<rpp::mutex> lock = resume_queue.spin_lock();
+        resume_queue.push(lock, resume_event{handle});
+        poller.wake();
     }
 
     void event_loop::post_resume_from_suspension(rpp::coro_handle<> handle) noexcept
@@ -277,16 +274,156 @@ namespace rpp
 
     void event_loop::post(rpp::delegate<void()>&& callback) noexcept
     {
-        resume_queue.push(resume_event{std::move(callback)});
+        // the wake runs under the queue lock, so the loop cannot pop the event and die under this thread
+        std::unique_lock<rpp::mutex> lock = resume_queue.spin_lock();
+        resume_queue.push(lock, resume_event{std::move(callback)});
+        poller.wake();
     }
 
     void event_loop::notify_fork_joiner() noexcept
     {
         if (num_active_forks.load(std::memory_order_acquire) == 0 && fork_joiner)
         {
+            cancel_timers(fork_joiner); // the join deadline is moot once every fork finished
             post_resume(fork_joiner);
             fork_joiner = {};
         }
+    }
+
+    bool event_loop::wait_next_event(resume_event& event, rpp::TimePoint deadline, time_frame& frame) noexcept
+    {
+        for (;;)
+        {
+            const rpp::Duration left = deadline - current_time(frame);
+            const rpp::Duration next = time_to_next_waiter();
+            const rpp::Duration wait = next < left ? next : left;
+            bool got = false;
+            if (wait <= rpp::Duration::zero())
+                got = resume_queue.try_pop(event);
+            else if (socket_waiters.empty())
+                got = wait_pop_until(event, frame.now() + wait, frame);
+            else
+                got = poll_sockets_until(event, frame.now() + wait, frame);
+            fire_due_waiters();
+            if (got || resume_queue.try_pop(event))
+                return true;
+            if (next >= left)
+                return false; // the deadline of the caller passed, and no waiter came first
+        }
+    }
+
+    bool event_loop::wait_next_event(resume_event& event, rpp::Duration timeout) noexcept
+    {
+        time_frame frame = get_time_source_frame(); // one snapshot per wait, see BUGS.md B26
+        return wait_next_event(event, frame.now() + timeout, frame);
+    }
+
+    rpp::Duration event_loop::time_to_next_waiter() noexcept
+    {
+        rpp::Duration next = rpp::Duration::max();
+        for (timer& t : timers)
+        {
+            const rpp::Duration left = t.end - current_time(t.frame);
+            if (left < next) next = left;
+        }
+        for (socket_waiter& w : socket_waiters)
+        {
+            const rpp::Duration left = w.awaiter->end - current_time(w.awaiter->frame);
+            if (left < next) next = left;
+        }
+        return next;
+    }
+
+    void event_loop::fire_due_waiters() noexcept
+    {
+        rpp::erase_if(timers, [this](timer& t)
+        {
+            const bool due = current_time(t.frame) >= t.end;
+            if (due)
+            {
+                resume_queue.push(std::move(t.event));
+                num_waiters.fetch_sub(1, std::memory_order_acq_rel);
+            }
+            return due;
+        });
+        rpp::erase_if(socket_waiters, [this](socket_waiter& w)
+        {
+            const bool due = current_time(w.awaiter->frame) >= w.awaiter->end;
+            if (due) complete_socket_waiter(w, false);
+            return due;
+        });
+    }
+
+    rpp::Duration event_loop::poll_wait(rpp::TimePoint until, time_frame& frame) noexcept
+    {
+        const rpp::Duration left = until - current_time(frame);
+        // a warped clock and a poller without a wake both need short slices, so a warp or a post is seen
+        const bool sliced = frame.warpable || !poller.can_wake();
+        return sliced && left > POLL_SLICE ? POLL_SLICE : left;
+    }
+
+    bool event_loop::poll_sockets_until(resume_event& event, rpp::TimePoint until, time_frame& frame) noexcept
+    {
+        // 1. a closed socket cannot enter the poll set, so its waiter resumes now and reads the error itself
+        for (socket_waiter& w : socket_waiters)
+            if (w.awaiter->sock.bad()) complete_socket_waiter(w, true);
+
+        // 2. the poll set follows the order of socket_waiters, so ready(i) belongs to socket_waiters[i]
+        poller.clear();
+        for (const socket_waiter& w : socket_waiters)
+            poller.add(w.awaiter->sock, w.awaiter->flag);
+
+        // 3. the poller arms its wake before the queue check, so a post() after the check still ends the poll
+        bool got = false;
+        poller.poll(poll_millis(poll_wait(until, frame)), [&]
+        {
+            got = resume_queue.try_pop(event);
+            return got;
+        });
+
+        // 4. an error or a hangup marks an entry ready too, and the coroutine reads it from the socket
+        for (size_t i = 0; i < socket_waiters.size(); ++i)
+            if (poller.ready(int(i))) complete_socket_waiter(socket_waiters[i], true);
+
+        // 5. every waiter which step 1 or step 4 completed leaves the list
+        rpp::erase_if(socket_waiters, [](const socket_waiter& w) { return w.awaiter->ready; });
+
+        return got || resume_queue.try_pop(event);
+    }
+
+    void event_loop::add_timer(rpp::TimePoint end, time_frame frame, rpp::coro_handle<> owner, resume_event event) noexcept
+    {
+        run_on_loop([this, end, frame, owner, event = std::move(event)]() mutable
+        {
+            timers.push_back(timer{end, frame, owner, std::move(event)});
+            num_waiters.fetch_add(1, std::memory_order_acq_rel);
+        });
+    }
+
+    void event_loop::cancel_timers(rpp::coro_handle<> owner) noexcept
+    {
+        rpp::erase_if(timers, [&](const timer& t)
+        {
+            const bool cancel = t.owner == owner;
+            if (cancel) num_waiters.fetch_sub(1, std::memory_order_acq_rel);
+            return cancel;
+        });
+    }
+
+    void event_loop::add_socket_waiter(socket_awaiter& awaiter, rpp::coro_handle<> cont) noexcept
+    {
+        run_on_loop([this, &awaiter, cont]
+        {
+            socket_waiters.push_back(socket_waiter{&awaiter, cont});
+            num_waiters.fetch_add(1, std::memory_order_acq_rel);
+        });
+    }
+
+    void event_loop::complete_socket_waiter(socket_waiter& waiter, bool ready) noexcept
+    {
+        waiter.awaiter->ready = ready;
+        resume_queue.push(resume_event{waiter.cont});
+        num_waiters.fetch_sub(1, std::memory_order_acq_rel);
     }
 
     // automatically clean up completed forks; exceptions go through except_handler

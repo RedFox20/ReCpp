@@ -70,6 +70,13 @@ Protect that number.
 - A case over 100ms needs a reason in the review. A case over 500ms is a defect.
 - Sleeps in this repo are 1ms to 10ms. `rpp::sleep_ms(50)` and above needs a
   reason. Never put a sleep inside a loop.
+- **A timeout the case expects to elapse is 5ms or 10ms.** That covers every
+  `delay()`, `wait_readable()`, `connect()` and `accept()` timeout, every `poll()`
+  and every `wait_pop()` a case waits out. A longer value needs a written reason in
+  the case, and a hard cap is one second. A wall wait slows the whole suite and
+  proves nothing more than a short one.
+- A timeout the case never expects to elapse is a hang guard. It also takes one
+  second at most, and the comment says what releases it.
 - Wait on an event, not on the clock: `rpp::semaphore`, `future.get()`,
   `task.wait()`, `pool.wait_until_idle()`. Each one returns as soon as the work
   ends.

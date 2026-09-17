@@ -335,6 +335,20 @@ namespace rpp
         }
 
         /**
+         * @brief Moves an item into the queue under a lock the caller already holds, and notifies the waiters.
+         *        No consumer sees the item before the caller releases the lock, so the caller can
+         *        finish its own work on the shared state first.
+         * @param lock_guard Mandatory queue.spin_lock() or queue.mutex() lock
+         */
+        void push(lock_t& lock_guard, T&& item) noexcept(std::is_nothrow_move_constructible_v<T>)
+        {
+            if (!lock_guard.owns_lock())
+                lock_guard.lock();
+            push_unlocked(lock_guard, std::move(item));
+            notify_all_unlocked();
+        }
+
+        /**
          * @brief Thread-safely copies an item into the queue without notifying waiters
          */
         void push_no_notify(const T& item) noexcept(std::is_nothrow_copy_constructible_v<T>)

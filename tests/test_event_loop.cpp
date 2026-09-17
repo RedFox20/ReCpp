@@ -33,6 +33,7 @@ TestImpl(test_event_loop)
     // a loop can hold a raw pointer to this pool, so the pool must outlive the loop
     std::unique_ptr<rpp::thread_pool> custom_pool;
     std::unique_ptr<rpp::event_loop> loop;
+    rpp::socket server, peer, client; // a loopback TCP pair, so a case feeds one end and awaits the other
     const uint64 main_tid = rpp::get_thread_id();
     // assert_failed() only records on the thread which owns the case, so a worker
     // reports a spin_until() timeout through this flag instead
@@ -55,11 +56,40 @@ TestImpl(test_event_loop)
     {
         loop.reset();        // the loop may point at custom_pool, so it goes first
         custom_pool.reset(); // and only then may the pool and its mutex die
+        client.close();
+        peer.close();
+        server.close();
         AssertFalse(spin_timed_out.load()); // a worker thread could not report it itself
     }
 
     void assert_on_main_thread(RPP_SOURCE_LOC) { AssertThatLoc(loc, rpp::get_thread_id(), main_tid); }
     void idle() const { loop->run_until_idle(); }
+
+    std::atomic_bool wait_done { false };
+    bool wait_ready = false;
+    // forks a coroutine which waits until `client` is readable, and reports through wait_ready and wait_done
+    void fork_wait_readable(rpp::Duration timeout)
+    {
+        wait_done = false;
+        // fork() keeps the closure alive for the coroutine, and the fixture outlives the loop
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+        loop->fork([this, timeout]() -> rpp::event_task
+        {
+            wait_ready = co_await loop->wait_readable(client, timeout);
+            assert_on_main_thread();
+            wait_done = true;
+        });
+    }
+
+    void connect_pair()
+    {
+        server = rpp::make_tcp_randomport(rpp::SO_NonBlock);
+        AssertTrue(server.good());
+        client = rpp::socket::connect_to(rpp::ipaddress4{"127.0.0.1", server.port()}, 10, rpp::SO_NonBlock);
+        AssertTrue(client.good());
+        peer = server.accept(10);
+        AssertTrue(peer.good());
+    }
 
     // spins without pumping the loop, so a test can order itself against a worker thread
     template<class Predicate> void spin_until(const Predicate& pred, RPP_SOURCE_LOC)
@@ -1223,8 +1253,8 @@ TestImpl(test_event_loop)
             done = true;
         });
 
-        // the poll must own the counter before the detach
-        spin_until([&]{ return loop->has_background_tasks(); });
+        // the timer holds its frame before the detach
+        AssertThat(loop->pending_waiters(), 1);
         loop->set_time_source(nullptr);
 
         loop_until(rpp::millis(150), [&]{ return done.load(); });
@@ -1251,8 +1281,9 @@ TestImpl(test_event_loop)
         };
         rpp::event_task task = joiner();
 
-        // the gated fork and the join timer must both own the counter before the detach
-        spin_until([&]{ return loop->background_tasks() >= 2; });
+        // the gated fork must own the counter and the join timer must hold its frame before the detach
+        spin_until([&]{ return loop->background_tasks() >= 1; });
+        AssertThat(loop->pending_waiters(), 1);
         loop->set_time_source(nullptr);
 
         loop_until(rpp::millis(150), [&]{ return joined.load(); });
@@ -1651,6 +1682,184 @@ TestImpl(test_event_loop)
         std::thread t{[&] { off_thread = loop->ensure_on_owner_thread(RPP_SOURCE_LOC_CURRENT); }};
         t.join();
         AssertThat(off_thread, false); // ran on a different thread (one expected error log above)
+    }
+
+    // ─── loop timers: delay() parks on the loop thread ──────────
+    // the timer queue holds the deadline, so no pool worker sleeps on its behalf
+    TestCase(delay_needs_no_pool_worker)
+    {
+        custom_pool = std::make_unique<rpp::thread_pool>();
+        loop = std::make_unique<rpp::event_loop>(0, custom_pool.get(), &clock);
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::millis(5));
+            assert_on_main_thread();
+            done = true;
+        });
+        AssertThat(loop->pending_waiters(), 1);
+        AssertThat(loop->background_tasks(), 0);
+        loop_until(rpp::seconds(1), [&]{ return done.load(); });
+        AssertThat(done.load(), true);
+        AssertThat(loop->pending_waiters(), 0);
+        AssertThat(custom_pool->total_tasks(), 0); // the pool never started a worker
+    }
+
+    // run_once() wakes at the timer deadline and resumes the coroutine inside the same call
+    TestCase(run_once_wakes_at_the_earliest_timer)
+    {
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::millis(10));
+            done = true;
+        });
+        rpp::Timer wall;
+        const bool processed = loop->run_once(rpp::seconds(1));
+        AssertThat(processed, true);
+        AssertThat(done.load(), true);
+        AssertLess(wall.elapsed_millis(), 500.0);
+    }
+
+    // an await from another thread registers through the resume queue, so the loop thread owns the timer list
+    TestCase(delay_from_another_thread_registers_through_the_queue)
+    {
+        std::atomic<uint64> resume_tid{0};
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            co_await loop->delay(rpp::millis(5));
+            resume_tid = rpp::get_thread_id();
+        };
+        rpp::cfuture<void> fut;
+        rpp::async_task([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
+        AssertThat(loop->pending_completions(), 1); // the registration waits in the queue
+        AssertThat(loop->pending_waiters(), 0);
+        loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
+        fut.get(); // ready in the success path, and a cfuture must be consumed before it dies
+        AssertThat(resume_tid.load(), main_tid);
+    }
+
+    // ─── socket waits: the loop thread polls the descriptor ─────
+    TestCase(wait_readable_from_another_thread_registers_through_the_queue)
+    {
+        connect_pair();
+        std::atomic<uint64> resume_tid{0};
+        bool ready = true;
+        // the closure must outlive the coroutine, which reads its captures after the suspend
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            ready = co_await loop->wait_readable(client, rpp::millis(5));
+            resume_tid = rpp::get_thread_id();
+        };
+        rpp::cfuture<void> fut;
+        rpp::async_task([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
+        AssertThat(loop->pending_completions(), 1); // the registration waits in the queue
+        AssertThat(loop->pending_waiters(), 0);
+        loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
+        fut.get(); // ready in the success path, and a cfuture must be consumed before it dies
+        AssertThat(ready, false);
+        AssertThat(resume_tid.load(), main_tid);
+    }
+
+    TestCase(wait_readable_resumes_when_data_arrives)
+    {
+        connect_pair();
+        fork_wait_readable(rpp::seconds(1));
+        AssertThat(loop->pending_waiters(), 1);
+        AssertThat(loop->background_tasks(), 0);
+        rpp::cfuture<void> sender = rpp::async_task([&]{ rpp::sleep_ms(5); peer.send("hi", 2); });
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        sender.get();
+        AssertThat(wait_ready, true);
+        AssertLess(spent, rpp::millis(500));
+        AssertThat(client.available(), 2);
+    }
+
+    TestCase(wait_readable_times_out_without_data)
+    {
+        connect_pair();
+        fork_wait_readable(rpp::millis(10));
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        AssertThat(wait_ready, false);
+        AssertLess(spent, rpp::millis(500));
+    }
+
+    TestCase(wait_readable_timeout_is_released_by_time_warp)
+    {
+        connect_pair();
+        fork_wait_readable(rpp::seconds(10)); // 10 *virtual* seconds
+        clock.warp_forward(rpp::seconds(10));
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        AssertThat(wait_ready, false);
+        AssertLess(spent, rpp::millis(500));
+    }
+
+    // a close is how the owner of a coroutine cancels its socket wait
+    TestCase(closing_the_socket_releases_wait_readable)
+    {
+        connect_pair();
+        fork_wait_readable(rpp::seconds(1)); // the close releases it, never the timeout
+        client.close();
+        rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
+        AssertThat(wait_ready, true); // the socket needs attention, and recv() then reports the close
+        AssertLess(spent, rpp::millis(500));
+    }
+
+    // a post() from a worker must not wait for the socket poll to time out
+    TestCase(post_wakes_a_socket_poll)
+    {
+        loop = std::make_unique<rpp::event_loop>(); // a warpable clock slices the poll, and that would hide a lost wake
+        connect_pair();
+        fork_wait_readable(rpp::seconds(1)); // nothing arrives, so the poll sits here
+        std::atomic_bool posted { false };
+        rpp::cfuture<void> poster = rpp::async_task([&]{ rpp::sleep_ms(5); loop->post([&]{ posted = true; }); });
+        rpp::Timer wall;
+        loop->run_once(rpp::seconds(1));
+        const double waited_ms = wall.elapsed_millis();
+        poster.get();
+        AssertThat(posted.load(), true);
+        AssertLess(waited_ms, 500.0); // without the wake socket the poll holds the post for its whole timeout
+        client.close(); // releases the waiter, so the fixture drains without a timeout
+        idle();
+    }
+
+    TestCaseCoro(wait_writable_is_ready_on_a_connected_socket)
+    {
+        connect_pair();
+        const bool ready = co_await loop->wait_writable(client, rpp::millis(10));
+        AssertThat(ready, true);
+        assert_on_main_thread();
+    }
+
+    // ─── connect: the loop completes a non-blocking connect ─────
+    TestCaseCoro(connect_completes_on_the_loop)
+    {
+        server = rpp::make_tcp_randomport(rpp::SO_NonBlock);
+        AssertTrue(server.good());
+        rpp::socket sock;
+        const bool connected = co_await sock.connect(*loop, rpp::ipaddress4{"127.0.0.1", server.port()}, rpp::millis(10));
+        assert_on_main_thread();
+        AssertThat(connected, true);
+        AssertThat(sock.connected(), true);
+        AssertThat(loop->background_tasks(), 0);
+        peer = co_await server.accept(*loop, rpp::millis(10));
+        assert_on_main_thread();
+        AssertTrue(peer.good());
+    }
+
+    TestCaseCoro(connect_to_a_closed_port_fails_on_the_loop)
+    {
+        rpp::socket closed = rpp::make_tcp_randomport();
+        const int port = closed.port();
+        closed.close();
+        rpp::socket sock;
+        rpp::Timer wall;
+        const bool connected = co_await loop->connect(sock, rpp::ipaddress4{"127.0.0.1", port}, rpp::millis(10));
+        AssertThat(connected, false);
+        // Windows reports a refused loopback connect late, so the bound is the timeout and not the refusal
+        AssertLess(wall.elapsed_millis(), 100.0);
+        AssertNotEqual(sock.last_err_type(), rpp::socket::SE_NONE);
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
