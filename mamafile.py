@@ -1,6 +1,9 @@
 import mama
-from mama.utils.system import error
+from mama.utils.system import error, warning
 import os, sys, shlex, subprocess
+
+# 14.4 is the floor because it is the newest 14.x. It does not cure B28. See BUGS.md B28.
+MIN_STABLE_GCC = (14, 4)
 
 class ReCpp(mama.BuildTarget):
 
@@ -17,7 +20,23 @@ class ReCpp(mama.BuildTarget):
             self.add_git('elfutils', 'https://github.com/RedFox20/elfutils-package.git')
 
 
+    def warn_on_unstable_gcc(self):
+        """Warns when the selected GCC predates the first release which compiles our modules."""
+        if not getattr(self.config, 'gcc', False): return
+        version = getattr(self.config, 'cxx_version', '') or ''
+        try: parts = tuple(int(p) for p in version.split('.')[:2])
+        except ValueError: return
+        if len(parts) < 2 or parts >= MIN_STABLE_GCC: return
+        min_gcc = '.'.join(str(p) for p in MIN_STABLE_GCC)
+        warning(f'GCC {version} is unstable for ReCpp. ReCpp asks for GCC {min_gcc} or newer. ' + \
+                'Measured: GCC 14.2 and 14.4 both crash on a module shape this library uses, ' + \
+                'at every optimization level, so 14.4 raises the floor and does not cure it. ' + \
+                'A translation unit which names an rpp::cfuture keeps to the BUGS.md B28 include set.')
+
+
     def configure(self):
+        self.warn_on_unstable_gcc()
+
         # follow mama's clang stdlib choice; getattr keeps this working on older mamabuild
         if getattr(self.config, 'clang_stdlib', 'libc++') != 'libc++':
             self.add_cmake_options('RPP_USE_LIBCXX=OFF')

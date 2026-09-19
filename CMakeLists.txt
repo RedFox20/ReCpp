@@ -40,6 +40,18 @@ else()
     message(FATAL_ERROR "Unsupported CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
+# 14.4 is the floor because it is the newest 14.x. It does not cure B28. See BUGS.md B28.
+set(RPP_MIN_STABLE_GCC 14.4)
+if(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MIN_STABLE_GCC})
+    message(WARNING
+        "GCC ${CMAKE_CXX_COMPILER_VERSION} is unstable for ReCpp. "
+        "ReCpp asks for GCC ${RPP_MIN_STABLE_GCC} or newer. "
+        "Measured: GCC 14.2 and 14.4 both crash on a module shape this library uses, at "
+        "every optimization level, so 14.4 raises the floor and does not cure it. "
+        "A translation unit which names an rpp::cfuture keeps to the include set "
+        "BUGS.md B28 lists.")
+endif()
+
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
@@ -375,6 +387,7 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-containers.cppm
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
+        src/rpp/rpp-future.cppm
         src/rpp/rpp-testing.cppm
     )
 

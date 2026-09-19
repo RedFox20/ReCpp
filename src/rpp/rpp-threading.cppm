@@ -9,10 +9,7 @@ module;
 #include "thread_pool.h"
 #include "threads.h"
 #include "task.h"
-#include "future.h"
 #include "future_types.h"
-#include "event_loop.h"
-#include "coroutines.h"
 #include "atomic_shared_ptr.h"
 #include "close_sync.h"
 
@@ -58,28 +55,11 @@ export namespace rpp {
     using rpp::yield;
     using rpp::task;
     using rpp::deferred;
-    using rpp::cpromise;
-    using rpp::async_task;
     using rpp::cfuture;
-    using rpp::make_ready_future;
-    using rpp::make_exceptional_future;
-    using rpp::wait_all;
-    using rpp::get_all;
-    using rpp::run_tasks;
     using rpp::coro_handle;
     using rpp::suspend_never;
     using rpp::suspend_always;
-    using rpp::IsFuture;
-    using rpp::NotFuture;
     using rpp::IsFunction;
-    using rpp::IsFunctionReturningFuture;
-    using rpp::IsFunctionNotReturningFuture;
-    using rpp::event_task;
-    using rpp::event_loop;
-    using rpp::functor_awaiter;
-    using rpp::functor_awaiter_fut;
-    using rpp::std_future_awaiter;
-    using rpp::time_awaiter;
     using rpp::atomic_shared_ptr;
     using rpp::atomic_weak_ptr;
     using rpp::readonly_lock;
@@ -97,9 +77,5 @@ export namespace rpp {
     using rpp::critical_section;
     using rpp::synchronized_critical;
 #endif
-}
-
-export namespace rpp::inline coro_operators {
-    using rpp::coro_operators::operator co_await;
 }
 // GENERATED EXPORTS END

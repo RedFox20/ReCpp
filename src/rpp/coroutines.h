@@ -8,7 +8,7 @@
 #include "timer.h" // rpp::Duration
 #include "timepoint.h" // rpp::Duration
 #include "delegate.h" // rpp::delegate
-#include "future_types.h" // rpp::IsFunctionNotReturningFuture
+#include "future_types.h" // rpp::cfuture, rpp::coro_handle
 #include "thread_pool.h" // rpp::parallel_task_detached
 
 
