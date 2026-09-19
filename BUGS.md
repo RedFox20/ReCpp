@@ -74,6 +74,22 @@ and `<new>`, which the fragment requires anyway:
 The rule predicts the column on the right. `<string>` and `<functional>` were predicted
 from the middle column first, then measured.
 
+**Condition 2 needs a textual include, and an import never meets it.** A module which
+carries `<memory>` in its own fragment is safe for an importer:
+
+| Importer | How `<memory>` arrives | Result |
+|---|---|---|
+| imports the `<future>` module alone | not at all | compiles |
+| imports it beside a `<memory>` module | by import | compiles |
+| imports one module which carries both | by import | compiles |
+| includes `<memory>`, then imports the `<future>` module | by text | ICE |
+
+An importer which includes nothing is still out of reach. libstdc++ asks for `<typeinfo>`
+by text, and both gcc-14 and gcc-15 answer `must '#include <typeinfo>' before using
+'typeid'` from `std_function.h`. So a full modularization does not rescue gcc-14. An
+importer of `rpp.future` starts at `<typeinfo>` and `<new>`, and on gcc-14 it may add
+`<vector>`, `<string>` and `<functional>` and nothing else.
+
 **`exception_ptr.h` is the crash site, not the cause.** Condition 1 names `<future>`, and no
 other header stands in for it. Measured on the same compiler:
 
