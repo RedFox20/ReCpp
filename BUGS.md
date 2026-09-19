@@ -62,6 +62,24 @@ and `<new>`, which the fragment requires anyway:
 The rule predicts the column on the right. `<string>` and `<functional>` were predicted
 from the middle column first, then measured.
 
+**`exception_ptr.h` is the crash site, not the cause.** Condition 1 names `<future>`, and no
+other header stands in for it. Measured on the same compiler:
+
+| Shape | Result |
+|---|---|
+| a `<future>` module, imported and never called | compiles |
+| a `<future>` module, `get()` called, no `exception_ptr.h` include | compiles |
+| an `<exception>` module, importer includes `<memory>`, `exception_ptr` returned | compiles |
+| a `<memory>` module, importer includes `<memory>` | compiles |
+
+So a plain import of this group is safe. The three conditions must meet, and dropping
+`<future>` from the fragment drops the crash even when `exception_ptr` stays on both sides.
+
+**The compiler is gcc 14.2.0**, Ubuntu package `14.2.0-4ubuntu2~24.04.1`, from August 2024.
+Two bugfix releases exist above it: 14.3 of May 2025 and 14.4 of June 2026. Ubuntu noble
+carries neither, so nothing here proves whether they close this. Test 14.4 before reporting
+upstream.
+
 **`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
 ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
 the type is enough, and no explicit `get()` call has to appear.
@@ -124,13 +142,18 @@ consumer which will not rewrite its own includes.
 | `-fno-lifetime-dse`, `-fno-ipa-icf`, `-fno-devirtualize`, `-fno-strict-aliasing` | ICE |
 | one LTO partition | ICE |
 
-**A second gcc-14 defect blocks the obvious repair.** An `optimize` attribute on an
-exported template would carry a weaker pass list into the importer. Writing one crashes
-the module writer instead, at `cp/module.cc:6334`:
+**A second gcc-14 defect blocks the obvious repair, and it is upstream PR 108080.** An
+`optimize` attribute on an exported template would carry a weaker pass list into the
+importer. Writing one crashes the module writer instead, at `cp/module.cc:6334`:
 
 ```cpp
 export template<class T> __attribute__((optimize("O0"))) inline std::future<T> mk(T v);
 ```
+
+That crash site is `core_vals`, which PR 108080 reports for `#pragma GCC target` and
+`#pragma GCC optimize`. PR 120406 is a duplicate of it. gcc 15.1 carries the fix, and the
+fix replaces the crash with `sorry, optimize attribute not supported in modules`. So a
+newer gcc diagnoses this repair rather than granting it, and the repair stays unavailable.
 
 gcc-13 does not reach this bug, because it fails the same module without `<memory>`. So
 gcc-14 is the oldest gcc which builds this group at all.
