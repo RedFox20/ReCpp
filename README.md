@@ -4876,8 +4876,8 @@ Function type traits for extracting return types and argument types from callabl
 
 | Trait | Description |
 |-------|-------------|
-| [`function_traits<T>`](src/rpp/traits.h#L14) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
-| [`first_arg_type<T>`](src/rpp/traits.h#L48) | First argument type of a callable |
+| [`function_traits<T>`](src/rpp/traits.h#L13) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
+| [`first_arg_type<T>`](src/rpp/traits.h#L43) | First argument type of a callable |
 
 ---
 

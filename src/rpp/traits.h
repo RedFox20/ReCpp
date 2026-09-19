@@ -6,7 +6,6 @@
  */
 #include <type_traits>
 #include <tuple>      // std::tuple, for function_traits::arg_types
-// #include <functional> // std::function
 
 namespace rpp
 {
@@ -26,11 +25,7 @@ namespace rpp
         using arg_types = std::tuple<Args...>;
     };
 
-    // template<typename R, typename... Args>
-    // struct function_traits<std::function<R(Args...)>> {
-    //     using ret_type  = R;
-    //     using arg_types = std::tuple<Args...>;
-    // };
+    // no std::function specialization, because it would pull <functional> into every consumer
 
     template<typename T, typename R, typename... Args>
     struct function_traits<R (T::*)(Args...)> { // member func ptr
