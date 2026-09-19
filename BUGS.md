@@ -36,8 +36,20 @@ gcc-14 needs three conditions at once. Remove any one of them and the importer c
 3. The importer instantiates `std::future<T>::get()`.
 
 The compiler reports `internal compiler error: Segmentation fault` at
-`bits/exception_ptr.h:169`. The pass which dies is `cddce`, so `-O0` and `-Og` compile.
-This predates the `rpp.future` split, and `import rpp.threading` reproduced it before that.
+`bits/exception_ptr.h`. This predates the `rpp.future` split, and `import rpp.threading`
+reproduced it before that.
+
+**No optimization level escapes it, and the crash is in the front end.** An earlier version
+of this entry said the `cddce` pass dies, so `-O0` and `-Og` compile. That belongs to B16 and
+not here. These are two crashes, and the measurement separates them:
+
+| Shape | `-O0` and `-Og` | `-O2` | Dies in |
+|---|---|---|---|
+| B16, the importer includes `<future>` and builds a `std::promise` | compiles | ICE | the optimizer |
+| B28, the importer includes `<memory>` and calls `future::get()` | ICE | ICE | the front end |
+
+The B28 trace names the instantiation of `_M_get_result()` under `future::get()`, so the
+compiler dies while it merges declarations, not while it optimizes them.
 
 **Condition 3 is `get()`, and neither the factory nor the template matters.** `wait()`
 compiles where `get()` crashes. A non-template factory crashes the same way. An earlier
@@ -76,9 +88,17 @@ So a plain import of this group is safe. The three conditions must meet, and dro
 `<future>` from the fragment drops the crash even when `exception_ptr` stays on both sides.
 
 **The compiler is gcc 14.2.0**, Ubuntu package `14.2.0-4ubuntu2~24.04.1`, from August 2024.
-Two bugfix releases exist above it: 14.3 of May 2025 and 14.4 of June 2026. Ubuntu noble
-carries neither, so nothing here proves whether they close this. Test 14.4 before reporting
-upstream.
+
+**gcc 14.4 does not close this.** No distribution packages 14.4, because noble, questing and
+the `ubuntu-toolchain-r` archive all stop at 14.3. So 14.4.0 was built from source and
+measured:
+
+| Compiler | `-O0` | `-Og` | `-O1` | `-O2` |
+|---|---|---|---|---|
+| gcc 14.2.0 | ICE | ICE | ICE | ICE |
+| gcc 14.4.0 | ICE | ICE | ICE | ICE |
+
+That build is sound, because every safe shape above compiles on it. Only this shape crashes.
 
 **`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
 ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
