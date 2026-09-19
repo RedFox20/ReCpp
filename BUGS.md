@@ -102,7 +102,19 @@ which the `consumer-gcc15` CI row installs:
 
 The 14.4 build is sound, because every safe shape above compiles on it. Only this shape
 crashes. On 15.2.0 the reduced case also links and runs, and the whole consumer gate passes
-with `RPP_B28_FREE` on. So gcc 15 is the floor `CMakeLists.txt` and `mamafile.py` name.
+with `RPP_B28_FREE` on.
+
+**ReCpp answers this with a minimum, not a workaround.** Two gates carry it, because a
+consumer compiles the exported `.cppm` itself:
+
+| Gate | Stops |
+|---|---|
+| `RPP_MODULES_MIN_GCC` in `CMakeLists.txt` | the ReCpp build from making modules under gcc 15 |
+| `no_export_modules()` in `mamafile.py` | the exported module list from reaching such a consumer |
+
+The CMake gate alone leaves the consumer on the module path, because the export list names
+source paths and no compiler version. So a gcc-14 project builds the headers and never
+meets this crash. The `consumer-gcc14-headers` CI row pins that path.
 
 **`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
 ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
@@ -660,7 +672,7 @@ is gone now, and a file names each group it uses.
 ### C28. gcc-14 ran out of module source locations on 44 modules (was B23)
 A clean C++23 build reported `unable to represent further imported source locations` six
 times, then failed with `conflicting global module declaration` in three modules. Eight header
-groups cut one translation unit from 39 imports to 8, and `ubuntu-cpp23-modules-gcc14` now
+groups cut one translation unit from 39 imports to 8, and `ubuntu-cpp23-modules-gcc15` now
 covers that standard.
 
 ### C27. gcc-14 crashed any importer which built a concurrent queue at `-O1` (was B18)
@@ -749,7 +761,7 @@ matched under MSVC, so the pointer bound to `to_string(bool)`. `strview.h` gaine
 The Android NDK ships no `clang-scan-deps`, so CMake wrote a scan rule with an
 empty command and every `.cppm` scan exited 127. AUTO now demands an existing
 `clang-scan-deps` on Clang, and the `android-cpp20-r29-ninja` and
-`consumer-integration` jobs cover the gap CI had.
+`consumer-gcc14-headers` jobs cover the gap CI had.
 
 ### C9. CI was red in 5 job classes, and all 24 jobs pass now
 Five unrelated causes: a TSAN memory-mapping abort, a missing `clang-21` package, a

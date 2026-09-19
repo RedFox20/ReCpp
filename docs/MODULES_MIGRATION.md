@@ -13,9 +13,9 @@ gate, #65 changeset 6.
 
 | Item | State |
 |---|---|
-| the nine modules | build and pass on gcc-14 at C++20 and C++23, in the tree and as a consumer, and CI covers gcc-15, clang-21 and MSVC 14.52 |
+| the nine modules | build and pass on gcc-15 at C++20 and C++23, in the tree and as a consumer, and CI covers clang-21 and MSVC 14.52 |
 | `debugging.macros.h` | split out, 50 preprocessed lines against 32893 |
-| `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 14 / Clang 21 / MSVC 19.34 |
+| `BUILD_WITH_MODULES=AUTO` | on per toolchain, GCC 15 / Clang 21 / MSVC 19.34 |
 | Include-order style rule | in AGENTS.md, and the `import-order` gate holds it |
 | `tools/check_includes.py` | 6 checks. 4 gate CI, and `missing` and `unused` stay ungated |
 | `tests/test_modules.cpp` | module consumer test over eight groups. It includes `tests.h` and the macro header only, so what those two mask needs a module-only target |
@@ -189,7 +189,7 @@ carries modules. So the same source compiles two ways:
 | Mode | How to build | What it proves |
 |---|---|---|
 | headers | `cmake -DBUILD_TESTS=ON` | the classic path still works |
-| modules | `cmake -DBUILD_TESTS=ON` on GCC 14+, Clang 21+ or MSVC 19.34+ | the exported names the tests use resolve |
+| modules | `cmake -DBUILD_TESTS=ON` on GCC 15+, Clang 21+ or MSVC 19.34+ | the exported names the tests use resolve |
 
 The test body is the same in both modes, so the module build proves the export
 list carries what the tests use. It is not a full completeness gate: the file also

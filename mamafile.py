@@ -2,8 +2,8 @@ import mama
 from mama.utils.system import error, warning
 import os, sys, shlex, subprocess
 
-# 15 is the floor because it is the first release which compiles B28. 14.2 and 14.4 both crash.
-MIN_STABLE_GCC = (15, 0)
+# mirrors RPP_MODULES_MIN_GCC in CMakeLists.txt. gcc-14 crashes an importer, see BUGS.md B28
+MODULES_MIN_GCC = (15, 0)
 
 class ReCpp(mama.BuildTarget):
 
@@ -20,24 +20,30 @@ class ReCpp(mama.BuildTarget):
             self.add_git('elfutils', 'https://github.com/RedFox20/elfutils-package.git')
 
 
-    def warn_on_unstable_gcc(self):
-        """Warns when the selected GCC predates the first release which compiles our modules."""
-        if not getattr(self.config, 'gcc', False): return
+    def gcc_below_modules_minimum(self) -> str:
+        """@returns the GCC version when it is under the modules minimum, else an empty string."""
+        if not getattr(self.config, 'gcc', False): return ''
         # answers the cached version, and resolves the compiler when the run has not picked one yet
         try: version = self.config.get_preferred_compiler_paths()[2] or ''
-        except Exception: return # a run which cannot name its compiler fails later, with a clearer message
+        except Exception: return '' # a run which cannot name its compiler fails later, with a clearer message
         try: parts = tuple(int(p) for p in version.split('.')[:2])
-        except ValueError: return
-        if not parts or parts >= MIN_STABLE_GCC[:len(parts)]: return
-        min_gcc = '.'.join(str(p) for p in MIN_STABLE_GCC).removesuffix('.0')
-        warning(f'GCC {version} is unstable for ReCpp modules. ReCpp asks for GCC {min_gcc} or newer. ' + \
-                'Measured: GCC 14.2 and 14.4 crash on a module importer which names an rpp::cfuture ' + \
-                'beside <memory>, at every optimization level. GCC 15.2 compiles the same source. ' + \
-                'The header path carries no such limit. See BUGS.md B28.')
+        except ValueError: return ''
+        return version if parts and parts < MODULES_MIN_GCC[:len(parts)] else ''
+
+
+    def warn_gcc_below_modules_minimum(self):
+        """Tells a GCC user below the modules minimum that this build takes the header path."""
+        version = self.gcc_below_modules_minimum()
+        if not version: return
+        min_gcc = '.'.join(str(p) for p in MODULES_MIN_GCC).removesuffix('.0')
+        warning(f'GCC {version} is below the ReCpp modules minimum of GCC {min_gcc}, so this build ' + \
+                'takes the header path. GCC 14.2 and 14.4 crash on an importer which names an ' + \
+                'rpp::cfuture beside <memory>, at every optimization level. The header path carries ' + \
+                'no such limit, and it supports every compiler. See BUGS.md B28.')
 
 
     def configure(self):
-        self.warn_on_unstable_gcc()
+        self.warn_gcc_below_modules_minimum()
 
         # follow mama's clang stdlib choice; getattr keeps this working on older mamabuild
         if getattr(self.config, 'clang_stdlib', 'libc++') != 'libc++':
@@ -56,6 +62,8 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
+        # a consumer compiles the exported .cppm itself, so a GCC under the minimum must receive none
+        if self.gcc_below_modules_minimum(): self.no_export_modules()
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)

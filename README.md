@@ -88,7 +88,7 @@ compiler at configure time.
 |-------------|---------|
 | C++ standard | C++20 |
 | CMake | 3.28+ |
-| GCC | 14+ |
+| GCC | 15+, because gcc-14 crashes an importer which names a `cfuture`, see `BUGS.md` B28 |
 | Clang | 21+ |
 | Generator | Ninja (required) |
 
@@ -110,10 +110,10 @@ Module interface units are in `src/rpp/` with the naming convention `rpp-<module
 Each module wraps a group of existing headers, so the traditional `#include` keeps working
 and a program can mix both styles in one binary.
 
-**Put every `#include` first and every `import` last.** GCC 14 re-parses a standard
-library header that follows an import, and its internal templates then collide with the
-entities the module already made reachable. One misplaced import gives hundreds of
-compile errors.
+**Put every `#include` first and every `import` last.** GCC re-parses a standard library
+header that follows an import, and its internal templates then collide with the entities
+the module already made reachable. One misplaced import gives thousands of compile errors,
+and gcc-15 reports more of them than gcc-14, not fewer.
 
 ```cpp
 #include <rpp/tests.h>   // 1. rpp headers
@@ -249,29 +249,17 @@ Four groups carry a limit the export list cannot state:
 | `rpp.containers` | [`memory_pool.h`](src/rpp/memory_pool.h) | Drops `pool_types_constructor`, an internal mixin. Each pool still gives you `construct<T>()` and the array forms |
 | `rpp.threading` | [`thread_pool.h`](src/rpp/thread_pool.h) | Drops `test_threadpool`, the forward declaration a unit test needs as a friend |
 
-`rpp.future` carries `<future>`, so it carries one more limit. On gcc-14 an importer of it
-cannot instantiate `std::promise` at `-O1` or above. The compiler crashes, and no export
-list changes that. `BUGS.md` B16 holds the reproducer and the measurements.
+`rpp.future` carries `<future>`, and that header is why the GCC minimum is 15. On gcc-14 an
+importer cannot instantiate `std::promise` at `-O1` or above, and an importer which names a
+`cfuture` beside `<memory>` crashes at every optimization level. `BUGS.md` B16 and B28 hold
+the reproducers and the measurements.
 
-Two ways around it. Import another module, because only this one carries `<future>`. Or
-include `<rpp/future.h>` instead of importing, in the translation unit which needs both.
+A gcc-14 project needs no workaround, because ReCpp exports it no module and the build takes
+the header path. gcc-15, clang-21 and MSVC carry no such limit.
 
 An importer of `rpp.future` also includes `<typeinfo>` and `<new>` before it calls into the
 future machinery. libstdc++ names `typeid` and placement `new` inside `<future>`, and a
 global module fragment reaches an importer only when an exported declaration names it.
-
-**The gcc-14 limit bounds `cfuture`, not the module.** A translation unit which names a
-`cfuture` keeps to `<typeinfo>`, `<new>`, `<vector>`, `<string>` and `<functional>`. Adding
-`<memory>`, `<chrono>`, `<thread>`, `<exception>` or `<stdexcept>` crashes the compiler.
-Those five reach `bits/exception_ptr.h`, and the first five do not, which is the whole
-rule. `~cfuture()` calls `get()`, so naming the type is enough to meet it.
-
-A translation unit which names no `cfuture` imports `rpp.future` beside any include.
-`tests/module_consumer/coro_module_only.cpp` pins that on gcc-14, driving `event_loop` and
-the awaiters with `<memory>` live. `future_module_only.cpp` holds the restricted half, and
-a gcc-14 consumer which wants both uses `<rpp/future.h>` there. gcc-15, clang-21 and MSVC
-carry no such limit. `BUGS.md` B28 holds the reduced reproducer and every repair which
-failed.
 
 ### How it works
 

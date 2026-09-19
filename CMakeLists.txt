@@ -40,17 +40,6 @@ else()
     message(FATAL_ERROR "Unsupported CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
-# 15 is the floor because it is the first release which compiles B28. 14.2 and 14.4 both crash.
-set(RPP_MIN_STABLE_GCC 15)
-if(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MIN_STABLE_GCC})
-    message(WARNING
-        "GCC ${CMAKE_CXX_COMPILER_VERSION} is unstable for ReCpp modules. "
-        "ReCpp asks for GCC ${RPP_MIN_STABLE_GCC} or newer. "
-        "Measured: GCC 14.2 and 14.4 crash on a module importer which names an rpp::cfuture "
-        "beside <memory>, at every optimization level. GCC 15.2 compiles the same source. "
-        "The header path carries no such limit. See BUGS.md B28.")
-endif()
-
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ############## RPP Compilation Flags ##############
@@ -324,9 +313,9 @@ endif()
 ###################################################
 
 # Experimental C++20 Modules support
-# The first version of each compiler family that builds the rpp-*.cppm facades.
-# Below these, the same sources give hundreds of std redefinition or ambiguity errors.
-set(RPP_MODULES_MIN_GCC   14)     # GCC 13 has no CMake-usable module support
+# The first version of each compiler family a consumer of the rpp-*.cppm facades can use.
+# Below these, the same sources crash the compiler or give hundreds of std redefinition errors.
+set(RPP_MODULES_MIN_GCC   15)     # gcc-14 crashes an importer which names a cfuture, see BUGS.md B28
 set(RPP_MODULES_MIN_CLANG 21)     # Clang 18 mis-resolves the facade using-declarations
 set(RPP_MODULES_MIN_MSVC  19.34)  # VS 2022 17.4
 

@@ -45,11 +45,12 @@ jobs:
           - { name: ubuntu-cpp23-asan-clang20,       compiler: clang, cc: clang-20, std: "23", san: asan,       cov: "false",
               llvm_apt: "true" }
           # Modules need Ninja and BUILD_WITH_MODULES=ON, because AUTO turns them off and
-          # keeps going. The C++23 row is where gcc-14 ran out of locations, see BUGS.md C28.
-          - { name: ubuntu-cpp20-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "20", san: asan,       cov: "false",
-              ninja: "true", modules: "ON", check_includes: "true" }
-          - { name: ubuntu-cpp23-modules-gcc14,      compiler: gcc,   cc: gcc-14,   std: "23", san: asan,       cov: "false",
-              ninja: "true", modules: "ON" }
+          # keeps going. gcc-15 is the gcc modules minimum, see BUGS.md B28. The C++23 row is
+          # where gcc ran out of module source locations, see BUGS.md C28
+          - { name: ubuntu-cpp20-modules-gcc15,      compiler: gcc,   cc: gcc-15,   std: "20", san: asan,       cov: "false",
+              ninja: "true", modules: "ON", check_includes: "true", gcc_ppa: "true" }
+          - { name: ubuntu-cpp23-modules-gcc15,      compiler: gcc,   cc: gcc-15,   std: "23", san: asan,       cov: "false",
+              ninja: "true", modules: "ON", gcc_ppa: "true" }
           - { name: ubuntu-cpp20-modules-clang21,    compiler: clang, cc: clang-21, std: "20", san: asan,       cov: "false",
               ninja: "true", modules: "ON", llvm_apt: "true" }
     steps:
@@ -84,6 +85,11 @@ jobs:
         if: matrix.llvm_apt == 'true'
         shell: bash
         run: .github/scripts/register_llvm_apt.sh ${{ matrix.cc }}
+
+      - name: Register ppa:ubuntu-toolchain-r for ${{ matrix.cc }}
+        if: matrix.gcc_ppa == 'true'
+        shell: bash
+        run: .github/scripts/register_gcc_ppa.sh ${{ matrix.cc }}
 
       - name: Install Python
         uses: actions/setup-python@v5
@@ -228,11 +234,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: consumer-integration, compiler: gcc,   cc: gcc-14,   llvm_apt: "false" }
-          - { name: consumer-clang21,     compiler: clang, cc: clang-21, llvm_apt: "true" }
-          # gcc-15 compiles the importer shape gcc-14 rejects, and this row is the only gate on
-          # it. The runner image stops at gcc-14, so a PPA carries gcc-15. See BUGS.md B28
-          - { name: consumer-gcc15,       compiler: gcc,   cc: gcc-15,   llvm_apt: "false", gcc_ppa: "true" }
+          # gcc-14 sits below the modules minimum, so this row pins the header path a gcc-14
+          # project gets. A legacy project keeps building, and it never meets BUGS.md B28
+          - { name: consumer-gcc14-headers, compiler: gcc,   cc: gcc-14,   expect: headers, llvm_apt: "false" }
+          - { name: consumer-clang21,       compiler: clang, cc: clang-21, expect: modules, llvm_apt: "true" }
+          # gcc-15 compiles the importer shape gcc-14 rejects, and this row is the only gcc gate
+          # on it. The runner image stops at gcc-14, so a PPA carries gcc-15. See BUGS.md B28
+          - { name: consumer-gcc15,         compiler: gcc,   cc: gcc-15,   expect: modules, llvm_apt: "false",
+              gcc_ppa: "true" }
     steps:
       - uses: actions/checkout@v4
 
@@ -264,7 +273,8 @@ jobs:
           mama install-${{ matrix.cc }}
 
       # Ninja plus a compiler over the modules minimum turns modules on by itself, so this
-      # job builds ReCpp with modules the way a downstream project builds it.
+      # job builds ReCpp the way a downstream project builds it. A row below the minimum
+      # must take the header path, and a row over it must take the module path.
       - name: Build and run the consumer with ${{ matrix.cc }}
         shell: bash
         run: |
@@ -275,7 +285,7 @@ jobs:
             | tee build.log
           # AUTO turns modules off and keeps going, so without this the job would still pass
           # if ReCpp stopped enabling modules when another project builds it
-          if ! grep -q "C++20 Modules enabled" build.log; then
+          if [[ "${{ matrix.expect }}" == "modules" ]] && ! grep -q "C++20 Modules enabled" build.log; then
             echo "FAIL: ReCpp built no modules as a dependency"
             grep -i "MODULES" build.log
             # a missing binary blames this job, a set binary with an empty cache entry blames
@@ -287,22 +297,31 @@ jobs:
                  -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
             exit 1
           fi
+          # the other direction: a compiler below the minimum must never reach the module path
+          if [[ "${{ matrix.expect }}" == "headers" ]] && grep -q "C++20 Modules enabled" build.log; then
+            echo "FAIL: ReCpp built modules on a compiler below the modules minimum"
+            grep -i "MODULES" build.log
+            exit 1
+          fi
 
       - name: Import the exported modules with ${{ matrix.cc }}
         shell: bash
         run: |
-          # this job clears the modules minimum, so the consumer must take the module path.
+          # matrix.expect names the path this compiler must take, and run_test.py fails on the other.
           # --compare-paths builds the same source through the headers and compares the report.
           # --unicode-off reaches the half of the module surface no consumer job builds, because
           # config.h turns unicode on for every one of them
           JOBS=$(nproc)
           CC_NAME="${{ matrix.cc }}" # gcc-15 names the g++-15 this step runs
-          UNICODE_OFF=$([[ ${{ matrix.compiler }} == "gcc" ]] && echo "--unicode-off g++-${CC_NAME#gcc-}" || echo "")
+          UNICODE_OFF=""
+          if [[ "${{ matrix.compiler }}" == "gcc" && "${{ matrix.expect }}" == "modules" ]]; then
+            UNICODE_OFF="--unicode-off g++-${CC_NAME#gcc-}"
+          fi
           cd tests/module_consumer
           CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
-              --compiler ${{ matrix.compiler }} --expect modules --compare-paths --jobs $JOBS $UNICODE_OFF
+              --compiler ${{ matrix.compiler }} --expect ${{ matrix.expect }} --compare-paths --jobs $JOBS $UNICODE_OFF
 
-      # C++23 costs gcc-14 more module source locations than C++20, see BUGS.md C28. A layout
+      # C++23 costs gcc more module source locations than C++20, see BUGS.md C28. A layout
       # which reads back on C++20 can still fail here, see BUGS.md B24, and only this step covers it
       - name: Import the exported modules as C++23 with ${{ matrix.cc }}
         shell: bash
@@ -310,7 +329,7 @@ jobs:
           JOBS=$(nproc)
           cd tests/module_consumer
           CXX23=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
-              --compiler ${{ matrix.compiler }} --expect modules --jobs $JOBS
+              --compiler ${{ matrix.compiler }} --expect ${{ matrix.expect }} --jobs $JOBS
 
   android:
     name: ${{ matrix.name }}
