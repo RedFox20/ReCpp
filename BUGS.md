@@ -84,11 +84,19 @@ carries `<memory>` in its own fragment is safe for an importer:
 | imports one module which carries both | by import | compiles |
 | includes `<memory>`, then imports the `<future>` module | by text | ICE |
 
-An importer which includes nothing is still out of reach. libstdc++ asks for `<typeinfo>`
-by text, and both gcc-14 and gcc-15 answer `must '#include <typeinfo>' before using
-'typeid'` from `std_function.h`. So a full modularization does not rescue gcc-14. An
-importer of `rpp.future` starts at `<typeinfo>` and `<new>`, and on gcc-14 it may add
-`<vector>`, `<string>` and `<functional>` and nothing else.
+An importer which includes nothing works only behind a non-template boundary. A template
+instantiates in the importer, and it drags the libstdc++ internals there with it:
+
+| The module exports | The importer includes | Result |
+|---|---|---|
+| a non-template future factory | nothing | compiles |
+| a template future factory | nothing | `must '#include <typeinfo>'` |
+
+Both compilers answer the same way, because `std::promise::set_value` builds a
+`std::function`, and `_M_manager` names `typeid` inside it. `rpp.future` is templated
+through `cfuture<T>`, so no importer of it reaches zero includes. It starts at
+`<typeinfo>` and `<new>`, and on gcc-14 it may add `<vector>`, `<string>` and
+`<functional>` and nothing else.
 
 **`exception_ptr.h` is the crash site, not the cause.** Condition 1 names `<future>`, and no
 other header stands in for it. Measured on the same compiler:
