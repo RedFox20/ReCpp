@@ -9,9 +9,9 @@
 // reaches exception_ptr.h, which gcc-14 rejects beside a cfuture. See BUGS.md B28
 #include <chrono>
 #endif
-#if defined(__clang__) || defined(_MSC_VER)
-// B28 is a gcc-14 defect, and this proves the other two carry no such limit. Only a compiler
-// which is not gcc reads these lines, because <memory> reaches exception_ptr.h
+#if defined(__clang__) || defined(_MSC_VER) || __GNUC__ >= 15
+// B28 is a gcc-14 defect. gcc-15, clang and MSVC compile the lines below, which reach
+// exception_ptr.h through <memory>
 #define RPP_B28_FREE 1
 #include <memory>
 #endif

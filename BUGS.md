@@ -89,16 +89,20 @@ So a plain import of this group is safe. The three conditions must meet, and dro
 
 **The compiler is gcc 14.2.0**, Ubuntu package `14.2.0-4ubuntu2~24.04.1`, from August 2024.
 
-**gcc 14.4 does not close this.** No distribution packages 14.4, because noble, questing and
-the `ubuntu-toolchain-r` archive all stop at 14.3. So 14.4.0 was built from source and
-measured:
+**gcc 14.4 does not close this, and gcc 15 does.** No distribution packages 14.4, because
+noble, questing and the `ubuntu-toolchain-r` archive all stop at 14.3. So a source build of
+14.4.0 measured the same shape. `ppa:ubuntu-toolchain-r/test` publishes 15.2.0 for noble,
+which the `consumer-gcc15` CI row installs:
 
 | Compiler | `-O0` | `-Og` | `-O1` | `-O2` |
 |---|---|---|---|---|
 | gcc 14.2.0 | ICE | ICE | ICE | ICE |
 | gcc 14.4.0 | ICE | ICE | ICE | ICE |
+| gcc 15.2.0 | compiles | compiles | compiles | compiles |
 
-That build is sound, because every safe shape above compiles on it. Only this shape crashes.
+The 14.4 build is sound, because every safe shape above compiles on it. Only this shape
+crashes. On 15.2.0 the reduced case also links and runs, and the whole consumer gate passes
+with `RPP_B28_FREE` on. So gcc 15 is the floor `CMakeLists.txt` and `mamafile.py` name.
 
 **`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
 ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
@@ -109,10 +113,10 @@ imports `rpp.future` beside any include. `RppCoroModuleOnly` pins that on gcc-14
 includes `<memory>` and drives `event_loop`, `time_awaiter` and `functor_awaiter`.
 `RppFutureModuleOnly` holds the other half, where a `cfuture` restricts the include set.
 
-**This is a gcc-14 limit, not a limit of the module.** clang-21 and MSVC build and run
-`RppFutureModuleOnly` with no such restriction, and the `RPP_B28_FREE` block in that file
-drives the exact shape gcc-14 rejects. So the group works on both other tier 1 compilers,
-and it keeps `<future>` out of the eight modules beside it either way.
+**This is a gcc-14 limit, not a limit of the module.** gcc-15, clang-21 and MSVC build and
+run `RppFutureModuleOnly` with no such restriction, and the `RPP_B28_FREE` block in that
+file drives the exact shape gcc-14 rejects. So the group works on every other tier 1
+compiler, and it keeps `<future>` out of the eight modules beside it either way.
 
 MSVC needs the opposite. It parses `<thread>` from the fragment and fails without
 `<chrono>`, which gcc-14 forbids here, so `future_module_only.cpp` guards that include on

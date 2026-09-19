@@ -40,16 +40,15 @@ else()
     message(FATAL_ERROR "Unsupported CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
-# 14.4 is the floor because it is the newest 14.x. It does not cure B28. See BUGS.md B28.
-set(RPP_MIN_STABLE_GCC 14.4)
+# 15 is the floor because it is the first release which compiles B28. 14.2 and 14.4 both crash.
+set(RPP_MIN_STABLE_GCC 15)
 if(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MIN_STABLE_GCC})
     message(WARNING
-        "GCC ${CMAKE_CXX_COMPILER_VERSION} is unstable for ReCpp. "
+        "GCC ${CMAKE_CXX_COMPILER_VERSION} is unstable for ReCpp modules. "
         "ReCpp asks for GCC ${RPP_MIN_STABLE_GCC} or newer. "
-        "Measured: GCC 14.2 and 14.4 both crash on a module shape this library uses, at "
-        "every optimization level, so 14.4 raises the floor and does not cure it. "
-        "A translation unit which names an rpp::cfuture keeps to the include set "
-        "BUGS.md B28 lists.")
+        "Measured: GCC 14.2 and 14.4 crash on a module importer which names an rpp::cfuture "
+        "beside <memory>, at every optimization level. GCC 15.2 compiles the same source. "
+        "The header path carries no such limit. See BUGS.md B28.")
 endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
