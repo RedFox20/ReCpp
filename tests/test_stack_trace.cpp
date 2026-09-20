@@ -3,8 +3,8 @@
 #include <rpp/timer.h>
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
+#include <rpp/delegate.h>
 #include <future>
-#include <functional> // std::function
 using namespace rpp;
 
 static std::string stack_tracer() { return stack_trace(); }
@@ -42,10 +42,10 @@ TestImpl(test_stack_trace)
         };
         inner_struct{}.method();
     }
-    TestCaseExpectedEx(trace_ex_from_function, traced_exception)
+    TestCaseExpectedEx(trace_ex_from_delegate, traced_exception)
     {
-        std::function<void()> f = [] {
-            throw traced_exception{ "TracedException from std::function" };
+        rpp::delegate<void()> f = [] {
+            throw traced_exception{ "TracedException from rpp::delegate" };
         };
         f();
     }
