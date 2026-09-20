@@ -8,7 +8,7 @@
 // C++20 makes <coroutine> mandatory, freestanding included, and config.h asserts C++20
 #include <coroutine>
 // This header must never reach <future>. gcc-14 crashes any importer of a module whose
-// fragment carries it, and every rpp header reached it through this one. See BUGS.md B16
+// fragment carries it, and every header which includes this one would carry it. See BUGS.md B16
 
 namespace rpp
 {

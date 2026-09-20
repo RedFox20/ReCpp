@@ -409,10 +409,6 @@ Second sighting on fd9c088, and this time it was `ubuntu-cpp20-tsan-gcc13`. Same
 two stacks, same two lines. So the race is not specific to one standard, and the job which
 reports it moves between runs. A re-run of the same job passed.
 
-Third sighting on 8dc779d, again on `ubuntu-cpp20-tsan-gcc13`, and again the same two
-lines. That commit edits three markdown files, so the rate alone moved it, not the code.
-All 556 cases passed and TSAN set exit 66 on its own.
-
 Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
 reported one warning, and the four other TSAN jobs passed on the same commit.
 
@@ -423,6 +419,10 @@ still far below one run.
 Fifth sighting on c5a9d9b, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two lines, and
 the same creation stack under `test_sockets::test_udp_poll_nonblocking_select`. All 557 cases
 passed, and three other TSAN jobs passed on the same commit.
+
+Sixth sighting on 8dc779d, on `ubuntu-cpp20-tsan-gcc13`, and again the same two lines. That
+commit edits three markdown files, so the rate alone moved it, not the code. All 556 cases
+passed and TSAN set exit 66 on its own.
 
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which

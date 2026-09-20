@@ -16,8 +16,8 @@
 
 namespace rpp
 {
-    // These name std::future, so they live here and not in future_types.h. That header
-    // reaches every rpp header, and <future> there crashes an importer. See BUGS.md B16
+    // These name std::future, so they live here and not in future_types.h. Every header
+    // which includes that one would carry <future>, which crashes an importer. See BUGS.md B16
 
     /// Matches `rpp::cfuture<T>` and `std::future<T>`, by the return type of `get()`
     template<typename F>
