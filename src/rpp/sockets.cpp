@@ -257,7 +257,7 @@ namespace rpp
                 return AF_IPv6; // IPv6 "::1" or "2001:db8::1"
             was_colon = is_colon;
         }
-        // this is a hostname like "www.kratt.codefox.ee", or ip "192.168.1.1:8912", or ":8080"
+        // this is a hostname like "www.example.com", or ip "192.168.1.1:8912", or ":8080"
         return AF_IPv4;
     }
 

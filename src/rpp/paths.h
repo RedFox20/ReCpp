@@ -745,7 +745,7 @@ namespace rpp /* ReCpp */
      * @return The current working directory of the application.
      *         An extra slash is always appended.
      *         Path is always normalized to forward slashes /
-     * @example Linux:   "/home/jorma/Projects/ReCpp/"
+     * @example Linux:   "/home/user/Projects/ReCpp/"
      * @example Windows: "C:/Projects/ReCpp/"
      */
     RPPAPI string working_dir() noexcept;

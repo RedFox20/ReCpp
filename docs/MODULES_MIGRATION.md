@@ -1086,8 +1086,8 @@ Three deliverables:
    - Mixing `import rpp.X` and `#include <rpp/X.h>` in one program is supported.
    - Macros need a header (section 6).
 
-Then port one real consumer. `krattcam` and `krattlink` both pull ReCpp through
-`add_git`. Convert one file in one of them and measure.
+Then port one real consumer. A downstream project which pulls ReCpp through
+`add_git` works. Convert one file in it and measure.
 
 **Estimate: 1.5 days.**
 
@@ -1181,7 +1181,7 @@ already used, so the public signature names no std type.
 
 | Risk | Impact | Response |
 |---|---|---|
-| Changeset 1b breaks a downstream build | krattcam, krattlink or krattgcs fails to compile after a dependency bump | Build one downstream project against the branch before merging 1b. A break there is a latent bug the removal exposed. |
+| Changeset 1b breaks a downstream build | a downstream project fails to compile after a dependency bump | Build one downstream project against the branch before merging 1b. A break there is a latent bug the removal exposed. |
 | A `[[clang::coro_return_type]]` reaches a non-coroutine (finding 16) | clang-21 refuses the file, headers and modules alike | Never pass an `rpp::cfuture` through `std::future` or `std::async`. The fix is on this branch. A future case needs `RPP_CORO_WRAPPER`, which `config.h` already defines and nothing used until now. |
 | The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | Track it as its own bug. `e.what()` reads a message the future shared state may free on another thread. |
 | Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |

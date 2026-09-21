@@ -270,14 +270,14 @@ The Windows checkout is a separate clone. Treat it as somebody else's tree.
    work.
 4. Move the branch with git, which refuses to overwrite dirty files:
    ```bash
-   git -C <mirror> fetch /home/jorma/krattcam/packages/ReCpp/ReCpp <branch>
+   git -C <mirror> fetch <downstream-checkout>/packages/ReCpp/ReCpp <branch>
    git -C <mirror> checkout -B <branch> FETCH_HEAD
    ```
 5. Build and test through PowerShell. `mama.exe` sits on the Windows PATH, at
    `C:\Python313\Scripts\mama.exe` on this machine:
    ```bash
-   powershell.exe -NoProfile -Command "cd C:\Projects\KrattGCS\packages\ReCpp\ReCpp; \$env:CXX20='1'; mama windows verbose build with_tests jobs=4"
-   powershell.exe -NoProfile -Command "cd C:\Projects\KrattGCS\packages\ReCpp\ReCpp; .\bin\RppTests.exe nogdb -vv"
+   powershell.exe -NoProfile -Command "cd <windows-mirror>\packages\ReCpp\ReCpp; \$env:CXX20='1'; mama windows verbose build with_tests jobs=4"
+   powershell.exe -NoProfile -Command "cd <windows-mirror>\packages\ReCpp\ReCpp; .\bin\RppTests.exe nogdb -vv"
    ```
 6. Forbidden in the mirror: `rm -rf`, `cp -r` over it, `git checkout -f`,
    `git reset --hard`, `git clean`.
