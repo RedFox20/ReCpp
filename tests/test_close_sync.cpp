@@ -38,7 +38,9 @@ TestImpl(test_close_sync)
                     throw std::runtime_error("SomeAsyncOperation: data != \"xxxxyyyyzzzzaaaabbbbcccc\"");
                 data = "aaaabbbbcccc";
             });
-            Locked.wait(); // the destructor must not reach lock_for_close() before the worker holds it
+            // the worker releases this from inside the close_sync, so a timeout means it never ran
+            if (Locked.wait(rpp::seconds(1)) == rpp::semaphore::timeout)
+                throw std::runtime_error("SomeAsyncOperation: the worker never took the close_sync");
         }
     };
 

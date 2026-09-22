@@ -19,7 +19,7 @@ using namespace std::string_literals;
 
 namespace rpp
 {
-    /// The friend seam of event_loop, which reaches the private pool entry B26 is about.
+    /// Friend seam which calls the private event_loop::start_in_background(), see BUGS.md B26.
     class event_loop_test
     {
     public:
