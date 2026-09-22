@@ -1,4 +1,5 @@
 #include <rpp/close_sync.h>
+#include <rpp/semaphore.h>
 #include <rpp/thread_pool.h>
 #include <rpp/tests.h>
 using namespace rpp;
@@ -14,6 +15,7 @@ TestImpl(test_close_sync)
     struct ImportantState
     {
         close_sync CloseSync;
+        rpp::semaphore_once_flag Locked;
         std::string data = "xxxxyyyyzzzzaaaabbbbcccc";
 
         ~ImportantState() noexcept(false)
@@ -29,13 +31,14 @@ TestImpl(test_close_sync)
             parallel_task([this]
             {
                 try_lock_or_return(CloseSync);
+                Locked.notify(); // the worker holds the close_sync from here
                 ::sleep_for(30ms);
                 //AssertThat(data, "xxxxyyyyzzzzaaaabbbbcccc");
                 if (data != "xxxxyyyyzzzzaaaabbbbcccc")
                     throw std::runtime_error("SomeAsyncOperation: data != \"xxxxyyyyzzzzaaaabbbbcccc\"");
                 data = "aaaabbbbcccc";
             });
-            ::sleep_for(15ms);
+            Locked.wait(); // the destructor must not reach lock_for_close() before the worker holds it
         }
     };
 
