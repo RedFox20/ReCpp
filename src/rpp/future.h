@@ -194,6 +194,7 @@ namespace rpp
                 {
                     try { (void)this->get(); }
                     catch (const std::exception& e) { __assertion_failure("cfuture<T> threw exception in destructor: %s", e.what()); }
+                    return; // collected, so only an unready future reaches the terminate below
                 }
                 // NOTE: This is a fail-fast strategy to catch programming bugs
                 //       and this happens if you forget to await a future before destruction.
@@ -612,6 +613,7 @@ namespace rpp
                 {
                     try { (void)this->get(); }
                     catch (std::exception& e) { __assertion_failure("cfuture<void> threw exception in destructor: %s", e.what()); }
+                    return; // collected, so only an unready future reaches the terminate below
                 }
                 // NOTE: This is a fail-fast strategy to catch programming bugs
                 //       and this happens if you forget to await a future before destruction.
