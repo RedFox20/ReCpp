@@ -10,8 +10,8 @@ stay in the header, and they keep every behavior they have today.
 **No existing consumer changes.** A project which includes `rpp/future.h` keeps `cfuture`
 and compiles as before. A project which imports `rpp.future` gets the new type.
 
-**A consumer moves when it chooses to.** `RPP_DEPRECATE_CFUTURE` lists the remaining sites
-in the compiler output, and it stays off until a project turns it on. See section 6.1.
+**A consumer does move.** `cfuture` takes a `[[deprecated]]` attribute in the last
+changeset, so every remaining site names itself in the compiler output. See section 6.1.
 
 ---
 
@@ -163,30 +163,49 @@ anybody renames it.
 
 ### 6.1 The deprecation which moves a consumer
 
-A plan nobody acts on leaves two types forever. A `[[deprecated]]` on `cfuture` names every
-site a port has to reach, in the compiler output, without breaking one of them.
+A plan nobody acts on leaves two types forever. `[[deprecated]]` names every remaining site
+in the compiler output, and it breaks none of them. It is unconditional, with no opt-in
+macro, because a warning nobody turns on moves nobody.
 
-**The attribute is opt-in, and it stays off by default.** `cfuture` fires at the point of
-use, and 20 files in this repository name it. An unconditional attribute turns the ReCpp
-build and every consumer build yellow on the same day, so nobody reads the warnings:
+**The attribute goes on the type and on its factories.** A consumer reaches `cfuture` two
+ways, and only both attributes cover both:
+
+| Consumer line | The type alone | The type and the factories |
+|---|---|---|
+| `cfuture<int> f = async_task(...)` | warns | warns |
+| `return async_task(...).get()` | silent | warns |
+| `auto f = make_ready_future(7)` | silent | warns |
+
+**A pragma region keeps the library itself quiet.** `future.h` names `cfuture` in its own
+declarations. An unguarded attribute warns at ReCpp lines in every consumer build, which
+buries the sites the consumer has to fix. GCC does not suppress a use inside a deprecated
+entity, so the region is what does it:
 
 ```cpp
-#ifdef RPP_DEPRECATE_CFUTURE
-#  define RPP_CFUTURE_DEPRECATED [[deprecated("use rpp::future from rpp/async.h")]]
-#else
-#  define RPP_CFUTURE_DEPRECATED
+template<class T> class RPP_DEPRECATED_CFUTURE cfuture : public std::future<T> { ... };
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+// async_task, make_ready_future, wait_all, get_all and run_tasks declare in here
+#if defined(__GNUC__)
+#  pragma GCC diagnostic pop
 #endif
 ```
 
-A project turns the macro on when it starts porting, then reads the list the compiler gives
-it. It turns the macro off again when the list is empty. The default never warns.
+Measured on gcc-15, gcc-14 and clang-18. All three agree, every consumer line warns once,
+and no line of the header warns at all. B30 does not reach this, because `future.h` is the
+header path and no module carries it after changeset 3.
 
-**It lands last, not first.** The attribute fires inside any header which names the type.
-So `event_loop.h` and `coroutines.h` must stop naming `cfuture` first, or a consumer sees
-ReCpp warnings beside its own. That is changeset 2, so the deprecation is changeset 5.
+**MSVC needs its own half, and nothing has measured it.** `#pragma warning(push)` with
+`disable: 4996` is the shape. Measure it before changeset 5 lands.
 
-The same macro covers `cpromise` and `async_task`, because a site which ports the type ports
-its launcher in the same edit.
+**It lands last, not first.** The attribute fires wherever a name is used, so `event_loop.h`
+and `coroutines.h` must stop naming `cfuture` first. That is changeset 2, so the deprecation
+is changeset 5. The legacy cases in `test_future.cpp` carry the same file scope suppression,
+because they test the deprecated type on purpose.
+
+`cpromise` takes the attribute beside the type, because a site which ports one ports both.
 
 ## 7. The changesets
 
@@ -205,8 +224,8 @@ Each one lands on its own and leaves the tree green.
    condition 1 is really gone.
 4. **A downstream project ports its own files**, one at a time, with the header still
    available for the files it has not reached.
-5. **`RPP_DEPRECATE_CFUTURE` arrives**, off by default, so a project can list its own
-   remaining sites. See 6.1.
+5. **`cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**, unconditionally.
+   Every consumer site then names itself on the next build. See 6.1.
 
 Changeset 3 is the one which pays. Until it lands, the module still carries `<future>` and
 gcc-14 still crashes an importer which names a `cfuture`.
@@ -237,6 +256,6 @@ in place of the std includes a modules build still writes. That one also needs g
    `cfuture`, no `async_task` and no `std_future_awaiter`.
 5. The header path still builds `cfuture` and passes every case it passes today. The two
    `std::future` coroutine cases still pass through `rpp/std_awaiter.h`.
-6. A build with `RPP_DEPRECATE_CFUTURE` on warns at every `cfuture` site and at no other
-   line. A build without it warns nowhere.
+6. A consumer build warns once at every `cfuture` site and at no line of `future.h` itself.
+   The ReCpp build stays warning free, because the legacy cases suppress it by file.
 7. One downstream project builds against the branch before changeset 3 merges.
