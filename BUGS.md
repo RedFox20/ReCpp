@@ -8,6 +8,29 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
+A template which a module exports instantiates in the importer. GCC then looks the diagnostic
+state up at the instantiation point, and the `push` and `ignored` lines around the declaration
+no longer apply. So a suppression which holds for a header consumer reaches no importer.
+
+`delegate.h` hit this first, and `9c23b1b` closed that half. `init_function` cast
+`&dummy::func_proxy` to a `dummy_type` which named a different parameter list on G++, under a
+pragma pair. `dummy_type` names the same list on every compiler now, so the cast is gone.
+`run_test.py --warn-free` pins it, and the probe fails against the old header 3 of 3.
+
+Three regions remain, and each one sits in a template a module exports:
+
+| Where | Suppresses | An importer at `-Wall -Wextra` |
+|---|---|---|
+| `delegate.h`, `devirtualize` | `-Wpmf-conversions` and `-Wpedantic` | warns at `delegate.h:433` |
+| `tests.h`, `add_test_func` | `-Wpmf-conversions` and `-Wpedantic` | warns at `tests.h:413` |
+| `tests.h`, `add_coro_test_func` | `-Wpmf-conversions` and `-Wpedantic` | no probe has run |
+
+Each one wraps the GNU pmf-conversion extension, which has no standard spelling, so the cast
+cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
+flag set. The ReCpp build stays quiet because every consumer includes the header before the
+import. Measured on gcc-15.
+
 ### B29. `udp_load_balancer` misses its throughput floor under full-suite load
 `test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate
 over the run. One full-suite run reported 91 KB against a 153 KB floor, at

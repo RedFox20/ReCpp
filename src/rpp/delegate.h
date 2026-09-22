@@ -133,12 +133,10 @@ namespace rpp
                 using memb_type = Ret (*)(void*, Args...);
             #endif
             using dummy_type = Ret (dummy::*)(Args...);
-        #elif __clang__
+        #else // G++ and Clang++
+            // dummy_type matches &dummy::func_proxy, so init_function needs no cast, see BUGS.md B30
             using memb_type  = Ret (*)(void*, Args...);
             using dummy_type = Ret (dummy::*)(Args...);
-        #else
-            using memb_type  = Ret (*)(void*, Args...);
-            using dummy_type = Ret (dummy::*)(void*, Args...);
         #endif
     private:
 
@@ -322,14 +320,7 @@ namespace rpp
             {
                 // store function as 'this' and call dummy class instance method
                 // which will cast 'this' into 'func_type'
-                #if (__GNUG__ && __GNUG__ > 5) && !__clang__ // G++
-                    #pragma GCC diagnostic push
-                    #pragma GCC diagnostic ignored "-Wcast-function-type"
-                    f.dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
-                    #pragma GCC diagnostic pop
-                #else
-                    f.dfunc = reinterpret_cast<dummy_type>( &dummy::func_proxy );
-                #endif
+                f.dfunc = &dummy::func_proxy;
                 obj = reinterpret_cast<void*>(function);
             }
             else

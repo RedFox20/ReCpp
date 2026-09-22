@@ -153,21 +153,49 @@ def check_unicode_off(cxx: str) -> str:
     @param cxx the compiler to run, such as `g++-14`
     @returns the first error line, or an empty string when the module keeps the overloads
     """
+    return build_one_importer(cxx, 'text',
+                              'import rpp.text;\n'
+                              'int main() { char b[32]; return rpp::to_string(b, 42) == 2 ? 0 : 1; }\n',
+                              common_flags=['-DRPP_ENABLE_UNICODE=0'])
+
+
+def build_one_importer(cxx: str, group: str, body: str, common_flags=(), use_flags=()) -> str:
+    """Compiles one module group, then one unit which imports it.
+
+    @param cxx the compiler to run, such as `g++-15`
+    @param group the module stem, which names `src/rpp/rpp-<group>.cppm` and imports no other group
+    @param body the whole source of the importing unit
+    @param common_flags extra flags for both units
+    @param use_flags extra flags for the importing unit alone
+    @returns the first error line, or an empty string when both units compile
+    """
     root = os.path.dirname(os.path.dirname(HERE))
     with tempfile.TemporaryDirectory() as d:
         use = os.path.join(d, 'use.cpp')
-        with open(use, 'w') as f:
-            f.write('import rpp.text;\n'
-                    'int main() { char b[32]; return rpp::to_string(b, 42) == 2 ? 0 : 1; }\n')
-        flags = [cxx, '-std=c++20', '-fmodules-ts', '-DRPP_ENABLE_UNICODE=0', '-I', 'src']
-        mapper = f'-fmodule-mapper=|@g++-mapper-server -r {d}'
-        # rpp.text carries strview.h and imports no other group, so one unit compiles first
-        for step in ([*flags, mapper, '-x', 'c++', '-c', 'src/rpp/rpp-text.cppm', '-o', f'{d}/m.o'],
-                     [*flags, mapper, '-c', use, '-o', f'{d}/u.o']):
+        with open(use, 'w') as f: f.write(body)
+        flags = [cxx, '-std=c++20', '-fmodules-ts', '-I', 'src', *common_flags,
+                 f'-fmodule-mapper=|@g++-mapper-server -r {d}']
+        for step in ([*flags, '-x', 'c++', '-c', f'src/rpp/rpp-{group}.cppm', '-o', f'{d}/m.o'],
+                     [*flags, *use_flags, '-c', use, '-o', f'{d}/u.o']):
             p = subprocess.run(step, cwd=root, capture_output=True, text=True)
             if p.returncode != 0:
                 return next((l for l in p.stderr.splitlines() if 'error:' in l), p.stderr[:200])
     return ''
+
+
+def check_module_warnings(cxx: str) -> str:
+    """Compiles an importer of `rpp.core` which builds a delegate from a function pointer.
+
+    GCC drops a `#pragma GCC diagnostic` region across a module boundary, so a suppression which
+    holds for a header consumer reaches no importer. See BUGS.md B30.
+
+    @param cxx the compiler to run, such as `g++-15`
+    @returns the first error line, or an empty string when the importer compiles warning free
+    """
+    return build_one_importer(cxx, 'core',
+                              'import rpp.core;\n'
+                              'int main() { rpp::delegate<int()> d { +[] { return 7; } }; return d() == 7 ? 0 : 1; }\n',
+                              use_flags=['-Werror=cast-function-type'])
 
 
 def main() -> int:
@@ -179,7 +207,17 @@ def main() -> int:
                     help='also build through the header fallback and compare the two reports')
     ap.add_argument('--unicode-off', default='',
                     help='g++ binary that compiles the module with RPP_ENABLE_UNICODE=0')
+    ap.add_argument('--warn-free', default='',
+                    help='g++ binary that compiles an importer with -Werror=cast-function-type')
     args = ap.parse_args()
+
+    if args.warn_free:
+        print(f'--- compiling an importer with -Werror=cast-function-type using {args.warn_free} ---')
+        err = check_module_warnings(args.warn_free)
+        if err:
+            print(f'FAILED: an importer warns where a header consumer does not: {err}')
+            return 1
+        print('the importer builds a delegate with no cast warning')
 
     if args.unicode_off:
         print(f'--- compiling the module with RPP_ENABLE_UNICODE=0 using {args.unicode_off} ---')

@@ -40,7 +40,7 @@ namespace rpp
         strview name;
         test_factory factory;
 
-        std::vector<strview> case_filters; // internal: only execute test cases that pass this filter
+        std::vector<strview> case_filters {}; // internal: only execute test cases that pass this filter
         bool test_enabled = true; // internal: this is automatically set by the test system
         bool auto_run     = true; // internal: will this test run automatically (true) or do you have to specify it? (false)
     };
