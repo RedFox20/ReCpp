@@ -310,30 +310,11 @@ count `g` and then stalled can hold the pointer an attach stored. The detach aft
 the other count, reads zero, and lets the caller free the clock. A correct split has to
 publish the pointer each reader holds, which is a hazard pointer, not a counter.
 
-**The pool window is measured.** `post_resume_from_suspension()` pushes the resume first and
-decrements the count second. The count reaches zero while the worker is still inside a loop
-member function. Three probes over 2000 destroy cycles under ASAN answer what that costs:
-
-| Probe | Post-decrement code | Result |
-|---|---|---|
-| A | a 200us delay, no access | clean |
-| B | a 200us delay, then one member read | **heap-use-after-free, at once** |
-| C | one member read, no delay | clean, 5 runs out of 5 |
-
-So the owner really does free the loop under the worker, and B proves it. The window is
-harmless today only because no awaiter touches the loop after the decrement. Every awaiter
-makes `post_resume_from_suspension()` the last statement of its lambda, and `join_forks`
-inlines the same two steps in the same order. Nothing enforces that.
-
-C is the part which matters for a fix. The natural window is too narrow to catch a real
-violation, so no test can pin this. A structural fix can. Move the decrement out of the
-awaiters and into the wrapper `start_in_background()` hands the pool. It then runs after the
-task returns, and no awaiter can add code after it. That costs one delegate move per
-background task, which is a hot path, so it needs the owner to agree.
-
-`the_background_count_is_a_workers_last_touch_of_the_loop` covers the shutdown path rather
-than the invariant. Probe B is what gives it teeth, and probe B needs a hook this repo does
-not have. B17 reports a detached task which outlives the suite that started it.
+**The pool window is closed.** `start_in_background()` now wraps the task and drops the count
+in a guard destructor. The decrement runs after the task returns, so no awaiter can add code
+past it. The wrapper is a template, so the one delegate allocation stays one.
+`the_count_drops_after_a_background_task_returns` reports a heap-use-after-free 3 runs out of
+3 when the decrement moves back into the awaiter.
 
 ### B22. gcc-14 emits no `_M_release` for a `std::shared_ptr` an importer reaches through a module
 The interface compiles and so does the importer. The link then fails:
@@ -538,7 +519,9 @@ This has three shapes. A bound too tight reports the overrun, as
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
 `~ImportantState: data != "aaaabbbbcccc"`, and again on `win64-cpp20-msvc` for #97 at
-13fd878, which touched no close_sync code. A third shape compares two measured times, as
+13fd878, which touched no close_sync code. `test_close_sync::basic_close_prevention` waits on
+a `semaphore_once_flag` now.
+A third shape compares two measured times, as
 `test_threadpool::parallel_for_performance` did on `ubuntu-cpp26-tsan-gcc14` with
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an

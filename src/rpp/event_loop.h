@@ -691,7 +691,7 @@ namespace rpp
                     try { action(); }
                     catch (...) { ex = std::current_exception(); }
                     // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
-                    loop.post_resume_from_suspension(cont);
+                    loop.post_resume(cont);
                 });
             }
             void await_resume() { if (ex) std::rethrow_exception(ex); }
@@ -718,7 +718,7 @@ namespace rpp
                     try { result.emplace(action()); }
                     catch (...) { ex = std::current_exception(); }
                     // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
-                    loop.post_resume_from_suspension(cont);
+                    loop.post_resume(cont);
                 });
             }
             T await_resume()
@@ -753,7 +753,7 @@ namespace rpp
                         f.wait(); // wait for the nested coroutine to finish (can throw)
                     } catch (...) { ex = std::current_exception(); }
                     // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
-                    loop.post_resume_from_suspension(cont);
+                    loop.post_resume(cont);
                 });
             }
             // similar to future<T>, either gets the result T, or throws the caught exception
@@ -801,7 +801,7 @@ namespace rpp
                         if (fut.valid())
                             fut.wait();
                     } catch (...) { ex = std::current_exception(); }
-                    loop.post_resume_from_suspension(cont);
+                    loop.post_resume(cont);
                 });
             }
             auto await_resume()
@@ -1144,15 +1144,26 @@ namespace rpp
             return task.await_resume(); // done: returns the value or rethrows (non-blocking)
         }
 
-        void start_in_background(task_delegate<void()>&& generic_task) noexcept
+        struct background_count_guard
+        {
+            event_loop& loop;
+            ~background_count_guard() noexcept
+            {
+                loop.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
+            }
+        };
+
+        // the decrement runs after the task returns, so no caller can touch the loop past it
+        template<class Task>
+        void start_in_background(Task&& background_task) noexcept
         {
             num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-            background_pool.parallel_task_detached(std::move(generic_task));
+            background_pool.parallel_task_detached([this, task = std::forward<Task>(background_task)]() mutable
+            {
+                background_count_guard guard { *this }; // drops the count even if the task throws
+                task();
+            });
         }
-
-
-        // posts a resume event and decrements the background suspension count
-        void post_resume_from_suspension(rpp::coro_handle<> handle) noexcept;
 
         // processes a single resume event
         void process_event(resume_event& event) noexcept;
