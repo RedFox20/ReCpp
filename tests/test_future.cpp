@@ -367,6 +367,18 @@ TestImpl(test_future)
         AssertThat(f1.valid(), false);
     }
 
+    // a ready future which nobody collected was not abandoned, so its destructor collects it
+    // and returns. Only an unready future is a fatal error, so this case fails by terminating
+    TestCase(destructor_collects_a_ready_future)
+    {
+        { cfuture<int> value = make_ready_future(42); }
+        { cfuture<void> nothing = make_ready_future(); }
+        {
+            cfuture<int> waited = async_task([] { return 7; });
+            waited.wait(); // the result is ready, and get() never runs
+        }
+    }
+
     // a deferred future runs on get(), so no wait finishes it. Reporting finished would send
     // a caller which polls with a zero timeout straight into a blocking get()
     TestCase(deferred_future_never_reports_finished)
