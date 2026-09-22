@@ -304,6 +304,23 @@ out of 20, and it costs no second drain. A frame captured inside the null window
 warpable, so a later warp does not advance it. During a 20000 swap storm that reaches most
 fresh frames, and outside a storm the window measures about 300ns per call.
 
+**The `frames` guard fired once in CI, and the skew assertion did not.**
+`ubuntu-cpp20-modules-clang21` reported `frames.load() => '0' must be greater than '0'` on a
+commit which changes no C++. That is the guard which stops the case passing vacuously, not
+the pair check. A reader starved for the whole swap storm reads only the base generation, so
+it counts no frame and asserts nothing about skew.
+
+| Where | Result |
+|---|---|
+| `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
+| seven other ASAN jobs, same commit | pass |
+| `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
+
+`spin_until` proves the reader is live before the first swap. It gives the reader no CPU
+during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
+hold the storm open until the reader counts one. That pins the invariant on the reader rather
+than on the scheduler.
+
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.
 

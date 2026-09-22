@@ -133,7 +133,7 @@ answer differently:
 | `coroutines.h`, `std_future_awaiter` and its two `operator co_await` | two cases | it moves to `rpp/std_awaiter.h` |
 
 **Nothing in the tree hands a `std::future` to an `event_loop`.** The only construction site
-is `run_async` at `event_loop.h:851`, and it reaches the std constructor only because
+is `run_async` in `event_loop.h`, and it reaches the std constructor only because
 `IsFuture` matches `std::future` as well. No source file and no test takes that path. So
 `event_loop` swaps to `rpp::future` in one step and needs no interop header.
 
@@ -197,8 +197,9 @@ Measured on gcc-15, gcc-14 and clang-18. All three agree, every consumer line wa
 and no line of the header warns at all. B30 does not reach this, because `future.h` is the
 header path and no module carries it after changeset 3.
 
-**MSVC needs its own half, and nothing has measured it.** `#pragma warning(push)` with
-`disable: 4996` is the shape. Measure it before changeset 5 lands.
+**MSVC needs its own half, and CI measures it.** `#pragma warning(push)` with `disable: 4996`
+is the shape. The `win64-cpp20-msvc` and `consumer-msvc` rows compile the header, so
+changeset 5 reads the answer from them rather than from a guess.
 
 **It lands last, not first.** The attribute fires wherever a name is used, so `event_loop.h`
 and `coroutines.h` must stop naming `cfuture` first. That is changeset 2, so the deprecation
@@ -227,8 +228,13 @@ Each one lands on its own and leaves the tree green.
 5. **`cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**, unconditionally.
    Every consumer site then names itself on the next build. See 6.1.
 
-Changeset 3 is the one which pays. Until it lands, the module still carries `<future>` and
-gcc-14 still crashes an importer which names a `cfuture`.
+Changeset 3 is the one which pays, and it pays twice over. The module stops carrying
+`<future>`, which is the smaller and surer win. Whether that also ends the gcc-14 crash is
+the measurement in criterion 3, and no run has answered it yet.
+
+**The plan is worth running even if B28 survives.** A module fragment which carries one
+fewer heavy std header costs every importer less, on every compiler. The crash is the reason
+this became urgent. It is not the reason the change is right.
 
 **The header keeps `cfuture` with no end date.** A removal needs its own decision, and this
 plan does not ask for one. The deprecation names the work. It does not schedule the delete.
