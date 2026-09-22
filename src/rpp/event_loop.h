@@ -289,7 +289,7 @@ namespace rpp
         /** @returns the virtual time of `src`, or the monotonic wall clock when it is null. */
         static rpp::TimePoint current_time(const rpp::AtomicTimeSource* src) noexcept { return time_frame{src}.now(); }
 
-        /** @brief Refreshes `frame` from the live clock, which a detached source leaves alone.
+        /** @brief Refreshes `frame` from the live clock, which any swap of that clock leaves alone.
          *  @returns the current time on that frame's clock. */
         rpp::TimePoint current_time(time_frame& frame) const noexcept
         {

@@ -294,12 +294,15 @@ now goes through `wait_next_event()` with a `time_frame`, so no wait hands the r
 
 **The publish order decides the pair.** A bump before the pointer store leaves one
 inconsistent pair, which is the old clock beside the new generation. A store before the bump
-mirrors that pair. It does not close the window, and a reader which loads the generation
-first mirrors it once more. `a_frame_never_pairs_one_clocks_offset_with_another_generation`
-fails 10 runs out of 10 on both orders, at 528 skewed frames on the first. So
-`set_time_source()` clears the pointer, drains, bumps, and only then stores the new clock. A
-reader inside that window reads null and keeps the offset of its own frame. That order passes
-20 runs out of 20, and it costs no second drain.
+mirrors that pair, and a reader which loads the generation first mirrors it once more.
+`a_frame_never_pairs_one_clocks_offset_with_another_generation` fails 10 runs out of 10 on
+both orders, at 528 skewed frames on the first.
+
+So `set_time_source()` clears the pointer, drains, bumps, and only then stores the new clock.
+A reader inside that null window keeps the offset of its own frame. That order passes 20 runs
+out of 20, and it costs no second drain. A frame captured inside the null window is not
+warpable, so a later warp does not advance it. During a 20000 swap storm that reaches most
+fresh frames, and outside a storm the window measures about 300ns per call.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.

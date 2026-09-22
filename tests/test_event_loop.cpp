@@ -1358,14 +1358,16 @@ TestImpl(test_event_loop)
         }
 
         std::atomic_bool stop { false };
+        std::atomic_int reads { 0 };
         std::atomic_int frames { 0 };
         std::atomic_int skewed { 0 };
-        auto base = loop->get_time_source_frame().generation; // the clock the fixture attached
+        rpp::uint32 base = loop->get_time_source_frame().generation; // the clock the fixture attached
         std::thread reader { [&]
         {
             while (!stop.load())
             {
                 auto f = loop->get_time_source_frame();
+                reads.fetch_add(1);
                 if (!f.warpable || f.generation == base)
                     continue;
                 int index = int((f.generation - base - 1) % NUM_CLOCKS);
@@ -1374,6 +1376,7 @@ TestImpl(test_event_loop)
                     skewed.fetch_add(1);
             }
         }};
+        spin_until([&]{ return reads.load() != 0; }); // a reader must be live before the first swap
 
         for (int i = 0; i < 20000; ++i)
             loop->set_time_source(clocks[i % NUM_CLOCKS].get());
