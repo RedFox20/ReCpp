@@ -1111,7 +1111,7 @@ Then port one real consumer. A downstream project which pulls ReCpp through
    translation unit both ways, which is what an importer feels. ReCpp's own build gains
    nothing, because its `.cpp` files keep using headers (D4).
 
-**Nothing remains. Every item above landed.**
+**Nothing remains in the list above. Section 11.2 holds the open design follow-ups.**
 
 ### 11.1 The fatal compiler defects, which block a consumer
 
@@ -1174,6 +1174,24 @@ One return type drove that question and no longer exists. `rpp::cfuture::wait_fo
 exported `std::swap`. Exporting it measured 18% on every importer of `rpp.std`, 166 ms against
 196 ms. The overload returns `rpp::wait_result` now, which `thread_pool::wait_until_idle`
 already used, so the public signature names no std type.
+
+### 11.2 Open design follow-ups
+
+**A modules build should import its std names, not include them.** A translation unit
+built with modules still writes `#include <vector>` and `#include <future>` today. The
+target is an `import` for every std name. An `#include` then stays only for a shallow
+header which carries a macro, such as `rpp/tests.macros.h`.
+
+This waits on `import std;`, and that sets the compiler floor:
+
+| Compiler | `import std;` | Evidence |
+|---|---|---|
+| gcc-14 | no | it rejects `-fmodules` outright, and it ships no `bits/std.cc` |
+| gcc-15 | yes | `bits/std.cc` ships, and a unit which imports std and builds a `std::vector` compiles |
+
+Two includes survive the change either way. An importer of `rpp.future` keeps `<typeinfo>`
+and `<new>`, because a template instantiates in the importer and libstdc++ names `typeid`
+there. See `BUGS.md` **B28**.
 
 ---
 

@@ -23,6 +23,7 @@ class ReCpp(mama.BuildTarget):
     def gcc_below_modules_minimum(self) -> str:
         """@returns the GCC version when it is under the modules minimum, else an empty string."""
         if not getattr(self.config, 'gcc', False): return ''
+        if os.getenv('RPP_MODULES_ALLOW_GCC14') in ('1', 'ON', 'TRUE'): return '' # the override, see BUGS.md B28
         # answers the cached version, and resolves the compiler when the run has not picked one yet
         try: version = self.config.get_preferred_compiler_paths()[2] or ''
         except Exception: return '' # a run which cannot name its compiler fails later, with a clearer message
@@ -59,6 +60,7 @@ class ReCpp(mama.BuildTarget):
         self.enable_from_env('CXX23', force=self.is_enabled_cxx23())
         self.enable_from_env('CXX26', force=self.is_enabled_cxx26())
         self.enable_from_env('BUILD_WITH_MODULES')
+        self.enable_from_env('RPP_MODULES_ALLOW_GCC14')
 
 
     def package(self):

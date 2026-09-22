@@ -140,6 +140,10 @@ The CMake gate alone leaves the consumer on the module path, because the export 
 source paths and no compiler version. So a gcc-14 project builds the headers and never
 meets this crash. The `consumer-gcc14-headers` CI row pins that path.
 
+**`RPP_MODULES_ALLOW_GCC14` opens both gates.** Set the CMake option, or the environment
+variable of the same name for a mama build. A build which takes it prints a warning and
+names the include set above. Use it to test the module path on gcc-14, never to ship one.
+
 **`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
 ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
 the type is enough, and no explicit `get()` call has to appear.
