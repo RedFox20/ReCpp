@@ -1489,12 +1489,13 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 | [`await_suspend(coro_handle<>)`](src/rpp/future.h#L511) | C++20 coroutine suspension point — waits on background thread, then resumes |
 | [`await_resume()`](src/rpp/future.h#L523) | C++20 coroutine resume — returns the result, rethrows exceptions |
 | [`promise_type`](src/rpp/future.h#L550) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
-| [`coro_handle<T>`](src/rpp/future_types.h#L20) | Alias for `std::coroutine_handle<T>` |
-| [`suspend_never`](src/rpp/future_types.h#L21) | Alias for the standard never-suspend awaiter |
-| [`suspend_always`](src/rpp/future_types.h#L22) | Alias for the standard always-suspend awaiter |
+| [`coro_handle<T>`](src/rpp/future_types.h#L29) | Alias for `std::coroutine_handle<T>` |
+| [`suspend_never`](src/rpp/future_types.h#L30) | Alias for the standard never-suspend awaiter |
+| [`suspend_always`](src/rpp/future_types.h#L31) | Alias for the standard always-suspend awaiter |
+| [`wait_result`](src/rpp/future_types.h#L20) | The outcome of a timed wait: `finished`, `timeout`, or `deferred` for a task which runs on `get()` |
 | [`IsFuture`](src/rpp/future.h#L24) | Concept which matches `rpp::cfuture<T>` and `std::future<T>` |
 | [`NotFuture`](src/rpp/future.h#L31) | Concept which matches any type `IsFuture` rejects |
-| [`IsFunction`](src/rpp/future_types.h#L26) | Concept which matches a callable taking no argument |
+| [`IsFunction`](src/rpp/future_types.h#L35) | Concept which matches a callable taking no argument |
 | [`IsFunctionReturningFuture`](src/rpp/future.h#L35) | Concept which matches a callable returning a future |
 
 ### Example: Composable Futures
@@ -1825,38 +1826,38 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](src/rpp/thread_pool.h#L401) | Thread pool manager with auto-scaling workers |
-| [`pool_task_handle`](src/rpp/thread_pool.h#L146) | Waitable, reference-counted handle for pool tasks |
-| [`pool_worker`](src/rpp/thread_pool.h#L120) | Individual worker thread in the pool |
+| [`thread_pool`](src/rpp/thread_pool.h#L395) | Thread pool manager with auto-scaling workers |
+| [`pool_task_handle`](src/rpp/thread_pool.h#L140) | Waitable, reference-counted handle for pool tasks |
+| [`pool_worker`](src/rpp/thread_pool.h#L114) | Individual worker thread in the pool |
 
 ### Configuration
 
 | Macro | Description |
 |-------|-------------|
-| [`RPP_POOL_TASK_USE_ATOMIC_SP`](src/rpp/thread_pool.h#L27) | `1` makes `pool_task_handle` use `rpp::atomic_shared_ptr`. `0` selects the older raw atomic pointer with a manual refcount |
+| [`RPP_POOL_TASK_USE_ATOMIC_SP`](src/rpp/thread_pool.h#L28) | `1` makes `pool_task_handle` use `rpp::atomic_shared_ptr`. `0` selects the older raw atomic pointer with a manual refcount |
 
 ### thread_pool Methods
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L593) | Split work across threads |
-| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L543) | Run a single async task, returns `pool_task_handle` |
-| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L439) | Set max concurrent workers |
-| [`max_parallelism()`](src/rpp/thread_pool.h#L442) | Get max concurrent workers |
-| [`active_tasks()`](src/rpp/thread_pool.h#L455) | Number of currently running tasks |
-| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L473) | Blocks until no pool task is running, including task delegate destruction |
-| [`idle_tasks()`](src/rpp/thread_pool.h#L476) | Number of idle workers |
-| [`total_tasks()`](src/rpp/thread_pool.h#L479) | Total number of workers |
-| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L483) | Remove idle workers |
+| [`parallel_for(int rangeStart, int rangeEnd, int rangeStride, TaskFunc&& func)`](src/rpp/thread_pool.h#L587) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L537) | Run a single async task, returns `pool_task_handle` |
+| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L433) | Set max concurrent workers |
+| [`max_parallelism()`](src/rpp/thread_pool.h#L436) | Get max concurrent workers |
+| [`active_tasks()`](src/rpp/thread_pool.h#L449) | Number of currently running tasks |
+| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L467) | Blocks until no pool task is running, including task delegate destruction |
+| [`idle_tasks()`](src/rpp/thread_pool.h#L470) | Number of idle workers |
+| [`total_tasks()`](src/rpp/thread_pool.h#L473) | Total number of workers |
+| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L477) | Remove idle workers |
 
 ### Free Functions (Global Pool)
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L593) | Parallel for on the global thread pool |
-| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L614) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](src/rpp/thread_pool.h#L543) | Run async task on the global pool |
-| [`action<TArgs...>`](src/rpp/thread_pool.h#L49) | Lightweight non-owning delegate for blocking call contexts |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L589) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L608) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L537) | Run async task on the global pool |
+| [`action<TArgs...>`](src/rpp/thread_pool.h#L50) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for
 

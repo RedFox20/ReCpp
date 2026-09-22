@@ -44,7 +44,6 @@ export namespace rpp {
     using rpp::task_delegate;
     using rpp::pool_signal_handler;
     using rpp::pool_trace_provider;
-    using rpp::wait_result;
     using rpp::pool_worker;
     using rpp::pool_task_state;
     using rpp::pool_task_handle;
@@ -56,6 +55,7 @@ export namespace rpp {
     using rpp::task;
     using rpp::deferred;
     using rpp::cfuture;
+    using rpp::wait_result;
     using rpp::coro_handle;
     using rpp::suspend_never;
     using rpp::suspend_always;
