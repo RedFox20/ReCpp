@@ -163,6 +163,7 @@ namespace rpp
         struct time_frame
         {
             rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
+            rpp::uint32 generation = 0; // the clock which built this frame, so a swap cannot move it
             bool warpable = false; // a time source was attached at capture time
 
             time_frame() noexcept = default;
@@ -214,6 +215,9 @@ namespace rpp
         // number of threads reading through time_source right now
         mutable std::atomic_int time_source_readers { 0 };
 
+        // bumps on every attach, so a frame can tell which clock built its offset
+        std::atomic<rpp::uint32> time_source_generation { 0 };
+
         // thread-safe FIFO queue of resume events
         rpp::concurrent_queue<resume_event> resume_queue;
 
@@ -262,19 +266,19 @@ namespace rpp
         /**
          * @brief Attaches a warpable clock used by delay()/delay_until(). When set, a pending
          *        delay tracks this source's virtual time, so warp_forward() advances the wait.
-         *        Pass null to revert to wall-clock timing, which also waits for every reader
-         *        to drop the old clock, so the caller may then destroy it.
+         *        Pass null to revert to wall-clock timing. Every call waits for the readers
+         *        of the old clock to drop it, so the caller may then destroy it.
+         *        A pending deadline keeps the clock which built it, so a swap never moves it.
          *        The loop borrows the clock and MUST NOT outlive it. No attribute states
          *        that: clang rejects lifetimebound on a function that returns void.
-         *        A swap to another clock does not wait, so a reader may still hold the one
-         *        it replaced. Clear it to null first when the caller frees it.
          */
         void set_time_source(rpp::AtomicTimeSource* clock) noexcept
         {
-            if (clock == nullptr)
-                retire_time_source();
-            else
-                time_source.store(clock, std::memory_order_seq_cst);
+            // the bump lands before the store, so a reader which sees the new clock never
+            // takes it for the old generation and moves a deadline onto the wrong timeline
+            time_source_generation.fetch_add(1, std::memory_order_seq_cst);
+            time_source.store(clock, std::memory_order_seq_cst);
+            drain_time_source_readers();
         }
 
         /** @returns the loop's current time: the warpable clock's virtual time if attached,
@@ -288,7 +292,11 @@ namespace rpp
          *  @returns the current time on that frame's clock. */
         rpp::TimePoint current_time(time_frame& frame) const noexcept
         {
-            get_time_source_offset(frame.offset_ns);
+            rpp::int64 offset_ns = frame.offset_ns;
+            rpp::uint32 generation = 0;
+            read_time_source(offset_ns, generation);
+            if (generation == frame.generation) // a swap leaves the frame on the clock which built it
+                frame.offset_ns = offset_ns;
             return frame.now();
         }
 
@@ -296,11 +304,11 @@ namespace rpp
         time_frame get_time_source_frame() const noexcept;
 
     private:
-        // reads the live source offset while the reader guard is up
-        bool get_time_source_offset(rpp::int64& offset_ns) const noexcept;
+        // reads the live source offset and its generation while the reader guard is up
+        bool read_time_source(rpp::int64& offset_ns, rpp::uint32& generation) const noexcept;
 
-        // clears the clock and waits for every reader to drop it, so the owner may free it
-        void retire_time_source() noexcept;
+        // waits for every reader to drop the old clock, so the owner may free it
+        void drain_time_source_readers() const noexcept;
 
         // pops until `deadline` on the clock `frame` captured, so a drained callback
         // which frees the clock leaves no raw source inside the wait

@@ -1274,6 +1274,59 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // ─── a delay() whose clock a swap replaces mid-wait ─────────
+    // A deadline belongs to the clock which built it. A waiter which takes the offset of the
+    // new clock measures that deadline on a timeline it never saw. See BUGS.md B26.
+    TestCase(delay_keeps_its_own_clock_when_a_swap_replaces_it)
+    {
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::millis(20));
+            done = true;
+        });
+        AssertThat(loop->pending_waiters(), 1); // the timer holds its frame before the swap
+
+        auto other = std::make_unique<rpp::AtomicTimeSource>();
+        other->warp_forward(rpp::seconds(3600)); // far past the deadline the old clock built
+        loop->set_time_source(other.get());
+
+        rpp::Duration waited = loop_until(rpp::seconds(1), [&]{ return done.load(); });
+        AssertThat(done.load(), true);
+        AssertGreater(waited.millis(), 15); // the new clock must not move a deadline the old one built
+
+        loop->set_time_source(nullptr); // the scope frees `other` next
+    }
+
+    // ─── a swap which frees the clock it replaced ───────────────
+    // Every attach drains the readers, so an owner may free the clock a swap replaced.
+    // Without that drain a reader holds the old pointer and ASAN reports the free. See B26.
+    TestCase(a_swap_drains_the_readers_before_the_owner_frees_the_old_clock)
+    {
+        std::atomic_bool stop { false };
+        std::atomic_int reads { 0 };
+        constexpr int NUM_READERS = 2; // more readers cost the drain far more time, see BUGS.md B26
+        std::vector<std::thread> readers;
+        readers.reserve(NUM_READERS);
+        for (int t = 0; t < NUM_READERS; ++t)
+            readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
+        spin_until([&]{ return reads.load() != 0; }); // a reader must be live before the first swap
+
+        std::unique_ptr<rpp::AtomicTimeSource> live;
+        for (int i = 0; i < 20000; ++i)
+        {
+            auto next = std::make_unique<rpp::AtomicTimeSource>();
+            loop->set_time_source(next.get());
+            live = std::move(next); // frees the clock the swap above replaced, never the live one
+        }
+        loop->set_time_source(nullptr);
+        live.reset();
+
+        stop = true;
+        for (std::thread& r : readers) r.join();
+        AssertGreater(reads.load(), 0);
+    }
+
     // ─── a join_forks() which loses its clock mid-wait ──────────
     // The join timer keeps the last offset it read. A timer which re-reads a detached source
     // drops the warp below and then waits for real time to reach the deadline.

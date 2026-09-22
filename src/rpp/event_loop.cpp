@@ -60,23 +60,23 @@ namespace rpp
         // destroy all fork coroutine frames (both completed and stale)
         fork_tasks.clear();
 
-        retire_time_source(); // a worker which outlived the wait must not read a freed clock
+        set_time_source(nullptr); // a worker which outlived the wait must not read a freed clock
     }
 
-    bool event_loop::get_time_source_offset(rpp::int64& offset_ns) const noexcept
+    bool event_loop::read_time_source(rpp::int64& offset_ns, rpp::uint32& generation) const noexcept
     {
         // seq_cst on both sides: either set_time_source() sees this count, or this load
         // sees the new pointer, so this never dereferences a retired clock
         time_source_readers.fetch_add(1, std::memory_order_seq_cst);
         rpp::AtomicTimeSource* src = time_source.load(std::memory_order_seq_cst);
+        generation = time_source_generation.load(std::memory_order_seq_cst);
         if (src) offset_ns = src->total_offset().nsec;
         time_source_readers.fetch_sub(1, std::memory_order_release);
         return src != nullptr;
     }
 
-    void event_loop::retire_time_source() noexcept
+    void event_loop::drain_time_source_readers() const noexcept
     {
-        time_source.store(nullptr, std::memory_order_seq_cst);
         // every reader counts, because a reader picks its count before it loads the pointer
         while (time_source_readers.load(std::memory_order_seq_cst) != 0)
             rpp::yield(); // a reader holds the old clock and the owner may free it next
@@ -85,7 +85,7 @@ namespace rpp
     event_loop::time_frame event_loop::get_time_source_frame() const noexcept
     {
         time_frame frame;
-        frame.warpable = get_time_source_offset(frame.offset_ns);
+        frame.warpable = read_time_source(frame.offset_ns, frame.generation);
         return frame;
     }
 
@@ -152,7 +152,7 @@ namespace rpp
         // a fork suspended on a post_resume() awaiter counts in neither, so it gets its own term
         const bool idle = !has_pending_work() && num_forks() == 0;
         if (idle)
-            retire_time_source(); // a live delay() worker polls it against a virtual deadline
+            set_time_source(nullptr); // a live delay() worker polls it against a virtual deadline
         return tasks_done && idle;
     }
 

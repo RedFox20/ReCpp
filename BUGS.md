@@ -282,12 +282,13 @@ A live worker holds three borrowed things: the loop, the time source and the poo
 the `delay()` half. A poll step reads the offset under a reader guard, and
 `stop_and_wait_all_ready()` retires the pointer before the owner frees it. Every loop wait
 now goes through `wait_next_event()` with a `time_frame`, so no wait hands the raw pointer to
-`concurrent_queue` any more. Two gaps stay open.
+`concurrent_queue` any more. The two swap gaps are closed.
 
-1. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
-   with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
-2. An owner which frees a clock it swapped out for another still reaches freed memory,
-   because only a clear to null retires. Clear it before the free.
+1. Every `set_time_source()` drains the readers, not only a clear to null. So an owner which
+   frees the clock a swap replaced no longer reaches freed memory.
+2. A `time_frame` carries the generation of the clock which built it, and a refresh which
+   reads another generation leaves the frame alone. So a swap cannot move a pending deadline
+   onto a timeline it never saw.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.
@@ -309,6 +310,10 @@ under ASAN. A reader picks its count before it loads the pointer. So a reader wh
 count `g` and then stalled can hold the pointer an attach stored. The detach after it retires
 the other count, reads zero, and lets the caller free the clock. A correct split has to
 publish the pointer each reader holds, which is a hazard pointer, not a counter.
+
+The generation a `time_frame` carries is not that shape. It splits no reader count, and it
+decides one thing only, which is whether a refresh belongs to the frame. One count still
+guards every reader, and the drain still waits for all of them.
 
 **The pool window is closed.** `start_in_background()` now wraps the task and drops the count
 in a guard destructor. The decrement runs after the task returns, so no awaiter can add code
