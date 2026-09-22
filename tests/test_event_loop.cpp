@@ -17,6 +17,19 @@ using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 
+namespace rpp
+{
+    /// The friend seam of event_loop, which reaches the private pool entry B26 is about.
+    class event_loop_test
+    {
+    public:
+        static void run_background(event_loop& loop, rpp::delegate<void()> body) noexcept
+        {
+            loop.start_in_background(std::move(body));
+        }
+    };
+}
+
 TestImpl(test_event_loop)
 {
     TestInit(test_event_loop)
@@ -825,8 +838,8 @@ TestImpl(test_event_loop)
 
         AssertGreater(loop->background_tasks(), 0);
 
-        // post_resume_from_suspension() posts the resume BEFORE it drops the counter,
-        // so a pending completion alone does not prove the counter reached 0 yet
+        // an awaiter posts the resume before start_in_background() drops the counter.
+        // a pending completion alone does not prove the counter reached 0 yet
         bg_may_finish.store(true);
         spin_until([&]{ return loop->pending_completions() != 0 && loop->background_tasks() == 0; });
 
@@ -1671,6 +1684,30 @@ TestImpl(test_event_loop)
         }
         AssertEqual(drained, CYCLES); // a shutdown which gave up proves nothing about the window
         AssertEqual(completed, CYCLES);
+    }
+
+    // a worker reads the loop after it posts the resume, see BUGS.md B26 probe B
+    TestCase(the_count_drops_after_a_background_task_returns)
+    {
+        constexpr int CYCLES = 200;
+        int touched = 0;
+        for (int i = 0; i < CYCLES; ++i)
+        {
+            auto scoped = std::make_unique<rpp::event_loop>();
+            rpp::event_loop* ev = scoped.get();
+            std::atomic_int seen { 0 };
+            rpp::event_loop_test::run_background(*ev, [ev, &seen]
+            {
+                ev->post_resume({}); // what every awaiter does last
+                rpp::sleep_us(200); // widens the window the owner races
+                seen += ev->background_tasks();
+            });
+            spin_until([ev]{ return ev->background_tasks() == 0; });
+            scoped.reset(); // the owner frees the loop the moment the count reaches zero
+            if (spin_timed_out.load()) break;
+            touched += seen.load();
+        }
+        AssertEqual(touched, CYCLES); // every worker read a live loop after its own resume
     }
 
     // ensure_on_owner_thread: true on the owner thread, false off it (logs an error — expected).

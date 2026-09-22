@@ -257,12 +257,6 @@ namespace rpp
         poller.wake();
     }
 
-    void event_loop::post_resume_from_suspension(rpp::coro_handle<> handle) noexcept
-    {
-        post_resume(handle);
-        num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
-    }
-
     bool event_loop::ensure_on_owner_thread(rpp::source_loc loc) const noexcept
     {
         if (owner_thread_id.load(std::memory_order_acquire) == rpp::get_thread_id())
