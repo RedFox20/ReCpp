@@ -118,3 +118,4 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
 - Build, sanitizers, clang-tidy: [`docs/BUILD.md`](docs/BUILD.md)
 - Code style examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md)
 - Modules migration plan: [`docs/MODULES_MIGRATION.md`](docs/MODULES_MIGRATION.md)
+- The module future plan: [`docs/FUTURE_MIGRATION.md`](docs/FUTURE_MIGRATION.md)
